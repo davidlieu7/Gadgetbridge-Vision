@@ -24,7 +24,4 @@ public final class PinecilConstants {
     public static final UUID UUID_SERVICE_SETTINGS_DATA = UUID.fromString("f6d75f91-5a10-4eba-a233-47d3f26a907f");
     public static final UUID UUID_SERVICE_LIVE_DATA = UUID.fromString("d85efab4-168e-4a71-affd-33e27f9bc533");
 
-
-    public static final UUID UUID_SERVICE_GENERIC_ATTRIBUTE = UUID.fromString("00001801-0000-1000-8000-00805f9b34fb");
-    public static final UUID UUID_SERVICE_GENERIC_ACCESS = UUID.fromString("00001800-0000-1000-8000-00805f9b34fb");
 }

@@ -22,6 +22,7 @@ import org.slf4j.LoggerFactory;
 import nodomain.freeyourgadget.gadgetbridge.devices.pinecil.PinecilConstants;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
 import nodomain.freeyourgadget.gadgetbridge.service.btle.AbstractBTLESingleDeviceSupport;
+import nodomain.freeyourgadget.gadgetbridge.service.btle.GattService;
 import nodomain.freeyourgadget.gadgetbridge.service.btle.TransactionBuilder;
 import nodomain.freeyourgadget.gadgetbridge.service.btle.actions.SetDeviceStateAction;
 
@@ -32,8 +33,8 @@ public class PinecilDeviceSupport extends AbstractBTLESingleDeviceSupport {
     public PinecilDeviceSupport() {
         super(LOG);
 
-        addSupportedService(PinecilConstants.UUID_SERVICE_GENERIC_ATTRIBUTE);
-        addSupportedService(PinecilConstants.UUID_SERVICE_GENERIC_ACCESS);
+        addSupportedService(GattService.UUID_SERVICE_GENERIC_ATTRIBUTE);
+        addSupportedService(GattService.UUID_SERVICE_GENERIC_ACCESS);
 
         addSupportedService(PinecilConstants.UUID_SERVICE_BULK_DATA);
         addSupportedService(PinecilConstants.UUID_SERVICE_LIVE_DATA);
