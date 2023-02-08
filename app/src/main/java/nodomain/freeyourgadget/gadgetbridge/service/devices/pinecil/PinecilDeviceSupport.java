@@ -16,19 +16,25 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>. */
 package nodomain.freeyourgadget.gadgetbridge.service.devices.pinecil;
 
+import android.bluetooth.BluetoothGatt;
+import android.bluetooth.BluetoothGattCharacteristic;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
+import java.util.UUID;
 
 import nodomain.freeyourgadget.gadgetbridge.devices.pinecil.PinecilConstants;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
 import nodomain.freeyourgadget.gadgetbridge.service.btle.AbstractBTLESingleDeviceSupport;
+import nodomain.freeyourgadget.gadgetbridge.service.btle.GattCharacteristic;
 import nodomain.freeyourgadget.gadgetbridge.service.btle.GattService;
 import nodomain.freeyourgadget.gadgetbridge.service.btle.TransactionBuilder;
 import nodomain.freeyourgadget.gadgetbridge.service.btle.actions.SetDeviceStateAction;
 
 public class PinecilDeviceSupport extends AbstractBTLESingleDeviceSupport {
 
-    private static final Logger LOG = LoggerFactory.getLogger(PinecilConstants.class);
+    private static final Logger LOG = LoggerFactory.getLogger(PinecilDeviceSupport.class);
 
     public PinecilDeviceSupport() {
         super(LOG);
@@ -36,9 +42,17 @@ public class PinecilDeviceSupport extends AbstractBTLESingleDeviceSupport {
         addSupportedService(GattService.UUID_SERVICE_GENERIC_ATTRIBUTE);
         addSupportedService(GattService.UUID_SERVICE_GENERIC_ACCESS);
 
-        addSupportedService(PinecilConstants.UUID_SERVICE_BULK_DATA);
+        /*
+         * Pinecil uses same UUID for characteristics in 3 different services. This causes problems
+         * which I am not able to solve with my limited knowledge. Need to lear more about BLE and
+         * Gadgetbridge.
+         *
+         * For no I use only one of the services below.
+         */
+
+        // addSupportedService(PinecilConstants.UUID_SERVICE_BULK_DATA);
         addSupportedService(PinecilConstants.UUID_SERVICE_LIVE_DATA);
-        addSupportedService(PinecilConstants.UUID_SERVICE_SETTINGS_DATA);
+        // addSupportedService(PinecilConstants.UUID_SERVICE_SETTINGS_DATA);
     }
 
     @Override
@@ -57,7 +71,25 @@ public class PinecilDeviceSupport extends AbstractBTLESingleDeviceSupport {
         // mark the device as initialized
         builder.add(new SetDeviceStateAction(getDevice(), GBDevice.State.INITIALIZED, getContext()));
 
+        builder.read(getCharacteristic(PinecilConstants.UUID_CHARACTERISTIC_LIVE_HANDLE_TEMP));
+        builder.read(getCharacteristic(GattCharacteristic.UUID_CHARACTERISTIC_DEVICE_NAME));
+
         return builder;
+    }
+
+    @Override
+    public boolean onCharacteristicRead(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic, int status) {
+        LOG.info("SERVICE: " + characteristic.getService().getUuid());
+        LOG.info("STATUS: " + status);
+
+        UUID uuid = characteristic.getUuid();
+        if (uuid.equals(PinecilConstants.UUID_CHARACTERISTIC_LIVE_HANDLE_TEMP)) {
+            LOG.info("HANDLE TEMP: " + characteristic.getFloatValue(BluetoothGattCharacteristic.FORMAT_FLOAT, 0) / 10f + "°C");
+        } else if (uuid.equals(GattCharacteristic.UUID_CHARACTERISTIC_DEVICE_NAME)) {
+            LOG.info("NAME: " + characteristic.getStringValue(0));
+        }
+
+        return true;
     }
 
     @Override
