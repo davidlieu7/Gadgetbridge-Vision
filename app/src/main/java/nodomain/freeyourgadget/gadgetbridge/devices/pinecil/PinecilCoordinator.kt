@@ -34,12 +34,6 @@ class PinecilCoordinator : AbstractBLEDeviceCoordinator() {
         ScanFilter.Builder()
             .setServiceUuid(android.os.ParcelUuid(PinecilConstants.UUID_SERVICE_BULK_DATA))
             .build(),
-        ScanFilter.Builder()
-            .setServiceUuid(android.os.ParcelUuid(PinecilConstants.UUID_SERVICE_SETTINGS_DATA))
-            .build(),
-        ScanFilter.Builder()
-            .setServiceUuid(android.os.ParcelUuid(PinecilConstants.UUID_SERVICE_LIVE_DATA))
-            .build(),
     )
 
     override fun getBondingStyle(): Int = BONDING_STYLE_LAZY
