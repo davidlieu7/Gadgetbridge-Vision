@@ -1,4 +1,4 @@
-/*  Copyright (C) 2015-2025 akasaka / Genjitsu Labs, Alicia Hormann, Andreas
+/*  Copyright (C) 2015-2026 akasaka / Genjitsu Labs, Alicia Hormann, Andreas
     Shimokawa, Arjan Schrijver, Carsten Pfeiffer, Daniel Dakhno, Daniele Gobbetti,
     Davis Mosenkovs, Dmitry Markin, José Rebelo, Matthieu Baerts, Nephiel,
     Petr Vaněk, Taavi Eomäe, Johannes Krude, Thomas Kuehne
@@ -27,6 +27,8 @@ import android.bluetooth.BluetoothDevice;
 import android.bluetooth.le.ScanFilter;
 import android.content.Context;
 import android.content.SharedPreferences;
+import android.database.Cursor;
+import android.database.sqlite.SQLiteDatabase;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
@@ -242,13 +244,18 @@ public abstract class AbstractDeviceCoordinator implements DeviceCoordinator {
             prefs.getPreferences().edit().putStringSet(GBPrefs.LAST_DEVICE_ADDRESSES, lastDeviceAddresses).apply();
         }
 
+        long start = System.currentTimeMillis();
+        LOG.info(">>> deleteDeviceSpecificSharedPrefs");
         GBApplication.deleteDeviceSpecificSharedPrefs(gbDevice.getAddress());
+        LOG.info("<<< {} ms - deleteDeviceSpecificSharedPrefs", System.currentTimeMillis() - start);
 
         try (DBHandler dbHandler = GBApplication.acquireDB()) {
             DaoSession session = dbHandler.getDaoSession();
             Device device = DBHelper.findDevice(gbDevice, session);
             if (device != null) {
                 deleteDevice(gbDevice, device, session);
+                start = System.currentTimeMillis();
+                LOG.info(">>> deleteDevice / generic DAOs");
                 deleteBy(session.getDeviceAttributesDao(), DeviceAttributesDao.Properties.DeviceId, device.getId());
                 deleteBy(session.getBatteryLevelDao(), BatteryLevelDao.Properties.DeviceId, device.getId());
                 deleteBy(session.getBatteryVoltageSampleDao(), BatteryVoltageSampleDao.Properties.DeviceId, device.getId());
@@ -261,6 +268,7 @@ public abstract class AbstractDeviceCoordinator implements DeviceCoordinator {
                 deleteBy(session.getInternetFirewallRuleDao(), InternetFirewallRuleDao.Properties.DeviceId, device.getId());
                 WorkoutTemplateRepository.INSTANCE.deleteByDevice(session, device.getId());
                 session.getDeviceDao().delete(device);
+                LOG.info("<<< {} ms - deleteDevice / generic DAOs", System.currentTimeMillis() - start);
             } else {
                 LOG.info("device to delete not found in db: {}", gbDevice);
             }
@@ -268,8 +276,37 @@ public abstract class AbstractDeviceCoordinator implements DeviceCoordinator {
             throw new GBException("Error deleting device: " + e.getMessage(), e);
         }
 
+        // deleting data (above) and vacuuming the database (below) can both take quite a while
+        // so release and reacquire the dbLock
+        try (DBHandler dbHandler = GBApplication.acquireDB()) {
+            SQLiteDatabase db = dbHandler.getDatabase();
+            start = System.currentTimeMillis();
+            LOG.info(">>> deleteDevice / VACUUM");
+            db.execSQL("VACUUM");
+            LOG.info("<<< {} ms - deleteDevice / VACUUM", System.currentTimeMillis() - start);
+            // GB typically has no write ahead log so wal_checkpoint shouldn't be
+            // required but do it anyway to be on the safe side
+            start = System.currentTimeMillis();
+            LOG.info(">>> deleteDevice / wal_checkpoint");
+            try (Cursor res = db.rawQuery("PRAGMA wal_checkpoint(TRUNCATE);", new String[0])) {
+                if (res.moveToNext()) {
+                    int busy = res.getInt(0);
+                    int log = res.getInt(1);
+                    int checkpointed = res.getInt(2);
+                    LOG.debug("deleteDevice wal_checkpoint busy:{} log:{} checkpointed:{}", busy, log, checkpointed);
+                }
+            }
+            LOG.info("<<< {} ms - deleteDevice / wal_checkpoint", System.currentTimeMillis() - start);
+        } catch (Exception e) {
+            LOG.warn("deleteDevice DB cleanup failed", e);
+            throw new GBException("Error deleting device: " + e.getLocalizedMessage(), e);
+        }
+
         if (deleteFiles) {
+            start = System.currentTimeMillis();
+            LOG.info(">>> deleteDeviceFiles");
             deleteDeviceFiles(gbDevice);
+            LOG.info("<<< {} ms - deleteDeviceFiles", System.currentTimeMillis() - start);
         }
     }
 
@@ -317,7 +354,11 @@ public abstract class AbstractDeviceCoordinator implements DeviceCoordinator {
         final Map<AbstractDao<?, ?>, Property> daoMap = getAllDeviceDao(session);
 
         for (final Map.Entry<AbstractDao<?, ?>, Property> e : daoMap.entrySet()) {
+            String tablename = e.getKey().getTablename();
+            long start = System.currentTimeMillis();
+            LOG.info(">>> deleteDevice / {}", tablename);
             deleteBy(e.getKey(), e.getValue(), deviceId);
+            LOG.info("<<< {} ms - deleteDevice / {}", System.currentTimeMillis() - start, tablename);
         }
     }
 
