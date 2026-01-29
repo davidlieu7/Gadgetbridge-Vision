@@ -5712,4 +5712,8 @@
     <string name="sennheiser_momentum_voice_answer_summary">Accept or reject an incoming call by saying yes or no</string>
     <string name="sennheiser_momentum_swap_volume_buttons_title">Swap volume buttons</string>
     <string name="sennheiser_momentum_swap_volume_buttons_summary">Reverse the direction of the volume + and - buttons</string>
+
+    <string name="devicetype_f8" translatable="false">F8</string>
+    <string name="f8_prefs_users">Users</string>
+    <string name="f8_prefs_active_user_title">Active User</string>
 </resources>
