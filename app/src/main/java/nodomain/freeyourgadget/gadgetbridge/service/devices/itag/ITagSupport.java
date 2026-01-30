@@ -32,6 +32,7 @@ import nodomain.freeyourgadget.gadgetbridge.service.btle.AbstractBTLESingleDevic
 import nodomain.freeyourgadget.gadgetbridge.service.btle.GattService;
 import nodomain.freeyourgadget.gadgetbridge.service.btle.TransactionBuilder;
 import nodomain.freeyourgadget.gadgetbridge.service.btle.profiles.IntentListener;
+import nodomain.freeyourgadget.gadgetbridge.service.btle.profiles.alertnotification.AlertLevel;
 import nodomain.freeyourgadget.gadgetbridge.service.btle.profiles.battery.BatteryInfoProfile;
 import nodomain.freeyourgadget.gadgetbridge.service.btle.profiles.deviceinfo.DeviceInfoProfile;
 
@@ -106,18 +107,38 @@ public class ITagSupport extends AbstractBTLESingleDeviceSupport {
 
     }
 
+    private void setLinkLossBehaviour(ITagConstants.LinkLossBehaviour linkLossBehaviour) {
+        getQueue().clear();
+        TransactionBuilder builder = createTransactionBuilder("beeping");
+        builder.write(ITagConstants.UUID_LINK_LOSS, linkLossBehaviour.getValue());
+        builder.queue();
+    }
+
+    private void setAlertLevel(AlertLevel alertLevel) {
+        getQueue().clear();
+        TransactionBuilder builder = createTransactionBuilder("beeping");
+        builder.write(ITagConstants.UUID_ALERT_LEVEL, (byte) alertLevel.getId());
+        builder.queue();
+    }
+
     @Override
     public void onFindDevice(boolean start) {
-        onSetConstantVibration(start ? 0x02 : 0x00);
+        setAlertLevel(AlertLevel.MildAlert);
     }
 
     @Override
     public void onSetConstantVibration(int intensity) {
-        getQueue().clear();
+        if ( intensity > 127 ) {
+            this.setAlertLevel(AlertLevel.HighAlert);
+            return;
+        }
 
-        TransactionBuilder builder = createTransactionBuilder("beeping");
-        builder.write(ITagConstants.UUID_LINK_LOSS_ALERT_LEVEL, new byte[]{(byte) intensity});
-        builder.queue();
+        if ( intensity > 0 ) {
+            this.setAlertLevel(AlertLevel.MildAlert);
+            return;
+        }
+
+        this.setAlertLevel(AlertLevel.NoAlert);
     }
 
     @Override
