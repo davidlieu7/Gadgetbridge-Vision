@@ -23,10 +23,6 @@ object ITagConstants {
     @JvmField
     val UUID_SERVICE_BUTTON: UUID? = UUID.fromString("0000ffe1-0000-1000-8000-00805f9b34fb")
 
-    // Defined in @BleNamesResolver? Either way, this is the characteristic for alert level in the Immediate Alert Service
-    @JvmField
-    val UUID_ALERT_LEVEL: UUID? = UUID.fromString("00002a06-0000-1000-8000-00805f9b34fb")
-
     // Controls what happens to the tag on disconnect
     @JvmField
     val UUID_LINK_LOSS: UUID? = UUID.fromString("0000ffe2-0000-1000-8000-00805f9b34fb")

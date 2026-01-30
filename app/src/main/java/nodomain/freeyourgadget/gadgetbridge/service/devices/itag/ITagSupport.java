@@ -16,6 +16,8 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 package nodomain.freeyourgadget.gadgetbridge.service.devices.itag;
 
+import static nodomain.freeyourgadget.gadgetbridge.service.btle.GattCharacteristic.UUID_CHARACTERISTIC_ALERT_LEVEL;
+
 import android.bluetooth.BluetoothGatt;
 import android.bluetooth.BluetoothGattCharacteristic;
 import android.content.Intent;
@@ -23,6 +25,7 @@ import android.content.Intent;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
 import java.util.UUID;
 
 import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEventBatteryInfo;
@@ -115,15 +118,23 @@ public class ITagSupport extends AbstractBTLESingleDeviceSupport {
     }
 
     private void setAlertLevel(AlertLevel alertLevel) {
-        getQueue().clear();
-        TransactionBuilder builder = createTransactionBuilder("beeping");
-        builder.write(ITagConstants.UUID_ALERT_LEVEL, (byte) alertLevel.getId());
-        builder.queue();
+        BluetoothGattCharacteristic characteristic = getCharacteristic(UUID_CHARACTERISTIC_ALERT_LEVEL);
+        try {
+            TransactionBuilder builder = performInitialized("setting iTag alert level");
+            builder.write(characteristic, (byte) alertLevel.getId());
+            builder.queue();
+        } catch (IOException e) {
+            LOG.error("error while setting iTag alert level", e);
+        }
     }
 
     @Override
     public void onFindDevice(boolean start) {
-        setAlertLevel(AlertLevel.MildAlert);
+        if (start) {
+            setAlertLevel(AlertLevel.MildAlert);
+        } else {
+            setAlertLevel(AlertLevel.NoAlert);
+        }
     }
 
     @Override
