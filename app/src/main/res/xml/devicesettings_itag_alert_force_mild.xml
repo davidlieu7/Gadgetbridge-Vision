@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.preference.PreferenceScreen xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:android="http://schemas.android.com/apk/res/android">
+    <CheckBoxPreference
+        android:defaultValue="false"
+        android:icon="@drawable/ic_watch_vibration"
+        android:key="itag_alert_force_mild"
+        android:title="@string/pref_title_itag_alert_force_mild"
+        app:summary="@string/pref_summary_itag_alert_force_mild" />
+</androidx.preference.PreferenceScreen>
