@@ -21,11 +21,13 @@ import java.util.UUID
 object ITagConstants {
     /** Contains information about the button state  */
     @JvmField
-    val UUID_SERVICE_BUTTON: UUID? = UUID.fromString("0000ffe1-0000-1000-8000-00805f9b34fb")
+    val UUID_SERVICE_BUTTON_CHARACTERISTIC: UUID = UUID.fromString("0000ffe1-0000-1000-8000-00805f9b34fb")
 
     // Controls what happens to the tag on disconnect
     @JvmField
-    val UUID_LINK_LOSS: UUID? = UUID.fromString("0000ffe2-0000-1000-8000-00805f9b34fb")
+    val UUID_LINK_LOSS_CHARACTERISTIC: UUID = UUID.fromString("0000ffe2-0000-1000-8000-00805f9b34fb")
+
+    const val PREF_ITAG_ALERT_FORCE_MILD: String = "itag_alert_force_mild";
 
     // I don't know if this is a case of 1 -> mild beep 2 -> scream because on my iTag alert level 2 does not appear to work
     enum class LinkLossBehaviour(val value: Byte) {

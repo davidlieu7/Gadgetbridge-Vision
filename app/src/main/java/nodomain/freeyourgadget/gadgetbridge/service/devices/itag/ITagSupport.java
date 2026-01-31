@@ -16,6 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 package nodomain.freeyourgadget.gadgetbridge.service.devices.itag;
 
+import static nodomain.freeyourgadget.gadgetbridge.devices.itag.ITagConstants.PREF_ITAG_ALERT_FORCE_MILD;
 import static nodomain.freeyourgadget.gadgetbridge.service.btle.GattCharacteristic.UUID_CHARACTERISTIC_ALERT_LEVEL;
 
 import android.bluetooth.BluetoothGatt;
@@ -65,7 +66,7 @@ public class ITagSupport extends AbstractBTLESingleDeviceSupport {
         addSupportedService(GattService.UUID_SERVICE_BATTERY_SERVICE);
 
         addSupportedService(GattService.UUID_SERVICE_IMMEDIATE_ALERT);
-        addSupportedService(ITagConstants.UUID_SERVICE_BUTTON);
+        addSupportedService(ITagConstants.UUID_SERVICE_BUTTON_CHARACTERISTIC);
 
 
         deviceInfoProfile = new DeviceInfoProfile<>(this);
@@ -113,12 +114,19 @@ public class ITagSupport extends AbstractBTLESingleDeviceSupport {
     private void setLinkLossBehaviour(ITagConstants.LinkLossBehaviour linkLossBehaviour) {
         getQueue().clear();
         TransactionBuilder builder = createTransactionBuilder("beeping");
-        builder.write(ITagConstants.UUID_LINK_LOSS, linkLossBehaviour.getValue());
+        builder.write(ITagConstants.UUID_LINK_LOSS_CHARACTERISTIC, linkLossBehaviour.getValue());
         builder.queue();
     }
 
     private void setAlertLevel(AlertLevel alertLevel) {
         BluetoothGattCharacteristic characteristic = getCharacteristic(UUID_CHARACTERISTIC_ALERT_LEVEL);
+
+        boolean forceMild = this.getDevicePrefs().getBoolean(PREF_ITAG_ALERT_FORCE_MILD, false);
+
+        if (alertLevel == AlertLevel.HighAlert && forceMild) {
+            alertLevel = AlertLevel.MildAlert;
+        }
+
         try {
             TransactionBuilder builder = performInitialized("setting iTag alert level");
             builder.write(characteristic, (byte) alertLevel.getId());
@@ -131,7 +139,7 @@ public class ITagSupport extends AbstractBTLESingleDeviceSupport {
     @Override
     public void onFindDevice(boolean start) {
         if (start) {
-            setAlertLevel(AlertLevel.MildAlert);
+            setAlertLevel(AlertLevel.HighAlert);
         } else {
             setAlertLevel(AlertLevel.NoAlert);
         }
