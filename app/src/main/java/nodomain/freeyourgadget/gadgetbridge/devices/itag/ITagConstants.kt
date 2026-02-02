@@ -29,6 +29,8 @@ object ITagConstants {
 
     const val PREF_ITAG_ALERT_FORCE_MILD: String = "itag_alert_force_mild";
 
+    const val PREF_ITAG_LINK_LOSS_ALERT: String = "itag_link_loss_alert";
+
     // I don't know if this is a case of 1 -> mild beep 2 -> scream because on my iTag alert level 2 does not appear to work
     enum class LinkLossBehaviour(val value: Byte) {
         DO_NOTHING(0),

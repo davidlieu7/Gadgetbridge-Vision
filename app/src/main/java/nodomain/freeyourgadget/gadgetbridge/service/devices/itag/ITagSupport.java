@@ -92,6 +92,13 @@ public class ITagSupport extends AbstractBTLESingleDeviceSupport {
         return builder;
     }
 
+    @Override
+    public void onSendConfiguration(String config) {
+        LOG.debug("LOOK! " + config);
+        switch (config){
+        }
+    }
+
     private void requestDeviceInfo(TransactionBuilder builder) {
         LOG.debug("Requesting device info!");
         deviceInfoProfile.requestDeviceInfo(builder);

@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.preference.PreferenceScreen xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:android="http://schemas.android.com/apk/res/android">
+    <SwitchPreferenceCompat
+        android:defaultValue="true"
+        android:icon="@drawable/ic_watch_vibration"
+        android:key="itag_alert_link_loss"
+        android:title="@string/pref_title_itag_alert_link_loss"
+        app:summary="@string/pref_summary_itag_alert_link_loss" />
+</androidx.preference.PreferenceScreen>

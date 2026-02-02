@@ -28,6 +28,7 @@ import java.util.regex.Pattern;
 
 import nodomain.freeyourgadget.gadgetbridge.R;
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSpecificSettings;
+import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSpecificSettingsCustomizer;
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSpecificSettingsScreen;
 import nodomain.freeyourgadget.gadgetbridge.devices.AbstractBLEDeviceCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.DeviceCoordinator;
@@ -76,6 +77,11 @@ public class ITagCoordinator extends AbstractBLEDeviceCoordinator {
         return true;
     }
 
+    @Override
+    public DeviceSpecificSettingsCustomizer getDeviceSpecificSettingsCustomizer(final GBDevice device) {
+        return new ITagSettingsCustomizer();
+    }
+
     @NonNull
     @Override
     public Class<? extends DeviceSupport> getDeviceSupportClass(final GBDevice device) {
@@ -89,6 +95,9 @@ public class ITagCoordinator extends AbstractBLEDeviceCoordinator {
         final List<Integer> generic = deviceSpecificSettings.addRootScreen(DeviceSpecificSettingsScreen.GENERIC);
         // Some itag devices refuse to buzz when their alert mode characteristic is set to high, presumably due to sub-par firmware/hardware.
         generic.add(R.xml.devicesettings_itag_alert_force_mild);
+
+        final List<Integer> connection = deviceSpecificSettings.addRootScreen(DeviceSpecificSettingsScreen.CONNECTION);
+        connection.add(R.xml.devicesettings_itag_alert_link_loss);
 
         return deviceSpecificSettings;
     }
