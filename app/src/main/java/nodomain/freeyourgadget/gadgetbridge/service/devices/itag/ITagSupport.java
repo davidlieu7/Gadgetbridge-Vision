@@ -32,6 +32,7 @@ import java.io.IOException;
 import java.util.UUID;
 
 import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEventBatteryInfo;
+import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEventFindPhone;
 import nodomain.freeyourgadget.gadgetbridge.devices.itag.ITagConstants;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
 import nodomain.freeyourgadget.gadgetbridge.service.btle.AbstractBTLESingleDeviceSupport;
@@ -48,6 +49,8 @@ public class ITagSupport extends AbstractBTLESingleDeviceSupport {
     private final GBDeviceEventBatteryInfo batteryCmd = new GBDeviceEventBatteryInfo();
     private final DeviceInfoProfile<ITagSupport> deviceInfoProfile;
     private final BatteryInfoProfile<ITagSupport> batteryInfoProfile;
+
+    private final GBDeviceEventFindPhone findPhoneEvent = new GBDeviceEventFindPhone();
 
     private final IntentListener mListener = new IntentListener() {
         @Override
@@ -178,7 +181,9 @@ public class ITagSupport extends AbstractBTLESingleDeviceSupport {
     }
 
     private void onButtonPressed() {
-        LOG.debug("Button pressed!");
+        LOG.info("find phone started");
+        findPhoneEvent.event = GBDeviceEventFindPhone.Event.START;
+        evaluateGBDeviceEvent(findPhoneEvent);
     }
 
     @Override
