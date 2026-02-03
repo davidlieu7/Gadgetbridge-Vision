@@ -6,9 +6,14 @@ import androidx.preference.Preference
 import nodomain.freeyourgadget.gadgetbridge.GBApplication
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSpecificSettingsCustomizer
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSpecificSettingsHandler
+import nodomain.freeyourgadget.gadgetbridge.service.devices.itag.ITagSupport
 import nodomain.freeyourgadget.gadgetbridge.util.Prefs
+import org.slf4j.Logger
+import org.slf4j.LoggerFactory
 
 class ITagSettingsCustomizer : DeviceSpecificSettingsCustomizer {
+
+    val log: Logger = LoggerFactory.getLogger(ITagSupport::class.java)
 
     @JvmField
     val CREATOR: Creator<ITagSettingsCustomizer> = object : Creator<ITagSettingsCustomizer> {
@@ -43,7 +48,7 @@ class ITagSettingsCustomizer : DeviceSpecificSettingsCustomizer {
             return
         }
 
-        val tryPrefKey = ITagConstants.PREF_ITAG_LINK_LOSS_ALERT
+        val tryPrefKey = ITagConstants.PREF_ITAG_ALERT_LINK_LOSS
         val tryPref = handler.findPreference<Preference?>(tryPrefKey)
         tryPref?.setOnPreferenceClickListener { _: Preference ->
             GBApplication.deviceService(handler.device).onSendConfiguration(tryPrefKey)
