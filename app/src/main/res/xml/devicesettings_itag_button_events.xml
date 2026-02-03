@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.preference.PreferenceScreen xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:android="http://schemas.android.com/apk/res/android">
+    <ListPreference
+        android:defaultValue="false"
+        android:icon="@drawable/ic_auto_awesome"
+        android:key="itag_button_event"
+        android:title="@string/pref_title_itag_button_events"
+        app:summary="@string/pref_summary_itag_button_events"
+        android:entries="@array/itag_button_event_names"
+        android:entryValues="@array/itag_button_event_values"/>
+</androidx.preference.PreferenceScreen>

@@ -94,6 +94,7 @@ public class ITagCoordinator extends AbstractBLEDeviceCoordinator {
 
         final List<Integer> generic = deviceSpecificSettings.addRootScreen(DeviceSpecificSettingsScreen.GENERIC);
         generic.add(R.xml.devicesettings_itag_alert_force_mild);
+        generic.add(R.xml.devicesettings_itag_button_events);
 
         final List<Integer> connection = deviceSpecificSettings.addRootScreen(DeviceSpecificSettingsScreen.CONNECTION);
         connection.add(R.xml.devicesettings_itag_alert_link_loss);

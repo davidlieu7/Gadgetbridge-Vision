@@ -34,9 +34,11 @@ object ITagConstants {
 
     // Some itag devices refuse to buzz when their alert mode characteristic is set to high, presumably due to sub-par firmware/hardware.
     // Add setting to force mild alerts only
-    const val PREF_ITAG_ALERT_FORCE_MILD: String = "itag_alert_force_mild";
+    const val PREF_ITAG_ALERT_FORCE_MILD: String = "itag_alert_force_mild"
 
-    const val PREF_ITAG_ALERT_LINK_LOSS: String = "itag_alert_link_loss";
+    const val PREF_ITAG_ALERT_LINK_LOSS: String = "itag_alert_link_loss"
+
+    const val PREF_BUTTON_EVENT: String = "itag_button_event"
 
     // I don't know if this is a case of 1 -> mild beep 2 -> scream because on my iTag alert level 2 does not appear to work
     enum class LinkLossBehaviour(val value: Byte) {

@@ -16,6 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 package nodomain.freeyourgadget.gadgetbridge.service.devices.itag;
 
+import static nodomain.freeyourgadget.gadgetbridge.devices.itag.ITagConstants.PREF_BUTTON_EVENT;
 import static nodomain.freeyourgadget.gadgetbridge.devices.itag.ITagConstants.PREF_ITAG_ALERT_FORCE_MILD;
 import static nodomain.freeyourgadget.gadgetbridge.devices.itag.ITagConstants.PREF_ITAG_ALERT_LINK_LOSS;
 import static nodomain.freeyourgadget.gadgetbridge.devices.itag.ITagConstants.UUID_BUTTON_CHARACTERISTIC;
@@ -31,7 +32,9 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.util.UUID;
 
+import nodomain.freeyourgadget.gadgetbridge.R;
 import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEventBatteryInfo;
+import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEventCameraRemote;
 import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEventFindPhone;
 import nodomain.freeyourgadget.gadgetbridge.devices.itag.ITagConstants;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
@@ -51,6 +54,7 @@ public class ITagSupport extends AbstractBTLESingleDeviceSupport {
     private final BatteryInfoProfile<ITagSupport> batteryInfoProfile;
 
     private final GBDeviceEventFindPhone findPhoneEvent = new GBDeviceEventFindPhone();
+    private final GBDeviceEventCameraRemote cameraRemoteEvent = new GBDeviceEventCameraRemote();
 
     private final IntentListener mListener = new IntentListener() {
         @Override
@@ -181,9 +185,16 @@ public class ITagSupport extends AbstractBTLESingleDeviceSupport {
     }
 
     private void onButtonPressed() {
-        LOG.info("find phone started");
-        findPhoneEvent.event = GBDeviceEventFindPhone.Event.START;
-        evaluateGBDeviceEvent(findPhoneEvent);
+        String button_event = this.getDevicePrefs().getString(PREF_BUTTON_EVENT, getContext().getString(R.string.p_off));
+        LOG.debug("Button pressed!");
+
+        if (button_event.equals(getContext().getString(R.string.p_menuitem_takephoto))) {
+            cameraRemoteEvent.event = GBDeviceEventCameraRemote.Event.TAKE_PICTURE;
+            evaluateGBDeviceEvent(cameraRemoteEvent);
+        } else if (button_event.equals(getContext().getString(R.string.p_menuitem_findphone))) {
+            findPhoneEvent.event = GBDeviceEventFindPhone.Event.START;
+            evaluateGBDeviceEvent(findPhoneEvent);
+        }
     }
 
     @Override
