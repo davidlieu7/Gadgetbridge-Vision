@@ -19,14 +19,21 @@ package nodomain.freeyourgadget.gadgetbridge.devices.itag
 import java.util.UUID
 
 object ITagConstants {
+
+    /** Non-Standard Service for button state & link loss detection  */
+    @JvmField
+    val UUID_SERVICE_ITAG: UUID = UUID.fromString("0000ffe0-0000-1000-8000-00805f9b34fb")
+
     /** Contains information about the button state  */
     @JvmField
-    val UUID_SERVICE_BUTTON_CHARACTERISTIC: UUID = UUID.fromString("0000ffe1-0000-1000-8000-00805f9b34fb")
+    val UUID_BUTTON_CHARACTERISTIC: UUID = UUID.fromString("0000ffe1-0000-1000-8000-00805f9b34fb")
 
     // Controls what happens to the tag on disconnect
     @JvmField
     val UUID_LINK_LOSS_CHARACTERISTIC: UUID = UUID.fromString("0000ffe2-0000-1000-8000-00805f9b34fb")
 
+    // Some itag devices refuse to buzz when their alert mode characteristic is set to high, presumably due to sub-par firmware/hardware.
+    // Add setting to force mild alerts only
     const val PREF_ITAG_ALERT_FORCE_MILD: String = "itag_alert_force_mild";
 
     const val PREF_ITAG_ALERT_LINK_LOSS: String = "itag_alert_link_loss";

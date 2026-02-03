@@ -17,6 +17,7 @@
 package nodomain.freeyourgadget.gadgetbridge.service.devices.itag;
 
 import static nodomain.freeyourgadget.gadgetbridge.devices.itag.ITagConstants.PREF_ITAG_ALERT_FORCE_MILD;
+import static nodomain.freeyourgadget.gadgetbridge.devices.itag.ITagConstants.PREF_ITAG_ALERT_LINK_LOSS;
 import static nodomain.freeyourgadget.gadgetbridge.service.btle.GattCharacteristic.UUID_CHARACTERISTIC_ALERT_LEVEL;
 
 import android.bluetooth.BluetoothGatt;
@@ -66,7 +67,7 @@ public class ITagSupport extends AbstractBTLESingleDeviceSupport {
         addSupportedService(GattService.UUID_SERVICE_BATTERY_SERVICE);
 
         addSupportedService(GattService.UUID_SERVICE_IMMEDIATE_ALERT);
-        addSupportedService(ITagConstants.UUID_SERVICE_BUTTON_CHARACTERISTIC);
+        addSupportedService(ITagConstants.UUID_SERVICE_ITAG);
 
 
         deviceInfoProfile = new DeviceInfoProfile<>(this);
@@ -94,8 +95,8 @@ public class ITagSupport extends AbstractBTLESingleDeviceSupport {
 
     @Override
     public void onSendConfiguration(String config) {
-        LOG.debug("LOOK! " + config);
-        switch (config){
+        switch (config) {
+            case PREF_ITAG_ALERT_LINK_LOSS -> handleLinkLossConfiguration();
         }
     }
 
@@ -108,19 +109,26 @@ public class ITagSupport extends AbstractBTLESingleDeviceSupport {
         builder.setDeviceState(GBDevice.State.INITIALIZED);
     }
 
-
     @Override
     public boolean useAutoConnect() {
         return true;
     }
 
     private void handleDeviceInfo(nodomain.freeyourgadget.gadgetbridge.service.btle.profiles.deviceinfo.DeviceInfo info) {
-
     }
 
-    private void setLinkLossBehaviour(ITagConstants.LinkLossBehaviour linkLossBehaviour) {
-        getQueue().clear();
-        TransactionBuilder builder = createTransactionBuilder("beeping");
+    private void handleLinkLossConfiguration() {
+        boolean alertOnLinkLoss = this.getDevicePrefs().getBoolean(PREF_ITAG_ALERT_LINK_LOSS, false);
+
+        ITagConstants.LinkLossBehaviour linkLossBehaviour;
+
+        if (alertOnLinkLoss) {
+            linkLossBehaviour = ITagConstants.LinkLossBehaviour.BEEP;
+        } else {
+            linkLossBehaviour = ITagConstants.LinkLossBehaviour.DO_NOTHING;
+        }
+
+        TransactionBuilder builder = createTransactionBuilder("link loss");
         builder.write(ITagConstants.UUID_LINK_LOSS_CHARACTERISTIC, linkLossBehaviour.getValue());
         builder.queue();
     }

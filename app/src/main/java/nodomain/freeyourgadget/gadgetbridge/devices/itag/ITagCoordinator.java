@@ -93,11 +93,12 @@ public class ITagCoordinator extends AbstractBLEDeviceCoordinator {
         final DeviceSpecificSettings deviceSpecificSettings = new DeviceSpecificSettings();
 
         final List<Integer> generic = deviceSpecificSettings.addRootScreen(DeviceSpecificSettingsScreen.GENERIC);
-        // Some itag devices refuse to buzz when their alert mode characteristic is set to high, presumably due to sub-par firmware/hardware.
         generic.add(R.xml.devicesettings_itag_alert_force_mild);
 
         final List<Integer> connection = deviceSpecificSettings.addRootScreen(DeviceSpecificSettingsScreen.CONNECTION);
         connection.add(R.xml.devicesettings_itag_alert_link_loss);
+
+        deviceSpecificSettings.addConnectedPreferences(ITagConstants.PREF_ITAG_ALERT_LINK_LOSS);
 
         return deviceSpecificSettings;
     }
