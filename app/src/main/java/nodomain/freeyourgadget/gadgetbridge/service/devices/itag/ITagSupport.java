@@ -18,6 +18,7 @@ package nodomain.freeyourgadget.gadgetbridge.service.devices.itag;
 
 import static nodomain.freeyourgadget.gadgetbridge.devices.itag.ITagConstants.PREF_ITAG_ALERT_FORCE_MILD;
 import static nodomain.freeyourgadget.gadgetbridge.devices.itag.ITagConstants.PREF_ITAG_ALERT_LINK_LOSS;
+import static nodomain.freeyourgadget.gadgetbridge.devices.itag.ITagConstants.UUID_BUTTON_CHARACTERISTIC;
 import static nodomain.freeyourgadget.gadgetbridge.service.btle.GattCharacteristic.UUID_CHARACTERISTIC_ALERT_LEVEL;
 
 import android.bluetooth.BluetoothGatt;
@@ -87,6 +88,7 @@ public class ITagSupport extends AbstractBTLESingleDeviceSupport {
     @Override
     protected TransactionBuilder initializeDevice(TransactionBuilder builder) {
         builder.setDeviceState(GBDevice.State.INITIALIZING);
+        builder.notify(UUID_BUTTON_CHARACTERISTIC, true);
         requestDeviceInfo(builder);
         setInitialized(builder);
         batteryInfoProfile.requestBatteryInfo(builder);
@@ -175,11 +177,20 @@ public class ITagSupport extends AbstractBTLESingleDeviceSupport {
         this.setAlertLevel(AlertLevel.NoAlert);
     }
 
+    private void onButtonPressed() {
+        LOG.debug("Button pressed!");
+    }
+
     @Override
     public boolean onCharacteristicChanged(BluetoothGatt gatt,
                                            BluetoothGattCharacteristic characteristic,
                                            byte[] value) {
         if (super.onCharacteristicChanged(gatt, characteristic, value)) {
+            return true;
+        }
+
+        if (characteristic.getUuid().equals(UUID_BUTTON_CHARACTERISTIC)) {
+            onButtonPressed();
             return true;
         }
 
