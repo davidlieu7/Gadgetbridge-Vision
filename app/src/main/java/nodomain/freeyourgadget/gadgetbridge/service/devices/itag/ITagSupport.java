@@ -56,6 +56,8 @@ public class ITagSupport extends AbstractBTLESingleDeviceSupport {
     private final GBDeviceEventFindPhone findPhoneEvent = new GBDeviceEventFindPhone();
     private final GBDeviceEventCameraRemote cameraRemoteEvent = new GBDeviceEventCameraRemote();
 
+    private BluetoothGatt gatt;
+
     private final IntentListener mListener = new IntentListener() {
         @Override
         public void notify(Intent intent) {
@@ -73,10 +75,10 @@ public class ITagSupport extends AbstractBTLESingleDeviceSupport {
         addSupportedService(GattService.UUID_SERVICE_GENERIC_ACCESS);
         addSupportedService(GattService.UUID_SERVICE_GENERIC_ATTRIBUTE);
         addSupportedService(GattService.UUID_SERVICE_BATTERY_SERVICE);
-
         addSupportedService(GattService.UUID_SERVICE_IMMEDIATE_ALERT);
-        addSupportedService(ITagConstants.UUID_SERVICE_ITAG);
+        addSupportedService(GattService.UUID_SERVICE_LINK_LOSS);
 
+        addSupportedService(ITagConstants.UUID_SERVICE_ITAG);
 
         deviceInfoProfile = new DeviceInfoProfile<>(this);
         deviceInfoProfile.addListener(mListener);
@@ -123,33 +125,57 @@ public class ITagSupport extends AbstractBTLESingleDeviceSupport {
         return true;
     }
 
+    @Override
+    public void onServicesDiscovered(BluetoothGatt gatt) {
+        this.gatt = gatt;
+        super.onServicesDiscovered(gatt);
+    }
+
     private void handleDeviceInfo(nodomain.freeyourgadget.gadgetbridge.service.btle.profiles.deviceinfo.DeviceInfo info) {
     }
 
     private void handleLinkLossConfiguration() {
+        BluetoothGattCharacteristic linkLossCharacteristic;
+
+        var STANDARD_LINK_LOSS_SERVICE = gatt.getService(GattService.UUID_SERVICE_LINK_LOSS);
+        var CUSTOM_LINK_LOSS_SERVICE = gatt.getService(ITagConstants.UUID_SERVICE_ITAG);
+
+        if (STANDARD_LINK_LOSS_SERVICE != null) {
+            linkLossCharacteristic = STANDARD_LINK_LOSS_SERVICE.getCharacteristic(UUID_CHARACTERISTIC_ALERT_LEVEL);
+        } else if (CUSTOM_LINK_LOSS_SERVICE != null) {
+            linkLossCharacteristic = CUSTOM_LINK_LOSS_SERVICE.getCharacteristic(ITagConstants.UUID_LINK_LOSS_CHARACTERISTIC);
+        } else {
+            LOG.warn("This iTag does not contain any supported link loss service.");
+            return;
+        }
+
         boolean alertOnLinkLoss = this.getDevicePrefs().getBoolean(PREF_ITAG_ALERT_LINK_LOSS, false);
 
-        ITagConstants.LinkLossBehaviour linkLossBehaviour;
+        AlertLevel alertLevel;
 
         if (alertOnLinkLoss) {
-            linkLossBehaviour = ITagConstants.LinkLossBehaviour.BEEP;
+            alertLevel = getHighestSupportedAlertLevel();
         } else {
-            linkLossBehaviour = ITagConstants.LinkLossBehaviour.DO_NOTHING;
+            alertLevel = AlertLevel.NoAlert;
         }
 
         TransactionBuilder builder = createTransactionBuilder("link loss");
-        builder.write(ITagConstants.UUID_LINK_LOSS_CHARACTERISTIC, linkLossBehaviour.getValue());
+        builder.write(linkLossCharacteristic, (byte)alertLevel.getId());
         builder.queue();
+    }
+
+    private AlertLevel getHighestSupportedAlertLevel() {
+        boolean forceMild = this.getDevicePrefs().getBoolean(PREF_ITAG_ALERT_FORCE_MILD, false);
+
+        if (forceMild) {
+            return AlertLevel.MildAlert;
+        } else {
+            return AlertLevel.HighAlert;
+        }
     }
 
     private void setAlertLevel(AlertLevel alertLevel) {
         BluetoothGattCharacteristic characteristic = getCharacteristic(UUID_CHARACTERISTIC_ALERT_LEVEL);
-
-        boolean forceMild = this.getDevicePrefs().getBoolean(PREF_ITAG_ALERT_FORCE_MILD, false);
-
-        if (alertLevel == AlertLevel.HighAlert && forceMild) {
-            alertLevel = AlertLevel.MildAlert;
-        }
 
         try {
             TransactionBuilder builder = performInitialized("setting iTag alert level");
@@ -163,7 +189,7 @@ public class ITagSupport extends AbstractBTLESingleDeviceSupport {
     @Override
     public void onFindDevice(boolean start) {
         if (start) {
-            setAlertLevel(AlertLevel.HighAlert);
+            setAlertLevel(getHighestSupportedAlertLevel());
         } else {
             setAlertLevel(AlertLevel.NoAlert);
         }
@@ -172,7 +198,7 @@ public class ITagSupport extends AbstractBTLESingleDeviceSupport {
     @Override
     public void onSetConstantVibration(int intensity) {
         if ( intensity > 127 ) {
-            this.setAlertLevel(AlertLevel.HighAlert);
+            this.setAlertLevel(getHighestSupportedAlertLevel());
             return;
         }
 
