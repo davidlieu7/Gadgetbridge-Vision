@@ -469,6 +469,7 @@ import nodomain.freeyourgadget.gadgetbridge.devices.mijia_lywsd.MijiaLywsd03Coor
 import nodomain.freeyourgadget.gadgetbridge.devices.mijia_lywsd.MijiaMhoC303Coordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.mijia_lywsd.MijiaXmwsdj04Coordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.miscale.MiCompositionScaleCoordinator;
+import nodomain.freeyourgadget.gadgetbridge.devices.miscale.MiScaleS400Coordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.miscale.MiSmartScaleCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.onebyone.OneByoneScaleCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.moondrop.MoondropSpaceTravel2Coordinator;
@@ -808,6 +809,7 @@ public enum DeviceType {
     CASIOGBD200(CasioGBD200DeviceCoordinator.class),
     CASIOGWB5600(CasioGWB5600DeviceCoordinator.class),
     CASIOGMWB5000(CasioGMWB5000DeviceCoordinator.class),
+    MISCALES400(MiScaleS400Coordinator.class),
     MISMARTSCALE(MiSmartScaleCoordinator.class),
     MICOMPOSITIONSCALE(MiCompositionScaleCoordinator.class),
     ONEBYONE_SCALE(OneByoneScaleCoordinator.class),

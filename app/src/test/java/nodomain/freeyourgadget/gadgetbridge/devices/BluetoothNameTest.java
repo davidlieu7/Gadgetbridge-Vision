@@ -104,6 +104,9 @@ public class BluetoothNameTest extends TestBase {
             put("Instinct Solar Tac", DeviceType.GARMIN_INSTINCT_SOLAR_TACTICAL); // #5764
             put("Instinct 2S Surf", DeviceType.GARMIN_INSTINCT_2S_SURF); // #5842
             put("Xiaomi Smart Band 10 8C9F", DeviceType.MIBAND10);
+            put("Xiaomi Scale S400 8E8B", DeviceType.MISCALES400);
+            put("XMTZC14HM", DeviceType.MISCALES400);
+            put("MJTZC01YM", DeviceType.MISCALES400);
             put("Venu X1", DeviceType.GARMIN_VENU_X1);
             put("Redmi Watch 5 163A", DeviceType.REDMIWATCH5);
             put("Descent Mk3 43mm", DeviceType.GARMIN_DESCENT_MK3);

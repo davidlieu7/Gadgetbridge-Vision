@@ -2426,11 +2426,22 @@
     <string name="devicetype_casiogwb5600" translatable="false">Casio GW-B5600</string>
     <string name="devicetype_casiogmwb5000" translatable="false">Casio GMW-B5000</string>
     <string name="devicetype_casiogbd200" translatable="false">Casio GBD-200</string>
+    <string name="devicetype_miscales400" translatable="false">Xiaomi Body Composition Scale S400</string>
     <string name="devicetype_mismartscale" translatable="false">Mi Smart Scale 2</string>
     <string name="devicetype_micompositionscale" translatable="false">Mi Body Composition Scale 2</string>
     <string name="devicetype_qnscale" translatable="false">QN-Scale (Chipsea CS20)</string>
     <string name="devicetype_xiaomi_hipee_p1" translatable="false">Xiaomi Hipee Smart Posture Corrector P1</string>
     <string name="devicetype_onebyone_scale" translatable="false">1byone Health Scale</string>
+    <string name="miscale_s400_bind_key_title">BLE bind key</string>
+    <string name="miscale_s400_bind_key_summary">Required to decrypt S400 measurements. Enter the 32-character BLE bind key for this scale.</string>
+    <string name="miscale_s400_bind_key_missing">S400 BLE bind key is missing or invalid. Add it in the device settings first.</string>
+    <string name="miscale_s400_profile_title">Profile to store</string>
+    <string name="miscale_s400_profile_summary">The scale assigns each weigh-in to one of its user profiles, and every measurement shows its profile number. Enter that number to store only your own weigh-ins, e.g. when several phones listen to the same scale. Leave empty to store every profile\'s.</string>
+    <string name="miscale_s400_profile_number">profile %1$d</string>
+    <string name="miscale_s400_profile_ignored">Ignored a weigh-in for profile %1$d, this phone stores profile %2$d</string>
+    <string name="miscale_s400_last_measurement">Last measurement</string>
+    <string name="miscale_s400_last_weight">Last weight</string>
+    <string name="miscale_s400_last_heart_rate">Last heart rate</string>
     <string name="devicetype_itag" translatable="false">iTag</string>
     <string name="devicetype_idasen" translatable="false">IKEA Idasen Desk</string>
     <string name="devicetype_bfh16" translatable="false">BFH-16</string>
