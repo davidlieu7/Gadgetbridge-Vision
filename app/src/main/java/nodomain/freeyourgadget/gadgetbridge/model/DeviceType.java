@@ -610,6 +610,7 @@ import nodomain.freeyourgadget.gadgetbridge.devices.thermalprinter.ThermalPrinte
 import nodomain.freeyourgadget.gadgetbridge.devices.tlw64.TLW64Coordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.ultrahuman.UltrahumanDeviceCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.ugreen.hitunemax5c.UgreenHituneMax5cCoordinator;
+import nodomain.freeyourgadget.gadgetbridge.devices.vring.VRingR26Coordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.um25.Coordinator.UM25Coordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.una.UnaDeviceCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.vesc.VescCoordinator;
@@ -1297,6 +1298,7 @@ public enum DeviceType {
     GENERIC_THERMAL_PRINTER(ThermalPrinterCoordinator.class),
     GENERIC_HEART_RATE(GenericHeartRateCoordinator.class),
     ULTRAHUMAN_RING_AIR(UltrahumanDeviceCoordinator.class),
+    VRING_R26(VRingR26Coordinator.class),
     ATC_BLE_OEPL(ATCBLEOEPLCoordinator.class),
     COOSPO_H6(CoospoH6Coordinator.class),
     COOSPO_HW9(CoospoHW9Coordinator.class),
