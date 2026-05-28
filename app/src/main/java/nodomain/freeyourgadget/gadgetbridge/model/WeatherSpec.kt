@@ -39,38 +39,144 @@ import kotlin.random.Random
  */
 @GsonSerialized
 class WeatherSpec() : Parcelable {
+    /**
+     * The time the weather information was retrieved in seconds since the Unix epoch, UTC
+     */
     var timestamp: Int = 0 // unix epoch timestamp, in seconds
+
+    /**
+     * The name of the location where this weather is taken / forecast
+     */
     var location: String? = null
-    var currentTemp: Int = 0 // kelvin
+
+    /**
+     * The temperature in kelvin
+     */
+    var currentTemp: Int = 0
+
+    /**
+     * The OpenWeatherMap condition code for the current conditions
+     */
     var currentConditionCode: Int = 3200 // OpenWeatherMap condition code
+    /**
+     * A textual description for the current conditions
+     */
     var currentCondition: String? = null
+
+    /**
+     * The current relative humidity percentage, [0,100]
+     */
     var currentHumidity: Int = 0
-    var todayMaxTemp: Int = 0 // kelvin
+
+    /**
+     * Today's max temperature in kelvin
+     */
+    var todayMaxTemp: Int = 0
+
+    /**
+     * Today's minimum temperature in kelvin
+     */
     var todayMinTemp: Int = 0 // kelvin
-    var windSpeed: Float = 0f // km per hour
-    var windDirection: Int = 0 // deg
-    var uvIndex: Float = 0f // 0.0 to 15.0
-    var precipProbability: Int = 0 // %
+
+    /**
+     * Wind speed in kilometers per hour
+     */
+    var windSpeed: Float = 0f
+
+    /**
+     * Wind source direction in compass degrees (0 = from North, 270 = from West)
+     */
+    var windDirection: Int = 0
+
+    /**
+     * UV Index [0.0, 15.0]
+     */
+    var uvIndex: Float = 0f
+
+    /**
+     * Precipitation probability in percent [0,100]
+     */
+    var precipProbability: Int = 0
+
+    /**
+     * Dew point temperature in kelvin
+     */
     var dewPoint: Int = 0 // kelvin
-    var pressure: Float = 0f // mb
-    var cloudCover: Int = 0 // %
-    var visibility: Float = 0f // m
-    var sunRise: Int = 0 // unix epoch timestamp, in seconds
-    var sunSet: Int = 0 // unix epoch timestamp, in seconds
-    var moonRise: Int = 0 // unix epoch timestamp, in seconds
-    var moonSet: Int = 0 // unix epoch timestamp, in seconds
-    var moonPhase: Int = 0 // deg [0, 360[
+
+    /**
+     * Pressure in millibars
+     */
+    var pressure: Float = 0f
+
+    /**
+     * The cloud cover percentage [0,100]
+     */
+    var cloudCover: Int = 0
+
+    /**
+     * Visibility distance in meters
+     */
+    var visibility: Float = 0f
+
+    /**
+     * The time of sunrise in seconds since the UNIX epoch, UTC
+     */
+    var sunRise: Int = 0
+
+    /**
+     * The time of sunset in seconds since the UNIX epoch, UTC
+     */
+    var sunSet: Int = 0
+
+    /**
+     * The time of moonrise in seconds since the UNIX epoch, UTC
+     */
+    var moonRise: Int = 0
+
+    /**
+     * The time of moonset in seconds since the UNIX epoch, UTC
+     */
+    var moonSet: Int = 0
+
+    /**
+     * The degree phase of the moon, [0, 360]
+     */
+    var moonPhase: Int = 0
+
+    /**
+     * The latitude of the weather location in degrees North of the Equator [-90.0, 90.0]
+     */
     var latitude: Float = 0f
+
+    /**
+     * The longitude of the weather location in degrees East of the Prime Meridian [-180.0, 180.0]
+     */
     var longitude: Float = 0f
-    var feelsLikeTemp: Int = 0 // kelvin
+
+    /**
+     * The feels-like temperature in kelvin
+     */
+    var feelsLikeTemp: Int = 0
+
+    /**
+     * Whether this weather specification represents the current location.
+     * 0: No; 1: Yes; -1: Unknown (default)
+     */
     var isCurrentLocation: Int = -1 // 0 for false, 1 for true, -1 for unknown
+
+    /**
+     * Current air quality
+     */
     var airQuality: AirQuality? = null
 
-    // Forecasts from the next day onward, in chronological order, one entry per day.
-    // It should not include the current or previous days
+    /**
+     * List of upcoming daily forecasts, starting with tomorrow's forecast
+     */
     var forecasts: ArrayList<Daily> = ArrayList()
 
-    // Hourly forecasts
+    /**
+     * List of hourly forecasts, starting at the next hour(?)
+     */
     var hourly: ArrayList<Hourly> = ArrayList()
 
     constructor(parcel: Parcel) : this() {
@@ -130,12 +236,54 @@ class WeatherSpec() : Parcelable {
         }
     }
 
+    /**
+     * Calculates the Beaufort scale number for the current wind speed
+     * @return Beaufort number, [0,12]
+     */
     fun windSpeedAsBeaufort(): Int = toBeaufort(this.windSpeed)
 
     fun getIsCurrentLocation(): Int = isCurrentLocation
 
     fun setIsCurrentLocation(currLoc: Int) {
         isCurrentLocation = currLoc
+    }
+
+    /**
+     * Gets the current temperature in degrees Celsius
+     * @return The current temperature, in Celsius
+     */
+    fun getCurrentTempInCelsius(): Int {
+        return toCelsius(currentTemp)
+    }
+
+    /**
+     * Gets the current temperature in degrees Fahrenheit
+     * @return The current temperature, in Fahrenheit
+     */
+    fun getCurrentTempInFahrenheit(): Int {
+        return toFahrenheit(currentTemp)
+    }
+
+    /**
+     * Gets the current wind speed in meters per second
+     * @return Wind speed in meters per second
+     */
+    fun getWindSpeedMetersPerSecond(): Float {
+        return toMetersPerSecond(windSpeed)
+    }
+    /**
+     * Gets the current wind speed in miles per hour
+     * @return Wind speed in miles per hour
+     */
+    fun getWindSpeedMilesPerHour(): Float {
+        return toMilesPerHour(windSpeed)
+    }
+    /**
+     * Gets the current wind speed in knots
+     * @return Wind speed in knots
+     */
+    fun getWindSpeedKnots(): Float {
+        return toKnots(windSpeed)
     }
 
     /**
@@ -537,6 +685,18 @@ class WeatherSpec() : Parcelable {
         /** total cloud cover in percent */
         var cloudCover: Int = 0
 
+        public fun getMaxTempCelsius(): Int {
+            return toCelsius(maxTemp);
+        }
+        public fun getMinTempCelsius(): Int {
+            return toCelsius(minTemp);
+        }
+        public fun getMaxTempFahrenheit(): Int {
+            return toFahrenheit(maxTemp);
+        }
+        public fun getMinTempFahrenheit(): Int {
+            return toFahrenheit(minTemp);
+        }
 
         internal constructor(parcel: Parcel) : this() {
             val version = parcel.readInt()
@@ -784,13 +944,66 @@ class WeatherSpec() : Parcelable {
         private val beaufort = floatArrayOf(2f, 6f, 12f, 20f, 29f, 39f, 50f, 62f, 75f, 89f, 103f, 118f)
 
         //                                    level: 0 1  2   3   4   5   6   7   8   9   10   11   12
-        fun toBeaufort(speed: Float): Int {
+        /**
+         * Gets the Beaufort scale number for a given wind speed
+         * @param speedInKmPerHour Wind speed in kilometers per hour
+         * @return Beaufort scale number ([0, 12])
+         */
+        fun toBeaufort(speedInKmPerHour: Float): Int {
             var level = 0
-            while (level < beaufort.size && beaufort[level] < speed) {
+            while (level < beaufort.size && beaufort[level] < speedInKmPerHour) {
                 level++
             }
             return level
         }
+
+        /**
+         * Converts a kilometers per hour speed to meters per second
+         * @param speedInKmPerHour Speed in kilometers per hour
+         * @return Speed in meters per second
+         */
+        fun toMetersPerSecond(speedInKmPerHour: Float): Float {
+            return speedInKmPerHour / 3.6F
+        }
+
+        /**
+         * Converts a kilometers per hour speed to miles per hour
+         * @param speedInKmPerHour Speed in kilometers per hour
+         * @return Speed in miles per hour
+         */
+        fun toMilesPerHour(speedInKmPerHour: Float): Float {
+            return speedInKmPerHour * 0.621371F
+        }
+
+        /**
+         * Converts a kilometers per hour speed to knots
+         * @param speedInKmPerHour Speed in kilometers per hour
+         * @return Speed in knots
+         */
+        fun toKnots(speedInKmPerHour: Float): Float {
+            return speedInKmPerHour / 1.852F
+        }
+
+        /**
+         * Gets the Celsius temperature from a kelvin temperature
+         * @param kelvin Temperature in kelvin
+         * @return Degrees Celsius
+         */
+        fun toCelsius(kelvin: Int): Int {
+            return kelvin - 273
+        }
+
+        /**
+         * Gets the Fahrenheit temperature from a kelvin temperature
+         * @param kelvin Temperature in kelvin
+         * @return Degrees Fahrenheit
+         */
+        fun toFahrenheit(kelvin: Int): Int {
+            // Computes an integer Rankine temperature, then converts to Fahrenheit
+            // This gives better-rounded integers than subtracting 273, scaling by 9/5, and adding 32
+            return kelvin * 9/5 - 459
+        }
+
 
         fun toLunarDay(phaseDegrees: Double): Int {
             val synodicMonth = 29.53059

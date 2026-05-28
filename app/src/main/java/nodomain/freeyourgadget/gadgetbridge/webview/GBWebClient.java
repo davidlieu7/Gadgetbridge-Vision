@@ -17,6 +17,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 package nodomain.freeyourgadget.gadgetbridge.webview;
 
+import android.annotation.SuppressLint;
 import android.content.Intent;
 import android.graphics.Bitmap;
 import android.net.Uri;
@@ -27,6 +28,7 @@ import android.webkit.WebView;
 import android.webkit.WebViewClient;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 
 import net.e175.klaus.solarpositioning.DeltaT;
 import net.e175.klaus.solarpositioning.SPA;
@@ -41,12 +43,18 @@ import org.slf4j.LoggerFactory;
 
 import java.io.ByteArrayInputStream;
 import java.nio.charset.StandardCharsets;
+import java.time.DateTimeException;
+import java.time.Instant;
 import java.time.LocalDate;
+import java.time.ZoneId;
 import java.time.ZonedDateTime;
+import java.time.format.DateTimeFormatter;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 import nodomain.freeyourgadget.gadgetbridge.GBApplication;
@@ -68,6 +76,8 @@ public class GBWebClient extends WebViewClient {
     private final String[] LocallySupportedDomains = new String[]{
             "openweathermap.org",   //for weather :)
             "rawgit.com",           //for trekvolle
+            "open-meteo.com",       // for even more weather
+            "openstreetmap.org",    // for reverse geocoding
     };
 
     private final Map<String, List<Entry>> postData = new HashMap<>();
@@ -84,7 +94,7 @@ public class GBWebClient extends WebViewClient {
     public synchronized void storePostBody(String url, String body) {
         long now = System.currentTimeMillis();
 
-        // Cleanup expired entries (more than a minute old)
+        // Cleanup expired entries (more than one minute old)
         Iterator<Map.Entry<String, List<Entry>>> mapIt = postData.entrySet().iterator();
         while (mapIt.hasNext()) {
             Map.Entry<String, List<Entry>> mapEntry = mapIt.next();
@@ -191,6 +201,15 @@ public class GBWebClient extends WebViewClient {
                 } else if (StringUtils.endsWith(requestedUri.getHost(), "rawgit.com")) {
                     LOG.debug("WEBVIEW request to rawgit.com detected of type: {} params: {}", requestedUri.getPath(), requestedUri.getQuery());
                     return mimicRawGitResponse(requestedUri.getPath());
+                } else if (requestedUri.getHost().equals("api.open-meteo.com")) {
+                    LOG.debug("WEBVIEW request to api.open-meteo.org with params: {}", requestedUri.getQuery());
+                    return mimicOpenMeteoApiResponse(requestedUri);
+                } else if (requestedUri.getHost().equals("air-quality-api.open-meteo.com")) {
+                    LOG.debug("WEBVIEW request to air-quality-api.open-meteo.org with params: {}", requestedUri.getQuery());
+                    return mimicOpenMeteoAirQualityResponse(requestedUri);
+                } else if (requestedUri.getHost().equals("nominatim.openstreetmap.org")) {
+                    LOG.debug("WEBVIEW request to nominatim.openstreetmap.org with params: {}", requestedUri.getQuery());
+                    return mimicNominatimResponse(requestedUri.getPath(), requestedUri.getQueryParameter("format"));
                 } else {
                     LOG.debug("WEBVIEW request to allowed domain detected but not intercepted: {}", requestedUri);
                 }
@@ -295,6 +314,379 @@ public class GBWebClient extends WebViewClient {
         }
 
         return null;
+    }
+
+    /**
+     * Creates a web response similar to nominatim.openstreetmap.org, just to give the location name
+     * @param format Format name for response, only "jsonv2" is implemented
+     * @return Web response object, or null if no weather is available or JSON fails
+     */
+    @Nullable
+    private WebResourceResponse mimicNominatimResponse(String path, String format) {
+        if (! "/reverse".equals(path)) {
+            LOG.warn("WEBVIEW - nominatim mimic does not support path {}", path);
+            return null;
+        }
+
+        WeatherSpec currWeather = Weather.getWeatherSpec();
+        if (currWeather == null) {
+            LOG.warn("WEBVIEW - no weather spec, cannot give response as nominatim");
+            return null;
+        }
+
+        if (currWeather.getLocation() == null) {
+            LOG.warn("WEBVIEW - no weather location, cannot reply as nominatim");
+            return null;
+        }
+
+        if ("jsonv2".equals(format)) {
+            try {
+                JSONObject responseJson = new JSONObject();
+                responseJson.put("name", currWeather.getLocation());
+                LOG.info("WEBVIEW - mimicked nominatim response: {}", responseJson.toString());
+                Map<String, String> headers = new HashMap<>();
+                headers.put("Access-Control-Allow-Origin", "*");
+                return new WebResourceResponse("application/json", "utf-8", 200, "OK",
+                        headers,
+                        new ByteArrayInputStream(responseJson.toString().getBytes())
+                );
+            } catch (JSONException e) {
+                LOG.warn("WEBVIEW error building the JSON message for nominatim.", e);
+            }
+        } else {
+            LOG.warn("WEBVIEW nominatim reverse search mimic does not support format {}", format);
+        }
+        return null;
+    }
+
+    /**
+     * Creates a web response similar to an api.open-meteo.com response
+     * @param requestedUri URI being requested, which may have many parameters
+     * @return Web response object, or null if no weather is available or JSON fails
+     */
+    @Nullable
+    private WebResourceResponse mimicOpenMeteoApiResponse(@NonNull Uri requestedUri) {
+
+        WeatherSpec weather = Weather.getWeatherSpec();
+        if (weather == null) {
+            LOG.warn("WEBVIEW - no weather data, cannot give response as api.open-meteo");
+            return null;
+        }
+        ZoneId responseTZ;
+        String timezoneString = requestedUri.getQueryParameter("timezone");
+        try {
+            if (timezoneString.equals("auto")) {  // if null, catch to UTC
+                responseTZ = ZoneId.systemDefault();
+            } else {
+                responseTZ = ZoneId.of(timezoneString);
+            }
+        } catch (Exception e) {
+            responseTZ = ZoneId.of("UTC");
+        }
+
+        try {
+            JSONObject responseJson = new JSONObject();
+            populateOmwCurrentJson(responseJson, weather, requestedUri, responseTZ);
+            populateOmwDailyJson(responseJson, weather, requestedUri, responseTZ);
+            LOG.info("WEBVIEW - mimicked open-meteo weather response: {}", responseJson.toString());
+
+            Map<String, String> headers = new HashMap<>();
+            headers.put("Access-Control-Allow-Origin", "*");
+            return new WebResourceResponse("application/json", "utf-8", 200, "OK",
+                        headers,
+                        new ByteArrayInputStream(responseJson.toString().getBytes())
+            );
+        } catch (JSONException e) {
+            LOG.warn("Error building the JSON weather message.", e);
+        }
+        return null;
+    }
+
+    /**
+     * Fills in the JSON structure of an open-meteo response using the given weather info
+     * @param responseJson The JSON object holding the top level response data
+     * @param currWeather The relevant weather spec
+     * @param requestUri The URI of the request
+     * @param responseTZ Zone ID to use for formatting timestamps
+     * @throws JSONException Exception if JSON can't be manipulated
+     */
+    private static void populateOmwCurrentJson(JSONObject responseJson, WeatherSpec currWeather, @NonNull Uri requestUri, ZoneId responseTZ) throws JSONException {
+        JSONObject units = new JSONObject();
+        populateOmwUnitsFromUrlKey(units, requestUri, "current");
+        if (units.length() < 1) return;
+
+        JSONObject values = new JSONObject();
+
+        Iterator<String> unitIterator = units.keys();
+
+        DateTimeFormatter dateTimeFormatter = DateTimeFormatter.ISO_LOCAL_DATE_TIME.withZone( responseTZ );
+
+        while (unitIterator.hasNext()) {
+            String item = unitIterator.next();
+            String unit = units.getString(item);
+
+            String value = null;
+            switch (item) {
+                case "time" ->
+                        value = dateTimeFormatter.format(Instant.ofEpochSecond(currWeather.getTimestamp()));
+                case "temperature_2m" -> {
+                    // The API returns a single-decimal float, but we only have integer precision
+                    if (unit.equals("°F")) {
+                        value = String.valueOf(currWeather.getCurrentTempInFahrenheit());
+                    } else {
+                        value = String.valueOf(currWeather.getCurrentTempInCelsius());
+                    }
+                }
+                case "cloud_cover" ->
+                        value = String.valueOf(currWeather.getCloudCover());
+                case "precipitation" ->
+                        value = "0.00"; // we have no precipitation data
+                case "weather_code" ->
+                        value = String.valueOf(WeatherMapper.mapToWMOCondition(currWeather.getCurrentConditionCode()));
+                case "wind_speed_10m" ->
+                        value = switch (unit) {
+                            // These are returned with a single decimal place, always with "." as the decimal separator
+                            case "m/s" -> String.format(Locale.US, "%.1f", currWeather.getWindSpeedMetersPerSecond());
+                            case "mph" -> String.format(Locale.US, "%.1f", currWeather.getWindSpeedMilesPerHour());
+                            case "kn" -> String.format(Locale.US, "%.1f", currWeather.getWindSpeedKnots());
+                            default -> String.format(Locale.US, "%.1f", currWeather.getWindSpeed());
+                        };
+            }
+
+            if ( value != null ) {
+                values.put(item, value);
+            } else {
+                LOG.debug("WEBVIEW open-meteo mimic: TODO support {} for current weather", item);
+            }
+        }
+
+        responseJson.put("current_units", units);
+        responseJson.put("current", values);
+    }
+
+    /**
+     * Populates the units for the elements request for a Open-Meteo URL
+     * @param units JSONObject where unit keys will be stored, like "time": "iso8601"
+     * @param requestUri URL for the request, including parameters like "daily" or "temperature_unit"
+     * @param urlParamForScope URL parameter with the request scope, like "current" or "daily"
+     * @throws JSONException Exception if JSON cannot be manipulated
+     */
+    private static void populateOmwUnitsFromUrlKey(JSONObject units, @NonNull Uri requestUri, @NonNull String urlParamForScope) throws JSONException {
+        String requestedElementsDelimList = requestUri.getQueryParameter(urlParamForScope);
+        if (requestedElementsDelimList == null) return;
+
+        // Always include time
+        units.put("time", "iso8601");
+        String[] requestedItems = requestedElementsDelimList.split(",");
+
+        // Populate the units for all requested items
+        for (String item : requestedItems) {
+            if (item.equals("cloud_cover")) {
+                units.put(item, "%");
+            } else if (item.startsWith("temperature_")) {
+                if ("fahrenheit".equals(requestUri.getQueryParameter("temperature_unit"))) {
+                    units.put(item, "°F");
+                } else {
+                    units.put(item, "°C");
+                }
+            } else if (item.equals("sunrise")) {
+                units.put(item, "iso8601");
+            } else if (item.equals("sunset")) {
+                units.put(item, "iso8601");
+            } else if (item.equals("precipitation")) {
+                String precipitation_unit = requestUri.getQueryParameter("precipitation_unit");
+                if ("inch".equals(precipitation_unit)) {
+                    units.put(item, "inch");
+                } else {
+                    units.put(item, "mm");
+                }
+            } else if (item.equals("weather_code")) {
+                units.put(item, "wmo code");
+            } else if (item.startsWith("wind_speed_")) {
+                String windSpeedUnit = requestUri.getQueryParameter("wind_speed_unit");
+                if ("ms".equals(windSpeedUnit)) {
+                    units.put(item, "m/s");
+                } else if ("mph".equals(windSpeedUnit)) {
+                    units.put(item, "mp/h");
+                } else if ("kn".equals(windSpeedUnit)) {
+                    units.put(item, "kn");
+                } else {
+                    units.put(item, "km/h");
+                }
+            } else {
+                LOG.debug("WEBVIEW open-meteo mimic: TODO recognize units for {} in {}", item, urlParamForScope);
+            }
+        }
+    }
+
+    /**
+     * Fills in the JSON structure of an open-meteo response using the given weather info
+     * @param responseJson The JSON object holding the top level response data
+     * @param currWeather The relevant weather spec
+     * @param requestUri The URI of the request
+     * @param responseTZ Time zone to use for response timestamps
+     * @throws JSONException Exception if JSON can't be manipulated
+     */
+    private static void populateOmwDailyJson(JSONObject responseJson, WeatherSpec currWeather, @NonNull Uri requestUri, ZoneId responseTZ) throws JSONException {
+        // Determine forecast range, default to 7 days
+        int forecastDays = 7;
+        String requestedDayCount = requestUri.getQueryParameter("forecast_days");
+        if ( requestedDayCount != null) {
+            try {
+                forecastDays = Integer.parseInt(requestedDayCount);
+            } catch (NumberFormatException ignored) {
+                LOG.info("WEBVIEW open-meteo mimic: cannot parse requested forecast days: {}", requestedDayCount);
+                return;
+            }
+        }
+
+        if ( (forecastDays-1) > currWeather.getForecasts().size()) {
+            LOG.debug("WEBVIEW open-meteo mimic: decreasing daily forecast count from {} because only {} future days are available", forecastDays, currWeather.getForecasts().size());
+            forecastDays = currWeather.getForecasts().size() + 1;
+        }
+
+        JSONObject units = new JSONObject();
+        populateOmwUnitsFromUrlKey(units, requestUri, "daily");
+        if (units.length() < 1) return;
+
+        JSONObject values = new JSONObject();
+
+        Instant weatherInst = Instant.ofEpochSecond(currWeather.getTimestamp());
+        // create entry for today as "0", future days starting at "1"
+        addOneDaytToOmwDailyJson(units, values, currWeather.todayAsDaily(), weatherInst, 0, responseTZ);
+        for (int dayIndex = 1; dayIndex < forecastDays; dayIndex++) {
+            addOneDaytToOmwDailyJson(units, values, currWeather.getForecasts().get(dayIndex-1), weatherInst, dayIndex, responseTZ);
+        }
+
+        responseJson.put("daily_units", units);
+        responseJson.put("daily", values);
+    }
+
+    /**
+     * Populates one day's measurements from a WeatherSpec.Daily forecast in the open-meteo "daily" response sections
+     * @param unitsRoot JSON root where each measurement is given with a string for its units
+     * @param dailyValues JSON root where daily values are / will be stored
+     * @param daily Daily weather object
+     * @param todayInstant Instant containing "today" for the purposes of date generation
+     * @param dayIndex JSON key to place this day's values, like 0, 1, 2, ...
+     * @throws JSONException If JSON can't be manipulated
+     */
+    private static void addOneDaytToOmwDailyJson(JSONObject unitsRoot, JSONObject dailyValues, WeatherSpec.Daily daily, @NonNull Instant todayInstant, int dayIndex, ZoneId responseTz) throws JSONException {
+
+        Iterator<String> unitIterator = unitsRoot.keys();
+
+        DateTimeFormatter dateFormatter = DateTimeFormatter.ISO_LOCAL_DATE.withZone( responseTz );
+        DateTimeFormatter dateTimeFormatter = DateTimeFormatter.ISO_LOCAL_DATE_TIME.withZone( responseTz); // note that this includes seconds, which the real open-meteo doesn't include
+
+        while (unitIterator.hasNext()) {
+            String item = unitIterator.next();
+            String unit = unitsRoot.getString(item);
+            // Get the existing JSON group for this item
+            JSONObject itemRoot;
+            try {
+                itemRoot = dailyValues.getJSONObject(item);
+            } catch (JSONException e) {
+                itemRoot = new JSONObject();
+            }
+
+            String value = null;
+            switch (item) {
+                case "time" ->
+                        value = dateFormatter.format(todayInstant.plus(dayIndex, ChronoUnit.DAYS));
+                case "sunset" ->
+                        value = dateTimeFormatter.format(Instant.ofEpochSecond(daily.getSunSet()));
+                case "sunrise" ->
+                        value = dateTimeFormatter.format(Instant.ofEpochSecond(daily.getSunRise()));
+                case "precipitation" ->
+                        value = "0.00"; // we have no precipitation data
+                case "temperature_2m_max" -> {
+                    if (unit.equals("°F")) {
+                        value = String.valueOf(daily.getMaxTempFahrenheit());
+                    } else {
+                        value = String.valueOf(daily.getMaxTempCelsius());
+                    }
+                }
+                case "temperature_2m_min" -> {
+                    if (unit.equals("°F")) {
+                        value = String.valueOf(daily.getMinTempFahrenheit());
+                    } else {
+                        value = String.valueOf(daily.getMinTempCelsius());
+                    }
+                }
+                case "weather_code" ->
+                        value = String.valueOf(WeatherMapper.mapToWMOCondition(daily.getConditionCode()));
+            }
+
+            if ( value == null ) {
+                LOG.debug("WEBVIEW open-meteo daily weather: TODO no daily value for {} on day {}", item, dayIndex);
+                continue;
+            }
+
+            itemRoot.put(String.valueOf(dayIndex) ,value);
+            dailyValues.put(item, itemRoot);
+        }
+    }
+
+    /**
+     * Creates a web response similar to an air-quality-api.open-meteo.com response
+     * @param requestedUri URI being requested, which may have many parameters
+     * @return Web response object, or null if no weather is available or JSON fails
+     */
+    @Nullable
+    private WebResourceResponse mimicOpenMeteoAirQualityResponse(@NonNull Uri requestedUri) {
+
+        WeatherSpec weather = Weather.getWeatherSpec();
+        if (weather == null) {
+            LOG.warn("WEBVIEW - no weather data, cannot give response as air-quality-api.open-meteo");
+            return null;
+        }
+
+        try {
+            JSONObject responseJson = new JSONObject();
+            populateOmaqCurrentJson(responseJson, weather, requestedUri);
+            LOG.info("WEBVIEW - mimicked open-meteo air-quality response: {}", responseJson.toString());
+
+            Map<String, String> headers = new HashMap<>();
+            headers.put("Access-Control-Allow-Origin", "*");
+            return new WebResourceResponse("application/json", "utf-8", 200, "OK",
+                    headers,
+                    new ByteArrayInputStream(responseJson.toString().getBytes())
+            );
+        } catch (JSONException e) {
+            LOG.warn("Error building the JSON air quality message.", e);
+        }
+        return null;
+    }
+
+    /**
+     * Gets current air quality conditions into JSON like air-quality-api.open-meteo.com
+     * @param responseJson JSONObject root of JSON data
+     * @param currWeather WeatherSpec of current weather data
+     * @param requestUri URI being requested
+     * @throws JSONException If JSON cannot be manipulated
+     */
+    private static void populateOmaqCurrentJson(JSONObject responseJson, WeatherSpec currWeather, @NonNull Uri requestUri) throws JSONException {
+        if (currWeather.getAirQuality() == null) return;
+        String requestedElementsDelimList = requestUri.getQueryParameter("current");
+        if (requestedElementsDelimList == null) return;
+
+        JSONObject units = new JSONObject();
+        JSONObject values = new JSONObject();
+
+        String[] requestedItems = requestedElementsDelimList.split(",");
+
+        for (String item : requestedItems) {
+            if ("us_aqi".equals(item)) {
+                units.put(item, "USAQI");
+                values.put(item, currWeather.getAirQuality().getAqi());
+            } else {
+                LOG.debug("WEBVIEW open-meteo mimic: TODO support {} in current air quality", item);
+            }
+        }
+
+        responseJson.put("current_units", units);
+        responseJson.put("current", values);
+
     }
 
     private WebResourceResponse mimicOpenWeatherMapResponse(String type, String units) {

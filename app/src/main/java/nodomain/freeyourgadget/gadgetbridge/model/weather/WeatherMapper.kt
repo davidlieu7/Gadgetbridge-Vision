@@ -5,6 +5,7 @@ import nodomain.freeyourgadget.gadgetbridge.R
 
 object WeatherMapper {
 
+
     @JvmStatic
     fun mapToOpenWeatherMapIcon(code: Int, isNight: Boolean = false): String = when (code) {
         //see https://openweathermap.org/weather-conditions
@@ -22,6 +23,11 @@ object WeatherMapper {
         else -> "02d" // fallback
     }
 
+    /**
+     * Maps a Yahoo weather condition code to a weather condition used by GadgetBridge
+     * @param yahooCondition Yahoo weather's condition code
+     * @return The OpenWeatherMap equivalent code
+     */
     @JvmStatic
     fun mapToOpenWeatherMapCondition(yahooCondition: Int): Int {
         //yahoo weather conditions:
@@ -62,6 +68,12 @@ object WeatherMapper {
         }
     }
 
+    /**
+     * Gets a textual description for a given weather condition code
+     * @param Context - The localization context
+     * @param code - The weather code, using OpenWeatherMap's conventions
+     * @return Text describing that code
+     */
     @JvmStatic
     fun getConditionString(context: Context, code: Int): String {
         return OwmCondition.fromCode(code)?.let { context.getString(it.labelRes) }?: ""
@@ -79,6 +91,11 @@ object WeatherMapper {
         else      -> context.getString(R.string.aqi_level_dangerous)
     }
 
+    /**
+     * Maps an internal weather condition code to the equivalent Pebble condition code
+     * @param openWeatherMapCondition The OpenWeatherMap condition code
+     * @return The Pebble condition code
+     */
     @JvmStatic
     fun mapToPebbleCondition(openWeatherMapCondition: Int): Byte {
         /* deducted values:
@@ -112,6 +129,11 @@ object WeatherMapper {
         }
     }
 
+    /**
+     * Maps a weather condition code to the equivalent Yahoo weather code
+     * @param openWeatherMapCondition The weather condition code, using OpenWeatherMap's conventions
+     * @return The Yahoo weather code
+     */
     @JvmStatic
     fun mapToYahooCondition(openWeatherMapCondition: Int): Int {
         // openweathermap.org conditions:
@@ -345,6 +367,54 @@ object WeatherMapper {
             212 -> 18
             231 -> 19
             else -> 3
+        }
+    }
+
+    /**
+     * Maps an internal weather condition code to the equivalent WMO condition code
+     * @param openWeatherMapCondition The OpenWeatherMap condition code
+     * @return The WMO condition code, 0-99, that open-meteo might return
+     */
+    @JvmStatic
+    fun mapToWMOCondition(openWeatherMapCondition: Int): Byte {
+        return when (openWeatherMapCondition) {
+            200, 201, 202, 210, 211, 230, 231, 232, 212, 221 -> 95 // thunderstorms
+            300 -> 51 // light drizzle
+            301 -> 53 // medium drizzle
+            302 -> 55 // heavy drizzle
+            310 -> 58 // drizzle and rain, slight
+            311, 312, 313, 314, 321 -> 59 // drizzle and rain, moderate or heavy
+            500 -> 61 // slight rain
+            501 -> 63 // moderate rain
+            502, 503, 504 -> 65 // heavy rain
+            511 -> 67 // freezing rain
+            520 -> 80 // slight rain showers
+            521 -> 81 // moderate rain showers
+            522, 531 -> 82 // violent rain showers
+            600 -> 71 // slight snow
+            601 -> 73 // moderate snow
+            602 -> 75 // heavy snow
+            615 -> 83 // slight rain and snow
+            616 -> 84 // rain and snow
+            620 -> 85 // slight snow showers
+            621, 622 -> 86 // moderate or heavy snow showers
+            612 -> 87 // slight snow pellet
+            611, 613 -> 88 // snow pellets or hail
+            701 -> 10 // mist
+            711, 762 -> 4 // smoke or volcanic ash
+            721 -> 5 // haze
+            731 -> 8 // dust whirls
+            741 -> 45 // fog
+            751, 761 -> 7 // dust or sand, but not whirling
+            771 -> 18 // squalls
+            781 -> 19 // tornado
+            800 -> 0 // clear sky
+            801 -> 1 // "few clouds" as clouds dissipating
+            802, 803 -> 2 // partly cloudy
+            804 -> 3 // overcast
+
+            else -> 0
+
         }
     }
 }

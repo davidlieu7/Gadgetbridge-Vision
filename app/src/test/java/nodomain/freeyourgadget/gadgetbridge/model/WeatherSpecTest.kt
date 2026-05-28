@@ -89,4 +89,48 @@ class WeatherSpecTest : TestBase() {
 
         Assert.assertEquals(weatherSpec, specFromParcel)
     }
+
+    /**
+     * Tests the conversion from the internal temperature in kelvin to Celsius and Fahrenheit
+     */
+    @Test
+    fun testTemperatureScaleConversions() {
+        val weatherSpec = WeatherSpec()
+        // water freezes
+        weatherSpec.currentTemp = 273
+        Assert.assertEquals(0,weatherSpec.getCurrentTempInCelsius())
+        Assert.assertEquals(32, weatherSpec.getCurrentTempInFahrenheit())
+        // water boils
+        weatherSpec.currentTemp = 273 + 100
+        Assert.assertEquals(100,weatherSpec.getCurrentTempInCelsius())
+        Assert.assertEquals(212, weatherSpec.getCurrentTempInFahrenheit())
+        // Celsius-Fahrenheit crossover
+        weatherSpec.currentTemp = 273 - 40
+        Assert.assertEquals(-40,weatherSpec.getCurrentTempInCelsius())
+        Assert.assertEquals(-40, weatherSpec.getCurrentTempInFahrenheit())
+        // Sequential room temperatures so we exercise values that aren't the same mod 5
+        weatherSpec.currentTemp = 273 + 20
+        Assert.assertEquals(68, weatherSpec.getCurrentTempInFahrenheit()) // Exact
+        weatherSpec.currentTemp = 273 + 21
+        Assert.assertEquals(70, weatherSpec.getCurrentTempInFahrenheit()) // Rounds up
+        weatherSpec.currentTemp = 273 + 22
+        Assert.assertEquals(72, weatherSpec.getCurrentTempInFahrenheit()) // Rounds up
+        weatherSpec.currentTemp = 273 + 23
+        Assert.assertEquals(73, weatherSpec.getCurrentTempInFahrenheit()) // Rounds down
+        weatherSpec.currentTemp = 273 + 24
+        Assert.assertEquals(75, weatherSpec.getCurrentTempInFahrenheit()) // Rounds down
+        weatherSpec.currentTemp = 273 + 25
+        Assert.assertEquals(77, weatherSpec.getCurrentTempInFahrenheit()) // Exact
+        // Sequential sub-freezing temperatures
+        weatherSpec.currentTemp = 273 - 1
+        Assert.assertEquals(30, weatherSpec.getCurrentTempInFahrenheit()) // Rounds
+        weatherSpec.currentTemp = 273 - 2
+        Assert.assertEquals(28, weatherSpec.getCurrentTempInFahrenheit()) // Rounds
+        weatherSpec.currentTemp = 273 - 3
+        Assert.assertEquals(27, weatherSpec.getCurrentTempInFahrenheit()) // Rounds
+        weatherSpec.currentTemp = 273 - 4
+        Assert.assertEquals(25, weatherSpec.getCurrentTempInFahrenheit()) // Rounds
+        weatherSpec.currentTemp = 273 - 5
+        Assert.assertEquals(23, weatherSpec.getCurrentTempInFahrenheit()) // Exact
+    }
 }

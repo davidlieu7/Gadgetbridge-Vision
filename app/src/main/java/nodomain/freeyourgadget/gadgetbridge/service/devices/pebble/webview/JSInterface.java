@@ -210,7 +210,7 @@ public class JSInterface {
             }
             return sb.toString().toLowerCase();
         } catch (NoSuchAlgorithmException e) {
-            LOG.warn("Error definining local storage prefix", e);
+            LOG.warn("Error defining local storage prefix", e);
             return prefix;
         }
     }
