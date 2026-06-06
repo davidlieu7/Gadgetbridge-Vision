@@ -312,6 +312,41 @@ public interface DeviceCoordinator {
     boolean supportsVO2Max(@NonNull final GBDevice device);
 
     /**
+     * Returns true if the device stores its heart-rate stream in a
+     * {@link nodomain.freeyourgadget.gadgetbridge.entities.GenericHeartRateSampleDao}-backed
+     * dedicated provider rather than (or in addition to) the bundled
+     * {@code ActivitySample} table.
+     *
+     * <p>Devices whose HR data is already exposed through the standard
+     * {@link #getSampleProvider} → {@code ActivitySample} pipeline must
+     * leave this as {@code false} to avoid duplicating HR records in
+     * Health Connect when the {@code DEDICATED_HEART_RATE} permission is
+     * granted (the {@code ACTIVITY} data type would already cover them).
+     *
+     * <p>Default: {@code false}.
+     */
+    default boolean supportsDedicatedHeartRateSync(@NonNull GBDevice device) {
+        return false;
+    }
+
+    /**
+     * Returns true if the device stores its sleep-stage stream in a
+     * {@link nodomain.freeyourgadget.gadgetbridge.entities.GenericSleepStageSampleDao}-backed
+     * dedicated provider rather than as {@code ActivitySample.kind == SLEEP}
+     * rows.
+     *
+     * <p>Devices whose sleep data is encoded in the standard
+     * {@code ActivitySample} table must leave this as {@code false} to
+     * avoid emitting empty {@code SleepSessionRecord}s into Health
+     * Connect (the {@code SLEEP} data type already covers them).
+     *
+     * <p>Default: {@code false}.
+     */
+    default boolean supportsDedicatedSleepStageSync(@NonNull GBDevice device) {
+        return false;
+    }
+
+    /**
      * Returns true if this device supports distinguishing VO2 max per sport (running / cycling).
      */
     boolean supportsVO2MultiSport(@NonNull final GBDevice device);
