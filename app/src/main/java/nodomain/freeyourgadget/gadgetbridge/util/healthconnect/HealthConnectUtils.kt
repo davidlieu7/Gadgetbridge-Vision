@@ -726,10 +726,6 @@ class HealthConnectUtils {
                     healthConnectClient, gbDevice, metadata, offset,
                     currentSliceStartTs, currentSliceEndTs, grantedPermissions
                 ))
-                HealthConnectPermissionManager.HealthConnectDataType.DEDICATED_HEART_RATE -> sliceStats.add(HeartRateMaxSyncer.sync(
-                    healthConnectClient, gbDevice, metadata, offset,
-                    currentSliceStartTs, currentSliceEndTs, grantedPermissions
-                ))
                 HealthConnectPermissionManager.HealthConnectDataType.DEDICATED_SLEEP -> sliceStats.add(SleepStagesSyncer.sync(
                     healthConnectClient, gbDevice, metadata, offset,
                     currentSliceStartTs, currentSliceEndTs, grantedPermissions
@@ -892,10 +888,6 @@ class HealthConnectUtils {
                 HealthConnectPermissionManager.HealthConnectDataType.HRV -> coordinator.getHrvValueSampleProvider(device, db.daoSession)
                 HealthConnectPermissionManager.HealthConnectDataType.RESPIRATORY_RATE -> coordinator.getRespiratoryRateSampleProvider(device, db.daoSession)
                 HealthConnectPermissionManager.HealthConnectDataType.RESTING_HEART_RATE -> coordinator.getHeartRateRestingSampleProvider(device, db.daoSession)
-                HealthConnectPermissionManager.HealthConnectDataType.DEDICATED_HEART_RATE ->
-                    if (coordinator.supportsDedicatedHeartRateSync(device))
-                        coordinator.getHeartRateMaxSampleProvider(device, db.daoSession)
-                    else null
                 HealthConnectPermissionManager.HealthConnectDataType.DEDICATED_SLEEP ->
                     if (coordinator.supportsDedicatedSleepStageSync(device))
                         nodomain.freeyourgadget.gadgetbridge.devices.GenericSleepStageSampleProvider(device, db.daoSession)

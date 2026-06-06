@@ -62,7 +62,6 @@ object HealthConnectPermissionManager {
         TEMPERATURE,
         RESPIRATORY_RATE,
         RESTING_HEART_RATE,
-        DEDICATED_HEART_RATE,
         DEDICATED_SLEEP,
         BLOOD_GLUCOSE,
         BLOOD_PRESSURE,
@@ -87,7 +86,6 @@ object HealthConnectPermissionManager {
             HealthConnectDataType.SPO2 -> setOf(HealthPermission.getWritePermission(OxygenSaturationRecord::class))
             HealthConnectDataType.RESPIRATORY_RATE -> setOf(HealthPermission.getWritePermission(RespiratoryRateRecord::class))
             HealthConnectDataType.RESTING_HEART_RATE -> setOf(HealthPermission.getWritePermission(RestingHeartRateRecord::class))
-            HealthConnectDataType.DEDICATED_HEART_RATE -> setOf(HealthPermission.getWritePermission(HeartRateRecord::class))
             HealthConnectDataType.DEDICATED_SLEEP -> setOf(HealthPermission.getWritePermission(SleepSessionRecord::class))
             HealthConnectDataType.BLOOD_GLUCOSE -> setOf(HealthPermission.getWritePermission(BloodGlucoseRecord::class))
             HealthConnectDataType.BLOOD_PRESSURE -> setOf(HealthPermission.getWritePermission(BloodPressureRecord::class))
