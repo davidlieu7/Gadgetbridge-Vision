@@ -59,6 +59,12 @@ internal object SleepStagesSyncer : HealthConnectSyncer {
         grantedPermissions: Set<String>
     ): SyncerStatistics {
         val deviceName = gbDevice.aliasOrName
+        val coordinator = gbDevice.deviceCoordinator
+
+        if (!coordinator.supportsDedicatedSleepStageSync(gbDevice)) {
+            LOG.debug("Skipping SleepStages sync for '$deviceName' — coordinator does not opt in")
+            return SyncerStatistics(recordType = "SleepStages")
+        }
 
         if (HealthPermission.getWritePermission(SleepSessionRecord::class) !in grantedPermissions) {
             LOG.info("Skipping SleepStages sync for '$deviceName' — permission not granted")

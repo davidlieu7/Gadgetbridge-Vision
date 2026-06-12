@@ -107,6 +107,10 @@ abstract class GloryFitCoordinator : AbstractBLEDeviceCoordinator() {
         return true
     }
 
+    override fun supportsDedicatedSleepStageSync(device: GBDevice): Boolean {
+        return true
+    }
+
     override fun supportsActiveCalories(device: GBDevice): Boolean {
         // TODO it does not, but we could try and match their formula in the samples
         return false
