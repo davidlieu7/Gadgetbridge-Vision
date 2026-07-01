@@ -130,6 +130,7 @@ public class GBPrefs extends Prefs {
     public static final String HEALTH_CONNECT_DISABLE_NOTICE = "health_connect_disable_notice";
     public static final String HEALTH_CONNECT_SYNC_ON_EVENT = "health_connect_sync_on_event";
     public static final String HEALTH_CONNECT_DETAILED_WORKOUT_SYNC = "health_connect_detailed_workout_sync";
+    public static final String HEALTH_CONNECT_DELETE_ORPHANED_WORKOUT_SESSIONS = "health_connect_delete_orphaned_workout_sessions";
     public static final String HEALTH_CONNECT_DEVICE_SELECTION = "health_connect_devices_multiselect";
     public static final String HEALTH_CONNECT_SETTINGS = "health_connect_settings";
     public static final String HEALTH_CONNECT_REQUEST_PERMISSIONS = "health_connect_request_permissions";

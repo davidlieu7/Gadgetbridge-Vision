@@ -5629,6 +5629,8 @@
     <string name="health_connect_sync_status_title">Sync Status</string>
     <string name="pref_health_connect_detailed_workout_sync_title">Detailed workout sync</string>
     <string name="pref_health_connect_detailed_workout_sync_summary">Sync GPS routes and per-second metrics (heart rate, speed, power) for workouts. Provides richer data but may take longer.</string>
+    <string name="pref_health_connect_delete_orphaned_workout_sessions_title">Delete unmatched workout sessions</string>
+    <string name="pref_health_connect_delete_orphaned_workout_sessions_summary">Allow Gadgetbridge to delete Health Connect exercise sessions even when matching workout detail records cannot also be removed. Disabled by default to avoid orphaned Health Connect data.</string>
     <string name="health_connect_initial_sync_custom_date">Sync from a custom date</string>
     <string name="health_connect_initial_sync_dialog_title">Initial Health Connect Sync</string>
     <string name="health_connect_initial_sync_dialog_message">Choose how much data to sync for the initial Health Connect synchronization:</string>

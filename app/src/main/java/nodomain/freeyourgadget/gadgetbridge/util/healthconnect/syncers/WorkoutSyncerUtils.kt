@@ -16,13 +16,72 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 package nodomain.freeyourgadget.gadgetbridge.util.healthconnect.syncers
 
+import androidx.health.connect.client.records.ActiveCaloriesBurnedRecord
+import androidx.health.connect.client.records.CyclingPedalingCadenceRecord
+import androidx.health.connect.client.records.DistanceRecord
+import androidx.health.connect.client.records.ElevationGainedRecord
 import androidx.health.connect.client.records.ExerciseSessionRecord
+import androidx.health.connect.client.records.HeartRateRecord
+import androidx.health.connect.client.records.PowerRecord
+import androidx.health.connect.client.records.Record
+import androidx.health.connect.client.records.SpeedRecord
+import androidx.health.connect.client.records.StepsCadenceRecord
+import androidx.health.connect.client.records.TotalCaloriesBurnedRecord
+import androidx.health.connect.client.records.metadata.Metadata
 import nodomain.freeyourgadget.gadgetbridge.model.ActivityKind
+import kotlin.reflect.KClass
 
 /**
  * Shared utilities for workout syncing.
  */
 internal object WorkoutSyncerUtils {
+    const val RECORD_TYPE_SESSION = "session"
+    const val RECORD_TYPE_HEART_RATE = "heart-rate"
+    const val RECORD_TYPE_SPEED = "speed"
+    const val RECORD_TYPE_POWER = "power"
+    const val RECORD_TYPE_DISTANCE = "distance"
+    const val RECORD_TYPE_ACTIVE_CALORIES = "active-calories"
+    const val RECORD_TYPE_TOTAL_CALORIES = "total-calories"
+    const val RECORD_TYPE_ELEVATION = "elevation"
+    const val RECORD_TYPE_STEPS_CADENCE = "steps-cadence"
+    const val RECORD_TYPE_CYCLING_CADENCE = "cycling-cadence"
+
+    data class WorkoutRecordType(
+        val key: String,
+        val recordClass: KClass<out Record>
+    )
+
+    val WORKOUT_RECORD_TYPES = listOf(
+        WorkoutRecordType(RECORD_TYPE_SESSION, ExerciseSessionRecord::class),
+        WorkoutRecordType(RECORD_TYPE_HEART_RATE, HeartRateRecord::class),
+        WorkoutRecordType(RECORD_TYPE_SPEED, SpeedRecord::class),
+        WorkoutRecordType(RECORD_TYPE_POWER, PowerRecord::class),
+        WorkoutRecordType(RECORD_TYPE_DISTANCE, DistanceRecord::class),
+        WorkoutRecordType(RECORD_TYPE_ACTIVE_CALORIES, ActiveCaloriesBurnedRecord::class),
+        WorkoutRecordType(RECORD_TYPE_TOTAL_CALORIES, TotalCaloriesBurnedRecord::class),
+        WorkoutRecordType(RECORD_TYPE_ELEVATION, ElevationGainedRecord::class),
+        WorkoutRecordType(RECORD_TYPE_STEPS_CADENCE, StepsCadenceRecord::class),
+        WorkoutRecordType(RECORD_TYPE_CYCLING_CADENCE, CyclingPedalingCadenceRecord::class)
+    )
+
+    fun workoutClientRecordId(recordTypeKey: String, summaryId: Long): String {
+        return "gb-workout-$recordTypeKey-$summaryId"
+    }
+
+    fun workoutRecordMetadata(
+        base: Metadata,
+        recordTypeKey: String,
+        summaryId: Long,
+        version: Long
+    ): Metadata {
+        val device = base.device ?: return base
+        val id = workoutClientRecordId(recordTypeKey, summaryId)
+        return when (base.recordingMethod) {
+            Metadata.RECORDING_METHOD_ACTIVELY_RECORDED -> Metadata.activelyRecorded(device, id, version)
+            else -> Metadata.autoRecorded(device, id, version)
+        }
+    }
+
     /**
      * Maps Gadgetbridge ActivityKind to Health Connect ExerciseSessionRecord type.
      */

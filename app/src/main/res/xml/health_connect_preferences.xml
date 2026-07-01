@@ -69,6 +69,14 @@
             android:summary="@string/pref_health_connect_detailed_workout_sync_summary"
             app:iconSpaceReserved="false" />
 
+        <SwitchPreferenceCompat
+            android:defaultValue="false"
+            android:key="health_connect_delete_orphaned_workout_sessions"
+            android:layout="@layout/preference_checkbox"
+            android:title="@string/pref_health_connect_delete_orphaned_workout_sessions_title"
+            android:summary="@string/pref_health_connect_delete_orphaned_workout_sessions_summary"
+            app:iconSpaceReserved="false" />
+
         <Preference
             android:icon="@drawable/ic_info"
             android:key="health_connect_sync_notice"
