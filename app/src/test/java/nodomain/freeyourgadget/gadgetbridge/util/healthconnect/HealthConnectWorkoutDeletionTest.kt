@@ -7,6 +7,8 @@ import androidx.health.connect.client.aggregate.AggregationResultGroupedByDurati
 import androidx.health.connect.client.aggregate.AggregationResultGroupedByPeriod
 import androidx.health.connect.client.permission.HealthPermission
 import androidx.health.connect.client.records.ExerciseSessionRecord
+import androidx.health.connect.client.records.HeartRateRecord
+import androidx.health.connect.client.records.PowerRecord
 import androidx.health.connect.client.records.Record
 import androidx.health.connect.client.request.AggregateGroupByDurationRequest
 import androidx.health.connect.client.request.AggregateGroupByPeriodRequest
@@ -30,18 +32,12 @@ class HealthConnectWorkoutDeletionTest {
     @Test
     fun deleteWorkoutFromHealthConnect_deletesExactIdsAndSkipsLegacySessionByDefault() = runBlocking {
         val client = CapturingClient()
-        val snapshot = HealthConnectWorkoutDeletion.WorkoutSummarySnapshot(
-            summaryId = 42L,
-            startTime = Instant.parse("2026-06-01T10:00:00Z"),
-            endTime = Instant.parse("2026-06-01T11:00:00Z")
-        )
-        val grantedPermissions = WorkoutSyncerUtils.WORKOUT_RECORD_TYPES
-            .map { HealthPermission.getWritePermission(it.recordClass) }
-            .toSet()
+        val snapshot = testSnapshot()
 
-        HealthConnectWorkoutDeletion.deleteWorkoutFromHealthConnect(client, grantedPermissions, snapshot)
+        HealthConnectWorkoutDeletion.deleteWorkoutFromHealthConnect(client, allWorkoutPermissions(), snapshot)
 
         assertEquals(WorkoutSyncerUtils.WORKOUT_RECORD_TYPES.size, client.idDeletes.size)
+        assertEquals(expectedDeleteOrder(), client.idDeletes.map { it.recordType })
         for (recordType in WorkoutSyncerUtils.WORKOUT_RECORD_TYPES) {
             val delete = client.idDeletes.single { it.recordType == recordType.recordClass }
             assertTrue(delete.recordIds.isEmpty())
@@ -55,21 +51,31 @@ class HealthConnectWorkoutDeletionTest {
     }
 
     @Test
-    fun deleteWorkoutFromHealthConnect_deletesLegacySessionWhenExplicitlyAllowed() = runBlocking {
+    fun deleteWorkoutFromHealthConnect_skipsLegacySessionWhenIdDeleteSucceedsEvenWhenExplicitlyAllowed() = runBlocking {
         val client = CapturingClient()
-        val snapshot = HealthConnectWorkoutDeletion.WorkoutSummarySnapshot(
-            summaryId = 42L,
-            startTime = Instant.parse("2026-06-01T10:00:00Z"),
-            endTime = Instant.parse("2026-06-01T11:00:00Z")
-        )
-        val grantedPermissions = WorkoutSyncerUtils.WORKOUT_RECORD_TYPES
-            .map { HealthPermission.getWritePermission(it.recordClass) }
-            .toSet()
 
         HealthConnectWorkoutDeletion.deleteWorkoutFromHealthConnect(
             client,
-            grantedPermissions,
-            snapshot,
+            allWorkoutPermissions(),
+            testSnapshot(),
+            allowSessionDeleteWithoutChildRecords = true
+        )
+
+        assertTrue(client.rangeDeletes.isEmpty())
+    }
+
+    @Test
+    fun deleteWorkoutFromHealthConnect_deletesLegacySessionOnlyWhenSessionIdMissing() = runBlocking {
+        val client = CapturingClient(
+            idDeleteFailures = mapOf(
+                ExerciseSessionRecord::class to IllegalArgumentException("No records found for clientRecordId")
+            )
+        )
+
+        HealthConnectWorkoutDeletion.deleteWorkoutFromHealthConnect(
+            client,
+            allWorkoutPermissions(),
+            testSnapshot(),
             allowSessionDeleteWithoutChildRecords = true
         )
 
@@ -80,17 +86,71 @@ class HealthConnectWorkoutDeletionTest {
     @Test
     fun deleteWorkoutFromHealthConnect_skipsSessionWhenChildPermissionMissingByDefault() = runBlocking {
         val client = CapturingClient()
-        val snapshot = HealthConnectWorkoutDeletion.WorkoutSummarySnapshot(
-            summaryId = 42L,
-            startTime = Instant.parse("2026-06-01T10:00:00Z"),
-            endTime = Instant.parse("2026-06-01T11:00:00Z")
-        )
         val grantedPermissions = setOf(HealthPermission.getWritePermission(ExerciseSessionRecord::class))
 
-        HealthConnectWorkoutDeletion.deleteWorkoutFromHealthConnect(client, grantedPermissions, snapshot)
+        HealthConnectWorkoutDeletion.deleteWorkoutFromHealthConnect(client, grantedPermissions, testSnapshot())
 
         assertTrue(client.idDeletes.none { it.recordType == ExerciseSessionRecord::class })
         assertTrue(client.rangeDeletes.isEmpty())
+    }
+
+    @Test
+    fun deleteWorkoutFromHealthConnect_missingChildRecordDoesNotKeepSessionByDefault() = runBlocking {
+        val client = CapturingClient(
+            idDeleteFailures = mapOf(
+                PowerRecord::class to IllegalArgumentException("No records found for clientRecordId")
+            )
+        )
+
+        HealthConnectWorkoutDeletion.deleteWorkoutFromHealthConnect(
+            client,
+            allWorkoutPermissions(),
+            testSnapshot()
+        )
+
+        assertEquals(expectedDeleteOrder(), client.idDeletes.map { it.recordType })
+        assertTrue(client.rangeDeletes.isEmpty())
+    }
+
+    @Test
+    fun deleteWorkoutFromHealthConnect_childFailureKeepsSessionByDefaultAndAttemptsChildrenFirst() = runBlocking {
+        val client = CapturingClient(
+            idDeleteFailures = mapOf(
+                HeartRateRecord::class to IllegalStateException("Health Connect delete failed")
+            )
+        )
+
+        HealthConnectWorkoutDeletion.deleteWorkoutFromHealthConnect(
+            client,
+            allWorkoutPermissions(),
+            testSnapshot()
+        )
+
+        assertEquals(expectedChildDeleteOrder(), client.idDeletes.map { it.recordType })
+        assertTrue(client.idDeletes.none { it.recordType == ExerciseSessionRecord::class })
+        assertTrue(client.rangeDeletes.isEmpty())
+    }
+
+    private fun testSnapshot() = HealthConnectWorkoutDeletion.WorkoutSummarySnapshot(
+        summaryId = 42L,
+        startTime = Instant.parse("2026-06-01T10:00:00Z"),
+        endTime = Instant.parse("2026-06-01T11:00:00Z")
+    )
+
+    private fun allWorkoutPermissions(): Set<String> {
+        return WorkoutSyncerUtils.WORKOUT_RECORD_TYPES
+            .map { HealthPermission.getWritePermission(it.recordClass) }
+            .toSet()
+    }
+
+    private fun expectedChildDeleteOrder(): List<KClass<out Record>> {
+        return WorkoutSyncerUtils.WORKOUT_RECORD_TYPES
+            .filter { it.key != WorkoutSyncerUtils.RECORD_TYPE_SESSION }
+            .map { it.recordClass }
+    }
+
+    private fun expectedDeleteOrder(): List<KClass<out Record>> {
+        return expectedChildDeleteOrder() + ExerciseSessionRecord::class
     }
 
     private data class IdDelete(
@@ -104,7 +164,9 @@ class HealthConnectWorkoutDeletionTest {
         val timeRangeFilter: TimeRangeFilter
     )
 
-    private class CapturingClient : HealthConnectClient {
+    private class CapturingClient(
+        private val idDeleteFailures: Map<KClass<out Record>, Exception> = emptyMap()
+    ) : HealthConnectClient {
         val idDeletes = mutableListOf<IdDelete>()
         val rangeDeletes = mutableListOf<RangeDelete>()
 
@@ -117,6 +179,7 @@ class HealthConnectWorkoutDeletionTest {
             clientRecordIdsList: List<String>
         ) {
             idDeletes.add(IdDelete(recordType, recordIdsList, clientRecordIdsList))
+            idDeleteFailures[recordType]?.let { throw it }
         }
 
         override suspend fun deleteRecords(recordType: KClass<out Record>, timeRangeFilter: TimeRangeFilter) {

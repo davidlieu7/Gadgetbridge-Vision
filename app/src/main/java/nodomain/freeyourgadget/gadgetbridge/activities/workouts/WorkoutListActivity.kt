@@ -440,15 +440,17 @@ class WorkoutListActivity : AbstractListActivity<BaseActivitySummary>() {
     }
 
     private fun deleteItems(items: List<BaseActivitySummary>) {
+        val healthConnectSnapshots = mutableListOf<HealthConnectWorkoutDeletion.WorkoutSummarySnapshot>()
         items.forEach { item ->
             val healthConnectSnapshot = HealthConnectWorkoutDeletion.snapshot(item)
             try {
                 item.delete()
-                healthConnectSnapshot?.let { HealthConnectWorkoutDeletion.deleteWorkoutFromHealthConnect(this, it) }
+                healthConnectSnapshot?.let { healthConnectSnapshots.add(it) }
             } catch (_: Exception) {
                 // pass delete error
             }
         }
+        HealthConnectWorkoutDeletion.deleteWorkoutsFromHealthConnect(this, healthConnectSnapshots)
         refresh()
     }
 

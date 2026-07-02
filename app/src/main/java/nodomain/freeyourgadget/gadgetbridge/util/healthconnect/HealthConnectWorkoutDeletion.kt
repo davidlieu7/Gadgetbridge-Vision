@@ -32,10 +32,18 @@ import nodomain.freeyourgadget.gadgetbridge.util.GBPrefs
 import nodomain.freeyourgadget.gadgetbridge.util.healthconnect.syncers.WorkoutSyncerUtils
 import org.slf4j.LoggerFactory
 import java.time.Instant
+import java.util.Locale
 import kotlin.reflect.KClass
 
 internal object HealthConnectWorkoutDeletion {
     private val LOG = LoggerFactory.getLogger(HealthConnectWorkoutDeletion::class.java)
+
+    private enum class ClientRecordDeleteResult {
+        DELETED,
+        NOT_FOUND,
+        FAILED,
+        SKIPPED
+    }
 
     data class WorkoutSummarySnapshot(
         val summaryId: Long,
@@ -65,17 +73,26 @@ internal object HealthConnectWorkoutDeletion {
 
     @OptIn(DelicateCoroutinesApi::class)
     fun deleteWorkoutFromHealthConnect(context: Context, snapshot: WorkoutSummarySnapshot) {
+        deleteWorkoutsFromHealthConnect(context, listOf(snapshot))
+    }
+
+    @OptIn(DelicateCoroutinesApi::class)
+    fun deleteWorkoutsFromHealthConnect(context: Context, snapshots: List<WorkoutSummarySnapshot>) {
+        if (snapshots.isEmpty()) {
+            return
+        }
+
         val appContext = context.applicationContext
         GlobalScope.launch(Dispatchers.IO) {
             try {
                 if (!HealthConnectPermissionManager.isHealthConnectEnabled(appContext)) {
-                    LOG.debug("Skipping Health Connect workout deletion for {}: Health Connect is disabled.", snapshot.summaryId)
+                    LOG.debug("Skipping Health Connect workout deletion for {} workout(s): Health Connect is disabled.", snapshots.size)
                     return@launch
                 }
 
                 val healthConnectClient = HealthConnectClientProvider.healthConnectInit(appContext)
                 if (healthConnectClient == null) {
-                    LOG.warn("Skipping Health Connect workout deletion for {}: client unavailable.", snapshot.summaryId)
+                    LOG.warn("Skipping Health Connect workout deletion for {} workout(s): client unavailable.", snapshots.size)
                     return@launch
                 }
 
@@ -88,14 +105,20 @@ internal object HealthConnectWorkoutDeletion {
                     false
                 )
 
-                deleteWorkoutFromHealthConnect(
-                    healthConnectClient,
-                    grantedPermissions,
-                    snapshot,
-                    allowSessionDeleteWithoutChildRecords
-                )
+                for (snapshot in snapshots) {
+                    try {
+                        deleteWorkoutFromHealthConnect(
+                            healthConnectClient,
+                            grantedPermissions,
+                            snapshot,
+                            allowSessionDeleteWithoutChildRecords
+                        )
+                    } catch (e: Exception) {
+                        LOG.warn("Failed to delete workout {} from Health Connect.", snapshot.summaryId, e)
+                    }
+                }
             } catch (e: Exception) {
-                LOG.warn("Failed to delete workout {} from Health Connect.", snapshot.summaryId, e)
+                LOG.warn("Failed to delete {} workout(s) from Health Connect.", snapshots.size, e)
             }
         }
     }
@@ -121,32 +144,16 @@ internal object HealthConnectWorkoutDeletion {
                 continue
             }
 
-            val clientRecordId = WorkoutSyncerUtils.workoutClientRecordId(recordType.key, snapshot.summaryId)
-            try {
-                healthConnectClient.deleteRecords(
-                    recordType.recordClass,
-                    recordIdsList = emptyList(),
-                    clientRecordIdsList = listOf(clientRecordId)
-                )
-                LOG.debug(
-                    "Deleted Health Connect {} with clientRecordId={} for workout {}.",
-                    recordType.recordClass.simpleName,
-                    clientRecordId,
-                    snapshot.summaryId
-                )
-            } catch (e: Exception) {
-                LOG.warn(
-                    "Failed to delete Health Connect {} with clientRecordId={} for workout {}.",
-                    recordType.recordClass.simpleName,
-                    clientRecordId,
-                    snapshot.summaryId,
-                    e
-                )
-                childRecordsDeleted = false
+            when (deleteRecordByClientRecordId(healthConnectClient, recordType.recordClass, recordType.key, snapshot)) {
+                ClientRecordDeleteResult.DELETED,
+                ClientRecordDeleteResult.NOT_FOUND -> Unit
+
+                ClientRecordDeleteResult.FAILED,
+                ClientRecordDeleteResult.SKIPPED -> childRecordsDeleted = false
             }
         }
 
-        deleteExerciseSessionByClientRecordId(
+        val sessionDeleteResult = deleteExerciseSessionByClientRecordId(
             healthConnectClient,
             grantedPermissions,
             snapshot,
@@ -154,13 +161,25 @@ internal object HealthConnectWorkoutDeletion {
             allowSessionDeleteWithoutChildRecords
         )
 
-        if (allowSessionDeleteWithoutChildRecords) {
-            deleteLegacyExerciseSession(healthConnectClient, grantedPermissions, snapshot)
-        } else {
-            LOG.debug(
-                "Skipping legacy Health Connect exercise deletion for workout {} because unmatched session deletion is disabled.",
-                snapshot.summaryId
-            )
+        when {
+            allowSessionDeleteWithoutChildRecords && sessionDeleteResult == ClientRecordDeleteResult.NOT_FOUND -> {
+                deleteLegacyExerciseSession(healthConnectClient, grantedPermissions, snapshot)
+            }
+
+            allowSessionDeleteWithoutChildRecords -> {
+                LOG.debug(
+                    "Skipping legacy Health Connect exercise deletion for workout {} because clientRecordId deletion result was {}.",
+                    snapshot.summaryId,
+                    sessionDeleteResult
+                )
+            }
+
+            else -> {
+                LOG.debug(
+                    "Skipping legacy Health Connect exercise deletion for workout {} because unmatched session deletion is disabled.",
+                    snapshot.summaryId
+                )
+            }
         }
     }
 
@@ -170,40 +189,65 @@ internal object HealthConnectWorkoutDeletion {
         snapshot: WorkoutSummarySnapshot,
         childRecordsDeleted: Boolean,
         allowSessionDeleteWithoutChildRecords: Boolean
-    ) {
+    ): ClientRecordDeleteResult {
         if (!hasWritePermission(grantedPermissions, ExerciseSessionRecord::class)) {
-            return
+            return ClientRecordDeleteResult.SKIPPED
         }
         if (!childRecordsDeleted && !allowSessionDeleteWithoutChildRecords) {
             LOG.warn(
                 "Skipping Health Connect ExerciseSessionRecord deletion for workout {} because some child records could not be deleted.",
                 snapshot.summaryId
             )
-            return
+            return ClientRecordDeleteResult.SKIPPED
         }
 
-        val clientRecordId = WorkoutSyncerUtils.workoutClientRecordId(
+        return deleteRecordByClientRecordId(
+            healthConnectClient,
+            ExerciseSessionRecord::class,
             WorkoutSyncerUtils.RECORD_TYPE_SESSION,
-            snapshot.summaryId
+            snapshot
         )
+    }
+
+    private suspend fun deleteRecordByClientRecordId(
+        healthConnectClient: HealthConnectClient,
+        recordClass: KClass<out Record>,
+        recordTypeKey: String,
+        snapshot: WorkoutSummarySnapshot
+    ): ClientRecordDeleteResult {
+        val clientRecordId = WorkoutSyncerUtils.workoutClientRecordId(recordTypeKey, snapshot.summaryId)
         try {
             healthConnectClient.deleteRecords(
-                ExerciseSessionRecord::class,
+                recordClass,
                 recordIdsList = emptyList(),
                 clientRecordIdsList = listOf(clientRecordId)
             )
             LOG.debug(
-                "Deleted Health Connect ExerciseSessionRecord with clientRecordId={} for workout {}.",
+                "Deleted Health Connect {} with clientRecordId={} for workout {}.",
+                recordClass.simpleName,
                 clientRecordId,
                 snapshot.summaryId
             )
+            return ClientRecordDeleteResult.DELETED
         } catch (e: Exception) {
-            LOG.warn(
-                "Failed to delete Health Connect ExerciseSessionRecord with clientRecordId={} for workout {}.",
-                clientRecordId,
-                snapshot.summaryId,
-                e
-            )
+            if (isMissingRecordIdentifierException(e)) {
+                LOG.debug(
+                    "No Health Connect {} found with clientRecordId={} for workout {}; treating as already absent.",
+                    recordClass.simpleName,
+                    clientRecordId,
+                    snapshot.summaryId
+                )
+                return ClientRecordDeleteResult.NOT_FOUND
+            } else {
+                LOG.warn(
+                    "Failed to delete Health Connect {} with clientRecordId={} for workout {}.",
+                    recordClass.simpleName,
+                    clientRecordId,
+                    snapshot.summaryId,
+                    e
+                )
+                return ClientRecordDeleteResult.FAILED
+            }
         }
     }
 
@@ -250,5 +294,25 @@ internal object HealthConnectWorkoutDeletion {
         recordClass: KClass<out Record>
     ): Boolean {
         return HealthPermission.getWritePermission(recordClass) in grantedPermissions
+    }
+
+    private fun isMissingRecordIdentifierException(e: Exception): Boolean {
+        val message = generateSequence(e as Throwable?) { it.cause }
+            .mapNotNull { it.message }
+            .joinToString(" ")
+            .lowercase(Locale.ROOT)
+
+        return listOf(
+            "not found",
+            "not exist",
+            "does not exist",
+            "doesn't exist",
+            "non-existing",
+            "non existing",
+            "no record",
+            "invalid uid",
+            "invalid identifier",
+            "invalid id"
+        ).any { it in message }
     }
 }
