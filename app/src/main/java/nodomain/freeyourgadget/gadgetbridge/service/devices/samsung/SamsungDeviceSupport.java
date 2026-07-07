@@ -38,13 +38,13 @@ public class SamsungDeviceSupport extends AbstractBTLESingleDeviceSupport {
         @Override
         public void onHello(byte[] frame) {
             LOG.debug("SAP HELLO received ({} bytes)", frame.length);
-
-            writeRaw(GB.hexStringToByteArray("6815040100ff035341505f42444435343931383942423336363141414537443132303941304245393346340101f4000003d44d323030374a335359000000000000005869616f6d69000000000000000000005869616f6d6900000000000000000000ffffffffffff02"), "hello-reply");
-            // The phone side answers HELLO with a "SAP_<token>" frame + its
-            // model/vendor. Reproduce that handshake here once decoded.
-            byte[] payload = sap.buildSingle(0x01, GB.hexStringToByteArray("01040205000e"), MTU );
-            byte[] replyFrame = SapFrame.wrap(payload);
-            writeRaw(replyFrame, "hello-reply");
+            if (SapHello.isBandHello(frame)) {
+                // Answer the band's "SAMSUNG_ACCESSARY" HELLO with our "SAP_<token>"
+                // reply. Without this the band stays on "Continue on the phone".
+                byte[] reply = SapHello.buildPhoneHello("SM-S918B", "samsung");
+                writeRaw(reply, "sap-hello-reply");
+                sendPostHelloInit();
+            }
         }
     });
 
@@ -107,7 +107,13 @@ public class SamsungDeviceSupport extends AbstractBTLESingleDeviceSupport {
     private void handleAppMessage(int channel, byte[] body) {
         // Dispatch reassembled application messages. Decode per channel using the
         // field maps (health 0x0A, media 0x09, etc.).
+        int msgId = body.length > 0 ? (body[0] & 0x3F) : -1;
         switch (channel) {
+            case SapProtocol.CH_CAPABILITY_0F:
+                // The band pushes its capability table (MSG_ID 0) repeatedly during
+                // setup; the vendor app answers with a single 0x00. Mirror that.
+                sendRawMessage(SapProtocol.CH_CAPABILITY_0F, new byte[]{0x00}, "cap-ack");
+                break;
             case SapProtocol.CH_MEDIA:
                 LOG.debug("media message ({} bytes)", body.length);
                 break;
@@ -118,9 +124,35 @@ public class SamsungDeviceSupport extends AbstractBTLESingleDeviceSupport {
                 LOG.debug("find-band status");
                 break;
             default:
-                LOG.debug("channel 0x{} message ({} bytes)",
-                        Integer.toHexString(channel), body.length);
+                LOG.debug("channel 0x{} msgId {} ({} bytes)",
+                        Integer.toHexString(channel), msgId, body.length);
         }
+    }
+
+
+    /**
+     * The minimal proactive init the vendor app sends after the HELLO reply, as
+     * observed in the capture(s). This gets the band into the same state the
+     * vendor app reaches; see the note below about the license gate.
+     */
+    private void sendPostHelloInit() {
+        // Ask the band for its device info (model/serial). Band replies on 0x01.
+        sendRawMessage(SapProtocol.CH_CONTROL, new byte[]{0x01, 0x04, 0x02, 0x05, 0x00, 0x0D}, "dev-info-req");
+        // Quick-reply channel init.
+        sendRawMessage(SapProtocol.CH_QUICK_REPLY, new byte[]{0x02, 0x03, 0x01}, "quickreply-init");
+        // Time request/sync trigger.
+        sendRawMessage(SapProtocol.CH_TIME_CAL, new byte[]{0x07}, "time-req");
+        
+        // NOTE (license gate): the band shows "Continue on the phone" until the
+        // user accepts the terms in the vendor app. The message that advances it
+        // is sent by the app *after* acceptance and is NOT in the init captures
+        // (they all end before acceptance). Capture a full pairing that includes
+        // tapping "accept" to obtain it, then send it here.
+    }
+
+    /** Send a pre-built inner body on a channel (alias of sendMessage). */
+    private void sendRawMessage(int channel, byte[] body, String reason) {
+        sendMessage(channel, body, reason);
     }
 
 
