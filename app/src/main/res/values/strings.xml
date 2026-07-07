@@ -6037,4 +6037,5 @@
     <string name="datestep_next_week">Next week</string>
     <string name="datestep_prev_month">Previous month</string>
     <string name="datestep_next_month">Next month</string>
+    <string name="devicetype_samsung_fit3">Samsung Fit3</string>
 </resources>
