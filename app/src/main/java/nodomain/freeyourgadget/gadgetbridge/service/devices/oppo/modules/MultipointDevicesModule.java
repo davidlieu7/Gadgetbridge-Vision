@@ -25,6 +25,7 @@ import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Comparator;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
@@ -47,11 +48,16 @@ public class MultipointDevicesModule extends AbstractModule {
     }
 
     @NonNull
-    public List<OppoMessage> encodeDeviceAction(@NonNull final String macAddressStr, @NonNull final MultipointDeviceAction action) {
+    public OppoMessage encodeReq() {
+        return new OppoMessage(OppoCommand.MULTIPOINT_DEVICES_REQ, new byte[0]);
+    }
+
+    public OppoMessage encodeDeviceAction(@NonNull final String macAddressStr,
+            @NonNull final MultipointDeviceAction action) {
         byte[] macAddress = StringUtils.hexToBytes(macAddressStr.replace(":", ""));
         if (macAddress.length != 6) {
             LOG.warn("Unexpected MAC Address length: {}, expected 6", macAddress.length);
-            return Collections.emptyList();
+            return null;
         }
 
         if (macOrder == ByteOrder.LITTLE_ENDIAN) {
@@ -123,6 +129,8 @@ public class MultipointDevicesModule extends AbstractModule {
             devices.add(new MultipointDevice(macAddress, deviceName, isConnected, false, !isSelf));
         }
 
+        devices.sort(Comparator.comparing(MultipointDevice::getCanForget).thenComparing(MultipointDevice::getName,
+                Comparator.nullsLast(String::compareTo)));
         return devices;
     }
 }

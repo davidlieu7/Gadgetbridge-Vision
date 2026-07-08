@@ -46,6 +46,7 @@ import java.util.LinkedList;
 
 import nodomain.freeyourgadget.gadgetbridge.R;
 import nodomain.freeyourgadget.gadgetbridge.activities.multipoint.MultipointPairingActivity;
+import nodomain.freeyourgadget.gadgetbridge.activities.multipoint.MultipointDevice;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
 import nodomain.freeyourgadget.gadgetbridge.util.StringUtils;
 import nodomain.freeyourgadget.gadgetbridge.util.LEB128Utils;
@@ -62,8 +63,10 @@ import nodomain.freeyourgadget.gadgetbridge.service.devices.oppo.commands.MiscCo
 import nodomain.freeyourgadget.gadgetbridge.service.devices.oppo.commands.AncConfigType;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.oppo.commands.AncConfigValue;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.oppo.commands.SubscriptionType;
+import nodomain.freeyourgadget.gadgetbridge.service.devices.oppo.commands.MultipointDeviceAction;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.oppo.modules.FirmwareVersionModule;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.oppo.modules.MiscConfigModule;
+import nodomain.freeyourgadget.gadgetbridge.service.devices.oppo.modules.MultipointDevicesModule;
 import nodomain.freeyourgadget.gadgetbridge.devices.oppo.OppoHeadphonesCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.oppo.OppoHeadphonesPreferences;
 import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEvent;
@@ -266,7 +269,8 @@ public class OppoHeadphonesSupport extends AbstractHeadphoneBTBRDeviceSupport {
     protected void handleCommand(OppoCommand command, byte[] payload) {
         final ByteBuffer buf = ByteBuffer.wrap(payload);
         switch (command) {
-            case SUBSCRIPTION_ACK, TOUCH_CONFIG_ACK, MISC_CONFIG_ACK, ANC_CONFIG_ACK, FIND_DEVICE_ACK -> {
+            case SUBSCRIPTION_ACK, TOUCH_CONFIG_ACK, MISC_CONFIG_ACK, ANC_CONFIG_ACK, FIND_DEVICE_ACK,
+                    MULTIPOINT_DEVICES_ACK -> {
                 final int zero = buf.get();
                 if (zero != 0) {
                     LOG.warn("Unexpected non-zero byte 0x{} for {}", OppoUtils.numberToHex(zero, 2), command);
@@ -351,6 +355,9 @@ public class OppoHeadphonesSupport extends AbstractHeadphoneBTBRDeviceSupport {
                 LOG.debug("Got {}", command);
                 parseFindPhone(payload);
             }
+            case MULTIPOINT_DEVICES_RET -> {
+                multipointReceiverDevices(getMultipointDevsModule().decodeRet(payload));
+            }
             default -> LOG.warn("Unhandled command {}", command);
         }
 
@@ -417,6 +424,8 @@ public class OppoHeadphonesSupport extends AbstractHeadphoneBTBRDeviceSupport {
             types.add(SubscriptionType.ANC_SELECTOR);
         if (getCoordinator().supportsGameMode(getDevice()))
             types.add(SubscriptionType.GAME_MODE);
+        if (getCoordinator().supportsMultipoint(getDevice()))
+            types.add(SubscriptionType.MULTIPOINT);
 
         final ByteBuffer buf = ByteBuffer.allocate(1 + types.size());
         buf.put((byte) 0x09);
@@ -483,6 +492,10 @@ public class OppoHeadphonesSupport extends AbstractHeadphoneBTBRDeviceSupport {
                 evaluateGBDeviceEvent(new GBDeviceEventUpdatePreferences(
                         OppoHeadphonesPreferences.ANC_SELECTOR,
                         value.getPrefId()));
+                break;
+            }
+            case MULTIPOINT: {
+                multipointReceiverDevices(getMultipointDevsModule().decodeRet(payload));
                 break;
             }
             default: {
@@ -704,6 +717,24 @@ public class OppoHeadphonesSupport extends AbstractHeadphoneBTBRDeviceSupport {
                 case MultipointPairingActivity.ACTION_MULTIPOINT_GET_STATUS -> {
                     queueCommand(getMiscConfigModule().encodeReq(MiscConfigType.MULTIPOINT));
                 }
+                case MultipointPairingActivity.ACTION_MULTIPOINT_GET_DEVICES -> {
+                    queueCommand(getMultipointDevsModule().encodeReq());
+                }
+                case MultipointPairingActivity.ACTION_MULTIPOINT_CONNECT_DEVICE -> {
+                    final String macAddress = intent.getStringExtra(MultipointPairingActivity.EXTRA_DEVICE_ADDRESS);
+                    queueCommand(
+                            getMultipointDevsModule().encodeDeviceAction(macAddress, MultipointDeviceAction.CONNECT));
+                }
+                case MultipointPairingActivity.ACTION_MULTIPOINT_DISCONNECT_DEVICE -> {
+                    final String macAddress = intent.getStringExtra(MultipointPairingActivity.EXTRA_DEVICE_ADDRESS);
+                    queueCommand(
+                            getMultipointDevsModule().encodeDeviceAction(macAddress, MultipointDeviceAction.DISCONNECT));
+                }
+                case MultipointPairingActivity.ACTION_MULTIPOINT_FORGET_DEVICE -> {
+                    final String macAddress = intent.getStringExtra(MultipointPairingActivity.EXTRA_DEVICE_ADDRESS);
+                    queueCommand(
+                            getMultipointDevsModule().encodeDeviceAction(macAddress, MultipointDeviceAction.FORGET));
+                }
             }
         }
     };
@@ -726,6 +757,15 @@ public class OppoHeadphonesSupport extends AbstractHeadphoneBTBRDeviceSupport {
         intent.putExtra(GBDevice.EXTRA_DEVICE, getDevice());
         intent.putExtra(MultipointPairingActivity.EXTRA_MULTIPOINT_ENABLED, isEnabled);
         intent.putExtra(MultipointPairingActivity.EXTRA_MULTIPOINT_DISABLE_SUPPORTED, true);
+        LocalBroadcastManager.getInstance(getContext()).sendBroadcast(intent);
+    }
+
+    private void multipointReceiverDevices(List<MultipointDevice> devices) {
+        Intent intent = new Intent(MultipointPairingActivity.ACTION_MULTIPOINT_DEVICE_LIST);
+        intent.putExtra(GBDevice.EXTRA_DEVICE, getDevice());
+        intent.putParcelableArrayListExtra(
+                MultipointPairingActivity.EXTRA_DEVICE_LIST,
+                new ArrayList<>(devices));
         LocalBroadcastManager.getInstance(getContext()).sendBroadcast(intent);
     }
 
@@ -797,6 +837,10 @@ public class OppoHeadphonesSupport extends AbstractHeadphoneBTBRDeviceSupport {
 
     protected MiscConfigModule getMiscConfigModule() {
         return new MiscConfigModule(getContext());
+    }
+
+    protected MultipointDevicesModule getMultipointDevsModule() {
+        return new MultipointDevicesModule(getContext(), ByteOrder.BIG_ENDIAN);
     }
 
     @Override
