@@ -28,6 +28,7 @@ import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.Device
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.components.enumList
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.components.multiEnumList
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.components.screen
+import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.components.multipointPairing
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.deviceSettings
 import nodomain.freeyourgadget.gadgetbridge.devices.AbstractBLClassicDeviceCoordinator
 import nodomain.freeyourgadget.gadgetbridge.devices.DeviceCoordinator
@@ -90,11 +91,7 @@ abstract class OppoHeadphonesCoordinator : AbstractBLClassicDeviceCoordinator() 
             )
         }
         if (supportsMultipoint(device)) {
-            switchSetting(
-                key = OppoHeadphonesPreferences.MULTIPOINT,
-                title = R.string.bluetooth_multipoint_pairing,
-                icon = R.drawable.ic_bluetooth_searching,
-            )
+            multipointPairing()
         }
         touchOptions(device)
         xmlScreen(
