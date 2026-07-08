@@ -3,18 +3,14 @@ package nodomain.freeyourgadget.gadgetbridge.service.devices.samsung;
 import android.bluetooth.BluetoothGatt;
 import android.bluetooth.BluetoothGattCharacteristic;
 import android.content.SharedPreferences;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
 import java.io.IOException;
 import java.util.UUID;
-
 import nodomain.freeyourgadget.gadgetbridge.GBApplication;
 import nodomain.freeyourgadget.gadgetbridge.service.btle.AbstractBTLESingleDeviceSupport;
 import nodomain.freeyourgadget.gadgetbridge.service.btle.TransactionBuilder;
-import nodomain.freeyourgadget.gadgetbridge.service.devices.fitpro.FitProDeviceSupport;
-import nodomain.freeyourgadget.gadgetbridge.util.GB;
+
 
 public class SamsungDeviceSupport extends AbstractBTLESingleDeviceSupport {
     private static final Logger LOG = LoggerFactory.getLogger(SamsungDeviceSupport.class);
@@ -295,4 +291,15 @@ public class SamsungDeviceSupport extends AbstractBTLESingleDeviceSupport {
     public boolean useAutoConnect() {
         return false;
     }
+
+
+    @Override
+    public void onFindDevice(boolean start) {
+        LOG.debug("Samsung find device");
+        /** Ring the band to find it (channel 0x02, MSG_ID 3). */
+        byte[] body = SapPayloadBuilder.fixed(3).raw(0x01).rawLe16(0x02b4).raw(0x00).build();
+        sendMessage(SapProtocol.CH_FIND_BAND, body, "find-band");
+
+    }
+
 }

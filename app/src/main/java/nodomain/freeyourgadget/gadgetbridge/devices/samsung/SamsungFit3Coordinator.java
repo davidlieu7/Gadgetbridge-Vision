@@ -77,4 +77,10 @@ public class SamsungFit3Coordinator extends AbstractBLEDeviceCoordinator {
     public Class<? extends DeviceSupport> getDeviceSupportClass(GBDevice device) {
         return SamsungDeviceSupport.class;
     }
+
+    @Override
+    public boolean supportsFindDevice(@NonNull GBDevice device) {
+        return true;
+    }
+
 }
