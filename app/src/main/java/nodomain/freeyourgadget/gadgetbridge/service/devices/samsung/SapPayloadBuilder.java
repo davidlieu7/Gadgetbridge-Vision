@@ -114,6 +114,17 @@ public final class SapPayloadBuilder {
         return this;
     }
 
+    /** String parameter: [id][len:2 LE][utf8]. */
+    public SapPayloadBuilder addString16(int id, String value) {
+        byte[] utf8 = value.getBytes(UTF8);
+        out.write(id & 0xFF);
+        out.write(utf8.length & 0xFF);           // 2-byte LE length, low byte
+        out.write((utf8.length >> 8) & 0xFF);    // 2-byte LE length, high byte
+        out.write(utf8, 0, utf8.length);
+        paramCount++;
+        return this;
+    }
+
     /** Raw/custom parameter: [id][len:1][bytes]. */
     public SapPayloadBuilder addRawParam(int id, byte[] data) {
         out.write(id & 0xFF);
