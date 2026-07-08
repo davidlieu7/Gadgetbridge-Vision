@@ -2,6 +2,7 @@ package nodomain.freeyourgadget.gadgetbridge.service.devices.samsung;
 
 import android.bluetooth.BluetoothGatt;
 import android.bluetooth.BluetoothGattCharacteristic;
+import android.content.SharedPreferences;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -9,6 +10,7 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.util.UUID;
 
+import nodomain.freeyourgadget.gadgetbridge.GBApplication;
 import nodomain.freeyourgadget.gadgetbridge.service.btle.AbstractBTLESingleDeviceSupport;
 import nodomain.freeyourgadget.gadgetbridge.service.btle.TransactionBuilder;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.fitpro.FitProDeviceSupport;
@@ -26,8 +28,36 @@ public class SamsungDeviceSupport extends AbstractBTLESingleDeviceSupport {
             UUID.fromString("63e30bad-4206-4596-839f-e47cbf7a4b5d");
 
     private static final int MTU = 512;
+    private static final String PHONE_MODEL = "SM-S918B";   // announced in HELLO; any works
+    private static final String PHONE_VENDOR = "samsung";
+    private String deviceMac; //get it from GB
 
     private int negotiatedMtu = 23;
+
+    // SAP HELLO session token and the 0x1a binding/registration token. IMPORTANT:
+    // both are STABLE per bond - captures across sessions showed byte-identical
+    // values, so the vendor app persists them and replays them every connect.
+    // Generate ONCE at first pairing and PERSIST (e.g. device props /
+    // SharedPreferences); do NOT randomize per connection. Reusing the vendor
+    // app's existing bond would instead require its exact tokens - a fresh
+    // Gadgetbridge pairing (band unpaired from the phone / reset) is cleaner.
+
+
+    private String loadOrCreateToken(String key) {
+        SharedPreferences sharedPrefs = GBApplication.getDeviceSpecificSharedPrefs(deviceMac);
+
+        String token = sharedPrefs.getString(key, null);
+        // TODO: load from persistent storage keyed by device; create+store if absent.
+        // Placeholder generates a fresh 32-hex value each app run - REPLACE with a
+        // persisted value or the band will see a new identity on every launch.
+        if (token == null || token.isEmpty()) {
+            token =SapHello.randomToken().toLowerCase();
+            SharedPreferences.Editor editor = sharedPrefs.edit();
+            editor.putString(key,token);
+            editor.apply();
+        }
+        return token;
+    }
 
     private final SapProtocol sap = new SapProtocol(new SapProtocol.Listener() {
         @Override
@@ -41,7 +71,9 @@ public class SamsungDeviceSupport extends AbstractBTLESingleDeviceSupport {
             if (SapHello.isBandHello(frame)) {
                 // Answer the band's "SAMSUNG_ACCESSARY" HELLO with our "SAP_<token>"
                 // reply. Without this the band stays on "Continue on the phone".
-                byte[] reply = SapHello.buildPhoneHello("SM-S918B", "samsung");
+                final String helloToken = loadOrCreateToken("sap_hello_token");
+
+                byte[] reply = SapHello.buildPhoneHello(helloToken, PHONE_MODEL, PHONE_VENDOR);
                 writeRaw(reply, "sap-hello-reply");
                 sendPostHelloInit();
             }
@@ -70,6 +102,7 @@ public class SamsungDeviceSupport extends AbstractBTLESingleDeviceSupport {
         //    Implement the HELLO reply, then mark INITIALIZED there instead of
         //    here. Marking it here is fine to get a first connection working.
         builder.setDeviceState(nodomain.freeyourgadget.gadgetbridge.impl.GBDevice.State.INITIALIZED);
+        deviceMac = this.gbDevice.getAddress();
         return builder;
     }
 
@@ -105,29 +138,60 @@ public class SamsungDeviceSupport extends AbstractBTLESingleDeviceSupport {
     }
 
     private void handleAppMessage(int channel, byte[] body) {
-        // Dispatch reassembled application messages. Decode per channel using the
-        // field maps (health 0x0A, media 0x09, etc.).
-        int msgId = body.length > 0 ? (body[0] & 0x3F) : -1;
-        switch (channel) {
-            case SapProtocol.CH_CAPABILITY_0F:
-                // The band pushes its capability table (MSG_ID 0) repeatedly during
-                // setup; the vendor app answers with a single 0x00. Mirror that.
-                sendRawMessage(SapProtocol.CH_CAPABILITY_0F, new byte[]{0x00}, "cap-ack");
-                break;
-            case SapProtocol.CH_MEDIA:
-                LOG.debug("media message ({} bytes)", body.length);
-                break;
-            case SapProtocol.CH_HEALTH:
-                LOG.debug("health record ({} bytes)", body.length);
-                break;
-            case SapProtocol.CH_FIND_BAND:
-                LOG.debug("find-band status");
-                break;
-            default:
-                LOG.debug("channel 0x{} msgId {} ({} bytes)",
-                        Integer.toHexString(channel), msgId, body.length);
+        if (body.length == 0) {
+            return;
         }
+        int msgId = body[0] & 0x3F;
+        boolean isRequest = ((body[0] >> 6) & 1) == 0;
+
+        // The init is BAND-DRIVEN: the band REQUESTS the config it needs and we
+        // must answer, or it stalls. (Verified from full both-sides captures.)
+        if (isRequest) {
+            switch (channel) {
+                case SapProtocol.CH_CAPABILITY_0F:       // capability table -> ack 0x00
+                    //sendRawMessage(SapProtocol.CH_CAPABILITY_0F, new byte[]{0x00}, "cap-ack"); //WARN: loops
+                    return;
+                case SapProtocol.CH_TIME_CAL:            // 0x08: /12,/13 timezone, /7 alarms, /9 calendar
+                    onTimeCalendarRequest(msgId, body);
+                    return;
+                case SapProtocol.CH_HEALTH:              // 0x0a: /9,/4 config; /2,/3,/32,/34,/62,/63 data upload
+                    onHealthRequest(msgId, body);
+                    return;
+                case SapProtocol.CH_NOTIFICATION:        // 0x07: /16,/22 notification config
+                case SapProtocol.CH_MEDIA:               // 0x09: /1,/8 media state
+                case SapProtocol.CH_SETTINGS:            // 0x0b: /16,/35 settings read-back
+                case SapProtocol.CH_CONTROL:
+                    LOG.debug("band request ch=0x{} msgId={} (needs a response - see capture)",
+                            Integer.toHexString(channel), msgId);
+                    return;
+                default:
+                    LOG.debug("band request ch=0x{} msgId={} unhandled",
+                            Integer.toHexString(channel), msgId);
+                    return;
+            }
+        }
+
+        // Responses / data pushed by the band (health records, now-playing, etc.)
+        LOG.debug("band data ch=0x{} msgId={} ({} bytes)",
+                Integer.toHexString(channel), msgId, body.length);
     }
+
+    /** Answer the band's 0x08 requests: timezone, alarms, calendar. */
+    private void onTimeCalendarRequest(int msgId, byte[] req) {
+        // e.g. band sends 0x0c (MSG_ID 12) -> reply with the timezone name+offset,
+        // 0x07 (MSG_ID 7) -> alarms, 0x09 (MSG_ID 9) -> calendar events.
+        // Build these from the user's timezone/calendar; see
+        // the captured 0x08 responses for the exact field layout.
+        LOG.debug("TODO respond to time/calendar request MSG_ID={}", msgId);
+    }
+
+    /** Answer / ack the band's 0x0a health requests and data uploads. */
+    private void onHealthRequest(int msgId, byte[] req) {
+        // /9,/4 = config (locale, feature enable); /2,/3,/32,/34,/62,/63 = the band
+        // uploading stored steps/sleep/workout records - ack them so it advances.
+        LOG.debug("TODO respond/ack health request MSG_ID={}", msgId);
+    }
+
 
 
     /**
@@ -135,21 +199,72 @@ public class SamsungDeviceSupport extends AbstractBTLESingleDeviceSupport {
      * observed in the capture(s). This gets the band into the same state the
      * vendor app reaches; see the note below about the license gate.
      */
+
     private void sendPostHelloInit() {
-        // Ask the band for its device info (model/serial). Band replies on 0x01.
-        sendRawMessage(SapProtocol.CH_CONTROL, new byte[]{0x01, 0x04, 0x02, 0x05, 0x00, 0x0D}, "dev-info-req");
-        // Quick-reply channel init.
-        sendRawMessage(SapProtocol.CH_QUICK_REPLY, new byte[]{0x02, 0x03, 0x01}, "quickreply-init");
-        // Time request/sync trigger.
-        sendRawMessage(SapProtocol.CH_TIME_CAL, new byte[]{0x07}, "time-req");
-        
-        // NOTE (license gate): the band shows "Continue on the phone" until the
-        // user accepts the terms in the vendor app. The message that advances it
-        // is sent by the app *after* acceptance and is NOT in the init captures
-        // (they all end before acceptance). Capture a full pairing that includes
-        // tapping "accept" to obtain it, then send it here.
+        // 1) device-info request (band replies on 0x01 with model/serial)
+        sendRawMessage(SapProtocol.CH_CONTROL, hex("01 04 02 05 00 0e"), "dev-info-req");
+
+        // 2) TIME SYNC (dynamic!) - current epoch as a decimal string + timezone.
+        //    Template from the capture; only the 10-digit epoch is swapped in.
+        //    The trailing 80 70 encodes the UTC offset (GMT+8 here) - adjust for
+        //    the user's timezone; 05 01 = flags.
+        sendRawMessage(SapProtocol.CH_CONTROL, buildTimeSync(), "time-sync");
+
+        // 3) push canned quick-reply lists (0x12/0 notifications, 0x12/1 calls)
+        sendRawMessage(SapProtocol.CH_QUICK_REPLY, hex("02 03 01"), "quickreply-init");
+        // (send your localized canned-reply lists here: 0x12 MSG_ID 0 and 1)
+
+        // 4) identity + BINDING TOKEN on 0x1a. The 16-byte token registers this
+        //    host with the band; a random value likely works (like the HELLO
+        //    token). Capture prefix 00:24:88 is Samsung's OUI.
+        sendRawMessage(SapProtocol.CH_IDENTITY, hex("01 09 01"), "identity");
+        sendRawMessage(SapProtocol.CH_IDENTITY, buildBindingToken(), "binding-token");
+
+        // 5) capability handshake tail + control enable
+        sendRawMessage(SapProtocol.CH_CAP2_06, hex("01"), "cap06-1");
+        sendRawMessage(SapProtocol.CH_CAP2_06, hex("00"), "cap06-0");
+        sendRawMessage(SapProtocol.CH_CONTROL, hex("84 01 01"), "control-enable");
+
+        // Beyond this the app pushes calendar (0x08/8,9), health config (0x0a/4),
+        // settings (0x0b), etc. Those enable features but the steps above are the
+        // ones that get the band off "Continue on the phone".
     }
 
+    /** Time sync: [83][01][39 00][02 00][03][len][epoch ascii][04 00 80 70][05 01] */
+    private byte[] buildTimeSync() {
+        String epoch = Long.toString(System.currentTimeMillis() / 1000L);   // 10 digits
+        java.io.ByteArrayOutputStream o = new java.io.ByteArrayOutputStream();
+        o.write(0x83); o.write(0x01); o.write(0x39); o.write(0x00);
+        o.write(0x02); o.write(0x00);
+        o.write(0x03); o.write(epoch.length());
+        byte[] e = epoch.getBytes(java.nio.charset.Charset.forName("US-ASCII"));
+        o.write(e, 0, e.length);
+        // 04 <tz>  - 00 80 70 = GMT+8 in the capture; replace per user timezone
+        o.write(0x04); o.write(0x00); o.write(0x80); o.write(0x70);
+        o.write(0x05); o.write(0x01);
+        return o.toByteArray();
+    }
+
+    /** Binding token on 0x1a MSG_ID 2: 02 0a 01 0b 00 0c 20 <32 hex ASCII>. */
+    private byte[] buildBindingToken() {
+        final String bindingToken = loadOrCreateToken("sap_binding_token");
+        byte[] hexAscii = bindingToken.getBytes(java.nio.charset.Charset.forName("US-ASCII"));
+        java.io.ByteArrayOutputStream o = new java.io.ByteArrayOutputStream();
+        o.write(0x02); o.write(0x0a); o.write(0x01); o.write(0x0b); o.write(0x00);
+        o.write(0x0c); o.write(hexAscii.length);           // 0x20 = 32
+        o.write(hexAscii, 0, hexAscii.length);
+        return o.toByteArray();
+    }
+
+    private static byte[] hex(String s) {
+        s = s.replace(" ", "");
+        byte[] b = new byte[s.length() / 2];
+        for (int i = 0; i < b.length; i++) {
+            b[i] = (byte) Integer.parseInt(s.substring(i * 2, i * 2 + 2), 16);
+        }
+        return b;
+    }
+        
     /** Send a pre-built inner body on a channel (alias of sendMessage). */
     private void sendRawMessage(int channel, byte[] body, String reason) {
         sendMessage(channel, body, reason);
