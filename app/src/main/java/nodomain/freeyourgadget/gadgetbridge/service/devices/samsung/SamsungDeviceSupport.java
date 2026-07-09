@@ -3,19 +3,27 @@ package nodomain.freeyourgadget.gadgetbridge.service.devices.samsung;
 import android.bluetooth.BluetoothGatt;
 import android.bluetooth.BluetoothGattCharacteristic;
 import android.content.SharedPreferences;
+import android.os.Bundle;
+
+import androidx.annotation.Nullable;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.util.UUID;
 import nodomain.freeyourgadget.gadgetbridge.GBApplication;
+import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEventBatteryInfo;
+import nodomain.freeyourgadget.gadgetbridge.model.BatteryState;
 import nodomain.freeyourgadget.gadgetbridge.model.NotificationSpec;
 import nodomain.freeyourgadget.gadgetbridge.service.btle.AbstractBTLESingleDeviceSupport;
 import nodomain.freeyourgadget.gadgetbridge.service.btle.TransactionBuilder;
+import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3BatteryInfo;
 
 
 public class SamsungDeviceSupport extends AbstractBTLESingleDeviceSupport {
     private static final Logger LOG = LoggerFactory.getLogger(SamsungDeviceSupport.class);
 
+    private final GBDeviceEventBatteryInfo batteryCmd = new GBDeviceEventBatteryInfo();
     // TODO: replace with the real UUIDs discovered from the band.
     public static final UUID UUID_SERVICE =
             UUID.fromString("00001a1a-0000-1000-8000-00805f9b34fb");
@@ -139,30 +147,46 @@ public class SamsungDeviceSupport extends AbstractBTLESingleDeviceSupport {
             return;
         }
         int msgId = body[0] & 0x3F;
+        boolean isResponse = ((body[0] >> 6) & 1) == 1;
         boolean isRequest = ((body[0] >> 6) & 1) == 0;
 
-        // The init is BAND-DRIVEN: the band REQUESTS the config it needs and we
-        // must answer, or it stalls. (Verified from full both-sides captures.)
-        if (isRequest) {
+        // Parsing band responses here. Ussually has payload with data.
+        if (isResponse) {
             switch (channel) {
                 case SapProtocol.CH_CAPABILITY_0F:       // capability table -> ack 0x00
                     //sendRawMessage(SapProtocol.CH_CAPABILITY_0F, new byte[]{0x00}, "cap-ack"); //WARN: loops
                     return;
+                case SapProtocol.CH_NOTIFICATION:        // 0x07: /16,/22 notification config
+                    return;
+                case SapProtocol.CH_MEDIA:               // 0x09: /1,/8 media state
+                    return;
+                case SapProtocol.CH_SETTINGS:            // 0x0b: /16,/35 settings read-back
+                    if(msgId == Fit3BatteryInfo.MSG_ID_BATTERY) //battery
+                        handleBatteryInfo(Fit3BatteryInfo.parse(body));
+                    return;
+                case SapProtocol.CH_CONTROL:
+                    LOG.debug("band response ch=0x{} msgId={} (needs a response - see capture)",
+                            Integer.toHexString(channel), msgId);
+                    return;
+                default:
+                    LOG.debug("band response ch=0x{} msgId={} unhandled",
+                            Integer.toHexString(channel), msgId);
+                    return;
+            }
+        }
+
+        // Pasrsing band request here. It usually waits some data in respone or just ack.
+        if (isRequest) {
+            switch (channel) {
                 case SapProtocol.CH_TIME_CAL:            // 0x08: /12,/13 timezone, /7 alarms, /9 calendar
                     onTimeCalendarRequest(msgId, body);
                     return;
                 case SapProtocol.CH_HEALTH:              // 0x0a: /9,/4 config; /2,/3,/32,/34,/62,/63 data upload
                     onHealthRequest(msgId, body);
                     return;
-                case SapProtocol.CH_NOTIFICATION:        // 0x07: /16,/22 notification config
-                case SapProtocol.CH_MEDIA:               // 0x09: /1,/8 media state
-                case SapProtocol.CH_SETTINGS:            // 0x0b: /16,/35 settings read-back
-                case SapProtocol.CH_CONTROL:
-                    LOG.debug("band request ch=0x{} msgId={} (needs a response - see capture)",
-                            Integer.toHexString(channel), msgId);
-                    return;
+
                 default:
-                    LOG.debug("band request ch=0x{} msgId={} unhandled",
+                    LOG.debug("band response ch=0x{} msgId={} unhandled",
                             Integer.toHexString(channel), msgId);
                     return;
             }
@@ -208,6 +232,7 @@ public class SamsungDeviceSupport extends AbstractBTLESingleDeviceSupport {
         sendRawMessage(SapProtocol.CH_CONTROL, buildTimeSync(), "time-sync"); //required
         // start configuration requests
 
+
         // 3) push canned quick-reply lists (0x12/0 notifications, 0x12/1 calls)
 //        sendRawMessage(SapProtocol.CH_QUICK_REPLY, hex("02 03 01"), "quickreply-init");
         // (send your localized canned-reply lists here: 0x12 MSG_ID 0 and 1)
@@ -224,6 +249,7 @@ public class SamsungDeviceSupport extends AbstractBTLESingleDeviceSupport {
         // end configuration requests
         sendRawMessage(SapProtocol.CH_CONTROL, hex("84 01 01"), "control-enable"); // required
 
+        sendRawMessage(Fit3BatteryInfo.CHANNEL, Fit3BatteryInfo.buildRequest(), "battery-request");
         // Beyond this the app pushes calendar (0x08/8,9), health config (0x0a/4),
         // settings (0x0b), etc. Those enable features but the steps above are the
         // ones that get the band off "Continue on the phone".
@@ -333,6 +359,14 @@ public class SamsungDeviceSupport extends AbstractBTLESingleDeviceSupport {
     private static String firstNonEmpty(String... v) {
         for (String s : v) if (s != null && !s.isEmpty()) return s;
         return "";
+    }
+
+    private void handleBatteryInfo(Fit3BatteryInfo info) {
+        LOG.info("Samsung Fit 3 battery info: " + info);
+        batteryCmd.level = info.level;
+        batteryCmd.state = info.charging ? BatteryState.BATTERY_CHARGING
+                : BatteryState.BATTERY_NORMAL;
+        evaluateGBDeviceEvent(batteryCmd);
     }
 
 }
