@@ -199,28 +199,30 @@ public class SamsungDeviceSupport extends AbstractBTLESingleDeviceSupport {
 
     private void sendPostHelloInit() {
         // 1) device-info request (band replies on 0x01 with model/serial)
-        sendRawMessage(SapProtocol.CH_CONTROL, hex("01 04 02 05 00 0e"), "dev-info-req");
+//        sendRawMessage(SapProtocol.CH_CONTROL, hex("01 04 02 05 00 0e"), "dev-info-req");
 
         // 2) TIME SYNC (dynamic!) - current epoch as a decimal string + timezone.
         //    Template from the capture; only the 10-digit epoch is swapped in.
         //    The trailing 80 70 encodes the UTC offset (GMT+8 here) - adjust for
         //    the user's timezone; 05 01 = flags.
-        sendRawMessage(SapProtocol.CH_CONTROL, buildTimeSync(), "time-sync");
+        sendRawMessage(SapProtocol.CH_CONTROL, buildTimeSync(), "time-sync"); //required
+        // start configuration requests
 
         // 3) push canned quick-reply lists (0x12/0 notifications, 0x12/1 calls)
-        sendRawMessage(SapProtocol.CH_QUICK_REPLY, hex("02 03 01"), "quickreply-init");
+//        sendRawMessage(SapProtocol.CH_QUICK_REPLY, hex("02 03 01"), "quickreply-init");
         // (send your localized canned-reply lists here: 0x12 MSG_ID 0 and 1)
 
         // 4) identity + BINDING TOKEN on 0x1a. The 16-byte token registers this
         //    host with the band; a random value likely works (like the HELLO
         //    token). Capture prefix 00:24:88 is Samsung's OUI.
-        sendRawMessage(SapProtocol.CH_IDENTITY, hex("01 09 01"), "identity");
-        sendRawMessage(SapProtocol.CH_IDENTITY, buildBindingToken(), "binding-token");
+//        sendRawMessage(SapProtocol.CH_IDENTITY, hex("01 09 01"), "identity");
+//        sendRawMessage(SapProtocol.CH_IDENTITY, buildBindingToken(), "binding-token");
 
         // 5) capability handshake tail + control enable
-        sendRawMessage(SapProtocol.CH_CAP2_06, hex("01"), "cap06-1");
-        sendRawMessage(SapProtocol.CH_CAP2_06, hex("00"), "cap06-0");
-        sendRawMessage(SapProtocol.CH_CONTROL, hex("84 01 01"), "control-enable");
+//        sendRawMessage(SapProtocol.CH_CAP2_06, hex("01"), "cap06-1");
+//        sendRawMessage(SapProtocol.CH_CAP2_06, hex("00"), "cap06-0");
+        // end configuration requests
+        sendRawMessage(SapProtocol.CH_CONTROL, hex("84 01 01"), "control-enable"); // required
 
         // Beyond this the app pushes calendar (0x08/8,9), health config (0x0a/4),
         // settings (0x0b), etc. Those enable features but the steps above are the
