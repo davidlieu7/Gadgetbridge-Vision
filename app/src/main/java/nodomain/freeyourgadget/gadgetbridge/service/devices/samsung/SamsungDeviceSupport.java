@@ -38,6 +38,7 @@ import nodomain.freeyourgadget.gadgetbridge.service.btle.TransactionBuilder;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3BatteryInfo;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3InitSetting;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3LicenseAgreement;
+import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3Notification;
 
 
 public class SamsungDeviceSupport extends AbstractBTLESingleDeviceSupport {
@@ -351,32 +352,7 @@ public class SamsungDeviceSupport extends AbstractBTLESingleDeviceSupport {
 
     @Override
     public void onNotification(NotificationSpec spec) {
-        String title = firstNonEmpty(spec.getTitle(), spec.getSender(), spec.getSourceName(), "Notification");
-        String body  = firstNonEmpty(spec.getBody(), spec.getTitle(), "");
-        String label = firstNonEmpty(spec.getSourceName(), "Message");           // 0x0e category/app label
-        String pkg   = spec.getSourceAppId() != null ? spec.getSourceAppId() : "com.android.messaging";
-        long when    = spec.getWhen() > 0 ? spec.getWhen() : System.currentTimeMillis();
-
-        byte[] payload = SapPayloadBuilder.variable(0)   // hdr 0x80 = variable/request/MSG_ID 0
-                .addByte(0x00, 1) // NOTI_TYPE
-                .addInt32 (0x01, spec.getId())   // SEQUENCE_ID — reply/dismiss reference this later
-                .addLong  (0x02, when)           // TIME  post time, epoch millis (8-B LE)
-                .addString(0x03, title)          // NOTIFY_HEADING sender / title
-                .addString16(0x04, body)           // NOTIFY_BODY body text
-                .addByte(0x0d, 1) // NEED_QUICK_RESPONSE
-                .addString(0x0e, spec.getSourceName()) //APP_NAME
-                .addByte(0x0f, 1) // ALERT_TYPE
-                .addByte(0x10, 1) // IS_URGENT
-                //.addInt32(0x11, 5) // WINDOW_ID
-                .addString(0x12, pkg) // APP_PACKAGE_NAME
-                .build();
-
-        sendMessage(SapProtocol.CH_NOTIFICATION, payload, "notification");
-    }
-
-    private static String firstNonEmpty(String... v) {
-        for (String s : v) if (s != null && !s.isEmpty()) return s;
-        return "";
+        sendMessage(Fit3Notification.CHANNEL, Fit3Notification.buildRequest(spec), "notification");
     }
 
     private void handleBatteryInfo(Fit3BatteryInfo info) {
