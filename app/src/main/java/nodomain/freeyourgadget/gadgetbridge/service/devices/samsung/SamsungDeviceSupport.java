@@ -31,11 +31,14 @@ import java.util.Locale;
 import java.util.UUID;
 import nodomain.freeyourgadget.gadgetbridge.GBApplication;
 import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEventBatteryInfo;
+import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEventCallControl;
 import nodomain.freeyourgadget.gadgetbridge.model.BatteryState;
+import nodomain.freeyourgadget.gadgetbridge.model.CallSpec;
 import nodomain.freeyourgadget.gadgetbridge.model.NotificationSpec;
 import nodomain.freeyourgadget.gadgetbridge.service.btle.AbstractBTLESingleDeviceSupport;
 import nodomain.freeyourgadget.gadgetbridge.service.btle.TransactionBuilder;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3BatteryInfo;
+import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3CallState;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3InitSetting;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3LicenseAgreement;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3Notification;
@@ -59,6 +62,12 @@ public class SamsungDeviceSupport extends AbstractBTLESingleDeviceSupport {
     private String deviceMac; //get it from GB
 
     private int negotiatedMtu = 23;
+
+    // The band's call UI only tracks calls that started ringing in; a call the
+    // phone itself places is never pushed as a call-state notification. This
+    // mirrors that: set on CALL_INCOMING, gates every later state push, and
+    // clears on CALL_END/CALL_REJECT.
+    private boolean callStartedByIncoming = false;
 
     // SAP HELLO session token and the 0x1a binding/registration token. IMPORTANT:
     // both are STABLE per bond - captures across sessions showed byte-identical
@@ -211,6 +220,9 @@ public class SamsungDeviceSupport extends AbstractBTLESingleDeviceSupport {
                 case SapProtocol.CH_HEALTH:              // 0x0a: /9,/4 config; /2,/3,/32,/34,/62,/63 data upload
                     onHealthRequest(msgId, body);
                     return;
+                case SapProtocol.CH_CALL:                // 0x03: /1 silence ringer, /5 reject from band
+                    onCallRequest(msgId);
+                    return;
 
                 default:
                     LOG.debug("band response ch=0x{} msgId={} unhandled",
@@ -238,6 +250,22 @@ public class SamsungDeviceSupport extends AbstractBTLESingleDeviceSupport {
         // /9,/4 = config (locale, feature enable); /2,/3,/32,/34,/62,/63 = the band
         // uploading stored steps/sleep/workout records - ack them so it advances.
         LOG.debug("TODO respond/ack health request MSG_ID={}", msgId);
+    }
+
+    /** Act on the band's 0x03 requests: ringer silence and call reject are both fixed, paramless. */
+    private void onCallRequest(int msgId) {
+        GBDeviceEventCallControl callCmd = new GBDeviceEventCallControl();
+        if (msgId == Fit3CallState.MSG_ID_REJECT_CALL) {
+            LOG.info("Samsung Fit 3: call rejected from band");
+            callCmd.event = GBDeviceEventCallControl.Event.REJECT;
+            evaluateGBDeviceEvent(callCmd);
+        } else if (msgId == Fit3CallState.MSG_ID_SILENCE_RINGER) {
+            LOG.info("Samsung Fit 3: ringer silenced from band");
+            callCmd.event = GBDeviceEventCallControl.Event.IGNORE;
+            evaluateGBDeviceEvent(callCmd);
+        } else {
+            LOG.debug("TODO handle call request MSG_ID={}", msgId);
+        }
     }
 
 
@@ -353,6 +381,35 @@ public class SamsungDeviceSupport extends AbstractBTLESingleDeviceSupport {
     @Override
     public void onNotification(NotificationSpec spec) {
         sendMessage(Fit3Notification.CHANNEL, Fit3Notification.buildRequest(spec), "notification");
+    }
+
+    @Override
+    public void onSetCallState(CallSpec callSpec) {
+        switch (callSpec.getCommand()) {
+            case CallSpec.CALL_INCOMING:
+                callStartedByIncoming = true;
+                sendMessage(Fit3CallState.CHANNEL, Fit3CallState.buildCallerIdPush(callSpec), "call-caller-id");
+                sendMessage(Fit3CallState.CHANNEL, Fit3CallState.buildCallState(Fit3CallState.STATE_RINGING), "call-state-ringing");
+                break;
+            case CallSpec.CALL_ACCEPT:
+            case CallSpec.CALL_START:
+                if (callStartedByIncoming) {
+                    sendMessage(Fit3CallState.CHANNEL, Fit3CallState.buildCallState(Fit3CallState.STATE_OFFHOOK), "call-state-offhook");
+                }
+                break;
+            case CallSpec.CALL_END:
+            case CallSpec.CALL_REJECT:
+                if (callStartedByIncoming) {
+                    sendMessage(Fit3CallState.CHANNEL, Fit3CallState.buildCallState(Fit3CallState.STATE_IDLE), "call-state-idle");
+                }
+                callStartedByIncoming = false;
+                break;
+            case CallSpec.CALL_OUTGOING:
+            default:
+                // The band's call UI only reacts to calls that started ringing in;
+                // nothing to push for a call the phone itself placed.
+                break;
+        }
     }
 
     private void handleBatteryInfo(Fit3BatteryInfo info) {
