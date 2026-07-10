@@ -1,3 +1,20 @@
+/*  Copyright (C) 2026 Vitaliy Tomin
+
+    This file is part of Gadgetbridge.
+
+    Gadgetbridge is free software: you can redistribute it and/or modify
+    it under the terms of the GNU Affero General Public License as published
+    by the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    Gadgetbridge is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU Affero General Public License for more details.
+
+    You should have received a copy of the GNU Affero General Public License
+    along with this program.  If not, see <https://www.gnu.org/licenses/>. */
+
 package nodomain.freeyourgadget.gadgetbridge.service.devices.samsung;
 
 import java.nio.charset.Charset;
@@ -40,6 +57,19 @@ public final class SapPayloadParser {
     public final int paramCount;
 
     public SapPayloadParser(byte[] body) {
+        this(body, null);
+    }
+
+    /**
+     * @param hasParamCount override whether to consume a leading param-count
+     *                      byte after the header; {@code null} infers it from
+     *                      the header's format bit (the common case). Some
+     *                      channels set the variable format bit but never
+     *                      emit a count byte - e.g. OOBE (channel 0x01, see
+     *                      {@link SapPayloadBuilder#variableNoCount}) - pass
+     *                      {@code false} there.
+     */
+    public SapPayloadParser(byte[] body, Boolean hasParamCount) {
         if (body == null || body.length < 1) {
             throw new IllegalArgumentException("empty SAP body");
         }
@@ -49,7 +79,8 @@ public final class SapPayloadParser {
         this.response = (hdr & 0x40) != 0;
         this.msgId    = hdr & 0x3F;
         this.pos = 1;
-        this.paramCount = variable ? (buf[pos++] & 0xFF) : -1;
+        boolean consumeCount = (hasParamCount != null) ? hasParamCount : variable;
+        this.paramCount = consumeCount ? (buf[pos++] & 0xFF) : -1;
     }
 
     // ---- cursor state ----

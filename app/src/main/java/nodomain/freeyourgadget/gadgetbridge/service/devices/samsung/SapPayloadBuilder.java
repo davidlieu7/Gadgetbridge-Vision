@@ -1,3 +1,20 @@
+/*  Copyright (C) 2026 Vitaliy Tomin
+
+    This file is part of Gadgetbridge.
+
+    Gadgetbridge is free software: you can redistribute it and/or modify
+    it under the terms of the GNU Affero General Public License as published
+    by the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    Gadgetbridge is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU Affero General Public License for more details.
+
+    You should have received a copy of the GNU Affero General Public License
+    along with this program.  If not, see <https://www.gnu.org/licenses/>. */
+
 package nodomain.freeyourgadget.gadgetbridge.service.devices.samsung;
 
 import java.io.ByteArrayOutputStream;
@@ -37,6 +54,7 @@ public final class SapPayloadBuilder {
     private final int header;
     private final ByteArrayOutputStream out = new ByteArrayOutputStream();
     private int paramCount = 0;
+    private boolean omitParamCount = false;
 
     private SapPayloadBuilder(int msgId, boolean variable, boolean response) {
         this.variable = variable;
@@ -56,6 +74,21 @@ public final class SapPayloadBuilder {
 
     public static SapPayloadBuilder variable(int msgId) {
         return new SapPayloadBuilder(msgId, true, false);
+    }
+
+    /**
+     * Variable-format header (bit7=1, so {@code format} reads "variable") but
+     * WITHOUT the leading param-count byte. Several channels set the format
+     * bit yet never actually put a count byte on the wire - confirmed on
+     * OOBE (channel 0x01, all 4 MSG_IDs) and
+     * several channel-0x0b single-setting messages. Use
+     * {@link #variable} instead for messages that DO carry a count byte
+     * (e.g. notification pushes).
+     */
+    public static SapPayloadBuilder variableNoCount(int msgId) {
+        SapPayloadBuilder b = new SapPayloadBuilder(msgId, true, false);
+        b.omitParamCount = true;
+        return b;
     }
 
     // ---- fixed-format helpers: append raw bytes after the header ----
@@ -81,6 +114,15 @@ public final class SapPayloadBuilder {
     public SapPayloadBuilder addByte(int id, int value) {
         out.write(id & 0xFF);
         out.write(value & 0xFF);
+        paramCount++;
+        return this;
+    }
+
+    /** [id][value:2 LE]. */
+    public SapPayloadBuilder addShort(int id, int value) {
+        out.write(id & 0xFF);
+        out.write(value & 0xFF);
+        out.write((value >> 8) & 0xFF);
         paramCount++;
         return this;
     }
@@ -137,7 +179,7 @@ public final class SapPayloadBuilder {
     public byte[] build() {
         ByteArrayOutputStream msg = new ByteArrayOutputStream();
         msg.write(header);
-        if (variable) {
+        if (variable && !omitParamCount) {
             msg.write(paramCount & 0xFF);
         }
         byte[] payload = out.toByteArray();

@@ -1,3 +1,20 @@
+/*  Copyright (C) 2026 Vitaliy Tomin
+
+    This file is part of Gadgetbridge.
+
+    Gadgetbridge is free software: you can redistribute it and/or modify
+    it under the terms of the GNU Affero General Public License as published
+    by the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    Gadgetbridge is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU Affero General Public License for more details.
+
+    You should have received a copy of the GNU Affero General Public License
+    along with this program.  If not, see <https://www.gnu.org/licenses/>. */
+
 package nodomain.freeyourgadget.gadgetbridge.service.devices.samsung;
 
 import android.bluetooth.BluetoothGatt;
@@ -10,6 +27,7 @@ import androidx.annotation.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import java.io.IOException;
+import java.util.Locale;
 import java.util.UUID;
 import nodomain.freeyourgadget.gadgetbridge.GBApplication;
 import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEventBatteryInfo;
@@ -18,6 +36,8 @@ import nodomain.freeyourgadget.gadgetbridge.model.NotificationSpec;
 import nodomain.freeyourgadget.gadgetbridge.service.btle.AbstractBTLESingleDeviceSupport;
 import nodomain.freeyourgadget.gadgetbridge.service.btle.TransactionBuilder;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3BatteryInfo;
+import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3InitSetting;
+import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3LicenseAgreement;
 
 
 public class SamsungDeviceSupport extends AbstractBTLESingleDeviceSupport {
@@ -165,8 +185,14 @@ public class SamsungDeviceSupport extends AbstractBTLESingleDeviceSupport {
                         handleBatteryInfo(Fit3BatteryInfo.parse(body));
                     return;
                 case SapProtocol.CH_CONTROL:
-                    LOG.debug("band response ch=0x{} msgId={} (needs a response - see capture)",
-                            Integer.toHexString(channel), msgId);
+                    if (msgId == Fit3InitSetting.MSG_ID_INIT_SETTING) {
+                        handleInitSettingInfo(Fit3InitSetting.parse(body));
+                    } else if (msgId == Fit3LicenseAgreement.MSG_ID_LICENSE_AGREEMENT) {
+                        LOG.info("Samsung Fit 3 license-agreement acked: {}", Fit3LicenseAgreement.isAck(body));
+                    } else {
+                        LOG.debug("band response ch=0x{} msgId={} (needs a response - see capture)",
+                                Integer.toHexString(channel), msgId);
+                    }
                     return;
                 default:
                     LOG.debug("band response ch=0x{} msgId={} unhandled",
@@ -225,11 +251,12 @@ public class SamsungDeviceSupport extends AbstractBTLESingleDeviceSupport {
         // 1) device-info request (band replies on 0x01 with model/serial)
 //        sendRawMessage(SapProtocol.CH_CONTROL, hex("01 04 02 05 00 0e"), "dev-info-req");
 
-        // 2) TIME SYNC (dynamic!) - current epoch as a decimal string + timezone.
-        //    Template from the capture; only the 10-digit epoch is swapped in.
-        //    The trailing 80 70 encodes the UTC offset (GMT+8 here) - adjust for
-        //    the user's timezone; 05 01 = flags.
-        sendRawMessage(SapProtocol.CH_CONTROL, buildTimeSync(), "time-sync"); //required
+        // 2) INIT_SETTING - locale, roaming, current time/timezone, 24h-format.
+        //    TODO: wire roaming / is24HourFormat to real device state once a
+        //    Context is available here; false/false is a safe placeholder.
+        sendRawMessage(Fit3InitSetting.CHANNEL,
+                Fit3InitSetting.buildRequest(Locale.getDefault(), false, false),
+                "init-setting"); //required
         // start configuration requests
 
 
@@ -243,31 +270,22 @@ public class SamsungDeviceSupport extends AbstractBTLESingleDeviceSupport {
 //        sendRawMessage(SapProtocol.CH_IDENTITY, hex("01 09 01"), "identity");
 //        sendRawMessage(SapProtocol.CH_IDENTITY, buildBindingToken(), "binding-token");
 
-        // 5) capability handshake tail + control enable
+        // 5) capability handshake tail
 //        sendRawMessage(SapProtocol.CH_CAP2_06, hex("01"), "cap06-1");
 //        sendRawMessage(SapProtocol.CH_CAP2_06, hex("00"), "cap06-0");
         // end configuration requests
-        sendRawMessage(SapProtocol.CH_CONTROL, hex("84 01 01"), "control-enable"); // required
+
+        // 6) LICENSE_AGREEMENT - closes out the setup handshake on this channel.
+        //    TODO: only send once the user has actually agreed in-app, rather
+        //    than unconditionally accepting on their behalf.
+        sendRawMessage(Fit3LicenseAgreement.CHANNEL,
+                Fit3LicenseAgreement.buildRequest(true),
+                "license-agreement"); // required
 
         sendRawMessage(Fit3BatteryInfo.CHANNEL, Fit3BatteryInfo.buildRequest(), "battery-request");
         // Beyond this the app pushes calendar (0x08/8,9), health config (0x0a/4),
         // settings (0x0b), etc. Those enable features but the steps above are the
         // ones that get the band off "Continue on the phone".
-    }
-
-    /** Time sync: [83][01][39 00][02 00][03][len][epoch ascii][04 00 80 70][05 01] */
-    private byte[] buildTimeSync() {
-        String epoch = Long.toString(System.currentTimeMillis() / 1000L);   // 10 digits
-        java.io.ByteArrayOutputStream o = new java.io.ByteArrayOutputStream();
-        o.write(0x83); o.write(0x01); o.write(0x39); o.write(0x00);
-        o.write(0x02); o.write(0x00);
-        o.write(0x03); o.write(epoch.length());
-        byte[] e = epoch.getBytes(java.nio.charset.Charset.forName("US-ASCII"));
-        o.write(e, 0, e.length);
-        // 04 <tz>  - 00 80 70 = GMT+8 in the capture; replace per user timezone
-        o.write(0x04); o.write(0x00); o.write(0x80); o.write(0x70);
-        o.write(0x05); o.write(0x01);
-        return o.toByteArray();
     }
 
     /** Binding token on 0x1a MSG_ID 2: 02 0a 01 0b 00 0c 20 <32 hex ASCII>. */
@@ -367,6 +385,16 @@ public class SamsungDeviceSupport extends AbstractBTLESingleDeviceSupport {
         batteryCmd.state = info.charging ? BatteryState.BATTERY_CHARGING
                 : BatteryState.BATTERY_NORMAL;
         evaluateGBDeviceEvent(batteryCmd);
+    }
+
+    private void handleInitSettingInfo(Fit3InitSetting info) {
+        if (info == null) {
+            LOG.warn("Samsung Fit 3 init-setting reply could not be parsed");
+            return;
+        }
+        LOG.info("Samsung Fit 3 init-setting reply: " + info);
+        // Coarse 1-6 level code here, not a percentage - not fed into
+        // batteryCmd; use Fit3BatteryInfo (CH_SETTINGS) for the real reading.
     }
 
 }
