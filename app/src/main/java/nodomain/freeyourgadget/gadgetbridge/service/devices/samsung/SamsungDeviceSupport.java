@@ -32,8 +32,11 @@ import java.util.UUID;
 import nodomain.freeyourgadget.gadgetbridge.GBApplication;
 import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEventBatteryInfo;
 import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEventCallControl;
+import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEventMusicControl;
 import nodomain.freeyourgadget.gadgetbridge.model.BatteryState;
 import nodomain.freeyourgadget.gadgetbridge.model.CallSpec;
+import nodomain.freeyourgadget.gadgetbridge.model.MusicSpec;
+import nodomain.freeyourgadget.gadgetbridge.model.MusicStateSpec;
 import nodomain.freeyourgadget.gadgetbridge.model.NotificationSpec;
 import nodomain.freeyourgadget.gadgetbridge.service.btle.AbstractBTLESingleDeviceSupport;
 import nodomain.freeyourgadget.gadgetbridge.service.btle.TransactionBuilder;
@@ -41,6 +44,9 @@ import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3CallState;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3InitSetting;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3LicenseAgreement;
+import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3MediaButton;
+import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3MediaInfo;
+import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3MediaVolume;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3Notification;
 
 
@@ -188,7 +194,8 @@ public class SamsungDeviceSupport extends AbstractBTLESingleDeviceSupport {
                     return;
                 case SapProtocol.CH_NOTIFICATION:        // 0x07: /16,/22 notification config
                     return;
-                case SapProtocol.CH_MEDIA:               // 0x09: /1,/8 media state
+                case SapProtocol.CH_MEDIA:               // 0x09: /1,/8 media state; /4 transport button
+                    onMediaRequest(msgId, body);
                     return;
                 case SapProtocol.CH_SETTINGS:            // 0x0b: /16,/35 settings read-back
                     if(msgId == Fit3BatteryInfo.MSG_ID_BATTERY) //battery
@@ -223,6 +230,9 @@ public class SamsungDeviceSupport extends AbstractBTLESingleDeviceSupport {
                 case SapProtocol.CH_CALL:                // 0x03: /1 silence ringer, /5 reject from band
                     onCallRequest(msgId);
                     return;
+                case SapProtocol.CH_MEDIA:               // 0x09: /4 transport button (see the isResponse
+                    onMediaRequest(msgId, body);          // branch above - the source app isn't consistent
+                    return;                                // about the type bit on this channel, so both are handled)
 
                 default:
                     LOG.debug("band response ch=0x{} msgId={} unhandled",
@@ -265,6 +275,70 @@ public class SamsungDeviceSupport extends AbstractBTLESingleDeviceSupport {
             evaluateGBDeviceEvent(callCmd);
         } else {
             LOG.debug("TODO handle call request MSG_ID={}", msgId);
+        }
+    }
+
+    /** Act on the band's 0x09 requests: transport button (MSG_ID 4) and volume control (MSG_ID 7). */
+    private void onMediaRequest(int msgId, byte[] body) {
+        if (msgId == Fit3MediaButton.MSG_ID_KEY_EVENT) {
+            handleMediaButton(Fit3MediaButton.parse(body));
+        } else if (msgId == Fit3MediaVolume.MSG_ID_VOLUME_CONTROL) {
+            handleVolumeControl(Fit3MediaVolume.parse(body));
+        } else {
+            LOG.debug("TODO handle media request MSG_ID={}", msgId);
+        }
+    }
+
+    /**
+     * A tap sends a press and a release; only act on the press to avoid
+     * double-triggering next/previous. There's no STOP event on the phone
+     * side, so that key is mapped to PAUSE instead of being dropped.
+     */
+    private void handleMediaButton(Fit3MediaButton button) {
+        if (button == null || button.keyAction != Fit3MediaButton.ACTION_PRESSED) {
+            return;
+        }
+        GBDeviceEventMusicControl musicCmd = new GBDeviceEventMusicControl();
+        switch (button.keyCode) {
+            case Fit3MediaButton.KEY_PLAYPAUSE:
+                musicCmd.event = GBDeviceEventMusicControl.Event.PLAYPAUSE;
+                evaluateGBDeviceEvent(musicCmd);
+                break;
+            case Fit3MediaButton.KEY_NEXT:
+                musicCmd.event = GBDeviceEventMusicControl.Event.NEXT;
+                evaluateGBDeviceEvent(musicCmd);
+                break;
+            case Fit3MediaButton.KEY_PREVIOUS:
+                musicCmd.event = GBDeviceEventMusicControl.Event.PREVIOUS;
+                evaluateGBDeviceEvent(musicCmd);
+                break;
+            case Fit3MediaButton.KEY_STOP:
+                musicCmd.event = GBDeviceEventMusicControl.Event.PAUSE;
+                evaluateGBDeviceEvent(musicCmd);
+                break;
+            default:
+                LOG.debug("Samsung Fit 3: unhandled media key code {}", button.keyCode);
+        }
+    }
+
+    /**
+     * Only up/down have a Gadgetbridge equivalent; set-to-value and mute
+     * on/off are logged rather than approximated, since there's no
+     * absolute-volume or mute event on {@link GBDeviceEventMusicControl}.
+     */
+    private void handleVolumeControl(Fit3MediaVolume volume) {
+        if (volume == null) {
+            return;
+        }
+        GBDeviceEventMusicControl deviceEventMusicControl = new GBDeviceEventMusicControl();
+        if (volume.command == Fit3MediaVolume.CMD_UP) {
+            deviceEventMusicControl.event = GBDeviceEventMusicControl.Event.VOLUMEUP;
+            evaluateGBDeviceEvent(deviceEventMusicControl);
+        } else if (volume.command == Fit3MediaVolume.CMD_DOWN) {
+            deviceEventMusicControl.event = GBDeviceEventMusicControl.Event.VOLUMEDOWN;
+            evaluateGBDeviceEvent(deviceEventMusicControl);
+        } else {
+            LOG.debug("Samsung Fit 3: unhandled volume command {} (value={})", volume.command, volume.value);
         }
     }
 
@@ -410,6 +484,16 @@ public class SamsungDeviceSupport extends AbstractBTLESingleDeviceSupport {
                 // nothing to push for a call the phone itself placed.
                 break;
         }
+    }
+
+    @Override
+    public void onSetMusicInfo(MusicSpec musicSpec) {
+        sendMessage(Fit3MediaInfo.CHANNEL, Fit3MediaInfo.buildNowPlaying(musicSpec), "media-now-playing");
+    }
+
+    @Override
+    public void onSetMusicState(MusicStateSpec stateSpec) {
+        sendMessage(Fit3MediaInfo.CHANNEL, Fit3MediaInfo.buildPlaybackState(stateSpec), "media-playback-state");
     }
 
     private void handleBatteryInfo(Fit3BatteryInfo info) {

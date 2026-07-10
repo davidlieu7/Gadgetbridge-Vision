@@ -76,6 +76,11 @@ public final class SapPayloadBuilder {
         return new SapPayloadBuilder(msgId, true, false);
     }
 
+    /** Variable format with the header response bit (bit6) set, WITH a leading param-count byte. */
+    public static SapPayloadBuilder variableResponse(int msgId) {
+        return new SapPayloadBuilder(msgId, true, true);
+    }
+
     /**
      * Variable-format header (bit7=1, so {@code format} reads "variable") but
      * WITHOUT the leading param-count byte. Several channels set the format
