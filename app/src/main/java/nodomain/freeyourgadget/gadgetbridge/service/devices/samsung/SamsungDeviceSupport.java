@@ -109,15 +109,23 @@ public class SamsungDeviceSupport extends AbstractBTLESingleDeviceSupport {
         @Override
         public void onHello(byte[] frame) {
             LOG.debug("SAP HELLO received ({} bytes)", frame.length);
-            if (SapHello.isBandHello(frame)) {
-                // Answer the band's "SAMSUNG_ACCESSARY" HELLO with our "SAP_<token>"
-                // reply. Without this the band stays on "Continue on the phone".
-                final String helloToken = loadOrCreateToken("sap_hello_token");
-
-                byte[] reply = SapHello.buildPhoneHello(helloToken, PHONE_MODEL, PHONE_VENDOR);
-                writeRaw(reply, "sap-hello-reply");
-                sendPostHelloInit();
+            if (!SapHello.isBandHello(frame)) {
+                return;
             }
+            SapHello.BandHello bandHello = SapHello.parseBandHello(frame);
+            if (bandHello == null) {
+                LOG.warn("SAP HELLO from band is too short to parse ({} bytes)", frame.length);
+                return;
+            }
+            LOG.debug("band identifies as '{}' / '{}'", bandHello.modelName, bandHello.vendorName);
+
+            // Answer the band's "SAMSUNG_ACCESSARY" HELLO with our "SAP_<token>"
+            // reply, echoing back its own param block. Without this the band
+            // stays on "Continue on the phone".
+            final String helloToken = loadOrCreateToken("sap_hello_token");
+            byte[] reply = SapHello.buildPhoneHello(bandHello, helloToken, PHONE_MODEL, PHONE_VENDOR, null);
+            writeRaw(reply, "sap-hello-reply");
+            sendPostHelloInit();
         }
     });
 
