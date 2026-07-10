@@ -17,6 +17,8 @@
 
 package nodomain.freeyourgadget.gadgetbridge.service.devices.samsung;
 
+import java.util.Arrays;
+
 import nodomain.freeyourgadget.gadgetbridge.util.CheckSums;
 
 /**
@@ -45,8 +47,8 @@ public final class SapFrame {
     public static byte[] wrap(byte[] payload) {
         int len = payload.length;
         byte[] lenBytes = new byte[]{(byte) ((len >> 8) & 0xFF), (byte) (len & 0xFF)};
-        int hdrCrc = Crc16.arc(lenBytes);
-        int dataCrc = Crc16.arc(payload); //FIXME: try to use generic crc16
+        int hdrCrc = CheckSums.getCRC16ansi(lenBytes, 0x0000);
+        int dataCrc = CheckSums.getCRC16ansi(payload, 0x0000);
 
         byte[] frame = new byte[len + 6];
         frame[0] = lenBytes[0];
@@ -77,11 +79,11 @@ public final class SapFrame {
             return null;
         }
         int hdrCrc = ((frame[2] & 0xFF) << 8) | (frame[3] & 0xFF);
-        if (Crc16.arc(frame, 0, 2) != hdrCrc) {
+        if (CheckSums.getCRC16ansi(Arrays.copyOfRange(frame, 0, 2), 0x0000) != hdrCrc) {
             return null;
         }
         int dataCrc = ((frame[4 + len] & 0xFF) << 8) | (frame[5 + len] & 0xFF);
-        if (Crc16.arc(frame, 4, len) != dataCrc) {
+        if (CheckSums.getCRC16ansi(Arrays.copyOfRange(frame, 4, 4 + len), 0x0000) != dataCrc) {
             return null;
         }
         byte[] payload = new byte[len];
