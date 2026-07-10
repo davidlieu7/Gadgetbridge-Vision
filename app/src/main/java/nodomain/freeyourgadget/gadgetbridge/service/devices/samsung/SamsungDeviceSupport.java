@@ -27,6 +27,8 @@ import androidx.annotation.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import java.io.IOException;
+import java.util.Collections;
+import java.util.List;
 import java.util.Locale;
 import java.util.UUID;
 import nodomain.freeyourgadget.gadgetbridge.GBApplication;
@@ -38,6 +40,8 @@ import nodomain.freeyourgadget.gadgetbridge.model.CallSpec;
 import nodomain.freeyourgadget.gadgetbridge.model.MusicSpec;
 import nodomain.freeyourgadget.gadgetbridge.model.MusicStateSpec;
 import nodomain.freeyourgadget.gadgetbridge.model.NotificationSpec;
+import nodomain.freeyourgadget.gadgetbridge.model.WeatherSpec;
+import nodomain.freeyourgadget.gadgetbridge.model.weather.Weather;
 import nodomain.freeyourgadget.gadgetbridge.service.btle.AbstractBTLESingleDeviceSupport;
 import nodomain.freeyourgadget.gadgetbridge.service.btle.TransactionBuilder;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3BatteryInfo;
@@ -48,6 +52,7 @@ import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3MediaInfo;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3MediaVolume;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3Notification;
+import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3WeatherInfo;
 
 
 public class SamsungDeviceSupport extends AbstractBTLESingleDeviceSupport {
@@ -241,6 +246,9 @@ public class SamsungDeviceSupport extends AbstractBTLESingleDeviceSupport {
                 case SapProtocol.CH_MEDIA:               // 0x09: /4 transport button (see the isResponse
                     onMediaRequest(msgId, body);          // branch above - the source app isn't consistent
                     return;                                // about the type bit on this channel, so both are handled)
+                case SapProtocol.CH_WEATHER:              // 0x05: /0 add-current-location, /1 refresh request
+                    onWeatherRequest(msgId);
+                    return;
 
                 default:
                     LOG.debug("band response ch=0x{} msgId={} unhandled",
@@ -294,6 +302,21 @@ public class SamsungDeviceSupport extends AbstractBTLESingleDeviceSupport {
             handleVolumeControl(Fit3MediaVolume.parse(body));
         } else {
             LOG.debug("TODO handle media request MSG_ID={}", msgId);
+        }
+    }
+
+    /**
+     * Act on the band's 0x05 requests: "add current location" (MSG_ID 0, the
+     * band asking to search using its own GPS fix - no Gadgetbridge
+     * equivalent) and "weather info request" (MSG_ID 1, wants a refresh).
+     * Gadgetbridge has no privacy-policy/city-search flow to replicate, so
+     * either request is answered the same way: push whatever's cached.
+     */
+    private void onWeatherRequest(int msgId) {
+        if (msgId == Fit3WeatherInfo.MSG_ID_WEATHER_INFO || msgId == Fit3WeatherInfo.MSG_ID_ADD_CURRENT_LOCATION) {
+            onSendWeather();
+        } else {
+            LOG.debug("TODO handle weather request MSG_ID={}", msgId);
         }
     }
 
@@ -429,16 +452,23 @@ public class SamsungDeviceSupport extends AbstractBTLESingleDeviceSupport {
     // Send path
     // ------------------------------------------------------------------
 
-    /** Send an already-built inner payload on a channel. */
+    /** Send an already-built inner payload on a channel. Fragmented over several frames if too large for one ATT write. */
     public void sendMessage(int channel, byte[] innerBody, String reason) {
-        byte[] frame = sap.buildSingle(channel, innerBody, negotiatedMtu);
-        writeRaw(frame, reason);
+        writeFrames(sap.buildFrames(channel, innerBody, negotiatedMtu), reason);
     }
 
     private void writeRaw(byte[] frame, String reason) {
+        writeFrames(Collections.singletonList(frame), reason);
+    }
+
+    /** Write one or more frames back-to-back in a single transaction, so a fragmented message can't be interleaved with anything else queued. */
+    private void writeFrames(List<byte[]> frames, String reason) {
         try {
             TransactionBuilder builder = performInitialized(reason);
-            builder.write(getCharacteristic(UUID_CHAR_WRITE), frame);
+            BluetoothGattCharacteristic characteristic = getCharacteristic(UUID_CHAR_WRITE);
+            for (byte[] frame : frames) {
+                builder.write(characteristic, frame);
+            }
             builder.queue();
         } catch (IOException e) {
             LOG.error("failed to write '{}'", reason, e);
@@ -502,6 +532,16 @@ public class SamsungDeviceSupport extends AbstractBTLESingleDeviceSupport {
     @Override
     public void onSetMusicState(MusicStateSpec stateSpec) {
         sendMessage(Fit3MediaInfo.CHANNEL, Fit3MediaInfo.buildPlaybackState(stateSpec), "media-playback-state");
+    }
+
+    @Override
+    public void onSendWeather() {
+        WeatherSpec weatherSpec = Weather.getWeatherSpec();
+        if (weatherSpec == null) {
+            LOG.warn("Samsung Fit 3: no weather found in singleton");
+            return;
+        }
+        sendMessage(Fit3WeatherInfo.CHANNEL, Fit3WeatherInfo.buildRequest(weatherSpec), "weather");
     }
 
     private void handleBatteryInfo(Fit3BatteryInfo info) {

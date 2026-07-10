@@ -83,4 +83,14 @@ public class SamsungFit3Coordinator extends AbstractBLEDeviceCoordinator {
         return true;
     }
 
+    @Override
+    public boolean supportsWeather(@NonNull final GBDevice device) {
+        return true;
+    }
+
+    @Override
+    public boolean supportsMusicInfo(final GBDevice device) {
+        return true;
+    }
+
 }

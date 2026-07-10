@@ -17,6 +17,11 @@
 
 package nodomain.freeyourgadget.gadgetbridge.service.devices.samsung;
 
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+
 /**
  * Stateful glue between the transport ({@link SapFrame}), session
  * ({@link SapPacket}) and reassembly ({@link SapReassembler}) layers.
@@ -89,23 +94,56 @@ public final class SapProtocol {
     /**
      * Build the frame(s) to send an application message on a channel.
      *
-     * Only single-frame messages are produced here (they cover all normal client
-     * commands: settings, replies, find-band, media, etc.). If {@code body} is
-     * too large for one ATT write, split it into a first-fragment + continuation
-     * chunk sequence — see the note in {@link SapReassembler}. For that you also
-     * need the outgoing chunk-header format, which is not yet fully decoded.
+     * If {@code body} fits in one ATT write, this is a single {@code TYPE_SINGLE}
+     * frame, same as before. Otherwise it's split into one first-fragment frame
+     * (carries the channel, {@code TYPE_FIRST}) followed by as many continuation
+     * frames ({@code TYPE_CONT}, no channel field) as needed to carry the rest.
+     *
+     * This is deliberately the simple case: one
+     * first-fragment plus N continuations for a single logical message, with no
+     * chunk-index header. {@link SapReassembler} (the receive side) concatenates
+     * exactly that shape - first-frag body + continuation bodies - until the next
+     * single/first-frag. It is NOT the separate, still only partly decoded,
+     * multi-CHUNK scheme used for objects that span several first-frag+
+     * continuation groups (e.g. app icons); that needs a chunk-index header this
+     * class does not (yet) produce.
+     *
+     * A continuation's SEQ is its chunk's SEQ with bit 0 set (e.g.
+     * {@code 0x50 -> 0x51}); every continuation in this batch shares that same
+     * value, matching the observed captures.
      *
      * @param mtu the negotiated ATT MTU (e.g. 512); max frame = mtu - 3.
      */
-    public byte[] buildSingle(int channel, byte[] body, int mtu) {
-        byte[] payload = SapPacket.encodeSingle(channel, nextSeq(), body);
-        byte[] frame = SapFrame.wrap(payload);
+    public List<byte[]> buildFrames(int channel, byte[] body, int mtu) {
         int maxFrame = mtu - 3;
-        if (frame.length > maxFrame) {
-            throw new IllegalArgumentException(
-                    "message needs fragmentation (" + frame.length + " > " + maxFrame + "); not implemented");
+        int seq = nextSeq();
+
+        byte[] singlePayload = SapPacket.encodeSingle(channel, seq, body);
+        byte[] singleFrame = SapFrame.wrap(singlePayload);
+        if (singleFrame.length <= maxFrame) {
+            return Collections.singletonList(singleFrame);
         }
-        return frame;
+
+        // SapFrame.wrap adds 6 bytes of framing (LEN 2 + HDRCRC 2 + DATACRC 2);
+        // first-frag payload has a 4-byte header ([TYPE][SEQ][CHAN][CHAN]),
+        // continuation payload has a 2-byte header ([TYPE][SEQ]).
+        int firstCap = maxFrame - 6 - 4;
+        int contCap = maxFrame - 6 - 2;
+        if (firstCap <= 0 || contCap <= 0) {
+            throw new IllegalArgumentException("MTU too small to fragment (" + mtu + ")");
+        }
+
+        List<byte[]> frames = new ArrayList<>();
+        int offset = Math.min(firstCap, body.length);
+        frames.add(SapFrame.wrap(SapPacket.encodeFirstFragment(channel, seq, Arrays.copyOfRange(body, 0, offset))));
+
+        int contSeq = seq | 0x01;
+        while (offset < body.length) {
+            int end = Math.min(offset + contCap, body.length);
+            frames.add(SapFrame.wrap(SapPacket.encodeContinuation(contSeq, Arrays.copyOfRange(body, offset, end))));
+            offset = end;
+        }
+        return frames;
     }
 
     /**

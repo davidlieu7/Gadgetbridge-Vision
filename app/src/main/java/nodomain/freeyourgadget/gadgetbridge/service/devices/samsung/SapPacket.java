@@ -109,6 +109,26 @@ public final class SapPacket {
         return payload;
     }
 
+    /** Encode the first fragment (carries the channel) of a phone-originated multi-frame message. */
+    public static byte[] encodeFirstFragment(int channel, int seq, byte[] chunk) {
+        byte[] payload = new byte[4 + chunk.length];
+        payload[0] = (byte) TYPE_FIRST;
+        payload[1] = (byte) (seq & 0xFF);
+        payload[2] = (byte) (channel & 0xFF);
+        payload[3] = (byte) (channel & 0xFF);
+        System.arraycopy(chunk, 0, payload, 4, chunk.length);
+        return payload;
+    }
+
+    /** Encode a continuation fragment (no channel field) of a phone-originated multi-frame message. */
+    public static byte[] encodeContinuation(int seq, byte[] chunk) {
+        byte[] payload = new byte[2 + chunk.length];
+        payload[0] = (byte) TYPE_CONT;
+        payload[1] = (byte) (seq & 0xFF);
+        System.arraycopy(chunk, 0, payload, 2, chunk.length);
+        return payload;
+    }
+
     /** Encode an ACK for a received packet with the given seq. */
     public static byte[] encodeAck(int seq, boolean chunk) {
         return new byte[]{
