@@ -17,7 +17,11 @@
 
 package nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests;
 
+import android.content.Context;
+import android.provider.Telephony;
+
 import nodomain.freeyourgadget.gadgetbridge.model.NotificationSpec;
+import nodomain.freeyourgadget.gadgetbridge.model.NotificationType;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.SapPayloadBuilder;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.SapProtocol;
 
@@ -52,7 +56,9 @@ import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.SapProtocol;
  *      0e len utf8...      [if app name]     param 0x0e = APP_NAME (string, 1-byte len)
  *      0f 01                             param 0x0f = ALERT_TYPE = 1 (byte)
  *      10 01                             param 0x10 = IS_URGENT = 1 (byte)
- *      12 len utf8...      [if package]      param 0x12 = APP_PACKAGE_NAME (string, 1-byte len)
+ *      09 len ascii...     [if package]           param 0x09 = IMAGE_URL (string, 1-byte len)
+ *      13 01               [if package, first push for this icon]  param 0x13 = IMAGE_NEWLY_ADDED = 1 (byte)
+ *      12 len utf8...      [if package]           param 0x12 = APP_PACKAGE_NAME (string, 1-byte len)
  * </pre>
  *
  * <p>Field order matters: these params are read positionally against a
@@ -62,10 +68,21 @@ import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.SapProtocol;
  * <p>{@code APP_ID} has no Gadgetbridge equivalent - on the source app it is
  * a stable id assigned per installed app (reused later to target
  * block/unblock-app messages), not something derived from a single
- * notification. A hash of the package name is sent in its place, so at
- * least repeated notifications from the same app carry a consistent id.
- * Icon transfer (params 0x07/0x09/0x13) and {@code WINDOW_ID} (0x11) are not
- * implemented.
+ * notification. A hash of the package name is sent in its place ({@link
+ * #appIdFor}), so at least repeated notifications from the same app carry a
+ * consistent id - the band later asks for that app's icon by echoing this
+ * same id back (see {@link Fit3NotificationIcon}). {@code WINDOW_ID} (0x11)
+ * is not implemented.
+ *
+ * <p>{@code IMAGE_URL} is the cue that makes the band bother asking for an
+ * icon at all - without it here, the band has no reason to ever send a
+ * {@code NOTI_ADDITIONAL_INFO} request, regardless of whether {@code
+ * APP_ID}/{@code APP_PACKAGE_NAME} are otherwise valid. {@code
+ * IMAGE_NEWLY_ADDED} additionally forces a re-fetch even if the band still
+ * has that URL cached from a previous push - the source app only sets it
+ * when its own persisted per-app icon hash changed; the caller here passes
+ * it for the first push of a given icon per connection and leaves it off
+ * afterwards, as a cheap stand-in for that hash check.
  */
 public final class Fit3Notification {
 
@@ -88,28 +105,53 @@ public final class Fit3Notification {
     private static final int PARAM_ALERT_TYPE       = 0x0f;
     private static final int PARAM_IS_URGENT        = 0x10;
     private static final int PARAM_APP_PACKAGE      = 0x12;
+    private static final int PARAM_IMAGE_URL        = 0x09;
+    private static final int PARAM_IMAGE_NEWLY_ADDED = 0x13;
 
     private Fit3Notification() {
     }
 
-    /** Build with the MSG_ID picked automatically from {@code spec.dndSuppressed}. */
-    public static byte[] buildRequest(NotificationSpec spec) {
-        int msgId = spec.getDndSuppressed() != 0 ? MSG_ID_WITH_DND : MSG_ID_NEW_WITH_POPUP;
-        return buildRequest(msgId, spec);
+    /**
+     * {@code spec.sourceAppId} isn't set for notifications Gadgetbridge builds
+     * itself rather than relaying from {@code NotificationListenerService}
+     * (e.g. incoming-SMS), so there's no package to send as {@code
+     * APP_PACKAGE_NAME} or to derive {@link #appIdFor} from, and thus nothing
+     * for the band to later ask an icon for. Falls back to the phone's
+     * default SMS/MMS app for {@link NotificationType#GENERIC_SMS}, since
+     * that's the closest real package to the synthetic notification's origin.
+     *
+     * @return the resolved package, or {@code ""} if none could be found.
+     */
+    public static String resolvePackage(NotificationSpec spec, Context context) {
+        if (spec.getSourceAppId() != null && !spec.getSourceAppId().isEmpty()) {
+            return spec.getSourceAppId();
+        }
+        if (spec.getType() == NotificationType.GENERIC_SMS) {
+            String smsPackage = Telephony.Sms.getDefaultSmsPackage(context);
+            if (smsPackage != null) {
+                return smsPackage;
+            }
+        }
+        return "";
     }
 
-    public static byte[] buildRequest(int msgId, NotificationSpec spec) {
+    /** Build with the MSG_ID picked automatically from {@code spec.dndSuppressed}. */
+    public static byte[] buildRequest(NotificationSpec spec, String pkg, boolean iconNewlyAdded) {
+        int msgId = spec.getDndSuppressed() != 0 ? MSG_ID_WITH_DND : MSG_ID_NEW_WITH_POPUP;
+        return buildRequest(msgId, spec, pkg, iconNewlyAdded);
+    }
+
+    public static byte[] buildRequest(int msgId, NotificationSpec spec, String pkg, boolean iconNewlyAdded) {
         String heading = firstNonEmpty(spec.getTitle(), spec.getSender(), spec.getSourceName(), "Notification");
         String body    = firstNonEmpty(spec.getBody(), spec.getSubject(), "");
         String appName = spec.getSourceName();
-        String pkg     = spec.getSourceAppId() != null ? spec.getSourceAppId() : "";
         long whenMillis = spec.getWhen() > 0 ? spec.getWhen() : System.currentTimeMillis();
         boolean hasQuickReplies = spec.getCannedReplies() != null && spec.getCannedReplies().length > 0;
 
         SapPayloadBuilder b = SapPayloadBuilder.variable(msgId)
                 .addByte(PARAM_TYPE, 1)
                 .addInt32(PARAM_SEQUENCE_ID, spec.getId())
-                .addString(PARAM_APP_ID, Integer.toString(Math.abs(pkg.hashCode())))
+                .addString(PARAM_APP_ID, appIdFor(pkg))
                 .addLong(PARAM_TIME, whenMillis)
                 .addString(PARAM_HEADING, heading);
 
@@ -130,6 +172,10 @@ public final class Fit3Notification {
          .addByte(PARAM_IS_URGENT, 1);
 
         if (!pkg.isEmpty()) {
+            b.addString(PARAM_IMAGE_URL, Fit3NotificationIcon.iconUrlFor(pkg));
+            if (iconNewlyAdded) {
+                b.addByte(PARAM_IMAGE_NEWLY_ADDED, 1);
+            }
             b.addString(PARAM_APP_PACKAGE, pkg);
         }
 
@@ -143,5 +189,10 @@ public final class Fit3Notification {
             }
         }
         return "";
+    }
+
+    /** The stand-in {@code APP_ID} sent for a package - see the class note. */
+    public static String appIdFor(String pkg) {
+        return Integer.toString(Math.abs(pkg.hashCode()));
     }
 }
