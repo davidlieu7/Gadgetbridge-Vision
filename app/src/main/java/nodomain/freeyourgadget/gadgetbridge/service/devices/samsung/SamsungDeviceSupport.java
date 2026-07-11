@@ -48,6 +48,12 @@ import nodomain.freeyourgadget.gadgetbridge.service.btle.AbstractBTLESingleDevic
 import nodomain.freeyourgadget.gadgetbridge.service.btle.TransactionBuilder;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3BatteryInfo;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3CallState;
+import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3HealthCapabilityCheck;
+import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3HealthDeviceInfo;
+import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3HealthPedometerRecord;
+import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3HealthRequestData;
+import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3HealthSyncData;
+import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3HealthWearableMsg;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3InitSetting;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3LicenseAgreement;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3MediaButton;
@@ -63,6 +69,7 @@ public class SamsungDeviceSupport extends AbstractBTLESingleDeviceSupport {
 
     private final GBDeviceEventBatteryInfo batteryCmd = new GBDeviceEventBatteryInfo();
     private final Fit3BigData bigData = new Fit3BigData();
+    private final Fit3HealthSync healthSync = new Fit3HealthSync();
     // Package for each id the band might later ask for an icon by, keyed on
     // the exact IMAGE_URL string (see Fit3NotificationIcon); populated as
     // notifications are pushed, since the fetch request only carries the id.
@@ -283,10 +290,89 @@ public class SamsungDeviceSupport extends AbstractBTLESingleDeviceSupport {
     }
 
     /** Answer / ack the band's 0x0a health requests and data uploads. */
-    private void onHealthRequest(int msgId, byte[] req) {
-        // /9,/4 = config (locale, feature enable); /2,/3,/32,/34,/62,/63 = the band
-        // uploading stored steps/sleep/workout records - ack them so it advances.
+    private void onHealthRequest(int msgId, byte[] body) {
+        if (msgId == 0x3f) {
+            handleHealthBulkChunk(body);
+            return;
+        }
+        if (msgId == Fit3HealthRequestData.MSG_ID) {
+            byte[] response = Fit3HealthRequestData.buildResponse(body);
+            if (response == null) {
+                LOG.warn("Samsung Fit 3: REQUEST_DATA body too short to echo");
+                return;
+            }
+            sendMessage(Fit3HealthRequestData.CHANNEL, response, "health-request-data-ack");
+            return;
+        }
+        if (msgId == Fit3HealthWearableMsg.MSG_ID) {
+            byte[] response = Fit3HealthWearableMsg.buildResponse(body);
+            if (response == null) {
+                LOG.warn("Samsung Fit 3: WEARABLE_MSG body didn't match the expected shape");
+                return;
+            }
+            sendMessage(Fit3HealthWearableMsg.CHANNEL, response, "health-wearable-msg-ack");
+            return;
+        }
+        if (msgId == Fit3HealthDeviceInfo.MSG_ID) {
+            sendMessage(Fit3HealthDeviceInfo.CHANNEL, Fit3HealthDeviceInfo.buildResponse(body), "health-device-info-ack");
+            return;
+        }
+        if (msgId == Fit3HealthCapabilityCheck.MSG_ID) {
+            byte[] response = Fit3HealthCapabilityCheck.buildResponse(body);
+            if (response == null) {
+                LOG.warn("Samsung Fit 3: capability-check body missing expected params");
+                return;
+            }
+            sendMessage(Fit3HealthCapabilityCheck.CHANNEL, response, "health-capability-check-ack");
+            return;
+        }
+        if (msgId == Fit3HealthSyncData.MSG_ID) {
+            handleHealthSyncData(body);
+            return;
+        }
+        // /9 = periodic locale ping; /62 = the band uploading stored
+        // sleep/workout records directly (unchunked).
         LOG.debug("TODO respond/ack health request MSG_ID={}", msgId);
+    }
+
+    /**
+     * Ack the band's SYNC_DATA push (see {@link Fit3HealthSyncData}) so it
+     * doesn't stall/retry, and log any pedometer record found in it. Not
+     * yet wired into Gadgetbridge's own activity tracking - see {@link
+     * Fit3HealthPedometerRecord}.
+     */
+    private void handleHealthSyncData(byte[] body) {
+        byte[] ack = Fit3HealthSyncData.buildAck(body);
+        if (ack == null) {
+            LOG.warn("Samsung Fit 3: SYNC_DATA body missing expected sequence number");
+            return;
+        }
+        sendMessage(Fit3HealthSyncData.CHANNEL, ack, "health-sync-data-ack");
+        Fit3HealthPedometerRecord record = Fit3HealthSyncData.findPedometerRecord(body);
+        if (record != null) {
+            LOG.info("Samsung Fit 3: pedometer record: {}", record);
+        }
+    }
+
+    /**
+     * Collect the band's channel-0x0a bulk-transfer chunks (see {@link
+     * Fit3HealthSync}), ack the object once its last chunk is in, and log it. Parsing the reassembled health-sync record (steps, sleep,
+     * workouts) isn't implemented yet.
+     */
+    private void handleHealthBulkChunk(byte[] body) {
+        Fit3HealthSync.Chunk chunk = Fit3HealthSync.parseChunk(body);
+        if (chunk == null) {
+            LOG.warn("Samsung Fit 3: malformed health bulk-transfer chunk");
+            return;
+        }
+        byte[] reassembled = healthSync.onChunk(chunk);
+        byte[] bulkAck = healthSync.takeAck();
+        if (bulkAck != null) {
+            sendMessage(SapProtocol.CH_HEALTH, bulkAck, "health-bulk-ack");
+        }
+        if (reassembled != null) {
+            LOG.debug("Samsung Fit 3: health sync data reassembled ({} bytes), not yet parsed", reassembled.length);
+        }
     }
 
     /** Act on the band's 0x03 requests: ringer silence and call reject are both fixed, paramless. */
@@ -465,9 +551,13 @@ public class SamsungDeviceSupport extends AbstractBTLESingleDeviceSupport {
                 "license-agreement"); // required
 
         sendRawMessage(Fit3BatteryInfo.CHANNEL, Fit3BatteryInfo.buildRequest(), "battery-request");
-        // Beyond this the app pushes calendar (0x08/8,9), health config (0x0a/4),
-        // settings (0x0b), etc. Those enable features but the steps above are the
-        // ones that get the band off "Continue on the phone".
+
+        // Beyond this the app pushes calendar (0x08/8,9), settings (0x0b),
+        // etc. Those enable features but the steps above are the ones that
+        // get the band off "Continue on the phone". Health-sync data isn't
+        // requested here - the band pings REQUEST_DATA (0x0a MSG_ID 3) on
+        // its own schedule and the reply to that (see Fit3HealthRequestData,
+        // wired up in onHealthRequest) is what lets it proceed.
     }
 
     /** Binding token on 0x1a MSG_ID 2: 02 0a 01 0b 00 0c 20 <32 hex ASCII>. */
