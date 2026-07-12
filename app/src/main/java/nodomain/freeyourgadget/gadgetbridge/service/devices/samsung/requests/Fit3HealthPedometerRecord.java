@@ -50,7 +50,7 @@ public final class Fit3HealthPedometerRecord {
      * All 4-byte timestamps on this channel are seconds since 1990-01-01T00:00:00Z,
      * not the Unix epoch.
      */
-    private static final int EPOCH_1990_OFFSET_SECONDS = 631152000;
+    public static final int EPOCH_1990_OFFSET_SECONDS = 631152000;
     private static final int TAG_START_TIME = 1;
     private static final int TAG_END_TIME = 2;
     private static final int TAG_TIME_OFFSET = 3;

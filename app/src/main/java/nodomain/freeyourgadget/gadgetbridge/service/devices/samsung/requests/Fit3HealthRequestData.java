@@ -78,8 +78,16 @@ public final class Fit3HealthRequestData {
      *
      * @param sequenceNumber the phone's own message counter; the band's
      *     reply echoes it.
+     * @param lastSyncTime seconds since the channel's 1990 epoch (see {@link
+     *     Fit3HealthPedometerRecord#EPOCH_1990_OFFSET_SECONDS}) of the newest
+     *     record already synced, so the band can skip what the phone has; 0
+     *     requests everything. Only the capture-confirmed all-zero form is
+     *     wire-validated - a non-zero value follows the field's meaning from
+     *     the band's own device-info records, and the worst case is the band
+     *     ignoring it and re-sending everything (harmless: stored samples
+     *     are keyed by timestamp, so re-inserts just overwrite).
      */
-    public static byte[] buildRequest(int sequenceNumber) {
+    public static byte[] buildRequest(int sequenceNumber, int lastSyncTime) {
         return new byte[]{
                 (byte) MSG_ID,
                 (byte) 0xe0, (byte) (sequenceNumber & 0xFF), (byte) ((sequenceNumber >> 8) & 0xFF),
@@ -87,7 +95,9 @@ public final class Fit3HealthRequestData {
                 0x01, 0x00,             // device (value ignored by the parser)
                 0x02, 0x00, 0x00,       // device type
                 0x03, 0x04, 0x33,       // version (4.51, replayed from the capture)
-                0x04, 0x00, 0x00, 0x00, 0x00, // last_sync_time: 0 = everything
+                0x04,                   // last_sync_time (4-byte LE)
+                (byte) (lastSyncTime & 0xFF), (byte) ((lastSyncTime >> 8) & 0xFF),
+                (byte) ((lastSyncTime >> 16) & 0xFF), (byte) ((lastSyncTime >> 24) & 0xFF),
                 0x05, 0x00, 0x00, 0x00, 0x00, // start_time
                 0x06, 0x00, 0x00, 0x00, 0x00, // end_time
                 0x07, 0x01,             // is_last_chunk

@@ -29,6 +29,7 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
@@ -41,10 +42,16 @@ import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEventBatteryInf
 import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEventCallControl;
 import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEventMusicControl;
 import nodomain.freeyourgadget.gadgetbridge.devices.samsung.SamsungSampleProvider;
+import nodomain.freeyourgadget.gadgetbridge.entities.BaseActivitySummary;
+import nodomain.freeyourgadget.gadgetbridge.entities.BaseActivitySummaryDao;
 import nodomain.freeyourgadget.gadgetbridge.entities.DaoSession;
+import nodomain.freeyourgadget.gadgetbridge.entities.Device;
 import nodomain.freeyourgadget.gadgetbridge.entities.SamsungFit3ActivitySample;
+import nodomain.freeyourgadget.gadgetbridge.entities.User;
 import nodomain.freeyourgadget.gadgetbridge.model.ActivityKind;
 import nodomain.freeyourgadget.gadgetbridge.model.ActivitySample;
+import nodomain.freeyourgadget.gadgetbridge.model.ActivitySummaryData;
+import nodomain.freeyourgadget.gadgetbridge.model.ActivitySummaryEntries;
 import nodomain.freeyourgadget.gadgetbridge.model.BatteryState;
 import nodomain.freeyourgadget.gadgetbridge.model.CallSpec;
 import nodomain.freeyourgadget.gadgetbridge.model.MusicSpec;
@@ -56,12 +63,14 @@ import nodomain.freeyourgadget.gadgetbridge.service.btle.AbstractBTLESingleDevic
 import nodomain.freeyourgadget.gadgetbridge.service.btle.TransactionBuilder;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3BatteryInfo;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3CallState;
+import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3ExerciseType;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3HealthCapabilityCheck;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3HealthDeviceInfo;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3HealthPedometerRecord;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3HealthRequestData;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3HealthSyncData;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3HealthWearableMsg;
+import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3HealthWorkout;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3InitSetting;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3LicenseAgreement;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3MediaButton;
@@ -363,6 +372,11 @@ public class SamsungDeviceSupport extends AbstractBTLESingleDeviceSupport {
             LOG.info("Samsung Fit 3: {} pedometer record(s), first: {}", records.size(), records.get(0));
             storePedometerRecords(records);
         }
+        Fit3HealthWorkout workout = Fit3HealthWorkout.findFirst(body, 0);
+        if (workout != null) {
+            LOG.info("Samsung Fit 3: {}", workout);
+            storeWorkout(workout);
+        }
     }
 
     private void storePedometerRecords(List<Fit3HealthPedometerRecord> records) {
@@ -429,7 +443,90 @@ public class SamsungDeviceSupport extends AbstractBTLESingleDeviceSupport {
             LOG.debug("Samsung Fit 3: health sync data reassembled ({} bytes, {} pedometer record(s))",
                     reassembled.length, records.size());
             storePedometerRecords(records);
+            Fit3HealthWorkout workout = Fit3HealthWorkout.findFirst(reassembled, 0);
+            if (workout != null) {
+                LOG.info("Samsung Fit 3: {}", workout);
+                storeWorkout(workout);
+            }
         }
+    }
+
+    /**
+     * Persist a parsed workout (see {@link Fit3HealthWorkout}) as a
+     * {@link BaseActivitySummary}, plus its {@code LIVE_DATA} samples (heart
+     * rate / speed / step count over time) as activity samples in the workout
+     * window so the workout detail view can chart them.
+     */
+    private void storeWorkout(Fit3HealthWorkout workout) {
+        ActivityKind kind = Fit3ExerciseType.toActivityKind(workout.exerciseType);
+        try (DBHandler dbHandler = GBApplication.acquireDB()) {
+            DaoSession session = dbHandler.getDaoSession();
+            Device device = DBHelper.getDevice(getDevice(), session);
+            User user = DBHelper.getUser(session);
+            long deviceId = device.getId();
+            long userId = user.getId();
+
+            BaseActivitySummary summary = new BaseActivitySummary();
+            summary.setDeviceId(deviceId);
+            summary.setUserId(userId);
+            summary.setName(kind.getLabel(getContext()));
+            summary.setStartTime(new Date(workout.startTime * 1000L));
+            summary.setEndTime(new Date(workout.endTime * 1000L));
+            summary.setActivityKind(kind.getCode());
+            summary.setSummaryData(buildWorkoutSummaryData(workout));
+            // De-dupe on (device, start): a re-sync of the same workout replaces it.
+            List<BaseActivitySummary> existing = session.getBaseActivitySummaryDao().queryBuilder()
+                    .where(BaseActivitySummaryDao.Properties.DeviceId.eq(deviceId),
+                            BaseActivitySummaryDao.Properties.StartTime.eq(summary.getStartTime()))
+                    .list();
+            if (!existing.isEmpty()) {
+                summary.setId(existing.get(0).getId());
+            }
+            session.getBaseActivitySummaryDao().insertOrReplace(summary);
+
+            if (!workout.samples.isEmpty()) {
+                SamsungSampleProvider provider = new SamsungSampleProvider(getDevice(), session);
+                List<SamsungFit3ActivitySample> samples = new ArrayList<>(workout.samples.size());
+                for (Fit3HealthWorkout.LiveSample ls : workout.samples) {
+                    SamsungFit3ActivitySample sample = provider.createActivitySample();
+                    sample.setTimestamp(ls.timestamp);
+                    sample.setDeviceId(deviceId);
+                    sample.setUserId(userId);
+                    sample.setRawKind(kind.getCode());
+                    sample.setSteps(ActivitySample.NOT_MEASURED);
+                    // Not carried per live sample - only as a workout total.
+                    sample.setActiveCalories(ActivitySample.NOT_MEASURED);
+                    sample.setHeartRate(ls.heartRate != null ? Math.round(ls.heartRate) : ActivitySample.NOT_MEASURED);
+                    // Live samples carry metres; getDistanceCm() is in centimetres.
+                    sample.setDistanceCm(ls.distance != null
+                            ? Math.round(ls.distance * 100) : ActivitySample.NOT_MEASURED);
+                    samples.add(sample);
+                }
+                provider.addGBActivitySamples(samples);
+            }
+        } catch (Exception e) {
+            LOG.error("Samsung Fit 3: failed to store workout", e);
+            return;
+        }
+        GB.signalActivityDataFinish(getDevice());
+    }
+
+    private static String buildWorkoutSummaryData(Fit3HealthWorkout workout) {
+        ActivitySummaryData data = new ActivitySummaryData();
+        data.add(ActivitySummaryEntries.DISTANCE_METERS, workout.distanceMeters, ActivitySummaryEntries.UNIT_METERS);
+        data.add(ActivitySummaryEntries.CALORIES_BURNT, workout.calories, ActivitySummaryEntries.UNIT_KCAL);
+        data.add(ActivitySummaryEntries.STEPS, workout.count, ActivitySummaryEntries.UNIT_STEPS);
+        data.add(ActivitySummaryEntries.ACTIVE_SECONDS, workout.durationMs / 1000f, ActivitySummaryEntries.UNIT_SECONDS);
+        if (workout.meanHr != null) {
+            data.add(ActivitySummaryEntries.HR_AVG, Math.round(workout.meanHr), ActivitySummaryEntries.UNIT_BPM);
+        }
+        if (workout.maxHr != null) {
+            data.add(ActivitySummaryEntries.HR_MAX, Math.round(workout.maxHr), ActivitySummaryEntries.UNIT_BPM);
+        }
+        if (workout.minHr != null) {
+            data.add(ActivitySummaryEntries.HR_MIN, Math.round(workout.minHr), ActivitySummaryEntries.UNIT_BPM);
+        }
+        return data.toString();
     }
 
     /** Act on the band's 0x03 requests: ringer silence and call reject are both fixed, paramless. */
@@ -685,8 +782,27 @@ public class SamsungDeviceSupport extends AbstractBTLESingleDeviceSupport {
     @Override
     public void onFetchRecordedData(int dataTypes) {
         sendMessage(Fit3HealthRequestData.CHANNEL,
-                Fit3HealthRequestData.buildRequest(healthRequestSequence++),
+                Fit3HealthRequestData.buildRequest(healthRequestSequence++, getLastSyncedTimestamp()),
                 "health-request-data-trigger");
+    }
+
+    /**
+     * Newest stored sample's timestamp, converted to the health channel's
+     * 1990 epoch - so a fetch can ask the band only for what's missing.
+     * 0 (= "send everything") if nothing is stored yet or the DB is
+     * unavailable.
+     */
+    private int getLastSyncedTimestamp() {
+        try (DBHandler dbHandler = GBApplication.acquireDB()) {
+            SamsungSampleProvider provider = new SamsungSampleProvider(getDevice(), dbHandler.getDaoSession());
+            SamsungFit3ActivitySample latest = provider.getLatestActivitySample();
+            if (latest != null) {
+                return Math.max(0, latest.getTimestamp() - Fit3HealthPedometerRecord.EPOCH_1990_OFFSET_SECONDS);
+            }
+        } catch (Exception e) {
+            LOG.warn("Samsung Fit 3: couldn't look up last synced sample, requesting everything", e);
+        }
+        return 0;
     }
 
     @Override

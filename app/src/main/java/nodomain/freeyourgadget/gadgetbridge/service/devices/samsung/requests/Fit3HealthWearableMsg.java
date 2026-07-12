@@ -33,25 +33,31 @@ import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.SapProtocol;
  * </pre>
  *
  * (offsets: request bytes 13,15,16,17,18,19,20,21 map to response bytes
- * 4,5,6,9,10,11,7,8 respectively). Reconstructed positionally from those two
- * samples - this is a "reproduce what was observed"
- * implementation, not a semantically understood one. Only handles a request
- * of exactly the observed 22-byte shape; anything else is left unanswered
- * rather than guessed at.
+ * 4,5,6,9,10,11,7,8 respectively). Reconstructed positionally from live
+ * capture samples - this is a "reproduce what was
+ * observed" implementation, not a semantically understood one.
+ *
+ * <p>A longer (46-byte) variant of the request also occurs, carrying a
+ * workout's {@code datauuid} as ASCII plus trailing params. It uses the
+ * <em>same</em> reply mapping (all the referenced offsets are &le; 21, i.e.
+ * before the extra payload), and - crucially - replying to it is what makes
+ * the band release the corresponding workout ({@code EXERCISE}) bulk object;
+ * leaving it unanswered stalls workout sync. So any request of at least the
+ * base length is answered with the same offset mapping.
  */
 public final class Fit3HealthWearableMsg {
 
     public static final int CHANNEL = SapProtocol.CH_HEALTH;
     public static final int MSG_ID = 0x04;
     private static final int RES_HEADER = 0x44;
-    private static final int EXPECTED_REQUEST_LEN = 22;
+    private static final int MIN_REQUEST_LEN = 22;
 
     private Fit3HealthWearableMsg() {
     }
 
-    /** @return the reply to send back, or {@code null} if {@code request} doesn't match the observed shape. */
+    /** @return the reply to send back, or {@code null} if {@code request} is too short to map. */
     public static byte[] buildResponse(byte[] request) {
-        if (request.length != EXPECTED_REQUEST_LEN) {
+        if (request.length < MIN_REQUEST_LEN) {
             return null;
         }
         return new byte[]{
