@@ -17,9 +17,11 @@
 
 package nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
@@ -31,13 +33,24 @@ import java.util.Set;
  * band: a captured record's {@code COUNT} field matched the step count shown
  * on the band's own screen exactly.
  *
- * <p>Live captures show the marker byte is followed by one extra byte before
- * the 12-field walk starts (always {@code 0x00} so far); its purpose isn't
- * confirmed, so it's skipped rather than interpreted.
+ * <p>The marker introduces a <em>list</em>, not a single record: each record
+ * is prefixed by a one-byte has-more flag ({@code 0x01} = another record
+ * follows, {@code 0x00} = last record), and the {@code 0x07} marker itself
+ * appears only once for the whole list. (Same list convention as several
+ * other record types on this channel.) A single-record push is the
+ * degenerate case {@code 07 00 [record]} - which is why this byte was
+ * "always {@code 0x00}" before multi-record bulk blobs were examined.
+ * Validated against a real band: a 41-record list parsed from one bulk
+ * transfer summed to exactly the step count on the band's own screen.
  */
 public final class Fit3HealthPedometerRecord {
 
     public static final int MARKER = 0x07;
+    /**
+     * All 4-byte timestamps on this channel are seconds since 1990-01-01T00:00:00Z,
+     * not the Unix epoch.
+     */
+    private static final int EPOCH_1990_OFFSET_SECONDS = 631152000;
     private static final int TAG_START_TIME = 1;
     private static final int TAG_END_TIME = 2;
     private static final int TAG_TIME_OFFSET = 3;
@@ -68,12 +81,14 @@ public final class Fit3HealthPedometerRecord {
     public final float calorie;
     public final int durationMs;
     public final int timeOffsetMs;
+    /** START_TIME (tag 1), converted to Unix epoch seconds. */
+    public final int timestamp;
     /** End of the record's own tag walk, one past the last byte consumed - for scanning past it. */
     public final int endOffset;
 
     private Fit3HealthPedometerRecord(int count, int runStep, int walkStep, float distance,
                                        float speed, float calorie, int durationMs, int timeOffsetMs,
-                                       int endOffset) {
+                                       int timestamp, int endOffset) {
         this.count = count;
         this.runStep = runStep;
         this.walkStep = walkStep;
@@ -82,21 +97,49 @@ public final class Fit3HealthPedometerRecord {
         this.calorie = calorie;
         this.durationMs = durationMs;
         this.timeOffsetMs = timeOffsetMs;
+        this.timestamp = timestamp;
         this.endOffset = endOffset;
     }
 
     /**
+     * Parse the record list a {@code 0x07} marker introduces: {@code
+     * [hasMore:1][record]} repeated, has-more {@code 0x01} = another record
+     * follows, {@code 0x00} = this is the last.
+     *
      * @param markerOffset offset of the {@code 0x07} marker byte itself.
-     * @return the parsed record, or {@code null} if this isn't a well-formed
-     *     PEDO_STEP_COUNT record at that offset (not every {@code 0x07} byte
-     *     in a payload is this marker - callers should treat a {@code null}
+     * @return the parsed records, empty if this isn't a well-formed
+     *     PEDO_STEP_COUNT list at that offset (not every {@code 0x07} byte
+     *     in a payload is this marker - callers should treat an empty result
      *     as "keep scanning", not as an error).
      */
-    public static Fit3HealthPedometerRecord parse(byte[] data, int markerOffset) {
+    public static List<Fit3HealthPedometerRecord> parseList(byte[] data, int markerOffset) {
+        List<Fit3HealthPedometerRecord> records = new ArrayList<>();
         if (markerOffset < 0 || markerOffset + 2 > data.length || (data[markerOffset] & 0xFF) != MARKER) {
-            return null;
+            return records;
         }
-        int pos = markerOffset + 2; // skip the marker and the one unidentified byte after it
+        int pos = markerOffset + 1;
+        while (pos < data.length) {
+            int hasMore = data[pos] & 0xFF;
+            if (hasMore != 0 && hasMore != 1) {
+                break;
+            }
+            Fit3HealthPedometerRecord record = parseFields(data, pos + 1);
+            if (record == null) {
+                break;
+            }
+            records.add(record);
+            pos = record.endOffset;
+            if (hasMore == 0) {
+                return records;
+            }
+        }
+        // Never saw the has-more=0 terminator (or a record failed mid-list):
+        // not a well-formed list, so don't trust any of it.
+        return new ArrayList<>();
+    }
+
+    /** Walk one record's 12 tag/value fields starting at {@code pos} (just past the has-more flag). */
+    private static Fit3HealthPedometerRecord parseFields(byte[] data, int pos) {
         Map<Integer, Integer> intFields = new HashMap<>();
         for (int i = 0; i < EXPECTED_TAGS.size(); i++) {
             if (pos >= data.length) {
@@ -132,26 +175,41 @@ public final class Fit3HealthPedometerRecord {
                 Float.intBitsToFloat(intFields.get(TAG_CALORIE)),
                 intFields.get(TAG_DURATION),
                 intFields.get(TAG_TIME_OFFSET),
+                intFields.get(TAG_START_TIME) + EPOCH_1990_OFFSET_SECONDS,
                 pos);
     }
 
-    /** Scan {@code data} for the first well-formed record at or after {@code fromOffset}. */
-    public static Fit3HealthPedometerRecord findFirst(byte[] data, int fromOffset) {
-        for (int i = fromOffset; i < data.length; i++) {
+    /**
+     * Scan {@code data} for every well-formed record list from {@code
+     * fromOffset} onward. Scanning (rather than walking the surrounding
+     * marker structure) because the other record types sharing the stream
+     * are mostly undecoded, so their lengths - and therefore the next
+     * marker's position - can't be computed; {@link #parseList}'s strict
+     * validation makes a false positive from a stray {@code 0x07} byte
+     * effectively impossible.
+     */
+    public static List<Fit3HealthPedometerRecord> findAll(byte[] data, int fromOffset) {
+        List<Fit3HealthPedometerRecord> records = new ArrayList<>();
+        int i = fromOffset;
+        while (i < data.length) {
             if ((data[i] & 0xFF) == MARKER) {
-                Fit3HealthPedometerRecord record = parse(data, i);
-                if (record != null) {
-                    return record;
+                List<Fit3HealthPedometerRecord> list = parseList(data, i);
+                if (!list.isEmpty()) {
+                    records.addAll(list);
+                    i = list.get(list.size() - 1).endOffset;
+                    continue;
                 }
             }
+            i++;
         }
-        return null;
+        return records;
     }
 
     @Override
     public String toString() {
         return "PedometerRecord{count=" + count + ", walkStep=" + walkStep + ", runStep=" + runStep
                 + ", distance=" + distance + ", speed=" + speed + ", calorie=" + calorie
-                + ", durationMs=" + durationMs + ", timeOffsetMs=" + timeOffsetMs + "}";
+                + ", durationMs=" + durationMs + ", timeOffsetMs=" + timeOffsetMs
+                + ", timestamp=" + timestamp + "}";
     }
 }

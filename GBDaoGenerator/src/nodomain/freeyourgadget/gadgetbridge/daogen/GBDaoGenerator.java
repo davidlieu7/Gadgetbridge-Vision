@@ -110,7 +110,7 @@ public class GBDaoGenerator {
             outputDir.mkdirs();
         }
 
-        final Schema schema = new Schema(151, MAIN_PACKAGE + ".entities");
+        final Schema schema = new Schema(152, MAIN_PACKAGE + ".entities");
 
         final List<Entity> sampleProvidersToGenerate = new LinkedList<>();
         final List<Entity> batterySampleProvidersToGenerate = new LinkedList<>();
@@ -255,6 +255,7 @@ public class GBDaoGenerator {
 
         addOlleeActivitySample(schema, user, device);
         addUnaDailySample(schema, user, device);
+        addSamsungFit3ActivitySample(schema, user, device);
 
         Entity huaweiWorkoutSummary = addHuaweiWorkoutSummarySample(schema, user, device);
         addHuaweiWorkoutSummaryAdditionalValuesSample(schema, huaweiWorkoutSummary);
@@ -1069,6 +1070,23 @@ public class GBDaoGenerator {
         activitySample.addIntProperty("caloriesBurnt");
         activitySample.addIntProperty("distanceMeters");
         activitySample.addIntProperty("activeTimeMinutes");
+        return activitySample;
+    }
+
+    private static Entity addSamsungFit3ActivitySample(Schema schema, Entity user, Entity device) {
+        Entity activitySample = addEntity(schema, "SamsungFit3ActivitySample");
+        activitySample.implementsSerializable();
+        addCommonActivitySampleProperties("AbstractActivitySample", activitySample, user, device);
+        activitySample.addIntProperty(SAMPLE_STEPS).notNull().codeBeforeGetterAndSetter(OVERRIDE);
+        activitySample.addIntProperty(SAMPLE_RAW_KIND).notNull().codeBeforeGetterAndSetter(OVERRIDE);
+        activitySample.addIntProperty(SAMPLE_HEART_RATE).notNull().codeBeforeGetterAndSetter(OVERRIDE);
+        // Calories go in the canonical ActivitySample property - a plain
+        // caloriesBurnt column would generate a getter nothing reads (the
+        // dashboard and the calories chart both go through getActiveCalories).
+        activitySample.addIntProperty("activeCalories").notNull().codeBeforeGetterAndSetter(OVERRIDE);
+        // Same again for distance: the canonical property is centimetres, and
+        // a distanceMeters column would generate a getter nothing reads.
+        activitySample.addIntProperty("distanceCm").notNull().codeBeforeGetterAndSetter(OVERRIDE);
         return activitySample;
     }
 

@@ -27,6 +27,7 @@ import androidx.annotation.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -34,9 +35,16 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 import nodomain.freeyourgadget.gadgetbridge.GBApplication;
+import nodomain.freeyourgadget.gadgetbridge.database.DBHandler;
+import nodomain.freeyourgadget.gadgetbridge.database.DBHelper;
 import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEventBatteryInfo;
 import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEventCallControl;
 import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEventMusicControl;
+import nodomain.freeyourgadget.gadgetbridge.devices.samsung.SamsungSampleProvider;
+import nodomain.freeyourgadget.gadgetbridge.entities.DaoSession;
+import nodomain.freeyourgadget.gadgetbridge.entities.SamsungFit3ActivitySample;
+import nodomain.freeyourgadget.gadgetbridge.model.ActivityKind;
+import nodomain.freeyourgadget.gadgetbridge.model.ActivitySample;
 import nodomain.freeyourgadget.gadgetbridge.model.BatteryState;
 import nodomain.freeyourgadget.gadgetbridge.model.CallSpec;
 import nodomain.freeyourgadget.gadgetbridge.model.MusicSpec;
@@ -62,6 +70,7 @@ import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3Notification;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3NotificationIcon;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3WeatherInfo;
+import nodomain.freeyourgadget.gadgetbridge.util.GB;
 
 
 public class SamsungDeviceSupport extends AbstractBTLESingleDeviceSupport {
@@ -70,6 +79,8 @@ public class SamsungDeviceSupport extends AbstractBTLESingleDeviceSupport {
     private final GBDeviceEventBatteryInfo batteryCmd = new GBDeviceEventBatteryInfo();
     private final Fit3BigData bigData = new Fit3BigData();
     private final Fit3HealthSync healthSync = new Fit3HealthSync();
+    /** Phone-side SEQUENCE_NUMBER counter for health-channel requests we originate (see Fit3HealthRequestData#buildRequest). */
+    private int healthRequestSequence = 1;
     // Package for each id the band might later ask for an icon by, keyed on
     // the exact IMAGE_URL string (see Fit3NotificationIcon); populated as
     // notifications are pushed, since the fetch request only carries the id.
@@ -337,9 +348,8 @@ public class SamsungDeviceSupport extends AbstractBTLESingleDeviceSupport {
 
     /**
      * Ack the band's SYNC_DATA push (see {@link Fit3HealthSyncData}) so it
-     * doesn't stall/retry, and log any pedometer record found in it. Not
-     * yet wired into Gadgetbridge's own activity tracking - see {@link
-     * Fit3HealthPedometerRecord}.
+     * doesn't stall/retry, and persist any pedometer record found in it (see
+     * {@link Fit3HealthPedometerRecord}) via {@link SamsungSampleProvider}.
      */
     private void handleHealthSyncData(byte[] body) {
         byte[] ack = Fit3HealthSyncData.buildAck(body);
@@ -348,16 +358,54 @@ public class SamsungDeviceSupport extends AbstractBTLESingleDeviceSupport {
             return;
         }
         sendMessage(Fit3HealthSyncData.CHANNEL, ack, "health-sync-data-ack");
-        Fit3HealthPedometerRecord record = Fit3HealthSyncData.findPedometerRecord(body);
-        if (record != null) {
-            LOG.info("Samsung Fit 3: pedometer record: {}", record);
+        List<Fit3HealthPedometerRecord> records = Fit3HealthSyncData.findPedometerRecords(body);
+        if (!records.isEmpty()) {
+            LOG.info("Samsung Fit 3: {} pedometer record(s), first: {}", records.size(), records.get(0));
+            storePedometerRecords(records);
         }
+    }
+
+    private void storePedometerRecords(List<Fit3HealthPedometerRecord> records) {
+        if (records.isEmpty()) {
+            return;
+        }
+        try (DBHandler dbHandler = GBApplication.acquireDB()) {
+            DaoSession session = dbHandler.getDaoSession();
+            SamsungSampleProvider provider = new SamsungSampleProvider(getDevice(), session);
+            long deviceId = DBHelper.getDevice(getDevice(), session).getId();
+            long userId = DBHelper.getUser(session).getId();
+            List<SamsungFit3ActivitySample> samples = new ArrayList<>(records.size());
+            for (Fit3HealthPedometerRecord record : records) {
+                SamsungFit3ActivitySample sample = provider.createActivitySample();
+                sample.setTimestamp(record.timestamp);
+                sample.setDeviceId(deviceId);
+                sample.setUserId(userId);
+                sample.setSteps(record.count);
+                sample.setRawKind(ActivityKind.ACTIVITY.getCode());
+                sample.setHeartRate(ActivitySample.NOT_MEASURED);
+                // The band reports kcal; ActivitySample#getActiveCalories() is in
+                // calories (DashboardUtils divides by 1000 for the kcal display).
+                sample.setActiveCalories(Math.round(record.calorie * 1000));
+                // The band reports metres; getDistanceCm() is in centimetres.
+                sample.setDistanceCm(Math.round(record.distance * 100));
+                samples.add(sample);
+            }
+            provider.addGBActivitySamples(samples);
+        } catch (Exception e) {
+            LOG.error("Samsung Fit 3: failed to store pedometer record(s)", e);
+            return;
+        }
+        // Tell the UI new activity data is in the DB - without this the
+        // dashboard keeps showing whatever it computed at startup.
+        GB.signalActivityDataFinish(getDevice());
     }
 
     /**
      * Collect the band's channel-0x0a bulk-transfer chunks (see {@link
-     * Fit3HealthSync}), ack the object once its last chunk is in, and log it. Parsing the reassembled health-sync record (steps, sleep,
-     * workouts) isn't implemented yet.
+     * Fit3HealthSync}), ack the object once its last chunk is in, and once it
+     * is reassembled, persist any pedometer records found in it (a reassembled
+     * blob is dominated by other, undecoded record types - e.g. workout
+     * interval samples - so most of it is still just logged by length).
      */
     private void handleHealthBulkChunk(byte[] body) {
         Fit3HealthSync.Chunk chunk = Fit3HealthSync.parseChunk(body);
@@ -371,7 +419,16 @@ public class SamsungDeviceSupport extends AbstractBTLESingleDeviceSupport {
             sendMessage(SapProtocol.CH_HEALTH, bulkAck, "health-bulk-ack");
         }
         if (reassembled != null) {
-            LOG.debug("Samsung Fit 3: health sync data reassembled ({} bytes), not yet parsed", reassembled.length);
+            // The reassembled blob's outer framing varies by what's inside (a
+            // large SYNC_DATA push, sleep data, ...) and isn't reliably known
+            // up front - scan the whole thing rather than assuming an offset;
+            // findAll()'s strict per-record validation (12 exact tags, no
+            // duplicates, bounds-checked) makes false positives from random
+            // byte alignment very unlikely.
+            List<Fit3HealthPedometerRecord> records = Fit3HealthPedometerRecord.findAll(reassembled, 0);
+            LOG.debug("Samsung Fit 3: health sync data reassembled ({} bytes, {} pedometer record(s))",
+                    reassembled.length, records.size());
+            storePedometerRecords(records);
         }
     }
 
@@ -618,6 +675,19 @@ public class SamsungDeviceSupport extends AbstractBTLESingleDeviceSupport {
         return false;
     }
 
+
+    /**
+     * Gadgetbridge's manual "fetch activity data" trigger (pull-to-sync,
+     * the dashboard sync button). The band otherwise only pushes health
+     * data on its own schedule (see {@link #handleHealthSyncData}); this
+     * pings it to start a cycle now instead of waiting.
+     */
+    @Override
+    public void onFetchRecordedData(int dataTypes) {
+        sendMessage(Fit3HealthRequestData.CHANNEL,
+                Fit3HealthRequestData.buildRequest(healthRequestSequence++),
+                "health-request-data-trigger");
+    }
 
     @Override
     public void onFindDevice(boolean start) {

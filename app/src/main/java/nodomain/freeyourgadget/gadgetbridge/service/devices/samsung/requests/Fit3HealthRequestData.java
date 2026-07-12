@@ -61,4 +61,36 @@ public final class Fit3HealthRequestData {
         response[2 + ECHO_LEN + 1] = 0x05;
         return response;
     }
+
+    /**
+     * Build a phone-initiated {@code REQUEST_DATA} to prompt the band into
+     * starting a sync cycle on demand - used for Gadgetbridge's manual
+     * "fetch activity data" action. The body is not just the header: it
+     * carries a {@code SEQUENCE_NUMBER} and a device-info record (marker
+     * {@code 0x05}, same field layout the band uses for its own device-info
+     * pushes) whose {@code last_sync_time}/{@code start_time}/{@code
+     * end_time} tags tell the band what range to send. All-zero timestamps
+     * mean "everything" - byte-for-byte what a real phone sent in a live
+     * capture, immediately followed by the band starting a full
+     * sync/bulk-transfer cycle. (A minimal header-only ping was tried first
+     * and does NOT work: the band replies with a device-info-only SYNC_DATA
+     * and sends no activity records.)
+     *
+     * @param sequenceNumber the phone's own message counter; the band's
+     *     reply echoes it.
+     */
+    public static byte[] buildRequest(int sequenceNumber) {
+        return new byte[]{
+                (byte) MSG_ID,
+                (byte) 0xe0, (byte) (sequenceNumber & 0xFF), (byte) ((sequenceNumber >> 8) & 0xFF),
+                0x05, 0x19,             // device-info record, 25 bytes follow
+                0x01, 0x00,             // device (value ignored by the parser)
+                0x02, 0x00, 0x00,       // device type
+                0x03, 0x04, 0x33,       // version (4.51, replayed from the capture)
+                0x04, 0x00, 0x00, 0x00, 0x00, // last_sync_time: 0 = everything
+                0x05, 0x00, 0x00, 0x00, 0x00, // start_time
+                0x06, 0x00, 0x00, 0x00, 0x00, // end_time
+                0x07, 0x01,             // is_last_chunk
+        };
+    }
 }

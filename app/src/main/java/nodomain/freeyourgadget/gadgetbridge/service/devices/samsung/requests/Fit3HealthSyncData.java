@@ -17,6 +17,9 @@
 
 package nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests;
 
+import java.util.Collections;
+import java.util.List;
+
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.SapProtocol;
 
 /**
@@ -69,11 +72,11 @@ public final class Fit3HealthSyncData {
         };
     }
 
-    /** @return the first pedometer record in this push, or {@code null} if it doesn't contain one. */
-    public static Fit3HealthPedometerRecord findPedometerRecord(byte[] request) {
+    /** @return every pedometer record in this push (usually one, but the same list format as bulk blobs). */
+    public static List<Fit3HealthPedometerRecord> findPedometerRecords(byte[] request) {
         if (request.length <= RECORDS_START) {
-            return null;
+            return Collections.emptyList();
         }
-        return Fit3HealthPedometerRecord.findFirst(request, RECORDS_START);
+        return Fit3HealthPedometerRecord.findAll(request, RECORDS_START);
     }
 }

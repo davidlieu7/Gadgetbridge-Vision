@@ -22,13 +22,21 @@ import android.net.Uri;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
+import java.util.HashMap;
+import java.util.Map;
 import java.util.regex.Pattern;
 
+import de.greenrobot.dao.AbstractDao;
+import de.greenrobot.dao.Property;
 import nodomain.freeyourgadget.gadgetbridge.R;
 import nodomain.freeyourgadget.gadgetbridge.devices.AbstractBLEDeviceCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.InstallHandler;
+import nodomain.freeyourgadget.gadgetbridge.devices.SampleProvider;
+import nodomain.freeyourgadget.gadgetbridge.entities.DaoSession;
+import nodomain.freeyourgadget.gadgetbridge.entities.SamsungFit3ActivitySampleDao;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDeviceCandidate;
+import nodomain.freeyourgadget.gadgetbridge.model.ActivitySample;
 import nodomain.freeyourgadget.gadgetbridge.model.ActivityUser;
 import nodomain.freeyourgadget.gadgetbridge.service.DeviceSupport;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.SamsungDeviceSupport;
@@ -90,6 +98,28 @@ public class SamsungFit3Coordinator extends AbstractBLEDeviceCoordinator {
 
     @Override
     public boolean supportsMusicInfo(final GBDevice device) {
+        return true;
+    }
+
+    @Override
+    public boolean supportsActivityTracking(@NonNull GBDevice device) {
+        return true;
+    }
+
+    @Override
+    public SampleProvider<? extends ActivitySample> getSampleProvider(GBDevice device, DaoSession session) {
+        return new SamsungSampleProvider(device, session);
+    }
+
+    @Override
+    public Map<AbstractDao<?, ?>, Property> getAllDeviceDao(@NonNull final DaoSession session) {
+        Map<AbstractDao<?, ?>, Property> map = new HashMap<>(1);
+        map.put(session.getSamsungFit3ActivitySampleDao(), SamsungFit3ActivitySampleDao.Properties.DeviceId);
+        return map;
+    }
+
+    @Override
+    public boolean supportsDataFetching(@NonNull final GBDevice device) {
         return true;
     }
 
