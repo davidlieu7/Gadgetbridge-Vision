@@ -32,8 +32,8 @@ import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.SapProtocol;
  * 0xe0}, 2-byte value, same param id/width as {@link
  * Fit3HealthCapabilityCheck}'s) that the reply must echo - confirmed from a
  * live push/ack pair. What follows the sequence number is one or more
- * "feature data type" records - only {@link Fit3HealthPedometerRecord} (marker {@code 0x07}) is
- * decoded here so far.
+ * "feature data type" records - {@link Fit3HealthPedometerRecord} (marker {@code 0x07}) and
+ * {@link Fit3HealthHeartRateRecord} (marker {@code 0x0a}) are decoded here.
  *
  * <p>The real app's ack also carries a large additional block after the
  * echoed sequence number (a recurring status/timestamp bundle seen
@@ -78,5 +78,13 @@ public final class Fit3HealthSyncData {
             return Collections.emptyList();
         }
         return Fit3HealthPedometerRecord.findAll(request, RECORDS_START);
+    }
+
+    /** @return every heart-rate sample in this push (see {@link Fit3HealthHeartRateRecord}). */
+    public static List<Fit3HealthHeartRateRecord.Sample> findHeartRateSamples(byte[] request) {
+        if (request.length <= RECORDS_START) {
+            return Collections.emptyList();
+        }
+        return Fit3HealthHeartRateRecord.findAll(request, RECORDS_START);
     }
 }

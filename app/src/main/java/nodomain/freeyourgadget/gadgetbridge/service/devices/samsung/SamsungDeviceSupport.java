@@ -47,6 +47,7 @@ import nodomain.freeyourgadget.gadgetbridge.entities.BaseActivitySummaryDao;
 import nodomain.freeyourgadget.gadgetbridge.entities.DaoSession;
 import nodomain.freeyourgadget.gadgetbridge.entities.Device;
 import nodomain.freeyourgadget.gadgetbridge.entities.SamsungFit3ActivitySample;
+import nodomain.freeyourgadget.gadgetbridge.entities.SamsungFit3ActivitySampleDao;
 import nodomain.freeyourgadget.gadgetbridge.entities.User;
 import nodomain.freeyourgadget.gadgetbridge.model.ActivityKind;
 import nodomain.freeyourgadget.gadgetbridge.model.ActivitySample;
@@ -66,6 +67,7 @@ import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3ExerciseType;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3HealthCapabilityCheck;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3HealthDeviceInfo;
+import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3HealthHeartRateRecord;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3HealthPedometerRecord;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3HealthRequestData;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3HealthSyncData;
@@ -372,6 +374,11 @@ public class SamsungDeviceSupport extends AbstractBTLESingleDeviceSupport {
             LOG.info("Samsung Fit 3: {} pedometer record(s), first: {}", records.size(), records.get(0));
             storePedometerRecords(records);
         }
+        List<Fit3HealthHeartRateRecord.Sample> hrSamples = Fit3HealthSyncData.findHeartRateSamples(body);
+        if (!hrSamples.isEmpty()) {
+            LOG.info("Samsung Fit 3: {} heart-rate sample(s), first: {}", hrSamples.size(), hrSamples.get(0));
+            storeHeartRateSamples(hrSamples);
+        }
         Fit3HealthWorkout workout = Fit3HealthWorkout.findFirst(body, 0);
         if (workout != null) {
             LOG.info("Samsung Fit 3: {}", workout);
@@ -415,6 +422,66 @@ public class SamsungDeviceSupport extends AbstractBTLESingleDeviceSupport {
     }
 
     /**
+     * Persist per-minute heart-rate samples (see {@link
+     * Fit3HealthHeartRateRecord}) into {@link SamsungSampleProvider}.
+     *
+     * <p>Heart rate and step data share the same one-minute timeline, and
+     * {@code insertOrReplace} keys on {@code (timestamp, device)} and rewrites
+     * the whole row - so a naive insert of an HR-only sample would wipe any
+     * step/calorie/distance already stored for that minute. This merges into
+     * the existing row instead when there is one.
+     */
+    private void storeHeartRateSamples(List<Fit3HealthHeartRateRecord.Sample> hrSamples) {
+        if (hrSamples.isEmpty()) {
+            return;
+        }
+        // Collapse duplicate timestamps (a single sync can repeat a minute); keep the last.
+        Map<Integer, Fit3HealthHeartRateRecord.Sample> byTimestamp = new HashMap<>();
+        for (Fit3HealthHeartRateRecord.Sample s : hrSamples) {
+            byTimestamp.put(s.timestamp, s);
+        }
+        try (DBHandler dbHandler = GBApplication.acquireDB()) {
+            DaoSession session = dbHandler.getDaoSession();
+            SamsungSampleProvider provider = new SamsungSampleProvider(getDevice(), session);
+            long deviceId = DBHelper.getDevice(getDevice(), session).getId();
+            long userId = DBHelper.getUser(session).getId();
+
+            int minTs = Collections.min(byTimestamp.keySet());
+            int maxTs = Collections.max(byTimestamp.keySet());
+            Map<Integer, SamsungFit3ActivitySample> existing = new HashMap<>();
+            for (SamsungFit3ActivitySample sample : session.getSamsungFit3ActivitySampleDao().queryBuilder()
+                    .where(SamsungFit3ActivitySampleDao.Properties.DeviceId.eq(deviceId),
+                            SamsungFit3ActivitySampleDao.Properties.Timestamp.ge(minTs),
+                            SamsungFit3ActivitySampleDao.Properties.Timestamp.le(maxTs))
+                    .list()) {
+                existing.put(sample.getTimestamp(), sample);
+            }
+
+            List<SamsungFit3ActivitySample> samples = new ArrayList<>(byTimestamp.size());
+            for (Fit3HealthHeartRateRecord.Sample s : byTimestamp.values()) {
+                SamsungFit3ActivitySample sample = existing.get(s.timestamp);
+                if (sample == null) {
+                    sample = provider.createActivitySample();
+                    sample.setTimestamp(s.timestamp);
+                    sample.setDeviceId(deviceId);
+                    sample.setUserId(userId);
+                    sample.setSteps(ActivitySample.NOT_MEASURED);
+                    sample.setActiveCalories(ActivitySample.NOT_MEASURED);
+                    sample.setDistanceCm(ActivitySample.NOT_MEASURED);
+                    sample.setRawKind(ActivityKind.ACTIVITY.getCode());
+                }
+                sample.setHeartRate(s.heartRate);
+                samples.add(sample);
+            }
+            provider.addGBActivitySamples(samples);
+        } catch (Exception e) {
+            LOG.error("Samsung Fit 3: failed to store heart-rate sample(s)", e);
+            return;
+        }
+        GB.signalActivityDataFinish(getDevice());
+    }
+
+    /**
      * Collect the band's channel-0x0a bulk-transfer chunks (see {@link
      * Fit3HealthSync}), ack the object once its last chunk is in, and once it
      * is reassembled, persist any pedometer records found in it (a reassembled
@@ -440,9 +507,11 @@ public class SamsungDeviceSupport extends AbstractBTLESingleDeviceSupport {
             // duplicates, bounds-checked) makes false positives from random
             // byte alignment very unlikely.
             List<Fit3HealthPedometerRecord> records = Fit3HealthPedometerRecord.findAll(reassembled, 0);
-            LOG.debug("Samsung Fit 3: health sync data reassembled ({} bytes, {} pedometer record(s))",
-                    reassembled.length, records.size());
+            List<Fit3HealthHeartRateRecord.Sample> hrSamples = Fit3HealthHeartRateRecord.findAll(reassembled, 0);
+            LOG.debug("Samsung Fit 3: health sync data reassembled ({} bytes, {} pedometer record(s), {} HR sample(s))",
+                    reassembled.length, records.size(), hrSamples.size());
             storePedometerRecords(records);
+            storeHeartRateSamples(hrSamples);
             Fit3HealthWorkout workout = Fit3HealthWorkout.findFirst(reassembled, 0);
             if (workout != null) {
                 LOG.info("Samsung Fit 3: {}", workout);
