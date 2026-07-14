@@ -38,15 +38,17 @@ public class ActivityTrack {
      *  (e.g. Xiaomi rowing's active/rest phase byte). Length always equals
      *  {@link #segments} length.
      *
-     *  Optional per-segment metric fields ({@link #distanceMeters}, {@link #strokes})
-     *  carry values that are PARSED DIRECTLY from the device's per-segment binary
-     *  payload — they are never derived or distributed from session-level aggregates.
-     *  When the source does not encode a per-segment metric, the field stays null and
-     *  the FIT exporter omits the corresponding lap field rather than fabricating it. */
+     *  Optional per-segment metric fields ({@link #distanceMeters}, {@link #strokes},
+     *  {@link #durationSeconds}) carry values parsed directly from the device's
+     *  per-segment binary payload; they are never derived or distributed from
+     *  session-level aggregates. When the source does not encode a per-segment metric,
+     *  the field stays null and the FIT exporter omits it, or falls back to the record
+     *  timestamp span, rather than fabricating a value. */
     public static final class SegmentInfo {
         private final SegmentIntensity intensity;
         private final Integer distanceMeters;
         private final Integer strokes;
+        private final Integer durationSeconds;
 
         public SegmentInfo() {
             this(SegmentIntensity.UNKNOWN, null, null);
@@ -59,9 +61,17 @@ public class ActivityTrack {
         public SegmentInfo(final SegmentIntensity intensity,
                            final Integer distanceMeters,
                            final Integer strokes) {
+            this(intensity, distanceMeters, strokes, null);
+        }
+
+        public SegmentInfo(final SegmentIntensity intensity,
+                           final Integer distanceMeters,
+                           final Integer strokes,
+                           final Integer durationSeconds) {
             this.intensity = intensity != null ? intensity : SegmentIntensity.UNKNOWN;
             this.distanceMeters = distanceMeters;
             this.strokes = strokes;
+            this.durationSeconds = durationSeconds;
         }
 
         public SegmentIntensity getIntensity() {
@@ -74,6 +84,15 @@ public class ActivityTrack {
 
         public Integer getStrokes() {
             return strokes;
+        }
+
+        /** Intended segment duration in seconds, parsed directly from the device's
+         *  per-segment header (e.g. Xiaomi rowing's record count at 1 Hz). The FIT exporter
+         *  prefers it over the record timestamp span for the lap's total_elapsed_time, since
+         *  for contiguous 1 Hz intervals that span is one sample short: the boundary second
+         *  opens the next segment. Null when the source does not encode it. */
+        public Integer getDurationSeconds() {
+            return durationSeconds;
         }
     }
 

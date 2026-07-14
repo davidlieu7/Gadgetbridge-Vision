@@ -83,16 +83,26 @@ public class WorkoutDetailsParser extends XiaomiActivityParser {
         /** Pace in s/km as the band displays it, 0 while stopped. Shapes {@link #speedMps}
          *  in {@link #setSpeedFromDistance}. */
         public Integer paceSecPerKm;
-        /** True on the first record of each interval/segment, for layouts whose phase
-         *  semantics are confirmed (currently rowing v4 only). Drives
-         *  {@link ActivityTrack} segment boundaries → one FIT lap per interval. */
+        /** True on the first record of each interval/segment. Set for every layout: the
+         *  segment header always carries an interval phase byte and record count. Drives
+         *  {@link ActivityTrack} segment boundaries, and so one FIT lap per interval. */
         public boolean segmentStart;
-        /** Intensity of the segment this record opens. Only meaningful when
-         *  {@link #segmentStart} is set; null otherwise. */
+        /** Intensity of the segment this record opens: ACTIVE (phase 0x81) or REST (0x82).
+         *  Null for a single continuous segment (phase 0x7f / other) and when
+         *  {@link #segmentStart} is not set. */
         public ActivityTrack.SegmentIntensity segmentIntensity;
-        /** Per-segment strokes parsed directly from the segment header (rowing v4).
+        /** Per-segment strokes parsed directly from the segment header (rowing v4 only).
          *  Only set on a {@link #segmentStart} record; null when not encoded. */
         public Integer segmentStrokes;
+        /** Per-segment distance in meters parsed directly from the segment header (all
+         *  non-rowing layouts that carry a trailing distance int32: treadmill/cycling @9,
+         *  walking @13). Only set on a {@link #segmentStart} record; null when not encoded. */
+        public Integer segmentDistanceMeters;
+        /** Intended segment duration in seconds = the header's record count (records run
+         *  at 1 Hz). Only set on a {@link #segmentStart} record; null when not encoded.
+         *  Lets the FIT exporter use the true interval length instead of the record
+         *  timestamp span, which is one second short for contiguous intervals. */
+        public Integer segmentDurationSeconds;
     }
 
     @Override
@@ -118,11 +128,13 @@ public class WorkoutDetailsParser extends XiaomiActivityParser {
         boolean firstSegment = true;
         for (final WorkoutDetailRecord r : records) {
             if (r.segmentStart) {
-                // Parsers that expose confirmed interval phases (rowing v4) mark the first
-                // record of each segment. The first marked segment sets the metadata of the
-                // implicit initial segment; later ones open new segments → one FIT lap each.
+                // Every layout marks the first record of each segment. The first marked
+                // segment sets the metadata of the implicit initial segment; later ones each
+                // open a new segment, and so a new FIT lap. A single-segment (continuous)
+                // workout marks only its first record, so it stays one segment and one lap.
                 final ActivityTrack.SegmentInfo info = new ActivityTrack.SegmentInfo(
-                        r.segmentIntensity, null, r.segmentStrokes);
+                        r.segmentIntensity, r.segmentDistanceMeters, r.segmentStrokes,
+                        r.segmentDurationSeconds);
                 if (firstSegment) {
                     track.setCurrentSegmentInfo(info);
                 } else {
@@ -186,13 +198,57 @@ public class WorkoutDetailsParser extends XiaomiActivityParser {
             if (r == null) continue;
             applyMetricsToPoint(p, version, r);
         }
-        if (byTs.isEmpty()) return;
-        for (final WorkoutDetailRecord r : byTs.values()) {
-            final ActivityPoint.Builder builder = new ActivityPoint.Builder(new Date(r.ts * 1000L));
-            applyMetrics(builder, version, r);
-            track.addTrackPoint(builder.build());
+        // DETAILS records with no matching GPS point (mid-trip fix loss) become location-less
+        // points so the HR / cadence chart stays continuous.
+        if (!byTs.isEmpty()) {
+            for (final WorkoutDetailRecord r : byTs.values()) {
+                final ActivityPoint.Builder builder = new ActivityPoint.Builder(new Date(r.ts * 1000L));
+                applyMetrics(builder, version, r);
+                track.addTrackPoint(builder.build());
+            }
+            track.sortPointsByTime();
         }
-        track.sortPointsByTime();
+        // Carry the DETAILS interval structure onto the GPS track so outdoor interval workouts
+        // export one FIT lap per interval; the GPS parser only segments on recording gaps.
+        applyIntervalSegments(track, records);
+    }
+
+    /** Re-partition {@code track}'s points into the interval segments described by the DETAILS
+     *  {@code records} (each segmentStart opens an interval), attaching the parsed intensity /
+     *  distance / duration. No-op unless there are at least two intervals, so a continuous
+     *  workout keeps the GPS track's own recording-gap segmentation. */
+    private static void applyIntervalSegments(final ActivityTrack track,
+                                              final List<WorkoutDetailRecord> records) {
+        final List<WorkoutDetailRecord> boundaries = new ArrayList<>();
+        for (final WorkoutDetailRecord r : records) {
+            if (r.segmentStart) boundaries.add(r);
+        }
+        if (boundaries.size() < 2) return;
+
+        final List<ActivityPoint> points = new ArrayList<>(track.getAllPoints());
+        points.sort((a, b) -> Long.compare(a.getTime().getTime(), b.getTime().getTime()));
+
+        final List<List<ActivityPoint>> newSegments = new ArrayList<>();
+        final List<ActivityTrack.SegmentInfo> newInfos = new ArrayList<>();
+        for (final WorkoutDetailRecord b : boundaries) {
+            newSegments.add(new ArrayList<>());
+            newInfos.add(new ActivityTrack.SegmentInfo(
+                    b.segmentIntensity, b.segmentDistanceMeters, b.segmentStrokes,
+                    b.segmentDurationSeconds));
+        }
+        for (final ActivityPoint p : points) {
+            final long ts = p.getTime().getTime() / 1000L;
+            int idx = 0;
+            for (int i = 1; i < boundaries.size(); i++) {
+                if (ts >= boundaries.get(i).ts) {
+                    idx = i;
+                } else {
+                    break;
+                }
+            }
+            newSegments.get(idx).add(p);
+        }
+        track.replaceSegments(newSegments, newInfos);
     }
 
     private static void applyMetricsToPoint(final ActivityPoint p,
@@ -679,20 +735,37 @@ public class WorkoutDetailsParser extends XiaomiActivityParser {
             }
             LOG.debug("Segment: {} records starting at ts={}", nr, ts);
 
-            // Per-segment interval metadata — only for layouts with confirmed phase semantics.
-            // Rowing v4: header offset 8 = phase (0x81 active / 0x82 rest), offset 9-12 = strokes.
-            // Stamped onto the first record of the segment so getActivityTrack can open one
-            // ActivityTrack segment (→ FIT lap) per interval.
-            final boolean segmentedLayout = layoutCode == 4;
+            // Per-segment interval metadata, uniform across every Xiaomi workout layout.
+            // The byte immediately after the segment-start timestamp (offset tsPosition + 4)
+            // is the interval phase: 0x81 = active, 0x82 = rest; 0x7f / other = a single
+            // continuous segment (left unlabelled so a normal workout is not tagged with a
+            // spurious intensity). Records run at 1 Hz, so the header record count is the
+            // interval length in seconds. The int32 that follows the phase byte, when the header
+            // is long enough to hold it, is per-segment strokes for rowing (v4) and per-segment
+            // distance in meters for every other layout (treadmill/cycling 13-byte headers @9,
+            // walking 17/27-byte headers @13). Stamped onto the first record of each segment so
+            // getActivityTrack opens one ActivityTrack segment, and one FIT lap, per interval.
+            final int phaseOffset = tsPosition + 4;
+            final boolean segmentedLayout = phaseOffset < segmentHeaderSize;
             ActivityTrack.SegmentIntensity segmentIntensity = null;
             Integer segmentStrokes = null;
+            Integer segmentDistanceMeters = null;
+            Integer segmentDurationSeconds = null;
             if (segmentedLayout) {
-                final byte phase = segHdr.get(8);
+                final byte phase = segHdr.get(phaseOffset);
                 segmentIntensity = phase == (byte) 0x81 ? ActivityTrack.SegmentIntensity.ACTIVE
                         : phase == (byte) 0x82 ? ActivityTrack.SegmentIntensity.REST
-                        : ActivityTrack.SegmentIntensity.UNKNOWN;
-                final int strokes = segHdr.getInt(9);
-                segmentStrokes = strokes > 0 ? strokes : null;
+                        : null;
+                segmentDurationSeconds = nr > 0 ? nr : null;
+                final int trailingOffset = phaseOffset + 1;
+                if (trailingOffset + 4 <= segmentHeaderSize) {
+                    final int trailing = segHdr.getInt(trailingOffset);
+                    if (layoutCode == 4) {
+                        segmentStrokes = trailing > 0 ? trailing : null;
+                    } else {
+                        segmentDistanceMeters = trailing > 0 ? trailing : null;
+                    }
+                }
             }
             boolean firstInSegment = true;
             final int segmentFirstRecord = records.size();
@@ -710,6 +783,8 @@ public class WorkoutDetailsParser extends XiaomiActivityParser {
                     r.segmentStart = true;
                     r.segmentIntensity = segmentIntensity;
                     r.segmentStrokes = segmentStrokes;
+                    r.segmentDistanceMeters = segmentDistanceMeters;
+                    r.segmentDurationSeconds = segmentDurationSeconds;
                 }
                 firstInSegment = false;
 

@@ -232,7 +232,58 @@ public class FitExporterPaceTest {
         assertNull("session.avgSpeed", session.getAvgSpeed());
     }
 
+    /**
+     * A lap's total_elapsed_time / total_timer_time come from the parser-declared per-segment
+     * duration when present, and fall back to the record timestamp span when it is absent (as for
+     * GPS laps, whose points already span the full interval).
+     */
+    @Test
+    public void lapElapsedUsesDeclaredSegmentDurationNotTimestampSpan() throws Exception {
+        final long start = 1776705018L;
+        final ActivityTrack track = new ActivityTrack();
+        // seg A: 30 one-second records (timestamp span 29 s) declared as 30 s.
+        addDeclaredSegment(track, start, 30, ActivityTrack.SegmentIntensity.ACTIVE, 30);
+        // seg B: 20 records (span 19 s) declared as 20 s.
+        addDeclaredSegment(track, start + 30, 20, ActivityTrack.SegmentIntensity.REST, 20);
+        // seg C: 15 records, no declared duration, so it falls back to the span (14 s).
+        addDeclaredSegment(track, start + 50, 15, ActivityTrack.SegmentIntensity.ACTIVE, null);
+
+        final BaseActivitySummary summary = newSummary(start, 65L, ActivityKind.ROWING_MACHINE);
+
+        final File out = tmp.newFile("rowing-lap-durations.fit");
+        new FitExporter().performExport(track, summary, new ActivitySummaryData(), out);
+
+        final List<FitLap> laps = laps(FitFile.parseIncoming(out));
+        assertEquals(3, laps.size());
+        // Declared durations win over the timestamp span, which is one second shorter.
+        assertEquals(30.0, laps.get(0).getTotalElapsedTime(), 0.001);
+        assertEquals(30.0, laps.get(0).getTotalTimerTime(), 0.001);
+        assertEquals(20.0, laps.get(1).getTotalElapsedTime(), 0.001);
+        // Falls back to the span: 15 records at 1 Hz span 14 s.
+        assertEquals(14.0, laps.get(2).getTotalElapsedTime(), 0.001);
+    }
+
     // ---------- helpers ----------
+
+    /** Append a segment of {@code records} one-second HR points; its SegmentInfo carries the
+     *  given intensity and (optional) declared duration in seconds. */
+    private static void addDeclaredSegment(final ActivityTrack track, final long startSec,
+                                           final int records,
+                                           final ActivityTrack.SegmentIntensity intensity,
+                                           final Integer durationSeconds) {
+        final ActivityTrack.SegmentInfo info =
+                new ActivityTrack.SegmentInfo(intensity, null, null, durationSeconds);
+        if (track.getAllPoints().isEmpty()) {
+            track.setCurrentSegmentInfo(info);
+        } else {
+            track.startNewSegment(info);
+        }
+        for (int i = 0; i < records; i++) {
+            final ActivityPoint p = new ActivityPoint(new Date((startSec + i) * 1000L));
+            p.setHeartRate(140);
+            track.addTrackPoint(p);
+        }
+    }
 
     private static BaseActivitySummary newSummary(final long startSec,
                                                   final long elapsedSec,

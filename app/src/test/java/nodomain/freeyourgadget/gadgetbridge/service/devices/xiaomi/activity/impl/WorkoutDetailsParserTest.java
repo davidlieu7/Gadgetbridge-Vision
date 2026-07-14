@@ -139,10 +139,11 @@ public class WorkoutDetailsParserTest {
             final ByteBuffer hdrBuf = ByteBuffer.wrap(hdr).order(ByteOrder.LITTLE_ENDIAN);
             hdrBuf.putInt(nrPosition, seg.records.length);
             hdrBuf.putInt(tsPosition, seg.startTs);
-            if (version == 4) {
-                // Rowing v4 segment header: offset 8 = phase, offset 9-12 = strokes.
-                hdrBuf.put(8, (byte) seg.phase);
-                hdrBuf.putInt(9, seg.strokes);
+            if (version == 4 || version == 6) {
+                // Phase byte follows the timestamp (offset tsPosition + 4); the trailing int32
+                // is strokes for rowing v4 and per-segment distance for treadmill/cycling v6.
+                hdrBuf.put(tsPosition + 4, (byte) seg.phase);
+                hdrBuf.putInt(tsPosition + 5, seg.strokes);
             }
             buf.put(hdr);
 
@@ -392,7 +393,8 @@ public class WorkoutDetailsParserTest {
         assertEquals(160, points.get(1).getHeartRate());
         assertEquals(172, points.get(1).getCadence());
 
-        // Non-rowing layouts have no confirmed interval phases → one segment, no markers.
+        // This v5 layout (cycling/running, signature EC CC C0 0C C0) has no confirmed interval
+        // phases, so one segment and no markers. The walking v5 signature is handled separately.
         assertEquals(1, track.getSegments().size());
         assertNull(records(makeFileId(5), bytes).get(0).segmentIntensity);
     }
@@ -438,6 +440,165 @@ public class WorkoutDetailsParserTest {
         assertEquals(Integer.valueOf(48), infos.get(0).getStrokes());
         assertNull(infos.get(1).getStrokes()); // 0 strokes → not encoded
         assertEquals(Integer.valueOf(79), infos.get(2).getStrokes());
+
+        // Interval duration = header record count (records run at 1 Hz). The exporter uses
+        // this instead of the record timestamp span, which would be one second short.
+        assertEquals(Integer.valueOf(2), infos.get(0).getDurationSeconds());
+        assertEquals(Integer.valueOf(2), infos.get(1).getDurationSeconds());
+        assertEquals(Integer.valueOf(3), infos.get(2).getDurationSeconds());
+    }
+
+    /** Outdoor walking v5 interval workout (signature FF CF F8 BF FF): the segment header's
+     *  phase byte (offset 12) drives one ActivityTrack segment, and so one FIT lap, per interval,
+     *  with the per-segment distance (offset 13) and 1 Hz record-count duration carried onto
+     *  SegmentInfo, as for rowing v4. */
+    @Test
+    public void testGetActivityTrackV5WalkingMultiSegmentLaps() {
+        final int ts1 = 1700100000;
+        final byte[] bytes = buildWalkingV5Bytes(
+                new WalkSeg(ts1, 0x81, 40, new int[]{150, 151, 152}),  // active, 40 m, 3 records
+                new WalkSeg(ts1 + 3, 0x82, 2, new int[]{120, 118}));   // rest, 2 m, 2 records
+
+        final ActivityTrack track = new WorkoutDetailsParser().getActivityTrack(makeFileId(5), bytes);
+        assertNotNull(track);
+
+        // One segment per interval; points partitioned by interval.
+        assertEquals(2, track.getSegments().size());
+        assertEquals(3, track.getSegments().get(0).size());
+        assertEquals(2, track.getSegments().get(1).size());
+
+        final List<ActivityTrack.SegmentInfo> infos = track.getSegmentInfos();
+        assertEquals(2, infos.size());
+        assertEquals(ActivityTrack.SegmentIntensity.ACTIVE, infos.get(0).getIntensity());
+        assertEquals(ActivityTrack.SegmentIntensity.REST, infos.get(1).getIntensity());
+        // Per-segment distance from header offset 13.
+        assertEquals(Integer.valueOf(40), infos.get(0).getDistanceMeters());
+        assertEquals(Integer.valueOf(2), infos.get(1).getDistanceMeters());
+        // Interval duration = header record count (1 Hz).
+        assertEquals(Integer.valueOf(3), infos.get(0).getDurationSeconds());
+        assertEquals(Integer.valueOf(2), infos.get(1).getDurationSeconds());
+        assertNull(infos.get(0).getStrokes()); // walking has no strokes
+        // HR carried onto the points.
+        assertEquals(150, track.getSegments().get(0).get(0).getHeartRate());
+    }
+
+    /** Treadmill v6 interval workout (signature FF FF 8B FF): the same active/rest phase byte
+     *  as rowing (header offset 8) and per-segment distance (offset 9) drive one FIT lap per
+     *  interval. Confirms the interval handling is layout-agnostic, not rowing-specific. */
+    @Test
+    public void testGetActivityTrackV6TreadmillMultiSegmentLaps() {
+        final int ts1 = 1700300000;
+        final byte[] bytes = buildBytes(6,
+                new Segment(ts1, new int[][]{
+                        {0, 140, 0, 80, 0}, {0, 142, 0, 81, 0}, {0, 144, 0, 82, 0},
+                }, 0x81, 59),                                   // active, 59 m, 3 records
+                new Segment(ts1 + 3, new int[][]{
+                        {0, 110, 0, 0, 0}, {0, 108, 0, 0, 0},
+                }, 0x82, 4),                                    // rest, 4 m, 2 records
+                new Segment(ts1 + 5, new int[][]{
+                        {0, 150, 0, 84, 0}, {0, 152, 0, 85, 0}, {0, 154, 0, 86, 0},
+                }, 0x81, 44));                                  // active, 44 m, 3 records
+
+        final ActivityTrack track = new WorkoutDetailsParser().getActivityTrack(makeFileId(6), bytes);
+        assertNotNull(track);
+        assertEquals(3, track.getSegments().size());
+
+        final List<ActivityTrack.SegmentInfo> infos = track.getSegmentInfos();
+        assertEquals(ActivityTrack.SegmentIntensity.ACTIVE, infos.get(0).getIntensity());
+        assertEquals(ActivityTrack.SegmentIntensity.REST, infos.get(1).getIntensity());
+        assertEquals(ActivityTrack.SegmentIntensity.ACTIVE, infos.get(2).getIntensity());
+        // Per-segment distance from header offset 9 (treadmill/cycling), not strokes.
+        assertEquals(Integer.valueOf(59), infos.get(0).getDistanceMeters());
+        assertEquals(Integer.valueOf(4), infos.get(1).getDistanceMeters());
+        assertEquals(Integer.valueOf(44), infos.get(2).getDistanceMeters());
+        assertNull(infos.get(0).getStrokes()); // treadmill has no strokes
+        assertEquals(Integer.valueOf(3), infos.get(0).getDurationSeconds());
+        assertEquals(Integer.valueOf(2), infos.get(1).getDurationSeconds());
+    }
+
+    /** Treadmill v6's byte-9 data-valid bitmap varies between bands and firmware (0xFF and 0xFB
+     *  are both emitted) while the record layout stays identical, so the parser accepts either
+     *  and still reads HR and cadence. */
+    @Test
+    public void testV6TreadmillAcceptsAlternateValidBitmap() {
+        final int ts = 1700200000;
+        final byte[] bytes = buildBytes(6,
+                new Segment(ts, new int[][]{
+                        {0, 145, 0, 80, 0},
+                        {0, 146, 0, 81, 0},
+                }));
+        // Flip byte 9 (data-valid bitmap) from 0xFF to 0xFB, the band's second variant.
+        bytes[9] = (byte) 0xFB;
+
+        final List<WorkoutDetailRecord> recs = records(makeFileId(6), bytes);
+        assertNotNull(recs);
+        assertEquals(2, recs.size());
+        assertEquals(145, recs.get(0).hr);
+        assertEquals(146, recs.get(1).hr);
+    }
+
+    /** Minimal outdoor-walking-v5 segment: start ts, phase byte, distance (m), and per-record
+     *  heart rates. Records run at 1 Hz. */
+    private static class WalkSeg {
+        final int startTs;
+        final int phase;
+        final int distanceMeters;
+        final int[] hr;
+
+        WalkSeg(final int startTs, final int phase, final int distanceMeters, final int[] hr) {
+            this.startTs = startTs;
+            this.phase = phase;
+            this.distanceMeters = distanceMeters;
+            this.hr = hr;
+        }
+    }
+
+    /** Build an outdoor-walking-v2 v5 DETAILS payload: signature FF CF F8 BF FF, 17-byte segment
+     *  header (int32 nr @4, int32 ts @8, byte phase @12, int32 distance @13) and 13-byte records
+     *  with HR at byte 1 (see WorkoutDetailsParser layoutCode 105). */
+    private static byte[] buildWalkingV5Bytes(final WalkSeg... segments) {
+        final byte[] signature = {
+                (byte) 0xFF, (byte) 0xCF, (byte) 0xF8, (byte) 0xBF, (byte) 0xFF
+        };
+        final int segmentHeaderSize = 17;
+        final int recordSize = 13;
+
+        int dataSize = 7 + 1 + signature.length;
+        for (final WalkSeg seg : segments) {
+            dataSize += segmentHeaderSize + seg.hr.length * recordSize;
+        }
+        dataSize += 4; // CRC32
+
+        final ByteBuffer buf = ByteBuffer.allocate(dataSize).order(ByteOrder.LITTLE_ENDIAN);
+        buf.put(new byte[7]); // fileId placeholder
+        buf.put((byte) 0);    // padding
+        buf.put(signature);
+
+        for (final WalkSeg seg : segments) {
+            final byte[] hdr = new byte[segmentHeaderSize];
+            final ByteBuffer hdrBuf = ByteBuffer.wrap(hdr).order(ByteOrder.LITTLE_ENDIAN);
+            hdrBuf.putInt(4, seg.hr.length);      // nr
+            hdrBuf.putInt(8, seg.startTs);        // ts
+            hdrBuf.put(12, (byte) seg.phase);     // phase
+            hdrBuf.putInt(13, seg.distanceMeters);// distance
+            buf.put(hdr);
+
+            for (final int hr : seg.hr) {
+                buf.put((byte) 0);          // caloriesAndSteps
+                buf.put((byte) hr);         // hr
+                buf.put((byte) 0);          // flags + heightChange
+                buf.put((byte) 0);          // distanceInc
+                buf.put((byte) 0);          // stride
+                buf.putInt(0);              // reserved (4)
+                buf.put((byte) 0);          // reserved (1)
+                buf.put((byte) 0);          // cadence
+                buf.putShort((short) 0);    // pace
+            }
+        }
+
+        final byte[] arr = buf.array();
+        buf.putInt(CheckSums.getCRC32(arr, 0, arr.length - 4));
+        return buf.array();
     }
 
     private static List<WorkoutDetailRecord> records(final XiaomiActivityFileId id, final byte[] bytes) {
@@ -629,6 +790,72 @@ public class WorkoutDetailsParserTest {
         assertEquals(33,  p0.getCadence());
         assertEquals(145, p1.getHeartRate());
         assertEquals(34,  p1.getCadence());
+    }
+
+    @Test
+    public void testMergeOntoTrackCarvesIntervalSegments() {
+        // A GPS track recorded as one continuous segment, merged with a two-interval DETAILS
+        // file, must be re-partitioned into one segment per interval so an outdoor interval
+        // workout exports a FIT lap per interval (not just HR patched onto a single lap).
+        final int startTs = 1700040000;
+        final byte[] bytes = buildBytes(4,
+                new Segment(startTs, new int[][]{
+                        {140, 0, 32}, {141, 0, 33}, {142, 0, 34},
+                }, 0x81, 48),                                   // active, 48 strokes, 3 s
+                new Segment(startTs + 3, new int[][]{
+                        {110, 0, 0}, {108, 0, 0},
+                }, 0x82, 0));                                   // rest, 2 s
+
+        final ActivityTrack track = new ActivityTrack();
+        for (int i = 0; i < 5; i++) {
+            track.addTrackPoint(new ActivityPoint(new Date((startTs + i) * 1000L)));
+        }
+
+        WorkoutDetailsParser.mergeOntoTrack(track, makeFileId(4), bytes);
+
+        // Re-segmented into the two intervals, points partitioned by interval boundary.
+        assertEquals(2, track.getSegments().size());
+        assertEquals(3, track.getSegments().get(0).size());
+        assertEquals(2, track.getSegments().get(1).size());
+
+        final List<ActivityTrack.SegmentInfo> infos = track.getSegmentInfos();
+        assertEquals(ActivityTrack.SegmentIntensity.ACTIVE, infos.get(0).getIntensity());
+        assertEquals(ActivityTrack.SegmentIntensity.REST, infos.get(1).getIntensity());
+        assertEquals(Integer.valueOf(3), infos.get(0).getDurationSeconds());
+        assertEquals(Integer.valueOf(2), infos.get(1).getDurationSeconds());
+        assertEquals(Integer.valueOf(48), infos.get(0).getStrokes());
+        // HR from DETAILS merged onto the GPS points.
+        assertEquals(140, track.getSegments().get(0).get(0).getHeartRate());
+    }
+
+    @Test
+    public void testMergeOntoTrackRestIntervalWithoutGpsStillEmitsLap() {
+        // GPS dropped out during the rest interval (no fixes there), but DETAILS still has its
+        // HR records. Those unmatched records are appended as location-less points and land in
+        // the rest segment, so the rest lap is never empty / dropped.
+        final int startTs = 1700050000;
+        final byte[] bytes = buildBytes(4,
+                new Segment(startTs, new int[][]{
+                        {140, 0, 32}, {141, 0, 33},
+                }, 0x81, 40),                                   // active, 2 s (has GPS)
+                new Segment(startTs + 2, new int[][]{
+                        {110, 0, 0}, {108, 0, 0},
+                }, 0x82, 0));                                   // rest, 2 s (no GPS)
+
+        final ActivityTrack track = new ActivityTrack();
+        // GPS points only for the active interval; none during the rest interval.
+        track.addTrackPoint(new ActivityPoint(new Date(startTs * 1000L)));
+        track.addTrackPoint(new ActivityPoint(new Date((startTs + 1) * 1000L)));
+
+        WorkoutDetailsParser.mergeOntoTrack(track, makeFileId(4), bytes);
+
+        assertEquals(2, track.getSegments().size());
+        assertEquals(2, track.getSegments().get(0).size()); // active: 2 GPS points
+        assertEquals(2, track.getSegments().get(1).size()); // rest: 2 appended DETAILS points
+        final List<ActivityTrack.SegmentInfo> infos = track.getSegmentInfos();
+        assertEquals(ActivityTrack.SegmentIntensity.REST, infos.get(1).getIntensity());
+        // The appended rest points carry HR from DETAILS.
+        assertEquals(110, track.getSegments().get(1).get(0).getHeartRate());
     }
 
     @Test

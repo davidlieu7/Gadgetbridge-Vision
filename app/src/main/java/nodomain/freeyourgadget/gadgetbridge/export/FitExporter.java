@@ -400,7 +400,16 @@ public class FitExporter {
             }
 
             if (segStartTs == Long.MAX_VALUE) continue; // no timestamped points in segment
-            final long segElapsed = Math.max(0L, segEndTs - segStartTs);
+            final long tsSpan = Math.max(0L, segEndTs - segStartTs);
+            // Prefer the device's declared interval length when the source parsed one from a
+            // per-segment header (e.g. Xiaomi rowing's 1 Hz record count). The timestamp span
+            // is one second short for contiguous intervals because the boundary second opens
+            // the next segment, so a 7m30 lap would otherwise export as 7m29. Fall back to the
+            // span for sources that do not encode a per-segment duration (GPS laps span the
+            // full interval already, so the span is correct there).
+            final long segElapsed = info.getDurationSeconds() != null && info.getDurationSeconds() > 0
+                    ? info.getDurationSeconds()
+                    : tsSpan;
             // Tiny-segment skip: keeps the lap stream meaningful while preserving every
             // record. The first segment always emits a lap so importers that require a
             // lap before the session see one.
