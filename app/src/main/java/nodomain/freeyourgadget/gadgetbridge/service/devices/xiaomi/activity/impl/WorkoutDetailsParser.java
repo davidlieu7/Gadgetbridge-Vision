@@ -122,7 +122,7 @@ public class WorkoutDetailsParser extends XiaomiActivityParser {
                 // record of each segment. The first marked segment sets the metadata of the
                 // implicit initial segment; later ones open new segments → one FIT lap each.
                 final ActivityTrack.SegmentInfo info = new ActivityTrack.SegmentInfo(
-                        r.segmentIntensity, null, r.segmentStrokes);
+                        r.segmentIntensity, null, r.segmentStrokes, true);
                 if (firstSegment) {
                     track.setCurrentSegmentInfo(info);
                 } else {

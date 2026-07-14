@@ -42,26 +42,42 @@ public class ActivityTrack {
      *  carry values that are PARSED DIRECTLY from the device's per-segment binary
      *  payload — they are never derived or distributed from session-level aggregates.
      *  When the source does not encode a per-segment metric, the field stays null and
-     *  the FIT exporter omits the corresponding lap field rather than fabricating it. */
+     *  the FIT exporter omits the corresponding lap field rather than fabricating it.
+     *
+     *  {@link #lap} marks whether the segment is a genuine lap / interval boundary
+     *  (Xiaomi rowing phases, Garmin FIT lap messages) as opposed to an incidental
+     *  recording break (a GPX {@code <trkseg>} gap, an auto-pause). Consumers that only
+     *  care about intentional splits — e.g. the Health Connect syncer's lap/segment
+     *  export — filter on it; the FIT exporter ignores it and keeps its
+     *  one-lap-per-segment behaviour. Defaults to false. */
     public static final class SegmentInfo {
         private final SegmentIntensity intensity;
         private final Integer distanceMeters;
         private final Integer strokes;
+        private final boolean lap;
 
         public SegmentInfo() {
-            this(SegmentIntensity.UNKNOWN, null, null);
+            this(SegmentIntensity.UNKNOWN, null, null, false);
         }
 
         public SegmentInfo(final SegmentIntensity intensity) {
-            this(intensity, null, null);
+            this(intensity, null, null, false);
         }
 
         public SegmentInfo(final SegmentIntensity intensity,
                            final Integer distanceMeters,
                            final Integer strokes) {
+            this(intensity, distanceMeters, strokes, false);
+        }
+
+        public SegmentInfo(final SegmentIntensity intensity,
+                           final Integer distanceMeters,
+                           final Integer strokes,
+                           final boolean lap) {
             this.intensity = intensity != null ? intensity : SegmentIntensity.UNKNOWN;
             this.distanceMeters = distanceMeters;
             this.strokes = strokes;
+            this.lap = lap;
         }
 
         public SegmentIntensity getIntensity() {
@@ -74,6 +90,12 @@ public class ActivityTrack {
 
         public Integer getStrokes() {
             return strokes;
+        }
+
+        /** True when this segment is an intentional lap / interval boundary rather
+         *  than an incidental recording break. See the class javadoc. */
+        public boolean isLap() {
+            return lap;
         }
     }
 

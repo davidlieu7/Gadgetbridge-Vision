@@ -26,11 +26,11 @@ class RecordedWorkoutSyncerLapsSegmentsTest {
     private fun point(secondsFromStart: Long): ActivityPoint =
         ActivityPoint(Date.from(start.plusSeconds(secondsFromStart)))
 
-    /** Build a track from (intensity, distanceMeters?, firstSec, lastSec) segment descriptors. */
+    /** Build a track from (intensity, distanceMeters?, firstSec, lastSec, isLap) segment descriptors. */
     private fun trackOf(vararg segs: SegDesc): ActivityTrack {
         val track = ActivityTrack()
         segs.forEachIndexed { i, s ->
-            val info = SegmentInfo(s.intensity, s.distanceMeters, null)
+            val info = SegmentInfo(s.intensity, s.distanceMeters, null, s.isLap)
             if (i == 0) {
                 track.setCurrentSegmentInfo(info)
             } else {
@@ -48,7 +48,8 @@ class RecordedWorkoutSyncerLapsSegmentsTest {
         val intensity: SegmentIntensity,
         val distanceMeters: Int?,
         val firstSec: Long,
-        val lastSec: Long
+        val lastSec: Long,
+        val isLap: Boolean = true
     )
 
     private fun bounds(track: ActivityTrack) =
@@ -145,6 +146,38 @@ class RecordedWorkoutSyncerLapsSegmentsTest {
         assertTrue(b.isEmpty())
         assertTrue(RecordedWorkoutSyncer.buildLaps(b).isEmpty())
         assertTrue(RecordedWorkoutSyncer.buildSegments(b).isEmpty())
+    }
+
+    @Test
+    fun nonLapSegments_excluded() {
+        // GPX <trkseg> gaps / auto-pauses arrive as untagged (lap=false) segments and
+        // must never become HC laps/segments, even when there are several.
+        val track = trackOf(
+            SegDesc(SegmentIntensity.UNKNOWN, null, 0, 300, isLap = false),
+            SegDesc(SegmentIntensity.UNKNOWN, null, 300, 600, isLap = false),
+            SegDesc(SegmentIntensity.UNKNOWN, null, 600, 900, isLap = false)
+        )
+        val b = bounds(track)
+        assertTrue(b.isEmpty())
+        assertTrue(RecordedWorkoutSyncer.buildLaps(b).isEmpty())
+        assertTrue(RecordedWorkoutSyncer.buildSegments(b).isEmpty())
+    }
+
+    @Test
+    fun mixedLapAndPause_keepsOnlyLaps() {
+        // Lap-structured track that also contains a recording pause: only the laps survive,
+        // the pause becomes a gap between them.
+        val track = trackOf(
+            SegDesc(SegmentIntensity.ACTIVE, 1000, 0, 300),
+            SegDesc(SegmentIntensity.UNKNOWN, null, 300, 420, isLap = false),
+            SegDesc(SegmentIntensity.ACTIVE, 1000, 420, 720)
+        )
+        val b = bounds(track)
+        assertEquals(2, b.size)
+        assertEquals(start.plusSeconds(300), b[0].end)
+        assertEquals(start.plusSeconds(420), b[1].start)
+        assertEquals(2, RecordedWorkoutSyncer.buildLaps(b).size)
+        assertEquals(2, RecordedWorkoutSyncer.buildSegments(b).size)
     }
 
     @Test

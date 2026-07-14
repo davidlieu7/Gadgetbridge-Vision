@@ -349,12 +349,9 @@ internal object RecordedWorkoutSyncer {
             LOG.debug("No activity track provider available device '{}'.", device)
             return null
         }
-
-        val track = activityTrackProvider.getActivityTrack(workout)
-        if (track == null || track.allPoints.isNullOrEmpty()) {
-            LOG.debug("Track file for workout {} contains no activity points", workout.id)
-            return null
-        }
+        // Emptiness is decided by the caller from the track's points (computed once there):
+        // getAllPoints() is an O(points) flatMap, so we avoid materialising it twice.
+        val track = activityTrackProvider.getActivityTrack(workout) ?: return null
 
         // Altitude from imported elevation tiles replaces what the device recorded, and so does
         // the elevation gained read from the summary below
@@ -546,6 +543,7 @@ internal object RecordedWorkoutSyncer {
             val bounds = ArrayList<SegmentBound>()
             var lastEnd: Instant? = null
             var droppedEmpty = 0
+            var droppedNonLap = 0
             var droppedNoTime = 0
             var droppedDegenerate = 0
             var clamped = 0
@@ -557,6 +555,14 @@ internal object RecordedWorkoutSyncer {
                     continue
                 }
                 val info = if (i < infos.size) infos[i] else ActivityTrack.SegmentInfo()
+                // Only genuine lap/interval boundaries (Xiaomi rowing phases, FIT lap
+                // messages) become HC laps/segments. Incidental recording breaks — GPX
+                // <trkseg> gaps, auto-pauses — carry lap=false and are skipped, so a
+                // paused recording does not turn into phantom laps.
+                if (!info.isLap) {
+                    droppedNonLap++
+                    continue
+                }
                 val startDate = seg.first().time
                 val endDate = seg.last().time
                 if (startDate == null || endDate == null) {
@@ -588,10 +594,10 @@ internal object RecordedWorkoutSyncer {
                 lastEnd = end
             }
 
-            if (droppedEmpty > 0 || droppedNoTime > 0 || droppedDegenerate > 0 || clamped > 0) {
+            if (droppedEmpty > 0 || droppedNonLap > 0 || droppedNoTime > 0 || droppedDegenerate > 0 || clamped > 0) {
                 LOG.info(
-                    "[HC_SYNC] Segment sanitisation for device '{}': dropped {} empty, {} without timestamps, {} degenerate; clamped {}; kept {}.",
-                    deviceName, droppedEmpty, droppedNoTime, droppedDegenerate, clamped, bounds.size
+                    "[HC_SYNC] Segment sanitisation for device '{}': dropped {} empty, {} non-lap, {} without timestamps, {} degenerate; clamped {}; kept {}.",
+                    deviceName, droppedEmpty, droppedNonLap, droppedNoTime, droppedDegenerate, clamped, bounds.size
                 )
             }
             bounds
