@@ -72,6 +72,11 @@ public final class SapPayloadBuilder {
         return new SapPayloadBuilder(msgId, false, false);
     }
 
+    /** Fixed format (no param-count byte) with the header response bit (bit6) set. */
+    public static SapPayloadBuilder fixedResponse(int msgId) {
+        return new SapPayloadBuilder(msgId, false, true);
+    }
+
     public static SapPayloadBuilder variable(int msgId) {
         return new SapPayloadBuilder(msgId, true, false);
     }

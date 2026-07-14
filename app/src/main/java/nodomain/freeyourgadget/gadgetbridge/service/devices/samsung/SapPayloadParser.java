@@ -146,6 +146,22 @@ public final class SapPayloadParser {
         return out;
     }
 
+    /**
+     * Custom/raw value body: [len:2 LE][bytes]. Call after consuming the param id.
+     * Defensive: if the declared length runs past the buffer (a truncated frame),
+     * returns only the bytes actually present rather than throwing - a malformed
+     * message must not crash the BLE callback thread.
+     */
+    public byte[] rawParam16() {
+        int len = (buf[pos] & 0xFF) | ((buf[pos + 1] & 0xFF) << 8);
+        pos += 2;
+        int avail = Math.min(len, buf.length - pos);
+        byte[] out = new byte[avail];
+        System.arraycopy(buf, pos, out, 0, avail);
+        pos += avail;
+        return out;
+    }
+
     /** Everything left, unparsed (e.g. to dump as "undecoded"). */
     public byte[] rest() {
         byte[] out = new byte[buf.length - pos];

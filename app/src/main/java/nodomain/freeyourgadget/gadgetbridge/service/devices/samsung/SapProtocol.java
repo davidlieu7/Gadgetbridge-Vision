@@ -44,6 +44,7 @@ public final class SapProtocol {
     public static final int CH_MEDIA        = 0x09;
     public static final int CH_HEALTH       = 0x0A;
     public static final int CH_SETTINGS     = 0x0B;
+    public static final int CH_DEBUG        = 0x0C;   // log-file pull
     public static final int CH_CAPABILITY_0F = 0x0F;
     public static final int CH_QUICK_REPLY  = 0x12;
     public static final int CH_CAP2_06      = 0x06;   // capability handshake tail
@@ -80,6 +81,16 @@ public final class SapProtocol {
 
     public SapProtocol(Listener listener) {
         this.listener = listener;
+    }
+
+    /**
+     * Install a {@link SapReassembler.LengthEstimator} so fragmented messages on
+     * length-delimited channels (e.g. {@link #CH_DEBUG} log transfers) complete
+     * as soon as their declared length is reached rather than when the next
+     * message starts. Channels the estimator does not recognise are unaffected.
+     */
+    public void setReassemblyLengthEstimator(SapReassembler.LengthEstimator estimator) {
+        reassembler.setLengthEstimator(estimator);
     }
 
     private int nextSeq() {
@@ -185,8 +196,12 @@ public final class SapProtocol {
             case FIRST_FRAGMENT:
             case CONTINUATION: {
                 SapReassembler.Message m = reassembler.offer(packet);
+                SapReassembler.Message stashed = reassembler.takeStashed();
                 if (m != null) {
                     listener.onMessage(m.channel, m.body);
+                }
+                if (stashed != null) {
+                    listener.onMessage(stashed.channel, stashed.body);
                 }
                 // Each chunk is ACKed with the chunk flag.
                 return SapFrame.wrap(SapPacket.encodeAck(packet.seq, true));

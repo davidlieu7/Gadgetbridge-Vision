@@ -21,12 +21,16 @@ import android.bluetooth.BluetoothGatt;
 import android.bluetooth.BluetoothGattCharacteristic;
 import android.content.SharedPreferences;
 import android.os.Bundle;
+import android.widget.Toast;
 
 import androidx.annotation.Nullable;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import java.io.File;
+import java.io.FileOutputStream;
 import java.io.IOException;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
@@ -81,6 +85,7 @@ import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3Notification;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3NotificationIcon;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3WeatherInfo;
+import nodomain.freeyourgadget.gadgetbridge.util.FileUtils;
 import nodomain.freeyourgadget.gadgetbridge.util.GB;
 
 
@@ -92,6 +97,27 @@ public class SamsungDeviceSupport extends AbstractBTLESingleDeviceSupport {
     private final Fit3HealthSync healthSync = new Fit3HealthSync();
     /** Phone-side SEQUENCE_NUMBER counter for health-channel requests we originate (see Fit3HealthRequestData#buildRequest). */
     private int healthRequestSequence = 1;
+
+    /** Pulls the band's diagnostic log files on CH_DEBUG; see {@link Fit3LogDump}. */
+    private final Fit3LogDump logDump = new Fit3LogDump(new Fit3LogDump.Listener() {
+        @Override
+        public void sendDebugMessage(byte[] body, String reason) {
+            sendMessage(SapProtocol.CH_DEBUG, body, reason);
+        }
+
+        @Override
+        public void onLogFile(int fileId, byte[] data) {
+            saveLogFile(fileId, data);
+        }
+
+        @Override
+        public void onLogDumpFinished(int fileCount) {
+            logDumpStamp = null;
+            GB.toast("Samsung Fit 3: fetched " + fileCount + " log file(s)", Toast.LENGTH_LONG, GB.INFO);
+        }
+    });
+    /** Shared timestamp for one dump session's file names; reset each run. */
+    private String logDumpStamp;
     // Package for each id the band might later ask for an icon by, keyed on
     // the exact IMAGE_URL string (see Fit3NotificationIcon); populated as
     // notifications are pushed, since the fetch request only carries the id.
@@ -175,6 +201,14 @@ public class SamsungDeviceSupport extends AbstractBTLESingleDeviceSupport {
     public SamsungDeviceSupport() {
         super(LOG);
         addSupportedService(UUID_SERVICE);
+        // Let the reassembler finish CH_DEBUG log packets by their declared
+        // length instead of waiting for the next packet (see Fit3LogDump).
+        sap.setReassemblyLengthEstimator(new SapReassembler.LengthEstimator() {
+            @Override
+            public int expectedLength(int channel, byte[] soFar) {
+                return Fit3LogDump.expectedBodyLength(channel, soFar);
+            }
+        });
     }
 
     @Override
@@ -235,6 +269,14 @@ public class SamsungDeviceSupport extends AbstractBTLESingleDeviceSupport {
         int msgId = body[0] & 0x3F;
         boolean isResponse = ((body[0] >> 6) & 1) == 1;
         boolean isRequest = ((body[0] >> 6) & 1) == 0;
+
+        // Log-file pull (see Fit3LogDump): the band mixes response-typed
+        // (count/init) and request-typed (transfer) messages on this channel,
+        // so route both to the state machine before the request/response split.
+        if (channel == SapProtocol.CH_DEBUG) {
+            logDump.onMessage(msgId, body);
+            return;
+        }
 
         // Parsing band responses here. Ussually has payload with data.
         if (isResponse) {
@@ -964,6 +1006,48 @@ public class SamsungDeviceSupport extends AbstractBTLESingleDeviceSupport {
         LOG.info("Samsung Fit 3 init-setting reply: " + info);
         // Coarse 1-6 level code here, not a percentage - not fed into
         // batteryCmd; use Fit3BatteryInfo (CH_SETTINGS) for the real reading.
+    }
+
+    /**
+     * Pull the band's on-device diagnostic log files (see {@link Fit3LogDump}).
+     * Wired to Gadgetbridge's "test new feature" debug action; the files land
+     * under the app's external files dir as {@code fit3log_<time>_<id>.bin}
+     * (usually gzip-compressed).
+     */
+    @Override
+    public void onTestNewFunction(@Nullable Bundle options) {
+        if (logDump.isActive()) {
+            GB.toast("Samsung Fit 3: log dump already running", Toast.LENGTH_SHORT, GB.INFO);
+            return;
+        }
+        logDumpStamp = null;
+        GB.toast("Samsung Fit 3: fetching device logs...", Toast.LENGTH_SHORT, GB.INFO);
+        logDump.start();
+    }
+
+    @Override
+    public void dispose() {
+        // A dump in progress can never complete once the link is gone; drop its
+        // state here so the next connection starts from a clean slate.
+        logDump.cancel();
+        logDumpStamp = null;
+        super.dispose();
+    }
+
+    /** Write one reassembled log file to external storage. */
+    private void saveLogFile(int fileId, byte[] data) {
+        if (logDumpStamp == null) {
+            logDumpStamp = new SimpleDateFormat("yyyyMMdd-HHmmss", Locale.US).format(new Date());
+        }
+        try {
+            File out = FileUtils.getExternalFile("samsung_fit3_logs/fit3log_" + logDumpStamp + "_" + fileId + ".bin");
+            try (FileOutputStream fos = new FileOutputStream(out)) {
+                fos.write(data);
+            }
+            LOG.info("Samsung Fit 3: wrote log file {} ({} bytes) to {}", fileId, data.length, out.getAbsolutePath());
+        } catch (IOException e) {
+            LOG.error("Samsung Fit 3: failed to write log file {}", fileId, e);
+        }
     }
 
 }
