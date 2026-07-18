@@ -39,6 +39,7 @@ import nodomain.freeyourgadget.gadgetbridge.model.ActivityTrack;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.FitFile;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.RecordData;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.messages.FitLap;
+import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.messages.FitRecord;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.messages.FitSession;
 
 /**
@@ -263,7 +264,106 @@ public class FitExporterPaceTest {
         assertEquals(14.0, laps.get(2).getTotalElapsedTime(), 0.001);
     }
 
+    /**
+     * On a track that carries a cadence or speed sensor, rest records export an explicit 0 rather
+     * than an omitted field, so a pause stays distinguishable from a data gap. Parsers leave the -1
+     * unset sentinel during rest, and the exporter converts it to 0.
+     */
+    @Test
+    public void restRecordsEmitZeroCadenceAndSpeed_whenSensorPresent() throws Exception {
+        final long start = 1776705018L;
+        final ActivityTrack track = new ActivityTrack();
+        // Active: 20 s with cadence + speed present.
+        addSensorSegment(track, start, 20, ActivityTrack.SegmentIntensity.ACTIVE, 80, 3.0f, 150);
+        // Rest: 20 s with cadence and speed left at the -1 unset sentinel.
+        addSensorSegment(track, start + 20, 20, ActivityTrack.SegmentIntensity.REST, -1, -1f, 110);
+
+        final BaseActivitySummary summary = newSummary(start, 40L, ActivityKind.RUNNING);
+        final File out = tmp.newFile("rest-records.fit");
+        new FitExporter().performExport(track, summary, new ActivitySummaryData(), out);
+
+        final List<FitRecord> recs = records(FitFile.parseIncoming(out));
+        assertEquals(40, recs.size());
+        for (int i = 0; i < 20; i++) {
+            // 80 steps/min is written as 40 strides/min: FIT running cadence counts one leg.
+            assertEquals("active cadence", Integer.valueOf(40), recs.get(i).getCadence());
+            assertEquals("active speed", 3.0, recs.get(i).getEnhancedSpeed(), 0.01);
+        }
+        for (int i = 20; i < 40; i++) {
+            // Rest samples carry an explicit 0 rather than an absent field.
+            assertEquals("rest cadence 0", Integer.valueOf(0), recs.get(i).getCadence());
+            assertEquals("rest speed 0", 0.0, recs.get(i).getEnhancedSpeed(), 0.001);
+        }
+    }
+
+    /**
+     * A lap's and the session's avg_cadence agree with the total_cycles reported in the same
+     * message: when a stroke count is present, avg_cadence is derived as
+     * total_cycles / (total_timer_time / 60).
+     */
+    @Test
+    public void restLapAvgCadenceMatchesTotalCycles() throws Exception {
+        final long start = 1776705018L;
+        final ActivityTrack track = newRowingTrack(start);
+        final BaseActivitySummary summary = newSummary(start, 2550L, ActivityKind.ROWING_MACHINE);
+
+        final File out = tmp.newFile("rest-lap-cadence.fit");
+        new FitExporter().performExport(track, summary, new ActivitySummaryData(), out);
+
+        final FitFile fit = FitFile.parseIncoming(out);
+        final List<FitLap> laps = laps(fit);
+        assertEquals(9, laps.size());
+        // Every lap's avg_cadence equals its own total_cycles / minutes.
+        for (final FitLap lap : laps) {
+            final Long tc = lap.getTotalCycles();
+            final Double tt = lap.getTotalTimerTime();
+            assertNotNull("lap total_cycles", tc);
+            assertNotNull("lap total_timer_time", tt);
+            final int expected = (int) Math.round(tc / (tt / 60.0));
+            assertEquals("lap avg_cadence == cycles/min", Integer.valueOf(expected), lap.getAvgCadence());
+        }
+        // Concrete rest lap: seg B has 16 one-second records (15 s span) and 4 strokes,
+        // so 4 / (15/60) = 16 spm.
+        assertEquals(Integer.valueOf(16), laps.get(1).getAvgCadence());
+
+        // Session avg_cadence is consistent with session total_cycles too.
+        final FitSession session = onlySession(fit);
+        assertEquals(
+                Integer.valueOf((int) Math.round(session.getTotalCycles() / (session.getTotalTimerTime() / 60.0))),
+                session.getAvgCadence());
+    }
+
     // ---------- helpers ----------
+
+    /** Append a segment of {@code n} one-second points carrying the given intensity, HR, and
+     *  (when {@code >= 0}) cadence / speed. Negative cadence/speed leaves the field unset so
+     *  the exporter sees the {@link ActivityPoint} -1 sentinel, as parsers do during rest. */
+    private static void addSensorSegment(final ActivityTrack track, final long startSec,
+                                         final int n, final ActivityTrack.SegmentIntensity intensity,
+                                         final int cadence, final float speed, final int hr) {
+        final ActivityTrack.SegmentInfo info =
+                new ActivityTrack.SegmentInfo(intensity, null, null, null);
+        if (track.getAllPoints().isEmpty()) {
+            track.setCurrentSegmentInfo(info);
+        } else {
+            track.startNewSegment(info);
+        }
+        for (int i = 0; i < n; i++) {
+            final ActivityPoint p = new ActivityPoint(new Date((startSec + i) * 1000L));
+            p.setHeartRate(hr);
+            if (cadence >= 0) p.setCadence(cadence);
+            if (speed >= 0f) p.setSpeed(speed);
+            track.addTrackPoint(p);
+        }
+    }
+
+    private static List<FitRecord> records(final FitFile fit) {
+        final List<FitRecord> out = new ArrayList<>();
+        for (final RecordData r : fit.getRecords()) {
+            if (r instanceof FitRecord) out.add((FitRecord) r);
+        }
+        return out;
+    }
 
     /** Append a segment of {@code records} one-second HR points; its SegmentInfo carries the
      *  given intensity and (optional) declared duration in seconds. */
