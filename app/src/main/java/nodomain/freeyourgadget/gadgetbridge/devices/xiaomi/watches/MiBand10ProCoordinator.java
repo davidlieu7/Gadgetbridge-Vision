@@ -61,4 +61,9 @@ public class MiBand10ProCoordinator extends XiaomiCoordinator {
     public Size getScreenSize() {
         return new Size(336, 480);
     }
+
+    @Override
+    public boolean supportsHrvMeasurement(@NonNull final GBDevice device) {
+        return true;
+    }
 }
