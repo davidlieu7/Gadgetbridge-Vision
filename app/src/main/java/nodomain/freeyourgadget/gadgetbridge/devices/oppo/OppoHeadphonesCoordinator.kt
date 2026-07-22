@@ -18,12 +18,17 @@
 package nodomain.freeyourgadget.gadgetbridge.devices.oppo
 
 import android.bluetooth.BluetoothClass
-import android.bluetooth.BluetoothDevice
 import android.util.Pair
+import java.util.Locale
 import nodomain.freeyourgadget.gadgetbridge.R
-import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSpecificSettings
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSpecificSettingsCustomizer
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSpecificSettingsScreen
+import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.DeviceSettingsScope
+import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.DeviceSettingsSpec
+import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.components.enumList
+import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.components.multiEnumList
+import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.components.screen
+import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.deviceSettings
 import nodomain.freeyourgadget.gadgetbridge.devices.AbstractBLClassicDeviceCoordinator
 import nodomain.freeyourgadget.gadgetbridge.devices.DeviceCoordinator
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice
@@ -34,6 +39,7 @@ import nodomain.freeyourgadget.gadgetbridge.service.devices.oppo.OppoHeadphonesS
 import nodomain.freeyourgadget.gadgetbridge.service.devices.oppo.commands.TouchConfigSide
 import nodomain.freeyourgadget.gadgetbridge.service.devices.oppo.commands.TouchConfigType
 import nodomain.freeyourgadget.gadgetbridge.service.devices.oppo.commands.TouchConfigValue
+import nodomain.freeyourgadget.gadgetbridge.service.devices.oppo.commands.AncConfigValue
 
 abstract class OppoHeadphonesCoordinator : AbstractBLClassicDeviceCoordinator() {
     override fun getManufacturer(): String = "Oppo"
@@ -59,68 +65,96 @@ abstract class OppoHeadphonesCoordinator : AbstractBLClassicDeviceCoordinator() 
 
     protected abstract val touchOptions: Map<Pair<TouchConfigSide, TouchConfigType>, List<TouchConfigValue>>
 
-    override fun getDeviceSpecificSettings(device: GBDevice): DeviceSpecificSettings {
-        val settings = DeviceSpecificSettings()
-
-        settings.addRootScreen(DeviceSpecificSettingsScreen.TOUCH_OPTIONS)
-        settings.addSubScreen(
-            DeviceSpecificSettingsScreen.TOUCH_OPTIONS,
-            R.xml.devicesettings_oppo_headphones_touch_options
-        )
-
-        settings.addRootScreen(DeviceSpecificSettingsScreen.CALLS_AND_NOTIFICATIONS)
-        settings.addSubScreen(
+    override fun getDeviceSettings(device: GBDevice): DeviceSettingsSpec = deviceSettings {
+        if (supportsAnc(device)) {
+            enumList<AncConfigValue>(
+                key = OppoHeadphonesPreferences.ANC_SELECTOR,
+                title = R.string.prefs_noise_control,
+                icon = R.drawable.ic_surround,
+                defaultValue = AncConfigValue.OFF,
+            )
+        }
+        if (supportsGameMode(device)) {
+            switchSetting(
+                key = OppoHeadphonesPreferences.GAME_MODE,
+                title = R.string.prefs_game_mode,
+                icon = R.drawable.ic_videogame,
+            )
+        }
+        if (supportsLdac(device)) {
+            switchSetting(
+                key = OppoHeadphonesPreferences.LDAC,
+                title = R.string.soundcore_ldac_mode_title,
+                icon = R.drawable.ic_music_note,
+            )
+        }
+        if (supportsMultipoint(device)) {
+            switchSetting(
+                key = OppoHeadphonesPreferences.MULTIPOINT,
+                title = R.string.bluetooth_multipoint_pairing,
+                icon = R.drawable.ic_bluetooth_searching,
+            )
+        }
+        touchOptions(device)
+        xmlScreen(
             DeviceSpecificSettingsScreen.CALLS_AND_NOTIFICATIONS,
-            R.xml.devicesettings_headphones
+            R.xml.devicesettings_headphones,
         )
+    }
 
-        if (supportsLdac(device) || supportsAnc(device)) {
-            settings.addRootScreen(DeviceSpecificSettingsScreen.AUDIO)
-            if (supportsLdac(device)) {
-                settings.addSubScreen(
-                    DeviceSpecificSettingsScreen.AUDIO,
-                    R.xml.devicesettings_ldac_toggle
-                )
-            }
+    private fun DeviceSettingsScope.touchOptions(device: GBDevice) {
+        if (touchOptions.isEmpty()) {
+            return
+        }
+        screen(
+            DeviceSpecificSettingsScreen.TOUCH_OPTIONS,
+            R.drawable.ic_touch,
+        ) {
+            touchOptions
+                .entries
+                .groupBy({ it.key.first }, { it.key.second to it.value })
+                .forEach { (side, typeGroups) ->
+                    category(
+                        key = "pref_key_header_oppo_${side.name.lowercase(Locale.ROOT)}",
+                        title = side.label,
+                    ) {
+                        typeGroups
+                            .forEach { (type, values) ->
+                                enumList<TouchConfigValue>(
+                                    key = OppoHeadphonesPreferences.getTouchKey(side, type),
+                                    title = type.label,
+                                    icon = type.icon,
+                                    defaultValue = TouchConfigValue.OFF,
+                                    filter = { it in values }
+                                )
+                            }
+                    }
+                }
             if (supportsAnc(device)) {
-                settings.addSubScreen(
-                    DeviceSpecificSettingsScreen.AUDIO,
-                    R.xml.devicesettings_onemore_noise_control_selector
-                )
-                settings.addSubScreen(
-                    DeviceSpecificSettingsScreen.TOUCH_OPTIONS,
-                    R.xml.devicesettings_oppo_headphones_touch_options_anc
-                )
+                touchOptionsAncCycleModes()
             }
         }
+    }
 
-        if (supportsMultipoint(device) || supportsGameMode(device)) {
-            settings.addRootScreen(DeviceSpecificSettingsScreen.CONNECTION)
-            if (supportsMultipoint(device)) {
-                settings.addSubScreen(
-                    DeviceSpecificSettingsScreen.CONNECTION,
-                    R.xml.devicesettings_oppo_headphones_multipoint
-                )
+    private fun DeviceSettingsScope.touchOptionsAncCycleModes() {
+        multiEnumList<AncConfigValue>(
+            key = OppoHeadphonesPreferences.ANC_TOUCH_CYCLE_MODES,
+            title = R.string.prefs_noise_modes_to_cycle,
+            icon = R.drawable.ic_cycle,
+            defaultValue = setOf(AncConfigValue.ON, AncConfigValue.TRANSPARENCY),
+            visibleWhen = { prefs ->
+                touchOptions.entries.any { (key, _) ->
+                    val prefKey = OppoHeadphonesPreferences.getTouchKey(key.first, key.second)
+                    val prefValue = prefs.getString(prefKey, TouchConfigValue.OFF.getPrefId())
+                    val value = TouchConfigValue.fromPrefId(prefValue)
+                    value == TouchConfigValue.NOISE_CONTROL
+                }
             }
-            if (supportsGameMode(device)) {
-                settings.addSubScreen(
-                    DeviceSpecificSettingsScreen.CONNECTION,
-                    R.xml.devicesettings_oppo_headphones_game_mode
-                )
-            }
-        }
-
-        return settings
+        )
     }
 
     override fun getDeviceSpecificSettingsCustomizer(device: GBDevice): DeviceSpecificSettingsCustomizer =
-        OppoHeadphonesSettingsCustomizer(
-            touchOptions,
-            supportsLdac(device),
-            supportsMultipoint(device),
-            supportsGameMode(device),
-            supportsAnc(device)
-        )
+        OppoHeadphonesSettingsCustomizer()
 
 
     final override fun getDeviceKind(device: GBDevice): DeviceCoordinator.DeviceKind =
@@ -131,4 +165,3 @@ abstract class OppoHeadphonesCoordinator : AbstractBLClassicDeviceCoordinator() 
     open fun supportsGameMode(device: GBDevice): Boolean = false
     open fun supportsAnc(device: GBDevice): Boolean = false
 }
-
