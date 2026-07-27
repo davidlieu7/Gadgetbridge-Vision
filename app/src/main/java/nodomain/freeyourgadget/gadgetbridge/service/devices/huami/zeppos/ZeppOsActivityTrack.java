@@ -10,8 +10,8 @@ public class ZeppOsActivityTrack extends ActivityTrack {
     public final List<Lap> laps = new ArrayList<>();
     public final List<SwimmingInterval> swimmingIntervals = new ArrayList<>();
 
-    public void addStrengthSet(final int reps, final float weightKg) {
-        strengthSets.add(new StrengthSet(reps, weightKg));
+    public void addStrengthSet(final int reps, final float weightKg, final long timeMillis) {
+        strengthSets.add(new StrengthSet(reps, weightKg, timeMillis));
     }
 
     public void addLap(final int number,
@@ -33,7 +33,8 @@ public class ZeppOsActivityTrack extends ActivityTrack {
             final int strokeRate,
             final int durationMillis,
             final int strokeDistance,
-            final int calories
+            final int calories,
+            final long endTimeMillis
     ) {
         swimmingIntervals.add(new SwimmingInterval(
                 number,
@@ -45,7 +46,8 @@ public class ZeppOsActivityTrack extends ActivityTrack {
                 strokeRate,
                 durationMillis,
                 strokeDistance,
-                calories
+                calories,
+                endTimeMillis
         ));
     }
 
@@ -61,9 +63,14 @@ public class ZeppOsActivityTrack extends ActivityTrack {
         return swimmingIntervals;
     }
 
-    public record StrengthSet(int reps, float weightKg) {
+    /** @param timeMillis wall time at which the set TLV was seen, 0 if the parser had no
+     *                   timestamp yet. */
+    public record StrengthSet(int reps, float weightKg, long timeMillis) {
     }
 
+    /** The lap TLV carries no timestamp of its own, only a sequence number and a duration,
+     *  so lap windows have to be reconstructed by accumulating {@link #duration} from the
+     *  start of the track. */
     public record Lap(int number,
                       int hr,
                       int pace,
@@ -72,6 +79,13 @@ public class ZeppOsActivityTrack extends ActivityTrack {
                       int duration) {
     }
 
+    /** One completed pool length, not a lap. The TLV is preceded by its own timestamp
+     *  offset, so {@link #endTimeMillis} is the wall time at which the length completed.
+     *
+     * @param pace           seconds per km
+     * @param strokeRate     strokes per minute
+     * @param durationMillis time spent swimming this length
+     */
     public record SwimmingInterval(int number,
                                    int poolLengthMeters,
                                    int hr,
@@ -81,6 +95,7 @@ public class ZeppOsActivityTrack extends ActivityTrack {
                                    int strokeRate,
                                    int durationMillis,
                                    int strokeDistance,
-                                   int calories) {
+                                   int calories,
+                                   long endTimeMillis) {
     }
 }

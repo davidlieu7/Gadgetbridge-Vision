@@ -1,8 +1,30 @@
+/*  Copyright (C) 2026 Dany Mestas
+
+    This file is part of Gadgetbridge.
+
+    Gadgetbridge is free software: you can redistribute it and/or modify
+    it under the terms of the GNU Affero General Public License as published
+    by the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    Gadgetbridge is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU Affero General Public License for more details.
+
+    You should have received a copy of the GNU Affero General Public License
+    along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 package nodomain.freeyourgadget.gadgetbridge.service.devices.huami.zeppos;
+
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
 
 import org.junit.Ignore;
 import org.junit.Test;
 
+import java.io.ByteArrayOutputStream;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.file.Files;
@@ -13,11 +35,211 @@ import nodomain.freeyourgadget.gadgetbridge.entities.BaseActivitySummary;
 import nodomain.freeyourgadget.gadgetbridge.entities.Device;
 import nodomain.freeyourgadget.gadgetbridge.entities.User;
 import nodomain.freeyourgadget.gadgetbridge.model.ActivityPoint;
+import nodomain.freeyourgadget.gadgetbridge.model.ActivityTrack;
 import nodomain.freeyourgadget.gadgetbridge.test.TestBase;
 
-import static org.junit.Assert.assertEquals;
-
+/**
+ * Covers the conversion of the ZeppOS TLV structures into the vendor-neutral
+ * {@link ActivityTrack} collections that the FIT export reads.
+ */
 public class ZeppOsActivityDetailsParserTest extends TestBase {
+    private static final long BASE_MILLIS = 1700000000000L;
+
+    // TLV type codes, see ZeppOsActivityDetailsParser.Type
+    private static final int TYPE_TIMESTAMP = 1;
+    private static final int TYPE_STATUS = 4;
+    private static final int TYPE_HEARTRATE = 8;
+    private static final int TYPE_LAP = 11;
+    private static final int TYPE_STRENGTH_SET = 15;
+    private static final int TYPE_SWIMMING_INTERVAL = 20;
+
+    private static final int STATUS_PAUSE = 4;
+    private static final int STATUS_RESUME = 5;
+    private static final int STATUS_STOP = 6;
+
+    // ---- tests ----
+
+    @Test
+    public void poolSwimProducesOneLengthPerInterval() throws Exception {
+        final byte[] bytes = stream(
+                tlv(TYPE_TIMESTAMP, timestamp(BASE_MILLIS)),
+                tlv(TYPE_HEARTRATE, heartRate(1_000, 120)),
+                // 25 m freestyle in 30 s.
+                tlv(TYPE_SWIMMING_INTERVAL, swimmingInterval(30_000, 1, 25, 125, 2, 1200, 50, 40, 30_000, 180, 5)),
+                // Offsets are a signed short, so the device re-anchors with a new timestamp.
+                tlv(TYPE_TIMESTAMP, timestamp(BASE_MILLIS + 30_000)),
+                // 25 m freestyle in 32 s.
+                tlv(TYPE_SWIMMING_INTERVAL, swimmingInterval(32_000, 2, 25, 126, 2, 1250, 52, 38, 32_000, 175, 5)),
+                tlv(TYPE_STATUS, status(32_000, STATUS_STOP))
+        );
+
+        final ZeppOsActivityTrack track = parse(bytes);
+
+        assertEquals(2, track.getSwimmingIntervals().size());
+        final List<ActivityTrack.LengthInfo> lengths = track.getLengths();
+        assertEquals(2, lengths.size());
+
+        final ActivityTrack.LengthInfo first = lengths.get(0);
+        assertEquals(BASE_MILLIS / 1000, first.startTimeSec);
+        assertEquals(30.0, first.totalElapsedTimeSec, 0.001);
+        assertEquals(30.0, first.totalTimerTimeSec, 0.001);
+        // The length TLV carries no stroke count.
+        assertNull(first.totalStrokes);
+        assertEquals(25f / 30f, first.avgSpeed, 0.001f);
+        assertEquals(Integer.valueOf(0), first.swimStroke); // freestyle
+        assertEquals(Integer.valueOf(1), first.lengthType); // active
+        assertEquals(Integer.valueOf(40), first.avgSwimmingCadence);
+
+        final ActivityTrack.LengthInfo second = lengths.get(1);
+        assertEquals((BASE_MILLIS + 30_000) / 1000, second.startTimeSec);
+        assertNull(second.totalStrokes);
+    }
+
+    @Test
+    public void swimStyleMapsToFitEnum() throws Exception {
+        // ZeppOS 1 breaststroke, 2 freestyle, 3 backstroke, 4 butterfly, 6 medley, 9 unknown
+        final int[] zeppOsStyles = {1, 2, 3, 4, 6, 9};
+        final Integer[] expectedFit = {2, 0, 1, 3, 6, null};
+
+        for (int i = 0; i < zeppOsStyles.length; i++) {
+            final byte[] bytes = stream(
+                    tlv(TYPE_TIMESTAMP, timestamp(BASE_MILLIS)),
+                    tlv(TYPE_SWIMMING_INTERVAL, swimmingInterval(30_000, 1, 25, 125, zeppOsStyles[i], 1200, 50, 40, 30_000, 180, 5))
+            );
+
+            final ZeppOsActivityTrack track = parse(bytes);
+
+            assertEquals(1, track.getLengths().size());
+            assertEquals("style " + zeppOsStyles[i], expectedFit[i], track.getLengths().get(0).swimStroke);
+        }
+    }
+
+    @Test
+    public void lapsBecomeSegmentsCarryingTheirDistance() throws Exception {
+        final ByteArrayOutputStream out = new ByteArrayOutputStream();
+        write(out, tlv(TYPE_TIMESTAMP, timestamp(BASE_MILLIS)));
+        for (int second = 1; second <= 11; second++) {
+            write(out, tlv(TYPE_HEARTRATE, heartRate(second * 1_000, 120 + second)));
+        }
+        // Two 5 s laps of 1000 m each, then a trailing second outside any lap.
+        write(out, tlv(TYPE_LAP, lap(1, 140, 300, 50, 1000, 5_000)));
+        write(out, tlv(TYPE_LAP, lap(2, 145, 305, 51, 1000, 5_000)));
+        write(out, tlv(TYPE_STATUS, status(11_000, STATUS_STOP)));
+
+        final ZeppOsActivityTrack track = parse(out.toByteArray());
+
+        assertEquals(2, track.getLaps().size());
+        final List<List<ActivityPoint>> segments = track.getSegments();
+        final List<ActivityTrack.SegmentInfo> infos = track.getSegmentInfos();
+        assertEquals(segments.size(), infos.size());
+        assertEquals(3, segments.size());
+
+        // Lap 1 closes at BASE + 5 s, so it holds the points at 0..5 s.
+        assertEquals(6, segments.get(0).size());
+        assertEquals(ActivityTrack.SegmentIntensity.ACTIVE, infos.get(0).getIntensity());
+        assertEquals(Integer.valueOf(1000), infos.get(0).getDistanceMeters());
+
+        // Lap 2 closes at BASE + 10 s, so it holds the points at 6..10 s.
+        assertEquals(5, segments.get(1).size());
+        assertEquals(Integer.valueOf(1000), infos.get(1).getDistanceMeters());
+
+        // The trailing point belongs to no lap and carries no lap metadata.
+        assertEquals(1, segments.get(2).size());
+        assertEquals(ActivityTrack.SegmentIntensity.UNKNOWN, infos.get(2).getIntensity());
+        assertNull(infos.get(2).getDistanceMeters());
+    }
+
+    @Test
+    public void pauseInsideALapKeepsTheBreakAndAttributesDistanceOnce() throws Exception {
+        final ByteArrayOutputStream out = new ByteArrayOutputStream();
+        write(out, tlv(TYPE_TIMESTAMP, timestamp(BASE_MILLIS)));
+        write(out, tlv(TYPE_HEARTRATE, heartRate(1_000, 121)));
+        write(out, tlv(TYPE_HEARTRATE, heartRate(2_000, 122)));
+        write(out, tlv(TYPE_STATUS, status(3_000, STATUS_PAUSE)));
+        write(out, tlv(TYPE_STATUS, status(4_000, STATUS_RESUME)));
+        write(out, tlv(TYPE_HEARTRATE, heartRate(5_000, 123)));
+        write(out, tlv(TYPE_HEARTRATE, heartRate(6_000, 124)));
+        // A single 10 s lap spanning the pause.
+        write(out, tlv(TYPE_LAP, lap(1, 140, 300, 50, 800, 10_000)));
+        write(out, tlv(TYPE_STATUS, status(6_000, STATUS_STOP)));
+
+        final ZeppOsActivityTrack track = parse(out.toByteArray());
+
+        final List<ActivityTrack.SegmentInfo> infos = track.getSegmentInfos();
+        // The pause break survives, so the GPX export still gets its track segments.
+        assertTrue("expected the pause to split the track", track.getSegments().size() > 1);
+        // ...but the lap distance is only attributed once, to the chunk closing the lap.
+        int withDistance = 0;
+        for (final ActivityTrack.SegmentInfo info : infos) {
+            if (info.getDistanceMeters() != null) {
+                assertEquals(Integer.valueOf(800), info.getDistanceMeters());
+                withDistance++;
+            }
+        }
+        assertEquals(1, withDistance);
+    }
+
+    @Test
+    public void tracksWithoutLapsKeepTheirPauseSegments() throws Exception {
+        final byte[] bytes = stream(
+                tlv(TYPE_TIMESTAMP, timestamp(BASE_MILLIS)),
+                tlv(TYPE_HEARTRATE, heartRate(1_000, 121)),
+                tlv(TYPE_STATUS, status(2_000, STATUS_PAUSE)),
+                tlv(TYPE_STATUS, status(3_000, STATUS_RESUME)),
+                tlv(TYPE_HEARTRATE, heartRate(4_000, 122)),
+                tlv(TYPE_STATUS, status(5_000, STATUS_STOP))
+        );
+
+        final ZeppOsActivityTrack track = parse(bytes);
+
+        assertTrue(track.getLaps().isEmpty());
+        assertTrue(track.getSegments().size() > 1);
+        for (final ActivityTrack.SegmentInfo info : track.getSegmentInfos()) {
+            assertEquals(ActivityTrack.SegmentIntensity.UNKNOWN, info.getIntensity());
+        }
+    }
+
+    @Test
+    public void strengthSetsBecomeSetRecords() throws Exception {
+        final byte[] bytes = stream(
+                tlv(TYPE_TIMESTAMP, timestamp(BASE_MILLIS)),
+                tlv(TYPE_STRENGTH_SET, strengthSet(10, 200)),      // 20.0 kg
+                tlv(TYPE_STRENGTH_SET, strengthSet(8, 0xffff)),    // weight not reported
+                tlv(TYPE_STATUS, status(1_000, STATUS_STOP))
+        );
+
+        final ZeppOsActivityTrack track = parse(bytes);
+
+        final List<ActivityTrack.SetInfo> sets = track.getSets();
+        assertEquals(2, sets.size());
+
+        assertEquals(BASE_MILLIS / 1000, sets.get(0).startTimeSec);
+        assertEquals(Integer.valueOf(10), sets.get(0).repetitions);
+        assertEquals(20.0f, sets.get(0).weightKg, 0.001f);
+        assertEquals(Integer.valueOf(1), sets.get(0).setType);
+        assertEquals(Integer.valueOf(0), sets.get(0).messageIndex);
+
+        assertEquals(Integer.valueOf(8), sets.get(1).repetitions);
+        assertNull(sets.get(1).weightKg);
+        assertEquals(Integer.valueOf(1), sets.get(1).messageIndex);
+    }
+
+    @Test
+    public void plainTrackProducesNoLengthsLapsOrSets() throws Exception {
+        final byte[] bytes = stream(
+                tlv(TYPE_TIMESTAMP, timestamp(BASE_MILLIS)),
+                tlv(TYPE_HEARTRATE, heartRate(1_000, 120)),
+                tlv(TYPE_STATUS, status(2_000, STATUS_STOP))
+        );
+
+        final ZeppOsActivityTrack track = parse(bytes);
+
+        assertNotNull(track);
+        assertTrue(track.getLengths().isEmpty());
+        assertTrue(track.getSets().isEmpty());
+        assertEquals(1, track.getSegments().size());
+    }
+
     @Test
     public void decodesCumulativeDistanceInCentimetres() throws Exception {
         final long start = 1700000000000L;
@@ -54,13 +276,123 @@ public class ZeppOsActivityDetailsParserTest extends TestBase {
     public void localTest() throws Exception {
         final byte[] bytes = Files.readAllBytes(Paths.get("/storage/downloads/raw_details.bin"));
 
+        final ZeppOsActivityTrack track = parse(bytes);
+        assertNotNull(track);
+    }
+
+    // ---- helpers ----
+
+    private static ZeppOsActivityTrack parse(final byte[] bytes) throws Exception {
+        final User user = new User();
+        user.setId(1L);
+        final Device device = new Device();
+        device.setId(1L);
+
         final BaseActivitySummary summary = new BaseActivitySummary();
-        summary.setRawSummaryData(bytes);
+        summary.setUser(user);
+        summary.setDevice(device);
         summary.setBaseLatitude(0);
         summary.setBaseLongitude(0);
         summary.setBaseAltitude(0);
 
-        final ZeppOsActivityDetailsParser parser = new ZeppOsActivityDetailsParser(summary);
-        final ZeppOsActivityTrack track = parser.parse(bytes);
+        return new ZeppOsActivityDetailsParser(summary).parse(bytes);
+    }
+
+    /** Wraps a payload in the single-byte tag + single-byte length BER encoding the parser reads. */
+    private static byte[] tlv(final int type, final byte[] payload) {
+        return ByteBuffer.allocate(2 + payload.length)
+                .order(ByteOrder.LITTLE_ENDIAN)
+                .put((byte) type)
+                .put((byte) payload.length)
+                .put(payload)
+                .array();
+    }
+
+    private static byte[] stream(final byte[]... tlvs) {
+        final ByteArrayOutputStream out = new ByteArrayOutputStream();
+        for (final byte[] tlv : tlvs) {
+            write(out, tlv);
+        }
+        return out.toByteArray();
+    }
+
+    private static void write(final ByteArrayOutputStream out, final byte[] bytes) {
+        out.write(bytes, 0, bytes.length);
+    }
+
+    private static ByteBuffer payload(final int length) {
+        return ByteBuffer.allocate(length).order(ByteOrder.LITTLE_ENDIAN);
+    }
+
+    private static byte[] timestamp(final long millis) {
+        return payload(12).putInt(0).putLong(millis).array();
+    }
+
+    private static byte[] status(final int offsetMillis, final int statusCode) {
+        return payload(4).putShort((short) offsetMillis).putShort((short) statusCode).array();
+    }
+
+    private static byte[] heartRate(final int offsetMillis, final int heartRate) {
+        return payload(3).putShort((short) offsetMillis).put((byte) heartRate).array();
+    }
+
+    private static byte[] swimmingInterval(final int offsetMillis,
+                                           final int number,
+                                           final int poolLengthMeters,
+                                           final int hr,
+                                           final int style,
+                                           final int pace,
+                                           final int swolf,
+                                           final int strokeRate,
+                                           final int durationMillis,
+                                           final int strokeDistance,
+                                           final int calories) {
+        return payload(31)
+                .putShort((short) offsetMillis)
+                .put((byte) 0)
+                .putShort((short) number)
+                .putShort((short) poolLengthMeters)
+                .put((byte) 0)
+                .put((byte) hr)
+                .putShort((short) 1)
+                .putShort((short) style)
+                .putShort((short) pace)
+                .putShort((short) swolf)
+                .putShort((short) strokeRate)
+                .putInt(durationMillis)
+                .putInt(0)
+                .putShort((short) strokeDistance)
+                .putShort((short) calories)
+                .array();
+    }
+
+    private static byte[] lap(final int number,
+                              final int hr,
+                              final int pace,
+                              final int calories,
+                              final int distanceMeters,
+                              final int durationMillis) {
+        return payload(99)
+                .put(new byte[2])
+                .putShort((short) number)
+                .put((byte) 3)
+                .put((byte) hr)
+                .putShort((short) pace)
+                .putShort((short) calories)
+                .putShort((short) distanceMeters)
+                .put(new byte[4])
+                .putInt(durationMillis)
+                .put(new byte[99 - 20])
+                .array();
+    }
+
+    private static byte[] strengthSet(final int reps, final int weightTenthsKg) {
+        return payload(34)
+                .put(new byte[15])
+                .putShort((short) reps)
+                .put((byte) 0)
+                .putShort((short) weightTenthsKg)
+                .put(new byte[14])
+                .array();
     }
 }
