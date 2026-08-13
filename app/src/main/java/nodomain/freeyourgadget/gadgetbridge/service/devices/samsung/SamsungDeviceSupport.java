@@ -1194,8 +1194,10 @@ public class SamsungDeviceSupport extends AbstractBTLESingleDeviceSupport {
             return;
         }
         LOG.info("Samsung Fit 3 init-setting reply: " + info);
-        // Coarse 1-6 level code here, not a percentage - not fed into
-        // batteryCmd; use Fit3BatteryInfo (CH_SETTINGS) for the real reading.
+        // The battery percentage here matches the CH_SETTINGS reading, but it
+        // says nothing about charging - reporting it would mean guessing that
+        // half of the event and could overwrite a correct state, so the real
+        // reading (Fit3BatteryInfo) stays the only source.
     }
 
     /**

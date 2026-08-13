@@ -32,10 +32,17 @@ import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.SapProtocol;
  * reads back its battery+locale echo. This is the third step of the OOBE
  * handshake, after the watch-info and device-status exchanges.
  *
- * <p>Both directions are variable-format (header bit7=1) but neither carries
- * a param-count byte on the wire, despite the format bit - see
- * {@link SapPayloadBuilder#variableNoCount}. Build with that helper, parse
- * with {@code new SapPayloadParser(body, false)}.
+ * <p>The two directions do NOT agree on the format bit. The request is
+ * variable-format (header bit7=1) but carries no param-count byte despite it -
+ * see {@link SapPayloadBuilder#variableNoCount}. The reply is plain fixed
+ * format (header {@code 0x43}), also without a count byte. Neither side lets
+ * the format bit decide anything, so build with {@code variableNoCount} and
+ * parse with {@code new SapPayloadParser(body, false)}.
+ *
+ * <p>The reply's param 1 is the band's battery charge in percent, matched
+ * against the CH_SETTINGS battery reading across seven sessions (0x28 = 40 %,
+ * 0x27 = 39 %, ... 0x24 = 36 %) - it is not the "battery level code 1-6"
+ * previously assumed, and that code does not appear here at all.
  *
  * <pre>
  *   request  : 83                          variable, request,  MSG_ID 3 (no count byte)
@@ -45,12 +52,12 @@ import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.SapProtocol;
  *                 04 00 80 70                   param 4 = tz sign (byte) + abs offset seconds
  *                                                          (short LE, bare value - no id of its own)
  *                 05 01                         param 5 = 24-hour format (bool)
- *   response : c3 01 xx 02 xx 03 xx 04 xx xx    variable, response, MSG_ID 3 (no count byte)
- *                 01 xx                          param 1 = unconfirmed (byte)
- *                 02 xx                          param 2 = battery level code, 1-6
- *                                                           (very-low/very-low/low/moderate/high/full)
- *                 03 xx                          param 3 = locale available (bool)
- *                 04 xx xx                       param 4 = locale value (short LE), default 90 if absent
+ *   response : 43 01 24 02 00 03 01           FIXED, response, MSG_ID 3 (no count byte)
+ *                 01 24                          param 1 = battery charge, percent (0x24 = 36 %)
+ *                 02 00                          param 2 = unknown, always 0 so far
+ *                 03 01                          param 3 = locale available (bool)
+ *                 04 xx xx                       param 4 = locale value (short LE), default 90 if
+ *                                                           absent - never present in any capture
  * </pre>
  *
  * <p>Locale ids are a Fit3-specific enumeration, not a system constant.
@@ -74,8 +81,8 @@ public final class Fit3InitSetting {
     private static final int PARAM_TZ_SIGN = 0x04;
     private static final int PARAM_24H     = 0x05;
 
-    private static final int RESP_PARAM_UNKNOWN_1      = 0x01;
-    private static final int RESP_PARAM_BATTERY_LEVEL  = 0x02;
+    private static final int RESP_PARAM_BATTERY_PERCENT = 0x01;
+    private static final int RESP_PARAM_UNKNOWN_2       = 0x02;
     private static final int RESP_PARAM_LOCALE_AVAIL   = 0x03;
     private static final int RESP_PARAM_LOCALE_VALUE   = 0x04;
     private static final int RESP_DEFAULT_LOCALE_VALUE = 90; // used when the band omits param 4
@@ -117,14 +124,16 @@ public final class Fit3InitSetting {
 
     // ---- response ----
 
-    public final int unknownParam1;
-    public final int batteryLevelCode;
+    /** Battery charge in percent (param 1), or -1 if the band omitted it. */
+    public final int batteryPercent;
+    /** Param 2. Always 0 in every capture so far - meaning unknown. */
+    public final int unknownParam2;
     public final boolean localeAvailable;
     public final int localeValue;
 
-    private Fit3InitSetting(int unknownParam1, int batteryLevelCode, boolean localeAvailable, int localeValue) {
-        this.unknownParam1 = unknownParam1;
-        this.batteryLevelCode = batteryLevelCode;
+    private Fit3InitSetting(int batteryPercent, int unknownParam2, boolean localeAvailable, int localeValue) {
+        this.batteryPercent = batteryPercent;
+        this.unknownParam2 = unknownParam2;
         this.localeAvailable = localeAvailable;
         this.localeValue = localeValue;
     }
@@ -132,47 +141,49 @@ public final class Fit3InitSetting {
     /** @return decoded info, or {@code null} if this body is not an INIT_SETTING reply. */
     public static Fit3InitSetting parse(byte[] body) {
         SapPayloadParser p = new SapPayloadParser(body, false); // no param-count byte, see class note
-        if (p.msgId != MSG_ID_INIT_SETTING || !p.variable || !p.response) {
+        // The reply is FIXED format (header 0x43), even though the request that
+        // provokes it is variable - so only the type bit and MSG_ID are checked.
+        if (p.msgId != MSG_ID_INIT_SETTING || !p.response) {
             return null;
         }
 
-        int unknownParam1 = 0;
-        int batteryLevelCode = 0;
+        int batteryPercent = -1;
+        int unknownParam2 = 0;
         boolean localeAvailable = false;
         int localeValue = RESP_DEFAULT_LOCALE_VALUE;
 
         while (p.remaining() >= 2) {
             int id = p.u8();
             switch (id) {
-                case RESP_PARAM_UNKNOWN_1:
-                    unknownParam1 = p.u8();
+                case RESP_PARAM_BATTERY_PERCENT:
+                    batteryPercent = p.u8();
                     break;
-                case RESP_PARAM_BATTERY_LEVEL:
-                    batteryLevelCode = p.u8();
+                case RESP_PARAM_UNKNOWN_2:
+                    unknownParam2 = p.u8();
                     break;
                 case RESP_PARAM_LOCALE_AVAIL:
                     localeAvailable = p.u8() != 0;
                     break;
                 case RESP_PARAM_LOCALE_VALUE:
                     if (p.remaining() < 2) {
-                        return new Fit3InitSetting(unknownParam1, batteryLevelCode, localeAvailable, localeValue);
+                        return new Fit3InitSetting(batteryPercent, unknownParam2, localeAvailable, localeValue);
                     }
                     localeValue = p.le16();
                     break;
                 default:
                     // unknown param id - stop clean rather than misreading a value as an id
-                    return new Fit3InitSetting(unknownParam1, batteryLevelCode, localeAvailable, localeValue);
+                    return new Fit3InitSetting(batteryPercent, unknownParam2, localeAvailable, localeValue);
             }
         }
-        return new Fit3InitSetting(unknownParam1, batteryLevelCode, localeAvailable, localeValue);
+        return new Fit3InitSetting(batteryPercent, unknownParam2, localeAvailable, localeValue);
     }
 
     @Override
     public String toString() {
-        return "InitSettingResponse{batteryLevelCode=" + batteryLevelCode
+        return "InitSettingResponse{batteryPercent=" + batteryPercent
                 + ", localeAvailable=" + localeAvailable
                 + ", localeValue=" + localeValue
-                + ", unknownParam1=" + unknownParam1 + "}";
+                + ", unknownParam2=" + unknownParam2 + "}";
     }
 
     // ---- locale id lookup (see class javadoc for the porting note) ----

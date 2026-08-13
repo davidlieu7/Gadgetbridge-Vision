@@ -34,6 +34,7 @@ import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3HealthCapabilityCheck;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3HealthPedometerRecord;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3HealthRequestData;
+import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3InitSetting;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3Settings;
 
 /**
@@ -70,6 +71,38 @@ public class Fit3MessagesTest {
     public void screenTimeoutIsALittleEndianShort() {
         assertArrayEquals(new byte[]{0x07, 0x0e, 0x04, 0x00}, Fit3Settings.screenTimeout(4));
         assertArrayEquals(new byte[]{0x07, 0x0e, 0x1e, 0x00}, Fit3Settings.screenTimeout(30));
+    }
+
+    // ---- Fit3InitSetting (CH_CONTROL / MSG_ID 3) ----
+
+    @Test
+    public void initSettingReplyIsFixedFormatDespiteTheVariableRequest() {
+        // Verbatim from a live band, whose battery read 36 % on the settings
+        // channel in the same session: 0x24 = 36.
+        Fit3InitSetting info = Fit3InitSetting.parse(
+                new byte[]{0x43, 0x01, 0x24, 0x02, 0x00, 0x03, 0x01});
+        assertNotNull(info);
+        assertEquals(36, info.batteryPercent);
+        assertEquals(0, info.unknownParam2);
+        assertTrue(info.localeAvailable);
+        assertEquals("locale value is absent, so the documented default stands",
+                90, info.localeValue);
+    }
+
+    @Test
+    public void initSettingReplyTakesAnOptionalLocaleValue() {
+        Fit3InitSetting info = Fit3InitSetting.parse(
+                new byte[]{0x43, 0x01, 0x28, 0x02, 0x00, 0x03, 0x01, 0x04, 0x39, 0x00});
+        assertNotNull(info);
+        assertEquals(40, info.batteryPercent);
+        assertEquals(0x39, info.localeValue);
+    }
+
+    @Test
+    public void initSettingRejectsOtherMessages() {
+        assertNull("a request, not a reply",
+                Fit3InitSetting.parse(new byte[]{(byte) 0x83, 0x01, 0x39, 0x00}));
+        assertNull("another MSG_ID", Fit3InitSetting.parse(new byte[]{0x42, 0x01, 0x24}));
     }
 
     // ---- Fit3FullSettings (CH_SETTINGS / MSG_ID 32) ----
