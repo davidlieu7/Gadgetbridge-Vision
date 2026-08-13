@@ -135,4 +135,11 @@ public class SamsungFit3Coordinator extends AbstractBLEDeviceCoordinator {
         return new SamsungWorkoutParser();
     }
 
+    @Override
+    public int[] getSupportedDeviceSpecificSettings(GBDevice device) {
+        return new int[]{
+                R.xml.devicesettings_samsung_fit3,
+        };
+    }
+
 }

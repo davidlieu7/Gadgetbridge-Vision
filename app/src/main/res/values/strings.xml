@@ -1156,6 +1156,7 @@
     <string name="movement_intensity">Movement intensity</string>
     <string name="battery">Battery</string>
     <string name="no_limit">No limit</string>
+    <string name="seconds_4">4 seconds</string>
     <string name="seconds_5">5 seconds</string>
     <string name="seconds_6">6 seconds</string>
     <string name="seconds_7">7 seconds</string>

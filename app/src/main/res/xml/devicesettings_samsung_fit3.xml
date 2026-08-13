@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.preference.PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <!-- The keys here must be the generic Gadgetbridge ones: onSendConfiguration
+         is only invoked for preference keys DeviceSpecificSettingsFragment
+         registers a change handler for, and that list is a fixed set of known
+         keys - a device-specific key would silently never be pushed. -->
+
+    <SwitchPreferenceCompat
+        android:defaultValue="true"
+        android:icon="@drawable/ic_vibration"
+        android:key="vibration_enable"
+        android:layout="@layout/preference_checkbox"
+        android:summary="@string/enable_vibrations_summary"
+        android:title="@string/prefs_vibration_enable" />
+
+    <ListPreference
+        android:defaultValue="10"
+        android:entries="@array/samsung_fit3_screen_timeout"
+        android:entryValues="@array/samsung_fit3_screen_timeout_values"
+        android:icon="@drawable/ic_hourglass_empty"
+        android:key="screen_timeout"
+        app:useSimpleSummaryProvider="true"
+        android:title="@string/prefs_screen_timeout" />
+
+</androidx.preference.PreferenceScreen>

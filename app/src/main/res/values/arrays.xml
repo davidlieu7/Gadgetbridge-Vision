@@ -3223,6 +3223,22 @@
         <item>1800</item>
     </string-array>
 
+    <!-- The discrete set the Galaxy Fit3's own display-timeout screen offers. -->
+    <string-array name="samsung_fit3_screen_timeout">
+        <item>@string/seconds_4</item>
+        <item>@string/seconds_7</item>
+        <item>@string/seconds_10</item>
+        <item>@string/seconds_15</item>
+        <item>@string/seconds_30</item>
+    </string-array>
+    <string-array name="samsung_fit3_screen_timeout_values" translatable="false">
+        <item>4</item>
+        <item>7</item>
+        <item>10</item>
+        <item>15</item>
+        <item>30</item>
+    </string-array>
+
     <string-array name="screen_timeout">
         <item>@string/seconds_5</item>
         <item>@string/seconds_6</item>

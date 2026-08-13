@@ -85,6 +85,7 @@ import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3MediaVolume;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3Notification;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3NotificationIcon;
+import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3Settings;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3WeatherInfo;
 import nodomain.freeyourgadget.gadgetbridge.util.FileUtils;
 import nodomain.freeyourgadget.gadgetbridge.util.GB;
@@ -1003,6 +1004,40 @@ public class SamsungDeviceSupport extends AbstractBTLESingleDeviceSupport {
     @Override
     public void onSetMusicState(MusicStateSpec stateSpec) {
         sendMessage(Fit3MediaInfo.CHANNEL, Fit3MediaInfo.buildPlaybackState(stateSpec), "media-playback-state");
+    }
+
+    /**
+     * Push one changed device-specific preference to the band. The keys are the
+     * {@code android:key}s of devicesettings_samsung_fit3.xml, mirrored as
+     * constants on {@link Fit3Settings} - generic Gadgetbridge keys, since only
+     * those are reported here at all (see the note on those constants).
+     */
+    @Override
+    public void onSendConfiguration(String config) {
+        SharedPreferences prefs = GBApplication.getDeviceSpecificSharedPrefs(getDevice().getAddress());
+        switch (config) {
+            case Fit3Settings.PREF_VIBRATION_ENABLE: {
+                // Gadgetbridge asks "vibrations enabled?", the band wants "muted?".
+                boolean enabled = prefs.getBoolean(Fit3Settings.PREF_VIBRATION_ENABLE, true);
+                sendMessage(Fit3Settings.CHANNEL, Fit3Settings.mute(!enabled), "settings-mute-vibration");
+                break;
+            }
+            case Fit3Settings.PREF_SCREEN_TIMEOUT: {
+                // ListPreference values are strings; the entries come from
+                // samsung_fit3_screen_timeout_values (seconds).
+                String seconds = prefs.getString(Fit3Settings.PREF_SCREEN_TIMEOUT, "10");
+                try {
+                    sendMessage(Fit3Settings.CHANNEL,
+                            Fit3Settings.screenTimeout(Integer.parseInt(seconds)),
+                            "settings-screen-timeout");
+                } catch (NumberFormatException e) {
+                    LOG.warn("Samsung Fit 3: bad screen-timeout preference '{}'", seconds);
+                }
+                break;
+            }
+            default:
+                super.onSendConfiguration(config);
+        }
     }
 
     @Override
