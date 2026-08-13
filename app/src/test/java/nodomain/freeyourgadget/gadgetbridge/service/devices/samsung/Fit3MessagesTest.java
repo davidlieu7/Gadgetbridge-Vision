@@ -55,6 +55,17 @@ public class Fit3MessagesTest {
     }
 
     @Test
+    public void brightnessIsAStepNotAPercentage() {
+        assertArrayEquals(new byte[]{0x06, 0x08, 0x01}, Fit3Settings.autoBrightness(true));
+        assertArrayEquals(new byte[]{0x05, 0x07, 0x01}, Fit3Settings.brightness(1));
+        assertArrayEquals(new byte[]{0x05, 0x07, 0x0a}, Fit3Settings.brightness(10));
+        // The band only knows ten steps, so anything else is clamped rather
+        // than handed over as a value it has no meaning for.
+        assertArrayEquals(new byte[]{0x05, 0x07, 0x01}, Fit3Settings.brightness(0));
+        assertArrayEquals(new byte[]{0x05, 0x07, 0x0a}, Fit3Settings.brightness(100));
+    }
+
+    @Test
     public void screenTimeoutIsALittleEndianShort() {
         assertArrayEquals(new byte[]{0x07, 0x0e, 0x04, 0x00}, Fit3Settings.screenTimeout(4));
         assertArrayEquals(new byte[]{0x07, 0x0e, 0x1e, 0x00}, Fit3Settings.screenTimeout(30));

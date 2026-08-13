@@ -24,6 +24,24 @@
         app:useSimpleSummaryProvider="true"
         android:title="@string/pref_vibration_intensity" />
 
+    <SwitchPreferenceCompat
+        android:defaultValue="true"
+        android:icon="@drawable/ic_brightness_auto"
+        android:key="screen_auto_brightness"
+        android:layout="@layout/preference_checkbox"
+        android:summary="@string/pref_screen_auto_brightness_summary"
+        android:title="@string/pref_screen_auto_brightness_title" />
+
+    <!-- The band has ten brightness steps, not a percentage. -->
+    <SeekBarPreference
+        android:defaultValue="5"
+        android:icon="@drawable/ic_brightness_medium"
+        android:key="screen_brightness"
+        android:max="10"
+        android:min="1"
+        android:title="@string/pref_screen_brightness"
+        app:showSeekBarValue="true" />
+
     <ListPreference
         android:defaultValue="10"
         android:entries="@array/samsung_fit3_screen_timeout"

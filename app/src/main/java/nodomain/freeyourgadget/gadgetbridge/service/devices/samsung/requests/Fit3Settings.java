@@ -62,6 +62,8 @@ public final class Fit3Settings {
     public static final String PREF_VIBRATION_ENABLE = DeviceSettingsPreferenceConst.PREF_VIBRATION_ENABLE;
     public static final String PREF_VIBRATION_INTENSITY = DeviceSettingsPreferenceConst.PREF_VIBRATION_INTENSITY;
     public static final String PREF_KEY_VIBRATION = DeviceSettingsPreferenceConst.PREF_KEY_VIBRATION;
+    public static final String PREF_SCREEN_BRIGHTNESS = DeviceSettingsPreferenceConst.PREF_SCREEN_BRIGHTNESS;
+    public static final String PREF_SCREEN_AUTO_BRIGHTNESS = DeviceSettingsPreferenceConst.PREF_SCREEN_AUTO_BRIGHTNESS;
     public static final String PREF_ALWAYS_ON_DISPLAY = DeviceSettingsPreferenceConst.PREF_ALWAYS_ON_DISPLAY;
     public static final String PREF_LIFTWRIST_NOSHED = DeviceSettingsPreferenceConst.PREF_LIFTWRIST_NOSHED;
     public static final String PREF_SCREEN_TIMEOUT = DeviceSettingsPreferenceConst.PREF_SCREEN_TIMEOUT;
@@ -111,11 +113,50 @@ public final class Fit3Settings {
                 .build();
     }
 
+    // ---- Brightness (MSG_ID 5 level, MSG_ID 6 auto; no count byte) ----
+
+    private static final int MSG_ID_BRIGHTNESS = 5;
+    private static final int PARAM_BRIGHTNESS = 7;   // byte: level, see BRIGHTNESS_MIN/MAX
+
+    /** Lowest brightness step the band accepts. */
+    public static final int BRIGHTNESS_MIN = 1;
+    /** Highest brightness step the band accepts. */
+    public static final int BRIGHTNESS_MAX = 10;
+
+    /**
+     * MSG_ID 5 / param 7: display brightness, as a step from
+     * {@link #BRIGHTNESS_MIN} to {@link #BRIGHTNESS_MAX} - not a percentage.
+     * The band's own slider runs 0..90 and converts with {@code progress / 10 + 1}
+     * (and back with {@code (level - 1) * 10}), which is where the ten steps come
+     * from. Out-of-range values are clamped rather than sent as-is.
+     * Wire: {@code 05 07 xx}.
+     */
+    public static byte[] brightness(final int level) {
+        int clamped = Math.max(BRIGHTNESS_MIN, Math.min(BRIGHTNESS_MAX, level));
+        return SapPayloadBuilder.fixed(MSG_ID_BRIGHTNESS)
+                .raw(PARAM_BRIGHTNESS)
+                .raw(clamped)
+                .build();
+    }
+
     // ---- Display (MSG_ID 6, one param per message, no count byte) ----
 
     private static final int MSG_ID_DISPLAY = 6;
+    private static final int PARAM_AUTO_BRIGHTNESS = 8;     // byte(bool)
     private static final int PARAM_ALWAYS_ON_DISPLAY = 9;   // byte(bool)
     private static final int PARAM_RAISE_WRIST_WAKE = 10;   // byte(bool)
+
+    /**
+     * MSG_ID 6 / param 8: adaptive brightness. While it is on, the band picks
+     * the level itself and the value from {@link #brightness} is ignored.
+     * Wire: {@code 06 08 xx}.
+     */
+    public static byte[] autoBrightness(final boolean on) {
+        return SapPayloadBuilder.fixed(MSG_ID_DISPLAY)
+                .raw(PARAM_AUTO_BRIGHTNESS)
+                .raw(on ? 1 : 0)
+                .build();
+    }
 
     /** MSG_ID 6 / param 9: keep the watch face on. Wire: {@code 06 09 xx}. */
     public static byte[] alwaysOnDisplay(final boolean on) {

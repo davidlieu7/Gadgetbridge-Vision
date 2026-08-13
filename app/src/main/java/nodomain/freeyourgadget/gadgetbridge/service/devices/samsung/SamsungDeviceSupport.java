@@ -1049,6 +1049,19 @@ public class SamsungDeviceSupport extends AbstractBTLESingleDeviceSupport {
                         "settings-touch-vibration");
                 break;
             }
+            case Fit3Settings.PREF_SCREEN_AUTO_BRIGHTNESS: {
+                boolean on = prefs.getBoolean(Fit3Settings.PREF_SCREEN_AUTO_BRIGHTNESS, true);
+                sendMessage(Fit3Settings.CHANNEL, Fit3Settings.autoBrightness(on),
+                        "settings-auto-brightness");
+                break;
+            }
+            case Fit3Settings.PREF_SCREEN_BRIGHTNESS: {
+                // Steps 1..10, not a percentage - see Fit3Settings#brightness.
+                int level = prefs.getInt(Fit3Settings.PREF_SCREEN_BRIGHTNESS, 5);
+                sendMessage(Fit3Settings.CHANNEL, Fit3Settings.brightness(level),
+                        "settings-brightness");
+                break;
+            }
             case Fit3Settings.PREF_ALWAYS_ON_DISPLAY: {
                 boolean on = prefs.getBoolean(Fit3Settings.PREF_ALWAYS_ON_DISPLAY, false);
                 sendMessage(Fit3Settings.CHANNEL, Fit3Settings.alwaysOnDisplay(on),
