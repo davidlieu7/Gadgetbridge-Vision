@@ -27,8 +27,11 @@ import static org.junit.Assert.assertTrue;
 import org.junit.Test;
 
 import java.io.ByteArrayOutputStream;
+import java.time.LocalDate;
+import java.util.Arrays;
 import java.util.List;
 
+import nodomain.freeyourgadget.gadgetbridge.model.ActivityUser;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3BatteryInfo;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3FullSettings;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3HealthCapabilityCheck;
@@ -36,6 +39,7 @@ import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3HealthRecordType;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3HealthRequestData;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3HealthSyncData;
+import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3HealthUserProfile;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3InitSetting;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3Settings;
 
@@ -257,6 +261,83 @@ public class Fit3MessagesTest {
         assertEquals(-1, Fit3HealthSyncData.firstRecordMarker(parseHex("8203e02027")));  // header only
         assertEquals(-1, Fit3HealthSyncData.firstRecordMarker(parseHex("820301202795")));  // 0xe0 missing
         assertEquals(-1, Fit3HealthSyncData.firstRecordMarker(new byte[0]));
+    }
+
+    // ---- Fit3HealthUserProfile (CH_HEALTH / MSG_ID 2, phone -> band) ----
+
+    /**
+     * The three profile records exactly as one capture's initial profile sync
+     * sent them: male, all-metric units, born 1987-12-31, 192.3 cm, 96.5 kg,
+     * all three stamped 0x44ae24c2.
+     */
+    private static final int CAPTURED_PROFILE_TIME = 0x44ae24c2;
+    private static final String CAPTURED_PROFILE =
+            ("0b 27000000 05 c224ae44 97 ae212c04 99 ae212c04"
+                    + " a1 13000000 0101 0301 0501 06 1f0cc307 0701 0801 0a01 0901"
+                    + " 1c 05 c224ae44 a3 cd4c4043 97 ae212c04 99 ae212c04"
+                    + " 1d 05 c224ae44 a4 0000c142 97 ae212c04 99 ae212c04").replace(" ", "");
+
+    @Test
+    public void theProfileRecordsMatchTheCapturedInitialSync() {
+        byte[] push = Fit3HealthUserProfile.buildRequest(0x0047, CAPTURED_PROFILE_TIME,
+                ActivityUser.GENDER_MALE, LocalDate.of(1987, 12, 31), 192.3f, 96.5f, true);
+        byte[] expected = parseHex(CAPTURED_PROFILE);
+        // The records start after the header, count, sequence number and the
+        // 27-byte device-info record that leads every push on this channel.
+        byte[] records = Arrays.copyOfRange(push, 5 + 27, push.length);
+        assertArrayEquals(expected, records);
+    }
+
+    @Test
+    public void theProfilePushIsFramedLikeAnyOtherSyncData() {
+        byte[] push = Fit3HealthUserProfile.buildRequest(0x1234, CAPTURED_PROFILE_TIME,
+                ActivityUser.GENDER_MALE, LocalDate.of(1987, 12, 31), 192.3f, 96.5f, true);
+        assertEquals("SYNC_DATA request header", 0x82, push[0] & 0xFF);
+        assertEquals("sequence number, device info, profile, height, weight", 5, push[1] & 0xFF);
+        assertEquals(0xe0, push[2] & 0xFF);
+        assertEquals(0x34, push[3] & 0xFF);
+        assertEquals(0x12, push[4] & 0xFF);
+        // Which makes it readable by the same parser that handles the band's
+        // own pushes - the marker of the first record is the device info.
+        assertEquals(0x05, Fit3HealthSyncData.firstRecordMarker(push));
+    }
+
+    @Test
+    public void genderIsFemaleOnlyForTheFemaleValue() {
+        assertEquals(2, genderByteOf(ActivityUser.GENDER_FEMALE));
+        assertEquals(1, genderByteOf(ActivityUser.GENDER_MALE));
+        // The wire has no third value; the app's own mapping falls back to male.
+        assertEquals(1, genderByteOf(ActivityUser.GENDER_OTHER));
+    }
+
+    @Test
+    public void imperialFlipsEveryUnitExceptBloodPressure() {
+        // weight, height, distance, temperature, blood pressure, water.
+        assertArrayEquals(new byte[]{1, 1, 1, 1, 1, 1}, unitBlockOf(true));
+        // Blood pressure is the odd one out: its 2 means kPa, not an imperial
+        // unit, so it stays on mmHg.
+        assertArrayEquals(new byte[]{2, 2, 2, 2, 1, 2}, unitBlockOf(false));
+    }
+
+    /** The gender sub-key's value, the first byte of the 0xa1 block. */
+    private static int genderByteOf(int gender) {
+        return profileKeyBlock(gender, true)[1] & 0xFF;
+    }
+
+    /** Every unit sub-key's value, in the order the block lists them. */
+    private static byte[] unitBlockOf(boolean metric) {
+        byte[] keys = profileKeyBlock(ActivityUser.GENDER_MALE, metric);
+        // 01 gender · 03 weight · 05 height · 06 birth(4) · 07 distance ·
+        // 08 temperature · 0a blood pressure · 09 water
+        return new byte[]{keys[3], keys[5], keys[12], keys[14], keys[16], keys[18]};
+    }
+
+    /** The 19-byte 0xa1 sub-key block out of a freshly built push. */
+    private static byte[] profileKeyBlock(int gender, boolean metric) {
+        byte[] push = Fit3HealthUserProfile.buildRequest(1, CAPTURED_PROFILE_TIME, gender,
+                LocalDate.of(1987, 12, 31), 173f, 72f, metric);
+        int keyBlock = 5 + 27 + 5 + 15 + 5; // ...device info, 0b marker+length, three tags, a1 tag+length
+        return Arrays.copyOfRange(push, keyBlock, keyBlock + 19);
     }
 
     // ---- Fit3BatteryInfo (CH_SETTINGS / MSG_ID 2) ----

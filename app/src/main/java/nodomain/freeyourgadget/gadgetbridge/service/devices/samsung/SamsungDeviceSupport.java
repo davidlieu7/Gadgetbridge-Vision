@@ -31,6 +31,7 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.text.SimpleDateFormat;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
@@ -40,6 +41,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 import nodomain.freeyourgadget.gadgetbridge.GBApplication;
+import nodomain.freeyourgadget.gadgetbridge.activities.SettingsActivity;
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsPreferenceConst;
 import nodomain.freeyourgadget.gadgetbridge.database.DBHandler;
 import nodomain.freeyourgadget.gadgetbridge.database.DBHelper;
@@ -58,6 +60,7 @@ import nodomain.freeyourgadget.gadgetbridge.entities.User;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
 import nodomain.freeyourgadget.gadgetbridge.model.ActivityKind;
 import nodomain.freeyourgadget.gadgetbridge.model.ActivitySample;
+import nodomain.freeyourgadget.gadgetbridge.model.ActivityUser;
 import nodomain.freeyourgadget.gadgetbridge.model.ActivitySummaryData;
 import nodomain.freeyourgadget.gadgetbridge.model.ActivitySummaryEntries;
 import nodomain.freeyourgadget.gadgetbridge.model.BatteryState;
@@ -80,6 +83,7 @@ import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3HealthRecordType;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3HealthRequestData;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3HealthSyncData;
+import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3HealthUserProfile;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3HealthWearableMsg;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3HealthWorkout;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3InitSetting;
@@ -103,6 +107,8 @@ public class SamsungDeviceSupport extends AbstractBTLESingleDeviceSupport {
     private final Fit3HealthSync healthSync = new Fit3HealthSync();
     /** Phone-side SEQUENCE_NUMBER counter for health-channel requests we originate (see Fit3HealthRequestData#buildRequest). */
     private int healthRequestSequence = 1;
+    /** Whether this connection has already pushed the user profile (see {@link #sendUserProfile}). */
+    private boolean userProfileSent;
 
     /** Pulls the band's diagnostic log files on CH_DEBUG; see {@link Fit3LogDump}. */
     private final Fit3LogDump logDump = new Fit3LogDump(new Fit3LogDump.Listener() {
@@ -203,6 +209,7 @@ public class SamsungDeviceSupport extends AbstractBTLESingleDeviceSupport {
             // initializeDevice); only now is the device usable, and only now may
             // anything go out through performInitialized().
             gbDevice.setUpdateState(GBDevice.State.INITIALIZED, getContext());
+            userProfileSent = false;
             sendPostHelloInit();
         }
     });
@@ -302,6 +309,17 @@ public class SamsungDeviceSupport extends AbstractBTLESingleDeviceSupport {
                 case SapProtocol.CH_MEDIA:               // 0x09: /1,/8 media state; /4 transport button
                     onMediaRequest(msgId, body);
                     return;
+                case SapProtocol.CH_HEALTH:              // 0x0a: /2 ack of a push of ours
+                    if (msgId == Fit3HealthUserProfile.MSG_ID) {
+                        // The band answers a phone->band SYNC_DATA with the
+                        // same MSG_ID and the type bit set, echoing our
+                        // sequence number. Nothing to do with it - the ack is
+                        // only useful as evidence the push landed.
+                        LOG.debug("Samsung Fit 3: band acked our health push ({} bytes)", body.length);
+                    } else {
+                        LOG.debug("band response ch=0x0a msgId={} unhandled", msgId);
+                    }
+                    return;
                 case SapProtocol.CH_SETTINGS:            // 0x0b: /16,/35 settings read-back
                     if (msgId == Fit3BatteryInfo.MSG_ID_BATTERY) { //battery
                         handleBatteryInfo(Fit3BatteryInfo.parse(body));
@@ -382,6 +400,14 @@ public class SamsungDeviceSupport extends AbstractBTLESingleDeviceSupport {
                 return;
             }
             sendMessage(Fit3HealthRequestData.CHANNEL, response, "health-request-data-ack");
+            // A REQUEST_DATA round trip is the point the band is known to be
+            // ready for records on this channel - it's what the real app waits
+            // for before pushing a profile - so the once-per-connection push
+            // rides on the first one.
+            if (!userProfileSent) {
+                userProfileSent = true;
+                sendUserProfile();
+            }
             return;
         }
         if (msgId == Fit3HealthWearableMsg.MSG_ID) {
@@ -960,6 +986,32 @@ public class SamsungDeviceSupport extends AbstractBTLESingleDeviceSupport {
     }
 
     /**
+     * Push the user's profile - gender, birth date, height, weight, unit
+     * preferences - to the band (see {@link Fit3HealthUserProfile}). Sent once
+     * per connection and again whenever one of those preferences changes; the
+     * band keeps no copy it can tell us about, so re-sending is the only way
+     * to know it is current.
+     *
+     * <p>The band uses this for its own on-device calorie and distance
+     * figures, which is why it wants height/weight at all - Gadgetbridge's own
+     * displays don't depend on the band having it.
+     */
+    private void sendUserProfile() {
+        ActivityUser user = new ActivityUser();
+        LocalDate dateOfBirth = user.getDateOfBirth();
+        boolean metric = !"imperial".equals(
+                GBApplication.getPrefs().getString(SettingsActivity.PREF_UNIT_DISTANCE, "metric"));
+        int now = (int) (System.currentTimeMillis() / 1000L)
+                - Fit3HealthPedometerRecord.EPOCH_1990_OFFSET_SECONDS;
+        LOG.debug("Samsung Fit 3: pushing user profile ({} cm, {} kg, born {})",
+                user.getHeightCm(), user.getWeightKg(), dateOfBirth);
+        sendMessage(Fit3HealthUserProfile.CHANNEL,
+                Fit3HealthUserProfile.buildRequest(healthRequestSequence++, now, user.getGender(),
+                        dateOfBirth, user.getHeightCm(), user.getWeightKg(), metric),
+                "health-user-profile");
+    }
+
+    /**
      * Newest stored sample's timestamp, converted to the health channel's
      * 1990 epoch - so a fetch can ask the band only for what's missing.
      * 0 (= "send everything") if nothing is stored yet or the DB is
@@ -1110,6 +1162,16 @@ public class SamsungDeviceSupport extends AbstractBTLESingleDeviceSupport {
                 }
                 break;
             }
+            case ActivityUser.PREF_USER_GENDER:
+            case ActivityUser.PREF_USER_DATE_OF_BIRTH:
+            case ActivityUser.PREF_USER_HEIGHT_CM:
+            case ActivityUser.PREF_USER_WEIGHT_KG:
+            case SettingsActivity.PREF_UNIT_DISTANCE:
+                // Not device preferences but app-wide ones, and the band takes
+                // all of them in a single message - so any of them re-sends the
+                // whole profile.
+                sendUserProfile();
+                break;
             case DeviceSettingsPreferenceConst.PREF_TIMEFORMAT:
                 // Not a CH_SETTINGS param - the band only learns the clock
                 // format from INIT_SETTING, so re-send that whole message.
