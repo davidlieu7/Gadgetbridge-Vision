@@ -53,6 +53,7 @@ import nodomain.freeyourgadget.gadgetbridge.entities.Device;
 import nodomain.freeyourgadget.gadgetbridge.entities.SamsungFit3ActivitySample;
 import nodomain.freeyourgadget.gadgetbridge.entities.SamsungFit3ActivitySampleDao;
 import nodomain.freeyourgadget.gadgetbridge.entities.User;
+import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
 import nodomain.freeyourgadget.gadgetbridge.model.ActivityKind;
 import nodomain.freeyourgadget.gadgetbridge.model.ActivitySample;
 import nodomain.freeyourgadget.gadgetbridge.model.ActivitySummaryData;
@@ -193,6 +194,10 @@ public class SamsungDeviceSupport extends AbstractBTLESingleDeviceSupport {
             final String helloToken = loadOrCreateToken("sap_hello_token");
             byte[] reply = SapHello.buildPhoneHello(bandHello, helloToken, PHONE_MODEL, PHONE_VENDOR, null);
             writeRaw(reply, "sap-hello-reply");
+            // The handshake is what actually completes initialization (see
+            // initializeDevice); only now is the device usable, and only now may
+            // anything go out through performInitialized().
+            gbDevice.setUpdateState(GBDevice.State.INITIALIZED, getContext());
             sendPostHelloInit();
         }
     });
@@ -213,7 +218,7 @@ public class SamsungDeviceSupport extends AbstractBTLESingleDeviceSupport {
 
     @Override
     protected TransactionBuilder initializeDevice(TransactionBuilder builder) {
-        builder.setDeviceState(nodomain.freeyourgadget.gadgetbridge.impl.GBDevice.State.INITIALIZING);
+        builder.setDeviceState(GBDevice.State.INITIALIZING);
 
         // 1) Grow the MTU so most SAP frames fit in a single write.
         builder.requestMtu(MTU);
@@ -223,10 +228,13 @@ public class SamsungDeviceSupport extends AbstractBTLESingleDeviceSupport {
         BluetoothGattCharacteristic notify = getCharacteristic(UUID_CHAR_NOTIFY);
         builder.notify(notify, true);
 
-        // 3) The band opens with a plaintext HELLO ("SAMSUNG_ACCESSARY" ...).
-        //    Implement the HELLO reply, then mark INITIALIZED there instead of
-        //    here. Marking it here is fine to get a first connection working.
-        builder.setDeviceState(nodomain.freeyourgadget.gadgetbridge.impl.GBDevice.State.INITIALIZED);
+        // 3) The band opens with a plaintext HELLO ("SAMSUNG_ACCESSARY" ...) once
+        //    it is subscribed to. The session is only really up after we answer
+        //    that and push the post-HELLO init - until then the band still shows
+        //    "Continue on the phone" - so INITIALIZED is set in onHello, not
+        //    here. Everything written before that point (the HELLO reply itself
+        //    and the frame ACKs) goes out through writeFrames' uninitialised
+        //    path, which does not re-enter this method.
         deviceMac = this.gbDevice.getAddress();
         return builder;
     }
@@ -860,19 +868,36 @@ public class SamsungDeviceSupport extends AbstractBTLESingleDeviceSupport {
         writeFrames(sap.buildFrames(channel, innerBody, negotiatedMtu), reason);
     }
 
+    /**
+     * Write a complete frame that is itself part of the handshake - the HELLO
+     * reply and the per-frame ACKs. These are answers to something the band just
+     * sent, so the link is up by definition, and they must NOT go through
+     * {@link #performInitialized(String)}: the device is still INITIALIZING at
+     * that point, which would queue another initializeDevice() run per write.
+     */
     private void writeRaw(byte[] frame, String reason) {
-        writeFrames(Collections.singletonList(frame), reason);
+        writeFrames(Collections.singletonList(frame), reason, false);
+    }
+
+    private void writeFrames(List<byte[]> frames, String reason) {
+        writeFrames(frames, reason, true);
     }
 
     /** Write one or more frames back-to-back in a single transaction, so a fragmented message can't be interleaved with anything else queued. */
-    private void writeFrames(List<byte[]> frames, String reason) {
+    private void writeFrames(List<byte[]> frames, String reason, boolean requiresInitialized) {
         try {
-            TransactionBuilder builder = performInitialized(reason);
+            TransactionBuilder builder = requiresInitialized
+                    ? performInitialized(reason)
+                    : createTransactionBuilder(reason);
             BluetoothGattCharacteristic characteristic = getCharacteristic(UUID_CHAR_WRITE);
             for (byte[] frame : frames) {
                 builder.write(characteristic, frame);
             }
-            builder.queue();
+            if (requiresInitialized) {
+                builder.queue();
+            } else {
+                builder.queueConnected();
+            }
         } catch (IOException e) {
             LOG.error("failed to write '{}'", reason, e);
         }
