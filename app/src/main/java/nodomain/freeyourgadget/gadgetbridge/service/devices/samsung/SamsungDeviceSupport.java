@@ -46,6 +46,7 @@ import nodomain.freeyourgadget.gadgetbridge.database.DBHelper;
 import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEventBatteryInfo;
 import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEventCallControl;
 import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEventMusicControl;
+import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEventUpdatePreferences;
 import nodomain.freeyourgadget.gadgetbridge.devices.samsung.SamsungSampleProvider;
 import nodomain.freeyourgadget.gadgetbridge.entities.BaseActivitySummary;
 import nodomain.freeyourgadget.gadgetbridge.entities.BaseActivitySummaryDao;
@@ -71,6 +72,7 @@ import nodomain.freeyourgadget.gadgetbridge.service.btle.TransactionBuilder;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3BatteryInfo;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3CallState;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3ExerciseType;
+import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3FullSettings;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3HealthCapabilityCheck;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3HealthDeviceInfo;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3HealthHeartRateRecord;
@@ -300,8 +302,11 @@ public class SamsungDeviceSupport extends AbstractBTLESingleDeviceSupport {
                     onMediaRequest(msgId, body);
                     return;
                 case SapProtocol.CH_SETTINGS:            // 0x0b: /16,/35 settings read-back
-                    if(msgId == Fit3BatteryInfo.MSG_ID_BATTERY) //battery
+                    if (msgId == Fit3BatteryInfo.MSG_ID_BATTERY) { //battery
                         handleBatteryInfo(Fit3BatteryInfo.parse(body));
+                    } else if (msgId == Fit3FullSettings.MSG_ID) {
+                        handleFullSettings(Fit3FullSettings.parse(body));
+                    }
                     return;
                 case SapProtocol.CH_CONTROL:
                     if (msgId == Fit3InitSetting.MSG_ID_INIT_SETTING) {
@@ -823,6 +828,10 @@ public class SamsungDeviceSupport extends AbstractBTLESingleDeviceSupport {
 
         sendRawMessage(Fit3BatteryInfo.CHANNEL, Fit3BatteryInfo.buildRequest(), "battery-request");
 
+        // 7) full settings snapshot - the band tells us what it is actually set
+        //    to, so the settings screen starts from its state and not ours.
+        sendRawMessage(Fit3FullSettings.CHANNEL, Fit3FullSettings.buildRequest(), "full-settings-request");
+
         // Beyond this the app pushes calendar (0x08/8,9), settings (0x0b),
         // etc. Those enable features but the steps above are the ones that
         // get the band off "Continue on the phone". Health-sync data isn't
@@ -1113,6 +1122,70 @@ public class SamsungDeviceSupport extends AbstractBTLESingleDeviceSupport {
         batteryCmd.state = info.charging ? BatteryState.BATTERY_CHARGING
                 : BatteryState.BATTERY_NORMAL;
         evaluateGBDeviceEvent(batteryCmd);
+    }
+
+    /**
+     * Adopt the band's own settings state (see {@link Fit3FullSettings}) into
+     * the device preferences, so the settings screen shows what the band is
+     * really set to instead of Gadgetbridge's XML defaults. Only the params
+     * that have a preference are taken; the rest are logged and dropped.
+     *
+     * <p>The band is authoritative here: this runs once per connection, before
+     * the user can have changed anything in this session.
+     */
+    private void handleFullSettings(Fit3FullSettings settings) {
+        if (settings == null) {
+            LOG.warn("Samsung Fit 3: full-settings reply could not be parsed");
+            return;
+        }
+        LOG.info("Samsung Fit 3 settings snapshot: {}", settings);
+
+        GBDeviceEventUpdatePreferences event = new GBDeviceEventUpdatePreferences();
+
+        Boolean mute = settings.getBoolean(Fit3FullSettings.PARAM_MUTE);
+        if (mute != null) {
+            event.withPreference(Fit3Settings.PREF_VIBRATION_ENABLE, !mute);
+        }
+        Boolean strong = settings.getBoolean(Fit3FullSettings.PARAM_VIBRATION_INTENSITY);
+        if (strong != null) {
+            event.withPreference(Fit3Settings.PREF_VIBRATION_INTENSITY,
+                    strong ? Fit3Settings.VIBRATION_INTENSITY_ENHANCED
+                            : Fit3Settings.VIBRATION_INTENSITY_NORMAL);
+        }
+        Boolean touchVibration = settings.getBoolean(Fit3FullSettings.PARAM_TOUCH_VIBRATION);
+        if (touchVibration != null) {
+            event.withPreference(Fit3Settings.PREF_KEY_VIBRATION, touchVibration);
+        }
+        Integer brightness = settings.get(Fit3FullSettings.PARAM_BRIGHTNESS);
+        if (brightness != null) {
+            event.withPreference(Fit3Settings.PREF_SCREEN_BRIGHTNESS,
+                    Math.max(Fit3Settings.BRIGHTNESS_MIN,
+                            Math.min(Fit3Settings.BRIGHTNESS_MAX, brightness)));
+        }
+        Boolean autoBrightness = settings.getBoolean(Fit3FullSettings.PARAM_AUTO_BRIGHTNESS);
+        if (autoBrightness != null) {
+            event.withPreference(Fit3Settings.PREF_SCREEN_AUTO_BRIGHTNESS, autoBrightness);
+        }
+        Boolean alwaysOn = settings.getBoolean(Fit3FullSettings.PARAM_ALWAYS_ON_DISPLAY);
+        if (alwaysOn != null) {
+            event.withPreference(Fit3Settings.PREF_ALWAYS_ON_DISPLAY, alwaysOn);
+        }
+        Boolean raiseWrist = settings.getBoolean(Fit3FullSettings.PARAM_RAISE_WRIST_WAKE);
+        if (raiseWrist != null) {
+            event.withPreference(Fit3Settings.PREF_LIFTWRIST_NOSHED, raiseWrist);
+        }
+        Integer screenTimeout = settings.get(Fit3FullSettings.PARAM_SCREEN_TIMEOUT);
+        if (screenTimeout != null) {
+            // The preference is a ListPreference, so its value is a string -
+            // storing an int here would blow up when the screen reads it back.
+            event.withPreference(Fit3Settings.PREF_SCREEN_TIMEOUT, String.valueOf(screenTimeout));
+        }
+
+        if (event.preferences.isEmpty()) {
+            LOG.warn("Samsung Fit 3: settings snapshot carried nothing we track");
+            return;
+        }
+        evaluateGBDeviceEvent(event);
     }
 
     private void handleInitSettingInfo(Fit3InitSetting info) {

@@ -30,6 +30,7 @@ import java.io.ByteArrayOutputStream;
 import java.util.List;
 
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3BatteryInfo;
+import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3FullSettings;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3HealthCapabilityCheck;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3HealthPedometerRecord;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3HealthRequestData;
@@ -69,6 +70,105 @@ public class Fit3MessagesTest {
     public void screenTimeoutIsALittleEndianShort() {
         assertArrayEquals(new byte[]{0x07, 0x0e, 0x04, 0x00}, Fit3Settings.screenTimeout(4));
         assertArrayEquals(new byte[]{0x07, 0x0e, 0x1e, 0x00}, Fit3Settings.screenTimeout(30));
+    }
+
+    // ---- Fit3FullSettings (CH_SETTINGS / MSG_ID 32) ----
+
+    @Test
+    public void fullSettingsRequestIsABareHeader() {
+        assertArrayEquals(new byte[]{0x20}, Fit3FullSettings.buildRequest());
+    }
+
+    @Test
+    public void fullSettingsMixesOneAndTwoByteParams() {
+        // 60 [count] then [id][value], widths per the band's own schema:
+        // 0 and 2 are bytes, 5 and 14 are little-endian shorts.
+        byte[] body = new byte[]{
+                0x60, 5,
+                0, 1,                    // mute on
+                2, 1,                    // intensity strong
+                5, 0x03, 0x00,           // call vibration pattern 3 (short)
+                7, 0x06,                 // brightness 6
+                14, 0x1e, 0x00,          // screen timeout 30 s (short)
+        };
+        Fit3FullSettings settings = Fit3FullSettings.parse(body);
+        assertNotNull(settings);
+        assertEquals(5, settings.size());
+        assertEquals(Boolean.TRUE, settings.getBoolean(Fit3FullSettings.PARAM_MUTE));
+        assertEquals(Boolean.TRUE, settings.getBoolean(Fit3FullSettings.PARAM_VIBRATION_INTENSITY));
+        assertEquals(Integer.valueOf(3), settings.get(Fit3FullSettings.PARAM_CALL_VIBRATION_PATTERN));
+        assertEquals(Integer.valueOf(6), settings.get(Fit3FullSettings.PARAM_BRIGHTNESS));
+        assertEquals(Integer.valueOf(30), settings.get(Fit3FullSettings.PARAM_SCREEN_TIMEOUT));
+        assertNull("absent params stay absent", settings.get(Fit3FullSettings.PARAM_ALWAYS_ON_DISPLAY));
+        assertNull(settings.getBoolean(Fit3FullSettings.PARAM_ALWAYS_ON_DISPLAY));
+    }
+
+    @Test
+    public void fullSettingsKeepsWhatItDecodedBeforeAnUnknownParam() {
+        byte[] body = new byte[]{
+                0x60, 3,
+                0, 0,                    // mute off
+                (byte) 0x7f, 0x01,       // unknown id: width unknown, stop here
+                9, 1,                    // never reached
+        };
+        Fit3FullSettings settings = Fit3FullSettings.parse(body);
+        assertNotNull(settings);
+        assertEquals(1, settings.size());
+        assertEquals(Boolean.FALSE, settings.getBoolean(Fit3FullSettings.PARAM_MUTE));
+        assertNull(settings.getBoolean(Fit3FullSettings.PARAM_ALWAYS_ON_DISPLAY));
+    }
+
+    @Test
+    public void fullSettingsSurvivesATruncatedShort() {
+        byte[] body = new byte[]{
+                0x60, 2,
+                7, 0x0a,                 // brightness 10
+                14, 0x1e,                // short cut in half
+        };
+        Fit3FullSettings settings = Fit3FullSettings.parse(body);
+        assertNotNull(settings);
+        assertEquals(Integer.valueOf(10), settings.get(Fit3FullSettings.PARAM_BRIGHTNESS));
+        assertNull(settings.get(Fit3FullSettings.PARAM_SCREEN_TIMEOUT));
+    }
+
+    @Test
+    public void fullSettingsRejectsOtherMessages() {
+        assertNull("a request, not a reply", Fit3FullSettings.parse(new byte[]{0x20, 0x00}));
+        assertNull("another MSG_ID", Fit3FullSettings.parse(new byte[]{(byte) 0xe2, 0x01, 0x00, 0x01}));
+    }
+
+    @Test
+    public void fullSettingsDecodesACapturedReply() {
+        // Verbatim body of a live band's reply to the 0x20 request: header 0x60
+        // (fixed format, response) plus a count byte anyway, then all 22 params.
+        byte[] body = parseHex(
+                "6016000001000201030104010501000601000703080109000a010b000c000d01"
+                        + "0e07000f1400100000110100120000130114001501");
+        Fit3FullSettings settings = Fit3FullSettings.parse(body);
+        assertNotNull(settings);
+        assertEquals("every param id 0..21 is reported", 22, settings.size());
+
+        assertEquals(Boolean.FALSE, settings.getBoolean(Fit3FullSettings.PARAM_MUTE));
+        assertEquals(Boolean.TRUE, settings.getBoolean(Fit3FullSettings.PARAM_VIBRATION_INTENSITY));
+        assertEquals(Boolean.TRUE, settings.getBoolean(Fit3FullSettings.PARAM_TOUCH_VIBRATION));
+        assertEquals(Integer.valueOf(3), settings.get(Fit3FullSettings.PARAM_BRIGHTNESS));
+        assertEquals(Boolean.TRUE, settings.getBoolean(Fit3FullSettings.PARAM_AUTO_BRIGHTNESS));
+        assertEquals(Boolean.FALSE, settings.getBoolean(Fit3FullSettings.PARAM_ALWAYS_ON_DISPLAY));
+        assertEquals(Boolean.TRUE, settings.getBoolean(Fit3FullSettings.PARAM_RAISE_WRIST_WAKE));
+        // The two-byte fields are the real check on the width table - a wrong
+        // width here would shift everything after it.
+        assertEquals(Integer.valueOf(7), settings.get(Fit3FullSettings.PARAM_SCREEN_TIMEOUT));
+        assertEquals(Integer.valueOf(20), settings.get(Fit3FullSettings.PARAM_SHOW_LAST_APP_TIMEOUT));
+        assertEquals(Integer.valueOf(1), settings.get(Fit3FullSettings.PARAM_DOUBLE_PRESS));
+        assertEquals(Boolean.TRUE, settings.getBoolean(Fit3FullSettings.PARAM_BUTTON_POSITION));
+    }
+
+    private static byte[] parseHex(final String hex) {
+        byte[] out = new byte[hex.length() / 2];
+        for (int i = 0; i < out.length; i++) {
+            out[i] = (byte) Integer.parseInt(hex.substring(i * 2, i * 2 + 2), 16);
+        }
+        return out;
     }
 
     // ---- Fit3BatteryInfo (CH_SETTINGS / MSG_ID 2) ----
