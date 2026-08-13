@@ -33,11 +33,32 @@ import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3HealthCapabilityCheck;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3HealthPedometerRecord;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3HealthRequestData;
+import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3Settings;
 
 /**
  * Per-message request builders and reply parsers.
  */
 public class Fit3MessagesTest {
+
+    // ---- Fit3Settings (CH_SETTINGS, one param per message, no count byte) ----
+
+    @Test
+    public void settingsWritesAreBareParamValuePairs() {
+        // All of these are confirmed on a live band - it acks each one and the
+        // setting changes on the device.
+        assertArrayEquals(new byte[]{0x03, 0x00, 0x01}, Fit3Settings.mute(true));
+        assertArrayEquals(new byte[]{0x03, 0x00, 0x00}, Fit3Settings.mute(false));
+        assertArrayEquals(new byte[]{0x03, 0x02, 0x01}, Fit3Settings.vibrationIntensityStrong(true));
+        assertArrayEquals(new byte[]{0x03, 0x03, 0x01}, Fit3Settings.touchVibration(true));
+        assertArrayEquals(new byte[]{0x06, 0x09, 0x01}, Fit3Settings.alwaysOnDisplay(true));
+        assertArrayEquals(new byte[]{0x06, 0x0a, 0x00}, Fit3Settings.raiseWristWake(false));
+    }
+
+    @Test
+    public void screenTimeoutIsALittleEndianShort() {
+        assertArrayEquals(new byte[]{0x07, 0x0e, 0x04, 0x00}, Fit3Settings.screenTimeout(4));
+        assertArrayEquals(new byte[]{0x07, 0x0e, 0x1e, 0x00}, Fit3Settings.screenTimeout(30));
+    }
 
     // ---- Fit3BatteryInfo (CH_SETTINGS / MSG_ID 2) ----
 

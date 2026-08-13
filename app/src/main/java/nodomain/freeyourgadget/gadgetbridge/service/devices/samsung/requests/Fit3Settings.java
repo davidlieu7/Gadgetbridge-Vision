@@ -34,9 +34,15 @@ import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.SapProtocol;
  * bool/level or 2 bytes little-endian, per param - this differs by param, not
  * by a MSG-wide rule, so each builder below encodes the width its param needs.
  *
- * <p>This class currently covers the two simplest single-param writes; add
- * more as they are wired into {@code onSendConfiguration}. Every builder names
- * its MSG_ID and param id explicitly so the mapping stays checkable.
+ * <p>This class covers the single-param writes that map onto a preference key
+ * Gadgetbridge already knows (see the key constants below); add more as they
+ * are wired into {@code onSendConfiguration}. Every builder names its MSG_ID
+ * and param id explicitly so the mapping stays checkable.
+ *
+ * <p>Every write here is confirmed against a live band: the band acks each one
+ * and the setting visibly changes on the device. Mute and display timeout were
+ * additionally verified byte-for-byte in a capture ({@code 03 00 01},
+ * {@code 07 0e 1e 00}).
  */
 public final class Fit3Settings {
 
@@ -54,15 +60,29 @@ public final class Fit3Settings {
      * "vibrations enabled", the band's param is "mute".
      */
     public static final String PREF_VIBRATION_ENABLE = DeviceSettingsPreferenceConst.PREF_VIBRATION_ENABLE;
+    public static final String PREF_VIBRATION_INTENSITY = DeviceSettingsPreferenceConst.PREF_VIBRATION_INTENSITY;
+    public static final String PREF_KEY_VIBRATION = DeviceSettingsPreferenceConst.PREF_KEY_VIBRATION;
+    public static final String PREF_ALWAYS_ON_DISPLAY = DeviceSettingsPreferenceConst.PREF_ALWAYS_ON_DISPLAY;
+    public static final String PREF_LIFTWRIST_NOSHED = DeviceSettingsPreferenceConst.PREF_LIFTWRIST_NOSHED;
     public static final String PREF_SCREEN_TIMEOUT = DeviceSettingsPreferenceConst.PREF_SCREEN_TIMEOUT;
+
+    /**
+     * The two values of {@code @array/vibration_intensity_values}. The band's
+     * param is a plain bool (light / strong), so only these two exist - there
+     * is no shared constant for them in Gadgetbridge.
+     */
+    public static final String VIBRATION_INTENSITY_NORMAL = "normal";
+    public static final String VIBRATION_INTENSITY_ENHANCED = "enhanced";
 
     private Fit3Settings() {
     }
 
-    // ---- Vibration (MSG_ID 3, single param, no count byte) ----
+    // ---- Vibration (MSG_ID 3, one param per message, no count byte) ----
 
     private static final int MSG_ID_VIBRATION = 3;
-    private static final int PARAM_MUTE = 0;   // byte(bool): mute all vibration on/off
+    private static final int PARAM_MUTE = 0;       // byte(bool): mute all vibration on/off
+    private static final int PARAM_INTENSITY = 2;  // byte(bool): light (0) / strong (1)
+    private static final int PARAM_TOUCH_VIBRATION = 3;  // byte(bool): vibrate on touch
 
     /** MSG_ID 3 / param 0: mute all vibration on or off. Wire: {@code 03 00 xx}. */
     public static byte[] mute(final boolean on) {
@@ -72,7 +92,48 @@ public final class Fit3Settings {
                 .build();
     }
 
-    // ---- Display (MSG_ID 7, single param, no count byte) ----
+    /**
+     * MSG_ID 3 / param 2: vibration intensity. The band only knows two levels,
+     * light and strong. Wire: {@code 03 02 xx}.
+     */
+    public static byte[] vibrationIntensityStrong(final boolean strong) {
+        return SapPayloadBuilder.fixed(MSG_ID_VIBRATION)
+                .raw(PARAM_INTENSITY)
+                .raw(strong ? 1 : 0)
+                .build();
+    }
+
+    /** MSG_ID 3 / param 3: vibrate on touch. Wire: {@code 03 03 xx}. */
+    public static byte[] touchVibration(final boolean on) {
+        return SapPayloadBuilder.fixed(MSG_ID_VIBRATION)
+                .raw(PARAM_TOUCH_VIBRATION)
+                .raw(on ? 1 : 0)
+                .build();
+    }
+
+    // ---- Display (MSG_ID 6, one param per message, no count byte) ----
+
+    private static final int MSG_ID_DISPLAY = 6;
+    private static final int PARAM_ALWAYS_ON_DISPLAY = 9;   // byte(bool)
+    private static final int PARAM_RAISE_WRIST_WAKE = 10;   // byte(bool)
+
+    /** MSG_ID 6 / param 9: keep the watch face on. Wire: {@code 06 09 xx}. */
+    public static byte[] alwaysOnDisplay(final boolean on) {
+        return SapPayloadBuilder.fixed(MSG_ID_DISPLAY)
+                .raw(PARAM_ALWAYS_ON_DISPLAY)
+                .raw(on ? 1 : 0)
+                .build();
+    }
+
+    /** MSG_ID 6 / param 10: wake the screen on a raise-wrist gesture. Wire: {@code 06 0a xx}. */
+    public static byte[] raiseWristWake(final boolean on) {
+        return SapPayloadBuilder.fixed(MSG_ID_DISPLAY)
+                .raw(PARAM_RAISE_WRIST_WAKE)
+                .raw(on ? 1 : 0)
+                .build();
+    }
+
+    // ---- Display timeout (MSG_ID 7, one param per message, no count byte) ----
 
     private static final int MSG_ID_DISPLAY_TIMEOUT = 7;
     private static final int PARAM_SCREEN_TIMEOUT = 14;  // short: screen-on timeout, seconds

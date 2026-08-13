@@ -40,6 +40,7 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 import nodomain.freeyourgadget.gadgetbridge.GBApplication;
+import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsPreferenceConst;
 import nodomain.freeyourgadget.gadgetbridge.database.DBHandler;
 import nodomain.freeyourgadget.gadgetbridge.database.DBHelper;
 import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEventBatteryInfo;
@@ -794,11 +795,7 @@ public class SamsungDeviceSupport extends AbstractBTLESingleDeviceSupport {
 //        sendRawMessage(SapProtocol.CH_CONTROL, hex("01 04 02 05 00 0e"), "dev-info-req");
 
         // 2) INIT_SETTING - locale, roaming, current time/timezone, 24h-format.
-        //    TODO: wire roaming / is24HourFormat to real device state once a
-        //    Context is available here; false/false is a safe placeholder.
-        sendRawMessage(Fit3InitSetting.CHANNEL,
-                Fit3InitSetting.buildRequest(Locale.getDefault(), false, false),
-                "init-setting"); //required
+        sendInitSetting();
         // start configuration requests
 
 
@@ -832,6 +829,22 @@ public class SamsungDeviceSupport extends AbstractBTLESingleDeviceSupport {
         // requested here - the band pings REQUEST_DATA (0x0a MSG_ID 3) on
         // its own schedule and the reply to that (see Fit3HealthRequestData,
         // wired up in onHealthRequest) is what lets it proceed.
+    }
+
+    /**
+     * Push INIT_SETTING (locale, roaming, clock, timezone, 24-hour format). Sent
+     * once after the HELLO reply, and again whenever the clock-format preference
+     * changes - the band has no separate message for that, the format only ever
+     * travels in this one.
+     *
+     * <p>TODO: roaming is still a placeholder; it needs TelephonyManager.
+     */
+    private void sendInitSetting() {
+        boolean is24Hour = DeviceSettingsPreferenceConst.PREF_TIMEFORMAT_24H
+                .equals(getDevicePrefs().getTimeFormat());
+        sendRawMessage(Fit3InitSetting.CHANNEL,
+                Fit3InitSetting.buildRequest(Locale.getDefault(), false, is24Hour),
+                "init-setting"); //required
     }
 
     /** Binding token on 0x1a MSG_ID 2: 02 0a 01 0b 00 0c 20 <32 hex ASCII>. */
@@ -1022,6 +1035,32 @@ public class SamsungDeviceSupport extends AbstractBTLESingleDeviceSupport {
                 sendMessage(Fit3Settings.CHANNEL, Fit3Settings.mute(!enabled), "settings-mute-vibration");
                 break;
             }
+            case Fit3Settings.PREF_VIBRATION_INTENSITY: {
+                boolean strong = Fit3Settings.VIBRATION_INTENSITY_ENHANCED.equals(
+                        prefs.getString(Fit3Settings.PREF_VIBRATION_INTENSITY,
+                                Fit3Settings.VIBRATION_INTENSITY_NORMAL));
+                sendMessage(Fit3Settings.CHANNEL, Fit3Settings.vibrationIntensityStrong(strong),
+                        "settings-vibration-intensity");
+                break;
+            }
+            case Fit3Settings.PREF_KEY_VIBRATION: {
+                boolean on = prefs.getBoolean(Fit3Settings.PREF_KEY_VIBRATION, false);
+                sendMessage(Fit3Settings.CHANNEL, Fit3Settings.touchVibration(on),
+                        "settings-touch-vibration");
+                break;
+            }
+            case Fit3Settings.PREF_ALWAYS_ON_DISPLAY: {
+                boolean on = prefs.getBoolean(Fit3Settings.PREF_ALWAYS_ON_DISPLAY, false);
+                sendMessage(Fit3Settings.CHANNEL, Fit3Settings.alwaysOnDisplay(on),
+                        "settings-always-on-display");
+                break;
+            }
+            case Fit3Settings.PREF_LIFTWRIST_NOSHED: {
+                boolean on = prefs.getBoolean(Fit3Settings.PREF_LIFTWRIST_NOSHED, false);
+                sendMessage(Fit3Settings.CHANNEL, Fit3Settings.raiseWristWake(on),
+                        "settings-raise-wrist-wake");
+                break;
+            }
             case Fit3Settings.PREF_SCREEN_TIMEOUT: {
                 // ListPreference values are strings; the entries come from
                 // samsung_fit3_screen_timeout_values (seconds).
@@ -1035,6 +1074,11 @@ public class SamsungDeviceSupport extends AbstractBTLESingleDeviceSupport {
                 }
                 break;
             }
+            case DeviceSettingsPreferenceConst.PREF_TIMEFORMAT:
+                // Not a CH_SETTINGS param - the band only learns the clock
+                // format from INIT_SETTING, so re-send that whole message.
+                sendInitSetting();
+                break;
             default:
                 super.onSendConfiguration(config);
         }

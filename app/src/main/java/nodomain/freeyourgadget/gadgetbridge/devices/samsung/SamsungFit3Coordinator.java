@@ -139,6 +139,10 @@ public class SamsungFit3Coordinator extends AbstractBLEDeviceCoordinator {
     public int[] getSupportedDeviceSpecificSettings(GBDevice device) {
         return new int[]{
                 R.xml.devicesettings_samsung_fit3,
+                R.xml.devicesettings_key_vibration,
+                R.xml.devicesettings_always_on_display,
+                R.xml.devicesettings_liftwrist_display_noshed,
+                R.xml.devicesettings_timeformat,
         };
     }
 

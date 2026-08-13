@@ -15,6 +15,15 @@
         android:summary="@string/enable_vibrations_summary"
         android:title="@string/prefs_vibration_enable" />
 
+    <!-- The band knows two levels only, so the generic two-value list fits. -->
+    <ListPreference
+        android:defaultValue="normal"
+        android:entries="@array/vibration_intensity"
+        android:entryValues="@array/vibration_intensity_values"
+        android:key="vibration_intensity"
+        app:useSimpleSummaryProvider="true"
+        android:title="@string/pref_vibration_intensity" />
+
     <ListPreference
         android:defaultValue="10"
         android:entries="@array/samsung_fit3_screen_timeout"
