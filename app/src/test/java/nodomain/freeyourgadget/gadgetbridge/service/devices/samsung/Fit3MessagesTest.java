@@ -33,7 +33,9 @@ import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3FullSettings;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3HealthCapabilityCheck;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3HealthPedometerRecord;
+import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3HealthRecordType;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3HealthRequestData;
+import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3HealthSyncData;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3InitSetting;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3Settings;
 
@@ -202,6 +204,59 @@ public class Fit3MessagesTest {
             out[i] = (byte) Integer.parseInt(hex.substring(i * 2, i * 2 + 2), 16);
         }
         return out;
+    }
+
+    // ---- Record-type identification (CH_HEALTH outer marker) ----
+
+    /**
+     * The leading bytes of four real band-to-phone payloads, each a different
+     * record type. Enough of each to cover the header, the sequence number and
+     * the first record's marker plus its length prefix.
+     */
+    private static final String CAPTURED_PREFERENCES = "8203e0202795661e000010 87d3ad4401".replace(" ", "");
+    private static final String CAPTURED_WORKOUT = "8203e0a52880004117000075 3661 3463".replace(" ", "");
+    private static final String CAPTURED_PER_MINUTE = "8203e07f278b00b24f000075 3137 3833".replace(" ", "");
+    private static final String CAPTURED_HEART_RATE = "8203e00328 0a 01 29000000 0129 18b044".replace(" ", "");
+
+    @Test
+    public void everyCapturedPayloadIsIdentifiedByItsFirstMarker() {
+        assertEquals(0x95, Fit3HealthSyncData.firstRecordMarker(parseHex(CAPTURED_PREFERENCES)));
+        assertEquals(0x80, Fit3HealthSyncData.firstRecordMarker(parseHex(CAPTURED_WORKOUT)));
+        assertEquals(0x8b, Fit3HealthSyncData.firstRecordMarker(parseHex(CAPTURED_PER_MINUTE)));
+        assertEquals(0x0a, Fit3HealthSyncData.firstRecordMarker(parseHex(CAPTURED_HEART_RATE)));
+
+        assertEquals("app preferences", Fit3HealthRecordType.name(0x95));
+        assertEquals("workout", Fit3HealthRecordType.name(0x80));
+        assertEquals("per-minute activity", Fit3HealthRecordType.name(0x8b));
+        assertEquals("heart rate", Fit3HealthRecordType.name(0x0a));
+    }
+
+    @Test
+    public void aPreferencesBlobIsNotScannedForActivityRecords() {
+        // Every bulk transfer seen so far is this one record type: kilobytes of
+        // app preferences with no activity data in them at all.
+        int marker = Fit3HealthSyncData.firstRecordMarker(parseHex(CAPTURED_PREFERENCES));
+        assertEquals(Fit3HealthRecordType.MARKER_APP_PREFERENCES, marker);
+        assertFalse(Fit3HealthRecordType.carriesActivityRecords(marker));
+    }
+
+    @Test
+    public void everythingElseIsStillScanned() {
+        // Including record types with no name yet, and payloads whose framing
+        // didn't parse - skipping the scan is opt-in, never the fallback.
+        assertTrue(Fit3HealthRecordType.carriesActivityRecords(0x80));
+        assertTrue(Fit3HealthRecordType.carriesActivityRecords(0x0a));
+        assertTrue("undecoded record type", Fit3HealthRecordType.carriesActivityRecords(0x6b));
+        assertTrue("unparseable framing", Fit3HealthRecordType.carriesActivityRecords(-1));
+        assertEquals("unknown", Fit3HealthRecordType.name(0x6b));
+        assertEquals("unknown", Fit3HealthRecordType.name(-1));
+    }
+
+    @Test
+    public void aPayloadWithoutTheSequenceNumberHasNoMarker() {
+        assertEquals(-1, Fit3HealthSyncData.firstRecordMarker(parseHex("8203e02027")));  // header only
+        assertEquals(-1, Fit3HealthSyncData.firstRecordMarker(parseHex("820301202795")));  // 0xe0 missing
+        assertEquals(-1, Fit3HealthSyncData.firstRecordMarker(new byte[0]));
     }
 
     // ---- Fit3BatteryInfo (CH_SETTINGS / MSG_ID 2) ----

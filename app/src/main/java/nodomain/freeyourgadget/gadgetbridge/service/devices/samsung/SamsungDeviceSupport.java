@@ -77,6 +77,7 @@ import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3HealthDeviceInfo;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3HealthHeartRateRecord;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3HealthPedometerRecord;
+import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3HealthRecordType;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3HealthRequestData;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3HealthSyncData;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3HealthWearableMsg;
@@ -426,6 +427,9 @@ public class SamsungDeviceSupport extends AbstractBTLESingleDeviceSupport {
             return;
         }
         sendMessage(Fit3HealthSyncData.CHANNEL, ack, "health-sync-data-ack");
+        int marker = Fit3HealthSyncData.firstRecordMarker(body);
+        LOG.debug("Samsung Fit 3: SYNC_DATA push ({} bytes, first record marker 0x{} = {})",
+                body.length, Integer.toHexString(marker), Fit3HealthRecordType.name(marker));
         List<Fit3HealthPedometerRecord> records = Fit3HealthSyncData.findPedometerRecords(body);
         if (!records.isEmpty()) {
             LOG.info("Samsung Fit 3: {} pedometer record(s), first: {}", records.size(), records.get(0));
@@ -556,24 +560,34 @@ public class SamsungDeviceSupport extends AbstractBTLESingleDeviceSupport {
         if (bulkAck != null) {
             sendMessage(SapProtocol.CH_HEALTH, bulkAck, "health-bulk-ack");
         }
-        if (reassembled != null) {
-            // The reassembled blob's outer framing varies by what's inside (a
-            // large SYNC_DATA push, sleep data, ...) and isn't reliably known
-            // up front - scan the whole thing rather than assuming an offset;
-            // findAll()'s strict per-record validation (12 exact tags, no
-            // duplicates, bounds-checked) makes false positives from random
-            // byte alignment very unlikely.
-            List<Fit3HealthPedometerRecord> records = Fit3HealthPedometerRecord.findAll(reassembled, 0);
-            List<Fit3HealthHeartRateRecord.Sample> hrSamples = Fit3HealthHeartRateRecord.findAll(reassembled, 0);
-            LOG.debug("Samsung Fit 3: health sync data reassembled ({} bytes, {} pedometer record(s), {} HR sample(s))",
-                    reassembled.length, records.size(), hrSamples.size());
-            storePedometerRecords(records);
-            storeHeartRateSamples(hrSamples);
-            Fit3HealthWorkout workout = Fit3HealthWorkout.findFirst(reassembled, 0);
-            if (workout != null) {
-                LOG.info("Samsung Fit 3: {}", workout);
-                storeWorkout(workout);
-            }
+        if (reassembled == null) {
+            return;
+        }
+        // A reassembled object is an ordinary SYNC_DATA push that was too big
+        // for one message, so its first record's outer marker says what the
+        // band actually sent - worth logging, because most of what arrives
+        // here is not activity data at all (see Fit3HealthRecordType).
+        int marker = Fit3HealthSyncData.firstRecordMarker(reassembled);
+        LOG.debug("Samsung Fit 3: health sync data reassembled ({} bytes, first record marker 0x{} = {})",
+                reassembled.length, Integer.toHexString(marker), Fit3HealthRecordType.name(marker));
+        if (!Fit3HealthRecordType.carriesActivityRecords(marker)) {
+            return;
+        }
+        // Records after the first can't be located without decoding the one in
+        // front of them, so scan the whole thing rather than walking it;
+        // findAll()'s strict per-record validation (12 exact tags, no
+        // duplicates, bounds-checked) makes false positives from random byte
+        // alignment very unlikely.
+        List<Fit3HealthPedometerRecord> records = Fit3HealthPedometerRecord.findAll(reassembled, 0);
+        List<Fit3HealthHeartRateRecord.Sample> hrSamples = Fit3HealthHeartRateRecord.findAll(reassembled, 0);
+        LOG.debug("Samsung Fit 3: bulk transfer holds {} pedometer record(s), {} HR sample(s)",
+                records.size(), hrSamples.size());
+        storePedometerRecords(records);
+        storeHeartRateSamples(hrSamples);
+        Fit3HealthWorkout workout = Fit3HealthWorkout.findFirst(reassembled, 0);
+        if (workout != null) {
+            LOG.info("Samsung Fit 3: {}", workout);
+            storeWorkout(workout);
         }
     }
 

@@ -46,6 +46,10 @@ import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.SapProtocol;
  *   request (band -&gt; phone): 82 [count:1] e0 [SEQUENCE_NUMBER:2 LE] ...one or more records...
  *   response (phone -&gt; band): 42 01 e0 [SEQUENCE_NUMBER, echoed]
  * </pre>
+ *
+ * <p>A reassembled {@link Fit3HealthSync} bulk object has this same request
+ * shape - the chunking is just how an oversized one of these gets across -
+ * so {@link #firstRecordMarker} works on either.
  */
 public final class Fit3HealthSyncData {
 
@@ -70,6 +74,26 @@ public final class Fit3HealthSyncData {
                 request[3],
                 request[4],
         };
+    }
+
+    /**
+     * The outer marker byte of the first record in this push - what the
+     * payload is, before trying to parse any of it. See
+     * {@link Fit3HealthRecordType}.
+     *
+     * <p>Only the first record's marker: a push may carry several records
+     * back to back, and the ones after it can't be located without decoding
+     * the record in front (widths are schema-defined per type, not on the
+     * wire). It is still the useful one - it identifies what the band decided
+     * to send.
+     *
+     * @return the marker, or {@code -1} if this isn't a well-formed push.
+     */
+    public static int firstRecordMarker(byte[] request) {
+        if (request.length <= RECORDS_START || (request[2] & 0xFF) != PARAM_SEQUENCE_NUMBER) {
+            return -1;
+        }
+        return request[RECORDS_START] & 0xFF;
     }
 
     /** @return every pedometer record in this push (usually one, but the same list format as bulk blobs). */
