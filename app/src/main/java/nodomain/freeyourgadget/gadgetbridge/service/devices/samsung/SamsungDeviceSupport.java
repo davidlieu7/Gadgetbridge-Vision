@@ -78,10 +78,12 @@ import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3FullSettings;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3HealthCapabilityCheck;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3HealthDeviceInfo;
+import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3HealthDeviceInfoRecord;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3HealthHeartRateRecord;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3HealthPedometerRecord;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3HealthRecordType;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3HealthRequestData;
+import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3HealthSleepRecord;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3HealthSyncData;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3HealthUserProfile;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3HealthWearableMsg;
@@ -107,6 +109,22 @@ public class SamsungDeviceSupport extends AbstractBTLESingleDeviceSupport {
     private final Fit3HealthSync healthSync = new Fit3HealthSync();
     /** Phone-side SEQUENCE_NUMBER counter for health-channel requests we originate (see Fit3HealthRequestData#buildRequest). */
     private int healthRequestSequence = 1;
+    /**
+     * The sync watermark this connection claims to the band, in seconds since
+     * the health channel's 1990 epoch: everything up to here has been
+     * consumed, don't send it again. Every ack on {@code CH_HEALTH} carries it
+     * (see {@link Fit3HealthDeviceInfoRecord}); without it the band re-sends
+     * the same object a few times and then stops syncing for the rest of the
+     * connection.
+     *
+     * <p>Advanced to the band's own clock, taken from the device-info record
+     * it appends to each message, once that message has been handled - so it
+     * only moves past data we have actually seen, and only ever forwards.
+     * Starts at 0 ("send me everything"): the band re-offers what we already
+     * have on a fresh connection, which is cheap and self-correcting, since
+     * samples are keyed by timestamp and a re-insert just overwrites.
+     */
+    private int healthSyncWatermark;
     /** Whether this connection has already pushed the user profile (see {@link #sendUserProfile}). */
     private boolean userProfileSent;
 
@@ -210,6 +228,7 @@ public class SamsungDeviceSupport extends AbstractBTLESingleDeviceSupport {
             // anything go out through performInitialized().
             gbDevice.setUpdateState(GBDevice.State.INITIALIZED, getContext());
             userProfileSent = false;
+            healthSyncWatermark = 0;
             sendPostHelloInit();
         }
     });
@@ -316,6 +335,8 @@ public class SamsungDeviceSupport extends AbstractBTLESingleDeviceSupport {
                         // sequence number. Nothing to do with it - the ack is
                         // only useful as evidence the push landed.
                         LOG.debug("Samsung Fit 3: band acked our health push ({} bytes)", body.length);
+                    } else if (msgId == Fit3HealthRequestData.MSG_ID) {
+                        logBandSyncState(body);
                     } else {
                         LOG.debug("band response ch=0x0a msgId={} unhandled", msgId);
                     }
@@ -394,7 +415,11 @@ public class SamsungDeviceSupport extends AbstractBTLESingleDeviceSupport {
             return;
         }
         if (msgId == Fit3HealthRequestData.MSG_ID) {
-            byte[] response = Fit3HealthRequestData.buildResponse(body);
+            // The ping carries nothing to store, so the watermark can be
+            // advanced before replying - the band's copy of it is what tells
+            // it where to resume.
+            advanceHealthSyncWatermark(body);
+            byte[] response = Fit3HealthRequestData.buildResponse(body, healthSyncWatermark);
             if (response == null) {
                 LOG.warn("Samsung Fit 3: REQUEST_DATA body too short to echo");
                 return;
@@ -442,35 +467,110 @@ public class SamsungDeviceSupport extends AbstractBTLESingleDeviceSupport {
     }
 
     /**
-     * Ack the band's SYNC_DATA push (see {@link Fit3HealthSyncData}) so it
-     * doesn't stall/retry, and persist any pedometer record found in it (see
-     * {@link Fit3HealthPedometerRecord}) via {@link SamsungSampleProvider}.
+     * Handle the band's SYNC_DATA push (see {@link Fit3HealthSyncData}):
+     * persist whatever records it carries, then ack it with an advanced sync
+     * watermark so the band moves on instead of re-sending it.
      */
     private void handleHealthSyncData(byte[] body) {
-        byte[] ack = Fit3HealthSyncData.buildAck(body);
+        processHealthRecords(body, "SYNC_DATA push");
+        advanceHealthSyncWatermark(body);
+        byte[] ack = Fit3HealthSyncData.buildAck(body, healthSyncWatermark);
         if (ack == null) {
             LOG.warn("Samsung Fit 3: SYNC_DATA body missing expected sequence number");
             return;
         }
         sendMessage(Fit3HealthSyncData.CHANNEL, ack, "health-sync-data-ack");
-        int marker = Fit3HealthSyncData.firstRecordMarker(body);
-        LOG.debug("Samsung Fit 3: SYNC_DATA push ({} bytes, first record marker 0x{} = {})",
-                body.length, Integer.toHexString(marker), Fit3HealthRecordType.name(marker));
-        List<Fit3HealthPedometerRecord> records = Fit3HealthSyncData.findPedometerRecords(body);
+    }
+
+    /**
+     * Persist every record type we can decode out of one SYNC_DATA payload.
+     * Shared by the direct-push and bulk-transfer paths: a reassembled bulk
+     * object is byte-for-byte an oversized push, same header and all.
+     */
+    private void processHealthRecords(byte[] payload, String what) {
+        int marker = Fit3HealthSyncData.firstRecordMarker(payload);
+        LOG.debug("Samsung Fit 3: {} ({} bytes, first record marker 0x{} = {})",
+                what, payload.length, Integer.toHexString(marker), Fit3HealthRecordType.name(marker));
+        if (!Fit3HealthRecordType.carriesActivityRecords(marker)) {
+            return;
+        }
+        List<Fit3HealthPedometerRecord> records = Fit3HealthSyncData.findPedometerRecords(payload);
         if (!records.isEmpty()) {
             LOG.info("Samsung Fit 3: {} pedometer record(s), first: {}", records.size(), records.get(0));
             storePedometerRecords(records);
         }
-        List<Fit3HealthHeartRateRecord.Sample> hrSamples = Fit3HealthSyncData.findHeartRateSamples(body);
+        List<Fit3HealthHeartRateRecord.Sample> hrSamples = Fit3HealthSyncData.findHeartRateSamples(payload);
         if (!hrSamples.isEmpty()) {
             LOG.info("Samsung Fit 3: {} heart-rate sample(s), first: {}", hrSamples.size(), hrSamples.get(0));
             storeHeartRateSamples(hrSamples);
         }
-        Fit3HealthWorkout workout = Fit3HealthWorkout.findFirst(body, 0);
+        List<Fit3HealthSleepRecord.Session> sleep = Fit3HealthSyncData.findSleepSessions(payload);
+        if (!sleep.isEmpty()) {
+            LOG.info("Samsung Fit 3: {} sleep session(s), first: {}", sleep.size(), sleep.get(0));
+            storeSleepSessions(sleep);
+        }
+        Fit3HealthWorkout workout = Fit3HealthWorkout.findFirst(payload, 0);
         if (workout != null) {
             LOG.info("Samsung Fit 3: {}", workout);
             storeWorkout(workout);
         }
+    }
+
+    /**
+     * Move the sync watermark up to the band's own clock as reported by the
+     * device-info record trailing the message we just handled. Monotonic: a
+     * message without a usable record, or one reporting a time we are already
+     * past, leaves it alone.
+     */
+    private void advanceHealthSyncWatermark(byte[] payload) {
+        int bandTime = Fit3HealthDeviceInfoRecord.findTrailingBandTime(payload);
+        if (bandTime > healthSyncWatermark) {
+            healthSyncWatermark = bandTime;
+        }
+    }
+
+    /**
+     * Log where the band thinks this sync stands, from its {@code REQUEST_DATA}
+     * response - the one message that needs no reply from us, so its only value
+     * is diagnostic.
+     *
+     * <p>The interesting field is the band's {@code last_sync_time}: it is the
+     * watermark it has recorded for the phone, so seeing it keep up with
+     * {@link #healthSyncWatermark} is the direct confirmation that our acks are
+     * being accepted.
+     *
+     * <p>Only a band that has fallen <em>behind</em> is worth raising: that is
+     * the state in which it starts re-sending objects it thinks we never took.
+     * The band running a second or two ahead is the normal case, not a
+     * discrepancy - it records the time it handled the exchange, whereas our
+     * watermark is the timestamp of the last object we consumed, so the two
+     * are never expected to be equal.
+     */
+    private void logBandSyncState(byte[] body) {
+        int bandsViewOfUs = Fit3HealthDeviceInfoRecord.findTrailingLastSync(body);
+        int bandClock = Fit3HealthDeviceInfoRecord.findTrailingBandTime(body);
+        if (bandsViewOfUs < 0) {
+            LOG.debug("Samsung Fit 3: REQUEST_DATA response carries no device-info record");
+        } else if (bandsViewOfUs == 0) {
+            LOG.warn("Samsung Fit 3: band has no record of our sync state - acks aren't landing,"
+                    + " expect it to re-send and then stall (we claim {})", toUnixTime(healthSyncWatermark));
+        } else if (bandsViewOfUs < healthSyncWatermark) {
+            LOG.info("Samsung Fit 3: band has us synced only to {}, behind our {} - it may re-send"
+                    + " (band clock {})", toUnixTime(bandsViewOfUs), toUnixTime(healthSyncWatermark),
+                    toUnixTime(bandClock));
+        } else {
+            LOG.debug("Samsung Fit 3: band has us synced to {}, we claim {} (band clock {})",
+                    toUnixTime(bandsViewOfUs), toUnixTime(healthSyncWatermark), toUnixTime(bandClock));
+        }
+    }
+
+    /** Render a health-channel 1990-epoch timestamp as a readable instant. */
+    private static String toUnixTime(int seconds1990) {
+        if (seconds1990 <= 0) {
+            return "never";
+        }
+        return new Date((seconds1990 + Fit3HealthPedometerRecord.EPOCH_1990_OFFSET_SECONDS) * 1000L)
+                .toString();
     }
 
     private void storePedometerRecords(List<Fit3HealthPedometerRecord> records) {
@@ -569,11 +669,117 @@ public class SamsungDeviceSupport extends AbstractBTLESingleDeviceSupport {
     }
 
     /**
+     * Persist sleep sessions (see {@link Fit3HealthSleepRecord}) twice over,
+     * because Gadgetbridge reads sleep from two unrelated places.
+     *
+     * <p>The <b>summary</b> ({@link BaseActivitySummary}, kind
+     * {@link ActivityKind#SLEEP_ANY}) is the faithful record: a start, an end
+     * and a duration, which is genuinely all the band sends. The stage
+     * breakdown is scored on the phone by the vendor app from a raw per-minute
+     * record we can't interpret, so there is no hypnogram to store.
+     *
+     * <p>The <b>per-minute samples</b> exist only to drive the UI.
+     * {@link nodomain.freeyourgadget.gadgetbridge.activities.charts.SleepAnalysis}
+     * and {@link nodomain.freeyourgadget.gadgetbridge.model.DailyTotals} both
+     * reconstruct sleep by summing minute samples whose kind is one of the four
+     * stages, and neither counts {@code SLEEP_ANY} - so without these the sleep
+     * chart and the daily total read zero. They are written as
+     * {@link ActivityKind#LIGHT_SLEEP}, the conventional bucket for a device
+     * that reports no staging; read it as "asleep", not as a claim that the
+     * sleep was light. Anything derived from the split between stages is
+     * therefore meaningless for this device - only the total is real, and the
+     * summary is where that total is recorded honestly.
+     *
+     * <p>The minute rows are merged into existing ones rather than inserted,
+     * for the same reason {@link #storeHeartRateSamples} does it: a session
+     * overlaps minutes that may already carry heart rate, and
+     * {@code insertOrReplace} rewrites the whole row.
+     */
+    private void storeSleepSessions(List<Fit3HealthSleepRecord.Session> sessions) {
+        if (sessions.isEmpty()) {
+            return;
+        }
+        try (DBHandler dbHandler = GBApplication.acquireDB()) {
+            DaoSession session = dbHandler.getDaoSession();
+            SamsungSampleProvider provider = new SamsungSampleProvider(getDevice(), session);
+            long deviceId = DBHelper.getDevice(getDevice(), session).getId();
+            long userId = DBHelper.getUser(session).getId();
+
+            for (Fit3HealthSleepRecord.Session s : sessions) {
+                BaseActivitySummary summary = new BaseActivitySummary();
+                summary.setDeviceId(deviceId);
+                summary.setUserId(userId);
+                summary.setName(ActivityKind.SLEEP_ANY.getLabel(getContext()));
+                summary.setStartTime(new Date(s.startTime * 1000L));
+                summary.setEndTime(new Date(s.endTime * 1000L));
+                summary.setActivityKind(ActivityKind.SLEEP_ANY.getCode());
+                ActivitySummaryData data = new ActivitySummaryData();
+                data.add(ActivitySummaryEntries.ACTIVE_SECONDS, s.durationSeconds(),
+                        ActivitySummaryEntries.UNIT_SECONDS);
+                summary.setSummaryData(data.toString());
+                // De-dupe on (device, start), as storeWorkout does: the band
+                // re-sends the same session on later syncs, and it grows as the
+                // night goes on, so the newest copy must replace the older one.
+                List<BaseActivitySummary> existing = session.getBaseActivitySummaryDao().queryBuilder()
+                        .where(BaseActivitySummaryDao.Properties.DeviceId.eq(deviceId),
+                                BaseActivitySummaryDao.Properties.StartTime.eq(summary.getStartTime()))
+                        .list();
+                if (!existing.isEmpty()) {
+                    summary.setId(existing.get(0).getId());
+                }
+                session.getBaseActivitySummaryDao().insertOrReplace(summary);
+            }
+
+            int minTs = Integer.MAX_VALUE;
+            int maxTs = Integer.MIN_VALUE;
+            for (Fit3HealthSleepRecord.Session s : sessions) {
+                minTs = Math.min(minTs, s.startTime);
+                maxTs = Math.max(maxTs, s.endTime);
+            }
+            Map<Integer, SamsungFit3ActivitySample> existingSamples = new HashMap<>();
+            for (SamsungFit3ActivitySample sample : session.getSamsungFit3ActivitySampleDao().queryBuilder()
+                    .where(SamsungFit3ActivitySampleDao.Properties.DeviceId.eq(deviceId),
+                            SamsungFit3ActivitySampleDao.Properties.Timestamp.ge(minTs),
+                            SamsungFit3ActivitySampleDao.Properties.Timestamp.le(maxTs))
+                    .list()) {
+                existingSamples.put(sample.getTimestamp(), sample);
+            }
+
+            Map<Integer, SamsungFit3ActivitySample> samples = new HashMap<>();
+            for (Fit3HealthSleepRecord.Session s : sessions) {
+                for (int ts = s.startTime; ts < s.endTime; ts += 60) {
+                    SamsungFit3ActivitySample sample = existingSamples.get(ts);
+                    if (sample == null) {
+                        sample = provider.createActivitySample();
+                        sample.setTimestamp(ts);
+                        sample.setDeviceId(deviceId);
+                        sample.setUserId(userId);
+                        sample.setSteps(ActivitySample.NOT_MEASURED);
+                        sample.setHeartRate(ActivitySample.NOT_MEASURED);
+                        sample.setActiveCalories(ActivitySample.NOT_MEASURED);
+                        sample.setDistanceCm(ActivitySample.NOT_MEASURED);
+                    }
+                    sample.setRawKind(ActivityKind.LIGHT_SLEEP.getCode());
+                    samples.put(ts, sample);
+                }
+            }
+            provider.addGBActivitySamples(new ArrayList<>(samples.values()));
+        } catch (Exception e) {
+            LOG.error("Samsung Fit 3: failed to store sleep session(s)", e);
+            return;
+        }
+        GB.signalActivityDataFinish(getDevice());
+    }
+
+    /**
      * Collect the band's channel-0x0a bulk-transfer chunks (see {@link
-     * Fit3HealthSync}), ack the object once its last chunk is in, and once it
-     * is reassembled, persist any pedometer records found in it (a reassembled
-     * blob is dominated by other, undecoded record types - e.g. workout
-     * interval samples - so most of it is still just logged by length).
+     * Fit3HealthSync}), ack the object once its last chunk is in, and handle
+     * the reassembled object exactly like a direct SYNC_DATA push - which is
+     * what it is, just too big to have fitted in one message.
+     *
+     * <p>That includes the message-level ack. The bulk ack only covers the
+     * transport: without the SYNC_DATA ack on top, the band treats the whole
+     * object as undelivered and re-sends it.
      */
     private void handleHealthBulkChunk(byte[] body) {
         Fit3HealthSync.Chunk chunk = Fit3HealthSync.parseChunk(body);
@@ -589,32 +795,14 @@ public class SamsungDeviceSupport extends AbstractBTLESingleDeviceSupport {
         if (reassembled == null) {
             return;
         }
-        // A reassembled object is an ordinary SYNC_DATA push that was too big
-        // for one message, so its first record's outer marker says what the
-        // band actually sent - worth logging, because most of what arrives
-        // here is not activity data at all (see Fit3HealthRecordType).
-        int marker = Fit3HealthSyncData.firstRecordMarker(reassembled);
-        LOG.debug("Samsung Fit 3: health sync data reassembled ({} bytes, first record marker 0x{} = {})",
-                reassembled.length, Integer.toHexString(marker), Fit3HealthRecordType.name(marker));
-        if (!Fit3HealthRecordType.carriesActivityRecords(marker)) {
+        processHealthRecords(reassembled, "health sync data reassembled");
+        advanceHealthSyncWatermark(reassembled);
+        byte[] ack = Fit3HealthSyncData.buildAck(reassembled, healthSyncWatermark);
+        if (ack == null) {
+            LOG.warn("Samsung Fit 3: reassembled bulk object missing expected sequence number");
             return;
         }
-        // Records after the first can't be located without decoding the one in
-        // front of them, so scan the whole thing rather than walking it;
-        // findAll()'s strict per-record validation (12 exact tags, no
-        // duplicates, bounds-checked) makes false positives from random byte
-        // alignment very unlikely.
-        List<Fit3HealthPedometerRecord> records = Fit3HealthPedometerRecord.findAll(reassembled, 0);
-        List<Fit3HealthHeartRateRecord.Sample> hrSamples = Fit3HealthHeartRateRecord.findAll(reassembled, 0);
-        LOG.debug("Samsung Fit 3: bulk transfer holds {} pedometer record(s), {} HR sample(s)",
-                records.size(), hrSamples.size());
-        storePedometerRecords(records);
-        storeHeartRateSamples(hrSamples);
-        Fit3HealthWorkout workout = Fit3HealthWorkout.findFirst(reassembled, 0);
-        if (workout != null) {
-            LOG.info("Samsung Fit 3: {}", workout);
-            storeWorkout(workout);
-        }
+        sendMessage(Fit3HealthSyncData.CHANNEL, ack, "health-sync-data-ack");
     }
 
     /**
@@ -977,11 +1165,25 @@ public class SamsungDeviceSupport extends AbstractBTLESingleDeviceSupport {
      * the dashboard sync button). The band otherwise only pushes health
      * data on its own schedule (see {@link #handleHealthSyncData}); this
      * pings it to start a cycle now instead of waiting.
+     *
+     * <p>Asks from what the database actually holds, not from
+     * {@link #healthSyncWatermark} - the point of the manual trigger is "send
+     * me anything I'm missing", whereas the watermark is a per-connection
+     * flow-control value that also covers record types we receive but can't
+     * decode. The band answering with nothing but a device-info record means
+     * it has nothing outstanding, which is a normal outcome and matches what
+     * the vendor app gets for the same request.
+     *
+     * <p>Note the request carries a single {@code last_sync_time} covering
+     * every data type at once (see {@link #getLastSyncedTimestamp}), so it can
+     * only ever be as recent as the least-recently-synced type.
      */
     @Override
     public void onFetchRecordedData(int dataTypes) {
+        int since = getLastSyncedTimestamp();
+        LOG.debug("Samsung Fit 3: manual sync, asking for everything after {}", toUnixTime(since));
         sendMessage(Fit3HealthRequestData.CHANNEL,
-                Fit3HealthRequestData.buildRequest(healthRequestSequence++, getLastSyncedTimestamp()),
+                Fit3HealthRequestData.buildRequest(healthRequestSequence++, since),
                 "health-request-data-trigger");
     }
 
@@ -1012,17 +1214,37 @@ public class SamsungDeviceSupport extends AbstractBTLESingleDeviceSupport {
     }
 
     /**
-     * Newest stored sample's timestamp, converted to the health channel's
-     * 1990 epoch - so a fetch can ask the band only for what's missing.
-     * 0 (= "send everything") if nothing is stored yet or the DB is
+     * Newest stored sample <em>that carries steps</em>, converted to the health
+     * channel's 1990 epoch - so a fetch can ask the band only for what's
+     * missing. 0 (= "send everything") if nothing is stored yet or the DB is
      * unavailable.
+     *
+     * <p>Deliberately not the newest sample of any kind. The request has room
+     * for exactly one {@code last_sync_time} covering every data type, so
+     * claiming the newest row in the table makes the phone assert it has step
+     * data it never received: heart rate is stored per minute and sleep fills
+     * every minute of a session, so either can easily sit hours ahead of the
+     * last step record, and the band then correctly withholds the steps in
+     * between. Seen live - the phone claimed 11:30 off a non-step row while
+     * its newest step record was 10:57, and the ~57 steps the band had in that
+     * window were never sent, on three consecutive manual syncs.
+     *
+     * <p>Steps are the type to key on because they are the one users check,
+     * and because over-requesting the others is free: samples are keyed by
+     * timestamp, so a re-sent heart-rate or sleep record just overwrites.
      */
     private int getLastSyncedTimestamp() {
         try (DBHandler dbHandler = GBApplication.acquireDB()) {
-            SamsungSampleProvider provider = new SamsungSampleProvider(getDevice(), dbHandler.getDaoSession());
-            SamsungFit3ActivitySample latest = provider.getLatestActivitySample();
-            if (latest != null) {
-                return Math.max(0, latest.getTimestamp() - Fit3HealthPedometerRecord.EPOCH_1990_OFFSET_SECONDS);
+            DaoSession session = dbHandler.getDaoSession();
+            long deviceId = DBHelper.getDevice(getDevice(), session).getId();
+            List<SamsungFit3ActivitySample> latest = session.getSamsungFit3ActivitySampleDao().queryBuilder()
+                    .where(SamsungFit3ActivitySampleDao.Properties.DeviceId.eq(deviceId),
+                            SamsungFit3ActivitySampleDao.Properties.Steps.gt(0))
+                    .orderDesc(SamsungFit3ActivitySampleDao.Properties.Timestamp)
+                    .limit(1)
+                    .list();
+            if (!latest.isEmpty()) {
+                return Math.max(0, latest.get(0).getTimestamp() - Fit3HealthPedometerRecord.EPOCH_1990_OFFSET_SECONDS);
             }
         } catch (Exception e) {
             LOG.warn("Samsung Fit 3: couldn't look up last synced sample, requesting everything", e);

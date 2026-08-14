@@ -35,17 +35,21 @@ import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.SapProtocol;
  * "feature data type" records - {@link Fit3HealthPedometerRecord} (marker {@code 0x07}) and
  * {@link Fit3HealthHeartRateRecord} (marker {@code 0x0a}) are decoded here.
  *
- * <p>The real app's ack also carries a large additional block after the
- * echoed sequence number (a recurring status/timestamp bundle seen
- * attached to several unrelated exchanges in captures, not specific to this
- * one) - omitted here since it appears to just be incidentally-bundled
- * chatter, not something this specific exchange depends on; unconfirmed
- * whether the band minds its absence.
+ * <p>Echoing the sequence number is necessary but not sufficient: the ack
+ * must also carry the phone's sync watermark, as a
+ * {@link Fit3HealthDeviceInfoRecord}. Without it the band treats the push as
+ * undelivered and re-sends the identical object every couple of minutes until
+ * it gives up and stops syncing for the rest of the connection - the reason a
+ * reconnect used to be the only way to get fresh data. The three-parameter
+ * shape below is byte-for-byte what the vendor app sends.
  *
  * <pre>
  *   request (band -&gt; phone): 82 [count:1] e0 [SEQUENCE_NUMBER:2 LE] ...one or more records...
- *   response (phone -&gt; band): 42 01 e0 [SEQUENCE_NUMBER, echoed]
+ *   response (phone -&gt; band): 42 03 e0 [SEQUENCE_NUMBER, echoed] 04 02 01 01 [device-info record]
  * </pre>
+ *
+ * <p>The {@code 04 02 01 01} parameter in the middle is a constant in every
+ * captured ack and is not decoded further.
  *
  * <p>A reassembled {@link Fit3HealthSync} bulk object has this same request
  * shape - the chunking is just how an oversized one of these gets across -
@@ -62,18 +66,31 @@ public final class Fit3HealthSyncData {
     private Fit3HealthSyncData() {
     }
 
-    /** @return the ack to send back, or {@code null} if the expected sequence-number param wasn't found. */
-    public static byte[] buildAck(byte[] request) {
+    /**
+     * @param lastSyncTime the phone's watermark to claim - seconds since the
+     *     1990 epoch of the newest data it has consumed. Passing the band's
+     *     own clock (see {@link Fit3HealthDeviceInfoRecord#findTrailingBandTime})
+     *     after handling the push is what stops it being re-sent.
+     * @return the ack to send back, or {@code null} if the expected
+     *     sequence-number param wasn't found.
+     */
+    public static byte[] buildAck(byte[] request, int lastSyncTime) {
         if (request.length < RECORDS_START || (request[2] & 0xFF) != PARAM_SEQUENCE_NUMBER) {
             return null;
         }
-        return new byte[]{
-                (byte) RES_HEADER,
-                1, // param count
-                (byte) PARAM_SEQUENCE_NUMBER,
-                request[3],
-                request[4],
-        };
+        byte[] deviceInfo = Fit3HealthDeviceInfoRecord.build(lastSyncTime, 0, 0);
+        byte[] ack = new byte[9 + deviceInfo.length];
+        ack[0] = (byte) RES_HEADER;
+        ack[1] = 3; // param count: sequence number, the constant below, device info
+        ack[2] = (byte) PARAM_SEQUENCE_NUMBER;
+        ack[3] = request[3];
+        ack[4] = request[4];
+        ack[5] = 0x04;
+        ack[6] = 0x02;
+        ack[7] = 0x01;
+        ack[8] = 0x01;
+        System.arraycopy(deviceInfo, 0, ack, 9, deviceInfo.length);
+        return ack;
     }
 
     /**
@@ -110,5 +127,13 @@ public final class Fit3HealthSyncData {
             return Collections.emptyList();
         }
         return Fit3HealthHeartRateRecord.findAll(request, RECORDS_START);
+    }
+
+    /** @return every sleep session in this push (see {@link Fit3HealthSleepRecord}). */
+    public static List<Fit3HealthSleepRecord.Session> findSleepSessions(byte[] request) {
+        if (request.length <= RECORDS_START) {
+            return Collections.emptyList();
+        }
+        return Fit3HealthSleepRecord.findAll(request, RECORDS_START);
     }
 }

@@ -35,9 +35,12 @@ import nodomain.freeyourgadget.gadgetbridge.model.ActivityUser;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3BatteryInfo;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3FullSettings;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3HealthCapabilityCheck;
+import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3HealthDeviceInfoRecord;
+import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3HealthHeartRateRecord;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3HealthPedometerRecord;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3HealthRecordType;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3HealthRequestData;
+import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3HealthSleepRecord;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3HealthSyncData;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3HealthUserProfile;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3InitSetting;
@@ -391,20 +394,156 @@ public class Fit3MessagesTest {
     // ---- Fit3HealthRequestData (CH_HEALTH / MSG_ID 3) ----
 
     @Test
-    public void requestDataReplyEchoesTheSequenceSpan() {
-        byte[] request = new byte[]{0x03, (byte) 0xe0, 0x11, 0x22, 0x33, 0x44, 0x01, 0x02};
-        byte[] reply = Fit3HealthRequestData.buildResponse(request);
+    public void requestDataReplyEchoesTheSequenceAndClaimsTheWatermark() {
+        // Shape taken from a vendor capture's reply, which is what the band
+        // wants: sequence number, a constant, then the phone's device-info
+        // record carrying last_sync_time. A reply without that record leaves
+        // the band's watermark stuck and it re-sends everything.
+        byte[] request = parseHex("03e0772704020101" + BAND_DEVICE_INFO_RECORD);
+        byte[] reply = Fit3HealthRequestData.buildResponse(request, 0x01020304);
         assertNotNull(reply);
-        assertArrayEquals(new byte[]{
-                0x43, 0x02,
-                (byte) 0xe0, 0x11, 0x22, 0x33, 0x44,
-                0x01, 0x05,
-        }, reply);
+        assertArrayEquals(parseHex("43e0772704020101"
+                + "0519" + "0100" + "020000" + "030433"
+                + "0404030201" + "0500000000" + "0600000000" + "0701"), reply);
     }
 
     @Test
     public void requestDataReplyNeedsAFullSequenceSpan() {
-        assertNull(Fit3HealthRequestData.buildResponse(new byte[]{0x03, (byte) 0xe0, 0x11}));
+        assertNull(Fit3HealthRequestData.buildResponse(new byte[]{0x03, (byte) 0xe0}, 0));
+    }
+
+    // ---- Fit3HealthDeviceInfoRecord (the sync watermark) ----
+
+    /** The 27-byte record the band appends to every message it sends. */
+    private static final String BAND_DEVICE_INFO_RECORD =
+            "0519" + "0119" + "024c27" + "030503"
+                    + "04c2cbdf44" + "0539ccdf44" + "0639ccdf44" + "0701";
+
+    @Test
+    public void theTrailingDeviceInfoRecordYieldsTheBandsClock() {
+        byte[] push = parseHex("8202e05327" + BAND_DEVICE_INFO_RECORD);
+        // end_time (tag 0x06) is the band's own clock - what we claim next.
+        assertEquals(0x44dfcc39, Fit3HealthDeviceInfoRecord.findTrailingBandTime(push));
+        // last_sync_time (tag 0x04) is where the band thinks the phone is.
+        assertEquals(0x44dfcbc2, Fit3HealthDeviceInfoRecord.findTrailingLastSync(push));
+    }
+
+    @Test
+    public void aPayloadNotEndingInADeviceInfoRecordYieldsNoClock() {
+        // Must not fall back to scanning: plenty of records contain a 0x05 byte.
+        assertEquals(-1, Fit3HealthDeviceInfoRecord.findTrailingBandTime(
+                parseHex("8202e05327" + BAND_DEVICE_INFO_RECORD + "00")));
+        assertEquals(-1, Fit3HealthDeviceInfoRecord.findTrailingBandTime(parseHex("8202e05327")));
+        assertEquals(-1, Fit3HealthDeviceInfoRecord.findTrailingBandTime(new byte[0]));
+    }
+
+    @Test
+    public void syncDataAckCarriesTheSequenceAndTheWatermark() {
+        byte[] push = parseHex("8202e05327" + BAND_DEVICE_INFO_RECORD);
+        byte[] ack = Fit3HealthSyncData.buildAck(push, 0x44dfcc39);
+        assertNotNull(ack);
+        assertArrayEquals(parseHex("4203" + "e05327" + "04020101"
+                + "0519" + "0100" + "020000" + "030433"
+                + "0439ccdf44" + "0500000000" + "0600000000" + "0701"), ack);
+    }
+
+    @Test
+    public void syncDataAckNeedsTheSequenceNumber() {
+        assertNull(Fit3HealthSyncData.buildAck(parseHex("820201202795"), 0));
+    }
+
+    // ---- Fit3HealthHeartRateRecord (CH_HEALTH, outer marker 0x0a) ----
+
+    /**
+     * Two consecutive spot readings and the trailing device-info record, from
+     * a live band-to-phone push. Note the single {@code 0a} marker: the second
+     * record follows straight on, introduced only by the first's has-more flag.
+     */
+    private static final String CAPTURED_HEART_RATE_SERIES = "8203e03e27" + "0a"
+            + "01" + "29000000"
+            + "014c58df44" + "024c58df44" + "054c58df44" + "030074b701"
+            + "204a" + "214a" + "224a" + "2300" + "25204e" + "97c0860100" + "99c0860100"
+            + "00" + "29000000"
+            + "01a45adf44" + "02a45adf44" + "05a45adf44" + "030074b701"
+            + "2053" + "2153" + "2253" + "2300" + "25204e" + "97c0860100" + "99c0860100"
+            + "05190119024c27030503045acadf4405d1cadf4406d1cadf440700";
+
+    @Test
+    public void aHeartRateSeriesDecodesEveryRecordAfterTheSingleMarker() {
+        List<Fit3HealthHeartRateRecord.Sample> samples =
+                Fit3HealthSyncData.findHeartRateSamples(parseHex(CAPTURED_HEART_RATE_SERIES));
+        assertEquals(2, samples.size());
+        // 2026-08-13T16:50:20Z and ten minutes later, 74 then 83 bpm.
+        assertEquals(1786639820, samples.get(0).timestamp);
+        assertEquals(74, samples.get(0).heartRate);
+        assertEquals(1786640420, samples.get(1).timestamp);
+        assertEquals(83, samples.get(1).heartRate);
+    }
+
+    @Test
+    public void aSpotReadingUsesMinAndMaxWhenThereIsNoBinning() {
+        // Continuous measurement off: no BINNING tag, the reading is in 0x20
+        // and min/max repeat it.
+        Fit3HealthHeartRateRecord.Sample sample =
+                Fit3HealthSyncData.findHeartRateSamples(parseHex(CAPTURED_HEART_RATE_SERIES)).get(0);
+        assertEquals(74, sample.minHeartRate);
+        assertEquals(74, sample.maxHeartRate);
+    }
+
+    // ---- Fit3HealthSleepRecord (CH_HEALTH, outer marker 0x10) ----
+
+    /** One sleep session as the band pushed it, plus its device-info tail. */
+    private static final String CAPTURED_SLEEP = "8203e04427" + "10"
+            + "00" + "38000000"
+            + "75" + "313738363636333131373731393835" + "00"
+            + "05e75cdf44" + "01e75cdf44" + "024eb3df44" + "030074b701"
+            + "5000004040" + "51ff" + "5601" + "97c0860100" + "99c0860100"
+            + BAND_DEVICE_INFO_RECORD;
+
+    @Test
+    public void aSleepPushDecodesToItsSessionWindow() {
+        List<Fit3HealthSleepRecord.Session> sessions =
+                Fit3HealthSyncData.findSleepSessions(parseHex(CAPTURED_SLEEP));
+        assertEquals(1, sessions.size());
+        Fit3HealthSleepRecord.Session session = sessions.get(0);
+        assertEquals("178666311771985", session.uid);
+        assertEquals(1786640999, session.startTime);   // 2026-08-13T17:09:59Z
+        assertEquals(1786663118, session.endTime);     // 6h08m later
+        assertEquals(22119, session.durationSeconds());
+        assertEquals("no score tag in this record", -1, session.score);
+        assertEquals("result type 1: no stages", 1, session.resultType);
+    }
+
+    @Test
+    public void sleepScoreIsAOneByteFieldNotAString() {
+        // Same session with a score (0x53), REM total (0x28), one factor (0x1c)
+        // and a 16-byte combined id (0x52).
+        String body = "75" + "313738363636333131373731393835" + "00"
+                + "05e75cdf44" + "01e75cdf44" + "024eb3df44" + "030074b701"
+                + "534b" + "5604" + "2810270000" + "1c0100"
+                + "52" + "000102030405060708090a0b0c0d0e0f"
+                + "97c0860100" + "99c0860100";
+        String len = String.format("%02x000000", body.length() / 2);
+        List<Fit3HealthSleepRecord.Session> sessions = Fit3HealthSyncData.findSleepSessions(
+                parseHex("8203e04427" + "10" + "00" + len + body + BAND_DEVICE_INFO_RECORD));
+        assertEquals(1, sessions.size());
+        assertEquals(75, sessions.get(0).score);
+        assertEquals(4, sessions.get(0).resultType);
+        assertEquals("178666311771985", sessions.get(0).uid);
+    }
+
+    @Test
+    public void sleepIsIdentifiedByItsMarkerAndFoundInABulkObject() {
+        assertEquals(0x10, Fit3HealthSyncData.firstRecordMarker(parseHex(CAPTURED_SLEEP)));
+        assertEquals("sleep", Fit3HealthRecordType.name(0x10));
+    }
+
+    @Test
+    public void aStraySleepMarkerDoesNotDecodeAsASession() {
+        // The device-info record alone contains no 0x10, but a payload of
+        // arbitrary bytes must not produce phantom sessions.
+        assertTrue(Fit3HealthSyncData.findSleepSessions(
+                parseHex("8203e04427" + "10101010101010101010" + BAND_DEVICE_INFO_RECORD)).isEmpty());
     }
 
     @Test

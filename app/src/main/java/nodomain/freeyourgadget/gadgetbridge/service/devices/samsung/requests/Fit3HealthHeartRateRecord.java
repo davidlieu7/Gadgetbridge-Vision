@@ -24,11 +24,14 @@ import java.util.List;
  * {@code HEART_RATE} - one of the "feature data type" records the band embeds
  * in a {@code CH_HEALTH} (0x0a) payload, outer marker {@code 0x0a}/10.
  *
- * <p>Unlike a {@code PEDO_STEP_COUNT} record (a bare tag walk introduced by a
- * has-more flag), a heart-rate record is length-prefixed:
+ * <p>The marker byte introduces a <em>series</em>, not a single record. It
+ * appears once, and is then followed by back-to-back length-prefixed records
+ * that do not repeat it; each record's has-more flag says whether another
+ * one follows:
  *
  * <pre>
- *   [0x0a][hasMore:1][len:4 LE][ body (len bytes) ]
+ *   [0x0a] [hasMore:1][len:4 LE][ body ] [hasMore:1][len:4 LE][ body ] ...
+ *            hasMore 1 = another record follows, 0 = last one
  * </pre>
  *
  * <p>The body is an order-independent {@code [tag][value]} walk. Value widths
@@ -47,20 +50,24 @@ import java.util.List;
  * {@link Fit3HealthPedometerRecord#EPOCH_1990_OFFSET_SECONDS}), which decodes
  * captured records to exact top-of-the-hour instants.
  *
- * <p>Confidence: the wire format is matched byte-for-byte against captures
- * (heart-rate values land in a
- * physiological range and timestamps align to the minute). Confirmed
- * end-to-end against a live band: with continuous heart-rate measurement
- * enabled, real records synced through and showed up as heart-rate samples in
- * Gadgetbridge. (When the band's continuous measurement is off it sends an
- * empty heart-rate record, i.e. no binning entries - which parses to zero
- * samples, not an error.)
+ * <p>Binning is only how the band packs <em>continuous</em> measurement. With
+ * continuous measurement off it instead sends one record per spot reading -
+ * no {@code BINNING} tag at all, the value in {@code HEART_RATE} (0x20) with
+ * {@code MIN}/{@code MAX} equal to it, timestamped by {@code START_TIME}.
+ * Both shapes are handled; a record carrying binning ignores its own 0x20,
+ * which is the average over the bins and would otherwise double-count.
+ *
+ * <p>Confidence: the wire format is matched byte-for-byte against captures.
+ * Both shapes are confirmed
+ * end-to-end against a live band - continuous measurement synced through as
+ * per-minute samples, and a capture with it switched off decoded to 50 spot
+ * readings at 10-minute spacing in a physiological range (54-104 bpm).
  */
 public final class Fit3HealthHeartRateRecord {
 
     public static final int MARKER = 0x0a;
 
-    private static final int RECORD_HEADER_LEN = 6; // marker(1) + hasMore(1) + len(4)
+    private static final int RECORD_HEADER_LEN = 5; // hasMore(1) + len(4)
 
     private static final int TAG_START_TIME = 1;
     private static final int TAG_END_TIME = 2;
@@ -121,33 +128,55 @@ public final class Fit3HealthHeartRateRecord {
     }
 
     /**
-     * Parse the length-prefixed heart-rate record whose marker byte is at
-     * {@code markerOffset}.
+     * Parse the series of heart-rate records introduced by the marker byte at
+     * {@code markerOffset}, following the has-more chain to its end.
      *
-     * @return the parsed record, or {@code null} if there isn't a well-formed
-     *     one there (not every {@code 0x0a} byte is this marker - a caller
-     *     scanning a mixed stream should treat {@code null} as "keep looking").
+     * @return the series' samples and where it ends, or {@code null} if there
+     *     isn't a well-formed one there (not every {@code 0x0a} byte is this
+     *     marker - a caller scanning a mixed stream should treat {@code null}
+     *     as "keep looking").
      */
     public static Fit3HealthHeartRateRecord parse(byte[] data, int markerOffset) {
-        if (markerOffset < 0 || markerOffset + RECORD_HEADER_LEN > data.length
+        if (markerOffset < 0 || markerOffset >= data.length
                 || (data[markerOffset] & 0xFF) != MARKER) {
             return null;
         }
-        int hasMore = data[markerOffset + 1] & 0xFF;
-        if (hasMore != 0 && hasMore != 1) {
-            return null;
+        List<Sample> samples = new ArrayList<>();
+        int pos = markerOffset + 1;
+        while (true) {
+            if (pos + RECORD_HEADER_LEN > data.length) {
+                return null;
+            }
+            int hasMore = data[pos] & 0xFF;
+            if (hasMore != 0 && hasMore != 1) {
+                return null;
+            }
+            int len = readU32(data, pos + 1);
+            if (len < 2 || len > MAX_RECORD_LEN || pos + RECORD_HEADER_LEN + len > data.length) {
+                return null;
+            }
+            int bodyStart = pos + RECORD_HEADER_LEN;
+            if (!parseBody(data, bodyStart, bodyStart + len, samples)) {
+                return null;
+            }
+            pos = bodyStart + len;
+            if (hasMore == 0) {
+                return new Fit3HealthHeartRateRecord(samples, pos);
+            }
         }
-        int len = readU32(data, markerOffset + 2);
-        if (len < 2 || len > MAX_RECORD_LEN) {
-            return null;
-        }
-        int bodyStart = markerOffset + RECORD_HEADER_LEN;
-        int bodyEnd = bodyStart + len;
-        if (bodyEnd > data.length) {
-            return null;
-        }
+    }
 
+    /**
+     * Walk one record body's tags, appending whatever samples it carries.
+     *
+     * @return {@code false} if the body isn't a well-formed record, in which
+     *     case the whole series is rejected.
+     */
+    private static boolean parseBody(byte[] data, int bodyStart, int bodyEnd, List<Sample> out) {
         long startTime1990 = -1;
+        int spotHeartRate = -1;
+        int spotMin = -1;
+        int spotMax = -1;
         List<int[]> binning = new ArrayList<>();
         int pos = bodyStart;
         while (pos < bodyEnd) {
@@ -161,7 +190,7 @@ public final class Fit3HealthHeartRateRecord {
                 case TAG_CREATE_VERSION:
                 case TAG_MODIFY_VERSION:
                     if (pos + 4 > bodyEnd) {
-                        return null;
+                        return false;
                     }
                     if (tag == TAG_START_TIME) {
                         startTime1990 = readU32(data, pos) & 0xFFFFFFFFL;
@@ -173,24 +202,31 @@ public final class Fit3HealthHeartRateRecord {
                 case TAG_MAX:
                 case TAG_BEAT_COUNT:
                     if (pos + 1 > bodyEnd) {
-                        return null;
+                        return false;
+                    }
+                    if (tag == TAG_HEART_RATE) {
+                        spotHeartRate = data[pos] & 0xFF;
+                    } else if (tag == TAG_MIN) {
+                        spotMin = data[pos] & 0xFF;
+                    } else if (tag == TAG_MAX) {
+                        spotMax = data[pos] & 0xFF;
                     }
                     pos += 1;
                     break;
                 case TAG_TAG_ID:
                     if (pos + 2 > bodyEnd) {
-                        return null;
+                        return false;
                     }
                     pos += 2;
                     break;
                 case TAG_BINNING: {
                     if (pos + 4 > bodyEnd) {
-                        return null;
+                        return false;
                     }
                     int count = readU32(data, pos);
                     if (count < 0 || count > MAX_BINNING_BYTES
                             || count % BINNING_ENTRY_LEN != 0 || pos + 4 + count > bodyEnd) {
-                        return null;
+                        return false;
                     }
                     int entriesStart = pos + 4;
                     for (int e = 0; e < count / BINNING_ENTRY_LEN; e++) {
@@ -208,30 +244,40 @@ public final class Fit3HealthHeartRateRecord {
                 default:
                     // The vendor parser abandons the whole record on an unknown
                     // tag; matching that keeps a stray 0x0a from parsing.
-                    return null;
+                    return false;
             }
         }
         // The tag walk must consume the body exactly, and a real record must
         // carry a sane start time - both make a false positive vanishingly
         // unlikely without needing to know the surrounding record framing.
         if (pos != bodyEnd || startTime1990 < MIN_START_1990 || startTime1990 > MAX_START_1990) {
-            return null;
+            return false;
         }
 
-        List<Sample> samples = new ArrayList<>(binning.size());
+        int base = (int) (startTime1990 + Fit3HealthPedometerRecord.EPOCH_1990_OFFSET_SECONDS);
+        if (binning.isEmpty()) {
+            // Spot reading: one measurement, timestamped by START_TIME. Min and
+            // max are the same value in every captured spot record, but fall
+            // back to the reading itself rather than emitting a negative.
+            if (spotHeartRate >= MIN_HR && spotHeartRate <= MAX_HR) {
+                out.add(new Sample(base, spotHeartRate,
+                        spotMin >= 0 ? spotMin : spotHeartRate,
+                        spotMax >= 0 ? spotMax : spotHeartRate));
+            }
+            return true;
+        }
         for (int[] b : binning) {
             int hr = b[1];
             if (hr < MIN_HR || hr > MAX_HR) {
                 continue; // e.g. a 0 "no reading" minute
             }
-            int ts = (int) (startTime1990 + Fit3HealthPedometerRecord.EPOCH_1990_OFFSET_SECONDS + b[0] * 60L);
-            samples.add(new Sample(ts, hr, b[2], b[3]));
+            out.add(new Sample((int) (base + b[0] * 60L), hr, b[2], b[3]));
         }
-        return new Fit3HealthHeartRateRecord(samples, bodyEnd);
+        return true;
     }
 
     /**
-     * Scan {@code data} for every heart-rate record's samples from {@code
+     * Scan {@code data} for every heart-rate series' samples from {@code
      * fromOffset} onward. Scans (rather than walking the surrounding record
      * structure) because the other record types sharing the stream are mostly
      * undecoded, so the next marker's position can't be computed; {@link

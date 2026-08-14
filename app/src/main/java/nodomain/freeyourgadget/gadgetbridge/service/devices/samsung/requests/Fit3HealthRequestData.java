@@ -28,37 +28,50 @@ import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.SapProtocol;
  * action); confirmed from a live capture, replying correctly is what lets it
  * proceed to its next step - queuing or starting a bulk-transfer sync (see
  * {@code Fit3HealthSync}) rather than repeating the same ping indefinitely.
- * The reply must echo back the request's own {@code SEQUENCE_NUMBER} span
- * verbatim - the band ignores a response that doesn't. Nothing else in the
- * request is independently decoded, so this only extracts what's needed to
- * build a valid reply, not the full request shape.
+ * The reply must echo back the request's own {@code SEQUENCE_NUMBER} and,
+ * like {@link Fit3HealthSyncData}'s ack, carry the phone's sync watermark as
+ * a {@link Fit3HealthDeviceInfoRecord}; the band's own copy of the ping
+ * always leaves {@code last_sync_time} zero, so the phone's answer is the
+ * only place that value comes from.
  *
  * <pre>
- *   request  (band -&gt; phone): 03 [e0 SEQUENCE_NUMBER: 4B LE] ...more bytes, unparsed
- *   response (phone -&gt; band): 43 02 [same 5-byte e0+SEQUENCE_NUMBER span, echoed] 01 05
+ *   request  (band -&gt; phone): 03 [e0 SEQUENCE_NUMBER:2 LE] 04 02 01 01 [device-info record]
+ *   response (phone -&gt; band): 43 [e0 SEQUENCE_NUMBER, echoed] 04 02 01 01 [device-info record]
  * </pre>
+ *
+ * <p>Note the response has no parameter-count byte, unlike
+ * {@link Fit3HealthSyncData}'s - matching the captures for both.
  */
 public final class Fit3HealthRequestData {
 
     public static final int CHANNEL = SapProtocol.CH_HEALTH;
     public static final int MSG_ID = 0x03;
     private static final int RES_HEADER = 0x43;
-    private static final int ECHO_LEN = 5; // SEQUENCE_NUMBER marker (0xe0) + 4-byte value
+    private static final int ECHO_LEN = 3; // SEQUENCE_NUMBER marker (0xe0) + 2-byte value
 
     private Fit3HealthRequestData() {
     }
 
-    /** @return the reply to send back, or {@code null} if {@code request} is too short to echo. */
-    public static byte[] buildResponse(byte[] request) {
+    /**
+     * @param lastSyncTime the phone's watermark to claim - seconds since the
+     *     1990 epoch of the newest data it has consumed, or 0 for "send
+     *     everything".
+     * @return the reply to send back, or {@code null} if {@code request} is
+     *     too short to echo.
+     */
+    public static byte[] buildResponse(byte[] request, int lastSyncTime) {
         if (request.length < 1 + ECHO_LEN) {
             return null;
         }
-        byte[] response = new byte[1 + 1 + ECHO_LEN + 2];
+        byte[] deviceInfo = Fit3HealthDeviceInfoRecord.build(lastSyncTime, 0, 0);
+        byte[] response = new byte[1 + ECHO_LEN + 4 + deviceInfo.length];
         response[0] = (byte) RES_HEADER;
-        response[1] = 0x02;
-        System.arraycopy(request, 1, response, 2, ECHO_LEN);
-        response[2 + ECHO_LEN] = 0x01;
-        response[2 + ECHO_LEN + 1] = 0x05;
+        System.arraycopy(request, 1, response, 1, ECHO_LEN);
+        response[4] = 0x04;
+        response[5] = 0x02;
+        response[6] = 0x01;
+        response[7] = 0x01;
+        System.arraycopy(deviceInfo, 0, response, 8, deviceInfo.length);
         return response;
     }
 
@@ -88,19 +101,13 @@ public final class Fit3HealthRequestData {
      *     are keyed by timestamp, so re-inserts just overwrite).
      */
     public static byte[] buildRequest(int sequenceNumber, int lastSyncTime) {
-        return new byte[]{
-                (byte) MSG_ID,
-                (byte) 0xe0, (byte) (sequenceNumber & 0xFF), (byte) ((sequenceNumber >> 8) & 0xFF),
-                0x05, 0x19,             // device-info record, 25 bytes follow
-                0x01, 0x00,             // device (value ignored by the parser)
-                0x02, 0x00, 0x00,       // device type
-                0x03, 0x04, 0x33,       // version (4.51, replayed from the capture)
-                0x04,                   // last_sync_time (4-byte LE)
-                (byte) (lastSyncTime & 0xFF), (byte) ((lastSyncTime >> 8) & 0xFF),
-                (byte) ((lastSyncTime >> 16) & 0xFF), (byte) ((lastSyncTime >> 24) & 0xFF),
-                0x05, 0x00, 0x00, 0x00, 0x00, // start_time
-                0x06, 0x00, 0x00, 0x00, 0x00, // end_time
-                0x07, 0x01,             // is_last_chunk
-        };
+        byte[] deviceInfo = Fit3HealthDeviceInfoRecord.build(lastSyncTime, 0, 0);
+        byte[] request = new byte[4 + deviceInfo.length];
+        request[0] = (byte) MSG_ID;
+        request[1] = (byte) 0xe0;
+        request[2] = (byte) (sequenceNumber & 0xFF);
+        request[3] = (byte) ((sequenceNumber >> 8) & 0xFF);
+        System.arraycopy(deviceInfo, 0, request, 4, deviceInfo.length);
+        return request;
     }
 }
