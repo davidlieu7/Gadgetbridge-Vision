@@ -110,7 +110,7 @@ public class GBDaoGenerator {
             outputDir.mkdirs();
         }
 
-        final Schema schema = new Schema(159, MAIN_PACKAGE + ".entities");
+        final Schema schema = new Schema(160, MAIN_PACKAGE + ".entities");
 
         final List<Entity> sampleProvidersToGenerate = new LinkedList<>();
         final List<Entity> batterySampleProvidersToGenerate = new LinkedList<>();
@@ -252,6 +252,7 @@ public class GBDaoGenerator {
         addHuaweiTemperatureSample(schema, user, device);
         addHuaweiHrvValuesSample(schema, user, device);
         addHuaweiEmotionsSample(schema, user, device);
+        addHuaweiAltitudeSample(schema, user, device);
 
         addUltrahumanActivitySample(schema, user, device);
         sampleProvidersToGenerate.add(addUltrahumanDeviceStateSample(schema, user, device));
@@ -2455,6 +2456,14 @@ public class GBDaoGenerator {
         sample.addIntProperty("originStatus");
         sample.addDoubleProperty("arousalCharacter");
 
+        return sample;
+    }
+
+    private static Entity addHuaweiAltitudeSample(Schema schema, Entity user, Entity device) {
+        Entity sample = addEntity(schema, "HuaweiAltitudeSample");
+        addCommonTimeSampleProperties("AbstractTimeSample", sample, user, device);
+        sample.addLongProperty("lastTimestamp").notNull().index();
+        sample.addDoubleProperty("altitude").notNull();
         return sample;
     }
 
