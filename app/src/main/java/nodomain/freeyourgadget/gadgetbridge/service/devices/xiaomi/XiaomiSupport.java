@@ -141,7 +141,7 @@ public class XiaomiSupport extends AbstractBluetoothDeviceSupport {
     }
 
     private XiaomiConnectionSupport createConnectionSpecificSupport() {
-        DeviceCoordinator.ConnectionType connType = getCoordinator().getConnectionType();
+        DeviceCoordinator.ConnectionType connType = getCoordinator().getConnectionType(getDevice());
 
         if (connType == DeviceCoordinator.ConnectionType.BOTH) {
             connType = getDevicePrefs().getForcedConnectionTypeFromPrefs();

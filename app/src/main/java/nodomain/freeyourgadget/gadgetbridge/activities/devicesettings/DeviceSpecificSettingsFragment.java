@@ -1884,7 +1884,7 @@ public class DeviceSpecificSettingsFragment extends AbstractPreferenceFragment i
                     intentApiSubScreens
             );
 
-            if (coordinator.getConnectionType().usesBluetoothLE()) {
+            if (coordinator.getConnectionType(device).usesBluetoothLE()) {
                 deviceSpecificSettings.addRootScreen(
                         DeviceSpecificSettingsScreen.DEVELOPER,
                         R.xml.devicesettings_ble_api

@@ -187,6 +187,20 @@ public interface DeviceCoordinator {
     ConnectionType getConnectionType();
 
     /**
+     * Returns the type of connection for the given device, Classic or BLE.
+     * <p>
+     * Defaults to {@link #getConnectionType()}. Override when the connection type differs between
+     * models served by a single coordinator, using the manufacturer-specific data recorded on the
+     * device to tell them apart.
+     *
+     * @param device the device to return the connection type for
+     * @return ConnectionType
+     */
+    default ConnectionType getConnectionType(@NonNull final GBDevice device) {
+        return getConnectionType();
+    }
+
+    /**
      * Returns false is the Device is not connectable,
      * only scannable, like beacons
      *
