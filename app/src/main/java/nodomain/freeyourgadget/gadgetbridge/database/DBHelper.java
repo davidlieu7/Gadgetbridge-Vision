@@ -65,12 +65,14 @@ import nodomain.freeyourgadget.gadgetbridge.entities.UserDao;
 import nodomain.freeyourgadget.gadgetbridge.entities.WorldClock;
 import nodomain.freeyourgadget.gadgetbridge.entities.WorldClockDao;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
+import nodomain.freeyourgadget.gadgetbridge.impl.GBDeviceCandidate;
 import nodomain.freeyourgadget.gadgetbridge.model.ActivityUser;
 import nodomain.freeyourgadget.gadgetbridge.model.DeviceType;
 import nodomain.freeyourgadget.gadgetbridge.model.ValidByDate;
 import nodomain.freeyourgadget.gadgetbridge.util.AlarmUtils;
 import nodomain.freeyourgadget.gadgetbridge.util.DateTimeUtils;
 import nodomain.freeyourgadget.gadgetbridge.util.GBPrefs;
+import nodomain.freeyourgadget.gadgetbridge.util.StringUtils;
 
 
 /**
@@ -436,6 +438,13 @@ public class DBHelper {
             device.setManufacturer(coordinator.getManufacturer());
             device.setTypeName(gbDevice.getType().name());
             device.setModel(gbDevice.getModel());
+
+            // A GBDevice built from a BluetoothDevice has no advertisement. Keep the stored one.
+            final String manufacturerSpecificData =
+                    GBDeviceCandidate.encodeManufacturerSpecificData(gbDevice.getManufacturerSpecificData());
+            if (!StringUtils.isNullOrEmpty(manufacturerSpecificData)) {
+                device.setManufacturerSpecificData(manufacturerSpecificData);
+            }
 
             if (device.getId() == null) {
                 session.getDeviceDao().insert(device);

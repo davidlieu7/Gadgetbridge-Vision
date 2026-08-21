@@ -218,6 +218,10 @@ public abstract class AbstractDeviceCoordinator implements DeviceCoordinator {
 
         setBatteryConfigOnDevice(gbDevice);
 
+        // Set before the deviceAttributesList check. It is needed before the first handshake.
+        gbDevice.setManufacturerSpecificData(
+                GBDeviceCandidate.decodeManufacturerSpecificData(dbDevice.getManufacturerSpecificData()));
+
         List<DeviceAttributes> deviceAttributesList = dbDevice.getDeviceAttributesList();
         if (!deviceAttributesList.isEmpty()) {
             gbDevice.setModel(dbDevice.getModel());
