@@ -150,7 +150,7 @@ public class MiBandPairingActivity extends AbstractGBActivity implements Bonding
                 .setTitle(getContext().getString(R.string.discovery_pair_title, deviceCandidate.getName()))
                 .setMessage(getContext().getString(R.string.discovery_pair_question))
                 .setNegativeButton(R.string.discovery_dont_pair, (dialog, which) -> {
-                    BondingUtil.attemptToFirstConnect(getCurrentTarget().getDevice());
+                    BondingUtil.attemptToFirstConnect(getCurrentTarget());
                 })
                 .setPositiveButton(getContext().getString(R.string.discovery_yes_pair), (dialog, which) -> {
                     BondingUtil.tryBondThenComplete(thiz, deviceCandidate.getDevice());

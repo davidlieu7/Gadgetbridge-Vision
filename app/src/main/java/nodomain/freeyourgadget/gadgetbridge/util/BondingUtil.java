@@ -137,7 +137,7 @@ public class BondingUtil {
                                 } else {
                                     // Bond-then-connect flow: reconnect now that bonding is complete.
                                     LOG.info("Device bonded - reconnecting and waiting for initialization");
-                                    attemptToFirstConnect(device);
+                                    attemptToFirstConnect(bondingInterface.getCurrentTarget());
                                 }
                                 return;
                             }
@@ -145,7 +145,7 @@ public class BondingUtil {
                                 LOG.info("Not bonded with {}, attempting to connect anyway.",
                                         device.getAddress());
                                 if(bondingInterface.getAttemptToConnect())
-                                    attemptToFirstConnect(device);
+                                    attemptToFirstConnect(bondingInterface.getCurrentTarget());
                                 return;
                             }
                             case BluetoothDevice.BOND_BONDING: {
@@ -165,11 +165,13 @@ public class BondingUtil {
     }
 
     /**
-     * Connect to candidate after a certain delay
+     * Connect to candidate after a certain delay.
+     * <p>
+     * Takes the candidate so its manufacturer-specific data reaches the {@link GBDevice}.
      *
      * @param candidate the device to connect to
      */
-    public static void attemptToFirstConnect(final BluetoothDevice candidate) {
+    public static void attemptToFirstConnect(final GBDeviceCandidate candidate) {
         Looper mainLooper = Looper.getMainLooper();
         new Handler(mainLooper).postDelayed(new Runnable() {
             @Override
@@ -239,7 +241,7 @@ public class BondingUtil {
             // with an already bonded device
             if (device.getBondState() == BluetoothDevice.BOND_BONDED) {
                 LOG.warn("For some reason the device is already bonded, but let's try first connect");
-                attemptToFirstConnect(context.getCurrentTarget().getDevice());
+                attemptToFirstConnect(context.getCurrentTarget());
             } else if (device.getBondState() == BluetoothDevice.BOND_BONDING) {
                 LOG.warn("Device is still bonding after an error");
                 // TODO: Not sure we can handle this better, it's weird already.
@@ -394,7 +396,7 @@ public class BondingUtil {
                 //  but re-bond works
                 askCompanionPairing(bondingInterface, device);
             } else {
-                attemptToFirstConnect(bondingInterface.getCurrentTarget().getDevice());
+                attemptToFirstConnect(bondingInterface.getCurrentTarget());
             }
             return;
         }
@@ -405,7 +407,7 @@ public class BondingUtil {
             askCompanionPairing(bondingInterface, device);
         } else if (PebbleHardware.isBleOnly(device)) {
             // TODO: start companionDevicePairing after connecting to Pebble 2 but before writing to pairing trigger
-            attemptToFirstConnect(device);
+            attemptToFirstConnect(bondingInterface.getCurrentTarget());
         } else {
             bluetoothBond(bondingInterface, device);
         }

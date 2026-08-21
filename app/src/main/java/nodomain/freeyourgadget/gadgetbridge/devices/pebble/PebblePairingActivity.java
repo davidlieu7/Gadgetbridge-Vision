@@ -212,7 +212,7 @@ public class PebblePairingActivity extends AbstractGBActivity implements Bonding
         }
 
         if (btDevice != null && success && getAttemptToConnect() && shouldReconnectAfterBond()) {
-            BondingUtil.attemptToFirstConnect(btDevice);
+            BondingUtil.attemptToFirstConnect(deviceCandidate);
         }
         finish();
     }

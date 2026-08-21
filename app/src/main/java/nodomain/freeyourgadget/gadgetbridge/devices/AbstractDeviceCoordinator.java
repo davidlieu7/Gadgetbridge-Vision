@@ -184,6 +184,7 @@ public abstract class AbstractDeviceCoordinator implements DeviceCoordinator {
     @Override
     public GBDevice createDevice(GBDeviceCandidate candidate, DeviceType deviceType) {
         GBDevice gbDevice = new GBDevice(candidate.getDevice().getAddress(), candidate.getName(), null, null, deviceType);
+        gbDevice.setManufacturerSpecificData(candidate.getManufacturerSpecificData());
         setBatteryConfigOnDevice(gbDevice);
 
         final DevicePrefs devicePreferences = GBApplication.getDevicePrefs(gbDevice);

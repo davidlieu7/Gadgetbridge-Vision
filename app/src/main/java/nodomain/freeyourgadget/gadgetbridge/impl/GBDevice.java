@@ -24,6 +24,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.os.Parcel;
 import android.os.Parcelable;
+import android.util.SparseArray;
 
 import androidx.annotation.DrawableRes;
 import androidx.annotation.IntRange;
@@ -102,6 +103,13 @@ public class GBDevice implements Parcelable {
     private List<ItemWithDetails> mDeviceInfos;
     private HashMap<String, Object> mExtraInfos;
 
+    /**
+     * Manufacturer-specific data from the BLE advertisement that this device was discovered from.
+     * Empty for devices paired before this was persisted, and for devices that advertise none.
+     */
+    @NonNull
+    private SparseArray<byte[]> mManufacturerSpecificData = new SparseArray<>(0);
+
     private int mNotificationIconConnected = R.drawable.ic_notification;
     private int mNotificationIconDisconnected = R.drawable.ic_notification_disconnected;
     private int mNotificationIconLowBattery = R.drawable.ic_notification_low_battery;
@@ -150,6 +158,7 @@ public class GBDevice implements Parcelable {
         mNotificationIconConnected = in.readInt();
         mNotificationIconDisconnected = in.readInt();
         mNotificationIconLowBattery = in.readInt();
+        mManufacturerSpecificData = in.readSparseArray(getClass().getClassLoader());
 
         validate();
     }
@@ -179,6 +188,7 @@ public class GBDevice implements Parcelable {
         mNotificationIconConnected = device.mNotificationIconConnected;
         mNotificationIconDisconnected = device.mNotificationIconDisconnected;
         mNotificationIconLowBattery = device.mNotificationIconLowBattery;
+        mManufacturerSpecificData = device.mManufacturerSpecificData;
     }
 
     @Override
@@ -205,6 +215,7 @@ public class GBDevice implements Parcelable {
         dest.writeInt(mNotificationIconConnected);
         dest.writeInt(mNotificationIconDisconnected);
         dest.writeInt(mNotificationIconLowBattery);
+        dest.writeSparseArray(mManufacturerSpecificData);
     }
 
     private void validate() {
@@ -309,6 +320,22 @@ public class GBDevice implements Parcelable {
 
     public void setModel(String model) {
         mModel = model;
+    }
+
+    /**
+     * The manufacturer-specific data advertised by this device, keyed by vendor id.
+     *
+     * @return the advertised data, empty if none is known
+     */
+    @NonNull
+    public SparseArray<byte[]> getManufacturerSpecificData() {
+        return mManufacturerSpecificData;
+    }
+
+    public void setManufacturerSpecificData(@Nullable final SparseArray<byte[]> manufacturerSpecificData) {
+        mManufacturerSpecificData = manufacturerSpecificData != null
+                ? manufacturerSpecificData
+                : new SparseArray<>(0);
     }
 
     public boolean isConnected() {

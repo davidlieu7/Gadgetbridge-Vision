@@ -37,10 +37,12 @@ import java.util.LinkedHashSet;
 import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
+import java.util.regex.Pattern;
 
 import nodomain.freeyourgadget.gadgetbridge.GBApplication;
 import nodomain.freeyourgadget.gadgetbridge.R;
 import nodomain.freeyourgadget.gadgetbridge.util.AndroidUtils;
+import nodomain.freeyourgadget.gadgetbridge.util.GB;
 
 /**
  * A device candidate is a Bluetooth or USB device that is not yet managed by
@@ -51,10 +53,13 @@ import nodomain.freeyourgadget.gadgetbridge.util.AndroidUtils;
 public class GBDeviceCandidate implements Parcelable, Cloneable {
     private static final Logger LOG = LoggerFactory.getLogger(GBDeviceCandidate.class);
 
+    private static final String ENTRY_SEPARATOR = ",";
+    private static final String KEY_SEPARATOR = ":";
+    private static final Pattern HEX_PATTERN = Pattern.compile("[0-9A-Fa-f]*");
+
     //
     // Bluetooth
     //
-
     private BluetoothDevice device;
     private short rssi;
     private ParcelUuid[] serviceUuids;
@@ -207,6 +212,71 @@ public class GBDeviceCandidate implements Parcelable, Cloneable {
     @NonNull
     public SparseArray<byte[]> getManufacturerSpecificData() {
         return manufacturerSpecificData;
+    }
+
+    /**
+     * Encodes manufacturer-specific data for persistence, as a comma-separated list of
+     * {@code <vendorId>:<hexBytes>} entries, for example {@code 340:0201061AFF,3818:AABB}.
+     *
+     * @param data the data to encode, may be null or empty
+     * @return the encoded form, or an empty string if there is nothing to encode
+     */
+    @NonNull
+    public static String encodeManufacturerSpecificData(@Nullable final SparseArray<byte[]> data) {
+        if (data == null || data.size() == 0) {
+            return "";
+        }
+
+        final StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < data.size(); i++) {
+            final byte[] bytes = data.valueAt(i);
+            if (bytes == null) {
+                continue;
+            }
+            if (sb.length() > 0) {
+                sb.append(ENTRY_SEPARATOR);
+            }
+            sb.append(data.keyAt(i)).append(KEY_SEPARATOR).append(GB.hexdump(bytes));
+        }
+        return sb.toString();
+    }
+
+    /**
+     * Decodes manufacturer-specific data previously encoded by
+     * {@link #encodeManufacturerSpecificData(SparseArray)}. Malformed entries are skipped, so a
+     * corrupt value does not stop a device from loading.
+     *
+     * @param encoded the encoded form, may be null or empty
+     * @return the decoded data, never null
+     */
+    @NonNull
+    public static SparseArray<byte[]> decodeManufacturerSpecificData(@Nullable final String encoded) {
+        final SparseArray<byte[]> data = new SparseArray<>();
+        if (encoded == null || encoded.isEmpty()) {
+            return data;
+        }
+
+        for (final String entry : encoded.split(ENTRY_SEPARATOR)) {
+            final int separator = entry.indexOf(KEY_SEPARATOR);
+            if (separator <= 0) {
+                LOG.warn("Skipping manufacturer data entry without a vendor id: {}", entry);
+                continue;
+            }
+
+            final String hex = entry.substring(separator + 1);
+            if (hex.length() % 2 != 0 || !HEX_PATTERN.matcher(hex).matches()) {
+                LOG.warn("Skipping manufacturer data entry with malformed payload: {}", entry);
+                continue;
+            }
+
+            try {
+                data.put(Integer.parseInt(entry.substring(0, separator)), GB.hexStringToByteArray(hex));
+            } catch (final NumberFormatException e) {
+                LOG.warn("Skipping manufacturer data entry with invalid vendor id: {}", entry);
+            }
+        }
+
+        return data;
     }
 
     @NonNull
