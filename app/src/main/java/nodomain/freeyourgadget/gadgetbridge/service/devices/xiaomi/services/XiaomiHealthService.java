@@ -36,6 +36,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Set;
+import java.util.TimeZone;
 
 import nodomain.freeyourgadget.gadgetbridge.GBApplication;
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsPreferenceConst;
@@ -125,9 +126,6 @@ public class XiaomiHealthService extends AbstractXiaomiService {
     private static final int CMD_RAW_SENSOR_BATCH = 53;     // FitnessID.WEAR_SENSOR_DATA
     // Synthetic-sport id used to mark the workout as hidden / non-persistent
     private static final int SAA_SYNTHETIC_SPORT = 810;     // AstroBox SportType.MOTION_SENSING_GAME
-    // Sport-info nested message required by the band in WorkoutStatusWatch.sportInfo
-    // for the SaA synthetic workout (wire bytes: 0x08 0x10).
-    private static final int SAA_SPORT_INFO_TYPE = 16;      // AstroBox SportType.HIGH_INTERVAL_TRAINING
     // The band blanks its workout screen unless the phone keeps pushing stats at this rate.
     private static final long WORKOUT_STATS_INTERVAL_MS = 1_000L;
     // Reported to the band until a real reading arrives.
@@ -1152,7 +1150,9 @@ public class XiaomiHealthService extends AbstractXiaomiService {
     }
 
     private void sendWorkoutStatus(final int status) {
-        final int ts = (int) (System.currentTimeMillis() / 1000);
+        final long now = System.currentTimeMillis();
+        final int ts = (int) (now / 1000);
+        final int tzOffsetQuarterHours = TimeZone.getDefault().getOffset(now) / 60000 / 15;
         getSupport().sendCommand(
                 "saa workout status " + status,
                 XiaomiProto.Command.newBuilder()
@@ -1162,7 +1162,7 @@ public class XiaomiHealthService extends AbstractXiaomiService {
                                 WorkoutStatusWatch.newBuilder()
                                         .setTimestamp(ts)
                                         .setSportInfo(WorkoutStatusWatchSport.newBuilder()
-                                                .setType(SAA_SPORT_INFO_TYPE))
+                                                .setTzOffsetQuarterHours(tzOffsetQuarterHours))
                                         .setSport(SAA_SYNTHETIC_SPORT)
                                         .setStatus(status)
                                         .setSupportedVersions(3)

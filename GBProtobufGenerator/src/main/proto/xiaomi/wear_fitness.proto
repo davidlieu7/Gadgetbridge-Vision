@@ -148,7 +148,8 @@ message WorkoutStatusWatch {
 }
 
 message WorkoutStatusWatchSport {
-  optional uint32 type = 1; // 16 in SaA synthetic mode
+  // Local UTC offset in quarter-hour units, DST included.
+  optional uint32 tzOffsetQuarterHours = 1;
 }
 
 // The watch asks the phone to confirm a workout it is about to open.
