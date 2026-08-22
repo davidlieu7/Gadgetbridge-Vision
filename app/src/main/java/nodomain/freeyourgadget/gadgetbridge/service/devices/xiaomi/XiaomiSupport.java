@@ -22,7 +22,8 @@ import android.content.Context;
 import android.location.Location;
 import android.net.Uri;
 import android.os.Bundle;
-import android.os.SystemClock;
+import android.os.Handler;
+import android.os.Looper;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -38,9 +39,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
 
 import nodomain.freeyourgadget.gadgetbridge.GBApplication;
 import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEventUpdatePreferences;
@@ -62,6 +60,7 @@ import nodomain.freeyourgadget.gadgetbridge.externalevents.sleepasandroid.SleepA
 import nodomain.freeyourgadget.gadgetbridge.proto.xiaomi.XiaomiProto;
 import nodomain.freeyourgadget.gadgetbridge.service.AbstractBluetoothDeviceSupport;
 import nodomain.freeyourgadget.gadgetbridge.service.SleepAsAndroidSender;
+import nodomain.freeyourgadget.gadgetbridge.service.SleepAsAndroidVibration;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.xiaomi.services.AbstractXiaomiService;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.xiaomi.services.XiaomiCalendarService;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.xiaomi.services.XiaomiDataUploadService;
@@ -98,11 +97,11 @@ public class XiaomiSupport extends AbstractBluetoothDeviceSupport {
     private String cachedFirmwareVersion = null;
     private XiaomiConnectionSupport connectionSupport = null;
     private SleepAsAndroidSender sleepAsAndroidSender;
-    private ScheduledExecutorService saaHintScheduler;
-    private ScheduledExecutorService saaAlarmScheduler;
-    private static final int SAA_ALARM_BURST_REPEATS = 3;
-    private static final long SAA_ALARM_BURST_INTERVAL_MS = 5_000L;
-    private static final long SAA_ALARM_MAX_DURATION_MS = 5 * 60_000L;
+    // Separate streams so a hint cannot cancel the schedule of an alarm that is still ringing.
+    private final SleepAsAndroidVibration saaHintVibration = new SleepAsAndroidVibration(
+            new Handler(Looper.getMainLooper()), on -> systemService.onFindWatch(on));
+    private final SleepAsAndroidVibration saaAlarmVibration = new SleepAsAndroidVibration(
+            new Handler(Looper.getMainLooper()), on -> systemService.onFindWatch(on));
 
     private final Map<Integer, AbstractXiaomiService> mServiceMap = new LinkedHashMap<>() {{
         put(XiaomiAuthService.COMMAND_TYPE, authService);
@@ -551,62 +550,22 @@ public class XiaomiSupport extends AbstractBluetoothDeviceSupport {
     }
 
     private void triggerSleepAsAndroidHint(int repeat) {
-        if (repeat <= 0) return;
-        if (saaHintScheduler != null) {
-            saaHintScheduler.shutdownNow();
+        if (saaAlarmVibration.isAlarmRunning()) {
+            // Both streams drive the same find-device state, and the alarm has to keep the band
+            // buzzing until Sleep as Android stops it.
+            LOG.debug("Ignoring Sleep as Android hint, the alarm is still ringing");
+            return;
         }
-        saaHintScheduler = Executors.newSingleThreadScheduledExecutor();
-        final int repeats = repeat;
-        saaHintScheduler.execute(() -> vibrate(repeats));
+        saaHintVibration.hint(repeat);
     }
 
-    private void vibrate(final int repeats) {
-        try {
-            for (int i = 0; i < repeats; i++) {
-                systemService.onFindWatch(true);
-                Thread.sleep(500);
-                systemService.onFindWatch(false);
-                if (i + 1 < repeats) Thread.sleep(300);
-            }
-        } catch (InterruptedException ignored) {
-            Thread.currentThread().interrupt();
-        }
-    }
-
-    /**
-     * Sleep as Android sends START_ALARM once and expects the watch to keep alarming until
-     * STOP_ALARM, which can be minutes later while the alarm is still ringing on the phone.
-     */
     private void scheduleSleepAsAndroidAlarmVibration(int delayMs) {
-        cancelSleepAsAndroidAlarmVibration();
-        if (delayMs == -1) return;
-
-        final long deadline = SystemClock.elapsedRealtime() + SAA_ALARM_MAX_DURATION_MS;
-        saaAlarmScheduler = Executors.newSingleThreadScheduledExecutor();
-        saaAlarmScheduler.scheduleWithFixedDelay(new Runnable() {
-            @Override
-            public void run() {
-                if (SystemClock.elapsedRealtime() > deadline) {
-                    // Nothing stopped us, so STOP_ALARM never arrived. Give up rather than
-                    // vibrate until the battery runs out.
-                    cancelSleepAsAndroidAlarmVibration();
-                    return;
-                }
-                vibrate(SAA_ALARM_BURST_REPEATS);
-            }
-        }, Math.max(0, delayMs), SAA_ALARM_BURST_INTERVAL_MS, TimeUnit.MILLISECONDS);
+        saaAlarmVibration.startAlarm(delayMs);
     }
 
     private void cancelSleepAsAndroidAlarmVibration() {
-        if (saaAlarmScheduler != null) {
-            saaAlarmScheduler.shutdownNow();
-            saaAlarmScheduler = null;
-        }
-        if (saaHintScheduler != null) {
-            saaHintScheduler.shutdownNow();
-            saaHintScheduler = null;
-        }
-        systemService.onFindWatch(false);
+        saaAlarmVibration.stop();
+        saaHintVibration.stop();
     }
 
     @Override

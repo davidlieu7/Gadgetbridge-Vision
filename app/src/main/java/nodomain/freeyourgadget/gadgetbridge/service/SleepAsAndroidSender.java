@@ -29,7 +29,7 @@ import nodomain.freeyourgadget.gadgetbridge.util.Prefs;
 
 public class SleepAsAndroidSender {
 
-    private final Logger LOG = LoggerFactory.getLogger(SleepAsAndroidSender.class);
+    private static final Logger LOG = LoggerFactory.getLogger(SleepAsAndroidSender.class);
     private final String PACKAGE_SLEEP_AS_ANDROID = "com.urbandroid.sleep";
     private final String ACTION_EXTRA_DATA_UPDATE = "com.urbandroid.sleep.ACTION_EXTRA_DATA_UPDATE";
     private final String ACTION_MOVEMENT_DATA_UPDATE = "com.urbandroid.sleep.watch.DATA_UPDATE";
@@ -758,12 +758,18 @@ public class SleepAsAndroidSender {
      * @return the alarm slot to be used for setting alarms on the watch
      */
     public static int getAlarmSlot() {
-        Prefs prefs = GBApplication.getPrefs();
-        String slotString = prefs.getString(GBPrefs.SLEEP_AS_ANDROID_ALARM_SLOT, "");
-        if (!slotString.isEmpty()) {
-            return Integer.parseInt(slotString);
+        final Prefs prefs = GBApplication.getPrefs();
+        final String slotString = prefs.getString(GBPrefs.SLEEP_AS_ANDROID_ALARM_SLOT, "");
+        if (slotString.isEmpty()) {
+            return 0;
         }
-        return 0;
+        try {
+            return Integer.parseInt(slotString);
+        } catch (final NumberFormatException e) {
+            // Losing the configured slot is better than aborting the alarm entirely.
+            LOG.warn("Invalid Sleep as Android alarm slot {}, falling back to the first slot", slotString);
+            return 0;
+        }
     }
 
     /**
