@@ -64,6 +64,7 @@ public class GBPrefs extends Prefs {
 
     public static final String SLEEP_AS_ANDROID_ENABLED = "pref_key_sleepasandroid_enable";
     public static final String SLEEP_AS_ANDROID_DEVICE = "sleepasandroid_device";
+    public static final String SLEEP_AS_ANDROID_ALARM_SLOT = "sleepasandroid_alarm_slot";
 
     public static final String PREF_AUTO_FETCH_ENABLED = "auto_fetch_enabled";
     public static final String PREF_AUTO_FETCH_INTERVAL_LIMIT = "auto_fetch_interval_limit";

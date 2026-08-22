@@ -33,6 +33,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 import nodomain.freeyourgadget.gadgetbridge.GBApplication;
+import nodomain.freeyourgadget.gadgetbridge.util.GBPrefs;
 import nodomain.freeyourgadget.gadgetbridge.R;
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsPreferenceConst;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
@@ -50,13 +51,13 @@ public class SleepAsAndroidPreferencesActivity extends AbstractSettingsActivityV
         public void onCreatePreferences(@Nullable Bundle savedInstanceState, @Nullable String rootKey) {
             setPreferencesFromResource(R.xml.sleepasandroid_preferences, rootKey);
 
-            final ListPreference sleepAsAndroidSlots = findPreference("sleepasandroid_alarm_slot");
+            final ListPreference sleepAsAndroidSlots = findPreference(GBPrefs.SLEEP_AS_ANDROID_ALARM_SLOT);
             if (sleepAsAndroidSlots != null)
             {
                 loadAlarmSlots(sleepAsAndroidSlots);
             }
 
-            final ListPreference sleepAsAndroidDevices = findPreference("sleepasandroid_device");
+            final ListPreference sleepAsAndroidDevices = findPreference(GBPrefs.SLEEP_AS_ANDROID_DEVICE);
             if (sleepAsAndroidDevices != null) {
                 loadDevicesList(sleepAsAndroidDevices);
                 sleepAsAndroidDevices.setOnPreferenceChangeListener(new Preference.OnPreferenceChangeListener() {
@@ -65,10 +66,10 @@ public class SleepAsAndroidPreferencesActivity extends AbstractSettingsActivityV
                         GBDevice device = GBApplication.app().getDeviceManager().getDeviceByAddress(newValue.toString());
                         if (device != null) {
 
-                            GBApplication.getPrefs().getPreferences().edit().putString("sleepasandroid_device", device.getAddress()).apply();
+                            GBApplication.getPrefs().getPreferences().edit().putString(GBPrefs.SLEEP_AS_ANDROID_DEVICE, device.getAddress()).apply();
 
                             Set<SleepAsAndroidFeature> supportedFeatures = device.getDeviceCoordinator().getSleepAsAndroidFeatures(device);
-                            findPreference("sleepasandroid_alarm_slot").setEnabled(supportedFeatures.contains(SleepAsAndroidFeature.ALARMS));
+                            findPreference(GBPrefs.SLEEP_AS_ANDROID_ALARM_SLOT).setEnabled(supportedFeatures.contains(SleepAsAndroidFeature.ALARMS));
                             findPreference("pref_key_sleepasandroid_feat_alarms").setEnabled(supportedFeatures.contains(SleepAsAndroidFeature.ALARMS));
                             findPreference("pref_key_sleepasandroid_feat_notifications").setEnabled(supportedFeatures.contains(SleepAsAndroidFeature.NOTIFICATIONS));
                             findPreference("pref_key_sleepasandroid_feat_movement").setEnabled(supportedFeatures.contains(SleepAsAndroidFeature.ACCELEROMETER));
@@ -82,7 +83,7 @@ public class SleepAsAndroidPreferencesActivity extends AbstractSettingsActivityV
                             spo2Pref.setSummary(spo2AutofetchSupported ? getString(R.string.pref_sleepasandroid_feat_spo2_autofetch_only_summary) : null);
                             findPreference("pref_key_sleepasandroid_spo2_autofetch_interval").setEnabled(spo2AutofetchSupported && spo2Supported && spo2Pref.isChecked());
 
-                            ListPreference alarmSlots = findPreference("sleepasandroid_alarm_slot");
+                            ListPreference alarmSlots = findPreference(GBPrefs.SLEEP_AS_ANDROID_ALARM_SLOT);
                             if (alarmSlots != null)
                             {
                                 loadAlarmSlots(alarmSlots);
@@ -99,13 +100,13 @@ public class SleepAsAndroidPreferencesActivity extends AbstractSettingsActivityV
 
             }
 
-            String defaultDeviceAddr = GBApplication.getPrefs().getString("sleepasandroid_device", "");
+            String defaultDeviceAddr = GBApplication.getPrefs().getString(GBPrefs.SLEEP_AS_ANDROID_DEVICE, "");
             if (!defaultDeviceAddr.isEmpty()) {
                 GBDevice device = GBApplication.app().getDeviceManager().getDeviceByAddress(defaultDeviceAddr);
                 if (device != null) {
 
                     Set<SleepAsAndroidFeature> supportedFeatures = device.getDeviceCoordinator().getSleepAsAndroidFeatures(device);
-                    findPreference("sleepasandroid_alarm_slot").setEnabled(supportedFeatures.contains(SleepAsAndroidFeature.ALARMS));
+                    findPreference(GBPrefs.SLEEP_AS_ANDROID_ALARM_SLOT).setEnabled(supportedFeatures.contains(SleepAsAndroidFeature.ALARMS));
                     findPreference("pref_key_sleepasandroid_feat_alarms").setEnabled(supportedFeatures.contains(SleepAsAndroidFeature.ALARMS));
                     findPreference("pref_key_sleepasandroid_feat_notifications").setEnabled(supportedFeatures.contains(SleepAsAndroidFeature.NOTIFICATIONS));
                     findPreference("pref_key_sleepasandroid_feat_movement").setEnabled(supportedFeatures.contains(SleepAsAndroidFeature.ACCELEROMETER));
@@ -125,7 +126,7 @@ public class SleepAsAndroidPreferencesActivity extends AbstractSettingsActivityV
 
     private static void loadAlarmSlots(ListPreference sleepAsAndroidSlots) {
         if (sleepAsAndroidSlots != null) {
-            String defaultDeviceAddr = GBApplication.getPrefs().getString("sleepasandroid_device", "");
+            String defaultDeviceAddr = GBApplication.getPrefs().getString(GBPrefs.SLEEP_AS_ANDROID_DEVICE, "");
             if (!defaultDeviceAddr.isEmpty()) {
                 GBDevice device = GBApplication.app().getDeviceManager().getDeviceByAddress(defaultDeviceAddr);
                 if (device != null) {

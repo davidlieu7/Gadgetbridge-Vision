@@ -759,7 +759,7 @@ public class SleepAsAndroidSender {
      */
     public static int getAlarmSlot() {
         Prefs prefs = GBApplication.getPrefs();
-        String slotString = prefs.getString("sleepasandroid_alarm_slot", "");
+        String slotString = prefs.getString(GBPrefs.SLEEP_AS_ANDROID_ALARM_SLOT, "");
         if (!slotString.isEmpty()) {
             return Integer.parseInt(slotString);
         }
