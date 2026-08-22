@@ -140,9 +140,10 @@ message WorkoutStatusWatch {
   optional uint32 timestamp = 1; // seconds
   optional WorkoutStatusWatchSport sportInfo = 2;
   optional uint32 sport = 3;
-  optional uint32 status = 4; // 0 started, 1 resumed, 2 paused, 3 finished
+  optional uint32 status = 4; // 0 started, 1 paused, 2 resumed, 3 finished
   optional bytes activityFileIds = 5;
-  optional uint32 unknown6 = 6; // 2; 3 in SaA synthetic-workout mode
+  // The protocol versions the phone accepts, answering supportedVersions in WorkoutOpenWatch.
+  optional uint32 supportedVersions = 6; // 2; 3 in SaA synthetic-workout mode
   optional uint32 unknown10 = 10; // 0
 }
 
@@ -150,25 +151,26 @@ message WorkoutStatusWatchSport {
   optional uint32 type = 1; // 16 in SaA synthetic mode
 }
 
+// The watch asks the phone to confirm a workout it is about to open.
 message WorkoutOpenWatch {
-  // This is only called when gps is needed?
   // 1 outdoor running, 2 walking, 3 hiking, 4 trekking, 5 trail run, 6 outdoor cycling
-  // Synthetic SaA workout (Mi Band 10): sport=810, unknown2=2, unknown3=810
   optional uint32 sport = 1;
-  optional uint32 unknown2 = 2; // 2
-  optional uint32 mode = 3; // mirrors sport for SaA synthetic mode
+  // The protocol versions the watch accepts for this workout.
+  optional uint32 supportedVersions = 2;
+  // The sport this one belongs to within a multi-sport session, equal to sport otherwise.
+  optional uint32 mainSport = 3;
 }
 
+// The watch does not open the workout until this arrives.
 message WorkoutOpenReply {
-  // 3 2 10 when no gps permissions at all
-  // 5 2 10 when no all time gps permission
-  // ...
-  // 0 * * when phone gps is working fine
-  // 0 2 10
-  // 0 2 2
-  optional uint32 unknown1 = 1; // GPS permission/status: 0 = phone GPS is working fine, 3 = no GPS permissions at all, 5 = no all-time GPS permission (foreground only)
-  optional uint32 unknown2 = 2; // always 2?
-  optional uint32 unknown3 = 3; // GPS acquisition state: 2 = GPS fix acquired (located), 10 = GPS searching (no fix yet)
+  // 0 ok, 1 busy, 2 sport type mismatch, 3 no permission, 4 sport unsupported,
+  // 5 insufficient location accuracy, 6 charging, 7 low battery, 8 version unsupported,
+  // 9 wear mode mismatch, 10 unknown
+  optional uint32 code = 1;
+  // One of the versions the watch offered in supportedVersions.
+  optional uint32 selectedVersion = 2;
+  // Accuracy of the location the phone will supply: 0 low or none, 1 medium, 2 high, 10 unknown.
+  optional uint32 gpsAccuracy = 3;
 }
 
 message GoalsConfig {
