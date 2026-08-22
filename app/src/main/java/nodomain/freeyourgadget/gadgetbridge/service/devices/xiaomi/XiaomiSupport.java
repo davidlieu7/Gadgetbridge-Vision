@@ -22,6 +22,7 @@ import android.content.Context;
 import android.location.Location;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.SystemClock;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -580,12 +581,12 @@ public class XiaomiSupport extends AbstractBluetoothDeviceSupport {
         cancelSleepAsAndroidAlarmVibration();
         if (delayMs == -1) return;
 
-        final long deadline = System.currentTimeMillis() + SAA_ALARM_MAX_DURATION_MS;
+        final long deadline = SystemClock.elapsedRealtime() + SAA_ALARM_MAX_DURATION_MS;
         saaAlarmScheduler = Executors.newSingleThreadScheduledExecutor();
         saaAlarmScheduler.scheduleWithFixedDelay(new Runnable() {
             @Override
             public void run() {
-                if (System.currentTimeMillis() > deadline) {
+                if (SystemClock.elapsedRealtime() > deadline) {
                     // Nothing stopped us, so STOP_ALARM never arrived. Give up rather than
                     // vibrate until the battery runs out.
                     cancelSleepAsAndroidAlarmVibration();
