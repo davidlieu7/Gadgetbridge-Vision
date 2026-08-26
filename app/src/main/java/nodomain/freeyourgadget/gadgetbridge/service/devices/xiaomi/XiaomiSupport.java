@@ -165,6 +165,8 @@ public class XiaomiSupport extends AbstractBluetoothDeviceSupport {
 
     @Override
     public void dispose() {
+        cancelSleepAsAndroidAlarmVibration();
+
         for (final AbstractXiaomiService service : mServiceMap.values()) {
             service.dispose();
         }
@@ -428,6 +430,9 @@ public class XiaomiSupport extends AbstractBluetoothDeviceSupport {
 
     protected void onAuthSuccess() {
         LOG.info("onAuthSuccess");
+
+        // A connection starts with the band no longer buzzing, whatever this schedule believed.
+        cancelSleepAsAndroidAlarmVibration();
 
         getConnectionSpecificSupport().onAuthSuccess();
 
