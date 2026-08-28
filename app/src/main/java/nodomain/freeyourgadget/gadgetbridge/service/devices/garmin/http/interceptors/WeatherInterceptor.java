@@ -291,16 +291,22 @@ public class WeatherInterceptor implements HttpInterceptor {
             precipProb = hourlyForecast.getPrecipProbability();
             wind = new Wind(getSpeed(hourlyForecast.getWindSpeed(), speedUnit), hourlyForecast.getWindDirection());
             icon = mapToGarminCondition(hourlyForecast.getConditionCode());
-            //dewPoint = new WeatherValue(hourlyForecast.temp - 273f, "CELSIUS"); // TODO dewPoint
+            if (hourlyForecast.getDewPoint() > 0) {
+                dewPoint = new WeatherValue(hourlyForecast.getDewPoint() - 273f, "CELSIUS");
+            }
             uvIndex = hourlyForecast.getUvIndex();
             relativeHumidity = hourlyForecast.getHumidity();
             //feelsLikeTemperature = new WeatherValue(hourlyForecast.temp - 273f, "CELSIUS"); // TODO feelsLikeTemperature
             //visibility = new WeatherValue(0, "METER"); // TODO visibility
-            //pressure = new WeatherValue(0f, "INCHES_OF_MERCURY"); // TODO pressure
+            if (hourlyForecast.getPressure() > 0) {
+                pressure = new WeatherValue(hourlyForecast.getPressure() * 0.0296133971f, "INCHES_OF_MERCURY");
+            }
             if (weatherSpec.getAirQuality() != null) {
                 airQuality = mapAqiToGarminAirQuality(weatherSpec.getAirQuality().getAqi());
             }
-            //cloudCover = 0; // TODO cloudCover
+            if (hourlyForecast.getCloudCover() > 0) {
+                cloudCover = hourlyForecast.getCloudCover();
+            }
         }
     }
 
