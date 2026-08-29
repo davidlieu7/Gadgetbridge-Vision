@@ -28,6 +28,7 @@ import android.util.TypedValue;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.GridLayout;
 import android.widget.ImageView;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -151,6 +152,10 @@ public class LoadFragment extends AbstractChartFragment<LoadFragment.LoadsData> 
             acuteLoadRatioGaugeStatus = rootView.findViewById(R.id.acute_load_ratio_gauge_status);
             loadChartDataTypeGroup = rootView.findViewById(R.id.load_chart_data_type_group);
             gaugeDrawer = new GaugeDrawer();
+            showChronicLoad = supportsTrainingLoadChronic();
+            if (!showChronicLoad) {
+                relabelAsTrainingLoad(rootView);
+            }
             setupLoadDataTypeChips(inflater);
             setupAcuteLoadChart();
         } else {
@@ -168,6 +173,25 @@ public class LoadFragment extends AbstractChartFragment<LoadFragment.LoadsData> 
         }
         final GBDevice device = getChartsHost().getDevice();
         return device.getDeviceCoordinator().supportsTrainingLoad(device);
+    }
+
+    public boolean supportsTrainingLoadChronic() {
+        final GBDevice device = getChartsHost().getDevice();
+        return device.getDeviceCoordinator().supportsTrainingLoadChronic(device);
+    }
+
+    /**
+     * Relabels the acute-load header and tile as a plain training load, hides the chronic-load tile
+     * and widens the remaining tile across both columns of the grid.
+     */
+    private void relabelAsTrainingLoad(final View rootView) {
+        ((TextView) rootView.findViewById(R.id.acute_load_header)).setText(R.string.pref_header_training_load);
+        ((TextView) rootView.findViewById(R.id.acute_load_label)).setText(R.string.pref_header_training_load);
+        rootView.findViewById(R.id.chronic_load_wrapper).setVisibility(View.GONE);
+        final View acuteLoadWrapper = rootView.findViewById(R.id.acute_load_wrapper);
+        final GridLayout.LayoutParams params = (GridLayout.LayoutParams) acuteLoadWrapper.getLayoutParams();
+        params.columnSpec = GridLayout.spec(0, 2, GridLayout.FILL, 1f);
+        acuteLoadWrapper.setLayoutParams(params);
     }
 
     @Override
@@ -459,6 +483,7 @@ public class LoadFragment extends AbstractChartFragment<LoadFragment.LoadsData> 
     }
 
     private LoadsData getData(DBHandler db, Calendar day, GBDevice device) {
+        final boolean chronicLoadSupported = supportsTrainingLoadChronic();
         final ZonedDateTime now = day.toInstant().atZone(ZoneId.systemDefault());
         final ZonedDateTime startOfThisWeek = now.with(DayOfWeek.MONDAY).with(LocalTime.of(0, 0, 0));
         final ZonedDateTime endOfThisWeek = startOfThisWeek.plusDays(6).with(LocalTime.of(23, 59, 59));
@@ -485,18 +510,22 @@ public class LoadFragment extends AbstractChartFragment<LoadFragment.LoadsData> 
                     if (dayAcuteLoadSample != null && dayAcuteLoadSample.getTimestamp() >= dayStartMillis) {
                         acuteLoad = (int) dayAcuteLoadSample.getMetricScore();
                     }
-                    MetricSample dayChronicLoadSample = getLatestMetricSampleBefore(db, device, GENERIC_TRAINING_LOAD_CHRONIC, dayEndMillis);
-                    if (dayChronicLoadSample != null && dayChronicLoadSample.getTimestamp() >= dayStartMillis) {
-                        chronicLoad = (int) dayChronicLoadSample.getMetricScore();
+                    if (chronicLoadSupported) {
+                        MetricSample dayChronicLoadSample = getLatestMetricSampleBefore(db, device, GENERIC_TRAINING_LOAD_CHRONIC, dayEndMillis);
+                        if (dayChronicLoadSample != null && dayChronicLoadSample.getTimestamp() >= dayStartMillis) {
+                            chronicLoad = (int) dayChronicLoadSample.getMetricScore();
+                        }
                     }
                 } else {
                     GenericTrainingLoadAcuteSample dayAcuteLoadSample = getLatestTrainingLoadAcuteSample(db, device, dayEndMillis);
                     if (dayAcuteLoadSample != null && dayAcuteLoadSample.getTimestamp() >= dayStartMillis) {
                         acuteLoad = dayAcuteLoadSample.getValue();
                     }
-                    GenericTrainingLoadChronicSample dayChronicLoadSample = getLatestTrainingLoadChronicSample(db, device, dayEndMillis);
-                    if (dayChronicLoadSample != null && dayChronicLoadSample.getTimestamp() >= dayStartMillis) {
-                        chronicLoad = dayChronicLoadSample.getValue();
+                    if (chronicLoadSupported) {
+                        GenericTrainingLoadChronicSample dayChronicLoadSample = getLatestTrainingLoadChronicSample(db, device, dayEndMillis);
+                        if (dayChronicLoadSample != null && dayChronicLoadSample.getTimestamp() >= dayStartMillis) {
+                            chronicLoad = dayChronicLoadSample.getValue();
+                        }
                     }
                 }
             }
@@ -523,9 +552,11 @@ public class LoadFragment extends AbstractChartFragment<LoadFragment.LoadsData> 
                     latestAcuteLoad = (int) latestAcuteLoadSample.getMetricScore();
                 }
 
-                MetricSample latestChronicLoadSample = getLatestMetricSampleBefore(db, device, GENERIC_TRAINING_LOAD_CHRONIC, dayEnd.getTime());
-                if (latestChronicLoadSample != null) {
-                    latestChronicLoad = (int) latestChronicLoadSample.getMetricScore();
+                if (chronicLoadSupported) {
+                    MetricSample latestChronicLoadSample = getLatestMetricSampleBefore(db, device, GENERIC_TRAINING_LOAD_CHRONIC, dayEnd.getTime());
+                    if (latestChronicLoadSample != null) {
+                        latestChronicLoad = (int) latestChronicLoadSample.getMetricScore();
+                    }
                 }
             } else {
                 GenericTrainingLoadAcuteSample latestAcuteLoadSample = getLatestTrainingLoadAcuteSample(db, device, dayEnd.getTime());
@@ -533,9 +564,11 @@ public class LoadFragment extends AbstractChartFragment<LoadFragment.LoadsData> 
                     latestAcuteLoad = latestAcuteLoadSample.getValue();
                 }
 
-                GenericTrainingLoadChronicSample latestChronicLoadSample = getLatestTrainingLoadChronicSample(db, device, dayEnd.getTime());
-                if (latestChronicLoadSample != null) {
-                    latestChronicLoad = latestChronicLoadSample.getValue();
+                if (chronicLoadSupported) {
+                    GenericTrainingLoadChronicSample latestChronicLoadSample = getLatestTrainingLoadChronicSample(db, device, dayEnd.getTime());
+                    if (latestChronicLoadSample != null) {
+                        latestChronicLoad = latestChronicLoadSample.getValue();
+                    }
                 }
             }
         }
