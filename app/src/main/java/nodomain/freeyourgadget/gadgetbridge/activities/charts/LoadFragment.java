@@ -79,6 +79,7 @@ import nodomain.freeyourgadget.gadgetbridge.entities.GenericTrainingLoadAcuteSam
 import nodomain.freeyourgadget.gadgetbridge.entities.GenericTrainingLoadChronicSample;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
 import nodomain.freeyourgadget.gadgetbridge.model.MetricSample;
+import nodomain.freeyourgadget.gadgetbridge.model.TrainingLoadStatus;
 import nodomain.freeyourgadget.gadgetbridge.model.WorkoutLoadSample;
 import nodomain.freeyourgadget.gadgetbridge.util.DateTimeUtils;
 
@@ -448,7 +449,29 @@ public class LoadFragment extends AbstractChartFragment<LoadFragment.LoadsData> 
             // Gauge
             acuteLoadRatioGaugeValue.setText(String.valueOf(latestAcuteLoad));
             float value;
-            if (latestAcuteLoad > 0 && latestChronicLoad > 0) {
+            final TrainingLoadStatus reportedStatus = data.getReportedStatus();
+            if (reportedStatus != null) {
+                // The device names its own zone, so the needle only has to land inside the matching
+                // gauge segment rather than encode a ratio.
+                switch (reportedStatus) {
+                    case LOW:
+                        value = 0.166f;
+                        acuteLoadRatioGaugeStatus.setText(getString(R.string.low));
+                        break;
+                    case OPTIMAL:
+                        value = 0.5f;
+                        acuteLoadRatioGaugeStatus.setText(getString(R.string.optimal));
+                        break;
+                    case HIGH:
+                        value = 0.833f;
+                        acuteLoadRatioGaugeStatus.setText(getString(R.string.high));
+                        break;
+                    default:
+                        value = 1f;
+                        acuteLoadRatioGaugeStatus.setText(getString(R.string.very_high));
+                        break;
+                }
+            } else if (latestAcuteLoad > 0 && latestChronicLoad > 0) {
                 value = (float) latestAcuteLoad / latestChronicLoad;
                 if (value < OPTIMAL_LOAD_RATIO_LOWER) {
                     value = (float) GaugeDrawer.normalize(value, 0, OPTIMAL_LOAD_RATIO_LOWER, 0, 0.333);
@@ -543,8 +566,10 @@ public class LoadFragment extends AbstractChartFragment<LoadFragment.LoadsData> 
 
         int latestAcuteLoad = 0;
         int latestChronicLoad = 0;
+        TrainingLoadStatus reportedStatus = null;
         if (supportsTrainingLoad()) {
             final Date dayEnd = DateTimeUtils.dayEnd(getEndDate());
+            reportedStatus = device.getDeviceCoordinator().getTrainingLoadStatus(device, db.getDaoSession(), dayEnd.getTime());
 
             if (metricTrainingLoad) {
                 MetricSample latestAcuteLoadSample = getLatestMetricSampleBefore(db, device, GENERIC_TRAINING_LOAD_ACUTE, dayEnd.getTime());
@@ -572,7 +597,7 @@ public class LoadFragment extends AbstractChartFragment<LoadFragment.LoadsData> 
                 }
             }
         }
-        return new LoadsData(data, latestAcuteLoad, latestChronicLoad, thisWeekLoad, lastWeekLoad);
+        return new LoadsData(data, latestAcuteLoad, latestChronicLoad, thisWeekLoad, lastWeekLoad, reportedStatus);
     }
 
     private List<? extends WorkoutLoadSample> getWorkoutLoadSamples(final DBHandler db, final GBDevice device, int tsFrom, int tsTo) {
@@ -697,15 +722,24 @@ public class LoadFragment extends AbstractChartFragment<LoadFragment.LoadsData> 
         private int latestChronicLoad;
         private int thisWeekLoad;
         private int lastWeekLoad;
+        private final TrainingLoadStatus reportedStatus;
 
         private final List<LoadFragment.LoadData> data;
 
-        public LoadsData(final List<LoadFragment.LoadData> chartsData, int latestAcuteLoad, int latestChronicLoad, int thisWeekLoad, int lastWeekLoad) {
+        public LoadsData(final List<LoadFragment.LoadData> chartsData, int latestAcuteLoad, int latestChronicLoad, int thisWeekLoad, int lastWeekLoad, final TrainingLoadStatus reportedStatus) {
             this.data = chartsData;
             this.latestAcuteLoad = latestAcuteLoad;
             this.latestChronicLoad = latestChronicLoad;
             this.thisWeekLoad = thisWeekLoad;
             this.lastWeekLoad = lastWeekLoad;
+            this.reportedStatus = reportedStatus;
+        }
+
+        /**
+         * The status the device reported itself, or {@code null} when it reports none.
+         */
+        public TrainingLoadStatus getReportedStatus() {
+            return reportedStatus;
         }
 
         public LoadFragment.LoadData getDay(int i) {
