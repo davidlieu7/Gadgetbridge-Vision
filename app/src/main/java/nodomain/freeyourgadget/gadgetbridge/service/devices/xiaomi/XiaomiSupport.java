@@ -99,9 +99,9 @@ public class XiaomiSupport extends AbstractBluetoothDeviceSupport {
     private SleepAsAndroidSender sleepAsAndroidSender;
     // Separate streams so a hint cannot cancel the schedule of an alarm that is still ringing.
     private final SleepAsAndroidVibration saaHintVibration = new SleepAsAndroidVibration(
-            new Handler(Looper.getMainLooper()), on -> systemService.onFindWatch(on));
+            new Handler(Looper.getMainLooper()), this::setFindWatchIfInitialized);
     private final SleepAsAndroidVibration saaAlarmVibration = new SleepAsAndroidVibration(
-            new Handler(Looper.getMainLooper()), on -> systemService.onFindWatch(on));
+            new Handler(Looper.getMainLooper()), this::setFindWatchIfInitialized);
 
     private final Map<Integer, AbstractXiaomiService> mServiceMap = new LinkedHashMap<>() {{
         put(XiaomiAuthService.COMMAND_TYPE, authService);
@@ -211,6 +211,14 @@ public class XiaomiSupport extends AbstractBluetoothDeviceSupport {
 
     public void setCachedFirmwareVersion(String version) {
         this.cachedFirmwareVersion = version;
+    }
+
+    /**
+     * Called on every connection attempt, before the band is authenticated. A connection is also
+     * how a reconnect starts, and a reconnect keeps this instance and everything it has scheduled.
+     */
+    public void onInitializeDevice() {
+        cancelSleepAsAndroidAlarmVibration();
     }
 
     public void onDisconnect() {
@@ -431,9 +439,6 @@ public class XiaomiSupport extends AbstractBluetoothDeviceSupport {
     protected void onAuthSuccess() {
         LOG.info("onAuthSuccess");
 
-        // A connection starts with the band no longer buzzing, whatever this schedule believed.
-        cancelSleepAsAndroidAlarmVibration();
-
         getConnectionSpecificSupport().onAuthSuccess();
 
         if (GBApplication.getPrefs().syncTime()) {
@@ -571,6 +576,19 @@ public class XiaomiSupport extends AbstractBluetoothDeviceSupport {
     private void cancelSleepAsAndroidAlarmVibration() {
         saaAlarmVibration.stop();
         saaHintVibration.stop();
+    }
+
+    /**
+     * A vibration runs on its own schedule for as long as Sleep as Android keeps its alarm up, and
+     * the band is reachable for only part of that. Commands sent outside that window are lost and,
+     * before authentication, can disturb the handshake.
+     */
+    private void setFindWatchIfInitialized(final boolean on) {
+        if (gbDevice == null || !gbDevice.isInitialized()) {
+            LOG.debug("Skipping find watch {}, device is not initialized", on);
+            return;
+        }
+        systemService.onFindWatch(on);
     }
 
     @Override
