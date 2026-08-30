@@ -582,9 +582,13 @@ public class XiaomiSupport extends AbstractBluetoothDeviceSupport {
      * A vibration runs on its own schedule for as long as Sleep as Android keeps its alarm up, and
      * the band is reachable for only part of that. Commands sent outside that window are lost and,
      * before authentication, can disturb the handshake.
+     * <p>
+     * The check cannot be {@link GBDevice#isInitialized()}, which also accepts
+     * {@link GBDevice.State#SCANNED}: a device sits in that state for seconds at a time while it is
+     * being scanned for, with no link to send anything over.
      */
     private void setFindWatchIfInitialized(final boolean on) {
-        if (gbDevice == null || !gbDevice.isInitialized()) {
+        if (gbDevice == null || !gbDevice.getState().equalsOrHigherThan(GBDevice.State.INITIALIZED)) {
             LOG.debug("Skipping find watch {}, device is not initialized", on);
             return;
         }

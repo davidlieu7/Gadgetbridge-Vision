@@ -116,6 +116,30 @@ public class SleepAsAndroidVibrationTest extends TestBase {
     }
 
     @Test
+    public void stopFromAnotherThreadIsQueuedOnTheHandler() throws InterruptedException {
+        // A connection cancels the alarm from the Bluetooth thread. Touching the schedule there
+        // would let a burst that is midway through posting its next step outlive the cancel.
+        vibration.startAlarm(0);
+        idle(12_000);
+        Assert.assertTrue(vibration.isAlarmRunning());
+
+        final int beforeCancel = toggles.size();
+        final Thread canceller = new Thread(vibration::stop);
+        canceller.start();
+        canceller.join();
+
+        Assert.assertEquals("the cancel may not run on the caller's thread", beforeCancel, toggles.size());
+
+        idle(1);
+        Assert.assertFalse(vibration.isAlarmRunning());
+        Assert.assertFalse("must leave the wearable quiet", toggles.get(toggles.size() - 1));
+
+        final int afterStop = toggles.size();
+        idle(60_000);
+        Assert.assertEquals("nothing may fire after the cancel", afterStop, toggles.size());
+    }
+
+    @Test
     public void negativeDelayCancelsARunningAlarm() {
         vibration.startAlarm(0);
         idle(12_000);

@@ -17,6 +17,7 @@
 package nodomain.freeyourgadget.gadgetbridge.service;
 
 import android.os.Handler;
+import android.os.Looper;
 import android.os.SystemClock;
 
 import androidx.annotation.Nullable;
@@ -33,6 +34,9 @@ import androidx.annotation.Nullable;
  * One instance drives one stream, so hints and alarms each get their own and neither cancels the
  * other's schedule. They still share the one find-device state on the wearable, so a caller that
  * starts a hint while an alarm is ringing has to hold it back itself.
+ * <p>
+ * A schedule is started from the handler's own thread. Only {@link #stop()} may be called from
+ * elsewhere.
  */
 public class SleepAsAndroidVibration {
 
@@ -65,7 +69,7 @@ public class SleepAsAndroidVibration {
         if (pulses <= 0) {
             return;
         }
-        stop();
+        stopNow();
         burst(pulses, 0, null);
     }
 
@@ -74,7 +78,7 @@ public class SleepAsAndroidVibration {
      * A delay of -1 is Sleep as Android's cancel convention.
      */
     public void startAlarm(final int delayMs) {
-        stop();
+        stopNow();
         if (delayMs == -1) {
             return;
         }
@@ -86,8 +90,20 @@ public class SleepAsAndroidVibration {
 
     /**
      * Cancel whatever is running and leave the wearable quiet.
+     * <p>
+     * A caller on another thread only gets the cancel queued: everything a schedule touches has to
+     * run on the handler, or a burst caught midway through posting its next step survives the
+     * cancel and keeps the wearable buzzing.
      */
     public void stop() {
+        if (Looper.myLooper() == handler.getLooper()) {
+            stopNow();
+        } else {
+            handler.post(this::stopNow);
+        }
+    }
+
+    private void stopNow() {
         alarmRunning = false;
         handler.removeCallbacksAndMessages(null);
         toggle.set(false);
@@ -102,7 +118,7 @@ public class SleepAsAndroidVibration {
             return;
         }
         if (SystemClock.elapsedRealtime() > alarmDeadline) {
-            stop();
+            stopNow();
             return;
         }
         burst(ALARM_BURST_PULSES, 0, () -> handler.postDelayed(this::alarmTick, ALARM_BURST_INTERVAL_MS));
