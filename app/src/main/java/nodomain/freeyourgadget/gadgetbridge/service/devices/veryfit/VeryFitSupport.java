@@ -36,13 +36,16 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 import nodomain.freeyourgadget.gadgetbridge.GBApplication;
 import nodomain.freeyourgadget.gadgetbridge.R;
 import nodomain.freeyourgadget.gadgetbridge.database.DBHelper;
 import nodomain.freeyourgadget.gadgetbridge.activities.SettingsActivity;
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsPreferenceConst;
+import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEventAppInfo;
 import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEventBatteryInfo;
 import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEventFindPhone;
 import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEventMusicControl;
@@ -52,6 +55,7 @@ import nodomain.freeyourgadget.gadgetbridge.devices.veryfit.VeryFitCapabilities;
 import nodomain.freeyourgadget.gadgetbridge.devices.veryfit.VeryFitConstants;
 import nodomain.freeyourgadget.gadgetbridge.devices.veryfit.VeryFitFeature;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
+import nodomain.freeyourgadget.gadgetbridge.impl.GBDeviceApp;
 import nodomain.freeyourgadget.gadgetbridge.model.ActivityUser;
 import nodomain.freeyourgadget.gadgetbridge.model.Alarm;
 import nodomain.freeyourgadget.gadgetbridge.model.DeviceService;
@@ -88,6 +92,7 @@ public class VeryFitSupport extends AbstractBTLESingleDeviceSupport {
 
     private final VeryFitProtocol protocol = new VeryFitProtocol();
     private final VeryFitHealthSync healthSync = new VeryFitHealthSync(this);
+    private final VeryFitWatchfaces watchfaces = new VeryFitWatchfaces();
 
     private MediaManager mediaManager;
     private boolean musicOpen;
@@ -243,6 +248,14 @@ public class VeryFitSupport extends AbstractBTLESingleDeviceSupport {
         }
         if (packet.cmd == VeryFitConstants.FRAMED_APP_REGISTRY) {
             handleApps(packet.payload);
+            return;
+        }
+        if (packet.cmd == VeryFitConstants.FRAMED_WATCHFACE_LIST) {
+            handleWatchfaces(packet.payload);
+            return;
+        }
+        if (packet.cmd == VeryFitConstants.FRAMED_WATCHFACE) {
+            LOG.debug("Watchface change answered with {}", GB.hexdump(packet.payload));
             return;
         }
         if (packet.cmd == VeryFitConstants.FRAMED_HEALTH
@@ -508,6 +521,16 @@ public class VeryFitSupport extends AbstractBTLESingleDeviceSupport {
                 Collections.frequency(apps.values(), Boolean.FALSE));
     }
 
+    private void handleWatchfaces(final byte[] payload) {
+        final List<GBDeviceApp> faces = watchfaces.parse(payload);
+        if (faces.isEmpty()) {
+            return;
+        }
+        final GBDeviceEventAppInfo event = new GBDeviceEventAppInfo();
+        event.apps = faces.toArray(new GBDeviceApp[0]);
+        evaluateGBDeviceEvent(event);
+    }
+
     /** The watch has its own alarm UI, so what it reports wins over what we last pushed. */
     private void handleAlarms(final byte[] payload) {
         LOG.info("Watch alarms: {}", VeryFitProtocol.describeAlarms(payload));
@@ -740,6 +763,34 @@ public class VeryFitSupport extends AbstractBTLESingleDeviceSupport {
         send("veryfit alarms", protocol.framed(VeryFitConstants.FRAMED_ALARMS,
                 VeryFitProtocol.alarms(alarms)));
         queryAlarms();
+    }
+
+    @Override
+    public void onAppInfoReq() {
+        queryWatchfaces();
+    }
+
+    @Override
+    public void onAppStart(final UUID uuid, final boolean start) {
+        if (!start) {
+            return;
+        }
+
+        final String file = watchfaces.fileOf(uuid);
+        if (file == null) {
+            LOG.warn("No watchface known as {}", uuid);
+            return;
+        }
+
+        send("veryfit watchface", protocol.framed(VeryFitConstants.FRAMED_WATCHFACE,
+                VeryFitProtocol.watchface(file)));
+        queryWatchfaces();
+    }
+
+    /** Read straight back after a change, which is both the confirmation and the new list. */
+    private void queryWatchfaces() {
+        send("veryfit watchface list",
+                protocol.framed(VeryFitConstants.FRAMED_WATCHFACE_LIST, new byte[0]));
     }
 
     /** The slider fires once per step, and neighbouring steps round onto the same level. */

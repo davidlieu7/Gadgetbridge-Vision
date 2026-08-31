@@ -16,6 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 package nodomain.freeyourgadget.gadgetbridge.devices.veryfit;
 
+import android.app.Activity;
 import android.bluetooth.le.ScanFilter;
 import android.content.Context;
 import android.os.ParcelUuid;
@@ -28,6 +29,7 @@ import java.util.List;
 
 import nodomain.freeyourgadget.gadgetbridge.GBApplication;
 import nodomain.freeyourgadget.gadgetbridge.R;
+import nodomain.freeyourgadget.gadgetbridge.activities.appmanager.AppManagerActivity;
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSpecificSettings;
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSpecificSettingsScreen;
 import nodomain.freeyourgadget.gadgetbridge.devices.AbstractBLEDeviceCoordinator;
@@ -131,6 +133,37 @@ public abstract class VeryFitCoordinator extends AbstractBLEDeviceCoordinator {
     public ActivityTrackProvider getActivityTrackProvider(@NonNull final GBDevice device,
                                                           @NonNull final Context context) {
         return new VeryFitActivityTrackProvider(device);
+    }
+
+    /** The watch only ever shows a face it already holds, so this is a picker and nothing more. */
+    @Override
+    public boolean supportsAppsManagement(@NonNull final GBDevice device) {
+        return getCapabilities(device).supports(VeryFitFeature.FRAMED_PROTOCOL);
+    }
+
+    @Override
+    public boolean supportsWatchfaceManagement(@NonNull final GBDevice device) {
+        return supportsAppsManagement(device);
+    }
+
+    @Override
+    public boolean supportsCachedAppManagement(@NonNull final GBDevice device) {
+        return false;
+    }
+
+    @Override
+    public boolean supportsInstalledAppManagement(@NonNull final GBDevice device) {
+        return false;
+    }
+
+    @Override
+    public boolean supportsAppListFetching(@NonNull final GBDevice device) {
+        return true;
+    }
+
+    @Override
+    public Class<? extends Activity> getAppsManagementActivity(@NonNull final GBDevice device) {
+        return AppManagerActivity.class;
     }
 
     @Override

@@ -112,6 +112,7 @@
     <string name="appmanager_installed_watchapps">Installed apps</string>
     <string name="appmanager_installed_watchfaces">Installed watchfaces</string>
     <string name="appmanager_watchface_activate">Activate</string>
+    <string name="appmanager_watchface_active">Active</string>
     <string name="appmanager_app_start">Start</string>
     <string name="appmanager_app_download">Download to cache</string>
     <string name="appmananger_app_delete">Delete</string>

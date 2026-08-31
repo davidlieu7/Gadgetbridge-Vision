@@ -194,6 +194,19 @@ public class VeryFitProtocol {
         return out.toByteArray();
     }
 
+    /**
+     * Body for {@link VeryFitConstants#FRAMED_WATCHFACE}: the selector, then the name of the file
+     * the watch keeps that face in, padded out to the slot it is read from.
+     */
+    public static byte[] watchface(final String name) {
+        final byte[] body = new byte[1 + VeryFitConstants.WATCHFACE_NAME_LEN];
+        body[0] = VeryFitConstants.WATCHFACE_SELECT;
+        final byte[] file = name.getBytes(StandardCharsets.UTF_8);
+        System.arraycopy(file, 0, body, 1,
+                Math.min(file.length, VeryFitConstants.WATCHFACE_NAME_LEN));
+        return body;
+    }
+
     /** Fetch one data type, or close it again so the watch moves on to the next. */
     public static byte[] healthRequest(final byte operate, final byte type, final boolean today) {
         return new byte[]{operate, type, (byte) (today ? 1 : 0), 0x00, 0x00};

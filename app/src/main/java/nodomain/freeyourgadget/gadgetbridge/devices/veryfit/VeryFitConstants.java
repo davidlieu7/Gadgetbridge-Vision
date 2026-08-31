@@ -53,6 +53,24 @@ public final class VeryFitConstants {
     public static final int FRAMED_ALARMS_QUERY = 0x000f;
     public static final int FRAMED_QUICK_REPLY = 0x0fff;
     public static final int FRAMED_APP_REGISTRY = 0x003c;
+    public static final int FRAMED_WATCHFACE = 0x0008;
+    public static final int FRAMED_WATCHFACE_LIST = 0x0031;
+
+    /** Selects the face named in the fixed-size slot behind it. */
+    public static final byte WATCHFACE_SELECT = 0x01;
+    public static final int WATCHFACE_NAME_LEN = 30;
+    /** The counts and the storage report the list opens with, ahead of the per-face records. */
+    public static final int WATCHFACE_LIST_HEADER_LEN = 63;
+    public static final int WATCHFACE_RECORD_LEN = 40;
+    /** Which face is being shown, in the same slot shape the records use. */
+    public static final int WATCHFACE_CURRENT_OFFSET = 5;
+    public static final int WATCHFACE_TOTAL_OFFSET = 38;
+    public static final int WATCHFACE_USED_OFFSET = 42;
+    public static final int WATCHFACE_COUNT_OFFSET = 62;
+    /** Inside a record, behind the marker, the slot it sits in and the bytes it takes. */
+    public static final int WATCHFACE_RECORD_NAME = 10;
+    /** Every face is a file, and the watch wants the whole file name. */
+    public static final String WATCHFACE_SUFFIX = ".iwf";
 
     /** Add the apps that follow to the watch's list, or ask for the list it holds. */
     public static final byte REGISTRY_ADD = 0x01;
