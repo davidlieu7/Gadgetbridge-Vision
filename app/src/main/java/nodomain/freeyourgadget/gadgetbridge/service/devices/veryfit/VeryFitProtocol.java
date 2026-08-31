@@ -174,6 +174,26 @@ public class VeryFitProtocol {
         return (byte) (kelvin - 273 + VeryFitConstants.WEATHER_TEMPERATURE_OFFSET);
     }
 
+    /**
+     * Body for {@link VeryFitConstants#FRAMED_APP_REGISTRY}: the apps the watch should keep a
+     * notification switch for, or an empty list to read back the ones it already has.
+     */
+    public static byte[] appRegistry(final byte operation, final int... appIds) {
+        final ByteArrayOutputStream out = new ByteArrayOutputStream();
+        out.write(0x00);
+        out.write(0x00);
+        out.write(0x00);
+        out.write(operation);
+        out.write(0x00);
+        out.write(appIds.length);
+        for (final int appId : appIds) {
+            writeIntLE(out, appId, 2);
+            out.write(0x01);
+            out.write(VeryFitConstants.APP_READY);
+        }
+        return out.toByteArray();
+    }
+
     /** Fetch one data type, or close it again so the watch moves on to the next. */
     public static byte[] healthRequest(final byte operate, final byte type, final boolean today) {
         return new byte[]{operate, type, (byte) (today ? 1 : 0), 0x00, 0x00};
@@ -261,7 +281,8 @@ public class VeryFitProtocol {
      * Notification body for {@link VeryFitConstants#FRAMED_NOTIFICATION}: flags, ids and lengths,
      * then the source tag, title and text back to back.
      */
-    public static byte[] notification(final int id, final String source, final String title, final String text) {
+    public static byte[] notification(final int id, final int appId, final String source,
+                                      final String title, final String text) {
         final byte[] sourceBytes = source.getBytes(StandardCharsets.UTF_8);
         final byte[] titleBytes = title.getBytes(StandardCharsets.UTF_8);
         final byte[] textBytes = text.getBytes(StandardCharsets.UTF_8);
@@ -271,8 +292,7 @@ public class VeryFitProtocol {
         out.write(0x01);
         out.write(0x00);
         out.write(0x01);
-        out.write(0x00);
-        out.write(0x00);
+        writeIntLE(out, appId, 2);
         writeIntLE(out, id, 4);
         writeIntLE(out, titleBytes.length, 4);
         writeIntLE(out, textBytes.length, 2);

@@ -52,6 +52,19 @@ public final class VeryFitConstants {
     public static final int FRAMED_ALARMS = 0x000e;
     public static final int FRAMED_ALARMS_QUERY = 0x000f;
     public static final int FRAMED_QUICK_REPLY = 0x0fff;
+    public static final int FRAMED_APP_REGISTRY = 0x003c;
+
+    /** Add the apps that follow to the watch's list, or ask for the list it holds. */
+    public static final byte REGISTRY_ADD = 0x01;
+    public static final byte REGISTRY_LIST = 0x03;
+    public static final int REGISTRY_ENTRY_LEN = 4;
+    /**
+     * The state the watch keeps per app. It answers with {@link #APP_PENDING} for one just added
+     * and moves it to {@link #APP_READY} later, so the vendor's freshly registered apps sit at the
+     * former until whatever settles them has happened.
+     */
+    public static final byte APP_READY = 0x01;
+    public static final byte APP_PENDING = 0x02;
 
     /** Fixed-size now-playing record: state, position, then the two padded text fields. */
     public static final int MUSIC_INFO_LEN = 139;

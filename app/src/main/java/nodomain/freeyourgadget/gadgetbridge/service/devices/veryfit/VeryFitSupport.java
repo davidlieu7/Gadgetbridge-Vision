@@ -34,6 +34,9 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
 
 import nodomain.freeyourgadget.gadgetbridge.GBApplication;
 import nodomain.freeyourgadget.gadgetbridge.R;
@@ -96,6 +99,7 @@ public class VeryFitSupport extends AbstractBTLESingleDeviceSupport {
     private byte[] pendingAuth;
     private byte[] features;
     private byte[] featuresExtra;
+    private final Map<Integer, Boolean> apps = new HashMap<>();
 
     public VeryFitSupport() {
         super(LOG);
@@ -123,6 +127,7 @@ public class VeryFitSupport extends AbstractBTLESingleDeviceSupport {
         }
         features = null;
         featuresExtra = null;
+        apps.clear();
         musicOpen = false;
         lastMusic = null;
         lastBrightness = null;
@@ -234,6 +239,10 @@ public class VeryFitSupport extends AbstractBTLESingleDeviceSupport {
     private void handleFramed(final VeryFitProtocol.Packet packet) {
         if (packet.cmd == VeryFitConstants.FRAMED_ALARMS_QUERY) {
             handleAlarms(packet.payload);
+            return;
+        }
+        if (packet.cmd == VeryFitConstants.FRAMED_APP_REGISTRY) {
+            handleApps(packet.payload);
             return;
         }
         if (packet.cmd == VeryFitConstants.FRAMED_HEALTH
@@ -349,6 +358,9 @@ public class VeryFitSupport extends AbstractBTLESingleDeviceSupport {
         setInitialized();
         if (getCapabilities().supports(VeryFitFeature.FRAMED_PROTOCOL)) {
             queryAlarms();
+        }
+        if (getCapabilities().supports(VeryFitFeature.FRAMED_PROTOCOL)) {
+            queryApps();
         }
         if (getCapabilities().isKnown()) {
             queryBrightness();
@@ -471,6 +483,29 @@ public class VeryFitSupport extends AbstractBTLESingleDeviceSupport {
         final GBDeviceEventFindPhone event = new GBDeviceEventFindPhone();
         event.event = stop ? GBDeviceEventFindPhone.Event.STOP : GBDeviceEventFindPhone.Event.START;
         evaluateGBDeviceEvent(event);
+    }
+
+    /**
+     * The list of apps the watch keeps a notification switch for. Its own settings screen is what
+     * turns them off, and it says so here rather than anywhere else, so what it reports wins.
+     */
+    private void handleApps(final byte[] payload) {
+        if (payload.length < 5 || payload[2] != VeryFitConstants.REGISTRY_LIST) {
+            return;
+        }
+
+        apps.clear();
+        final int count = payload[4] & 0xff;
+        for (int i = 0; i < count; i++) {
+            final int offset = 5 + i * VeryFitConstants.REGISTRY_ENTRY_LEN;
+            if (offset + VeryFitConstants.REGISTRY_ENTRY_LEN > payload.length) {
+                break;
+            }
+            apps.put((payload[offset] & 0xff) | ((payload[offset + 1] & 0xff) << 8),
+                    payload[offset + 3] == VeryFitConstants.APP_READY);
+        }
+        LOG.info("Watch holds {} notification apps, {} of them still pending", apps.size(),
+                Collections.frequency(apps.values(), Boolean.FALSE));
     }
 
     /** The watch has its own alarm UI, so what it reports wins over what we last pushed. */
@@ -729,6 +764,11 @@ public class VeryFitSupport extends AbstractBTLESingleDeviceSupport {
         send("veryfit brightness read", VeryFitProtocol.query(VeryFitConstants.QUERY_BRIGHTNESS));
     }
 
+    private void queryApps() {
+        sendFramed("veryfit app list", VeryFitConstants.FRAMED_APP_REGISTRY,
+                VeryFitProtocol.appRegistry(VeryFitConstants.REGISTRY_LIST));
+    }
+
     /** Reads the list straight back, which is the only way to see whether the watch took it. */
     private void queryAlarms() {
         send("veryfit alarm list", protocol.framed(VeryFitConstants.FRAMED_ALARMS_QUERY,
@@ -808,15 +848,35 @@ public class VeryFitSupport extends AbstractBTLESingleDeviceSupport {
                 notificationSpec.type != null ? notificationSpec.type.name() : "");
         final String title = StringUtils.getFirstOf(notificationSpec.title, notificationSpec.sender);
         final String body = StringUtils.ensureNotNull(notificationSpec.body);
+        final int appId = appId(notificationSpec.sourceAppId);
+
+        // An app the watch has only just been told about is not one it will quote back, so the
+        // two go out as separate writes rather than back to back in one.
+        if (!apps.containsKey(appId)) {
+            apps.put(appId, true);
+            sendFramed("veryfit app register", VeryFitConstants.FRAMED_APP_REGISTRY,
+                    VeryFitProtocol.appRegistry(VeryFitConstants.REGISTRY_ADD, appId));
+        }
 
         send("veryfit notification", protocol.framed(VeryFitConstants.FRAMED_NOTIFICATION,
-                VeryFitProtocol.notification(notificationSpec.getId(), source, title, body)));
+                VeryFitProtocol.notification(notificationSpec.getId(), appId, source, title, body)));
     }
 
     @Override
     public void onReset(final int flags) {
         send("veryfit reboot", VeryFitProtocol.command(VeryFitConstants.GROUP_RESTART,
                 VeryFitConstants.RESTART_REBOOT));
+    }
+
+    /**
+     * The watch keys its per-app switch on an id the phone picks for itself; both vendor apps use
+     * a different one for the same app, so the package name is folded into one of our own.
+     */
+    private static int appId(final String packageName) {
+        if (packageName == null) {
+            return 1;
+        }
+        return Math.abs(packageName.hashCode() % 0x7ffe) + 1;
     }
 
     private VeryFitCapabilities getCapabilities() {
