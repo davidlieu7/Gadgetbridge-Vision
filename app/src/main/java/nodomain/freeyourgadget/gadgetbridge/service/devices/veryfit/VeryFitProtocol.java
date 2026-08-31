@@ -18,6 +18,8 @@ package nodomain.freeyourgadget.gadgetbridge.service.devices.veryfit;
 
 import java.io.ByteArrayOutputStream;
 import java.nio.charset.StandardCharsets;
+import java.util.Calendar;
+import java.util.GregorianCalendar;
 import java.util.List;
 import java.util.Locale;
 
@@ -25,6 +27,8 @@ import nodomain.freeyourgadget.gadgetbridge.devices.veryfit.VeryFitConstants;
 import nodomain.freeyourgadget.gadgetbridge.model.Alarm;
 import nodomain.freeyourgadget.gadgetbridge.model.MusicSpec;
 import nodomain.freeyourgadget.gadgetbridge.model.MusicStateSpec;
+import nodomain.freeyourgadget.gadgetbridge.model.WeatherSpec;
+import nodomain.freeyourgadget.gadgetbridge.model.weather.WeatherMapper;
 import nodomain.freeyourgadget.gadgetbridge.util.StringUtils;
 
 /**
@@ -89,6 +93,85 @@ public class VeryFitProtocol {
 
     public static byte[] setting(final byte key, final byte... payload) {
         return command(VeryFitConstants.GROUP_SETTING, key, payload);
+    }
+
+    /**
+     * Body for {@link VeryFitConstants#FRAMED_WEATHER}: a 32-byte header, then the runs it counts
+     * off — sun times, hours, days — and the city name at the end of them. The header carries how
+     * long that name is, so it is the one field the watch reads the place from.
+     */
+    public static byte[] weather(final WeatherSpec spec) {
+        final byte[] city = StringUtils.truncateToBytes(spec.getLocation(), VeryFitConstants.WEATHER_CITY_LEN);
+        final byte[] name = city != null ? city : new byte[0];
+        final byte[] body = new byte[VeryFitConstants.WEATHER_FIXED_LEN + name.length];
+
+        final Calendar now = GregorianCalendar.getInstance();
+        body[0] = VeryFitConstants.WEATHER_VERSION;
+        body[1] = (byte) (now.get(Calendar.MONTH) + 1);
+        body[2] = (byte) now.get(Calendar.DAY_OF_MONTH);
+        body[3] = (byte) now.get(Calendar.HOUR_OF_DAY);
+        body[4] = (byte) now.get(Calendar.MINUTE);
+        body[5] = (byte) now.get(Calendar.SECOND);
+        body[6] = (byte) (now.get(Calendar.DAY_OF_WEEK) == Calendar.SUNDAY
+                ? 7 : now.get(Calendar.DAY_OF_WEEK) - 1);
+
+        final byte condition = WeatherMapper.mapToVeryFitCondition(spec.getCurrentConditionCode());
+        final long seconds = now.getTimeInMillis() / 1000L;
+        body[7] = seconds >= spec.getSunRise() && seconds < spec.getSunSet()
+                ? condition : WeatherMapper.veryFitConditionToNight(condition);
+        body[8] = temperature(spec.getCurrentTemp());
+        body[9] = temperature(spec.getTodayMaxTemp());
+        body[10] = temperature(spec.getTodayMinTemp());
+        body[15] = (byte) spec.getCurrentHumidity();
+        body[16] = (byte) Math.round(spec.getUvIndex());
+        body[18] = VeryFitConstants.WEATHER_SUN_TIMES;
+        body[19] = VeryFitConstants.WEATHER_HOURS;
+        body[20] = VeryFitConstants.WEATHER_DAYS;
+        body[21] = (byte) name.length;
+        body[22] = 0x01;
+
+        sunTimes(body, 32, spec);
+        forecast(body, 180, spec);
+
+        // The hourly run has never been filled, and the vendor leaves the tail of its own record
+        // in it — humidity, the sun, the days and the name over again. Sent the same way.
+        body[112] = body[15];
+        body[113] = body[16];
+        body[114] = 0x01;
+        sunTimes(body, 115, spec);
+        forecast(body, 119, spec);
+        body[150] = (byte) name.length;
+        System.arraycopy(name, 0, body, 151, name.length);
+
+        System.arraycopy(name, 0, body, VeryFitConstants.WEATHER_FIXED_LEN, name.length);
+        return body;
+    }
+
+    private static void sunTimes(final byte[] body, final int offset, final WeatherSpec spec) {
+        final Calendar sunrise = GregorianCalendar.getInstance();
+        sunrise.setTimeInMillis(spec.getSunRise() * 1000L);
+        final Calendar sunset = GregorianCalendar.getInstance();
+        sunset.setTimeInMillis(spec.getSunSet() * 1000L);
+
+        body[offset] = (byte) sunrise.get(Calendar.HOUR_OF_DAY);
+        body[offset + 1] = (byte) sunrise.get(Calendar.MINUTE);
+        body[offset + 2] = (byte) sunset.get(Calendar.HOUR_OF_DAY);
+        body[offset + 3] = (byte) sunset.get(Calendar.MINUTE);
+    }
+
+    /** Five days of {@code [condition][high][low]}, as many as the forecast reaches. */
+    private static void forecast(final byte[] body, final int offset, final WeatherSpec spec) {
+        final List<WeatherSpec.Daily> days = spec.getForecasts();
+        for (int i = 0; i < VeryFitConstants.WEATHER_FORECAST_DAYS && i < days.size(); i++) {
+            final WeatherSpec.Daily day = days.get(i);
+            body[offset + i * 3] = WeatherMapper.mapToVeryFitCondition(day.getConditionCode());
+            body[offset + i * 3 + 1] = temperature(day.getMaxTemp());
+            body[offset + i * 3 + 2] = temperature(day.getMinTemp());
+        }
+    }
+
+    private static byte temperature(final int kelvin) {
+        return (byte) (kelvin - 273 + VeryFitConstants.WEATHER_TEMPERATURE_OFFSET);
     }
 
     /** Fetch one data type, or close it again so the watch moves on to the next. */

@@ -54,6 +54,9 @@ import nodomain.freeyourgadget.gadgetbridge.model.Alarm;
 import nodomain.freeyourgadget.gadgetbridge.model.DeviceService;
 import nodomain.freeyourgadget.gadgetbridge.model.MusicSpec;
 import nodomain.freeyourgadget.gadgetbridge.model.MusicStateSpec;
+import nodomain.freeyourgadget.gadgetbridge.model.WeatherSpec;
+import nodomain.freeyourgadget.gadgetbridge.model.weather.Weather;
+import nodomain.freeyourgadget.gadgetbridge.model.weather.WeatherMapper;
 import nodomain.freeyourgadget.gadgetbridge.model.NotificationSpec;
 import nodomain.freeyourgadget.gadgetbridge.service.btle.AbstractBTLESingleDeviceSupport;
 import nodomain.freeyourgadget.gadgetbridge.service.btle.GattService;
@@ -630,6 +633,35 @@ public class VeryFitSupport extends AbstractBTLESingleDeviceSupport {
         }
 
         send("veryfit " + config, command);
+    }
+
+    @Override
+    public void onSendWeather() {
+        final WeatherSpec spec = Weather.getWeatherSpec();
+        if (spec == null || !getCapabilities().supports(VeryFitFeature.FRAMED_PROTOCOL)) {
+            return;
+        }
+
+        LOG.debug("Weather for {} at {}: condition {}, {} K, today {}/{} K",
+                spec.getLocation(), spec.getTimestamp(), spec.getCurrentConditionCode(),
+                spec.getCurrentTemp(), spec.getTodayMaxTemp(), spec.getTodayMinTemp());
+        for (int i = 0; i < spec.getForecasts().size() && i < 5; i++) {
+            final WeatherSpec.Daily day = spec.getForecasts().get(i);
+            LOG.debug("Weather day {}: condition {} -> {}, {}/{} K", i, day.getConditionCode(),
+                    WeatherMapper.mapToVeryFitCondition(day.getConditionCode()),
+                    day.getMaxTemp(), day.getMinTemp());
+        }
+
+        try {
+            final TransactionBuilder builder = performInitialized("veryfit weather");
+            write(builder, VeryFitProtocol.setting(VeryFitConstants.SETTING_WEATHER,
+                    VeryFitConstants.ON, (byte) 0, (byte) 0, (byte) 0));
+            write(builder, protocol.framed(VeryFitConstants.FRAMED_WEATHER,
+                    VeryFitProtocol.weather(spec)));
+            builder.queue();
+        } catch (final IOException e) {
+            LOG.error("Failed to send the weather", e);
+        }
     }
 
     @Override

@@ -129,6 +129,22 @@ public final class VeryFitConstants {
     public static final int GPS_SIGN_BIT = 0x8000;
     public static final int GPS_MINUTE_FRACTION = 10000;
 
+    /** The version the watch was sent in the one capture of this command. */
+    public static final byte WEATHER_VERSION = 0x03;
+    /** The three runs the header counts off, in the lengths the vendor asks for. */
+    public static final byte WEATHER_SUN_TIMES = 0x01;
+    public static final byte WEATHER_HOURS = 0x30;
+    public static final byte WEATHER_DAYS = 0x07;
+    /** Where those runs leave the city name: 32 + 1 x 4 + 48 x 3 + 7 x 3. */
+    public static final int WEATHER_FIXED_LEN = 201;
+    /** As much of the name as fits the hourly run the vendor's own copy of it sits in. */
+    public static final int WEATHER_CITY_LEN = 29;
+    public static final int WEATHER_FORECAST_DAYS = 5;
+    /** Temperatures are offset so that anything down to -100 C fits in a byte. */
+    public static final int WEATHER_TEMPERATURE_OFFSET = 100;
+
+    public static final byte SETTING_WEATHER = 0x2d;
+
     /** No reading was taken in that slot. */
     public static final int HEALTH_NO_VALUE = 0xff;
 

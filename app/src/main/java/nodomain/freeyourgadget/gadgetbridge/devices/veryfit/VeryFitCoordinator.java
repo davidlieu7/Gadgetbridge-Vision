@@ -134,6 +134,11 @@ public abstract class VeryFitCoordinator extends AbstractBLEDeviceCoordinator {
     }
 
     @Override
+    public boolean supportsWeather(@NonNull final GBDevice device) {
+        return getCapabilities(device).supports(VeryFitFeature.FRAMED_PROTOCOL);
+    }
+
+    @Override
     public boolean supportsRecordedActivities(@NonNull final GBDevice device) {
         return supportsDataFetching(device);
     }

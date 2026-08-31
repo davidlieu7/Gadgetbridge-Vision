@@ -313,6 +313,56 @@ object WeatherMapper {
         }
     }
 
+    /**
+     * The codes the VeryFit family draws icons for. They are the vendor SDK's WeatherInfo values,
+     * which is what its app puts on the wire whichever protocol version the watch speaks; the
+     * larger WeatherInfoV3 list is not what the watch reads. Rain (4) and cloudy (2) are the two
+     * confirmed against a capture of the vendor app and what the watch drew for it.
+     */
+    @JvmStatic
+    fun mapToVeryFitCondition(openWeatherMapCondition: Int): Byte {
+        return when (openWeatherMapCondition) {
+            // Group 2xx: Thunderstorm
+            200, 201, 210, 211, 230, 231, 232 -> 6 // shower
+            202, 212, 221 -> 5 // rainstorm
+            // Group 3xx: Drizzle
+            300, 301, 302, 310, 311, 312, 313, 314, 321 -> 6 // shower
+            // Group 5xx: Rain
+            500, 501 -> 4 // rain
+            502, 503, 504 -> 5 // rainstorm
+            511 -> 8 // sleet
+            520, 521, 522, 531 -> 6 // shower
+            // Group 6xx: Snow
+            600, 601, 602, 620, 621, 622 -> 7 // snow
+            611, 612, 613, 615, 616 -> 8 // sleet
+            // Group 7xx: Atmosphere
+            701, 711, 721, 741 -> 17 // haze
+            731, 751, 761, 762 -> 10 // sandstorm
+            771, 781 -> 16 // gale
+            // Group 800: Clear, and 80x: Clouds
+            800, 801 -> 1 // clear, and a few clouds the watch has no icon for
+            802, 803 -> 2 // cloudy
+            804 -> 3 // overcast
+            // Other codes
+            900 -> 5 // thunderstorm
+            901, 902, 962 -> 9 // typhoon
+            903 -> 14 // cold
+            904 -> 13 // hot
+            905, 957, 958, 959, 960, 961 -> 16 // gale
+            906 -> 8 // hail
+            951, 952, 953, 954, 955, 956 -> 15 // breeze
+            else -> 0
+        }
+    }
+
+    /** The watch has a night icon for the two conditions the sun is part of. */
+    @JvmStatic
+    fun veryFitConditionToNight(veryFitCondition: Byte): Byte {
+        if (veryFitCondition.toInt() == 1) return 11 // clear -> clear night
+        if (veryFitCondition.toInt() == 2) return 12 // cloudy -> cloudy night
+        return veryFitCondition
+    }
+
     @JvmStatic
     fun cmfConditionToNight(cmfCondition: Byte): Byte {
         if (cmfCondition.toInt() == 1) return 23 // clear --> clear night
