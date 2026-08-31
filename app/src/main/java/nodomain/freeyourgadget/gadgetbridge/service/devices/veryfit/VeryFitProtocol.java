@@ -91,6 +91,21 @@ public class VeryFitProtocol {
         return command(VeryFitConstants.GROUP_SETTING, key, payload);
     }
 
+    /** Fetch one data type, or close it again so the watch moves on to the next. */
+    public static byte[] healthRequest(final byte operate, final byte type, final boolean today) {
+        return new byte[]{operate, type, (byte) (today ? 1 : 0), 0x00, 0x00};
+    }
+
+    /** The round opens by announcing the wanted types, one fixed-size slot each. */
+    public static byte[] healthTypes(final byte[] types) {
+        final byte[] payload =
+                new byte[VeryFitConstants.HEALTH_TYPE_SLOTS * VeryFitConstants.HEALTH_REQUEST_LEN];
+        for (int i = 0; i < types.length; i++) {
+            payload[i * VeryFitConstants.HEALTH_REQUEST_LEN] = types[i];
+        }
+        return payload;
+    }
+
     public byte[] bindRequest() {
         return command(VeryFitConstants.GROUP_BIND, VeryFitConstants.BIND_START,
                 new byte[]{0x02, 0x02, 0x01, 0x03});

@@ -36,6 +36,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 
 import nodomain.freeyourgadget.gadgetbridge.GBApplication;
+import nodomain.freeyourgadget.gadgetbridge.R;
 import nodomain.freeyourgadget.gadgetbridge.database.DBHelper;
 import nodomain.freeyourgadget.gadgetbridge.activities.SettingsActivity;
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsPreferenceConst;
@@ -80,6 +81,7 @@ public class VeryFitSupport extends AbstractBTLESingleDeviceSupport {
     private static final int MIN_CHUNK_LEN = 20;
 
     private final VeryFitProtocol protocol = new VeryFitProtocol();
+    private final VeryFitHealthSync healthSync = new VeryFitHealthSync(this);
 
     private MediaManager mediaManager;
     private boolean musicOpen;
@@ -113,6 +115,9 @@ public class VeryFitSupport extends AbstractBTLESingleDeviceSupport {
 
         pending = null;
         pendingAuth = null;
+        if (healthSync.reset()) {
+            GB.updateTransferNotification(null, "", false, 100, getContext());
+        }
         features = null;
         featuresExtra = null;
         musicOpen = false;
@@ -226,6 +231,11 @@ public class VeryFitSupport extends AbstractBTLESingleDeviceSupport {
     private void handleFramed(final VeryFitProtocol.Packet packet) {
         if (packet.cmd == VeryFitConstants.FRAMED_ALARMS_QUERY) {
             handleAlarms(packet.payload);
+            return;
+        }
+        if (packet.cmd == VeryFitConstants.FRAMED_HEALTH
+                || packet.cmd == VeryFitConstants.FRAMED_HEALTH_TYPES) {
+            healthSync.onPacket(packet.cmd, packet.payload);
             return;
         }
         LOG.debug("Unhandled framed packet cmd=0x{} crc={} payload={}",
@@ -620,6 +630,33 @@ public class VeryFitSupport extends AbstractBTLESingleDeviceSupport {
         }
 
         send("veryfit " + config, command);
+    }
+
+    @Override
+    public void onFetchRecordedData(final int dataTypes) {
+        if (!getCapabilities().supports(VeryFitFeature.FRAMED_PROTOCOL) || healthSync.isRunning()) {
+            return;
+        }
+
+        GB.updateTransferNotification(getContext().getString(R.string.busy_task_fetch_activity_data),
+                "", true, 0, getContext());
+        getDevice().setBusyTask(R.string.busy_task_fetch_activity_data, getContext());
+        getDevice().sendDeviceUpdateIntent(getContext());
+        healthSync.start();
+    }
+
+    /** Nothing else runs while a round is in flight, so the device is free again once it ends. */
+    void onHealthSyncFinished() {
+        GB.signalActivityDataFinish(getDevice());
+        GB.updateTransferNotification(null, "", false, 100, getContext());
+        if (getDevice().isBusy()) {
+            getDevice().unsetBusyTask();
+            getDevice().sendDeviceUpdateIntent(getContext());
+        }
+    }
+
+    void sendFramed(final String task, final int cmd, final byte[] payload) {
+        send(task, protocol.framed(cmd, payload));
     }
 
     @Override

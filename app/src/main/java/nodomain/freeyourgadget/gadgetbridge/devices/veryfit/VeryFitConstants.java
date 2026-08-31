@@ -93,6 +93,49 @@ public final class VeryFitConstants {
     public static final byte QUERY_CLOCK = (byte) 0xa3;
     public static final byte QUERY_BRIGHTNESS = (byte) 0xb0;
     public static final byte QUERY_AUTO_WORKOUT = (byte) 0xea;
+
+    public static final int FRAMED_HEALTH = 0x0004;
+    public static final int FRAMED_HEALTH_TYPES = 0x0005;
+
+    /** Fetch a type, then close it again so the watch moves on. */
+    public static final byte HEALTH_FETCH = 0x00;
+    public static final byte HEALTH_CLOSE = 0x01;
+    /** Header in front of the summary block: the request echoed back, then three sizes. */
+    public static final int HEALTH_HEADER_LEN = 14;
+    public static final int HEALTH_REQUEST_LEN = 5;
+    /** The announcement the round opens with has room for twenty of them. */
+    public static final int HEALTH_TYPE_SLOTS = 20;
+
+    public static final byte HEALTH_SPO2 = 0x01;
+    public static final byte HEALTH_STRESS = 0x02;
+    public static final byte HEALTH_HEART_RATE = 0x03;
+    public static final byte HEALTH_STEPS = 0x08;
+    public static final byte HEALTH_SLEEP = 0x09;
+    public static final byte HEALTH_HRV = 0x11;
+    public static final byte HEALTH_GPS = 0x05;
+    public static final byte HEALTH_WORKOUT = 0x0e;
+
+    /** The only sport code ever seen on the wire, and the vendor app named it. */
+    public static final int WORKOUT_OUTDOOR_WALKING = 0x10;
+    /** Summary of one workout, the same shape whatever the sport was. */
+    public static final int WORKOUT_SUMMARY_LEN = 118;
+    /** A track is blocks of a full position followed by fixes that move it. */
+    public static final int GPS_BLOCK_LEN = 9;
+    public static final int GPS_FIX_LEN = 5;
+    public static final byte GPS_BLOCK = 0x01;
+    public static final int GPS_LONGITUDE_UP = 0x40;
+    public static final int GPS_LATITUDE_UP = 0x80;
+    /** Coordinates are degrees and whole minutes, with ten-thousandths of a minute beside them. */
+    public static final int GPS_SIGN_BIT = 0x8000;
+    public static final int GPS_MINUTE_FRACTION = 10000;
+
+    /** No reading was taken in that slot. */
+    public static final int HEALTH_NO_VALUE = 0xff;
+
+    public static final int SLEEP_AWAKE = 1;
+    public static final int SLEEP_LIGHT = 2;
+    public static final int SLEEP_DEEP = 3;
+    public static final int SLEEP_REM = 4;
     public static final byte QUERY_FIRMWARE = (byte) 0xeb;
     public static final byte QUERY_MTU = (byte) 0xf0;
 

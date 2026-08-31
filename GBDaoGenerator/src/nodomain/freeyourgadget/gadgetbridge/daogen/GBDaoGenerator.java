@@ -110,7 +110,7 @@ public class GBDaoGenerator {
             outputDir.mkdirs();
         }
 
-        final Schema schema = new Schema(151, MAIN_PACKAGE + ".entities");
+        final Schema schema = new Schema(152, MAIN_PACKAGE + ".entities");
 
         final List<Entity> sampleProvidersToGenerate = new LinkedList<>();
         final List<Entity> batterySampleProvidersToGenerate = new LinkedList<>();
@@ -237,6 +237,8 @@ public class GBDaoGenerator {
         sampleProvidersToGenerate.add(addMoyoungSleepStageSample(schema, user, device));
         sampleProvidersToGenerate.add(addMoyoungStressSample(schema, user, device));
         sampleProvidersToGenerate.add(addGloryFitStepsSample(schema, user, device));
+        sampleProvidersToGenerate.add(addVeryFitStepsSample(schema, user, device));
+        sampleProvidersToGenerate.add(addVeryFitWorkoutGpsSample(schema, user, device));
         addKeephealthActivitySample(schema, user, device);
         addKeephealthBloodPressureSample(schema, user, device);
         addKeephealthTemperatureSample(schema, user, device);
@@ -1512,6 +1514,24 @@ public class GBDaoGenerator {
         addCommonTimeSampleProperties("AbstractStressSample", stressSample, user, device);
         stressSample.addIntProperty(SAMPLE_STRESS).notNull().codeBeforeGetter(OVERRIDE);
         return stressSample;
+    }
+
+    private static Entity addVeryFitStepsSample(Schema schema, Entity user, Entity device) {
+        Entity stepsSample = addEntity(schema, "VeryFitStepsSample");
+        addCommonTimeSampleProperties("AbstractTimeSample", stepsSample, user, device);
+        stepsSample.addIntProperty("steps").notNull();
+        stepsSample.addIntProperty("distance").notNull();
+        stepsSample.addIntProperty("calories").notNull();
+        stepsSample.addIntProperty("activeMinutes").notNull();
+        return stepsSample;
+    }
+
+    private static Entity addVeryFitWorkoutGpsSample(Schema schema, Entity user, Entity device) {
+        Entity gpsSample = addEntity(schema, "VeryFitWorkoutGpsSample");
+        addCommonTimeSampleProperties("AbstractTimeSample", gpsSample, user, device);
+        gpsSample.addIntProperty("latitude").notNull();
+        gpsSample.addIntProperty("longitude").notNull();
+        return gpsSample;
     }
 
     private static Entity addGloryFitStepsSample(Schema schema, Entity user, Entity device) {

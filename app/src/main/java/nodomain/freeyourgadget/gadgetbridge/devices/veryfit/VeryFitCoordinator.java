@@ -17,6 +17,7 @@
 package nodomain.freeyourgadget.gadgetbridge.devices.veryfit;
 
 import android.bluetooth.le.ScanFilter;
+import android.content.Context;
 import android.os.ParcelUuid;
 
 import androidx.annotation.NonNull;
@@ -30,6 +31,18 @@ import nodomain.freeyourgadget.gadgetbridge.R;
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSpecificSettings;
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSpecificSettingsScreen;
 import nodomain.freeyourgadget.gadgetbridge.devices.AbstractBLEDeviceCoordinator;
+import nodomain.freeyourgadget.gadgetbridge.devices.GenericHrvValueSampleProvider;
+import nodomain.freeyourgadget.gadgetbridge.devices.GenericSpo2SampleProvider;
+import nodomain.freeyourgadget.gadgetbridge.devices.GenericStressSampleProvider;
+import nodomain.freeyourgadget.gadgetbridge.devices.SampleProvider;
+import nodomain.freeyourgadget.gadgetbridge.devices.TimeSampleProvider;
+import nodomain.freeyourgadget.gadgetbridge.entities.AbstractActivitySample;
+import nodomain.freeyourgadget.gadgetbridge.entities.DaoSession;
+import nodomain.freeyourgadget.gadgetbridge.model.ActivitySummaryParser;
+import nodomain.freeyourgadget.gadgetbridge.model.ActivityTrackProvider;
+import nodomain.freeyourgadget.gadgetbridge.model.HrvValueSample;
+import nodomain.freeyourgadget.gadgetbridge.model.Spo2Sample;
+import nodomain.freeyourgadget.gadgetbridge.model.StressSample;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDeviceCandidate;
 import nodomain.freeyourgadget.gadgetbridge.service.DeviceSupport;
@@ -83,6 +96,91 @@ public abstract class VeryFitCoordinator extends AbstractBLEDeviceCoordinator {
     @Override
     public boolean supportsMusicInfo(@NonNull final GBDevice device) {
         return getCapabilities(device).supports(VeryFitFeature.FRAMED_PROTOCOL);
+    }
+
+    @Override
+    public SampleProvider<? extends AbstractActivitySample> getSampleProvider(final GBDevice device,
+                                                                             final DaoSession session) {
+        return new VeryFitActivitySampleProvider(device, session);
+    }
+
+    @Override
+    public TimeSampleProvider<? extends Spo2Sample> getSpo2SampleProvider(final GBDevice device,
+                                                                          final DaoSession session) {
+        return new GenericSpo2SampleProvider(device, session);
+    }
+
+    @Override
+    public TimeSampleProvider<? extends StressSample> getStressSampleProvider(final GBDevice device,
+                                                                              final DaoSession session) {
+        return new GenericStressSampleProvider(device, session);
+    }
+
+    @Override
+    public TimeSampleProvider<? extends HrvValueSample> getHrvValueSampleProvider(final GBDevice device,
+                                                                                  final DaoSession session) {
+        return new GenericHrvValueSampleProvider(device, session);
+    }
+
+    @Override
+    public ActivitySummaryParser getActivitySummaryParser(final GBDevice device, final Context context) {
+        return new VeryFitWorkoutSummaryParser();
+    }
+
+    @Override
+    public ActivityTrackProvider getActivityTrackProvider(@NonNull final GBDevice device,
+                                                          @NonNull final Context context) {
+        return new VeryFitActivityTrackProvider(device);
+    }
+
+    @Override
+    public boolean supportsRecordedActivities(@NonNull final GBDevice device) {
+        return supportsDataFetching(device);
+    }
+
+    @Override
+    public boolean supportsDataFetching(@NonNull final GBDevice device) {
+        return getCapabilities(device).supports(VeryFitFeature.FRAMED_PROTOCOL);
+    }
+
+    @Override
+    public boolean supportsActivityTracking(@NonNull final GBDevice device) {
+        return supportsDataFetching(device);
+    }
+
+    @Override
+    public boolean supportsActiveCalories(@NonNull final GBDevice device) {
+        return true;
+    }
+
+    @Override
+    public boolean supportsHeartRateMeasurement(@NonNull final GBDevice device) {
+        return true;
+    }
+
+    @Override
+    public boolean supportsSpo2(@NonNull final GBDevice device) {
+        return getCapabilities(device).supports(VeryFitFeature.SPO2_ALL_DAY);
+    }
+
+    @Override
+    public boolean supportsStressMeasurement(@NonNull final GBDevice device) {
+        return true;
+    }
+
+    @Override
+    public boolean supportsHrvMeasurement(@NonNull final GBDevice device) {
+        return true;
+    }
+
+    @Override
+    public boolean supportsRemSleep(@NonNull final GBDevice device) {
+        return true;
+    }
+
+    @Override
+    public boolean supportsAwakeSleep(@NonNull final GBDevice device) {
+        return true;
     }
 
     @Override
