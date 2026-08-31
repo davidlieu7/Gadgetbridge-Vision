@@ -16,8 +16,10 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 package nodomain.freeyourgadget.gadgetbridge.service.devices.veryfit;
 
+import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothGatt;
 import android.bluetooth.BluetoothGattCharacteristic;
+import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
 
@@ -39,6 +41,7 @@ import nodomain.freeyourgadget.gadgetbridge.activities.SettingsActivity;
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsPreferenceConst;
 import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEventBatteryInfo;
 import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEventFindPhone;
+import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEventMusicControl;
 import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEventVersionInfo;
 import nodomain.freeyourgadget.gadgetbridge.devices.veryfit.VeryFitCapabilities;
 import nodomain.freeyourgadget.gadgetbridge.devices.veryfit.VeryFitConstants;
@@ -47,11 +50,14 @@ import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
 import nodomain.freeyourgadget.gadgetbridge.model.ActivityUser;
 import nodomain.freeyourgadget.gadgetbridge.model.Alarm;
 import nodomain.freeyourgadget.gadgetbridge.model.DeviceService;
+import nodomain.freeyourgadget.gadgetbridge.model.MusicSpec;
+import nodomain.freeyourgadget.gadgetbridge.model.MusicStateSpec;
 import nodomain.freeyourgadget.gadgetbridge.model.NotificationSpec;
 import nodomain.freeyourgadget.gadgetbridge.service.btle.AbstractBTLESingleDeviceSupport;
 import nodomain.freeyourgadget.gadgetbridge.service.btle.GattService;
 import nodomain.freeyourgadget.gadgetbridge.service.btle.TransactionBuilder;
 import nodomain.freeyourgadget.gadgetbridge.util.GB;
+import nodomain.freeyourgadget.gadgetbridge.util.MediaManager;
 import nodomain.freeyourgadget.gadgetbridge.util.preferences.DevicePrefs;
 import nodomain.freeyourgadget.gadgetbridge.util.StringUtils;
 
@@ -74,6 +80,10 @@ public class VeryFitSupport extends AbstractBTLESingleDeviceSupport {
 
     private final VeryFitProtocol protocol = new VeryFitProtocol();
 
+    private MediaManager mediaManager;
+    private boolean musicOpen;
+    private byte[] lastMusic;
+    private int lastVolume = -1;
     private ByteArrayOutputStream pending;
     private int pendingLength;
     private byte[] pendingAuth;
@@ -88,6 +98,12 @@ public class VeryFitSupport extends AbstractBTLESingleDeviceSupport {
     }
 
     @Override
+    public void setContext(final GBDevice device, final BluetoothAdapter adapter, final Context context) {
+        super.setContext(device, adapter, context);
+        mediaManager = new MediaManager(context);
+    }
+
+    @Override
     protected TransactionBuilder initializeDevice(@NonNull final TransactionBuilder builder) {
         builder.setDeviceState(GBDevice.State.INITIALIZING);
         builder.requestMtu(TARGET_MTU);
@@ -97,6 +113,9 @@ public class VeryFitSupport extends AbstractBTLESingleDeviceSupport {
         pendingAuth = null;
         features = null;
         featuresExtra = null;
+        musicOpen = false;
+        lastMusic = null;
+        lastVolume = -1;
 
         final byte[] storedAuth = getStoredAuth();
         if (storedAuth != null) {
@@ -290,6 +309,8 @@ public class VeryFitSupport extends AbstractBTLESingleDeviceSupport {
         if (getCapabilities().supports(VeryFitFeature.FRAMED_PROTOCOL)) {
             queryAlarms();
         }
+        mediaManager.refresh();
+        sendMusic();
     }
 
     private void handleBind(final VeryFitProtocol.Packet packet) {
@@ -348,12 +369,54 @@ public class VeryFitSupport extends AbstractBTLESingleDeviceSupport {
                     queryAlarms();
                 }
                 break;
+            case VeryFitConstants.LINK_MEDIA:
+                handleMedia(packet.payload);
+                break;
             case VeryFitConstants.LINK_FIND_PHONE:
                 handleFindPhone(packet.payload);
                 break;
             default:
                 LOG.debug("Unhandled link event {}", Integer.toHexString(packet.key));
         }
+    }
+
+    /**
+     * The watch's own slider reports a percentage rather than a direction, so anything but the
+     * level it already has becomes a step in that direction.
+     */
+    private void handleMedia(final byte[] payload) {
+        if (payload.length < 2) {
+            return;
+        }
+
+        final GBDeviceEventMusicControl event = new GBDeviceEventMusicControl();
+        switch (payload[0]) {
+            case VeryFitConstants.MEDIA_PLAY:
+                event.event = GBDeviceEventMusicControl.Event.PLAY;
+                break;
+            case VeryFitConstants.MEDIA_PAUSE:
+                event.event = GBDeviceEventMusicControl.Event.PAUSE;
+                break;
+            case VeryFitConstants.MEDIA_PREVIOUS:
+                event.event = GBDeviceEventMusicControl.Event.PREVIOUS;
+                break;
+            case VeryFitConstants.MEDIA_NEXT:
+                event.event = GBDeviceEventMusicControl.Event.NEXT;
+                break;
+            case VeryFitConstants.MEDIA_VOLUME:
+                final int requested = payload[1] & 0xff;
+                if (requested == mediaManager.getPhoneVolume()) {
+                    return;
+                }
+                event.event = requested > mediaManager.getPhoneVolume()
+                        ? GBDeviceEventMusicControl.Event.VOLUMEUP
+                        : GBDeviceEventMusicControl.Event.VOLUMEDOWN;
+                break;
+            default:
+                LOG.debug("Unhandled media event {}", GB.hexdump(payload));
+                return;
+        }
+        evaluateGBDeviceEvent(event);
     }
 
     /** Sent as a start/stop pair, one pair per press of the watch's find-my-phone button. */
@@ -443,6 +506,7 @@ public class VeryFitSupport extends AbstractBTLESingleDeviceSupport {
         write(builder, VeryFitSettings.findPhone(prefs));
         write(builder, VeryFitSettings.heartRate(prefs));
         if (capabilities.isKnown()) {
+            write(builder, VeryFitSettings.music());
             write(builder, VeryFitSettings.inactivity(prefs));
             write(builder, VeryFitSettings.hydration(prefs));
         }
@@ -527,6 +591,67 @@ public class VeryFitSupport extends AbstractBTLESingleDeviceSupport {
     private void queryAlarms() {
         send("veryfit alarm list", protocol.framed(VeryFitConstants.FRAMED_ALARMS_QUERY,
                 new byte[]{0x00}));
+    }
+
+    @Override
+    public void onSetMusicInfo(final MusicSpec musicSpec) {
+        if (mediaManager.onSetMusicInfo(musicSpec)) {
+            sendMusic();
+        }
+    }
+
+    @Override
+    public void onSetMusicState(final MusicStateSpec stateSpec) {
+        if (mediaManager.onSetMusicState(stateSpec)) {
+            sendMusic();
+        }
+    }
+
+    /** Every change is announced twice, and the watch is told about it once. */
+    @Override
+    public void onSetPhoneVolume(final float volume) {
+        if (watchVolume() == lastVolume) {
+            return;
+        }
+        lastVolume = watchVolume();
+        send("veryfit volume", VeryFitSettings.volume(lastVolume));
+    }
+
+    /** The watch only listens once the screen has been opened, and stops when it is closed. */
+    private void sendMusic() {
+        if (!getCapabilities().supports(VeryFitFeature.FRAMED_PROTOCOL)) {
+            return;
+        }
+
+        final MusicSpec spec = mediaManager.getBufferMusicSpec();
+        final MusicStateSpec state = mediaManager.getBufferMusicStateSpec();
+        final boolean playing = spec != null && state != null;
+
+        // The track and its state arrive as two separate updates, which often say the same thing.
+        final byte[] info = VeryFitProtocol.musicInfo(spec, state, watchVolume());
+        if (Arrays.equals(info, lastMusic)) {
+            return;
+        }
+        lastMusic = info;
+
+        try {
+            final TransactionBuilder builder = performInitialized("veryfit music");
+            if (playing != musicOpen) {
+                musicOpen = playing;
+                write(builder, VeryFitProtocol.command(VeryFitConstants.GROUP_APP,
+                        VeryFitConstants.APP_MUSIC,
+                        playing ? VeryFitConstants.APP_MUSIC_START : VeryFitConstants.APP_MUSIC_STOP,
+                        (byte) 0, (byte) 0, (byte) 0));
+            }
+            write(builder, protocol.framed(VeryFitConstants.FRAMED_MUSIC, info));
+            builder.queue();
+        } catch (final IOException e) {
+            LOG.error("Failed to send music info", e);
+        }
+    }
+
+    private int watchVolume() {
+        return Math.round(mediaManager.getPhoneVolume() * VeryFitConstants.MUSIC_VOLUME_STEPS / 100f);
     }
 
     @Override

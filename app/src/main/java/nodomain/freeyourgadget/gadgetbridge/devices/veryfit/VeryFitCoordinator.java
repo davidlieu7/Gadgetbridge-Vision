@@ -81,6 +81,11 @@ public abstract class VeryFitCoordinator extends AbstractBLEDeviceCoordinator {
     }
 
     @Override
+    public boolean supportsMusicInfo(@NonNull final GBDevice device) {
+        return getCapabilities(device).supports(VeryFitFeature.FRAMED_PROTOCOL);
+    }
+
+    @Override
     public int getAlarmSlotCount(final GBDevice device) {
         final VeryFitCapabilities capabilities = getCapabilities(device);
         return capabilities.supports(VeryFitFeature.FRAMED_PROTOCOL) ? capabilities.getAlarmSlots() : 0;

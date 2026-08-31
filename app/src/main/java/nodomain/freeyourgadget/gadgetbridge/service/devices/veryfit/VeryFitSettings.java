@@ -159,6 +159,18 @@ public final class VeryFitSettings {
                 onOff(enabled), (byte) 0, (byte) 0, (byte) 0);
     }
 
+    /** The second byte is the watch's own now-playing screen, which the vendor leaves off. */
+    public static byte[] music() {
+        return VeryFitProtocol.setting(VeryFitConstants.SETTING_MUSIC,
+                VeryFitConstants.ON, VeryFitConstants.OFF);
+    }
+
+    /** The phone's media level on the watch's fifteen-step scale. */
+    public static byte[] volume(final int volume) {
+        return VeryFitProtocol.setting(VeryFitConstants.SETTING_VOLUME,
+                VeryFitConstants.MUSIC_VOLUME_STEPS, (byte) volume);
+    }
+
     public static byte[] inactivity(final Prefs prefs) {
         final boolean enabled = prefs.getBoolean(DeviceSettingsPreferenceConst.PREF_INACTIVITY_ENABLE, false);
         final int threshold = prefs.getInt(DeviceSettingsPreferenceConst.PREF_INACTIVITY_THRESHOLD, 60);

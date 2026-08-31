@@ -48,9 +48,19 @@ public final class VeryFitConstants {
     public static final int FRAMED_NOTIFICATION = 0x0060;
     public static final int FRAMED_WORLD_CLOCK = 0x003b;
     public static final int FRAMED_WEATHER = 0x003a;
+    public static final int FRAMED_MUSIC = 0x000a;
     public static final int FRAMED_ALARMS = 0x000e;
     public static final int FRAMED_ALARMS_QUERY = 0x000f;
     public static final int FRAMED_QUICK_REPLY = 0x0fff;
+
+    /** Fixed-size now-playing record: state, position, then the two padded text fields. */
+    public static final int MUSIC_INFO_LEN = 139;
+    public static final int MUSIC_TEXT_LEN = 64;
+    public static final byte MUSIC_PLAYING = 0x01;
+    public static final byte MUSIC_PAUSED = 0x02;
+    public static final byte MUSIC_IDLE = 0x03;
+    /** The scale the watch shows the volume on; the phone's own level is quantised onto it. */
+    public static final byte MUSIC_VOLUME_STEPS = 0x0f;
 
     // Every slot is written on every push, empty ones included.
     public static final int ALARM_RECORD_LEN = 34;
@@ -91,8 +101,10 @@ public final class VeryFitConstants {
     public static final byte SETTING_HOST_OS = 0x23;
     public static final byte SETTING_HEART_RATE = 0x24;
     public static final byte SETTING_FIND_PHONE = 0x26;
+    public static final byte SETTING_MUSIC = 0x2a;
     public static final byte SETTING_INACTIVITY = 0x47;
     public static final byte SETTING_HYDRATION = 0x60;
+    public static final byte SETTING_VOLUME = (byte) 0xf0;
 
     public static final byte BIND_START = 0x01;
     public static final byte BIND_RELEASE = 0x02;
@@ -106,9 +118,23 @@ public final class VeryFitConstants {
     /** Code `00` says the user changed something on the watch, and byte 2 says what. */
     public static final byte LINK_EVENT_CHANGED = 0x00;
     public static final byte LINK_EVENT_CHANGED_ALARMS = 0x01;
+    /** Pushed by the watch when a media button on its music screen is pressed. */
+    public static final byte LINK_MEDIA = 0x01;
+    public static final byte MEDIA_PLAY = 0x01;
+    public static final byte MEDIA_PAUSE = 0x02;
+    public static final byte MEDIA_PREVIOUS = 0x04;
+    public static final byte MEDIA_NEXT = 0x05;
+    /** Followed by the level the watch's own slider was moved to, as a percentage. */
+    public static final byte MEDIA_VOLUME = 0x0f;
+
     /** Pushed by the watch when its find-my-phone button is used: {@code [00 start / 01 stop][0f]}. */
     public static final byte LINK_FIND_PHONE = 0x02;
     public static final byte LINK_FIND_PHONE_STOP = 0x01;
+
+    /** Opens and closes the watch's music screen, start/stop as the first payload byte. */
+    public static final byte APP_MUSIC = 0x01;
+    public static final byte APP_MUSIC_START = 0x00;
+    public static final byte APP_MUSIC_STOP = 0x01;
 
     /** Alert on the watch, with the start/stop selector as the first payload byte. */
     public static final byte APP_FIND_DEVICE = 0x04;

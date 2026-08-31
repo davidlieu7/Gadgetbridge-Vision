@@ -23,6 +23,8 @@ import java.util.Locale;
 
 import nodomain.freeyourgadget.gadgetbridge.devices.veryfit.VeryFitConstants;
 import nodomain.freeyourgadget.gadgetbridge.model.Alarm;
+import nodomain.freeyourgadget.gadgetbridge.model.MusicSpec;
+import nodomain.freeyourgadget.gadgetbridge.model.MusicStateSpec;
 import nodomain.freeyourgadget.gadgetbridge.util.StringUtils;
 
 /**
@@ -186,6 +188,41 @@ public class VeryFitProtocol {
     }
 
     /**
+     * Body for {@link VeryFitConstants#FRAMED_MUSIC}: play state, position and duration, then the
+     * track and the artist, each in a padded field of its own with a byte count in front of it.
+     * With nothing playing the watch only wants the state.
+     */
+    public static byte[] musicInfo(final MusicSpec spec, final MusicStateSpec state, final int volume) {
+        final byte[] body = new byte[VeryFitConstants.MUSIC_INFO_LEN];
+        if (spec == null || state == null) {
+            body[0] = VeryFitConstants.MUSIC_IDLE;
+            return body;
+        }
+
+        body[0] = state.state == MusicStateSpec.STATE_PLAYING
+                ? VeryFitConstants.MUSIC_PLAYING : VeryFitConstants.MUSIC_PAUSED;
+        writeShortLE(body, 1, state.position);
+        writeShortLE(body, 3, spec.duration);
+
+        final byte[] track = text(spec.track);
+        writeShortLE(body, 5, track.length);
+        System.arraycopy(track, 0, body, 7, track.length);
+
+        body[71] = VeryFitConstants.MUSIC_VOLUME_STEPS;
+        body[72] = (byte) volume;
+
+        final byte[] artist = text(spec.artist);
+        writeShortLE(body, 73, artist.length);
+        System.arraycopy(artist, 0, body, 75, artist.length);
+        return body;
+    }
+
+    private static byte[] text(final String value) {
+        final byte[] bytes = StringUtils.truncateToBytes(value, VeryFitConstants.MUSIC_TEXT_LEN);
+        return bytes != null ? bytes : new byte[0];
+    }
+
+    /**
      * Body for {@link VeryFitConstants#FRAMED_ALARMS}: a count, then one fixed-size record per
      * slot. The watch replaces its whole table, so unused slots are written out as empty rather
      * than left off the end.
@@ -254,6 +291,12 @@ public class VeryFitProtocol {
     private int nextSequence() {
         sequence = (sequence + 1) & 0xffff;
         return sequence;
+    }
+
+    private static void writeShortLE(final byte[] target, final int offset, final int value) {
+        final int clamped = Math.max(0, Math.min(value, 0xffff));
+        target[offset] = (byte) (clamped & 0xff);
+        target[offset + 1] = (byte) ((clamped >> 8) & 0xff);
     }
 
     private static void writeIntLE(final ByteArrayOutputStream out, final int value, final int bytes) {
