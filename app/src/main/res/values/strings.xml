@@ -1393,6 +1393,12 @@
     <string name="icelandic">Icelandic</string>
     <string name="latvian">Latvian</string>
     <string name="lithuanian">Lithuanian</string>
+    <string name="bulgarian">Bulgarian</string>
+    <string name="burmese">Burmese</string>
+    <string name="filipino">Filipino</string>
+    <string name="hindi">Hindi</string>
+    <string name="slovak">Slovak</string>
+    <string name="slovenian">Slovenian</string>
     <string name="persian">Persian</string>
     <string name="scandinavian">Scandinavian</string>
     <string name="serbian">Serbian</string>
@@ -2308,6 +2314,7 @@
     <string name="devicetype_qhybrid" translatable="false">Fossil Q Hybrid</string>
     <string name="devicetype_mykronoz_zetime" translatable="false">MyKronoz ZeTime</string>
     <string name="devicetype_id115" translatable="false">ID115</string>
+    <string name="devicetype_realme_watch_5" translatable="false">realme Watch 5</string>
     <string name="devicetype_watch9" translatable="false">Watch 9</string>
     <string name="devicetype_watchx" translatable="false">Watch X</string>
     <string name="devicetype_watchxplus" translatable="false">Watch X Plus</string>

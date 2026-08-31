@@ -524,6 +524,7 @@ import nodomain.freeyourgadget.gadgetbridge.devices.realme.RealmeBudsT100Coordin
 import nodomain.freeyourgadget.gadgetbridge.devices.realme.RealmeBudsT110Coordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.realme.RealmeBudsT200Coordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.realme.RealmeBudsT300Coordinator;
+import nodomain.freeyourgadget.gadgetbridge.devices.veryfit.RealmeWatch5Coordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.redmibuds.RedmiBuds3ProCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.redmibuds.RedmiBuds4ActiveCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.redmibuds.RedmiBuds5ProCoordinator;
@@ -783,6 +784,7 @@ public enum DeviceType {
     XWATCH(XWatchCoordinator.class),
     ZETIME(ZeTimeCoordinator.class),
     ID115(ID115Coordinator.class),
+    REALME_WATCH_5(RealmeWatch5Coordinator.class),
     WATCH9(Watch9DeviceCoordinator.class),
     WATCHXPLUS(WatchXPlusDeviceCoordinator.class),
     ROIDMI(Roidmi1Coordinator.class),

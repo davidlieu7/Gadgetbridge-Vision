@@ -2848,6 +2848,15 @@
         <item name="th">@string/thai</item>
         <item name="fa">@string/persian</item>
         <item name="vi">@string/vietnamese</item>
+        <item name="bg">@string/bulgarian</item>
+        <item name="my">@string/burmese</item>
+        <item name="hr">@string/croatian</item>
+        <item name="fil">@string/filipino</item>
+        <item name="hi">@string/hindi</item>
+        <item name="lt">@string/lithuanian</item>
+        <item name="sr">@string/serbian</item>
+        <item name="sk">@string/slovak</item>
+        <item name="sl">@string/slovenian</item>
     </string-array>
 
     <string-array name="pref_language_all_values">
@@ -2914,6 +2923,15 @@
         <item>th</item>
         <item>fa</item>
         <item>vi</item>
+        <item>bg</item>
+        <item>my</item>
+        <item>hr</item>
+        <item>fil</item>
+        <item>hi</item>
+        <item>lt</item>
+        <item>sr</item>
+        <item>sk</item>
+        <item>sl</item>
     </string-array>
 
     <string-array name="pref_amazfitbip_language">
