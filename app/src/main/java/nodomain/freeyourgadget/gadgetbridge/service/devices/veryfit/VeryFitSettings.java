@@ -27,6 +27,7 @@ import java.util.TimeZone;
 
 import nodomain.freeyourgadget.gadgetbridge.GBApplication;
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsPreferenceConst;
+import nodomain.freeyourgadget.gadgetbridge.devices.miband.MiBandConst;
 import nodomain.freeyourgadget.gadgetbridge.devices.veryfit.VeryFitCapabilities;
 import nodomain.freeyourgadget.gadgetbridge.devices.veryfit.VeryFitConstants;
 import nodomain.freeyourgadget.gadgetbridge.devices.veryfit.VeryFitFeature;
@@ -159,6 +160,16 @@ public final class VeryFitSettings {
                 onOff(enabled), (byte) 0, (byte) 0, (byte) 0);
     }
 
+    /** Raise to wake. The window is the watch's own, and its screen is the only way to set it. */
+    public static byte[] wristWake(final Prefs prefs) {
+        final boolean enabled = prefs.getBoolean(
+                DeviceSettingsPreferenceConst.PREF_LIFTWRIST_NOSHED, false);
+
+        return VeryFitProtocol.setting(VeryFitConstants.SETTING_WRIST_WAKE,
+                onOff(enabled), VeryFitConstants.WRIST_WAKE_SECONDS, VeryFitConstants.WRIST_ALL_DAY,
+                (byte) 0, (byte) 0, VeryFitConstants.WRIST_END_HOUR, VeryFitConstants.WRIST_END_MINUTE);
+    }
+
     /** The second byte is the watch's own now-playing screen, which the vendor leaves off. */
     public static byte[] music() {
         return VeryFitProtocol.setting(VeryFitConstants.SETTING_MUSIC,
@@ -169,6 +180,31 @@ public final class VeryFitSettings {
     public static byte[] volume(final int volume) {
         return VeryFitProtocol.setting(VeryFitConstants.SETTING_VOLUME,
                 VeryFitConstants.MUSIC_VOLUME_STEPS, (byte) volume);
+    }
+
+    /**
+     * The level, then the window the watch dims itself in on its own. The two trailing fields are
+     * the night level and how long the screen stays lit, neither of which is exposed.
+     */
+    public static byte[] brightness(final Prefs prefs) {
+        final int percent = prefs.getInt(DeviceSettingsPreferenceConst.PREF_SCREEN_BRIGHTNESS, 50);
+        final boolean night = MiBandConst.PREF_NIGHT_MODE_SCHEDULED.equals(
+                prefs.getString(MiBandConst.PREF_NIGHT_MODE, MiBandConst.PREF_NIGHT_MODE_OFF));
+        final Calendar start = time(prefs, MiBandConst.PREF_NIGHT_MODE_START, "16:00");
+        final Calendar end = time(prefs, MiBandConst.PREF_NIGHT_MODE_END, "07:00");
+
+        return VeryFitProtocol.setting(VeryFitConstants.SETTING_BRIGHTNESS,
+                level(percent), VeryFitConstants.BRIGHTNESS_FROM_PHONE,
+                VeryFitConstants.BRIGHTNESS_AMBIENT_OFF,
+                night ? VeryFitConstants.NIGHT_DIM_SCHEDULED : VeryFitConstants.NIGHT_DIM_OFF,
+                hour(start), minute(start), hour(end), minute(end),
+                VeryFitConstants.NIGHT_DIM_LEVEL, VeryFitConstants.BRIGHTNESS_INTERVAL);
+    }
+
+    private static byte level(final int percent) {
+        final int step = VeryFitConstants.BRIGHTNESS_STEP;
+        final int stops = Math.round(percent / (float) step);
+        return (byte) (Math.max(1, Math.min(stops, 100 / step)) * step);
     }
 
     public static byte[] inactivity(final Prefs prefs) {

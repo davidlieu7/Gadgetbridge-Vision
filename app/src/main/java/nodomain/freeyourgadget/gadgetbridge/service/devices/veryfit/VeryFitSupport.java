@@ -43,6 +43,7 @@ import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEventBatteryInf
 import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEventFindPhone;
 import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEventMusicControl;
 import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEventVersionInfo;
+import nodomain.freeyourgadget.gadgetbridge.devices.miband.MiBandConst;
 import nodomain.freeyourgadget.gadgetbridge.devices.veryfit.VeryFitCapabilities;
 import nodomain.freeyourgadget.gadgetbridge.devices.veryfit.VeryFitConstants;
 import nodomain.freeyourgadget.gadgetbridge.devices.veryfit.VeryFitFeature;
@@ -83,6 +84,7 @@ public class VeryFitSupport extends AbstractBTLESingleDeviceSupport {
     private MediaManager mediaManager;
     private boolean musicOpen;
     private byte[] lastMusic;
+    private byte[] lastBrightness;
     private int lastVolume = -1;
     private ByteArrayOutputStream pending;
     private int pendingLength;
@@ -115,6 +117,7 @@ public class VeryFitSupport extends AbstractBTLESingleDeviceSupport {
         featuresExtra = null;
         musicOpen = false;
         lastMusic = null;
+        lastBrightness = null;
         lastVolume = -1;
 
         final byte[] storedAuth = getStoredAuth();
@@ -262,6 +265,9 @@ public class VeryFitSupport extends AbstractBTLESingleDeviceSupport {
             case VeryFitConstants.QUERY_FIRMWARE:
                 handleFirmware(packet.payload);
                 break;
+            case VeryFitConstants.QUERY_BRIGHTNESS:
+                handleBrightness(packet.payload);
+                break;
             default:
                 LOG.debug("Unhandled query response {}: {}", Integer.toHexString(packet.key),
                         GB.hexdump(packet.payload));
@@ -277,6 +283,16 @@ public class VeryFitSupport extends AbstractBTLESingleDeviceSupport {
         event.level = payload[4] & 0xff;
         event.voltage = ((payload[1] & 0xff) | ((payload[2] & 0xff) << 8)) / 1000f;
         evaluateGBDeviceEvent(event);
+    }
+
+    /** What the watch settled on: it keeps its own values for the fields it does not like. */
+    private void handleBrightness(final byte[] payload) {
+        if (payload.length < 10) {
+            return;
+        }
+        LOG.info("Watch brightness: level {}, night dimming {} from {}:{} to {}:{} at level {}",
+                payload[0] & 0xff, payload[3] & 0xff, payload[4] & 0xff, payload[5] & 0xff,
+                payload[6] & 0xff, payload[7] & 0xff, payload[8] & 0xff);
     }
 
     private void handleFirmware(final byte[] payload) {
@@ -308,6 +324,9 @@ public class VeryFitSupport extends AbstractBTLESingleDeviceSupport {
         setInitialized();
         if (getCapabilities().supports(VeryFitFeature.FRAMED_PROTOCOL)) {
             queryAlarms();
+        }
+        if (getCapabilities().isKnown()) {
+            queryBrightness();
         }
         mediaManager.refresh();
         sendMusic();
@@ -507,6 +526,9 @@ public class VeryFitSupport extends AbstractBTLESingleDeviceSupport {
         write(builder, VeryFitSettings.heartRate(prefs));
         if (capabilities.isKnown()) {
             write(builder, VeryFitSettings.music());
+            write(builder, VeryFitSettings.wristWake(prefs));
+            lastBrightness = VeryFitSettings.brightness(prefs);
+            write(builder, lastBrightness);
             write(builder, VeryFitSettings.inactivity(prefs));
             write(builder, VeryFitSettings.hydration(prefs));
         }
@@ -539,6 +561,15 @@ public class VeryFitSupport extends AbstractBTLESingleDeviceSupport {
             case DeviceSettingsPreferenceConst.PREF_FIND_PHONE:
                 command = VeryFitSettings.findPhone(prefs);
                 break;
+            case DeviceSettingsPreferenceConst.PREF_LIFTWRIST_NOSHED:
+                command = VeryFitSettings.wristWake(prefs);
+                break;
+            case DeviceSettingsPreferenceConst.PREF_SCREEN_BRIGHTNESS:
+            case MiBandConst.PREF_NIGHT_MODE:
+            case MiBandConst.PREF_NIGHT_MODE_START:
+            case MiBandConst.PREF_NIGHT_MODE_END:
+                sendBrightness();
+                return;
             case DeviceSettingsPreferenceConst.PREF_INACTIVITY_ENABLE:
             case DeviceSettingsPreferenceConst.PREF_INACTIVITY_START:
             case DeviceSettingsPreferenceConst.PREF_INACTIVITY_END:
@@ -585,6 +616,22 @@ public class VeryFitSupport extends AbstractBTLESingleDeviceSupport {
         send("veryfit alarms", protocol.framed(VeryFitConstants.FRAMED_ALARMS,
                 VeryFitProtocol.alarms(alarms)));
         queryAlarms();
+    }
+
+    /** The slider fires once per step, and neighbouring steps round onto the same level. */
+    private void sendBrightness() {
+        final byte[] command = VeryFitSettings.brightness(getDevicePrefs());
+        if (Arrays.equals(command, lastBrightness)) {
+            return;
+        }
+        lastBrightness = command;
+        send("veryfit brightness", command);
+        queryBrightness();
+    }
+
+    /** The vendor reads this one straight back after every write, and so do we. */
+    private void queryBrightness() {
+        send("veryfit brightness read", VeryFitProtocol.query(VeryFitConstants.QUERY_BRIGHTNESS));
     }
 
     /** Reads the list straight back, which is the only way to see whether the watch took it. */

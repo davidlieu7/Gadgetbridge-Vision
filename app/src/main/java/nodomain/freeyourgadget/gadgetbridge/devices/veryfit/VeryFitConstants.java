@@ -91,6 +91,7 @@ public final class VeryFitConstants {
     public static final byte QUERY_STEP_GOAL = 0x08;
     public static final byte QUERY_UNITS = 0x22;
     public static final byte QUERY_CLOCK = (byte) 0xa3;
+    public static final byte QUERY_BRIGHTNESS = (byte) 0xb0;
     public static final byte QUERY_FIRMWARE = (byte) 0xeb;
     public static final byte QUERY_MTU = (byte) 0xf0;
 
@@ -101,7 +102,9 @@ public final class VeryFitConstants {
     public static final byte SETTING_HOST_OS = 0x23;
     public static final byte SETTING_HEART_RATE = 0x24;
     public static final byte SETTING_FIND_PHONE = 0x26;
+    public static final byte SETTING_WRIST_WAKE = 0x28;
     public static final byte SETTING_MUSIC = 0x2a;
+    public static final byte SETTING_BRIGHTNESS = 0x32;
     public static final byte SETTING_INACTIVITY = 0x47;
     public static final byte SETTING_HYDRATION = 0x60;
     public static final byte SETTING_VOLUME = (byte) 0xf0;
@@ -140,6 +143,28 @@ public final class VeryFitConstants {
     public static final byte APP_FIND_DEVICE = 0x04;
     public static final byte APP_FIND_DEVICE_START = 0x00;
     public static final byte APP_FIND_DEVICE_STOP = 0x01;
+
+    /** How long the screen stays lit after a raise, in seconds; the vendor never changes it. */
+    public static final byte WRIST_WAKE_SECONDS = 0x05;
+    /**
+     * The window the gesture is limited to. The watch keeps its own and ignores this one, so it
+     * is sent as the whole day the way the vendor app sends it.
+     */
+    public static final byte WRIST_ALL_DAY = 0x01;
+    public static final byte WRIST_END_HOUR = 23;
+    public static final byte WRIST_END_MINUTE = 59;
+
+    /** The watch's own slider has five stops, so any percentage is rounded onto them. */
+    public static final int BRIGHTNESS_STEP = 20;
+    /** Set from the phone rather than left to the watch, which is what makes the write stick. */
+    public static final byte BRIGHTNESS_FROM_PHONE = 0x01;
+    /** The ambient-light sensor, which the vendor never turns on. */
+    public static final byte BRIGHTNESS_AMBIENT_OFF = 0x00;
+    public static final byte NIGHT_DIM_OFF = 0x01;
+    public static final byte NIGHT_DIM_SCHEDULED = 0x03;
+    /** The level held inside the night window, and how long the screen stays lit, both fixed. */
+    public static final byte NIGHT_DIM_LEVEL = 0x14;
+    public static final byte BRIGHTNESS_INTERVAL = 0x06;
 
     public static final byte ON = (byte) 0xaa;
     public static final byte OFF = (byte) 0x55;

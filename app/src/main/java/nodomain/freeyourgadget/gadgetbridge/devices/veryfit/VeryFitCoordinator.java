@@ -115,6 +115,13 @@ public abstract class VeryFitCoordinator extends AbstractBLEDeviceCoordinator {
             health.add(R.xml.devicesettings_hydration_reminder_sheduled);
         }
 
+        if (capabilities.isKnown()) {
+            final List<Integer> display = settings.addRootScreen(DeviceSpecificSettingsScreen.DISPLAY);
+            display.add(R.xml.devicesettings_liftwrist_display_noshed);
+            display.add(R.xml.devicesettings_screen_brightness);
+            display.add(R.xml.devicesettings_nightmode);
+        }
+
         final List<Integer> dateTime = settings.addRootScreen(DeviceSpecificSettingsScreen.DATE_TIME);
         dateTime.add(R.xml.devicesettings_timeformat);
 
