@@ -122,6 +122,11 @@ public abstract class VeryFitCoordinator extends AbstractBLEDeviceCoordinator {
             display.add(R.xml.devicesettings_nightmode);
         }
 
+        if (capabilities.isKnown()) {
+            settings.addRootScreen(DeviceSpecificSettingsScreen.WORKOUT,
+                    R.xml.devicesettings_veryfit_workout_detection);
+        }
+
         final List<Integer> dateTime = settings.addRootScreen(DeviceSpecificSettingsScreen.DATE_TIME);
         dateTime.add(R.xml.devicesettings_timeformat);
 

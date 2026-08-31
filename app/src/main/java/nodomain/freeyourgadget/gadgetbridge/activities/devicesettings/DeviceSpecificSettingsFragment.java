@@ -1104,6 +1104,8 @@ public class DeviceSpecificSettingsFragment extends AbstractPreferenceFragment i
         addPreferenceHandlerFor(PREF_WORKOUT_DETECTION_CATEGORIES);
         addPreferenceHandlerFor(PREF_WORKOUT_DETECTION_ALERT);
         addPreferenceHandlerFor(PREF_WORKOUT_DETECTION_SENSITIVITY);
+        addPreferenceHandlerFor(DeviceSettingsPreferenceConst.PREF_WORKOUT_AUTO_PAUSE);
+        addPreferenceHandlerFor(DeviceSettingsPreferenceConst.PREF_WORKOUT_AUTO_END);
 
         addPreferenceHandlerFor(PREF_GPS_MODE_PRESET);
         addPreferenceHandlerFor(PREF_GPS_BAND);

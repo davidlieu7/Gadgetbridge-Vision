@@ -685,6 +685,10 @@
     <string name="pref_workout_detection_summary">Detect workout automatically</string>
     <string name="pref_workout_detection_categories_title">Workout Categories</string>
     <string name="pref_workout_detection_categories_summary">Workouts categories to detect automatically</string>
+    <string name="pref_workout_auto_pause_title">Auto pause</string>
+    <string name="pref_workout_auto_pause_summary">Pause a workout while you are not moving</string>
+    <string name="pref_workout_auto_end_title">Auto end</string>
+    <string name="pref_workout_auto_end_summary">End a workout once it looks finished</string>
     <string name="pref_workout_detection_alert_title">Alert</string>
     <string name="pref_workout_detection_alert_summary">Notify when a workout is detected</string>
     <string name="pref_workout_detection_sensitivity">Sensitivity</string>

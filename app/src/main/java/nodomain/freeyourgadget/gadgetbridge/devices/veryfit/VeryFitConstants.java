@@ -92,6 +92,7 @@ public final class VeryFitConstants {
     public static final byte QUERY_UNITS = 0x22;
     public static final byte QUERY_CLOCK = (byte) 0xa3;
     public static final byte QUERY_BRIGHTNESS = (byte) 0xb0;
+    public static final byte QUERY_AUTO_WORKOUT = (byte) 0xea;
     public static final byte QUERY_FIRMWARE = (byte) 0xeb;
     public static final byte QUERY_MTU = (byte) 0xf0;
 
@@ -105,6 +106,7 @@ public final class VeryFitConstants {
     public static final byte SETTING_WRIST_WAKE = 0x28;
     public static final byte SETTING_MUSIC = 0x2a;
     public static final byte SETTING_BRIGHTNESS = 0x32;
+    public static final byte SETTING_AUTO_WORKOUT = 0x49;
     public static final byte SETTING_INACTIVITY = 0x47;
     public static final byte SETTING_HYDRATION = 0x60;
     public static final byte SETTING_VOLUME = (byte) 0xf0;
@@ -143,6 +145,19 @@ public final class VeryFitConstants {
     public static final byte APP_FIND_DEVICE = 0x04;
     public static final byte APP_FIND_DEVICE_START = 0x00;
     public static final byte APP_FIND_DEVICE_STOP = 0x01;
+
+    /**
+     * Which movement the watch starts a workout for, one switch each, plus the two switches that
+     * end one. The last two have never been set by either vendor app and are left clear.
+     */
+    public static final int AUTO_WORKOUT_WALKING = 0;
+    public static final int AUTO_WORKOUT_RUNNING = 1;
+    public static final int AUTO_WORKOUT_CYCLING = 2;
+    public static final int AUTO_WORKOUT_PAUSE = 3;
+    public static final int AUTO_WORKOUT_END = 4;
+    public static final int AUTO_WORKOUT_ELLIPTICAL = 5;
+    public static final int AUTO_WORKOUT_ROWING = 6;
+    public static final int AUTO_WORKOUT_SWITCHES = 9;
 
     /** How long the screen stays lit after a raise, in seconds; the vendor never changes it. */
     public static final byte WRIST_WAKE_SECONDS = 0x05;

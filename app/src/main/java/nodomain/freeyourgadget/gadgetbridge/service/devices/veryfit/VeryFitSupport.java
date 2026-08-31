@@ -268,6 +268,9 @@ public class VeryFitSupport extends AbstractBTLESingleDeviceSupport {
             case VeryFitConstants.QUERY_BRIGHTNESS:
                 handleBrightness(packet.payload);
                 break;
+            case VeryFitConstants.QUERY_AUTO_WORKOUT:
+                handleAutoWorkout(packet.payload);
+                break;
             default:
                 LOG.debug("Unhandled query response {}: {}", Integer.toHexString(packet.key),
                         GB.hexdump(packet.payload));
@@ -283,6 +286,15 @@ public class VeryFitSupport extends AbstractBTLESingleDeviceSupport {
         event.level = payload[4] & 0xff;
         event.voltage = ((payload[1] & 0xff) | ((payload[2] & 0xff) << 8)) / 1000f;
         evaluateGBDeviceEvent(event);
+    }
+
+    /** The nine switches as the watch holds them, behind the status byte its answer starts with. */
+    private void handleAutoWorkout(final byte[] payload) {
+        if (payload.length < VeryFitConstants.AUTO_WORKOUT_SWITCHES + 1) {
+            return;
+        }
+        LOG.info("Watch workout detection: {}",
+                GB.hexdump(payload, 1, VeryFitConstants.AUTO_WORKOUT_SWITCHES));
     }
 
     /** What the watch settled on: it keeps its own values for the fields it does not like. */
@@ -327,6 +339,8 @@ public class VeryFitSupport extends AbstractBTLESingleDeviceSupport {
         }
         if (getCapabilities().isKnown()) {
             queryBrightness();
+            send("veryfit workout detection read",
+                    VeryFitProtocol.query(VeryFitConstants.QUERY_AUTO_WORKOUT));
         }
         mediaManager.refresh();
         sendMusic();
@@ -527,6 +541,7 @@ public class VeryFitSupport extends AbstractBTLESingleDeviceSupport {
         if (capabilities.isKnown()) {
             write(builder, VeryFitSettings.music());
             write(builder, VeryFitSettings.wristWake(prefs));
+            write(builder, VeryFitSettings.autoWorkout(prefs));
             lastBrightness = VeryFitSettings.brightness(prefs);
             write(builder, lastBrightness);
             write(builder, VeryFitSettings.inactivity(prefs));
@@ -561,6 +576,11 @@ public class VeryFitSupport extends AbstractBTLESingleDeviceSupport {
             case DeviceSettingsPreferenceConst.PREF_FIND_PHONE:
                 command = VeryFitSettings.findPhone(prefs);
                 break;
+            case DeviceSettingsPreferenceConst.PREF_WORKOUT_DETECTION_CATEGORIES:
+            case DeviceSettingsPreferenceConst.PREF_WORKOUT_AUTO_PAUSE:
+            case DeviceSettingsPreferenceConst.PREF_WORKOUT_AUTO_END:
+                sendAutoWorkout();
+                return;
             case DeviceSettingsPreferenceConst.PREF_LIFTWRIST_NOSHED:
                 command = VeryFitSettings.wristWake(prefs);
                 break;
@@ -627,6 +647,12 @@ public class VeryFitSupport extends AbstractBTLESingleDeviceSupport {
         lastBrightness = command;
         send("veryfit brightness", command);
         queryBrightness();
+    }
+
+    private void sendAutoWorkout() {
+        send("veryfit workout detection", VeryFitSettings.autoWorkout(getDevicePrefs()));
+        send("veryfit workout detection read",
+                VeryFitProtocol.query(VeryFitConstants.QUERY_AUTO_WORKOUT));
     }
 
     /** The vendor reads this one straight back after every write, and so do we. */

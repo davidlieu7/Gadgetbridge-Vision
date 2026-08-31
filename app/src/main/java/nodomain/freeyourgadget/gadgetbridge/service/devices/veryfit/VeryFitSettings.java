@@ -22,7 +22,9 @@ import java.time.LocalDate;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.GregorianCalendar;
+import java.util.Collections;
 import java.util.Locale;
+import java.util.Set;
 import java.util.TimeZone;
 
 import nodomain.freeyourgadget.gadgetbridge.GBApplication;
@@ -158,6 +160,30 @@ public final class VeryFitSettings {
         final boolean enabled = !"off".equals(prefs.getString(DeviceSettingsPreferenceConst.PREF_FIND_PHONE, "off"));
         return VeryFitProtocol.setting(VeryFitConstants.SETTING_FIND_PHONE,
                 onOff(enabled), (byte) 0, (byte) 0, (byte) 0);
+    }
+
+    /**
+     * One switch per movement the watch may start a workout for, then the two that end one. The
+     * write carries a tenth byte the vendor always sends clear.
+     */
+    public static byte[] autoWorkout(final Prefs prefs) {
+        final Set<String> types = prefs.getStringSet(
+                DeviceSettingsPreferenceConst.PREF_WORKOUT_DETECTION_CATEGORIES, Collections.emptySet());
+
+        final byte[] payload = new byte[VeryFitConstants.AUTO_WORKOUT_SWITCHES + 1];
+        for (int i = 0; i < VeryFitConstants.AUTO_WORKOUT_SWITCHES; i++) {
+            payload[i] = VeryFitConstants.OFF;
+        }
+        payload[VeryFitConstants.AUTO_WORKOUT_WALKING] = onOff(types.contains("walking"));
+        payload[VeryFitConstants.AUTO_WORKOUT_RUNNING] = onOff(types.contains("outdoor_running"));
+        payload[VeryFitConstants.AUTO_WORKOUT_CYCLING] = onOff(types.contains("outdoor_cycling"));
+        payload[VeryFitConstants.AUTO_WORKOUT_ELLIPTICAL] = onOff(types.contains("elliptical"));
+        payload[VeryFitConstants.AUTO_WORKOUT_ROWING] = onOff(types.contains("rowing_machine"));
+        payload[VeryFitConstants.AUTO_WORKOUT_PAUSE] =
+                onOff(prefs.getBoolean(DeviceSettingsPreferenceConst.PREF_WORKOUT_AUTO_PAUSE, false));
+        payload[VeryFitConstants.AUTO_WORKOUT_END] =
+                onOff(prefs.getBoolean(DeviceSettingsPreferenceConst.PREF_WORKOUT_AUTO_END, false));
+        return VeryFitProtocol.setting(VeryFitConstants.SETTING_AUTO_WORKOUT, payload);
     }
 
     /** Raise to wake. The window is the watch's own, and its screen is the only way to set it. */

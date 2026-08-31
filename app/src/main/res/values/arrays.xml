@@ -3489,6 +3489,21 @@
         <item>distantpast</item>
     </string-array>
 
+    <string-array name="veryfit_workout_detection_categories">
+        <item>@string/activity_type_walking</item>
+        <item>@string/activity_type_outdoor_running</item>
+        <item>@string/activity_type_outdoor_cycling</item>
+        <item>@string/activity_type_elliptical</item>
+        <item>@string/activity_type_rowing_machine</item>
+    </string-array>
+    <string-array name="veryfit_workout_detection_categories_values" translatable="false">
+        <item>walking</item>
+        <item>outdoor_running</item>
+        <item>outdoor_cycling</item>
+        <item>elliptical</item>
+        <item>rowing_machine</item>
+    </string-array>
+
     <string-array name="lefun_interface_language_names">
         <item>@string/english</item>
         <item>@string/simplified_chinese</item>

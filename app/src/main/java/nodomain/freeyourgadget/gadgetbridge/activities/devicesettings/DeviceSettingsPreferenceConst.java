@@ -303,6 +303,8 @@ public class DeviceSettingsPreferenceConst {
     public static final String PREF_WORKOUT_DETECTION_CATEGORIES = "workout_detection_categories";
     public static final String PREF_WORKOUT_DETECTION_ALERT = "workout_detection_alert";
     public static final String PREF_WORKOUT_DETECTION_SENSITIVITY = "workout_detection_sensitivity";
+    public static final String PREF_WORKOUT_AUTO_PAUSE = "workout_auto_pause";
+    public static final String PREF_WORKOUT_AUTO_END = "workout_auto_end";
 
     public static final String PREF_GPS_MODE_PRESET = "pref_gps_mode_preset";
     public static final String PREF_GPS_BAND = "pref_gps_band";

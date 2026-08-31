@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.preference.PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android">
+    <PreferenceScreen
+        android:icon="@drawable/ic_activity_unknown_small"
+        android:key="pref_header_workout_detection"
+        android:persistent="false"
+        android:summary="@string/pref_workout_detection_summary"
+        android:title="@string/pref_workout_detection_title">
+
+        <MultiSelectListPreference
+            android:defaultValue="@array/pref_huami2021_empty_array"
+            android:dialogTitle="@string/pref_workout_detection_categories_title"
+            android:entries="@array/veryfit_workout_detection_categories"
+            android:entryValues="@array/veryfit_workout_detection_categories_values"
+            android:icon="@drawable/ic_activity_unknown_small"
+            android:key="workout_detection_categories"
+            android:summary="@string/pref_workout_detection_categories_summary"
+            android:title="@string/pref_workout_detection_categories_title" />
+
+        <SwitchPreferenceCompat
+            android:defaultValue="false"
+            android:key="workout_auto_pause"
+            android:layout="@layout/preference_checkbox"
+            android:summary="@string/pref_workout_auto_pause_summary"
+            android:title="@string/pref_workout_auto_pause_title" />
+
+        <SwitchPreferenceCompat
+            android:defaultValue="false"
+            android:key="workout_auto_end"
+            android:layout="@layout/preference_checkbox"
+            android:summary="@string/pref_workout_auto_end_summary"
+            android:title="@string/pref_workout_auto_end_title" />
+    </PreferenceScreen>
+</androidx.preference.PreferenceScreen>
