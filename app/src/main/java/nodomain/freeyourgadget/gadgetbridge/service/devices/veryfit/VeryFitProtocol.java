@@ -195,12 +195,12 @@ public class VeryFitProtocol {
     }
 
     /**
-     * Body for {@link VeryFitConstants#FRAMED_WATCHFACE}: the selector, then the name of the file
+     * Body for {@link VeryFitConstants#FRAMED_WATCHFACE}: what to do, then the name of the file
      * the watch keeps that face in, padded out to the slot it is read from.
      */
-    public static byte[] watchface(final String name) {
+    public static byte[] watchface(final byte operate, final String name) {
         final byte[] body = new byte[1 + VeryFitConstants.WATCHFACE_NAME_LEN];
-        body[0] = VeryFitConstants.WATCHFACE_SELECT;
+        body[0] = operate;
         final byte[] file = name.getBytes(StandardCharsets.UTF_8);
         System.arraycopy(file, 0, body, 1,
                 Math.min(file.length, VeryFitConstants.WATCHFACE_NAME_LEN));

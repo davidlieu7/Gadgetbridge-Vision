@@ -56,8 +56,11 @@ public final class VeryFitConstants {
     public static final int FRAMED_WATCHFACE = 0x0008;
     public static final int FRAMED_WATCHFACE_LIST = 0x0031;
 
-    /** Selects the face named in the fixed-size slot behind it. */
+    /** What to do with the face named in the fixed-size slot behind it. */
     public static final byte WATCHFACE_SELECT = 0x01;
+    public static final byte WATCHFACE_DELETE = 0x02;
+    /** The answer leads with this, and echoes the operation and the name back behind it. */
+    public static final byte WATCHFACE_OK = 0x00;
     public static final int WATCHFACE_NAME_LEN = 30;
     /** The counts and the storage report the list opens with, ahead of the per-face records. */
     public static final int WATCHFACE_LIST_HEADER_LEN = 63;

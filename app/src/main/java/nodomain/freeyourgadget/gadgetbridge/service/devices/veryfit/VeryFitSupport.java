@@ -268,7 +268,7 @@ public class VeryFitSupport extends AbstractBTLESingleDeviceSupport {
             return;
         }
         if (packet.cmd == VeryFitConstants.FRAMED_WATCHFACE) {
-            LOG.debug("Watchface change answered with {}", GB.hexdump(packet.payload));
+            handleWatchfaceOperation(packet.payload);
             return;
         }
         if (packet.cmd == VeryFitConstants.FRAMED_HEALTH
@@ -863,19 +863,41 @@ public class VeryFitSupport extends AbstractBTLESingleDeviceSupport {
         if (!start) {
             return;
         }
+        operateWatchface("veryfit watchface", VeryFitConstants.WATCHFACE_SELECT, uuid);
+    }
 
+    /** A face is deleted by the name it is stored under, which only the list knows. */
+    @Override
+    public void onAppDelete(final UUID uuid) {
+        operateWatchface("veryfit watchface delete", VeryFitConstants.WATCHFACE_DELETE, uuid);
+    }
+
+    private void operateWatchface(final String task, final byte operate, final UUID uuid) {
         final String file = watchfaces.fileOf(uuid);
         if (file == null) {
             LOG.warn("No watchface known as {}", uuid);
             return;
         }
-
-        send("veryfit watchface", protocol.framed(VeryFitConstants.FRAMED_WATCHFACE,
-                VeryFitProtocol.watchface(file)));
-        queryWatchfaces();
+        send(task, protocol.framed(VeryFitConstants.FRAMED_WATCHFACE,
+                VeryFitProtocol.watchface(operate, file)));
     }
 
-    /** Read straight back after a change, which is both the confirmation and the new list. */
+    /** The watch only echoes what it was asked to do, so the list is what shows the result. */
+    private void handleWatchfaceOperation(final byte[] payload) {
+        if (payload.length < 2) {
+            return;
+        }
+        if (payload[0] != VeryFitConstants.WATCHFACE_OK) {
+            LOG.warn("Watch refused a watchface operation: {}", GB.hexdump(payload));
+            return;
+        }
+        if (payload[1] == VeryFitConstants.WATCHFACE_SELECT
+                || payload[1] == VeryFitConstants.WATCHFACE_DELETE) {
+            queryWatchfaces();
+        }
+    }
+
+    /** Read after every change, which is the only confirmation one landed. */
     private void queryWatchfaces() {
         send("veryfit watchface list",
                 protocol.framed(VeryFitConstants.FRAMED_WATCHFACE_LIST, new byte[0]));

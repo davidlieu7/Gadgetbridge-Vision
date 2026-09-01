@@ -138,7 +138,7 @@ public abstract class VeryFitCoordinator extends AbstractBLEDeviceCoordinator {
         return new VeryFitActivityTrackProvider(device);
     }
 
-    /** The watch only ever shows a face it already holds, so this is a picker and nothing more. */
+    /** Faces are listed, picked, installed and deleted, but the watch draws them all itself. */
     @Override
     public boolean supportsAppsManagement(@NonNull final GBDevice device) {
         return getCapabilities(device).supports(VeryFitFeature.FRAMED_PROTOCOL);
@@ -161,6 +161,12 @@ public abstract class VeryFitCoordinator extends AbstractBLEDeviceCoordinator {
 
     @Override
     public boolean supportsAppListFetching(@NonNull final GBDevice device) {
+        return true;
+    }
+
+    /** Puts the picker on the face list itself, since a face is the only thing to pick. */
+    @Override
+    public boolean supportsFlashing(@NonNull final GBDevice device) {
         return true;
     }
 
