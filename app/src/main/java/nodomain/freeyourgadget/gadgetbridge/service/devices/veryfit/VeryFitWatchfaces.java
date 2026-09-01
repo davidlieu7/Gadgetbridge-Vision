@@ -42,6 +42,8 @@ class VeryFitWatchfaces {
     private static final Logger LOG = LoggerFactory.getLogger(VeryFitWatchfaces.class);
 
     private final Map<UUID, String> files = new HashMap<>();
+    private int slots;
+    private long free;
 
     /** Turns the reported list into apps, keeping the file name each of them stands for. */
     List<GBDeviceApp> parse(final byte[] payload) {
@@ -52,6 +54,9 @@ class VeryFitWatchfaces {
 
         final String current = text(payload, VeryFitConstants.WATCHFACE_CURRENT_OFFSET);
         final int count = payload[VeryFitConstants.WATCHFACE_COUNT_OFFSET] & 0xff;
+        slots = (payload[VeryFitConstants.WATCHFACE_SLOTS_OFFSET] & 0xff)
+                | ((payload[VeryFitConstants.WATCHFACE_SLOTS_OFFSET + 1] & 0xff) << 8);
+        free = intAt(payload, VeryFitConstants.WATCHFACE_FREE_OFFSET);
         LOG.info("Watch holds {} faces, showing {}, {} of {} bytes used", count, current,
                 intAt(payload, VeryFitConstants.WATCHFACE_USED_OFFSET),
                 intAt(payload, VeryFitConstants.WATCHFACE_TOTAL_OFFSET));
@@ -77,6 +82,30 @@ class VeryFitWatchfaces {
         }
 
         return faces;
+    }
+
+    /**
+     * What a face of our own would be stored as, or null when the list was never read. The watch
+     * names its own faces after the slot they sit in, and an uploaded one carries that on.
+     */
+    String nextFile() {
+        if (files.isEmpty()) {
+            return null;
+        }
+        int number = files.size() + 1;
+        while (files.containsValue(upload(number))) {
+            number++;
+        }
+        return upload(number);
+    }
+
+    /** Whether the watch has both a slot and the room for a face of that size. */
+    boolean hasRoom(final int size) {
+        return files.size() < slots && size <= free;
+    }
+
+    private static String upload(final int number) {
+        return VeryFitConstants.WATCHFACE_UPLOAD_PREFIX + number + VeryFitConstants.WATCHFACE_SUFFIX;
     }
 
     /** The file the given face is stored as, or null when the list it came from was never read. */

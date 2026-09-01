@@ -19,6 +19,8 @@ package nodomain.freeyourgadget.gadgetbridge.devices.veryfit;
 import android.app.Activity;
 import android.bluetooth.le.ScanFilter;
 import android.content.Context;
+import android.net.Uri;
+import android.os.Bundle;
 import android.os.ParcelUuid;
 
 import androidx.annotation.NonNull;
@@ -34,6 +36,7 @@ import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSpec
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSpecificSettingsScreen;
 import nodomain.freeyourgadget.gadgetbridge.devices.AbstractBLEDeviceCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.GenericHrvValueSampleProvider;
+import nodomain.freeyourgadget.gadgetbridge.devices.InstallHandler;
 import nodomain.freeyourgadget.gadgetbridge.devices.GenericSpo2SampleProvider;
 import nodomain.freeyourgadget.gadgetbridge.devices.GenericStressSampleProvider;
 import nodomain.freeyourgadget.gadgetbridge.devices.SampleProvider;
@@ -164,6 +167,13 @@ public abstract class VeryFitCoordinator extends AbstractBLEDeviceCoordinator {
     @Override
     public Class<? extends Activity> getAppsManagementActivity(@NonNull final GBDevice device) {
         return AppManagerActivity.class;
+    }
+
+    @Override
+    public InstallHandler findInstallHandler(final Uri uri, @NonNull final Bundle options,
+                                             @NonNull final Context context) {
+        final VeryFitInstallHandler handler = new VeryFitInstallHandler(uri, context);
+        return handler.isValid() ? handler : null;
     }
 
     @Override

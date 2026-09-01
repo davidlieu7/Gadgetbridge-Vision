@@ -64,13 +64,37 @@ public final class VeryFitConstants {
     public static final int WATCHFACE_RECORD_LEN = 40;
     /** Which face is being shown, in the same slot shape the records use. */
     public static final int WATCHFACE_CURRENT_OFFSET = 5;
+    public static final int WATCHFACE_SLOTS_OFFSET = 1;
     public static final int WATCHFACE_TOTAL_OFFSET = 38;
     public static final int WATCHFACE_USED_OFFSET = 42;
+    public static final int WATCHFACE_FREE_OFFSET = 46;
     public static final int WATCHFACE_COUNT_OFFSET = 62;
     /** Inside a record, behind the marker, the slot it sits in and the bytes it takes. */
     public static final int WATCHFACE_RECORD_NAME = 10;
     /** Every face is a file, and the watch wants the whole file name. */
     public static final String WATCHFACE_SUFFIX = ".iwf";
+    /** A face of our own continues the numbering the watch's own ones stop at. */
+    public static final String WATCHFACE_UPLOAD_PREFIX = "static_";
+    /** The watch is fed the file packed, and stores it under the name without that suffix. */
+    public static final String WATCHFACE_PACKED_SUFFIX = ".lz";
+
+    // File channel: [0xd1][operation][...], a stream of its own beside the command packets. A
+    // transfer is announced, opened, sent in batches and closed with what it adds up to.
+    public static final byte FILE_MARKER = (byte) 0xd1;
+    public static final byte FILE_BEGIN = 0x01;
+    public static final byte FILE_DATA = 0x02;
+    public static final byte FILE_END = 0x03;
+    public static final byte FILE_ACK_EVERY = 0x05;
+    public static final byte FILE_DECLARE = 0x08;
+    public static final byte FILE_OK = 0x00;
+    /** What the file is for; the watch takes the same value for everything it is sent. */
+    public static final byte FILE_ANY_TYPE = (byte) 0xff;
+    public static final byte FILE_PACKED = 0x02;
+    /** As much data as one chunk carries, and how many of them the watch counts at a time. */
+    public static final int FILE_CHUNK_LEN = 241;
+    public static final int FILE_ACK_CHUNKS = 30;
+    /** The digest closing a transfer sits in a slot far longer than the text it holds. */
+    public static final int FILE_DIGEST_LEN = 128;
 
     /** Add the apps that follow to the watch's list, or ask for the list it holds. */
     public static final byte REGISTRY_ADD = 0x01;

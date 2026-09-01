@@ -22,6 +22,8 @@ import android.bluetooth.BluetoothGattCharacteristic;
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.net.Uri;
+import android.os.Bundle;
 
 import androidx.annotation.NonNull;
 import androidx.localbroadcastmanager.content.LocalBroadcastManager;
@@ -54,6 +56,7 @@ import nodomain.freeyourgadget.gadgetbridge.devices.miband.MiBandConst;
 import nodomain.freeyourgadget.gadgetbridge.devices.veryfit.VeryFitCapabilities;
 import nodomain.freeyourgadget.gadgetbridge.devices.veryfit.VeryFitConstants;
 import nodomain.freeyourgadget.gadgetbridge.devices.veryfit.VeryFitFeature;
+import nodomain.freeyourgadget.gadgetbridge.devices.veryfit.VeryFitWatchfaceFile;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDeviceApp;
 import nodomain.freeyourgadget.gadgetbridge.model.ActivityUser;
@@ -89,10 +92,12 @@ public class VeryFitSupport extends AbstractBTLESingleDeviceSupport {
     private static final int QUERY_TIMEOUT_MILLIS = 2000;
     private static final int LINK_EVENT_ECHO_LEN = 12;
     private static final int MIN_CHUNK_LEN = 20;
+    private static final int WATCHFACE_SETTLE_MILLIS = 1000;
 
     private final VeryFitProtocol protocol = new VeryFitProtocol();
     private final VeryFitHealthSync healthSync = new VeryFitHealthSync(this);
     private final VeryFitWatchfaces watchfaces = new VeryFitWatchfaces();
+    private final VeryFitFileUpload fileUpload = new VeryFitFileUpload(this);
 
     private MediaManager mediaManager;
     private boolean musicOpen;
@@ -130,6 +135,7 @@ public class VeryFitSupport extends AbstractBTLESingleDeviceSupport {
         if (healthSync.reset()) {
             GB.updateTransferNotification(null, "", false, 100, getContext());
         }
+        fileUpload.reset();
         features = null;
         featuresExtra = null;
         apps.clear();
@@ -186,6 +192,13 @@ public class VeryFitSupport extends AbstractBTLESingleDeviceSupport {
         }
         if (!VeryFitConstants.UUID_CHARACTERISTIC_NOTIFY.equals(characteristic.getUuid())) {
             return false;
+        }
+
+        // The file channel runs beside the command packets and is put together by whoever asked
+        // for it, not here.
+        if (value.length > 0 && value[0] == VeryFitConstants.FILE_MARKER) {
+            fileUpload.onPacket(value);
+            return true;
         }
 
         final byte[] complete = reassemble(value);
@@ -768,6 +781,81 @@ public class VeryFitSupport extends AbstractBTLESingleDeviceSupport {
     @Override
     public void onAppInfoReq() {
         queryWatchfaces();
+    }
+
+    /**
+     * A face goes out over the file channel under a name of the watch's own making, and the watch
+     * shows it as soon as it has it.
+     */
+    @Override
+    public void onInstallApp(final Uri uri, @NonNull final Bundle options) {
+        if (fileUpload.isRunning()) {
+            LOG.warn("A watchface is already on its way");
+            return;
+        }
+
+        final VeryFitWatchfaceFile face = new VeryFitWatchfaceFile(uri, getContext());
+        if (!face.isValid()) {
+            LOG.warn("{} is not a watchface", uri);
+            return;
+        }
+
+        final String file = watchfaces.nextFile();
+        if (file == null) {
+            LOG.warn("The watch has not said which faces it holds yet");
+            queryWatchfaces();
+            return;
+        }
+        if (!watchfaces.hasRoom(face.getOriginalSize())) {
+            LOG.warn("No room left on the watch for {} bytes", face.getOriginalSize());
+            return;
+        }
+
+        gbDevice.setBusyTask(R.string.uploading_watchface, getContext());
+        gbDevice.sendDeviceUpdateIntent(getContext());
+        fileUpload.start(file + VeryFitConstants.WATCHFACE_PACKED_SUFFIX, face.getPacked(),
+                face.getOriginalSize());
+    }
+
+    /** The watch shows a face it has just taken, so the list is read back to see which one. */
+    void onFileUploadFinished(final boolean success) {
+        LOG.info("Watchface upload {}", success ? "done" : "failed");
+        try {
+            final TransactionBuilder builder = performInitialized("veryfit file done");
+            builder.setProgress(success ? R.string.uploadwatchfaceoperation_complete
+                    : R.string.uploadwatchfaceoperation_failed, false, 100);
+            if (success) {
+                // It takes the watch about a second to put the face away and start showing it.
+                builder.sleep(WATCHFACE_SETTLE_MILLIS);
+                write(builder, protocol.framed(VeryFitConstants.FRAMED_WATCHFACE_LIST, new byte[0]));
+            }
+            builder.queue();
+        } catch (final IOException e) {
+            LOG.error("Failed to close the upload", e);
+        }
+
+        if (gbDevice.isBusy()) {
+            gbDevice.unsetBusyTask();
+            gbDevice.sendDeviceUpdateIntent(getContext());
+        }
+    }
+
+    /** File channel packets are a stream of their own, so they go out as they are. */
+    void sendFile(final String task, final List<byte[]> packets, final int percent) {
+        try {
+            final TransactionBuilder builder = performInitialized(task);
+            builder.setProgress(R.string.uploading_watchface, true, percent);
+            for (final byte[] packet : packets) {
+                builder.write(VeryFitConstants.UUID_CHARACTERISTIC_WRITE, packet);
+            }
+            builder.queue();
+        } catch (final IOException e) {
+            LOG.error("Failed to run {}", task, e);
+        }
+    }
+
+    int getFileChunkLen() {
+        return Math.min(VeryFitConstants.FILE_CHUNK_LEN, getMTU() - 6);
     }
 
     @Override
