@@ -70,6 +70,12 @@ public class BLEScanService extends Service {
     public static final String EXTRA_DEVICE_ADDRESS = "EXTRA_DEVICE_ADDRESS";
     public static final String EXTRA_RSSI = "EXTRA_RSSI";
     public static final String EXTRA_MANUFACTURER_SPECIFIC_DATA = "EXTRA_MANUFACTURER_SPECIFIC_DATA";
+    /**
+     * The full {@link ScanResult}, including the {@link android.bluetooth.le.ScanRecord} with
+     * service data, for device supports that consume advertisements directly
+     * (see {@link nodomain.freeyourgadget.gadgetbridge.devices.DeviceCoordinator#handlesScanResults()}).
+     */
+    public static final String EXTRA_SCAN_RESULT = "EXTRA_SCAN_RESULT";
 
     // 5 minutes scan restart interval
     private final int DELAY_SCAN_RESTART = 5 * 60 * 1000;
@@ -110,6 +116,7 @@ public class BLEScanService extends Service {
             Intent intent = new Intent(EVENT_DEVICE_FOUND);
             intent.putExtra(EXTRA_DEVICE_ADDRESS, device.getAddress());
             intent.putExtra(EXTRA_RSSI, result.getRssi());
+            intent.putExtra(EXTRA_SCAN_RESULT, result);
 
             Parcel parcel = Parcel.obtain();
             try {

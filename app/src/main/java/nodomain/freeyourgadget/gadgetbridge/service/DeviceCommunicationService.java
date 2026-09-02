@@ -41,6 +41,7 @@ import android.app.ApplicationExitInfo;
 import android.app.Service;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
+import android.bluetooth.le.ScanResult;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
@@ -283,6 +284,11 @@ public class DeviceCommunicationService extends Service implements SharedPrefere
                 } else if (subject == GBDevice.DeviceUpdateSubject.DEVICE_STATE && (device.getState() == GBDevice.State.SCANNED)) {
                     sendDeviceAPIBroadcast(device.getAddress(), API_LEGACY_ACTION_DEVICE_SCANNED);
                 }
+
+                if ((subject == GBDevice.DeviceUpdateSubject.DEVICE_STATE || subject == GBDevice.DeviceUpdateSubject.CONNECTION_STATE)
+                        && isScanOnlyDevice(device)) {
+                    updateScanServiceForScanOnlyDevice(device);
+                }
             } else if (BLEScanService.EVENT_DEVICE_FOUND.equals(action)) {
                 String deviceAddress = intent.getStringExtra(BLEScanService.EXTRA_DEVICE_ADDRESS);
 
@@ -293,6 +299,14 @@ public class DeviceCommunicationService extends Service implements SharedPrefere
 
                 if (target == null) {
                     LOG.error("onReceive: device not found");
+                    return;
+                }
+
+                if (isScanOnlyDevice(target)) {
+                    final ScanResult scanResult = intent.getParcelableExtra(BLEScanService.EXTRA_SCAN_RESULT);
+                    if (scanResult != null) {
+                        handleScanResult(target, scanResult);
+                    }
                     return;
                 }
 
@@ -407,9 +421,10 @@ public class DeviceCommunicationService extends Service implements SharedPrefere
 
         startForeground();
         updateReceiversState();
-        if (reconnectViaScan) {
-            scanAllDevices();
-
+        // Scan-only devices are scanned for regardless of the reconnect-via-scan preference,
+        // since scanning is the only way to get data from them
+        final boolean anyDeviceWaitingForScan = scanAllDevices(!reconnectViaScan);
+        if (reconnectViaScan || anyDeviceWaitingForScan) {
             Intent scanServiceIntent = new Intent(this, BLEScanService.class);
             startService(scanServiceIntent);
         }
@@ -486,10 +501,20 @@ public class DeviceCommunicationService extends Service implements SharedPrefere
         }
     }
 
-    private void scanAllDevices() {
+    /**
+     * Puts all auto-connect BLE devices into {@link GBDevice.State#WAITING_FOR_SCAN}.
+     *
+     * @param scanOnlyDevices if true, only devices that are {@link #isScanOnlyDevice(GBDevice) scan-only}
+     * @return true if at least one device is now waiting for scan
+     */
+    private boolean scanAllDevices(final boolean scanOnlyDevices) {
+        boolean anyDevice = false;
         List<GBDevice> devices = GBApplication.app().getDeviceManager().getDevices();
         for (GBDevice device : devices) {
             if (!device.getDeviceCoordinator().getConnectionType().usesBluetoothLE()) {
+                continue;
+            }
+            if (scanOnlyDevices && !isScanOnlyDevice(device)) {
                 continue;
             }
             if (device.getState() != GBDevice.State.NOT_CONNECTED) {
@@ -501,7 +526,86 @@ public class DeviceCommunicationService extends Service implements SharedPrefere
             }
             createDeviceStruct(device);
             device.setUpdateState(GBDevice.State.WAITING_FOR_SCAN, this);
+            anyDevice = true;
         }
+        return anyDevice;
+    }
+
+    /**
+     * A device that is not connectable and whose support consumes the advertisements
+     * directly, see {@link DeviceCoordinator#handlesScanResults()}.
+     */
+    private static boolean isScanOnlyDevice(final GBDevice device) {
+        final DeviceCoordinator coordinator = device.getDeviceCoordinator();
+        return !coordinator.isConnectable() && coordinator.handlesScanResults();
+    }
+
+    /**
+     * Hands a BLE advertisement to the device support of a scan-only device, creating the
+     * support first if needed. The support is never {@link DeviceSupport#connect() connected}.
+     * <p>
+     * The device struct is not created here: a device only gets one when it is put into
+     * {@link GBDevice.State#WAITING_FOR_SCAN} (or connected) through the usual paths, and an
+     * advertisement from a device that is not waiting for scan is dropped.
+     */
+    private void handleScanResult(final GBDevice device, final ScanResult scanResult) {
+        final DeviceStruct struct = getDeviceStructOrNull(device);
+        if (struct == null) {
+            LOG.debug("handleScanResult - ignoring advertisement from {}, not waiting for scan", device.getAddress());
+            return;
+        }
+
+        DeviceSupport deviceSupport = struct.getDeviceSupport();
+        if (deviceSupport == null) {
+            LOG.debug("handleScanResult - create new device support for {} ({})", device.getAddress(), device.getType());
+            try {
+                deviceSupport = mFactory.createDeviceSupport(device);
+            } catch (final GBException e) {
+                LOG.error("handleScanResult - failed to create device support for {}", device.getAddress(), e);
+                return;
+            }
+            if (deviceSupport == null) {
+                LOG.error("handleScanResult - no device support for {}", device.getAddress());
+                return;
+            }
+            struct.setDeviceSupport(deviceSupport);
+        }
+
+        try {
+            deviceSupport.onScanResult(scanResult);
+        } catch (final Exception e) {
+            LOG.error("handleScanResult - {} failed to handle scan result", device.getAddress(), e);
+        }
+    }
+
+    /**
+     * Starts or stops the {@link BLEScanService} as a scan-only device enters or leaves
+     * {@link GBDevice.State#WAITING_FOR_SCAN}, unless the service is wanted anyway for
+     * reconnecting via scan.
+     */
+    private void updateScanServiceForScanOnlyDevice(final GBDevice device) {
+        if (reconnectViaScan) {
+            // the scan service is running anyway and follows device state changes itself
+            return;
+        }
+
+        final Intent scanServiceIntent = new Intent(this, BLEScanService.class);
+        if (device.getState() == GBDevice.State.WAITING_FOR_SCAN) {
+            scanServiceIntent.setAction(BLEScanService.COMMAND_SCAN_DEVICE);
+            startService(scanServiceIntent);
+            return;
+        }
+
+        for (final GBDevice other : GBApplication.app().getDeviceManager().getDevices()) {
+            if (other.getState() == GBDevice.State.WAITING_FOR_SCAN) {
+                // still needed by another device, let it re-apply the filters
+                scanServiceIntent.setAction(BLEScanService.COMMAND_SCAN_DEVICE);
+                startService(scanServiceIntent);
+                return;
+            }
+        }
+
+        stopService(scanServiceIntent);
     }
 
     private DeviceStruct createDeviceStruct(GBDevice target) {

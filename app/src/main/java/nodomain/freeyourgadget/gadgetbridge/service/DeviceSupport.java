@@ -17,6 +17,7 @@
 package nodomain.freeyourgadget.gadgetbridge.service;
 
 import android.bluetooth.BluetoothAdapter;
+import android.bluetooth.le.ScanResult;
 import android.content.Context;
 import android.hardware.usb.UsbAccessory;
 
@@ -119,6 +120,14 @@ public interface DeviceSupport extends EventHandler {
      */
     @CallSuper
     void dispose();
+
+    /**
+     * Called with every BLE advertisement received from the device while it is being
+     * scanned for. Only invoked for devices whose coordinator returns true from
+     * {@link nodomain.freeyourgadget.gadgetbridge.devices.DeviceCoordinator#handlesScanResults()};
+     * such devices are never {@link #connect() connected}.
+     */
+    void onScanResult(ScanResult scanResult);
 
     /**
      * Returns true if a connection attempt shall be made automatically whenever

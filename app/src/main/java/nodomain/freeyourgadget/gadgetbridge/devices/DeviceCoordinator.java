@@ -197,6 +197,17 @@ public interface DeviceCoordinator {
     boolean isConnectable();
 
     /**
+     * Returns true if the device support wants to receive the raw BLE advertisements of this
+     * device via {@link DeviceSupport#onScanResult(android.bluetooth.le.ScanResult)}. Only
+     * meaningful for devices that are not {@link #isConnectable() connectable}, e.g. sensors
+     * that broadcast their measurements in advertisement service data. Such devices are
+     * scanned for by the {@link nodomain.freeyourgadget.gadgetbridge.service.btle.BLEScanService}
+     * while in state {@link GBDevice.State#WAITING_FOR_SCAN}, and the device support is
+     * created without ever calling {@link DeviceSupport#connect()}.
+     */
+    boolean handlesScanResults();
+
+    /**
      * Checks whether this coordinator handles the given candidate.
      *
      * @param candidate

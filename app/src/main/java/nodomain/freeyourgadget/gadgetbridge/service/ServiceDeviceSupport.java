@@ -19,6 +19,7 @@
 package nodomain.freeyourgadget.gadgetbridge.service;
 
 import android.bluetooth.BluetoothAdapter;
+import android.bluetooth.le.ScanResult;
 import android.content.Context;
 import android.hardware.usb.UsbAccessory;
 import android.location.Location;
@@ -134,6 +135,11 @@ public class ServiceDeviceSupport implements DeviceSupport {
     @Override
     public void dispose() {
         delegate.dispose();
+    }
+
+    @Override
+    public void onScanResult(final ScanResult scanResult) {
+        delegate.onScanResult(scanResult);
     }
 
     @Override
