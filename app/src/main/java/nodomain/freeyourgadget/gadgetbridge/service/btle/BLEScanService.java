@@ -97,6 +97,7 @@ public class BLEScanService extends Service {
     }
 
     private ScanningState currentState = ScanningState.NOT_SCANNING;
+    private final Handler restartScanHandler = new Handler();
 
     private final ScanCallback scanCallback = new ScanCallback() {
         @Override
@@ -169,8 +170,8 @@ public class BLEScanService extends Service {
     }
 
     private void scheduleRestartScan(long millis) {
-        Handler handler = new Handler();
-        handler.postDelayed(() -> {
+        restartScanHandler.removeCallbacksAndMessages(null);
+        restartScanHandler.postDelayed(() -> {
             LOG.debug("restarting scan...");
             try {
                 restartScan(true);
@@ -184,7 +185,17 @@ public class BLEScanService extends Service {
     @Override
     public void onDestroy() {
         super.onDestroy();
+        restartScanHandler.removeCallbacksAndMessages(null);
         unregisterReceivers();
+        stopScan();
+    }
+
+    @SuppressLint("MissingPermission") // linter does not recognize the usage of hasBluetoothPermission
+    private void stopScan() {
+        if (currentState.isDoingAnyScan() && scanner != null && hasBluetoothPermission()) {
+            scanner.stopScan(scanCallback);
+            currentState = ScanningState.NOT_SCANNING;
+        }
     }
 
     private void updateNotification(boolean isScanning, int scannedDeviceCount) {
