@@ -36,6 +36,11 @@ import static nodomain.freeyourgadget.gadgetbridge.model.ActivitySummaryEntries.
 import static nodomain.freeyourgadget.gadgetbridge.model.ActivitySummaryEntries.UNIT_SECONDS_PER_KM;
 import static nodomain.freeyourgadget.gadgetbridge.model.ActivitySummaryEntries.UNIT_STEPS;
 
+import androidx.annotation.NonNull;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.Calendar;
@@ -43,7 +48,15 @@ import java.util.Date;
 import java.util.GregorianCalendar;
 import java.util.TimeZone;
 
+import de.greenrobot.dao.query.QueryBuilder;
+import nodomain.freeyourgadget.gadgetbridge.GBApplication;
+import nodomain.freeyourgadget.gadgetbridge.database.DBHandler;
+import nodomain.freeyourgadget.gadgetbridge.database.DBHelper;
 import nodomain.freeyourgadget.gadgetbridge.entities.BaseActivitySummary;
+import nodomain.freeyourgadget.gadgetbridge.entities.DaoSession;
+import nodomain.freeyourgadget.gadgetbridge.entities.VeryFitWorkoutGpsSample;
+import nodomain.freeyourgadget.gadgetbridge.entities.VeryFitWorkoutGpsSampleDao;
+import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
 import nodomain.freeyourgadget.gadgetbridge.model.ActivityKind;
 import nodomain.freeyourgadget.gadgetbridge.model.ActivitySummaryData;
 import nodomain.freeyourgadget.gadgetbridge.model.ActivitySummaryParser;
@@ -54,6 +67,13 @@ import nodomain.freeyourgadget.gadgetbridge.model.ActivitySummaryParser;
  * in broken-down fields and in seconds, and both run on the watch's clock rather than on ours.
  */
 public class VeryFitWorkoutSummaryParser implements ActivitySummaryParser {
+    private static final Logger LOG = LoggerFactory.getLogger(VeryFitWorkoutSummaryParser.class);
+
+    private final GBDevice device;
+
+    public VeryFitWorkoutSummaryParser(@NonNull final GBDevice device) {
+        this.device = device;
+    }
 
     @Override
     public BaseActivitySummary parseBinaryData(final BaseActivitySummary summary, final boolean forDetails) {
@@ -87,9 +107,30 @@ public class VeryFitWorkoutSummaryParser implements ActivitySummaryParser {
         data.add(HR_ZONE_WARM_UP, buf.getInt(52), UNIT_SECONDS);
         data.add(HR_ZONE_FAT_BURN, buf.getInt(56), UNIT_SECONDS);
         data.add(RECOVERY_TIME, watchClock(buf, 75) - ended, UNIT_SECONDS);
+        data.setHasGps(hasTrack(summary));
 
         summary.setSummaryData(data.toString());
         return summary;
+    }
+
+    /**
+     * The record says nothing about a track, so what settles it is whether any fixes were kept for
+     * the time the workout ran. One is enough to ask for, since the list asks this of every row.
+     */
+    private boolean hasTrack(final BaseActivitySummary summary) {
+        try (DBHandler handler = GBApplication.acquireDbReadOnly()) {
+            final DaoSession session = handler.getDaoSession();
+            final QueryBuilder<VeryFitWorkoutGpsSample> query =
+                    session.getVeryFitWorkoutGpsSampleDao().queryBuilder();
+            query.where(VeryFitWorkoutGpsSampleDao.Properties.DeviceId
+                    .eq(DBHelper.getDevice(device, session).getId()));
+            query.where(VeryFitWorkoutGpsSampleDao.Properties.Timestamp
+                    .between(summary.getStartTime().getTime(), summary.getEndTime().getTime()));
+            return !query.limit(1).build().list().isEmpty();
+        } catch (final Exception e) {
+            LOG.error("Failed to look for a track for {}", summary.getStartTime(), e);
+            return false;
+        }
     }
 
     /**

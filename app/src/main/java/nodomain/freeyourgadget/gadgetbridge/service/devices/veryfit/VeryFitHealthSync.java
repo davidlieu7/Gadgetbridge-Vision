@@ -48,6 +48,7 @@ import nodomain.freeyourgadget.gadgetbridge.entities.User;
 import nodomain.freeyourgadget.gadgetbridge.entities.VeryFitStepsSample;
 import nodomain.freeyourgadget.gadgetbridge.entities.VeryFitWorkoutGpsSample;
 import nodomain.freeyourgadget.gadgetbridge.model.ActivityKind;
+import nodomain.freeyourgadget.gadgetbridge.model.ActivitySummaryParser;
 
 /**
  * One pass over the watch's health store.
@@ -78,8 +79,6 @@ class VeryFitHealthSync {
     private final VeryFitSupport support;
     private int index;
     private boolean running;
-    private long workoutStart;
-    private long workoutEnd;
 
     VeryFitHealthSync(final VeryFitSupport support) {
         this.support = support;
@@ -99,8 +98,6 @@ class VeryFitHealthSync {
     void start() {
         index = 0;
         running = true;
-        workoutStart = 0;
-        workoutEnd = 0;
         support.sendFramed("veryfit health types", VeryFitConstants.FRAMED_HEALTH_TYPES,
                 VeryFitProtocol.healthTypes(TYPES));
     }
@@ -199,7 +196,7 @@ class VeryFitHealthSync {
                 storeWorkout(head);
                 break;
             case VeryFitConstants.HEALTH_GPS:
-                storeTrack(detail);
+                storeTrack(head, detail);
                 break;
             default:
                 LOG.debug("Unhandled health type 0x{}", Integer.toHexString(type));
@@ -421,16 +418,20 @@ class VeryFitHealthSync {
         BaseActivitySummary summary = new BaseActivitySummary();
         summary.setRawSummaryData(head);
         summary.setActivityKind(ActivityKind.UNKNOWN.getCode());
-        summary = new VeryFitWorkoutSummaryParser().parseBinaryData(summary, true);
+        summary = new VeryFitWorkoutSummaryParser(support.getDevice()).parseBinaryData(summary, true);
         summary.setSummaryData(null);
-
-        workoutStart = summary.getStartTime().getTime();
-        workoutEnd = summary.getEndTime().getTime();
 
         try (DBHandler handler = GBApplication.acquireDB()) {
             final DaoSession session = handler.getDaoSession();
             summary.setDevice(DBHelper.getDevice(support.getDevice(), session));
             summary.setUser(DBHelper.getUser(session));
+
+            // The watch keeps handing the same workout out, so every round replaces its row.
+            final BaseActivitySummary stored = ActivitySummaryParser.findBaseActivitySummary(
+                    session, support.getDevice(), summary.getStartTime().getTime() / 1000L);
+            if (stored != null) {
+                summary.setId(stored.getId());
+            }
             LOG.debug("Persisting workout from {}", summary.getStartTime());
             session.getBaseActivitySummaryDao().insertOrReplace(summary);
         } catch (final Exception e) {
@@ -441,11 +442,10 @@ class VeryFitHealthSync {
     /**
      * Blocks of a full position followed by the fixes around it, each an offset from that position
      * in ten-thousandths of an arc minute rather than from the fix before it. The records carry no
-     * time of their own, so they are spread across the workout they belong to.
+     * time of their own, so they are spread across the workout the head dates them to.
      */
-    private void storeTrack(final byte[] detail) {
-        if (workoutEnd <= workoutStart) {
-            LOG.debug("Skipping a track with no workout to attach it to");
+    private void storeTrack(final byte[] head, final byte[] detail) {
+        if (head.length < VeryFitConstants.GPS_HEAD_LEN) {
             return;
         }
 
@@ -485,13 +485,22 @@ class VeryFitHealthSync {
             samples.add(sample);
         }
 
-        for (int i = 0; i < samples.size(); i++) {
-            samples.get(i).setTimestamp(workoutStart
-                    + (workoutEnd - workoutStart) * i / Math.max(1, samples.size() - 1));
-        }
-
         try (DBHandler handler = GBApplication.acquireDB()) {
             final DaoSession session = handler.getDaoSession();
+            final BaseActivitySummary summary = ActivitySummaryParser.findBaseActivitySummary(
+                    session, support.getDevice(), instant(head, 1) / 1000L);
+            if (summary == null) {
+                LOG.debug("Skipping a track with no workout to attach it to");
+                return;
+            }
+
+            final long start = summary.getStartTime().getTime();
+            final long end = summary.getEndTime().getTime();
+            for (int i = 0; i < samples.size(); i++) {
+                samples.get(i).setTimestamp(
+                        start + (end - start) * i / Math.max(1, samples.size() - 1));
+            }
+
             final Device device = DBHelper.getDevice(support.getDevice(), session);
             final User user = DBHelper.getUser(session);
             for (final VeryFitWorkoutGpsSample sample : samples) {
@@ -527,6 +536,15 @@ class VeryFitHealthSync {
         final Calendar calendar = GregorianCalendar.getInstance();
         calendar.clear();
         calendar.set(u16(head, offset), (head[offset + 2] & 0xff) - 1, head[offset + 3] & 0xff);
+        return calendar.getTimeInMillis();
+    }
+
+    /** A workout is named by the second it started, both in its own record and in the track's. */
+    private static long instant(final byte[] head, final int offset) {
+        final Calendar calendar = GregorianCalendar.getInstance();
+        calendar.clear();
+        calendar.set(u16(head, offset), (head[offset + 2] & 0xff) - 1, head[offset + 3] & 0xff,
+                head[offset + 4] & 0xff, head[offset + 5] & 0xff, head[offset + 6] & 0xff);
         return calendar.getTimeInMillis();
     }
 

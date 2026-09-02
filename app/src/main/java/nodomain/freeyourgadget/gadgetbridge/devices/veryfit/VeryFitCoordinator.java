@@ -129,7 +129,7 @@ public abstract class VeryFitCoordinator extends AbstractBLEDeviceCoordinator {
 
     @Override
     public ActivitySummaryParser getActivitySummaryParser(final GBDevice device, final Context context) {
-        return new VeryFitWorkoutSummaryParser();
+        return new VeryFitWorkoutSummaryParser(device);
     }
 
     @Override

@@ -177,6 +177,8 @@ public final class VeryFitConstants {
     public static final int WORKOUT_OUTDOOR_WALKING = 0x10;
     /** Summary of one workout, the same shape whatever the sport was. */
     public static final int WORKOUT_SUMMARY_LEN = 118;
+    /** The head of a track session, which dates it to the workout that recorded it. */
+    public static final int GPS_HEAD_LEN = 21;
     /** A track is blocks of a full position followed by fixes that move it. */
     public static final int GPS_BLOCK_LEN = 9;
     public static final int GPS_FIX_LEN = 5;
