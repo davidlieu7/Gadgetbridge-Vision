@@ -5203,6 +5203,8 @@
     <string name="pref_huawei_arterial_stiffness_detection">Arterial stiffness detection</string>
     <string name="pref_huawei_arterial_stiffness_detection_enable_title">Enable arterial stiffness detection</string>
     <string name="pref_huawei_arterial_stiffness_detection_enable_summary">Activate arterial stiffness detection on the device</string>
+    <string name="pref_huawei_wheelchair_mode">Wheelchair mode</string>
+    <string name="pref_huawei_wheelchair_mode_enable_summary">Rolling workout will be available on the watch and Activity records will track daily activity, such as wheelchair pushes. Steps will not be counted.</string>
     <string name="movementConsistency">Consistency</string>
     <string name="movementStability">Stability</string>
     <string name="movementContinuity">Continuity</string>

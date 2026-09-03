@@ -540,6 +540,8 @@ public abstract class HuaweiCoordinator extends AbstractDeviceCoordinator {
 
         if (deviceState.supportsTrack() || deviceState.supportsHeartRateZones())
             deviceSpecificSettings.addRootScreen(DeviceSpecificSettingsScreen.WORKOUT, R.xml.devicesettings_heartrate_settings);
+        if (deviceState.supportsWheelchairMode(device))
+            deviceSpecificSettings.addRootScreen(DeviceSpecificSettingsScreen.WORKOUT, R.xml.devicesettings_huawei_wheelchair);
 
         // Other
         deviceSpecificSettings.addRootScreen(R.xml.devicesettings_find_phone);

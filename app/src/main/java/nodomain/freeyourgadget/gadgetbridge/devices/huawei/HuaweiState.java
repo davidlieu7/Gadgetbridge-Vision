@@ -37,6 +37,7 @@ import nodomain.freeyourgadget.gadgetbridge.devices.huawei.packets.Notifications
 import nodomain.freeyourgadget.gadgetbridge.devices.huawei.packets.Notifications.NotificationConstraintsType;
 import nodomain.freeyourgadget.gadgetbridge.devices.huawei.packets.Watchface;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
+import nodomain.freeyourgadget.gadgetbridge.model.DeviceType;
 import nodomain.freeyourgadget.gadgetbridge.model.heartratezones.HeartRateZonesSpec;
 import nodomain.freeyourgadget.gadgetbridge.util.GB;
 
@@ -499,6 +500,12 @@ public class HuaweiState {
 
     public boolean supportsSendingGps() {
         return supportsCommandForService(0x18, 0x02);
+    }
+
+    public boolean supportsWheelchairMode(final GBDevice gbDevice) {
+        // Huawei does not advertise the wheelchair DataSync package as a capability. Until it
+        // does, keep the known supported model gate centralized with the other device state.
+        return gbDevice.getType() == DeviceType.HUAWEIBAND11PRO;
     }
 
     public boolean supportsGpsAndTimeToDevice() {
