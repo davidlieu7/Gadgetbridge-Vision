@@ -27,7 +27,6 @@ import java.util.Collections;
 import nodomain.freeyourgadget.gadgetbridge.GBApplication;
 import nodomain.freeyourgadget.gadgetbridge.devices.huawei.HuaweiConstants;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.huawei.HuaweiSupportProvider;
-import nodomain.freeyourgadget.gadgetbridge.service.devices.huawei.datasync.HuaweiDataSyncCommon;
 
 public class HuaweiDataSyncWheelchairService implements HuaweiDataSyncCommon.DataCallback {
     private static final Logger LOG = LoggerFactory.getLogger(HuaweiDataSyncWheelchairService.class);
@@ -43,10 +42,21 @@ public class HuaweiDataSyncWheelchairService implements HuaweiDataSyncCommon.Dat
     public static final String PACKAGE = "hw.watch.wheelchair";
     private static final int CONFIG_ID = 900500039;
     private static final byte CONFIG_ACTION_SET = 1;
-    private static final byte CONFIG_ACTION_GET = 2;
     private static final String WHEELCHAIR_SWITCH = "wheelchairSwitch";
 
     public boolean setWheelchairMode(final boolean enabled) {
+        return sendWheelchairMode(enabled, System.currentTimeMillis());
+    }
+
+    /**
+     * Reconciles a locally cached value with the watch. A zero timestamp makes the watch return
+     * its newer value instead of applying the cached value, as observed in Huawei Health.
+     */
+    public boolean requestWheelchairModeStatus(final boolean lastKnownEnabled) {
+        return sendWheelchairMode(lastKnownEnabled, 0);
+    }
+
+    private boolean sendWheelchairMode(final boolean enabled, final long timestamp) {
         try {
             final JSONObject data = new JSONObject();
             data.put(WHEELCHAIR_SWITCH, enabled ? "1" : "0");
@@ -55,7 +65,7 @@ public class HuaweiDataSyncWheelchairService implements HuaweiDataSyncCommon.Dat
             config.configId = CONFIG_ID;
             config.configAction = CONFIG_ACTION_SET;
             config.configData = data.toString().getBytes(StandardCharsets.UTF_8);
-            config.configUnknown = System.currentTimeMillis();
+            config.configUnknown = timestamp;
 
             final HuaweiDataSyncCommon.ConfigCommandData command = new HuaweiDataSyncCommon.ConfigCommandData();
             command.setConfigDataList(Collections.singletonList(config));
@@ -65,18 +75,6 @@ public class HuaweiDataSyncWheelchairService implements HuaweiDataSyncCommon.Dat
             LOG.error("Failed to create wheelchair mode configuration", e);
             return false;
         }
-    }
-
-    public boolean getWheelchairMode() {
-        final HuaweiDataSyncCommon.ConfigData config = new HuaweiDataSyncCommon.ConfigData();
-        config.configId = CONFIG_ID;
-        config.configAction = CONFIG_ACTION_GET;
-        config.configData = new byte[0];
-
-        final HuaweiDataSyncCommon.ConfigCommandData command = new HuaweiDataSyncCommon.ConfigCommandData();
-        command.setConfigDataList(Collections.singletonList(config));
-        return support.getHuaweiDataSyncManager()
-                .sendConfigCommand(SRC_PACKAGE, PACKAGE, command);
     }
 
     @Override
