@@ -98,6 +98,14 @@ public final class VeryFitConstants {
     public static final int FILE_ACK_CHUNKS = 30;
     /** The digest closing a transfer sits in a slot far longer than the text it holds. */
     public static final int FILE_DIGEST_LEN = 128;
+    /** What a notification icon is filed under; the watch keeps one place for it per app. */
+    public static final byte FILE_ICON_TYPE = 0x02;
+    public static final String ICON_FILE = "1.msg";
+    /**
+     * An icon is read back in shorter blocks than a watch face is. The length is fixed rather
+     * than negotiated: the watch answers a size of its own for it, and that size is zero.
+     */
+    public static final int ICON_BLOCK_LEN = 1024;
 
     /** Add the apps that follow to the watch's list, or ask for the list it holds. */
     public static final byte REGISTRY_ADD = 0x01;
@@ -151,6 +159,20 @@ public final class VeryFitConstants {
     public static final byte QUERY_CLOCK = (byte) 0xa3;
     public static final byte QUERY_BRIGHTNESS = (byte) 0xb0;
     public static final byte QUERY_AUTO_WORKOUT = (byte) 0xea;
+    public static final byte QUERY_APP_ICON = (byte) 0xe9;
+
+    /**
+     * Which of the watch's pictures is being asked about; a notification icon is the first kind,
+     * the ones a workout screen is drawn from are the others.
+     */
+    public static final byte ICON_NOTIFICATION = 0x00;
+    /** The answer: whether it can be had, which app it is about, and how it has to be drawn. */
+    public static final byte ICON_OK = 0x00;
+    public static final int ICON_PARAMS_LEN = 11;
+    public static final int ICON_APP_OFFSET = 2;
+    public static final int ICON_WIDTH_OFFSET = 6;
+    public static final int ICON_HEIGHT_OFFSET = 8;
+    public static final int ICON_FORMAT_OFFSET = 10;
 
     public static final int FRAMED_HEALTH = 0x0004;
     public static final int FRAMED_HEALTH_TYPES = 0x0005;

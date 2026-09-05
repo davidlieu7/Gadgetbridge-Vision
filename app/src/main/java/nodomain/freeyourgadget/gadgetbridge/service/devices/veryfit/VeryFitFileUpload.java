@@ -27,6 +27,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
 
+import nodomain.freeyourgadget.gadgetbridge.R;
 import nodomain.freeyourgadget.gadgetbridge.devices.veryfit.VeryFitConstants;
 import nodomain.freeyourgadget.gadgetbridge.util.GB;
 
@@ -44,6 +45,8 @@ class VeryFitFileUpload {
     private final VeryFitSupport support;
     private String file;
     private byte[] data;
+    private byte type;
+    private int label;
     private int sent;
     private boolean running;
 
@@ -63,13 +66,30 @@ class VeryFitFileUpload {
 
     /** Announces the file, from which the watch works out how much room it has to make. */
     void start(final String name, final byte[] contents, final int originalSize) {
-        file = name;
-        data = contents;
-        sent = 0;
-        running = true;
+        take(name, contents, VeryFitConstants.FILE_ANY_TYPE, R.string.uploading_watchface);
         LOG.info("Sending {} as {} bytes of {}", name, contents.length, originalSize);
         support.sendFile("veryfit file declare", Collections.singletonList(
-                open(VeryFitConstants.FILE_DECLARE, originalSize, name)), 0);
+                open(VeryFitConstants.FILE_DECLARE, originalSize, name)), 0, label);
+    }
+
+    /**
+     * A file the watch already keeps a place of its own for, so there is no room for it to make
+     * and nothing to announce: the transfer opens straight away.
+     */
+    void start(final String name, final byte[] contents, final byte fileType, final int busy) {
+        take(name, contents, fileType, busy);
+        LOG.info("Sending {} as {} bytes", name, contents.length);
+        support.sendFile("veryfit file begin", Collections.singletonList(
+                open(VeryFitConstants.FILE_BEGIN, contents.length, name)), 0, label);
+    }
+
+    private void take(final String name, final byte[] contents, final byte fileType, final int busy) {
+        file = name;
+        data = contents;
+        type = fileType;
+        label = busy;
+        sent = 0;
+        running = true;
     }
 
     void onPacket(final byte[] value) {
@@ -85,12 +105,12 @@ class VeryFitFileUpload {
         switch (value[1]) {
             case VeryFitConstants.FILE_DECLARE:
                 support.sendFile("veryfit file begin", Collections.singletonList(
-                        open(VeryFitConstants.FILE_BEGIN, data.length, file)), 0);
+                        open(VeryFitConstants.FILE_BEGIN, data.length, file)), 0, label);
                 break;
             case VeryFitConstants.FILE_BEGIN:
                 support.sendFile("veryfit file interval", Collections.singletonList(new byte[]{
                         VeryFitConstants.FILE_MARKER, VeryFitConstants.FILE_ACK_EVERY,
-                        (byte) VeryFitConstants.FILE_ACK_CHUNKS}), 0);
+                        (byte) VeryFitConstants.FILE_ACK_CHUNKS}), 0, label);
                 break;
             case VeryFitConstants.FILE_ACK_EVERY:
                 sendBatch();
@@ -126,7 +146,7 @@ class VeryFitFileUpload {
         if (sent >= data.length) {
             packets.add(close());
         }
-        support.sendFile("veryfit file data", packets, 100 * sent / data.length);
+        support.sendFile("veryfit file data", packets, 100 * sent / data.length, label);
     }
 
     private void finish(final boolean success) {
@@ -136,12 +156,12 @@ class VeryFitFileUpload {
     }
 
     /** Names the file and says how long it is, either as it is stored or as it arrives. */
-    private static byte[] open(final byte operation, final int size, final String file) {
+    private byte[] open(final byte operation, final int size, final String file) {
         final byte[] name = file.getBytes(StandardCharsets.UTF_8);
         final byte[] packet = new byte[8 + name.length];
         packet[0] = VeryFitConstants.FILE_MARKER;
         packet[1] = operation;
-        packet[2] = VeryFitConstants.FILE_ANY_TYPE;
+        packet[2] = type;
         packet[3] = (byte) size;
         packet[4] = (byte) (size >> 8);
         packet[5] = (byte) (size >> 16);

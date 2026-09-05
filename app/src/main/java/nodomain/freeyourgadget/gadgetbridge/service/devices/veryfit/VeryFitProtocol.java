@@ -96,6 +96,16 @@ public class VeryFitProtocol {
     }
 
     /**
+     * Asks the watch what a notification icon for one of its registered apps has to look like.
+     * The slot behind the app is the sport a workout picture would be for, and stays empty.
+     */
+    public static byte[] appIcon(final int appId) {
+        return command(VeryFitConstants.GROUP_QUERY, VeryFitConstants.QUERY_APP_ICON,
+                VeryFitConstants.ICON_NOTIFICATION, (byte) appId, (byte) (appId >> 8),
+                (byte) 0, (byte) 0);
+    }
+
+    /**
      * Body for {@link VeryFitConstants#FRAMED_WEATHER}: a 32-byte header, then the runs it counts
      * off — sun times, hours, days — and the city name at the end of them. The header carries how
      * long that name is, so it is the one field the watch reads the place from.

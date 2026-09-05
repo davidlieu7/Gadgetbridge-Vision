@@ -47,9 +47,14 @@ public final class VeryFitPacker {
 
     /** Splits the data into blocks and packs each of them on its own. */
     public static byte[] pack(final byte[] data) {
+        return pack(data, BLOCK_LEN);
+    }
+
+    /** The same, for a file the watch reads back in blocks of a length of its own. */
+    public static byte[] pack(final byte[] data, final int blockLen) {
         final ByteArrayOutputStream out = new ByteArrayOutputStream();
-        for (int offset = 0; offset < data.length; offset += BLOCK_LEN) {
-            final byte[] block = packBlock(data, offset, Math.min(BLOCK_LEN, data.length - offset));
+        for (int offset = 0; offset < data.length; offset += blockLen) {
+            final byte[] block = packBlock(data, offset, Math.min(blockLen, data.length - offset));
             out.write((block.length >> 24) & 0xff);
             out.write((block.length >> 16) & 0xff);
             out.write((block.length >> 8) & 0xff);

@@ -98,6 +98,7 @@ public class VeryFitSupport extends AbstractBTLESingleDeviceSupport {
     private final VeryFitHealthSync healthSync = new VeryFitHealthSync(this);
     private final VeryFitWatchfaces watchfaces = new VeryFitWatchfaces();
     private final VeryFitFileUpload fileUpload = new VeryFitFileUpload(this);
+    private final VeryFitAppIcons appIcons = new VeryFitAppIcons(this);
 
     private MediaManager mediaManager;
     private boolean musicOpen;
@@ -139,6 +140,7 @@ public class VeryFitSupport extends AbstractBTLESingleDeviceSupport {
         features = null;
         featuresExtra = null;
         apps.clear();
+        appIcons.reset();
         musicOpen = false;
         lastMusic = null;
         lastBrightness = null;
@@ -318,6 +320,9 @@ public class VeryFitSupport extends AbstractBTLESingleDeviceSupport {
                 break;
             case VeryFitConstants.QUERY_AUTO_WORKOUT:
                 handleAutoWorkout(packet.payload);
+                break;
+            case VeryFitConstants.QUERY_APP_ICON:
+                appIcons.onParameters(packet.payload);
                 break;
             default:
                 LOG.debug("Unhandled query response {}: {}", Integer.toHexString(packet.key),
@@ -660,6 +665,9 @@ public class VeryFitSupport extends AbstractBTLESingleDeviceSupport {
             case DeviceSettingsPreferenceConst.PREF_FIND_PHONE:
                 command = VeryFitSettings.findPhone(prefs);
                 break;
+            case DeviceSettingsPreferenceConst.PREF_UPLOAD_NOTIFICATIONS_APP_ICON:
+                sendAppIcons();
+                return;
             case DeviceSettingsPreferenceConst.PREF_WORKOUT_DETECTION_CATEGORIES:
             case DeviceSettingsPreferenceConst.PREF_WORKOUT_AUTO_PAUSE:
             case DeviceSettingsPreferenceConst.PREF_WORKOUT_AUTO_END:
@@ -819,6 +827,11 @@ public class VeryFitSupport extends AbstractBTLESingleDeviceSupport {
 
     /** The watch shows a face it has just taken, so the list is read back to see which one. */
     void onFileUploadFinished(final boolean success) {
+        if (appIcons.isRunning()) {
+            appIcons.onUploaded(success);
+            return;
+        }
+
         LOG.info("Watchface upload {}", success ? "done" : "failed");
         try {
             final TransactionBuilder builder = performInitialized("veryfit file done");
@@ -841,10 +854,10 @@ public class VeryFitSupport extends AbstractBTLESingleDeviceSupport {
     }
 
     /** File channel packets are a stream of their own, so they go out as they are. */
-    void sendFile(final String task, final List<byte[]> packets, final int percent) {
+    void sendFile(final String task, final List<byte[]> packets, final int percent, final int label) {
         try {
             final TransactionBuilder builder = performInitialized(task);
-            builder.setProgress(R.string.uploading_watchface, true, percent);
+            builder.setProgress(label, true, percent);
             for (final byte[] packet : packets) {
                 builder.write(VeryFitConstants.UUID_CHARACTERISTIC_WRITE, packet);
             }
@@ -852,6 +865,45 @@ public class VeryFitSupport extends AbstractBTLESingleDeviceSupport {
         } catch (final IOException e) {
             LOG.error("Failed to run {}", task, e);
         }
+    }
+
+    /**
+     * The watch answers this for an app it holds a switch for, so one it has never heard of is
+     * registered first — the same registration a notification from it would have made.
+     */
+    void queryAppIcon(final int appId) {
+        if (!apps.containsKey(appId)) {
+            apps.put(appId, true);
+            sendFramed("veryfit app register", VeryFitConstants.FRAMED_APP_REGISTRY,
+                    VeryFitProtocol.appRegistry(VeryFitConstants.REGISTRY_ADD, appId));
+        }
+        send("veryfit app icon read", VeryFitProtocol.appIcon(appId));
+    }
+
+    void sendAppIcon(final byte[] picture) {
+        fileUpload.start(VeryFitConstants.ICON_FILE, picture, VeryFitConstants.FILE_ICON_TYPE,
+                R.string.notifications_app_icon_upload);
+    }
+
+    void onAppIconsFinished() {
+        try {
+            final TransactionBuilder builder = performInitialized("veryfit app icons done");
+            builder.setProgress(R.string.notifications_app_icon_upload, false, 100);
+            builder.queue();
+        } catch (final IOException e) {
+            LOG.error("Failed to close the icon upload", e);
+        }
+    }
+
+    /** The settings screen keeps what was ticked, and the button asks for it to be sent. */
+    private void sendAppIcons() {
+        if (fileUpload.isRunning()) {
+            LOG.warn("A file is already on its way");
+            return;
+        }
+        appIcons.upload(getDevicePrefs().getStringSet(
+                DeviceSettingsPreferenceConst.PREF_UPLOAD_NOTIFICATIONS_APP_ICON,
+                Collections.emptySet()));
     }
 
     int getFileChunkLen() {
@@ -1033,7 +1085,7 @@ public class VeryFitSupport extends AbstractBTLESingleDeviceSupport {
      * The watch keys its per-app switch on an id the phone picks for itself; both vendor apps use
      * a different one for the same app, so the package name is folded into one of our own.
      */
-    private static int appId(final String packageName) {
+    static int appId(final String packageName) {
         if (packageName == null) {
             return 1;
         }

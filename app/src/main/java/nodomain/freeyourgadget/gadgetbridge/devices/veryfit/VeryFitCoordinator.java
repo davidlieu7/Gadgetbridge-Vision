@@ -285,6 +285,9 @@ public abstract class VeryFitCoordinator extends AbstractBLEDeviceCoordinator {
         final List<Integer> notifications = settings.addRootScreen(DeviceSpecificSettingsScreen.NOTIFICATIONS);
         notifications.add(R.xml.devicesettings_send_app_notifications);
         notifications.add(R.xml.devicesettings_transliteration);
+        if (capabilities.supports(VeryFitFeature.FRAMED_PROTOCOL)) {
+            notifications.add(R.xml.devicesettings_upload_notifications_app_icon);
+        }
 
         settings.addRootScreen(R.xml.devicesettings_find_phone);
 
