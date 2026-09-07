@@ -25,6 +25,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.ByteArrayOutputStream;
+import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -49,12 +50,16 @@ import nodomain.freeyourgadget.gadgetbridge.entities.Device;
 import nodomain.freeyourgadget.gadgetbridge.entities.GenericHeartRateSample;
 import nodomain.freeyourgadget.gadgetbridge.entities.User;
 import nodomain.freeyourgadget.gadgetbridge.entities.VeepooActivitySample;
+import nodomain.freeyourgadget.gadgetbridge.export.GPXExporter;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
 import nodomain.freeyourgadget.gadgetbridge.model.ActivityKind;
+import nodomain.freeyourgadget.gadgetbridge.model.ActivityPoint;
 import nodomain.freeyourgadget.gadgetbridge.model.ActivitySample;
 import nodomain.freeyourgadget.gadgetbridge.model.ActivitySummaryData;
 import nodomain.freeyourgadget.gadgetbridge.model.ActivitySummaryEntries;
+import nodomain.freeyourgadget.gadgetbridge.model.ActivityTrack;
 import nodomain.freeyourgadget.gadgetbridge.model.BatteryState;
+import nodomain.freeyourgadget.gadgetbridge.model.GPSCoordinate;
 import nodomain.freeyourgadget.gadgetbridge.model.RecordedDataTypes;
 import nodomain.freeyourgadget.gadgetbridge.service.btle.AbstractBTLESingleDeviceSupport;
 import nodomain.freeyourgadget.gadgetbridge.service.btle.TransactionBuilder;
@@ -772,7 +777,7 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
             summary.add(ActivitySummaryEntries.HR_MAX, hrMax, ActivitySummaryEntries.UNIT_BPM);
         }
         perMinute.addToSummaryData(summary);
-        saveSportSession(startTime, stopTime, sportType, summary, dayIndex);
+        saveSportSession(startTime, stopTime, sportType, summary, new ArrayList<>(), dayIndex);
     }
 
     /**
@@ -884,8 +889,10 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
         }
 
         ActivitySummaryTableBuilder perMinute = newPerMinuteTable();
+        List<GpxPoint> gpsPoints = new ArrayList<>();
         int offset = headLength;
         int minuteNumber = 1;
+        int itemIndex = 0;
         while (offset + 3 <= blob.length) {
             if ((blob[offset] & 0xFF) != 0xA2) {
                 break;
@@ -909,10 +916,45 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
                         new ActivitySummaryValue(itemKcalRaw > 0 ? itemKcalRaw / 1000f : null, ActivitySummaryEntries.UNIT_KCAL)));
                 minuteNumber++;
             }
+            int pointStart = hasAltitudeBlock ? 22 : 18;
+            long itemAltitude = hasAltitudeBlock && recordLength > 16 ? le32(blob, dataStart + 13) : 0;
+            int pointCount = Math.max(0, (recordLength - 16) / 11);
+            for (int p = 0; p < pointCount; p++) {
+                int pos = dataStart + pointStart + p * 11;
+                if (pos + 11 > dataStart + recordLength) {
+                    break;
+                }
+                long lon = le32(blob, pos + 1);
+                long lat = le32(blob, pos + 5);
+                if (lon != 0 && lat != 0) {
+                    long timeMs = startUnix * 1000L + itemIndex * 60000L
+                            + (pointCount > 1 ? p * 60000L / pointCount : 30000L);
+                    gpsPoints.add(new GpxPoint(lon, lat, itemAltitude, timeMs));
+                }
+            }
+            itemIndex++;
             offset = dataStart + recordLength;
         }
         perMinute.addToSummaryData(summary);
-        saveSportSession(startTime, stopTime, sportType, summary, dayIndex);
+        LOG.info("Workout day {}: parsed {} per-minute records ({} GPS points)", dayIndex, minuteNumber - 1, gpsPoints.size());
+        if (minuteNumber == 1 && blob.length > headLength + 3) {
+            StringBuilder hex = new StringBuilder();
+            int dumpEnd = Math.min(blob.length, headLength + 48);
+            for (int i = headLength; i < dumpEnd; i++) {
+                hex.append(String.format("%02x ", blob[i] & 0xFF));
+            }
+            StringBuilder a2Offsets = new StringBuilder();
+            int a2Count = 0;
+            for (int i = 0; i < blob.length && a2Count < 40; i++) {
+                if ((blob[i] & 0xFF) == 0xA2) {
+                    a2Offsets.append(i).append(' ');
+                    a2Count++;
+                }
+            }
+            LOG.info("Workout day {}: no 0xA2 item records at offset {}; bytes there: [{}]; 0xA2 byte offsets in blob: [{}]",
+                    dayIndex, headLength, hex.toString().trim(), a2Offsets.toString().trim());
+        }
+        saveSportSession(startTime, stopTime, sportType, summary, gpsPoints, dayIndex);
     }
 
     private static void addSportEntries(ActivitySummaryData summary, long activeSeconds, int distanceMeters, float kcal, int steps) {
@@ -936,7 +978,8 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
     }
 
     /** Persists one parsed workout as a BaseActivitySummary; identical sessions are skipped. */
-    private void saveSportSession(Date startTime, Date stopTime, int sportType, ActivitySummaryData summary, int dayIndex) {
+    private void saveSportSession(Date startTime, Date stopTime, int sportType, ActivitySummaryData summary,
+                                  List<GpxPoint> gpsPoints, int dayIndex) {
         try (DBHandler dbHandler = GBApplication.acquireDB()) {
             DaoSession session = dbHandler.getDaoSession();
             User user = DBHelper.getUser(session);
@@ -960,6 +1003,10 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
             workout.setEndTime(stopTime);
             workout.setDevice(device);
             workout.setUser(user);
+            if (gpsPoints.size() >= 2) {
+                summary.setHasGps(true);
+                workout.setGpxTrack(writeSportGpx(startTime, workout.getName(), device, user, gpsPoints));
+            }
             workout.setSummaryData(summary.toString());
             dao.insertOrReplace(workout);
             LOG.info("Workout day {}: saved {} session {} to {}", dayIndex, kind.name(), startTime, stopTime);
@@ -967,6 +1014,43 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
             LOG.error("Error saving VeePoo workout session (day {})", dayIndex, e);
         }
         getDevice().sendDeviceUpdateIntent(getContext());
+    }
+
+    /** Writes the collected GPS track points as a .gpx file in the export directory. */
+    private String writeSportGpx(Date startTime, String name, Device device, User user, List<GpxPoint> gpsPoints) throws Exception {
+        File dir = getDevice().getDeviceCoordinator().getWritableExportDirectory(getDevice(), true);
+        File gpxFile = new File(dir, "veepoo_sport_" + (startTime.getTime() / 1000L) + ".gpx");
+        ActivityTrack track = new ActivityTrack();
+        track.setBaseTime(startTime);
+        track.setName(name);
+        track.setDevice(device);
+        track.setUser(user);
+        for (GpxPoint point : gpsPoints) {
+            ActivityPoint activityPoint = new ActivityPoint(new Date(point.timeMs));
+            if (point.altitude > 0) {
+                activityPoint.setLocation(new GPSCoordinate(point.longitude / 1e6, point.latitude / 1e6, point.altitude));
+            } else {
+                activityPoint.setLocation(new GPSCoordinate(point.longitude / 1e6, point.latitude / 1e6));
+            }
+            track.addTrackPoint(activityPoint);
+        }
+        new GPXExporter().performExport(track, gpxFile, null);
+        return gpxFile.getAbsolutePath();
+    }
+
+    /** One decoded GPS track point from a per-minute sport item (coordinates in micro-degrees). */
+    private static final class GpxPoint {
+        private final long longitude;
+        private final long latitude;
+        private final long altitude;
+        private final long timeMs;
+
+        private GpxPoint(long longitude, long latitude, long altitude, long timeMs) {
+            this.longitude = longitude;
+            this.latitude = latitude;
+            this.altitude = altitude;
+            this.timeMs = timeMs;
+        }
     }
 
     /** Maps the VeePoo ESportType value to the closest Gadgetbridge activity kind. */
@@ -994,7 +1078,7 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
             case 20: return ActivityKind.SOCCER;
             case 21: return ActivityKind.BADMINTON;
             case 22: return ActivityKind.TENNIS;
-            case 23: return ActivityKind.FLOOR_CLIMBING;
+            case 23: return ActivityKind.STAIR_STEPPER; // climb stairs
             case 24: return ActivityKind.CARDIO;
             case 25: return ActivityKind.STRENGTH_TRAINING;
             case 26: return ActivityKind.DIVING;
@@ -1004,15 +1088,28 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
             case 32: return ActivityKind.HIIT;
             case 33: return ActivityKind.ROCK_CLIMBING;
             case 45: return ActivityKind.RUNNING; // marathon
+            case 53: return ActivityKind.GOLF;
+            case 56: return ActivityKind.ROWING;
+            case 57: return ActivityKind.BOATING;
+            case 58: return ActivityKind.INLINE_SKATING;
             case 62: return ActivityKind.WALKING; // strong walk
             case 63: return ActivityKind.TREADMILL;
             case 64: return ActivityKind.TRAIL_RUN;
             case 65: return ActivityKind.WALKING; // race walking
             case 66: return ActivityKind.MOUNTAIN_BIKE;
+            case 68: return ActivityKind.HIKING; // orienteering
+            case 69: return ActivityKind.FISHING;
+            case 70: return ActivityKind.HUNTING;
             case 84: return ActivityKind.STRENGTH_TRAINING;
             case 89: return ActivityKind.PILATES;
             case 108: return ActivityKind.MARTIAL_ARTS;
             case 109: return ActivityKind.TAI_CHI;
+            case 142: return ActivityKind.SNOWBOARDING;
+            case 143: return ActivityKind.SNOWBOARDING;
+            case 144: return ActivityKind.SKIING; // alpine skiing
+            case 177: return ActivityKind.RUNNING; // long distance running
+            case 178: return ActivityKind.RUNNING; // full speed run
+            case 179: return ActivityKind.RUNNING; // variable speed run
             default: return ActivityKind.EXERCISE;
         }
     }
