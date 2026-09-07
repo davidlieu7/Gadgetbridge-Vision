@@ -20,16 +20,20 @@ import android.bluetooth.le.ScanFilter;
 
 import androidx.annotation.NonNull;
 
+import java.util.Arrays;
 import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
 
 import de.greenrobot.dao.AbstractDao;
 import de.greenrobot.dao.Property;
 import nodomain.freeyourgadget.gadgetbridge.R;
+import nodomain.freeyourgadget.gadgetbridge.activities.VeepooWorkoutStartActivity;
 import nodomain.freeyourgadget.gadgetbridge.devices.AbstractBLEDeviceCoordinator;
+import nodomain.freeyourgadget.gadgetbridge.devices.DeviceCardAction;
 import nodomain.freeyourgadget.gadgetbridge.devices.SampleProvider;
 import nodomain.freeyourgadget.gadgetbridge.devices.veepoo.samples.VeepooActivitySampleProvider;
 import nodomain.freeyourgadget.gadgetbridge.entities.DaoSession;
@@ -122,5 +126,15 @@ public class VeepooKR96ProCoordinator extends AbstractBLEDeviceCoordinator {
     public int getBondingStyle() {
         // The band pairs via its own password command (0xA1), not BLE pairing.
         return BONDING_STYLE_LAZY;
+    }
+
+    @NonNull
+    @Override
+    public List<DeviceCardAction> getCustomActions() {
+        return Arrays.asList(
+                DeviceCardAction.forActivity(R.drawable.ic_activity_running, R.string.veepoo_workout_start,
+                        VeepooWorkoutStartActivity.class),
+                DeviceCardAction.forConfiguration(R.drawable.ic_stop, R.string.veepoo_workout_stop,
+                        VeepooConstants.CONFIG_WORKOUT_STOP));
     }
 }

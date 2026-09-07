@@ -27,6 +27,9 @@ import org.slf4j.LoggerFactory;
 import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
+import java.nio.BufferUnderflowException;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Calendar;
@@ -96,6 +99,16 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
     private final Runnable sportWatchdog = () -> runSportWatchdog();
     private final List<VeepooActivitySample> pendingOriginSamples = new ArrayList<>();
     private final List<VeepooActivitySample> pendingSleepSamples = new ArrayList<>();
+
+    // Phone-initiated workout state (0xDA sport control)
+    private final Object liveWorkoutLock = new Object();
+    private int liveSportType = 0;        // ESportType of the active session (0 = unknown/none)
+    private boolean liveWorkoutActive = false;
+    private boolean workoutCommandPending = false; // awaiting an ack for a start/stop command
+    private boolean pendingCommandIsStop = false;
+    private final List<byte[]> liveReportChunks = new ArrayList<>();
+    private int liveReportTotalChunks = 0;
+    private boolean postStopFetchScheduled = false;
 
     // Capabilities from the device-pushed 0xA7 report (package 2)
     private int watchDataDay = VeepooConstants.WATCH_DAY_DEFAULT;
@@ -232,6 +245,9 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
                 break;
             case 0xD4:
                 handleSportFrame(data);
+                break;
+            case 0xDA:
+                handleSportControlFrame(data);
                 break;
             case 0xD0:
                 handleHeartRateMeasurement(data);
@@ -1635,6 +1651,296 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
         return String.format("%02x", value & 0xFF);
     }
 
+    @Override
+    public void onSendConfiguration(final String config) {
+        if (config == null) {
+            return;
+        }
+        if (config.startsWith(VeepooConstants.CONFIG_WORKOUT_START_PREFIX)) {
+            int sportType;
+            try {
+                sportType = Integer.parseInt(config.substring(VeepooConstants.CONFIG_WORKOUT_START_PREFIX.length()));
+            } catch (NumberFormatException e) {
+                LOG.warn("Invalid workout config key: {}", config);
+                return;
+            }
+            startWorkout(sportType);
+        } else if (VeepooConstants.CONFIG_WORKOUT_STOP.equals(config)) {
+            stopWorkout();
+        } else {
+            super.onSendConfiguration(config);
+        }
+    }
+
+    /**
+     * Starts a workout via 0xDA: first opens the live control report (vendor flow), then sends
+     * the START command. The sport type is an ESportType value from the picker.
+     */
+    private void startWorkout(int sportType) {
+        if (sportType <= 0 || sportType > 188) {
+            LOG.warn("Ignoring workout start with unknown sport type {}", sportType);
+            return;
+        }
+        synchronized (liveWorkoutLock) {
+            if (liveWorkoutActive) {
+                LOG.warn("A workout is already running; ignoring the start request");
+                return;
+            }
+            liveSportType = sportType;
+            workoutCommandPending = true;
+            pendingCommandIsStop = false;
+            liveReportChunks.clear();
+        }
+        try {
+            TransactionBuilder builder = performInitialized("start workout");
+            writeFrame(builder, new byte[]{VeepooConstants.OP_SPORT_CONTROL});
+            writeFrame(builder, new byte[]{VeepooConstants.OP_SPORT_CONTROL, 0x01,
+                    (byte) (sportType & 0xFF), (byte) ((sportType >> 8) & 0xFF),
+                    (byte) VeepooConstants.SPORT_CTRL_START});
+            builder.queue();
+            LOG.info("Workout start requested (sport type {})", sportType);
+        } catch (IOException e) {
+            synchronized (liveWorkoutLock) {
+                workoutCommandPending = false;
+            }
+            LOG.error("Error requesting workout start", e);
+        }
+    }
+
+    /**
+     * Stops the running workout. The vendor app stops with sport type NONE (0): the device knows
+     * which session is active. After a successful ack, day 0 of the workout history is re-fetched
+     * so the finished session shows up immediately.
+     */
+    private void stopWorkout() {
+        synchronized (liveWorkoutLock) {
+            if (workoutCommandPending) {
+                LOG.warn("A workout command is already pending; ignoring the stop request");
+                return;
+            }
+            workoutCommandPending = true;
+            pendingCommandIsStop = true;
+        }
+        try {
+            TransactionBuilder builder = performInitialized("stop workout");
+            writeFrame(builder, new byte[]{VeepooConstants.OP_SPORT_CONTROL, 0x01,
+                    0x00, 0x00, (byte) VeepooConstants.SPORT_CTRL_STOP});
+            builder.queue();
+            LOG.info("Workout stop requested");
+        } catch (IOException e) {
+            synchronized (liveWorkoutLock) {
+                workoutCommandPending = false;
+            }
+            LOG.error("Error requesting workout stop", e);
+        }
+    }
+
+    private final Runnable postStopFetchTask = () -> {
+        synchronized (liveWorkoutLock) {
+            postStopFetchScheduled = false;
+        }
+        synchronized (syncLock) {
+            if (fetchPhase != FetchPhase.IDLE) {
+                LOG.info("A data fetch is already running; it will pick up the finished workout");
+                return;
+            }
+            fetchPhase = FetchPhase.SPORT;
+            sportDayIndex = 0;
+        }
+        getDevice().setBusyTask(R.string.busy_task_fetch_activity_data, getContext());
+        requestSportDay(0);
+    };
+
+    /** Delays the day-0 history fetch so the firmware can finalize the stopped session. */
+    private void schedulePostStopFetch() {
+        synchronized (liveWorkoutLock) {
+            if (postStopFetchScheduled) {
+                return;
+            }
+            postStopFetchScheduled = true;
+        }
+        mainHandler.postDelayed(postStopFetchTask, 3000L);
+    }
+
+    /**
+     * Opcode 0xDA frame (sport control): [1]==1 is the command ack ([2]==1 success). [1]==2/3 is
+     * a chunked live workout report: chunk index at [3] (1-based), total chunks at [6], and the
+     * little-endian TLV payload continues from byte [4] of every chunk.
+     */
+    private void handleSportControlFrame(byte[] data) {
+        if (data.length < 7) {
+            LOG.debug("Dropping short 0xDA frame: {} bytes", data.length);
+            return;
+        }
+        int action = data[1] & 0xFF;
+        if (action == 1) {
+            boolean ok = (data[2] & 0xFF) == 1;
+            boolean wasStop;
+            synchronized (liveWorkoutLock) {
+                if (!workoutCommandPending) {
+                    LOG.debug("Sport control ack without a pending command");
+                    return;
+                }
+                workoutCommandPending = false;
+                wasStop = pendingCommandIsStop;
+                pendingCommandIsStop = false;
+                liveWorkoutActive = !wasStop && ok;
+            }
+            if (wasStop) {
+                LOG.info("Workout stopped by the app (ack: {})", ok ? "success" : "FAILED");
+                if (ok) {
+                    schedulePostStopFetch();
+                }
+            } else {
+                LOG.info("Workout start command {}", ok ? "accepted" : "FAILED by the device");
+            }
+            return;
+        }
+
+        int chunkIndex = data[3] & 0xFF;
+        byte[] payload;
+        synchronized (liveWorkoutLock) {
+            if (chunkIndex == 1) {
+                liveReportChunks.clear();
+                liveReportTotalChunks = data[6] & 0xFF;
+            }
+            liveReportChunks.add(data);
+            if (chunkIndex < 1 || chunkIndex != liveReportTotalChunks) {
+                return;
+            }
+            int total = 0;
+            for (byte[] frame : liveReportChunks) {
+                total += Math.max(frame.length - 4, 0);
+            }
+            payload = new byte[total];
+            int offset = 0;
+            for (byte[] frame : liveReportChunks) {
+                int size = Math.max(frame.length - 4, 0);
+                System.arraycopy(frame, 4, payload, offset, size);
+                offset += size;
+            }
+            liveReportChunks.clear();
+        }
+        applyLiveWorkoutData(payload);
+    }
+
+    /**
+     * Parses the assembled little-endian TLV stream of a live workout report and updates the
+     * session state. Tags mirror the vendor's SportControlDataInfo: 0xA1 sport type (BE u16),
+     * 0xA2 opcode, 0xA3 run state, 0xA4 device state, 0xA5 duration s, 0xA6 distance m,
+     * 0xA7 heart rate bpm, 0xA8 calories, 0xA9 pace (BE u16), 0xAA speed (BE u16),
+     * 0xAB GNSS flag + signal. Each tag is followed by a length byte that is skipped.
+     */
+    private void applyLiveWorkoutData(byte[] payload) {
+        int sportType = 0, opcode = 0, runState = 0, duration = -1, distance = -1;
+        int heartRate = 0, calories = -1, pace = -1, speed = -1;
+        boolean gnss = false;
+        try {
+            ByteBuffer buffer = ByteBuffer.wrap(payload).order(ByteOrder.LITTLE_ENDIAN);
+            while (buffer.hasRemaining()) {
+                int tag = buffer.get() & 0xFF;
+                switch (tag) {
+                    case 0xA0:
+                        buffer.get();
+                        buffer.get();
+                        break;
+                    case 0xA1:
+                        buffer.get();
+                        sportType = ((buffer.get() & 0xFF) << 8) | (buffer.get() & 0xFF);
+                        break;
+                    case 0xA2:
+                        buffer.get();
+                        opcode = buffer.get() & 0xFF;
+                        break;
+                    case 0xA3:
+                        buffer.get();
+                        runState = buffer.get() & 0xFF;
+                        break;
+                    case 0xA4:
+                        buffer.get();
+                        break;
+                    case 0xA5:
+                        buffer.get();
+                        duration = buffer.getInt();
+                        break;
+                    case 0xA6:
+                        buffer.get();
+                        distance = buffer.getInt();
+                        break;
+                    case 0xA7:
+                        buffer.get();
+                        heartRate = buffer.get() & 0xFF;
+                        break;
+                    case 0xA8:
+                        buffer.get();
+                        calories = buffer.getInt();
+                        break;
+                    case 0xA9:
+                        buffer.get();
+                        pace = ((buffer.get() & 0xFF) << 8) | (buffer.get() & 0xFF);
+                        break;
+                    case 0xAA:
+                        buffer.get();
+                        speed = ((buffer.get() & 0xFF) << 8) | (buffer.get() & 0xFF);
+                        break;
+                    case 0xAB:
+                        buffer.get();
+                        gnss = (buffer.get() & 0xFF) == 1;
+                        break;
+                    default:
+                        LOG.debug("Unknown sport control TLV tag: 0x{}", Integer.toHexString(tag));
+                }
+            }
+        } catch (BufferUnderflowException e) {
+            LOG.warn("Truncated live workout report ({} bytes)", payload.length);
+            return;
+        }
+
+        boolean finished = false;
+        synchronized (liveWorkoutLock) {
+            if (sportType > 0) {
+                liveSportType = sportType;
+            }
+            // RunState: 0 not started, 1 running, 2 paused, 3 resuming, 4 finished.
+            if (runState == 4) {
+                finished = true;
+                liveWorkoutActive = false;
+            } else if (runState == 0) {
+                liveWorkoutActive = false;
+            } else if (runState == 1 || runState == 3) {
+                liveWorkoutActive = true;
+            }
+        }
+
+        LOG.info("Live workout: state {} ({} s, {} m, HR {}, {} kcal, pace {}, speed {}){}",
+                runState, duration, distance, heartRate, calories, pace, speed, gnss ? ", GNSS" : "");
+        if (finished) {
+            schedulePostStopFetch();
+        }
+        persistLiveHeartRate(heartRate);
+    }
+
+    /** Stores a live workout heart rate so it shows up in the regular heart-rate views. */
+    private void persistLiveHeartRate(int bpm) {
+        if (bpm < 30 || bpm > 220) {
+            return;
+        }
+        try (DBHandler dbHandler = GBApplication.acquireDB()) {
+            DaoSession session = dbHandler.getDaoSession();
+            Long userId = DBHelper.getUser(session).getId();
+            Long deviceId = DBHelper.getDevice(getDevice(), session).getId();
+
+            GenericHeartRateSample sample = new GenericHeartRateSample();
+            sample.setTimestamp(System.currentTimeMillis());
+            sample.setHeartRate(bpm);
+            sample.setUserId(userId);
+            sample.setDeviceId(deviceId);
+            new nodomain.freeyourgadget.gadgetbridge.devices.GenericHeartRateSampleProvider(getDevice(), session).addSample(sample);
+        } catch (Exception e) {
+            LOG.error("Error saving live workout heart rate", e);
+        }
+    }
+
     /** Opcode 0xD0: single-shot heart rate result, [1] = bpm. */
     private void handleHeartRateMeasurement(byte[] data) {
         if (data.length < 2) {
@@ -1744,6 +2050,7 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
 
     @Override
     public void dispose() {
+        mainHandler.removeCallbacks(postStopFetchTask);
         synchronized (syncLock) {
             fetchPhase = FetchPhase.IDLE;
         }

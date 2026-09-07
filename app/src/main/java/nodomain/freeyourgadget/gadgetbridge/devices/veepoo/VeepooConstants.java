@@ -83,6 +83,24 @@ public final class VeepooConstants {
     public static final byte OP_SLEEP_READ = (byte) 0xE0;
     /** Production / firmware info. */
     public static final byte OP_PRODUCTION_INFO = (byte) 0xFC;
+    /**
+     * Sport (workout) control: [0xDA][action][sportType LE16][control]. Action 0 opens the live
+     * control report, 1 sets control (start/pause/resume/stop), 2 reads info. Responses are an
+     * ack ([1]==1, [2]==1 success) or a chunked little-endian TLV live report.
+     */
+    public static final byte OP_SPORT_CONTROL = (byte) 0xDA;
+
+    // ---- 0xDA sport control values ----------------------------------------
+    /** [4] for the set-control action: start the workout. */
+    public static final int SPORT_CTRL_START = 1;
+    /** [4] for the set-control action: stop the workout (sport type may be 0/NONE). */
+    public static final int SPORT_CTRL_STOP = 4;
+
+    // ---- Phone-initiated workout config keys (onSendConfiguration) --------
+    /** Prefix of the "start workout" key; the numeric suffix is the ESportType value. */
+    public static final String CONFIG_WORKOUT_START_PREFIX = "veepoo_workout_start_";
+    /** Stop the running workout. */
+    public static final String CONFIG_WORKOUT_STOP = "veepoo_workout_stop";
 
     // ---- Activity rawKind (stored in VeepooActivitySample.rawKind) -------
     // Mapped to ActivityKind by VeepooActivitySampleProvider.normalizeType().
