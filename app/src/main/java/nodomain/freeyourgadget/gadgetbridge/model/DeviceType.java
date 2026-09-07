@@ -566,6 +566,7 @@ import nodomain.freeyourgadget.gadgetbridge.devices.tlw64.TLW64Coordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.ultrahuman.UltrahumanDeviceCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.um25.Coordinator.UM25Coordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.una.UnaDeviceCoordinator;
+import nodomain.freeyourgadget.gadgetbridge.devices.veepoo.VeepooKR96ProCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.vesc.VescCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.vibratissimo.VibratissimoCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.victron.VictronSmartShuntCoordinator;
@@ -1227,6 +1228,7 @@ public enum DeviceType {
     UNA_WATCH(UnaDeviceCoordinator.class),
     ZEBLAZE_BEYOND_3_PRO(Beyond3ProCoordinator.class),
     QN_SCALE(QnScaleCoordinator.class),
+    VEEPOO_KR96_PRO(VeepooKR96ProCoordinator.class),
     TEST(TestDeviceCoordinator.class);
 
     private DeviceCoordinator coordinator;
