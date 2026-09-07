@@ -828,6 +828,12 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
         int avgHr = blob[35] & 0xFF;
         int minHr = blob[36] & 0xFF;
         int avgPace = le16(blob, 39);
+        int maxSpeed = le16(blob, 43);
+        int avgSpeed = le16(blob, 45);
+        int minSpeed = le16(blob, 47);
+        int maxCadence = le16(blob, 49);
+        int avgCadence = le16(blob, 51);
+        int minCadence = le16(blob, 53);
 
         long maxAltitude = 0;
         long avgAltitude = 0;
@@ -869,6 +875,24 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
         }
         if (avgPace > 0) {
             summary.add(ActivitySummaryEntries.PACE_AVG_SECONDS_KM, avgPace, ActivitySummaryEntries.UNIT_SECONDS_PER_KM);
+        }
+        if (avgSpeed > 0) {
+            summary.add(ActivitySummaryEntries.SPEED_AVG, avgSpeed / 1000f, ActivitySummaryEntries.UNIT_KMPH);
+        }
+        if (maxSpeed > 0) {
+            summary.add(ActivitySummaryEntries.SPEED_MAX, maxSpeed / 1000f, ActivitySummaryEntries.UNIT_KMPH);
+        }
+        if (minSpeed > 0) {
+            summary.add(ActivitySummaryEntries.SPEED_MIN, minSpeed / 1000f, ActivitySummaryEntries.UNIT_KMPH);
+        }
+        if (avgCadence >= 30 && avgCadence <= 400) {
+            summary.add(ActivitySummaryEntries.CADENCE_AVG, avgCadence, ActivitySummaryEntries.UNIT_SPM);
+        }
+        if (maxCadence >= 30 && maxCadence <= 400) {
+            summary.add(ActivitySummaryEntries.CADENCE_MAX, maxCadence, ActivitySummaryEntries.UNIT_SPM);
+        }
+        if (minCadence >= 30 && minCadence <= 400) {
+            summary.add(ActivitySummaryEntries.CADENCE_MIN, minCadence, ActivitySummaryEntries.UNIT_SPM);
         }
         if (hasAltitudeBlock) {
             if (maxAltitude > 0) {
@@ -1004,8 +1028,12 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
             workout.setDevice(device);
             workout.setUser(user);
             if (gpsPoints.size() >= 2) {
-                summary.setHasGps(true);
-                workout.setGpxTrack(writeSportGpx(startTime, workout.getName(), device, user, gpsPoints));
+                try {
+                    summary.setHasGps(true);
+                    workout.setGpxTrack(writeSportGpx(startTime, workout.getName(), device, user, gpsPoints));
+                } catch (Exception e) {
+                    LOG.warn("Workout day {}: GPX export failed, saving without track", dayIndex, e);
+                }
             }
             workout.setSummaryData(summary.toString());
             dao.insertOrReplace(workout);
