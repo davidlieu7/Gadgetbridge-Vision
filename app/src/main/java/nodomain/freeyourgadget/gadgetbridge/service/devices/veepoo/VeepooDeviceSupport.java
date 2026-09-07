@@ -788,8 +788,11 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
       * Optional altitude block (base + 2 > 39): max/avg/min altitude LE u32 at [55..66], climb
       * LE u32 [67..70], decline LE u32 [71..74]. Sport block at base: pause seconds LE16
       * [base+23..24], sport type LE u16 [base+31..32], data type [base+33] (1/2/5/6 => per-point
-      * altitude). Items follow as TLV: tag 0xA2, BE u16 length, then one per-minute record (rate
-      * [2], steps LE16 [5..6], distance LE16 [7..8], kcal x 1000 LE16 [9..10]) plus its GPS points.
+       * altitude). Items follow as TLV: tag 0xA2, LE u16 length (the KR96 Pro firmware sends the
+       * length little-endian; the vendor app's big-endian read rejects them), then one per-minute
+       * record (HR [2], steps LE16 [5..6], distance LE16 [7..8], kcal x 1000 LE16 [9..10]) plus
+       * any trailing GPS points. On the KR96 Pro every item is exactly 16 bytes, i.e. no GPS
+       * points are embedded in the workout history stream.
      */
     private void parseSportGpsDay(List<byte[]> frames, int dayIndex) {
         if (frames.isEmpty()) {
@@ -915,13 +918,13 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
         ActivitySummaryTableBuilder perMinute = newPerMinuteTable();
         List<GpxPoint> gpsPoints = new ArrayList<>();
         int offset = headLength;
-        int minuteNumber = 1;
         int itemIndex = 0;
+        int rowsAdded = 0;
         while (offset + 3 <= blob.length) {
             if ((blob[offset] & 0xFF) != 0xA2) {
                 break;
             }
-            int recordLength = be16(blob, offset + 1);
+            int recordLength = le16(blob, offset + 1);
             int dataStart = offset + 3;
             if (recordLength < 12 || dataStart + recordLength > blob.length) {
                 break;
@@ -932,13 +935,13 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
             int itemKcalRaw = le16(blob, dataStart + 9);
             boolean validHr = rate >= 30 && rate <= 200;
             if (validHr || itemSteps > 0 || itemDistance > 0 || itemKcalRaw > 0) {
-                perMinute.addRow("minute_" + minuteNumber, Arrays.asList(
-                        new ActivitySummaryValue(minuteNumber, ActivitySummaryEntries.UNIT_NONE),
+                perMinute.addRow("minute_" + (itemIndex + 1), Arrays.asList(
+                        new ActivitySummaryValue(itemIndex + 1, ActivitySummaryEntries.UNIT_NONE),
                         new ActivitySummaryValue(validHr ? rate : null, ActivitySummaryEntries.UNIT_BPM),
                         new ActivitySummaryValue(itemSteps > 0 ? itemSteps : null, ActivitySummaryEntries.UNIT_STEPS),
                         new ActivitySummaryValue(itemDistance > 0 ? itemDistance : null, ActivitySummaryEntries.UNIT_METERS),
                         new ActivitySummaryValue(itemKcalRaw > 0 ? itemKcalRaw / 1000f : null, ActivitySummaryEntries.UNIT_KCAL)));
-                minuteNumber++;
+                rowsAdded++;
             }
             int pointStart = hasAltitudeBlock ? 22 : 18;
             long itemAltitude = hasAltitudeBlock && recordLength > 16 ? le32(blob, dataStart + 13) : 0;
@@ -960,8 +963,9 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
             offset = dataStart + recordLength;
         }
         perMinute.addToSummaryData(summary);
-        LOG.info("Workout day {}: parsed {} per-minute records ({} GPS points)", dayIndex, minuteNumber - 1, gpsPoints.size());
-        if (minuteNumber == 1 && blob.length > headLength + 3) {
+        LOG.info("Workout day {}: parsed {} item records, saved {} per-minute rows ({} GPS points)",
+                dayIndex, itemIndex, rowsAdded, gpsPoints.size());
+        if (rowsAdded == 0 && blob.length > headLength + 3) {
             StringBuilder hex = new StringBuilder();
             int dumpEnd = Math.min(blob.length, headLength + 48);
             for (int i = headLength; i < dumpEnd; i++) {
