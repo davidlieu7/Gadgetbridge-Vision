@@ -20,6 +20,7 @@ import android.bluetooth.BluetoothGatt;
 import android.bluetooth.BluetoothGattCharacteristic;
 import android.os.Handler;
 import android.os.Looper;
+import android.widget.Toast;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -66,6 +67,7 @@ import nodomain.freeyourgadget.gadgetbridge.model.GPSCoordinate;
 import nodomain.freeyourgadget.gadgetbridge.model.RecordedDataTypes;
 import nodomain.freeyourgadget.gadgetbridge.service.btle.AbstractBTLESingleDeviceSupport;
 import nodomain.freeyourgadget.gadgetbridge.service.btle.TransactionBuilder;
+import nodomain.freeyourgadget.gadgetbridge.util.GB;
 
 /**
  * Device support for the VeePoo G Band (KR96 Pro, {@code com.vpgband.app}).
@@ -1684,6 +1686,7 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
         synchronized (liveWorkoutLock) {
             if (liveWorkoutActive) {
                 LOG.warn("A workout is already running; ignoring the start request");
+                GB.toast(getContext(), R.string.veepoo_workout_already_running, Toast.LENGTH_SHORT, GB.WARN);
                 return;
             }
             liveSportType = sportType;
@@ -1717,6 +1720,7 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
         synchronized (liveWorkoutLock) {
             if (workoutCommandPending) {
                 LOG.warn("A workout command is already pending; ignoring the stop request");
+                GB.toast(getContext(), R.string.veepoo_workout_command_pending, Toast.LENGTH_SHORT, GB.WARN);
                 return;
             }
             workoutCommandPending = true;
@@ -1803,11 +1807,15 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
             mainHandler.removeCallbacks(workoutCommandTimeout);
             if (wasStop) {
                 LOG.info("Workout stopped by the app (ack: {})", ok ? "success" : "FAILED");
+                GB.toast(getContext(), ok ? R.string.veepoo_workout_stopped : R.string.veepoo_workout_stop_failed,
+                        Toast.LENGTH_SHORT, ok ? GB.INFO : GB.ERROR);
                 if (ok) {
                     schedulePostStopFetch();
                 }
             } else {
                 LOG.info("Workout start command {}", ok ? "accepted" : "FAILED by the device");
+                GB.toast(getContext(), ok ? R.string.veepoo_workout_started : R.string.veepoo_workout_start_failed,
+                        Toast.LENGTH_SHORT, ok ? GB.INFO : GB.ERROR);
             }
             return;
         }

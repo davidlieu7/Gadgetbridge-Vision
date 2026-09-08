@@ -2429,6 +2429,12 @@
     <string name="veepoo_workout_start">Start workout</string>
     <string name="veepoo_workout_stop">Stop workout</string>
     <string name="veepoo_workout_start_title">Start workout</string>
+    <string name="veepoo_workout_started">Workout started</string>
+    <string name="veepoo_workout_start_failed">Workout start failed</string>
+    <string name="veepoo_workout_stopped">Workout stopped</string>
+    <string name="veepoo_workout_stop_failed">Workout stop failed</string>
+    <string name="veepoo_workout_already_running">A workout is already running</string>
+    <string name="veepoo_workout_command_pending">Please wait for the previous command to complete</string>
     <string name="devicetype_blackview_r60" translatable="false">Blackview R60</string>
     <string name="devicetype_misirun_c17" translatable="false">Misirun C17</string>
     <string name="devicetype_c20" translatable="false">C20</string>
