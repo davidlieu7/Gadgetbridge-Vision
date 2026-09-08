@@ -598,7 +598,7 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
                 fetchPhase = FetchPhase.SPORT;
                 sportDayIndex = 0;
             }
-            LOG.info("Activity days complete; reading {} day(s) of workout history", sportModelDay);
+            LOG.info("Activity days complete; reading up to {} day(s) of workout history", sportFetchLimit());
             requestSportDay(0);
         } else {
             synchronized (syncLock) {
@@ -644,28 +644,59 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
         sportDayFrames.clear();
         int dayIndex = sportDayIndex;
         LOG.info("Workout day {} complete ({} frames)", dayIndex, frames.size());
-        parseSportDay(frames, dayIndex);
+        boolean hadSession = parseSportDay(frames, dayIndex);
+        advanceSportDay(dayIndex, hadSession);
+    }
 
+    /**
+     * Advances the fetch after one workout day. Inside the advertised sportModelDay window every
+     * day is requested; beyond it, days are probed (the firmware keeps a compacted ring of
+     * sessions that can extend past the window) until an empty day or SPORT_FETCH_MAX_DAYS.
+     */
+    private void advanceSportDay(int dayIndex, boolean hadSession) {
         int nextDay = dayIndex + 1;
-        synchronized (syncLock) {
-            if (nextDay < sportModelDay) {
-                sportDayIndex = nextDay;
-            } else {
+        int limit = sportFetchLimit();
+        if (nextDay >= sportModelDay && !hadSession) {
+            if (dayIndex >= sportModelDay) {
+                LOG.info("Workout probe: day {} empty, history ends at day {}", dayIndex, dayIndex);
+            }
+            synchronized (syncLock) {
                 fetchPhase = FetchPhase.IDLE;
             }
+            finishFetch();
+            return;
         }
-        if (nextDay < sportModelDay) {
+        if (nextDay < limit) {
+            if (nextDay == sportModelDay) {
+                LOG.info("Workout window full at {} day(s); probing up to day {}", sportModelDay, limit - 1);
+            }
+            synchronized (syncLock) {
+                sportDayIndex = nextDay;
+            }
             requestSportDay(nextDay);
         } else {
+            synchronized (syncLock) {
+                fetchPhase = FetchPhase.IDLE;
+            }
             finishFetch();
         }
     }
 
-    /** Mirrors the app's 90-second per-day timeout: advances with whatever data arrived so far. */
+    /** Total 0xD4 days to request: the advertised window, extended by the probe. */
+    private int sportFetchLimit() {
+        return sportModelDay > 0 ? Math.max(sportModelDay, VeepooConstants.SPORT_FETCH_MAX_DAYS) : 0;
+    }
+
+    /** Mirrors the app's 90-second per-day timeout; probe days time out much faster. */
     private void scheduleSportWatchdog() {
         mainHandler.removeCallbacks(sportWatchdog);
         sportLastFrameAt = System.currentTimeMillis();
-        mainHandler.postDelayed(sportWatchdog, 90_000L);
+        mainHandler.postDelayed(sportWatchdog, sportWatchdogTimeout());
+    }
+
+    /** 90 s for advertised days (mirrors the vendor app), 10 s for days beyond the window. */
+    private long sportWatchdogTimeout() {
+        return sportDayIndex >= sportModelDay ? 10_000L : 90_000L;
     }
 
     private void runSportWatchdog() {
@@ -675,42 +706,39 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
             }
         }
         long idle = System.currentTimeMillis() - sportLastFrameAt;
-        if (idle < 90_000L) {
+        if (idle < sportWatchdogTimeout()) {
             scheduleSportWatchdog();
             return;
         }
-        LOG.warn("Workout read stalled for {} ms; finishing the day with partial data", idle);
         mainHandler.removeCallbacks(sportWatchdog);
+        if (sportDayIndex >= sportModelDay) {
+            LOG.info("Workout probe: no response for day {}, stopping the history fetch", sportDayIndex);
+            sportDayFrames.clear();
+            synchronized (syncLock) {
+                fetchPhase = FetchPhase.IDLE;
+            }
+            finishFetch();
+            return;
+        }
+        LOG.warn("Workout read stalled for {} ms; finishing the day with partial data", idle);
         List<byte[]> frames = new ArrayList<>(sportDayFrames);
         sportDayFrames.clear();
         int dayIndex = sportDayIndex;
-        parseSportDay(frames, dayIndex);
-
-        int nextDay = dayIndex + 1;
-        synchronized (syncLock) {
-            if (nextDay < sportModelDay) {
-                sportDayIndex = nextDay;
-            } else {
-                fetchPhase = FetchPhase.IDLE;
-            }
-        }
-        if (nextDay < sportModelDay) {
-            requestSportDay(nextDay);
-        } else {
-            finishFetch();
-        }
+        boolean hadSession = parseSportDay(frames, dayIndex);
+        advanceSportDay(dayIndex, hadSession);
     }
 
     /** Parses one 0xD4 day: GPS layout for multi-sport types 4/5/6, plain layout otherwise. */
-    private void parseSportDay(List<byte[]> frames, int dayIndex) {
+    private boolean parseSportDay(List<byte[]> frames, int dayIndex) {
         try {
             if (multSportModeType == 4 || multSportModeType == 5 || multSportModeType == 6) {
-                parseSportGpsDay(frames, dayIndex);
+                return parseSportGpsDay(frames, dayIndex);
             } else {
-                parseSportPlainDay(frames, dayIndex);
+                return parseSportPlainDay(frames, dayIndex);
             }
         } catch (Exception e) {
             LOG.error("Error parsing workout day {}", dayIndex, e);
+            return false;
         }
     }
 
@@ -724,10 +752,10 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
      * BE u16 minute index [1..2] (3-based), BE u16 total minutes [3..4] (3-based), BE u16 steps
      * [9..10], BE u16 kcal x 1000 [11..12], BE u16 distance (meters) [13..14].
      */
-    private void parseSportPlainDay(List<byte[]> frames, int dayIndex) {
+    private boolean parseSportPlainDay(List<byte[]> frames, int dayIndex) {
         if (frames.size() < 3) {
             LOG.info("Workout day {}: no workout data ({} frame(s))", dayIndex, frames.size());
-            return;
+            return false;
         }
         byte[] head = new byte[42];
         for (int k = 0; k < 3; k++) {
@@ -739,8 +767,12 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
         Date stopTime = dateFromParts(be16(head, 8), head[10] & 0xFF, head[11] & 0xFF,
                 head[12] & 0xFF, head[13] & 0xFF, head[14] & 0xFF);
         if (startTime == null || stopTime == null || stopTime.before(startTime)) {
-            LOG.warn("Workout day {}: implausible workout window in the head; skipping", dayIndex);
-            return;
+            if (startTime == null && stopTime == null) {
+                LOG.info("Workout day {}: empty slot", dayIndex);
+            } else {
+                LOG.warn("Workout day {}: implausible workout window in the head; skipping", dayIndex);
+            }
+            return false;
         }
 
         int steps = (int) le32(head, 15);
@@ -796,6 +828,7 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
         }
         perMinute.addToSummaryData(summary);
         saveSportSession(startTime, stopTime, sportType, summary, new ArrayList<>(), dayIndex);
+        return true;
     }
 
     /**
@@ -812,10 +845,10 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
        * any trailing GPS points. On the KR96 Pro every item is exactly 16 bytes, i.e. no GPS
        * points are embedded in the workout history stream.
      */
-    private void parseSportGpsDay(List<byte[]> frames, int dayIndex) {
+    private boolean parseSportGpsDay(List<byte[]> frames, int dayIndex) {
         if (frames.isEmpty()) {
             LOG.info("Workout day {}: no workout data", dayIndex);
-            return;
+            return false;
         }
         int blobLength = 0;
         for (byte[] frame : frames) {
@@ -830,16 +863,20 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
 
         if (blob.length < 40 || (blob[0] & 0xFF) != 0xA1) {
             LOG.info("Workout day {}: no GPS workout data in {}-byte blob", dayIndex, blob.length);
-            return;
+            return false;
         }
         int headLength = Math.min((blob[1] & 0xFF) + 2, blob.length);
         long startUnix = le32(blob, 4);
         long stopUnix = le32(blob, 8);
+        if (startUnix == 0 && stopUnix == 0) {
+            LOG.info("Workout day {}: empty slot", dayIndex);
+            return false;
+        }
         if (startUnix < 946684800L || startUnix > 4102444800L || headLength < 40
                 || stopUnix < startUnix) {
             LOG.warn("Workout day {}: implausible GPS head (start epoch {}, stop epoch {}); skipping",
                     dayIndex, startUnix, stopUnix);
-            return;
+            return false;
         }
 
         int sportSeconds = (int) le32(blob, 12);
@@ -874,7 +911,7 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
 
         if (blob.length < base + 34) {
             LOG.warn("Workout day {}: GPS blob truncated before the sport block; skipping", dayIndex);
-            return;
+            return false;
         }
         int pauseSeconds = le16(blob, base + 23);
         int sportType = le16(blob, base + 31);
@@ -1003,6 +1040,7 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
                     dayIndex, headLength, hex.toString().trim(), a2Offsets.toString().trim());
         }
         saveSportSession(startTime, stopTime, sportType, summary, gpsPoints, dayIndex);
+        return true;
     }
 
     private static void addSportEntries(ActivitySummaryData summary, long activeSeconds, int distanceMeters, float kcal, int steps) {

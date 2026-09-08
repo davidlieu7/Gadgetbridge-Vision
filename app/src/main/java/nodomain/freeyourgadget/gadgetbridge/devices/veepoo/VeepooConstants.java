@@ -125,6 +125,14 @@ public final class VeepooConstants {
     /** Package 2: multi-sport mode type; 4/5/6 -> GPS variant of the 0xD4 layout. */
     public static final int CAP_PKG2_MULTISPORT_MODE_TYPE = 16;
 
+    /**
+     * Maximum total days to request from the 0xD4 workout history, even when the device
+     * advertises fewer via sportModelDay. The firmware keeps a compacted ring of sessions
+     * that may extend past the advertised window; day 0 of the 0xD5 CRC report frame can
+     * carry at most 8 LE u16 values, so 8 is the practical cap.
+     */
+    public static final int SPORT_FETCH_MAX_DAYS = 8;
+
     public static final int WATCH_DAY_DEFAULT = 3;
     public static final int ORIGIN_PROTOCOL_VERSION_DF = 5;
     public static final int ORIGIN_PROTOCOL_VERSION_DF_ALT = 3;
