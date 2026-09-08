@@ -738,7 +738,7 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
                 head[5] & 0xFF, head[6] & 0xFF, head[7] & 0xFF);
         Date stopTime = dateFromParts(be16(head, 8), head[10] & 0xFF, head[11] & 0xFF,
                 head[12] & 0xFF, head[13] & 0xFF, head[14] & 0xFF);
-        if (startTime == null || stopTime == null) {
+        if (startTime == null || stopTime == null || stopTime.before(startTime)) {
             LOG.warn("Workout day {}: implausible workout window in the head; skipping", dayIndex);
             return;
         }
@@ -834,12 +834,14 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
         }
         int headLength = Math.min((blob[1] & 0xFF) + 2, blob.length);
         long startUnix = le32(blob, 4);
-        if (startUnix < 946684800L || startUnix > 4102444800L || headLength < 40) {
-            LOG.warn("Workout day {}: implausible GPS head (start epoch {}); skipping", dayIndex, startUnix);
+        long stopUnix = le32(blob, 8);
+        if (startUnix < 946684800L || startUnix > 4102444800L || headLength < 40
+                || stopUnix < startUnix) {
+            LOG.warn("Workout day {}: implausible GPS head (start epoch {}, stop epoch {}); skipping",
+                    dayIndex, startUnix, stopUnix);
             return;
         }
 
-        long stopUnix = le32(blob, 8);
         int sportSeconds = (int) le32(blob, 12);
         int base = blob[17] & 0xFF;
         int steps = (int) le32(blob, 18);
