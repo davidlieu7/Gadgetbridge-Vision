@@ -1698,6 +1698,7 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
                     (byte) (sportType & 0xFF), (byte) ((sportType >> 8) & 0xFF),
                     (byte) VeepooConstants.SPORT_CTRL_START});
             builder.queue();
+            mainHandler.postDelayed(workoutCommandTimeout, 10000L);
             LOG.info("Workout start requested (sport type {})", sportType);
         } catch (IOException e) {
             synchronized (liveWorkoutLock) {
@@ -1726,6 +1727,7 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
             writeFrame(builder, new byte[]{VeepooConstants.OP_SPORT_CONTROL, 0x01,
                     0x00, 0x00, (byte) VeepooConstants.SPORT_CTRL_STOP});
             builder.queue();
+            mainHandler.postDelayed(workoutCommandTimeout, 10000L);
             LOG.info("Workout stop requested");
         } catch (IOException e) {
             synchronized (liveWorkoutLock) {
@@ -1734,6 +1736,18 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
             LOG.error("Error requesting workout stop", e);
         }
     }
+
+    /** Clears a stuck pending start/stop command if the device never acks. */
+    private final Runnable workoutCommandTimeout = () -> {
+        synchronized (liveWorkoutLock) {
+            if (!workoutCommandPending) {
+                return;
+            }
+            LOG.warn("No sport control ack received in time; clearing the pending command");
+            workoutCommandPending = false;
+            pendingCommandIsStop = false;
+        }
+    };
 
     private final Runnable postStopFetchTask = () -> {
         synchronized (liveWorkoutLock) {
@@ -1768,8 +1782,8 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
      * little-endian TLV payload continues from byte [4] of every chunk.
      */
     private void handleSportControlFrame(byte[] data) {
-        if (data.length < 7) {
-            LOG.debug("Dropping short 0xDA frame: {} bytes", data.length);
+        if (data.length < 3) {
+            LOG.debug("Dropping short 0xDA frame: {} bytes ({})", data.length, hexBytes(data));
             return;
         }
         int action = data[1] & 0xFF;
@@ -1786,6 +1800,7 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
                 pendingCommandIsStop = false;
                 liveWorkoutActive = !wasStop && ok;
             }
+            mainHandler.removeCallbacks(workoutCommandTimeout);
             if (wasStop) {
                 LOG.info("Workout stopped by the app (ack: {})", ok ? "success" : "FAILED");
                 if (ok) {
@@ -1797,6 +1812,10 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
             return;
         }
 
+        if (data.length < 7) {
+            LOG.debug("Dropping short 0xDA data frame: {} bytes ({})", data.length, hexBytes(data));
+            return;
+        }
         int chunkIndex = data[3] & 0xFF;
         byte[] payload;
         synchronized (liveWorkoutLock) {
@@ -1822,6 +1841,14 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
             liveReportChunks.clear();
         }
         applyLiveWorkoutData(payload);
+    }
+
+    private static String hexBytes(byte[] bytes) {
+        StringBuilder sb = new StringBuilder();
+        for (byte b : bytes) {
+            sb.append(String.format("%02X", b));
+        }
+        return sb.toString();
     }
 
     /**
@@ -2051,6 +2078,7 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
     @Override
     public void dispose() {
         mainHandler.removeCallbacks(postStopFetchTask);
+        mainHandler.removeCallbacks(workoutCommandTimeout);
         synchronized (syncLock) {
             fetchPhase = FetchPhase.IDLE;
         }
