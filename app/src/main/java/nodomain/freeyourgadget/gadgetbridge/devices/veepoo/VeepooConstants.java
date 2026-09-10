@@ -138,7 +138,9 @@ public final class VeepooConstants {
     // ---- 0xDA sport control values ----------------------------------------
     /** [4] for the set-control action: start the workout. */
     public static final int SPORT_CTRL_START = 1;
-    /** [4] for the set-control action: stop the workout (sport type may be 0/NONE). */
+    /** [4] for the set-control action: read the current run state (live report answer). */
+    public static final int SPORT_CTRL_READ = 2;
+    /** [4] for the set-control action: stop the workout (must carry the active sport type). */
     public static final int SPORT_CTRL_STOP = 4;
 
     // ---- Phone-initiated workout config keys (onSendConfiguration) --------

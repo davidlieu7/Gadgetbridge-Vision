@@ -2435,6 +2435,7 @@
     <string name="veepoo_workout_stop_failed">Workout stop failed</string>
     <string name="veepoo_workout_already_running">A workout is already running</string>
     <string name="veepoo_workout_command_pending">Please wait for the previous command to complete</string>
+    <string name="veepoo_workout_none_active">No active workout on the band</string>
     <string name="veepoo_sync_in_progress">Please wait for the sync to finish</string>
     <string name="veepoo_manual_hr_saved">Manual heart rate: %1$d reading(s) saved</string>
     <string name="veepoo_manual_hr_empty">No manual heart rate data on the band</string>

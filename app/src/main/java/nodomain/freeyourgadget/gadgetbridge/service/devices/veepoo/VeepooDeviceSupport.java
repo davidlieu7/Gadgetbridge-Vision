@@ -133,6 +133,9 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
     private boolean liveWorkoutActive = false;
     private boolean workoutCommandPending = false; // awaiting an ack for a start/stop command
     private boolean pendingCommandIsStop = false;
+    private boolean precheckInProgress = false; // awaiting the run-state report before sending START
+    private int precheckSportType = 0;          // sport type requested in startWorkout
+    private boolean stopPrecheckInProgress = false; // awaiting the run-state report to learn the active sport type for STOP
     private final List<byte[]> liveReportChunks = new ArrayList<>();
     private int liveReportTotalChunks = 0;
     private boolean postStopFetchScheduled = false;
@@ -334,7 +337,7 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
      * Opcode 0xA1: device password confirmation plus phone time.
      * Layout: [0]=A1, [1..2]=password LE16, [3]=mode 0 (confirm+time), [4..5]=year BE16 hex,
      * [6]=month, [7]=day, [8]=hour, [9]=minute, [10]=second, [11]=12/24h flag, [12]=const 1,
-     * [13]=timezone in 15-minute steps.
+     * [13]=timezone in 15-minute steps, [14]=confirm flag (vendor default true).
      */
     private byte[] buildPwdConfirmTimeFrame() {
         Calendar now = Calendar.getInstance();
@@ -353,8 +356,9 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
         frame[10] = (byte) now.get(Calendar.SECOND);
         frame[11] = 0x01; // 24-hour mode
         frame[12] = 0x01;
-        int tzMinutes = TimeZone.getDefault().getOffset(System.currentTimeMillis()) / 60;
+        int tzMinutes = TimeZone.getDefault().getOffset(System.currentTimeMillis()) / 1000 / 60;
         frame[13] = (byte) (tzMinutes / 15);
+        frame[14] = 0x01;
         return frame;
     }
 
@@ -1189,17 +1193,25 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
             return false;
         }
         int headLength = Math.min((blob[1] & 0xFF) + 2, blob.length);
-        long startUnix = le32(blob, 4);
-        long stopUnix = le32(blob, 8);
-        if (startUnix == 0 && stopUnix == 0) {
+        long fieldA = le32(blob, 4);
+        long fieldB = le32(blob, 8);
+        if (fieldA == 0 && fieldB == 0) {
             LOG.info("Workout day {}: empty slot", dayIndex);
             return false;
         }
-        if (startUnix < 946684800L || startUnix > 4102444800L || headLength < 40
-                || stopUnix < startUnix) {
-            LOG.warn("Workout day {}: implausible GPS head (start epoch {}, stop epoch {}); skipping",
-                    dayIndex, startUnix, stopUnix);
+        // Older firmware versions stamped the start epoch with a wrong timezone (future date),
+        // leaving the two epochs out of order. Normalize with min/max so those sessions are
+        // still saved.
+        long startUnix = Math.min(fieldA, fieldB);
+        long stopUnix = Math.max(fieldA, fieldB);
+        if (startUnix < 946684800L || startUnix > 4102444800L || headLength < 40) {
+            LOG.warn("Workout day {}: implausible GPS head (epochs {} and {}); skipping",
+                    dayIndex, fieldA, fieldB);
             return false;
+        }
+        if (fieldB < fieldA) {
+            LOG.warn("Workout day {}: start/stop epochs out of order ({}, {}); using min/max",
+                    dayIndex, fieldA, fieldB);
         }
 
         int sportSeconds = (int) le32(blob, 12);
@@ -2102,8 +2114,10 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
     }
 
     /**
-     * Starts a workout via 0xDA: first opens the live control report (vendor flow), then sends
-     * the START command. The sport type is an ESportType value from the picker.
+     * Starts a workout via 0xDA. First re-syncs time (A1+A5), opens the live control report
+     * (vendor flow) and queries the device run state with readSportControlInfo. The START
+     * command is only sent once the band reports no active session, so a workout started
+     * elsewhere (or a zombie from a failed stop) is never stacked over with a second one.
      */
     private void startWorkout(int sportType) {
         if (sportType <= 0 || sportType > 188) {
@@ -2111,6 +2125,11 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
             return;
         }
         synchronized (liveWorkoutLock) {
+            if (workoutCommandPending) {
+                LOG.warn("A workout command is already pending; ignoring the start request");
+                GB.toast(getContext(), R.string.veepoo_workout_command_pending, Toast.LENGTH_SHORT, GB.WARN);
+                return;
+            }
             if (liveWorkoutActive) {
                 LOG.warn("A workout is already running; ignoring the start request");
                 GB.toast(getContext(), R.string.veepoo_workout_already_running, Toast.LENGTH_SHORT, GB.WARN);
@@ -2119,29 +2138,63 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
             liveSportType = sportType;
             workoutCommandPending = true;
             pendingCommandIsStop = false;
+            precheckInProgress = true;
+            precheckSportType = sportType;
             liveReportChunks.clear();
         }
         try {
             TransactionBuilder builder = performInitialized("start workout");
+            writeFrame(builder, buildPwdConfirmTimeFrame());
+            writeFrame(builder, buildSyncTimeFrame());
+            writeFrame(builder, new byte[]{VeepooConstants.OP_SPORT_CONTROL});
+            // readSportControlInfo: the device answers with a live report carrying the run state.
+            writeFrame(builder, new byte[]{VeepooConstants.OP_SPORT_CONTROL, 0x02,
+                    (byte) (sportType & 0xFF), (byte) ((sportType >> 8) & 0xFF),
+                    (byte) VeepooConstants.SPORT_CTRL_READ});
+            builder.queue();
+            mainHandler.postDelayed(workoutCommandTimeout, 10000L);
+            LOG.info("Workout start pre-check sent (sport type {})", sportType);
+        } catch (IOException e) {
+            synchronized (liveWorkoutLock) {
+                workoutCommandPending = false;
+                precheckInProgress = false;
+                precheckSportType = 0;
+            }
+            LOG.error("Error requesting workout start", e);
+        }
+    }
+
+    /** Sends the START command, called after the pre-check confirmed no session is active. */
+    private void sendWorkoutStartCommand(int sportType) {
+        synchronized (liveWorkoutLock) {
+            workoutCommandPending = true;
+            pendingCommandIsStop = false;
+            precheckInProgress = false;
+            precheckSportType = 0;
+            liveSportType = sportType;
+        }
+        try {
+            TransactionBuilder builder = performInitialized("send workout start command");
             writeFrame(builder, new byte[]{VeepooConstants.OP_SPORT_CONTROL});
             writeFrame(builder, new byte[]{VeepooConstants.OP_SPORT_CONTROL, 0x01,
                     (byte) (sportType & 0xFF), (byte) ((sportType >> 8) & 0xFF),
                     (byte) VeepooConstants.SPORT_CTRL_START});
             builder.queue();
             mainHandler.postDelayed(workoutCommandTimeout, 10000L);
-            LOG.info("Workout start requested (sport type {})", sportType);
+            LOG.info("Workout start command sent (sport type {})", sportType);
         } catch (IOException e) {
             synchronized (liveWorkoutLock) {
                 workoutCommandPending = false;
             }
-            LOG.error("Error requesting workout start", e);
+            LOG.error("Error sending workout start command", e);
         }
     }
 
     /**
-     * Stops the running workout. The vendor app stops with sport type NONE (0): the device knows
-     * which session is active. After a successful ack, day 0 of the workout history is re-fetched
-     * so the finished session shows up immediately.
+     * Stops the running workout with the same sport type it was started with (vendor behavior).
+     * If the active sport type is unknown (session started elsewhere), the device run state is
+     * queried first and its reported sport type used. After a successful ack, day 0 of the
+     * workout history is re-fetched so the finished session shows up immediately.
      */
     private void stopWorkout() {
         synchronized (liveWorkoutLock) {
@@ -2155,29 +2208,77 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
         }
         try {
             TransactionBuilder builder = performInitialized("stop workout");
-            writeFrame(builder, new byte[]{VeepooConstants.OP_SPORT_CONTROL, 0x01,
-                    0x00, 0x00, (byte) VeepooConstants.SPORT_CTRL_STOP});
+            if (liveSportType == 0) {
+                // Unknown active sport type: the vendor's STOP(NONE) is acked but ignored by the
+                // device, so query the run state first and stop with the reported sport type.
+                synchronized (liveWorkoutLock) {
+                    stopPrecheckInProgress = true;
+                    liveReportChunks.clear();
+                }
+                writeFrame(builder, new byte[]{VeepooConstants.OP_SPORT_CONTROL});
+                writeFrame(builder, new byte[]{VeepooConstants.OP_SPORT_CONTROL, 0x02,
+                        0x00, 0x00, (byte) VeepooConstants.SPORT_CTRL_READ});
+                LOG.info("Workout stop: querying the device for the active sport type");
+            } else {
+                writeFrame(builder, new byte[]{VeepooConstants.OP_SPORT_CONTROL, 0x01,
+                        (byte) (liveSportType & 0xFF), (byte) ((liveSportType >> 8) & 0xFF),
+                        (byte) VeepooConstants.SPORT_CTRL_STOP});
+                LOG.info("Workout stop requested");
+            }
             builder.queue();
             mainHandler.postDelayed(workoutCommandTimeout, 10000L);
-            LOG.info("Workout stop requested");
         } catch (IOException e) {
             synchronized (liveWorkoutLock) {
                 workoutCommandPending = false;
+                pendingCommandIsStop = false;
+                stopPrecheckInProgress = false;
             }
             LOG.error("Error requesting workout stop", e);
         }
     }
 
-    /** Clears a stuck pending start/stop command if the device never acks. */
+    /** Sends the STOP command with the given sport type (vendor requires the active one). */
+    private void sendStopCommand(int sportType) {
+        synchronized (liveWorkoutLock) {
+            if (sportType > 0) {
+                liveSportType = sportType;
+            }
+            stopPrecheckInProgress = false;
+        }
+        try {
+            TransactionBuilder builder = performInitialized("send workout stop command");
+            writeFrame(builder, new byte[]{VeepooConstants.OP_SPORT_CONTROL, 0x01,
+                    (byte) (liveSportType & 0xFF), (byte) ((liveSportType >> 8) & 0xFF),
+                    (byte) VeepooConstants.SPORT_CTRL_STOP});
+            builder.queue();
+            mainHandler.postDelayed(workoutCommandTimeout, 10000L);
+            LOG.info("Workout stop command sent (sport type {})", liveSportType);
+        } catch (IOException e) {
+            synchronized (liveWorkoutLock) {
+                workoutCommandPending = false;
+                pendingCommandIsStop = false;
+            }
+            LOG.error("Error sending workout stop command", e);
+        }
+    }
+
+    /** Clears a stuck pending start/stop command if the device never responds. */
     private final Runnable workoutCommandTimeout = () -> {
+        boolean wasStop;
         synchronized (liveWorkoutLock) {
             if (!workoutCommandPending) {
                 return;
             }
-            LOG.warn("No sport control ack received in time; clearing the pending command");
+            LOG.warn("No sport control response received in time; clearing the pending command");
+            wasStop = pendingCommandIsStop;
             workoutCommandPending = false;
             pendingCommandIsStop = false;
+            precheckInProgress = false;
+            precheckSportType = 0;
+            stopPrecheckInProgress = false;
         }
+        GB.toast(getContext(), wasStop ? R.string.veepoo_workout_stop_failed : R.string.veepoo_workout_start_failed,
+                Toast.LENGTH_SHORT, GB.ERROR);
     };
 
     private final Runnable postStopFetchTask = () -> {
@@ -2193,7 +2294,16 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
             sportDayIndex = 0;
         }
         getDevice().setBusyTask(R.string.busy_task_fetch_activity_data, getContext());
-        requestSportDay(0);
+        // The firmware only writes a stopped session into the day-0 history slot when a new
+        // phone session is established (an A1 password-confirm frame), so re-send A1+A5 in
+        // the same transaction as the day-0 read.
+        sportDayFrames.clear();
+        scheduleSportWatchdog();
+        continueFetch("fetch workout history day 0", builder -> {
+            writeFrame(builder, buildPwdConfirmTimeFrame());
+            writeFrame(builder, buildSyncTimeFrame());
+            writeFrame(builder, new byte[]{VeepooConstants.OP_SPORT_ORIGIN, (byte) 0});
+        });
     };
 
     /** Delays the day-0 history fetch so the firmware can finalize the stopped session. */
@@ -2204,7 +2314,9 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
             }
             postStopFetchScheduled = true;
         }
-        mainHandler.postDelayed(postStopFetchTask, 3000L);
+        // The device takes a while to finalize the finished session into day 0 (minutes have
+        // been observed), so do not poll too early.
+        mainHandler.postDelayed(postStopFetchTask, 60000L);
     }
 
     /**
@@ -2224,6 +2336,11 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
             synchronized (liveWorkoutLock) {
                 if (!workoutCommandPending) {
                     LOG.debug("Sport control ack without a pending command");
+                    return;
+                }
+                if (precheckInProgress || stopPrecheckInProgress) {
+                    // Ack for a readSportControlInfo of a start/stop pre-check; the report follows.
+                    LOG.debug("Pre-check read ack ({}); waiting for the run-state report", ok ? "ok" : "failed");
                     return;
                 }
                 workoutCommandPending = false;
@@ -2359,6 +2476,9 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
         }
 
         boolean finished = false;
+        int precheckDecision = 0; // 1 = proceed with start, -1 = session already active
+        int stopPrecheckDecision = 0; // 1 = send stop, -1 = no active session
+        final int[] startTypeRef = {0};
         synchronized (liveWorkoutLock) {
             if (sportType > 0) {
                 liveSportType = sportType;
@@ -2369,13 +2489,50 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
                 liveWorkoutActive = false;
             } else if (runState == 0) {
                 liveWorkoutActive = false;
-            } else if (runState == 1 || runState == 3) {
+            } else if (runState == 1 || runState == 2 || runState == 3) {
                 liveWorkoutActive = true;
+            }
+            boolean sessionActive = runState == 1 || runState == 2 || runState == 3;
+            if (precheckInProgress) {
+                startTypeRef[0] = precheckSportType;
+                precheckInProgress = false;
+                precheckSportType = 0;
+                if (sessionActive) {
+                    workoutCommandPending = false;
+                    precheckDecision = -1;
+                } else {
+                    precheckDecision = 1;
+                }
+            } else if (stopPrecheckInProgress) {
+                stopPrecheckInProgress = false;
+                if (sessionActive) {
+                    stopPrecheckDecision = 1;
+                } else {
+                    workoutCommandPending = false;
+                    pendingCommandIsStop = false;
+                    stopPrecheckDecision = -1;
+                }
             }
         }
 
         LOG.info("Live workout: state {} ({} s, {} m, HR {}, {} kcal, pace {}, speed {}){}",
                 runState, duration, distance, heartRate, calories, pace, speed, gnss ? ", GNSS" : "");
+        if (precheckDecision == -1) {
+            LOG.warn("The band already has an active workout; not starting a new one");
+            GB.toast(getContext(), R.string.veepoo_workout_already_running, Toast.LENGTH_SHORT, GB.WARN);
+        } else if (precheckDecision == 1) {
+            mainHandler.post(() -> sendWorkoutStartCommand(startTypeRef[0]));
+        }
+        if (stopPrecheckDecision == 1) {
+            int stopType = sportType;
+            if (stopType == 0) {
+                LOG.warn("Device reports an active session but no sport type; falling back to STOP(NONE)");
+            }
+            mainHandler.post(() -> sendStopCommand(stopType));
+        } else if (stopPrecheckDecision == -1) {
+            LOG.info("No active workout on the band; nothing to stop");
+            GB.toast(getContext(), R.string.veepoo_workout_none_active, Toast.LENGTH_SHORT, GB.INFO);
+        }
         if (finished) {
             schedulePostStopFetch();
         }
