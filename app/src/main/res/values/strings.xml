@@ -238,6 +238,12 @@
     <string name="pref_summary_mb_intents">Enable if device media control is not working for certain applications</string>
     <string name="pref_title_audio_player">Preferred Audioplayer</string>
     <string name="pref_title_nagivation_apps">Navigation apps</string>
+    <string name="pref_title_xiaomi_band_navigation_settings">Xiaomi Smart Band specific settings</string>
+    <string name="pref_title_navigation_right_hand_driving">Right-hand traffic</string>
+    <string name="pref_description_navigation_right_hand_driving">Controls which navigation icon is shown for roundabouts.</string>
+    <string name="pref_title_navigation_continuous_updates">Send continuous updates</string>
+    <string name="pref_description_navigation_continuous_updates">If enabled, updates are sent continuously to the gadget. If disabled, updates are sent at each turn.</string>
+    <string name="pref_title_navigation_update_rate">Update rate for continuous mode (in milliseconds)</string>
     <string name="pref_header_external_integrations">External Integrations</string>
     <string name="pref_header_automations">Automations</string>
     <string name="pref_description_general">Startup, language, region, location</string>

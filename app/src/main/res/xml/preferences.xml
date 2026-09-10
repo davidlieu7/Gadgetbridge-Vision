@@ -377,6 +377,39 @@
                     android:title="@string/pref_navigation_app_comaps"
                     app:iconSpaceReserved="false" />
             </PreferenceCategory>
+
+            <PreferenceCategory
+                android:key="navigation_xiaomi_settings"
+                android:title="@string/pref_title_xiaomi_band_navigation_settings"
+                app:iconSpaceReserved="false">
+                <SwitchPreferenceCompat
+                    android:defaultValue="true"
+                    android:persistent="true"
+                    android:key="navigation_right_hand_driving"
+                    android:layout="@layout/preference_checkbox"
+                    android:title="@string/pref_title_navigation_right_hand_driving"
+                    android:summary="@string/pref_description_navigation_right_hand_driving"
+                    app:iconSpaceReserved="false" />
+
+                <SwitchPreferenceCompat
+                    android:defaultValue="true"
+                    android:persistent="true"
+                    android:key="xiaomi_navigation_continuous_updates"
+                    android:layout="@layout/preference_checkbox"
+                    android:title="@string/pref_title_navigation_continuous_updates"
+                    android:summary="@string/pref_description_navigation_continuous_updates"
+                    app:iconSpaceReserved="false" />
+
+                <EditTextPreference
+                    android:defaultValue="5000"
+                    android:persistent="true"
+                    android:inputType="number"
+                    android:dependency="xiaomi_navigation_continuous_updates"
+                    android:key="xiaomi_navigation_update_rate"
+                    android:title="@string/pref_title_navigation_update_rate"
+                    android:icon="@drawable/ic_sync"
+                    app:useSimpleSummaryProvider="true" />
+            </PreferenceCategory>
         </PreferenceScreen>
 
         <nodomain.freeyourgadget.gadgetbridge.util.preferences.SubtitleListPreference

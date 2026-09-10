@@ -22,8 +22,8 @@ import android.content.Context;
 import android.location.Location;
 import android.net.Uri;
 import android.os.Bundle;
-import android.os.Handler;
 import android.os.Looper;
+import android.os.SystemClock;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -53,6 +53,7 @@ import nodomain.freeyourgadget.gadgetbridge.model.CannedMessagesSpec;
 import nodomain.freeyourgadget.gadgetbridge.model.Contact;
 import nodomain.freeyourgadget.gadgetbridge.model.MusicSpec;
 import nodomain.freeyourgadget.gadgetbridge.model.MusicStateSpec;
+import nodomain.freeyourgadget.gadgetbridge.model.NavigationInfoSpec;
 import nodomain.freeyourgadget.gadgetbridge.model.NotificationSpec;
 import nodomain.freeyourgadget.gadgetbridge.model.Reminder;
 import nodomain.freeyourgadget.gadgetbridge.model.WorldClock;
@@ -127,6 +128,11 @@ public class XiaomiSupport extends AbstractBluetoothDeviceSupport {
         put(XiaomiPhonebookService.COMMAND_TYPE, phonebookService);
         put(XiaomiRpkService.COMMAND_TYPE, rpkService);
     }};
+
+    private NavigationInfoSpec lastSentNavigationSpec = null;
+    private int previousNotificationId = -1;
+    private final int assumedFinishDistance = 15;
+    private long lastNotificationSentAt = -1;
 
     @Override
     public boolean useAutoConnect() {
@@ -600,6 +606,96 @@ public class XiaomiSupport extends AbstractBluetoothDeviceSupport {
     public void setFeatureSupported(final String featureKey, final boolean supported) {
         LOG.debug("Setting feature {} -> {}", featureKey, supported ? "supported" : "not supported");
         evaluateGBDeviceEvent(new GBDeviceEventUpdatePreferences(featureKey, supported));
+    }
+
+    private boolean shouldSendNavigation(final NavigationInfoSpec nav) {
+
+        final Prefs prefs = GBApplication.getPrefs();
+        boolean sendAllNavigationNotifications = prefs.getBoolean("xiaomi_navigation_continuous_updates", false);
+        int updateCooldown = prefs.getInt("xiaomi_navigation_update_rate", 5000);
+
+        final long now = SystemClock.elapsedRealtime();
+        long timeElapsed =  now - lastNotificationSentAt;
+        boolean cooldownPassed = Math.toIntExact(timeElapsed) >= updateCooldown;
+
+        if (lastSentNavigationSpec == null || (sendAllNavigationNotifications && cooldownPassed)) {
+            return true;
+        }
+
+        // ignore other updates when continuous mode is active
+        if (sendAllNavigationNotifications) return false;
+
+        final boolean actionDifferent = nav.getNextAction() != lastSentNavigationSpec.getNextAction();
+
+        final int currentRemainder = nav.getDistanceToTargetMeters() - nav.getDistanceToTurnMeters();
+        final int previousRemainder = lastSentNavigationSpec.getDistanceToTargetMeters() - lastSentNavigationSpec.getDistanceToTurnMeters();
+        int newSegmentDistanceDelta = 5;
+        final boolean newSegment = (previousRemainder - currentRemainder) > newSegmentDistanceDelta;
+
+        // CoMaps ends navigation abruptly when distance to destination is ~15m, sends no propper "destination reached" notification
+        final boolean destinationReached = nav.getNextAction() == NavigationInfoSpec.ACTION_FINISH && nav.getDistanceToTargetMeters() <= assumedFinishDistance;
+
+        return actionDifferent || newSegment || destinationReached;
+    }
+
+    @Override
+    public void onSetNavigationInfo(final NavigationInfoSpec nav) {
+        if (!getCoordinator().supportsNavigation(getDevice())) {
+            return;
+        }
+
+        if (!shouldSendNavigation(nav) || nav.getDistanceToTurn() == null) {
+            return;
+        }
+
+        final int id = Math.toIntExact(SystemClock.elapsedRealtime());
+
+        final Prefs prefs = GBApplication.getPrefs();
+        final boolean is_right_hand_driving = prefs.getBoolean("navigation_right_hand_driving", true);
+
+        final NotificationSpec spec = new NotificationSpec(id);
+
+        // must be changed if icons where edited, to force the device to fetch the new ones
+        // must be updated in XiaomiNavigationService.resolveNotificationIcon() as well
+        final String iconVersion = "v1";
+
+        String fakeAppId = "gadgetbridge.nav.icon" + iconVersion + "." + nav.getNextAction();
+
+        final boolean isRoundaboutTurn = nav.getNextAction() == NavigationInfoSpec.ACTION_ROUNDABOUT_LEFT || nav.getNextAction() == NavigationInfoSpec.ACTION_ROUNDABOUT_RIGHT;
+
+        if (!is_right_hand_driving && isRoundaboutTurn) {
+            fakeAppId += ".LHD";
+        }
+
+        spec.setSourceAppId(fakeAppId);
+
+        final boolean destinationReached = nav.getNextAction() == NavigationInfoSpec.ACTION_FINISH && nav.getDistanceToTargetMeters() <= assumedFinishDistance;
+
+        final String info = destinationReached ?
+                "" :
+                "Arrival in " + nav.getTotalTimeToDestination() + "s (" + nav.getCompletionPercent() + "%)";
+
+        final String title = destinationReached ?
+                "Destination reached" :
+                "In " + nav.getDistanceToTurn() + " " + nav.getInstruction();
+
+        final String body = destinationReached ?
+                "" :
+                "ETA: " + nav.getETA() + "\n" + nav.getDistanceToTarget() + " left";
+
+        spec.setSourceName(info);
+        spec.setTitle(title);
+        spec.setBody(body);
+
+        notificationService.onNotification(spec);
+
+        if (previousNotificationId != -1) {
+            notificationService.onDeleteNotification(previousNotificationId);
+        }
+
+        previousNotificationId = destinationReached ? -1 : id;
+        lastSentNavigationSpec = destinationReached ? null : nav;
+        lastNotificationSentAt = SystemClock.elapsedRealtime();
     }
 
     private static final String[] EMOJI_SOURCE = new String[]{
