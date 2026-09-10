@@ -341,6 +341,18 @@ class WorkoutDetailsFragment : Fragment(), MenuProvider {
                 }
                 true
             }
+            
+            R.id.activity_summary_detail_action_edit_type -> {
+                currentWorkout?.let {
+                    workoutEditor.editWorkoutType(it, object : WorkoutEditor.Callback {
+                        override fun onWorkoutUpdated() {
+                            notifyWorkoutChanged()
+                            updateWorkoutHeader(workout.summary)
+                        }
+                    })
+                }
+                true
+            }
 
             R.id.activity_summary_detail_action_add_photo -> {
                 currentWorkout?.let {

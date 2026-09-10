@@ -1894,6 +1894,7 @@
     <string name="activity_summaries">Sport Activities</string>
     <string name="activity_summary_detail">Sport Activity Detail</string>
     <string name="activity_summary_edit_name_title">Edit label</string>
+    <string name="activity_summary_edit_type_title">Edit type</string>
     <string name="activity_summary_detail_select_gpx_track">Select GPX track</string>
     <string name="activity_summary_detail_clear_gpx_track">Clear GPX track</string>
     <string name="activity_summary_detail_editing_gpx_track">Editing linked GPX track</string>
