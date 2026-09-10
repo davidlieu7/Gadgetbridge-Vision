@@ -55,6 +55,7 @@ public class SleepAsAndroidVibration {
     private final Toggle toggle;
 
     private boolean alarmRunning = false;
+    private boolean toggledOn = false;
     private long alarmDeadline = 0;
 
     public SleepAsAndroidVibration(final Handler handler, final Toggle toggle) {
@@ -106,7 +107,19 @@ public class SleepAsAndroidVibration {
     private void stopNow() {
         alarmRunning = false;
         handler.removeCallbacksAndMessages(null);
-        toggle.set(false);
+        set(false);
+    }
+
+    /**
+     * Two streams share the one find-device state, and both are stopped together, so the state is
+     * tracked to keep the second stop off the wire.
+     */
+    private void set(final boolean on) {
+        if (toggledOn == on) {
+            return;
+        }
+        toggledOn = on;
+        toggle.set(on);
     }
 
     public boolean isAlarmRunning() {
@@ -125,9 +138,9 @@ public class SleepAsAndroidVibration {
     }
 
     private void burst(final int pulses, final int index, @Nullable final Runnable onComplete) {
-        toggle.set(true);
+        set(true);
         handler.postDelayed(() -> {
-            toggle.set(false);
+            set(false);
             if (index + 1 >= pulses) {
                 if (onComplete != null) {
                     onComplete.run();

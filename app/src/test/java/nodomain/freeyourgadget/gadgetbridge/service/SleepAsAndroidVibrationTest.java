@@ -91,7 +91,6 @@ public class SleepAsAndroidVibrationTest extends TestBase {
     public void alarmHonoursTheInitialDelay() {
         vibration.startAlarm(10_000);
 
-        // startAlarm clears any previous state, which emits one "off", so count pulses instead.
         idle(9_000);
         Assert.assertEquals(0, countOn());
 
@@ -164,6 +163,31 @@ public class SleepAsAndroidVibrationTest extends TestBase {
 
         idle(120_000);
         Assert.assertEquals(atCap, toggles.size());
+    }
+
+    @Test
+    public void aStopWithNothingRunningSaysNothing() {
+        // Hints and alarms are stopped together and share the one find-device state, so a stop
+        // that changes nothing must not put a second command on the wire.
+        vibration.stop();
+        idle(1);
+
+        Assert.assertTrue(toggles.isEmpty());
+    }
+
+    @Test
+    public void aSecondStopSaysNothing() {
+        vibration.startAlarm(0);
+        idle(12_000);
+
+        vibration.stop();
+        idle(1);
+        final int afterFirstStop = toggles.size();
+
+        vibration.stop();
+        idle(1);
+
+        Assert.assertEquals(afterFirstStop, toggles.size());
     }
 
     @Test
