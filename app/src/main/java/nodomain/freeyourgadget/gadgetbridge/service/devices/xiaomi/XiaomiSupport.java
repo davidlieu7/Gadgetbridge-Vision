@@ -488,7 +488,9 @@ public class XiaomiSupport extends AbstractBluetoothDeviceSupport {
             LOG.warn("SaA sender not initialized, dropping {}", action);
             return;
         }
-        if (!gbDevice.isInitialized()) {
+        // Not isInitialized(), which also accepts SCANNED: a device sits in that state for seconds
+        // at a time while it is being scanned for, with no link to send anything over.
+        if (gbDevice == null || !gbDevice.getState().equalsOrHigherThan(GBDevice.State.INITIALIZED)) {
             LOG.warn("Device not initialized, dropping SaA action {}", action);
             return;
         }
@@ -572,12 +574,9 @@ public class XiaomiSupport extends AbstractBluetoothDeviceSupport {
 
     /**
      * A vibration runs on its own schedule for as long as Sleep as Android keeps its alarm up, and
-     * the band is reachable for only part of that. Commands sent outside that window are lost and,
-     * before authentication, can disturb the handshake.
-     * <p>
-     * The check cannot be {@link GBDevice#isInitialized()}, which also accepts
-     * {@link GBDevice.State#SCANNED}: a device sits in that state for seconds at a time while it is
-     * being scanned for, with no link to send anything over.
+     * the band is reachable for only part of that, so the link is re-checked at every pulse rather
+     * than once when the alarm starts. Commands sent outside that window are lost and, before
+     * authentication, can disturb the handshake.
      */
     private void setFindWatchIfInitialized(final boolean on) {
         if (gbDevice == null || !gbDevice.getState().equalsOrHigherThan(GBDevice.State.INITIALIZED)) {
