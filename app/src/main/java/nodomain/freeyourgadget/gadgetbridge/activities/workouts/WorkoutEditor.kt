@@ -283,11 +283,11 @@ class WorkoutEditor(private val context: Context, resultCaller: ActivityResultCa
             // Determine rotation
             val orientation = readExifOrientation(uri)
             val orientationSwapsDimensions = orientation == ExifInterface.ORIENTATION_ROTATE_90 ||
-                    orientation == ExifInterface.ORIENTATION_ROTATE_270 ||
-                    orientation == ExifInterface.ORIENTATION_TRANSPOSE ||
-                    orientation == ExifInterface.ORIENTATION_TRANSVERSE
+                orientation == ExifInterface.ORIENTATION_ROTATE_270 ||
+                orientation == ExifInterface.ORIENTATION_TRANSPOSE ||
+                orientation == ExifInterface.ORIENTATION_TRANSVERSE
             val needsRotation = orientation != ExifInterface.ORIENTATION_NORMAL &&
-                    orientation != ExifInterface.ORIENTATION_UNDEFINED
+                orientation != ExifInterface.ORIENTATION_UNDEFINED
             LOG.debug("Photo needs rotation: {}", needsRotation)
 
             // Determine whether resize is needed
