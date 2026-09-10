@@ -353,12 +353,12 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
         frame[10] = (byte) now.get(Calendar.SECOND);
         frame[11] = 0x01; // 24-hour mode
         frame[12] = 0x01;
-        int tzMinutes = TimeZone.getDefault().getRawOffset() / 60;
+        int tzMinutes = TimeZone.getDefault().getOffset(System.currentTimeMillis()) / 60;
         frame[13] = (byte) (tzMinutes / 15);
         return frame;
     }
 
-    /** Opcode 0xA5: time sync. [4..7]=hour/minute/second after year BE16/month/day, [8]=time mode (2=24h). */
+    /** Opcode 0xA5: time sync (vendor settingTime): [1..2]=year BE16, [3..7]=month/day/hour/minute/second, [8]=time mode (2=24h). */
     private byte[] buildSyncTimeFrame() {
         Calendar now = Calendar.getInstance();
         int year = now.get(Calendar.YEAR);
