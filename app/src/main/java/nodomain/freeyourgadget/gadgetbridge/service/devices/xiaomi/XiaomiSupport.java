@@ -32,9 +32,8 @@ import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.sql.Timestamp;
 import java.util.ArrayList;
-import java.util.Calendar;
+import java.util.Date;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -73,7 +72,6 @@ import nodomain.freeyourgadget.gadgetbridge.service.devices.xiaomi.services.Xiao
 import nodomain.freeyourgadget.gadgetbridge.service.devices.xiaomi.services.XiaomiSystemService;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.xiaomi.services.XiaomiWatchfaceService;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.xiaomi.services.XiaomiWeatherService;
-import nodomain.freeyourgadget.gadgetbridge.util.AlarmUtils;
 import nodomain.freeyourgadget.gadgetbridge.util.GB;
 import nodomain.freeyourgadget.gadgetbridge.util.Prefs;
 
@@ -536,7 +534,10 @@ public class XiaomiSupport extends AbstractBluetoothDeviceSupport {
                 break;
             }
             case SleepAsAndroidAction.UPDATE_ALARM:
-                setSleepAsAndroidAlarm(extras.getLong("TIMESTAMP"));
+                // The band rings through find-device on START_ALARM, which Sleep as Android also
+                // stops when the user dismisses or snoozes. An alarm written into a slot would ring
+                // outside that control, and stay there when the wake never happens.
+                LOG.debug("Ignoring Sleep as Android alarm update for {}", new Date(extras.getLong("TIMESTAMP")));
                 break;
             case SleepAsAndroidAction.START_ALARM:
                 scheduleSleepAsAndroidAlarmVibration(extras.getInt("DELAY", 60000));
@@ -548,15 +549,6 @@ public class XiaomiSupport extends AbstractBluetoothDeviceSupport {
                 LOG.warn("Received unsupported SaA action: {}", action);
                 break;
         }
-    }
-
-    private void setSleepAsAndroidAlarm(long alarmTimestamp) {
-        Calendar calendar = Calendar.getInstance();
-        calendar.setTimeInMillis(new Timestamp(alarmTimestamp).getTime());
-        Alarm alarm = AlarmUtils.createSingleShot(SleepAsAndroidSender.getAlarmSlot(), false, false, calendar);
-        ArrayList<Alarm> alarms = new ArrayList<>(1);
-        alarms.add(alarm);
-        GBApplication.deviceService(gbDevice).onSetAlarms(alarms);
     }
 
     private void triggerSleepAsAndroidHint(int repeat) {
