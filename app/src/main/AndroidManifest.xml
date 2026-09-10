@@ -990,6 +990,10 @@
             android:label="@string/veepoo_workout_start_title"
             android:exported="false" />
 
+        <activity android:name=".activities.VeepooVitalsChooserActivity"
+            android:label="@string/veepoo_action_measure_vitals"
+            android:exported="false" />
+
         <activity
             android:name=".activities.ExternalPebbleJSActivity"
             android:label="@string/app_configure"

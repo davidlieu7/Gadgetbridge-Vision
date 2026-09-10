@@ -186,6 +186,8 @@ public class GBDaoGenerator {
         addPolarH10ActivitySample(schema, user, device);
         addWithingsSteelHRActivitySample(schema, user, device);
         sampleProvidersToGenerate.add(addGenericBloodPressureSample(schema, user, device));
+        sampleProvidersToGenerate.add(addGenericBodyCompositionSample(schema, user, device));
+        sampleProvidersToGenerate.add(addGenericBloodLipidSample(schema, user, device));
         addHybridHRActivitySample(schema, user, device);
         sampleProvidersToGenerate.add(addHybridHRSpo2Sample(schema, user, device));
         addVivomoveHrActivitySample(schema, user, device);
@@ -238,6 +240,7 @@ public class GBDaoGenerator {
         addKeephealthBloodPressureSample(schema, user, device);
         addKeephealthTemperatureSample(schema, user, device);
         addVeepooActivitySample(schema, user, device);
+        addVeepooEcgSample(schema, user, device);
 
         addHuaweiActivitySample(schema, user, device);
         sampleProvidersToGenerate.add(addHuaweiStressSample(schema, user, device));
@@ -1505,6 +1508,25 @@ public class GBDaoGenerator {
         return activitySample;
     }
 
+    private static Entity addVeepooEcgSample(Schema schema, Entity user, Entity device) {
+        Entity ecg = addEntity(schema, "VeepooEcgSample");
+        ecg.setJavaDoc("A single Veepoo KR96 Pro single-lead ECG measurement. Holds the summary fields of a\n" +
+                "measurement plus the raw waveform as a blob of big-endian signed 24-bit samples (3 bytes each).");
+        ecg.addIdProperty();
+        Property userId = ecg.addLongProperty("userId").notNull().getProperty();
+        ecg.addToOne(user, userId);
+        Property deviceId = ecg.addLongProperty("deviceId").notNull().getProperty();
+        ecg.addToOne(device, deviceId);
+        ecg.addLongProperty("timestamp").notNull().index();
+        ecg.addIntProperty("heartRate");
+        ecg.addIntProperty("sampleRate");
+        ecg.addIntProperty("durationMs");
+        ecg.addIntProperty("sampleCount");
+        ecg.addByteArrayProperty("resultBlob");
+        ecg.addByteArrayProperty("waveform");
+        return ecg;
+    }
+
     private static Entity addGloryFitStepsSample(Schema schema, Entity user, Entity device) {
         Entity sleepStageSample = addEntity(schema, "GloryFitStepsSample");
         addCommonTimeSampleProperties("AbstractTimeSample", sleepStageSample, user, device);
@@ -2546,6 +2568,7 @@ public class GBDaoGenerator {
 
     private static Entity addGenericHeartRateSample(Schema schema, Entity user, Entity device) {
         Entity heartRateSample = addEntity(schema, "GenericHeartRateSample");
+        heartRateSample.implementsSerializable();
         addCommonTimeSampleProperties("AbstractHeartRateSample", heartRateSample, user, device);
         heartRateSample.addIntProperty(SAMPLE_HEART_RATE).codeBeforeGetter(OVERRIDE).notNull();
         return heartRateSample;
@@ -2560,6 +2583,7 @@ public class GBDaoGenerator {
 
     private static Entity addGenericSpo2Sample(Schema schema, Entity user, Entity device) {
         Entity spo2sample = addEntity(schema, "GenericSpo2Sample");
+        spo2sample.implementsSerializable();
         addCommonTimeSampleProperties("AbstractSpo2Sample", spo2sample, user, device);
         spo2sample.addIntProperty(SAMPLE_SPO2).notNull().codeBeforeGetter(OVERRIDE);
         return spo2sample;
@@ -2574,6 +2598,7 @@ public class GBDaoGenerator {
 
     private static Entity addGenericStressSample(Schema schema, Entity user, Entity device) {
         Entity stressSample = addEntity(schema, "GenericStressSample");
+        stressSample.implementsSerializable();
         addCommonTimeSampleProperties("AbstractStressSample", stressSample, user, device);
         stressSample.addIntProperty(SAMPLE_STRESS).notNull().codeBeforeGetter(OVERRIDE);
         return stressSample;
@@ -2581,6 +2606,7 @@ public class GBDaoGenerator {
 
     private static Entity addGenericTemperatureSample(Schema schema, Entity user, Entity device) {
         Entity temperatureSample = addEntity(schema, "GenericTemperatureSample");
+        temperatureSample.implementsSerializable();
         addCommonTimeSampleProperties("AbstractTemperatureSample", temperatureSample, user, device);
         temperatureSample.addFloatProperty(SAMPLE_TEMPERATURE).notNull().codeBeforeGetterAndSetter(OVERRIDE);
         temperatureSample.addIntProperty("temperatureType").notNull().codeBeforeGetter(OVERRIDE);
@@ -2634,6 +2660,7 @@ public class GBDaoGenerator {
         bloodPressureSample.addIntProperty("meanArterialPressure");
         bloodPressureSample.addIntProperty("pulseRate");
         bloodPressureSample.addIntProperty("measurementStatus");
+        bloodPressureSample.implementsSerializable();
         return bloodPressureSample;
     }
 
@@ -2644,6 +2671,39 @@ public class GBDaoGenerator {
         sample.addDoubleProperty("metricScore").notNull().codeBeforeGetterAndSetter(OVERRIDE);
         sample.addLongProperty("metricExtra").codeBeforeGetterAndSetter(OVERRIDE);
 
+        return sample;
+    }
+
+    private static Entity addGenericBodyCompositionSample(Schema schema, Entity user, Entity device) {
+        Entity sample = addEntity(schema, "GenericBodyCompositionSample");
+        addCommonTimeSampleProperties("AbstractBodyCompositionSample", sample, user, device);
+        sample.addFloatProperty("bmi");
+        sample.addFloatProperty("bodyFatRate");
+        sample.addFloatProperty("fatWeight");
+        sample.addFloatProperty("ffm");
+        sample.addFloatProperty("muscleRate");
+        sample.addFloatProperty("muscleMass");
+        sample.addFloatProperty("subcutaneousFat");
+        sample.addFloatProperty("bodyWaterRate");
+        sample.addFloatProperty("waterContent");
+        sample.addFloatProperty("skeletalMuscleRate");
+        sample.addFloatProperty("boneMass");
+        sample.addFloatProperty("proteinProportion");
+        sample.addFloatProperty("proteinMass");
+        sample.addFloatProperty("basalMetabolicRate");
+        sample.implementsSerializable();
+        return sample;
+    }
+
+    private static Entity addGenericBloodLipidSample(Schema schema, Entity user, Entity device) {
+        Entity sample = addEntity(schema, "GenericBloodLipidSample");
+        addCommonTimeSampleProperties("AbstractBloodLipidSample", sample, user, device);
+        sample.addFloatProperty("uricAcid");
+        sample.addFloatProperty("totalCholesterol");
+        sample.addFloatProperty("triglyceride");
+        sample.addFloatProperty("hdl");
+        sample.addFloatProperty("ldl");
+        sample.implementsSerializable();
         return sample;
     }
 

@@ -73,12 +73,46 @@ public final class VeepooConstants {
     public static final byte OP_SPORT_ORIGIN = (byte) 0xD4;
     /** Real-time heart-rate stream start/stop. */
     public static final byte OP_HR_REALTIME = (byte) 0xD0;
-    /** Real-time SpO2 stream start/stop. */
+    /** Real-time SpO2 stream start {0x80,1,2} / stop {0x80,2,2}. */
     public static final byte OP_SPO2_REALTIME = (byte) 0x80;
-    /** Real-time stress stream start/stop. */
-    public static final byte OP_STRESS_REALTIME = (byte) 0x82;
-    /** Real-time body-temperature stream start/stop. */
+    /**
+     * Stress (pressure) detection — multiplexed "detect" opcode: start {0x89,6,1} / stop {0x89,6,2}.
+     * The vendor opcode table labels 0x89 as blood_glucose_detect_operate; sub-parameter 6 selects stress.
+     */
+    public static final byte OP_STRESS_REALTIME = (byte) 0x89;
+    /** Body-temperature detection start {0x87,1,1} / stop {0x87,1,2}. */
     public static final byte OP_TEMP_REALTIME = (byte) 0x87;
+    /** Blood pressure detection start {0x90,1,model} / stop {0x90,0,model}. */
+    public static final byte OP_BP_REALTIME = (byte) 0x90;
+    /**
+     * Body composition detection. Start {0x93,4,1}, stop {0x93,4,2}. Response frames are
+     * [0x93][4][event 1 detect / 2 stop][state]. State: 0 progress ([4]=%), 1 data, 2 failed,
+     * 3 busy, 4 low battery. Data frames carry [4]=seq (1-based), [5]=total and a 14-byte chunk
+     * at [6..19]; the concatenated chunks form a payload whose first byte must be 0x9C followed
+     * by 14 big-endian u16 values (divided by 10).
+     */
+    public static final byte OP_BODY_COMPOSITION_REALTIME = (byte) 0x93;
+    /**
+     * Blood component (lipids) detection. Start {0x8A,1,1,calibrated}, stop {0x8A,1,2,0}.
+     * Response frames are [0x8A][1][event 1 detect / 2 stop][state]. State: 0 values, 1
+     * detecting, 2 low battery, 3 busy, 4 not worn. Value frames carry [4]=progress % and the
+     * results at [5..14]: uric acid (u16/10), cholesterol, triglycerides, HDL, LDL (u16/100);
+     * the measurement completes at 100%.
+     */
+    public static final byte OP_BLOOD_LIPID_REALTIME = (byte) 0x8A;
+    /**
+     * ECG (single-lead) detection. Same wire opcode as body composition, selected by the
+     * function byte: start {0x93,1,1,1}, stop {0x93,1,2,1}. Control/status frames reply on the
+     * main channel with [1]==1; the subcommand is at [3]: 0 = info (sample rate as little-endian
+     * u16 at [4..5], 500 Hz), 1 = per-second status (live HR big-endian u16 at [4..5],
+     * acquisition progress 0-100 % at [19]), 2 = failed, 4 = finished successfully (all-zero
+     * payload, the device-side completion event), 5 = result chunk (seq/total at [4]/[5]; the
+     * device sends seq 1..total and then the completion frame). The waveform itself streams on
+     * the light-origin channel ({@link #UUID_CHARACTERISTIC_F002_DATA}) as frames of a leading
+     * 0x88, N big-endian signed int24 samples (3 bytes each; 0xFFFFFF/0x020202 are invalid
+     * markers) and a 4-byte tail ending in a per-frame sequence counter.
+     */
+    public static final byte OP_ECG_REALTIME = (byte) 0x93;
     /** Night sleep read: [0xE0][dayIndex]. */
     public static final byte OP_SLEEP_READ = (byte) 0xE0;
     /** Production / firmware info. */
@@ -89,6 +123,17 @@ public final class VeepooConstants {
      * ack ([1]==1, [2]==1 success) or a chunked little-endian TLV live report.
      */
     public static final byte OP_SPORT_CONTROL = (byte) 0xDA;
+    /**
+     * Multi-type manual measurement data read-back: [0xDE][2][pos LE32][readMask LE32]
+     * [detectMask LE32][0 x6]. Responses are 0xDE notifications with the record index at
+     * [2..5] (LE32, 0-based, strictly sequential); only the first frame carries the total count
+     * at [8..11]; every frame appends payload bytes starting at [6].
+     */
+    public static final byte OP_MANUAL_DETECT = (byte) 0xDE;
+
+    // ---- 0xDE manual measurement read-back ----------------------------------
+    /** Heart-rate bit of the 4-byte LE read/detect masks (DeviceManualDataType bit 1). */
+    public static final int MANUAL_MASK_HEART_RATE = 1 << 1;
 
     // ---- 0xDA sport control values ----------------------------------------
     /** [4] for the set-control action: start the workout. */
@@ -101,6 +146,68 @@ public final class VeepooConstants {
     public static final String CONFIG_WORKOUT_START_PREFIX = "veepoo_workout_start_";
     /** Stop the running workout. */
     public static final String CONFIG_WORKOUT_STOP = "veepoo_workout_stop";
+    /** Start a single-shot SpO2 (blood oxygen) measurement. */
+    public static final String CONFIG_MEASURE_SPO2 = "veepoo_measure_spo2";
+    /** Start a single-shot body-temperature measurement. */
+    public static final String CONFIG_MEASURE_TEMPERATURE = "veepoo_measure_temperature";
+    /** Start a single-shot stress (pressure) measurement. */
+    public static final String CONFIG_MEASURE_STRESS = "veepoo_measure_stress";
+    /** Start a single-shot blood pressure measurement. */
+    public static final String CONFIG_MEASURE_BLOOD_PRESSURE = "veepoo_measure_blood_pressure";
+    public static final String CONFIG_MEASURE_BODY_COMPOSITION = "veepoo_measure_body_composition";
+    public static final String CONFIG_MEASURE_BLOOD_LIPIDS = "veepoo_measure_blood_lipids";
+    /** Start a single-shot ECG measurement (waveform capture). */
+    public static final String CONFIG_MEASURE_ECG = "veepoo_measure_ecg";
+
+    // ---- Single-shot vital detection sub-parameters -----------------------
+    // 0x80 SpO2: start {0x80,1,2}, stop {0x80,2,2}
+    public static final int SPO2_DETECT_START = 1;
+    public static final int SPO2_DETECT_STOP = 2;
+    // 0x87 temperature: start {0x87,1,1}, stop {0x87,1,2}
+    public static final int TEMP_DETECT_START = 1;
+    public static final int TEMP_DETECT_STOP = 2;
+    // 0x89 stress: sub-parameter selects the metric (6 = pressure/stress)
+    public static final int STRESS_DETECT_METRIC = 6;
+    public static final int STRESS_DETECT_START = 1;
+    public static final int STRESS_DETECT_STOP = 2;
+    // 0x90 blood pressure: {0x90, action, model}; action 1=start / 0=stop, model 0=public (uncalibrated)
+    public static final int BP_DETECT_START = 1;
+    public static final int BP_DETECT_STOP = 0;
+    public static final int BP_DETECT_MODEL_PUBLIC = 0;
+    // 0x93 body composition: {0x93, function 4, event}; event 1=start / 2=stop
+    public static final int BC_DETECT_FUNCTION = 4;
+    public static final int BC_DETECT_START = 1;
+    public static final int BC_DETECT_STOP = 2;
+    // 0x8A blood component: {0x8A, function 1, event, calibrated}; event 1=start / 2=stop
+    public static final int LIPID_DETECT_FUNCTION = 1;
+    public static final int LIPID_DETECT_START = 1;
+    public static final int LIPID_DETECT_STOP = 2;
+    // 0x93 ECG: {0x93, function 1, event, 1}; event 1=start / 2=stop
+    public static final int ECG_DETECT_FUNCTION = 1;
+    public static final int ECG_DETECT_START = 1;
+    public static final int ECG_DETECT_STOP = 2;
+
+    // ---- ECG light-origin (F002) waveform frames --------------------------
+    // Frame layout (verified against live capture):
+    //   [0]        0x88 opcode
+    //   [1..len-5] waveform samples, each a big-endian signed int24 (3 bytes)
+    //   [len-4]    0x00, [len-3] 0x14, [len-2] 0xFF (constant), [len-1] per-frame seq counter
+    /** Minimum total frame length carrying at least one waveform sample. */
+    public static final int ECG_LIGHT_MIN_FRAME_LEN = 7;
+    /** Waveform samples before the constant tail. */
+    public static final int ECG_LIGHT_TAIL_LEN = 4;
+    /** Sample-rate field of the [3]==0 info frame: little-endian u16 at [4..5]. */
+    public static final int ECG_INFO_SAMPLE_RATE_OFFSET = 4;
+    // [3]==1 per-second status frame layout (verified against vendor + live capture):
+    //   [4]  device state byte (0 = FREE, 0xFC = UNPASS_WEAR / no contact, others: charging/busy)
+    //   [5]  hr1 live heart rate (single byte), [6] hr2, [7] HRV, [8..9] RR intervals
+    //   [10..11] battery, [12] wear flag (1 = not worn / no probe contact), [13] mid
+    //   [14..15] QTc little-endian u16, [16] PWV, [19] progress 0-100 %
+    public static final int ECG_STATUS_DEVICE_STATE_OFFSET = 4;
+    public static final int ECG_STATUS_HR_OFFSET = 5;
+    public static final int ECG_STATUS_WEAR_OFFSET = 12;
+    public static final int ECG_STATUS_PROGRESS_OFFSET = 19;
+    public static final int ECG_DEVICE_STATE_UNPASS_WEAR = 0xFC;
 
     // ---- Activity rawKind (stored in VeepooActivitySample.rawKind) -------
     // Mapped to ActivityKind by VeepooActivitySampleProvider.normalizeType().
@@ -114,6 +221,8 @@ public final class VeepooConstants {
     // ---- A7 device_function capability package offsets --------------------
     // Package id is at byte[19] of each pushed 20-byte packet.
     public static final int CAP_PACKAGE_ID_OFFSET = 19;
+    /** Package 1: SpO2H type; supported when in {1..9, -3, -2, -32} (0/other = unsupported). */
+    public static final int CAP_PKG1_SPO2H_TYPE = 8;
     /** Package 2: days of data kept on the watch; 0 -> default WATCH_DAY_DEFAULT. */
     public static final int CAP_PKG2_WATCH_DAY = 2;
     /** Package 2: origin protocol version; 3 or 5 -> Origin DF (0xDF), else v1 (0xD1). */
@@ -124,6 +233,12 @@ public final class VeepooConstants {
     public static final int CAP_PKG2_SPORT_MODEL_DAY = 5;
     /** Package 2: multi-sport mode type; 4/5/6 -> GPS variant of the 0xD4 layout. */
     public static final int CAP_PKG2_MULTISPORT_MODE_TYPE = 16;
+    /** Package 3: temperature type; 0 -> no app-triggered temperature measurement. */
+    public static final int CAP_PKG3_TEMP_TYPE = 7;
+    /** Package 3: MET (metabolic rate) type; 2/3 -> supported. */
+    public static final int CAP_PKG3_MET_TYPE = 17;
+    /** Package 3: stress (pressure) type; 2/3 -> app-triggered detection supported. */
+    public static final int CAP_PKG3_STRESS_TYPE = 18;
 
     /**
      * Maximum total days to request from the 0xD4 workout history, even when the device
@@ -132,6 +247,12 @@ public final class VeepooConstants {
      * carry at most 8 LE u16 values, so 8 is the practical cap.
      */
     public static final int SPORT_FETCH_MAX_DAYS = 8;
+
+    /** Max total days to request from the 0xE0 sleep history, probing past watchDataDay. */
+    public static final int SLEEP_FETCH_MAX_DAYS = 8;
+
+    /** Max total days to request from the Origin (0xDF/0xD1) activity history, probing past watchDataDay. */
+    public static final int ORIGIN_FETCH_MAX_DAYS = 8;
 
     public static final int WATCH_DAY_DEFAULT = 3;
     public static final int ORIGIN_PROTOCOL_VERSION_DF = 5;
