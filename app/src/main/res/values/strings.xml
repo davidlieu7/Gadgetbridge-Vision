@@ -2499,11 +2499,13 @@
     <string name="veepoo_bp_ok">Blood pressure: %1$d/%2$d mmHg</string>
     <string name="veepoo_bp_no_reading">No blood pressure reading (timed out)</string>
     <string name="veepoo_settings_auto_measure">Auto measurement</string>
-    <string name="veepoo_auto_measure_hr">Measure heart rate periodically</string>
-    <string name="veepoo_auto_measure_spo2">Measure blood oxygen periodically</string>
-    <string name="veepoo_auto_measure_temperature">Measure body temperature periodically</string>
-    <string name="veepoo_auto_measure_stress">Measure stress periodically</string>
-    <string name="veepoo_auto_measure_blood_pressure">Measure blood pressure periodically</string>
+    <string name="veepoo_auto_measure_hr">Heart rate</string>
+    <string name="veepoo_auto_measure_spo2">Blood oxygen</string>
+    <string name="veepoo_auto_measure_temperature">Body temperature</string>
+    <string name="veepoo_auto_measure_stress">Stress</string>
+    <string name="veepoo_auto_measure_blood_pressure">Blood pressure</string>
+    <string name="veepoo_auto_measure_hrv">HRV</string>
+    <string name="veepoo_auto_measure_blood_components">Blood components</string>
     <string name="veepoo_auto_measure_failed">The band did not accept the auto-measure change</string>
     <string name="devicetype_blackview_r60" translatable="false">Blackview R60</string>
     <string name="devicetype_misirun_c17" translatable="false">Misirun C17</string>

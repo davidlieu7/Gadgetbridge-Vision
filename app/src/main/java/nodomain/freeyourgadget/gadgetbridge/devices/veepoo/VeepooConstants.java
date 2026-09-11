@@ -180,6 +180,17 @@ public final class VeepooConstants {
     public static final String CONFIG_AUTO_MEASURE_TEMPERATURE = "veepoo_auto_measure_temperature";
     public static final String CONFIG_AUTO_MEASURE_STRESS = "veepoo_auto_measure_stress";
     public static final String CONFIG_AUTO_MEASURE_BLOOD_PRESSURE = "veepoo_auto_measure_blood_pressure";
+    public static final String CONFIG_AUTO_MEASURE_HRV = "veepoo_auto_measure_hrv";
+    public static final String CONFIG_AUTO_MEASURE_BLOOD_COMPONENTS = "veepoo_auto_measure_blood_components";
+    // Per-monitor capability flags persisted from the device reports; the settings UI hides a
+    // switch when its monitor is not supported by the firmware.
+    public static final String CONFIG_AUTO_MEASURE_HR_SUPPORTED = "veepoo_monitor_hr_supported";
+    public static final String CONFIG_AUTO_MEASURE_SPO2_SUPPORTED = "veepoo_monitor_spo2_supported";
+    public static final String CONFIG_AUTO_MEASURE_TEMPERATURE_SUPPORTED = "veepoo_monitor_temperature_supported";
+    public static final String CONFIG_AUTO_MEASURE_STRESS_SUPPORTED = "veepoo_monitor_stress_supported";
+    public static final String CONFIG_AUTO_MEASURE_BLOOD_PRESSURE_SUPPORTED = "veepoo_monitor_bp_supported";
+    public static final String CONFIG_AUTO_MEASURE_HRV_SUPPORTED = "veepoo_monitor_hrv_supported";
+    public static final String CONFIG_AUTO_MEASURE_BLOOD_COMPONENTS_SUPPORTED = "veepoo_monitor_blood_components_supported";
     // Capability flag from the 0xA7 package 4 report; persisted so the settings UI can hide
     // the auto-measure screen on firmware that does not support it.
     public static final String CONFIG_AUTO_MEASURE_SUPPORTED = "veepoo_auto_measure_supported";
@@ -197,11 +208,24 @@ public final class VeepooConstants {
     // Frame 1 ([19]==0) monitor field offsets.
     public static final int CUSTOM_SETTING_F1_AUTO_HEART = 4;
     public static final int CUSTOM_SETTING_F1_AUTO_BP = 5;
+    public static final int CUSTOM_SETTING_F1_AUTO_HRV = 12;
     // Frame 2 ([19]==1) monitor field offsets.
     public static final int CUSTOM_SETTING_F2_AUTO_TEMP = 4;
     public static final int CUSTOM_SETTING_F2_STRESS = 9;
-    // Persisted when a 0xB8 report shows at least one configurable monitor.
-    public static final String CONFIG_MONITOR_SUPPORTED = "veepoo_monitor_supported";
+    public static final int CUSTOM_SETTING_F2_BLOOD_COMPONENTS = 11;
+
+    // ---- AllSet night SpO2 auto-detect, opcode 0xB3 (legacy dialect) ------
+    /** [2] of an AllSet write frame: set command. */
+    public static final int ALLSET_OPRATE_SET = 0;
+    /** [2] of an AllSet write frame: read request. */
+    public static final int ALLSET_OPRATE_READ = 1;
+    // Response layout: [3]=oprate (0=set ack, 1=read data), [4..7]=start h/m + end h/m, [8]=open.
+    public static final int ALLSET_RESP_OPRATE = 3;
+    public static final int ALLSET_RESP_START_HOUR = 4;
+    public static final int ALLSET_RESP_START_MINUTE = 5;
+    public static final int ALLSET_RESP_END_HOUR = 6;
+    public static final int ALLSET_RESP_END_MINUTE = 7;
+    public static final int ALLSET_RESP_OPEN = 8;
 
     // ---- Single-shot vital detection sub-parameters -----------------------
     // 0x80 SpO2: start {0x80,1,2}, stop {0x80,2,2}

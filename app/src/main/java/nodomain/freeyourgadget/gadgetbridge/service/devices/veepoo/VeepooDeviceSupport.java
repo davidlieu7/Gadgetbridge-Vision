@@ -366,6 +366,28 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
     private String customSettingPendingKey = null;
     private boolean customSettingPendingOn = false;
 
+    // 0xB3 AllSet (legacy dialect): night SpO2 auto-detect with a time window. Used on firmware
+    // that does not report the newer 0xB3 TLV auto-measure capability (see A7 package 4).
+    private final Object allSetLock = new Object();
+    private boolean allSetReadOutstanding = false;
+    private boolean allSetPending = false;
+    private boolean allSetPendingOn = false;
+    private int allSetOpen = -1;   // last known open state (-1 unknown), 0 closed, 1 open
+    private int allSetStartHour;
+    private int allSetStartMinute;
+    private int allSetEndHour;
+    private int allSetEndMinute;
+    private final Runnable allSetReadTimeout = () -> {
+        synchronized (allSetLock) {
+            if (!allSetReadOutstanding) {
+                return;
+            }
+            allSetReadOutstanding = false;
+            allSetPending = false;
+        }
+        LOG.warn("SpO2 auto-detect settings read timed out");
+    };
+
     public VeepooDeviceSupport() {
         super(LOG);
         addSupportedService(VeepooConstants.UUID_SERVICE_F008);
@@ -405,6 +427,20 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
                 sendAutoMeasureRead();
             }, 5000L);
         }
+        // Same steady-state deferral for the legacy SpO2 auto-detect read; the A7 package 1
+        // report (which sets the capability) has arrived by then on supported firmware.
+        mainHandler.postDelayed(() -> {
+            SharedPreferences spo2Capabilities = GBApplication.getDeviceSpecificSharedPrefs(getDevice().getAddress());
+            if (!spo2Capabilities.getBoolean(VeepooConstants.CONFIG_AUTO_MEASURE_SPO2_SUPPORTED, true)) {
+                return;
+            }
+            synchronized (allSetLock) {
+                if (allSetReadOutstanding || allSetOpen >= 0) {
+                    return;
+                }
+            }
+            sendAllSetRead();
+        }, 5000L);
         // The device pushes its 0xA7 capability report after pairing; it is handled in
         // onCharacteristicChanged() and may arrive before the INITIALIZED state is reached.
         builder.setDeviceState(GBDevice.State.INITIALIZED);
@@ -546,7 +582,13 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
                 handleLipidFrame(data);
                 break;
             case 0xB3:
-                handleAutoMeasureFrame(data);
+                // Two dialects share this opcode; the A7 package 4 capability selects which one
+                // the firmware speaks (newer TLV auto-measure vs legacy AllSet SpO2).
+                if (autoMeasureSupported) {
+                    handleAutoMeasureFrame(data);
+                } else {
+                    handleAllSetFrame(data);
+                }
                 break;
             case 0xB8:
                 handleCustomSettingFrame(data);
@@ -639,7 +681,12 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
         LOG.info("Device capability report, package {}: {}", packageId, hexBytes(data));
         if (packageId == 1) {
             spo2hType = data[VeepooConstants.CAP_PKG1_SPO2H_TYPE] & 0xFF;
-            LOG.info("Capabilities: spo2hType={} ({})", spo2hType, isSpo2hTypeSupported(spo2hType) ? "supported" : "not supported");
+            boolean spo2Supported = isSpo2hTypeSupported(spo2hType) && spo2hType != 8;
+            LOG.info("Capabilities: spo2hType={} ({})", spo2hType, spo2Supported ? "supported" : "not supported");
+            GBApplication.getDeviceSpecificSharedPrefs(getDevice().getAddress())
+                    .edit()
+                    .putBoolean(VeepooConstants.CONFIG_AUTO_MEASURE_SPO2_SUPPORTED, spo2Supported)
+                    .apply();
         } else if (packageId == 2) {
             int watchDay = data[2] & 0xFF;
             if (watchDay >= 1 && watchDay <= 7) {
@@ -699,27 +746,57 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
         }
         int hr = stateOf(0, VeepooConstants.CUSTOM_SETTING_F1_AUTO_HEART);
         int bp = stateOf(0, VeepooConstants.CUSTOM_SETTING_F1_AUTO_BP);
+        int hrv = stateOf(0, VeepooConstants.CUSTOM_SETTING_F1_AUTO_HRV);
         int temp = stateOf(1, VeepooConstants.CUSTOM_SETTING_F2_AUTO_TEMP);
         int stress = stateOf(1, VeepooConstants.CUSTOM_SETTING_F2_STRESS);
-        LOG.info("Custom setting monitors: heart={} bp={} temp={} stress={}", hr, bp, temp, stress);
-        GBApplication.getDeviceSpecificSharedPrefs(getDevice().getAddress()).edit()
-                .putBoolean(VeepooConstants.CONFIG_AUTO_MEASURE_HR, hr == VeepooConstants.CUSTOM_SETTING_VALUE_OPEN)
-                .putBoolean(VeepooConstants.CONFIG_AUTO_MEASURE_BLOOD_PRESSURE, bp == VeepooConstants.CUSTOM_SETTING_VALUE_OPEN)
-                .putBoolean(VeepooConstants.CONFIG_AUTO_MEASURE_TEMPERATURE, temp == VeepooConstants.CUSTOM_SETTING_VALUE_OPEN)
-                .putBoolean(VeepooConstants.CONFIG_AUTO_MEASURE_STRESS, stress == VeepooConstants.CUSTOM_SETTING_VALUE_OPEN)
-                .putBoolean(VeepooConstants.CONFIG_MONITOR_SUPPORTED,
-                        hr != 0 || bp != 0 || temp != 0 || stress != 0)
-                .apply();
+        int bloodComponents = stateOf(1, VeepooConstants.CUSTOM_SETTING_F2_BLOOD_COMPONENTS);
+        LOG.info("Custom setting monitors: heart={} bp={} hrv={} temp={} stress={} bloodComponents={}",
+                hr, bp, hrv, temp, stress, bloodComponents);
+        SharedPreferences.Editor editor = GBApplication.getDeviceSpecificSharedPrefs(getDevice().getAddress()).edit();
+        persistMonitor(editor, VeepooConstants.CONFIG_AUTO_MEASURE_HR, VeepooConstants.CONFIG_AUTO_MEASURE_HR_SUPPORTED, hr);
+        persistMonitor(editor, VeepooConstants.CONFIG_AUTO_MEASURE_BLOOD_PRESSURE, VeepooConstants.CONFIG_AUTO_MEASURE_BLOOD_PRESSURE_SUPPORTED, bp);
+        persistMonitor(editor, VeepooConstants.CONFIG_AUTO_MEASURE_HRV, VeepooConstants.CONFIG_AUTO_MEASURE_HRV_SUPPORTED, hrv);
+        persistMonitor(editor, VeepooConstants.CONFIG_AUTO_MEASURE_TEMPERATURE, VeepooConstants.CONFIG_AUTO_MEASURE_TEMPERATURE_SUPPORTED, temp);
+        persistMonitor(editor, VeepooConstants.CONFIG_AUTO_MEASURE_STRESS, VeepooConstants.CONFIG_AUTO_MEASURE_STRESS_SUPPORTED, stress);
+        persistMonitor(editor, VeepooConstants.CONFIG_AUTO_MEASURE_BLOOD_COMPONENTS, VeepooConstants.CONFIG_AUTO_MEASURE_BLOOD_COMPONENTS_SUPPORTED, bloodComponents);
+        editor.apply();
         if (baselineComplete && customSettingPendingKey != null) {
             applyCustomSettingToggle(customSettingPendingKey, customSettingPendingOn);
         }
     }
 
+    /** Stores the live state of one monitor; -1 means the frame carrying it has not arrived. */
+    private void persistMonitor(SharedPreferences.Editor editor, String stateKey, String supportKey, int value) {
+        if (value < 0) {
+            return;
+        }
+        editor.putBoolean(stateKey, value == VeepooConstants.CUSTOM_SETTING_VALUE_OPEN);
+        editor.putBoolean(supportKey, value != 0);
+    }
+
     private int stateOf(int frameIndex, int offset) {
         synchronized (customSettingLock) {
             byte[] frame = frameIndex == 0 ? customSettingFrame1 : customSettingFrame2;
-            return frame == null ? 0 : frame[offset] & 0xFF;
+            return frame == null ? -1 : frame[offset] & 0xFF;
         }
+    }
+
+    /** Maps a monitor setting key to its {frame index, byte offset}; null for non-0xB8 keys. */
+    private static int[] customSettingField(final String config) {
+        if (VeepooConstants.CONFIG_AUTO_MEASURE_HR.equals(config)) {
+            return new int[]{0, VeepooConstants.CUSTOM_SETTING_F1_AUTO_HEART};
+        } else if (VeepooConstants.CONFIG_AUTO_MEASURE_BLOOD_PRESSURE.equals(config)) {
+            return new int[]{0, VeepooConstants.CUSTOM_SETTING_F1_AUTO_BP};
+        } else if (VeepooConstants.CONFIG_AUTO_MEASURE_HRV.equals(config)) {
+            return new int[]{0, VeepooConstants.CUSTOM_SETTING_F1_AUTO_HRV};
+        } else if (VeepooConstants.CONFIG_AUTO_MEASURE_TEMPERATURE.equals(config)) {
+            return new int[]{1, VeepooConstants.CUSTOM_SETTING_F2_AUTO_TEMP};
+        } else if (VeepooConstants.CONFIG_AUTO_MEASURE_STRESS.equals(config)) {
+            return new int[]{1, VeepooConstants.CUSTOM_SETTING_F2_STRESS};
+        } else if (VeepooConstants.CONFIG_AUTO_MEASURE_BLOOD_COMPONENTS.equals(config)) {
+            return new int[]{1, VeepooConstants.CUSTOM_SETTING_F2_BLOOD_COMPONENTS};
+        }
+        return null;
     }
 
     /**
@@ -728,21 +805,8 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
      * queue the toggle and request a read so the baseline arrives first.
      */
     private void handleCustomSettingToggle(final String config) {
-        int frameIndex;
-        int offset;
-        if (VeepooConstants.CONFIG_AUTO_MEASURE_HR.equals(config)) {
-            frameIndex = 0;
-            offset = VeepooConstants.CUSTOM_SETTING_F1_AUTO_HEART;
-        } else if (VeepooConstants.CONFIG_AUTO_MEASURE_BLOOD_PRESSURE.equals(config)) {
-            frameIndex = 0;
-            offset = VeepooConstants.CUSTOM_SETTING_F1_AUTO_BP;
-        } else if (VeepooConstants.CONFIG_AUTO_MEASURE_TEMPERATURE.equals(config)) {
-            frameIndex = 1;
-            offset = VeepooConstants.CUSTOM_SETTING_F2_AUTO_TEMP;
-        } else if (VeepooConstants.CONFIG_AUTO_MEASURE_STRESS.equals(config)) {
-            frameIndex = 1;
-            offset = VeepooConstants.CUSTOM_SETTING_F2_STRESS;
-        } else {
+        int[] field = customSettingField(config);
+        if (field == null) {
             return;
         }
         boolean on = GBApplication.getDeviceSpecificSharedPrefs(getDevice().getAddress())
@@ -773,23 +837,12 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
     }
 
     private void applyCustomSettingToggle(final String config, final boolean on) {
-        int frameIndex;
-        int offset;
-        if (VeepooConstants.CONFIG_AUTO_MEASURE_HR.equals(config)) {
-            frameIndex = 0;
-            offset = VeepooConstants.CUSTOM_SETTING_F1_AUTO_HEART;
-        } else if (VeepooConstants.CONFIG_AUTO_MEASURE_BLOOD_PRESSURE.equals(config)) {
-            frameIndex = 0;
-            offset = VeepooConstants.CUSTOM_SETTING_F1_AUTO_BP;
-        } else if (VeepooConstants.CONFIG_AUTO_MEASURE_TEMPERATURE.equals(config)) {
-            frameIndex = 1;
-            offset = VeepooConstants.CUSTOM_SETTING_F2_AUTO_TEMP;
-        } else if (VeepooConstants.CONFIG_AUTO_MEASURE_STRESS.equals(config)) {
-            frameIndex = 1;
-            offset = VeepooConstants.CUSTOM_SETTING_F2_STRESS;
-        } else {
+        int[] field = customSettingField(config);
+        if (field == null) {
             return;
         }
+        int frameIndex = field[0];
+        int offset = field[1];
         byte[] frame1;
         byte[] frame2;
         synchronized (customSettingLock) {
@@ -829,6 +882,114 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
             builder.queue();
         } catch (IOException e) {
             LOG.error("Error writing custom setting toggle {}", config, e);
+        }
+    }
+
+    /**
+     * Opcode 0xB3 AllSet frame (legacy dialect, only SpO2 night auto-detect on this generation):
+     * response [1]==1, [3]=oprate (0 set ack / 1 read data), [4..7]=window start h/m + end h/m,
+     * [8]=open state.
+     */
+    private void handleAllSetFrame(byte[] data) {
+        if (data == null || data.length < 9 || (data[1] & 0xFF) != VeepooConstants.AUTO_MEASURE_CMD_SET) {
+            LOG.debug("Ignoring unexpected AllSet frame: {}", data == null ? "null" : hexBytes(data));
+            return;
+        }
+        int oprate = data[VeepooConstants.ALLSET_RESP_OPRATE] & 0xFF;
+        if (oprate != VeepooConstants.ALLSET_OPRATE_SET && oprate != VeepooConstants.ALLSET_OPRATE_READ) {
+            LOG.debug("Unknown AllSet oprate: {}", oprate);
+            return;
+        }
+        boolean applyPending = false;
+        int open;
+        synchronized (allSetLock) {
+            allSetReadOutstanding = false;
+            if (oprate == VeepooConstants.ALLSET_OPRATE_READ) {
+                allSetOpen = data[VeepooConstants.ALLSET_RESP_OPEN] & 0xFF;
+                allSetStartHour = data[VeepooConstants.ALLSET_RESP_START_HOUR] & 0xFF;
+                allSetStartMinute = data[VeepooConstants.ALLSET_RESP_START_MINUTE] & 0xFF;
+                allSetEndHour = data[VeepooConstants.ALLSET_RESP_END_HOUR] & 0xFF;
+                allSetEndMinute = data[VeepooConstants.ALLSET_RESP_END_MINUTE] & 0xFF;
+                applyPending = allSetPending;
+            }
+            open = allSetOpen;
+        }
+        if (oprate == VeepooConstants.ALLSET_OPRATE_READ) {
+            LOG.info("SpO2 auto-detect: open={} window {}:{}-{}:{}", open,
+                    allSetStartHour, allSetStartMinute, allSetEndHour, allSetEndMinute);
+            GBApplication.getDeviceSpecificSharedPrefs(getDevice().getAddress())
+                    .edit()
+                    .putBoolean(VeepooConstants.CONFIG_AUTO_MEASURE_SPO2, open == 1)
+                    .apply();
+        } else {
+            LOG.info("SpO2 auto-detect set acknowledged (open={})", open);
+        }
+        if (applyPending) {
+            boolean pendingOn;
+            synchronized (allSetLock) {
+                pendingOn = allSetPendingOn;
+            }
+            writeAllSet(pendingOn);
+        }
+    }
+
+    private void sendAllSetRead() {
+        synchronized (allSetLock) {
+            allSetReadOutstanding = true;
+        }
+        try {
+            TransactionBuilder builder = performInitialized("read SpO2 auto-detect settings");
+            writeFrame(builder, new byte[]{VeepooConstants.OP_AUTO_MEASURE, 0x00,
+                    (byte) VeepooConstants.ALLSET_OPRATE_READ});
+            builder.queue();
+            mainHandler.removeCallbacks(allSetReadTimeout);
+            mainHandler.postDelayed(allSetReadTimeout, 15000L);
+        } catch (IOException e) {
+            synchronized (allSetLock) {
+                allSetReadOutstanding = false;
+            }
+            LOG.error("Error requesting SpO2 auto-detect settings", e);
+        }
+    }
+
+    /** SpO2 auto-detect toggle from the device settings screen. */
+    private void handleSpo2Configuration(final String config) {
+        boolean on = GBApplication.getDeviceSpecificSharedPrefs(getDevice().getAddress())
+                .getBoolean(VeepooConstants.CONFIG_AUTO_MEASURE_SPO2, false);
+        boolean known;
+        synchronized (allSetLock) {
+            allSetPending = true;
+            allSetPendingOn = on;
+            known = allSetOpen >= 0;
+        }
+        if (known) {
+            writeAllSet(on);
+        } else {
+            LOG.info("SpO2 auto-detect state unknown; requesting a read before writing");
+            sendAllSetRead();
+        }
+    }
+
+    private void writeAllSet(final boolean on) {
+        int open, startHour, startMinute, endHour, endMinute;
+        synchronized (allSetLock) {
+            allSetPending = false;
+            open = on ? 1 : 0;
+            startHour = allSetStartHour;
+            startMinute = allSetStartMinute;
+            endHour = allSetEndHour;
+            endMinute = allSetEndMinute;
+        }
+        LOG.info("Writing SpO2 auto-detect: open={} window {}:{}-{}:{}", open,
+                startHour, startMinute, endHour, endMinute);
+        try {
+            TransactionBuilder builder = performInitialized("write SpO2 auto-detect");
+            writeFrame(builder, new byte[]{VeepooConstants.OP_AUTO_MEASURE, 0x00,
+                    (byte) VeepooConstants.ALLSET_OPRATE_SET,
+                    (byte) startHour, (byte) startMinute, (byte) endHour, (byte) endMinute, (byte) open});
+            builder.queue();
+        } catch (IOException e) {
+            LOG.error("Error writing SpO2 auto-detect settings", e);
         }
     }
 
@@ -2378,6 +2539,8 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
         } else {
             if (autoMeasureSupported) {
                 handleAutoMeasureConfiguration(config);
+            } else if (VeepooConstants.CONFIG_AUTO_MEASURE_SPO2.equals(config)) {
+                handleSpo2Configuration(config);
             } else {
                 handleCustomSettingToggle(config);
             }
