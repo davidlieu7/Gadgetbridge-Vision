@@ -195,6 +195,32 @@ public final class VeepooConstants {
     // the auto-measure screen on firmware that does not support it.
     public static final String CONFIG_AUTO_MEASURE_SUPPORTED = "veepoo_auto_measure_supported";
 
+    // ---- Notification push, opcode 0xC2 (vendor SocialMsgOperater) ---------
+    /**
+     * Opcode for pushing phone notifications to the watch. Fixed 20-byte frames:
+     * [1]=message type (see SOCIAL_MSG_TYPE_*), [2]=payload length, [3]=total packet count,
+     * [4]=1-based packet index, [5]=section (1=contact name, 2=message text, 0=no contact),
+     * [6..19]=UTF-8 payload (max 14 bytes). The watch vibrates and lights up on its side.
+     */
+    public static final byte OP_SOCIAL_MESSAGE = (byte) 0xC2;
+    /** Message-type values for byte [1] (vendor ESocailMsg). */
+    public static final int SOCIAL_MSG_TYPE_PHONE = 0;
+    public static final int SOCIAL_MSG_TYPE_SMS = 1;
+    public static final int SOCIAL_MSG_TYPE_WECHAT = 2;
+    public static final int SOCIAL_MSG_TYPE_QQ = 3;
+    public static final int SOCIAL_MSG_TYPE_TWITTER = 6;
+    public static final int SOCIAL_MSG_TYPE_LINKEDIN = 8;
+    public static final int SOCIAL_MSG_TYPE_WHATSAPP = 9;
+    public static final int SOCIAL_MSG_TYPE_LINE = 10;
+    public static final int SOCIAL_MSG_TYPE_INSTAGRAM = 11;
+    public static final int SOCIAL_MSG_TYPE_SNAPCHAT = 12;
+    public static final int SOCIAL_MSG_TYPE_SKYPE = 13;
+    public static final int SOCIAL_MSG_TYPE_GMAIL = 14;
+    public static final int SOCIAL_MSG_TYPE_OTHER = 17;
+    public static final int SOCIAL_MSG_TYPE_TELEGRAM = 19;
+    public static final int SOCIAL_MSG_TYPE_KAKAOTALK = 21;
+    public static final int SOCIAL_MSG_TYPE_VIBER = 25;
+
     // ---- Custom setting (per-feature monitor toggles), opcode 0xB8 --------
     /** Opcode for reading/writing the classic per-feature monitor settings. */
     public static final byte OP_CUSTOM_SETTING = (byte) 0xB8;
@@ -291,6 +317,8 @@ public final class VeepooConstants {
     public static final int CAP_PACKAGE_ID_OFFSET = 19;
     /** Package 1: SpO2H type; supported when in {1..9, -3, -2, -32} (0/other = unsupported). */
     public static final int CAP_PKG1_SPO2H_TYPE = 8;
+    /** Package 1: max packets per pushed notification (0xC2); 0 -> vendor default. */
+    public static final int CAP_PKG1_ALL_MSG_LENGTH = 9;
     /** Package 2: days of data kept on the watch; 0 -> default WATCH_DAY_DEFAULT. */
     public static final int CAP_PKG2_WATCH_DAY = 2;
     /** Package 2: origin protocol version; 3 or 5 -> Origin DF (0xDF), else v1 (0xD1). */

@@ -36,6 +36,7 @@ import java.io.Serializable;
 import java.nio.BufferUnderflowException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Calendar;
@@ -90,6 +91,8 @@ import nodomain.freeyourgadget.gadgetbridge.model.ActivityTrack;
 import nodomain.freeyourgadget.gadgetbridge.model.BatteryState;
 import nodomain.freeyourgadget.gadgetbridge.model.DeviceService;
 import nodomain.freeyourgadget.gadgetbridge.model.GPSCoordinate;
+import nodomain.freeyourgadget.gadgetbridge.model.NotificationSpec;
+import nodomain.freeyourgadget.gadgetbridge.model.NotificationType;
 import nodomain.freeyourgadget.gadgetbridge.model.RecordedDataTypes;
 import nodomain.freeyourgadget.gadgetbridge.service.btle.AbstractBTLESingleDeviceSupport;
 import nodomain.freeyourgadget.gadgetbridge.service.btle.TransactionBuilder;
@@ -350,6 +353,8 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
 
     // Capabilities from the device-pushed 0xA7 report (packages 1 and 3)
     private int spo2hType = -1;     // pkg1: supported when in {1..9, 0xFD, 0xFE, 0xE0}
+    /** pkg1: max 0xC2 packets per pushed notification; vendor default when the report says 0. */
+    private int socialMsgMaxPackets = 4;
     private int tempType = -1;      // pkg3: 0 => no app-triggered temperature measurement
     private int metType = -1;       // pkg3: 2/3 => MET supported
     private int stressType = -1;    // pkg3: 2/3 => app-triggered stress detection supported
@@ -682,7 +687,12 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
         if (packageId == 1) {
             spo2hType = data[VeepooConstants.CAP_PKG1_SPO2H_TYPE] & 0xFF;
             boolean spo2Supported = isSpo2hTypeSupported(spo2hType) && spo2hType != 8;
-            LOG.info("Capabilities: spo2hType={} ({})", spo2hType, spo2Supported ? "supported" : "not supported");
+            int allMsgLength = data[VeepooConstants.CAP_PKG1_ALL_MSG_LENGTH] & 0xFF;
+            if (allMsgLength >= 1 && allMsgLength <= 64) {
+                socialMsgMaxPackets = allMsgLength;
+            }
+            LOG.info("Capabilities: spo2hType={} ({}) maxMessagePackets={}", spo2hType,
+                    spo2Supported ? "supported" : "not supported", socialMsgMaxPackets);
             GBApplication.getDeviceSpecificSharedPrefs(getDevice().getAddress())
                     .edit()
                     .putBoolean(VeepooConstants.CONFIG_AUTO_MEASURE_SPO2_SUPPORTED, spo2Supported)
@@ -2546,6 +2556,159 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
             }
             super.onSendConfiguration(config);
         }
+    }
+
+    /**
+     * Pushes a notification to the watch (vendor "device_msg_oprate"): fixed 20-byte 0xC2 frames,
+     * [1]=message type, [2]=payload length, [3]=total packet count, [4]=1-based index,
+     * [5]=section (1=contact name, 2=message text, 0=no contact), [6..19]=UTF-8 payload
+     * (max 14 bytes). The watch performs its own vibration and light on receipt.
+     */
+    @Override
+    public void onNotification(NotificationSpec spec) {
+        if (spec == null) {
+            return;
+        }
+        NotificationType type = spec.getType();
+        String title = firstNonEmpty(spec.getTitle(), spec.getSubject());
+        String sender = spec.getSender();
+        boolean hasSenderName = sender != null && !sender.trim().isEmpty();
+        // Google Messages (and other SMS apps) report the caller as a phone number rather than a
+        // GENERIC_SMS type; route anything carrying a phone number through the SMS layout so the
+        // watch plays its SMS pattern and shows a proper contact entry.
+        boolean smsLayout = type == NotificationType.GENERIC_SMS
+                || firstNonEmpty(spec.getPhoneNumber()).length() > 0;
+        List<byte[]> frames = new ArrayList<>();
+        if (type == NotificationType.GENERIC_PHONE) {
+            byte[] nameBytes = truncateUtf8(firstNonEmpty(sender, spec.getPhoneNumber()), 12)
+                    .getBytes(StandardCharsets.UTF_8);
+            frames.add(socialMsgFrame(VeepooConstants.SOCIAL_MSG_TYPE_PHONE, 1, 1,
+                    hasSenderName ? 1 : 0, nameBytes));
+        } else if (smsLayout) {
+            String body = firstNonEmpty(spec.getBody(), spec.getTitle());
+            byte[] nameBytes = truncateUtf8(firstNonEmpty(sender, spec.getPhoneNumber(), " "), 12)
+                    .getBytes(StandardCharsets.UTF_8);
+            byte[] bodyBytes = body.getBytes(StandardCharsets.UTF_8);
+            int total = Math.min(1 + (bodyBytes.length + 13) / 14, socialMsgMaxPackets);
+            frames.add(socialMsgFrame(VeepooConstants.SOCIAL_MSG_TYPE_SMS, total, 1,
+                    hasSenderName ? 1 : 0, nameBytes));
+            int offset = 0;
+            for (int index = 2; index <= total; index++) {
+                byte[] chunk = new byte[Math.min(14, bodyBytes.length - offset)];
+                System.arraycopy(bodyBytes, offset, chunk, 0, chunk.length);
+                frames.add(socialMsgFrame(VeepooConstants.SOCIAL_MSG_TYPE_SMS, total, index, 2, chunk));
+                offset += chunk.length;
+            }
+        } else {
+            String text;
+            if (title.isEmpty()) {
+                text = firstNonEmpty(spec.getBody());
+            } else if (firstNonEmpty(spec.getBody()).isEmpty()) {
+                text = title;
+            } else {
+                text = truncateUtf8(title, 12) + ":" + spec.getBody();
+            }
+            byte[] bytes = text.getBytes(StandardCharsets.UTF_8);
+            if (bytes.length > 0) {
+                int msgType = mapSocialMsgType(type);
+                int total = Math.min((bytes.length + 13) / 14, socialMsgMaxPackets);
+                int offset = 0;
+                for (int index = 1; index <= total; index++) {
+                    byte[] chunk = new byte[Math.min(14, bytes.length - offset)];
+                    System.arraycopy(bytes, offset, chunk, 0, chunk.length);
+                    frames.add(socialMsgFrame(msgType, total, index, 2, chunk));
+                    offset += chunk.length;
+                }
+            }
+        }
+        if (frames.isEmpty()) {
+            return;
+        }
+        LOG.info("Pushing notification to watch: type={} frames={}", spec.getType(), frames.size());
+        try {
+            TransactionBuilder builder = performInitialized("send notification");
+            for (byte[] frame : frames) {
+                writeFrame(builder, frame);
+            }
+            builder.queue();
+        } catch (IOException e) {
+            LOG.error("Error pushing notification to watch", e);
+        }
+    }
+
+    /** Maps a Gadgetbridge notification type onto the vendor ESocailMsg value at frame [1]. */
+    private static int mapSocialMsgType(NotificationType type) {
+        switch (type) {
+            case WECHAT:
+                return VeepooConstants.SOCIAL_MSG_TYPE_WECHAT;
+            case QQ:
+                return VeepooConstants.SOCIAL_MSG_TYPE_QQ;
+            case TWITTER:
+                return VeepooConstants.SOCIAL_MSG_TYPE_TWITTER;
+            case LINKEDIN:
+                return VeepooConstants.SOCIAL_MSG_TYPE_LINKEDIN;
+            case WHATSAPP:
+                return VeepooConstants.SOCIAL_MSG_TYPE_WHATSAPP;
+            case LINE:
+                return VeepooConstants.SOCIAL_MSG_TYPE_LINE;
+            case INSTAGRAM:
+                return VeepooConstants.SOCIAL_MSG_TYPE_INSTAGRAM;
+            case SNAPCHAT:
+                return VeepooConstants.SOCIAL_MSG_TYPE_SNAPCHAT;
+            case SKYPE:
+                return VeepooConstants.SOCIAL_MSG_TYPE_SKYPE;
+            case GMAIL:
+                return VeepooConstants.SOCIAL_MSG_TYPE_GMAIL;
+            case TELEGRAM:
+                return VeepooConstants.SOCIAL_MSG_TYPE_TELEGRAM;
+            case KAKAO_TALK:
+                return VeepooConstants.SOCIAL_MSG_TYPE_KAKAOTALK;
+            case VIBER:
+                return VeepooConstants.SOCIAL_MSG_TYPE_VIBER;
+            default:
+                return VeepooConstants.SOCIAL_MSG_TYPE_OTHER;
+        }
+    }
+
+    /** Builds one 20-byte 0xC2 frame; the payload must be at most 14 UTF-8 bytes. */
+    private static byte[] socialMsgFrame(int msgType, int total, int index, int section, byte[] payload) {
+        if (payload.length > 14) {
+            throw new IllegalArgumentException("0xC2 payloads must be at most 14 bytes");
+        }
+        byte[] frame = new byte[VeepooConstants.PACKET_SIZE];
+        frame[0] = VeepooConstants.OP_SOCIAL_MESSAGE;
+        frame[1] = (byte) msgType;
+        frame[2] = (byte) payload.length;
+        frame[3] = (byte) total;
+        frame[4] = (byte) index;
+        frame[5] = (byte) section;
+        System.arraycopy(payload, 0, frame, 6, payload.length);
+        return frame;
+    }
+
+    /** Truncates to at most {@code maxBytes} UTF-8 bytes without splitting a multibyte character. */
+    private static String truncateUtf8(String value, int maxBytes) {
+        if (value == null) {
+            return "";
+        }
+        byte[] bytes = value.getBytes(StandardCharsets.UTF_8);
+        if (bytes.length <= maxBytes) {
+            return value;
+        }
+        int end = maxBytes;
+        while (end > 0 && (bytes[end] & 0xC0) == 0x80) {
+            end--;
+        }
+        return new String(bytes, 0, end, StandardCharsets.UTF_8);
+    }
+
+    private static String firstNonEmpty(String... values) {
+        for (String value : values) {
+            if (value != null && !value.trim().isEmpty()) {
+                return value;
+            }
+        }
+        return "";
     }
 
     /**
