@@ -202,6 +202,11 @@ public class VeepooKR96ProCoordinator extends AbstractBLEDeviceCoordinator {
     }
 
     @Override
+    public boolean supportsFindDevice(@NonNull final GBDevice device) {
+        return true;
+    }
+
+    @Override
     public TimeSampleProvider<? extends HrvValueSample> getHrvValueSampleProvider(@NonNull final GBDevice device, @NonNull final DaoSession session) {
         return new GenericHrvValueSampleProvider(device, session);
     }

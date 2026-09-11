@@ -130,6 +130,15 @@ public final class VeepooConstants {
      * at [8..11]; every frame appends payload bytes starting at [6].
      */
     public static final byte OP_MANUAL_DETECT = (byte) 0xDE;
+    /**
+     * Find device: make the band vibrate (vendor "find_phone_by_watch_operate", FindPhoneOrDeviceOprate).
+     * {0xB5, 0x0A} starts ringing, {0xB5, 0x0B} stops it. Status frames echo [1]=0x0A/0x0B with
+     * [2] = 0 unsupported, 1 finding, 2 found, 3 stopped. The vendor UI gates this on A7 pkg3[8].
+     */
+    public static final byte OP_FIND_DEVICE = (byte) 0xB5;
+    /** Find-device operation values for byte [1]. */
+    public static final int FIND_DEVICE_START = 0x0A;
+    public static final int FIND_DEVICE_STOP = 0x0B;
 
     // ---- 0xDE manual measurement read-back ----------------------------------
     /** Heart-rate bit of the 4-byte LE read/detect masks (DeviceManualDataType bit 1). */
@@ -221,15 +230,15 @@ public final class VeepooConstants {
     public static final int SOCIAL_MSG_TYPE_KAKAOTALK = 21;
     public static final int SOCIAL_MSG_TYPE_VIBER = 25;
 
-    // ---- Text alarms (multi-alarm "alarm2"), opcode 0xB7 (vendor TextAlarmOprate) ---
+    // ---- Text alarms (multi-alarm "alarm2"), opcode 0xB9 (vendor TextAlarmOprate) ---
     /**
      * Opcode for text alarms. Variable-length frames: [1]=sub-op (ALARM_OP_*), [2..3]=packet
      * count/index (always 1/1 here, negotiated MTU is large enough), [4]=0xA0 marker, [5]=2,
      * [6..7]=CRC16 (vendor Alarm2Util) over the full post-op alarm list as concatenated records,
      * [8..]=one alarm record. Acks echo the CRC in [7..8] so state drift is detectable.
      */
-    public static final byte OP_MULTI_ALARM = (byte) 0xB7;
-    /** [1] sub-ops of a 0xB7 frame (1/2 phone-initiated, 3 read; 4-7 pushed by the band). */
+    public static final byte OP_MULTI_ALARM = (byte) 0xB9;
+    /** [1] sub-ops of a 0xB9 frame (1/2 phone-initiated, 3 read; 4-7 pushed by the band). */
     public static final int ALARM_OP_DELETE = 1;
     public static final int ALARM_OP_SET = 2;
     public static final int ALARM_OP_READ = 3;
@@ -237,7 +246,7 @@ public final class VeepooConstants {
     public static final int ALARM_OP_DEVICE_ADD = 5;
     public static final int ALARM_OP_DEVICE_DELETE = 6;
     public static final int ALARM_OP_DEVICE_TOGGLE = 7;
-    /** Trailer marker at [4] of a 0xB7 frame and its ack. */
+    /** Trailer marker at [4] of a 0xB9 frame and its ack. */
     public static final int ALARM_CRC_MARKER = 0xA0;
     /** Max text alarms this firmware keeps (vendor Alarm2Util.isTextAlarmListFull). */
     public static final int ALARM_MAX_ALARMS = 10;
@@ -341,7 +350,7 @@ public final class VeepooConstants {
     public static final int CAP_PKG1_SPO2H_TYPE = 8;
     /** Package 1: max packets per pushed notification (0xC2); 0 -> vendor default. */
     public static final int CAP_PKG1_ALL_MSG_LENGTH = 9;
-    /** Package 1: alarm tag; 5/6/7 -> text alarms + multi-alarm (0xB7) supported. */
+    /** Package 1: alarm tag; 5/6/7 -> text alarms + multi-alarm (0xB9) supported. */
     public static final int CAP_PKG1_ALARM_TAG = 17;
     /** Package 2: days of data kept on the watch; 0 -> default WATCH_DAY_DEFAULT. */
     public static final int CAP_PKG2_WATCH_DAY = 2;
@@ -359,6 +368,8 @@ public final class VeepooConstants {
     public static final int CAP_PKG3_MET_TYPE = 17;
     /** Package 3: stress (pressure) type; 2/3 -> app-triggered detection supported. */
     public static final int CAP_PKG3_STRESS_TYPE = 18;
+    /** Package 3: find-device-by-phone flag; non-zero -> the vendor UI shows "Find device". */
+    public static final int CAP_PKG3_FIND_DEVICE_BY_PHONE = 8;
 
     /**
      * Maximum total days to request from the 0xD4 workout history, even when the device

@@ -360,7 +360,7 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
     private int metType = -1;       // pkg3: 2/3 => MET supported
     private int stressType = -1;    // pkg3: 2/3 => app-triggered stress detection supported
 
-    // Text alarms (0xB7): the band verifies a CRC over the whole alarm list on every op, so we
+    // Text alarms (0xB9): the band verifies a CRC over the whole alarm list on every op, so we
     // track its exact state and re-read whenever an op fails or the band edits alarms locally.
     private final Object alarmLock = new Object();
     private final List<VeepooAlarm> alarmList = new ArrayList<>();
@@ -466,7 +466,7 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
             sendAllSetRead();
         }, 5000L);
         // Read the watch's alarm list once the A7 capability report has had time to arrive; the
-        // band verifies a whole-list CRC on every 0xB7 op, so we must know its current state.
+        // band verifies a whole-list CRC on every 0xB9 op, so we must know its current state.
         mainHandler.postDelayed(() -> sendAlarmRead(), 8000L);
         // The device pushes its 0xA7 capability report after pairing; it is handled in
         // onCharacteristicChanged() and may arrive before the INITIALIZED state is reached.
@@ -620,8 +620,11 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
             case 0xB8:
                 handleCustomSettingFrame(data);
                 break;
-            case 0xB7:
+            case 0xB9:
                 handleAlarmFrame(data);
+                break;
+            case 0xB5:
+                handleFindDeviceAck(data);
                 break;
             case 0xDE:
                 handleManualDetectFrame(data);
@@ -633,7 +636,8 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
 
     /**
      * Opcode 0xA1 response: [3]=status (6 = check + time success), [4..5]=deviceNumber BE,
-     * [6..9]=firmware/test version digits.
+     * [6..9]=firmware/test version digits, [18]=find-device capability (0 none, 1/2 supported),
+     * [19]=wear-check capability (0 none, 1/2 supported).
      */
     private void handlePwdConfirmResponse(byte[] data) {
         if (data.length < 20) {
@@ -643,7 +647,10 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
         int status = data[3] & 0xFF;
         int deviceNumber = ((data[4] & 0xFF) << 8) | (data[5] & 0xFF);
         String firmwareVersion = hexByte(data[6]) + "." + hexByte(data[7]) + "." + hexByte(data[8]) + "." + hexByte(data[9]);
-        LOG.info("Password confirm status: {} (device number {}, firmware {})", status, deviceNumber, firmwareVersion);
+        int findPhoneFunction = data[18] & 0xFF;
+        int wearDetectFunction = data[19] & 0xFF;
+        LOG.info("Password confirm status: {} (device number {}, firmware {}, findPhone: {}, wearDetect: {})",
+                status, deviceNumber, firmwareVersion, findPhoneFunction, wearDetectFunction);
         if (status != 1 && status != 3 && status != 5 && status != 6) {
             LOG.warn("Password confirm did not report success (status {}); the band may be paired to another phone", status);
         }
@@ -743,9 +750,10 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
             tempType = data[VeepooConstants.CAP_PKG3_TEMP_TYPE] & 0xFF;
             metType = data[VeepooConstants.CAP_PKG3_MET_TYPE] & 0xFF;
             stressType = data[VeepooConstants.CAP_PKG3_STRESS_TYPE] & 0xFF;
-            LOG.info("Capabilities: tempType={} ({}), metType={}, stressType={} ({})",
+            int findDeviceByPhone = data[VeepooConstants.CAP_PKG3_FIND_DEVICE_BY_PHONE] & 0xFF;
+            LOG.info("Capabilities: tempType={} ({}), metType={}, stressType={} ({}), findDeviceByPhone={}",
                     tempType, tempType != 0 ? "supported" : "not supported", metType, stressType,
-                    (stressType == 2 || stressType == 3) ? "supported" : "not supported");
+                    (stressType == 2 || stressType == 3) ? "supported" : "not supported", findDeviceByPhone);
         } else if (packageId == 4) {
             autoMeasureSupported = (data[12] & 0xFF) == 1;
             LOG.info("Capabilities: autoMeasure={} ({})", data[12] & 0xFF,
@@ -2715,8 +2723,53 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
         return frame;
     }
 
+    @Override
+    public void onFindDevice(boolean start) {
+        try {
+            byte[] frame = new byte[VeepooConstants.PACKET_SIZE];
+            frame[0] = VeepooConstants.OP_FIND_DEVICE;
+            frame[1] = (byte) (start ? VeepooConstants.FIND_DEVICE_START : VeepooConstants.FIND_DEVICE_STOP);
+            TransactionBuilder builder = performInitialized("find device");
+            writeFrame(builder, frame);
+            builder.queue();
+            LOG.info("Find device: {}", start ? "start" : "stop");
+        } catch (IOException e) {
+            LOG.error("Error sending find-device command", e);
+        }
+    }
+
+    /** Status frame for 0xB5 find-device: [1] echoes the op (0x0A start / 0x0B stop) and [2] is
+     * the state (0 unsupported, 1 finding, 2 found, 3 stopped). [1]=0/2 are band-initiated
+     * find-phone events. */
+    private void handleFindDeviceAck(byte[] data) {
+        if (data.length < 2) {
+            return;
+        }
+        int operation = data[1] & 0xFF;
+        if (operation == VeepooConstants.FIND_DEVICE_START || operation == VeepooConstants.FIND_DEVICE_STOP) {
+            if (data.length >= 3) {
+                int state = data[2] & 0xFF;
+                if (state == 1) {
+                    LOG.info("Find device: finding");
+                } else if (state == 2) {
+                    LOG.info("Find device: found");
+                } else if (state == 3) {
+                    LOG.info("Find device: stopped");
+                } else if (state == 0) {
+                    LOG.warn("Find device: band reports not supported");
+                } else {
+                    LOG.debug("Find device status: op={} state={}", operation, state);
+                }
+            }
+        } else if (operation == 0 || operation == 2) {
+            LOG.info("Band-initiated find event from watch (op={})", operation);
+        } else {
+            LOG.debug("Find-device frame: op={}", operation);
+        }
+    }
+
     // ------------------------------------------------------------------------
-    // Text alarms (0xB7), mirroring the vendor TextAlarmOprate. Every op frame carries a CRC
+    // Text alarms (0xB9), mirroring the vendor TextAlarmOprate. Every op frame carries a CRC
     // over the whole post-op alarm list; the band echoes it back in the ack and rejects the op
     // on mismatch, so alarmList below must always mirror the watch exactly.
     // ------------------------------------------------------------------------
@@ -2848,7 +2901,7 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
     }
 
     /**
-     * Diffs the desired list against the tracked watch state and produces the 0xB7 frames that
+     * Diffs the desired list against the tracked watch state and produces the 0xB9 frames that
      * reach it, in wire order. Each frame's CRC covers the simulated post-op list; the tracked
      * state is updated optimistically and a verification read follows the push.
      */
@@ -2928,7 +2981,7 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
         return -1;
     }
 
-    /** Builds a 0xB7 frame carrying one alarm record plus the whole-list CRC. */
+    /** Builds a 0xB9 frame carrying one alarm record plus the whole-list CRC. */
     private static byte[] alarmOpFrame(int op, VeepooAlarm alarm, int crc) {
         byte[] record = alarmRecord(alarm);
         byte[] frame = new byte[8 + record.length];
@@ -3034,7 +3087,7 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
         mainHandler.postDelayed(alarmResync, delayMillis);
     }
 
-    /** Dispatches 0xB7 frames: our op acks, read responses, and band-initiated alarm changes. */
+    /** Dispatches 0xB9 frames: our op acks, read responses, and band-initiated alarm changes. */
     private void handleAlarmFrame(byte[] data) {
         if (data == null || data.length < 2) {
             return;
