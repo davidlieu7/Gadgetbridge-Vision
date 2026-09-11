@@ -48,8 +48,12 @@ public class SleepAsAndroidVibration {
     static final long GAP_MS = 300L;
     static final int ALARM_BURST_PULSES = 3;
     static final long ALARM_BURST_INTERVAL_MS = 5_000L;
-    /** Nothing stops the alarm if STOP_ALARM never arrives, so it cannot run unbounded. */
-    static final long ALARM_MAX_DURATION_MS = 5 * 60_000L;
+    /**
+     * Nothing stops the alarm if STOP_ALARM never arrives, so it cannot run unbounded. It has to
+     * outlast a real alarm by a wide margin, though: the wearable falling silent while the phone is
+     * still ringing is the louder failure of the two.
+     */
+    static final long ALARM_MAX_DURATION_MS = 10 * 60_000L;
 
     private final Handler handler;
     private final Toggle toggle;
