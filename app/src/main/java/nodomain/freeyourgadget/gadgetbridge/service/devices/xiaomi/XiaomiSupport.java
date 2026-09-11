@@ -95,11 +95,24 @@ public class XiaomiSupport extends AbstractBluetoothDeviceSupport {
     private String cachedFirmwareVersion = null;
     private XiaomiConnectionSupport connectionSupport = null;
     private SleepAsAndroidSender sleepAsAndroidSender;
+    private final SleepAsAndroidVibration.Toggle findDeviceToggle = new SleepAsAndroidVibration.Toggle() {
+        @Override
+        public void set(final boolean on) {
+            setFindWatchIfInitialized(on);
+        }
+
+        @Override
+        public void wake() {
+            if (gbDevice != null && gbDevice.getState().equalsOrHigherThan(GBDevice.State.INITIALIZED)) {
+                systemService.wakeLink();
+            }
+        }
+    };
     // Separate streams so a hint cannot cancel the schedule of an alarm that is still ringing.
     private final SleepAsAndroidVibration saaHintVibration = new SleepAsAndroidVibration(
-            new Handler(Looper.getMainLooper()), this::setFindWatchIfInitialized);
+            new Handler(Looper.getMainLooper()), findDeviceToggle);
     private final SleepAsAndroidVibration saaAlarmVibration = new SleepAsAndroidVibration(
-            new Handler(Looper.getMainLooper()), this::setFindWatchIfInitialized);
+            new Handler(Looper.getMainLooper()), findDeviceToggle);
 
     private final Map<Integer, AbstractXiaomiService> mServiceMap = new LinkedHashMap<>() {{
         put(XiaomiAuthService.COMMAND_TYPE, authService);

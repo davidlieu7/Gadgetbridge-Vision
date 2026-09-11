@@ -18,6 +18,7 @@ package nodomain.freeyourgadget.gadgetbridge.service;
 
 import android.os.Handler;
 import android.os.Looper;
+import android.os.SystemClock;
 
 import org.junit.Assert;
 import org.junit.Before;
@@ -34,6 +35,8 @@ public class SleepAsAndroidVibrationTest extends TestBase {
 
     /** Every find-device toggle, in order. */
     private List<Boolean> toggles;
+    /** Elapsed time of every link wake, in order. */
+    private List<Long> wakes;
     private SleepAsAndroidVibration vibration;
 
     @Before
@@ -41,16 +44,29 @@ public class SleepAsAndroidVibrationTest extends TestBase {
     public void setUp() throws Exception {
         super.setUp();
         toggles = new ArrayList<>();
-        vibration = new SleepAsAndroidVibration(new Handler(Looper.getMainLooper()), on -> toggles.add(on));
+        wakes = new ArrayList<>();
+        vibration = new SleepAsAndroidVibration(new Handler(Looper.getMainLooper()), new SleepAsAndroidVibration.Toggle() {
+            @Override
+            public void set(final boolean on) {
+                toggles.add(on);
+            }
+
+            @Override
+            public void wake() {
+                wakes.add(SystemClock.elapsedRealtime());
+            }
+        });
     }
 
     private void idle(final long millis) {
         Shadows.shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(millis));
     }
 
-    /** Length of one complete burst of n pulses. */
+    /** Length of one complete burst of n pulses, counting the wake that precedes it. */
     private static long burstDuration(final int pulses) {
-        return pulses * SleepAsAndroidVibration.PULSE_MS + (pulses - 1) * SleepAsAndroidVibration.GAP_MS;
+        return SleepAsAndroidVibration.WAKE_LEAD_MS
+                + pulses * SleepAsAndroidVibration.PULSE_MS
+                + (pulses - 1) * SleepAsAndroidVibration.GAP_MS;
     }
 
     private int countOn() {
@@ -163,6 +179,55 @@ public class SleepAsAndroidVibrationTest extends TestBase {
 
         idle(120_000);
         Assert.assertEquals(atCap, toggles.size());
+    }
+
+    // --- waking the link --------------------------------------------------------------------
+
+    @Test
+    public void theLinkIsWokenBeforeAHintPulses() {
+        vibration.hint(3);
+
+        Assert.assertEquals(1, wakes.size());
+        Assert.assertTrue("nothing may be toggled until the link has had time to wake",
+                toggles.isEmpty());
+
+        idle(burstDuration(3));
+        Assert.assertEquals(3, countOn());
+    }
+
+    @Test
+    public void everyAlarmBurstWakesTheLinkFirst() {
+        // The link goes idle between bursts, so each one pays the wake-up latency again.
+        vibration.startAlarm(0);
+        idle(30_000);
+
+        Assert.assertTrue("expected one wake per burst, saw " + wakes.size() + " for "
+                        + countOn() + " pulses",
+                wakes.size() >= countOn() / SleepAsAndroidVibration.ALARM_BURST_PULSES);
+    }
+
+    @Test
+    public void theLeadPulseWaitsOutTheWakeLead() {
+        vibration.startAlarm(0);
+
+        idle(SleepAsAndroidVibration.WAKE_LEAD_MS - 1);
+        Assert.assertEquals("the leading pulse must not go out before the link is awake",
+                0, countOn());
+
+        idle(2);
+        Assert.assertEquals(1, countOn());
+    }
+
+    @Test
+    public void aCancelledAlarmNeverWakesTheLinkAgain() {
+        vibration.startAlarm(0);
+        idle(12_000);
+        vibration.stop();
+        final int afterStop = wakes.size();
+
+        idle(60_000);
+
+        Assert.assertEquals(afterStop, wakes.size());
     }
 
     @Test

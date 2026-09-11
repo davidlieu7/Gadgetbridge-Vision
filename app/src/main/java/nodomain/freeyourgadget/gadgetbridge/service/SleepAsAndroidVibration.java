@@ -42,8 +42,25 @@ public class SleepAsAndroidVibration {
 
     public interface Toggle {
         void set(boolean on);
+
+        /**
+         * Put something on the wire so the link is awake by the time the next pulse is set.
+         * Whatever is sent has to be free of side effects; only the fact that it was sent matters.
+         */
+        default void wake() {
+        }
     }
 
+    /**
+     * How long before a burst the link is woken.
+     * <p>
+     * A Bluetooth link that has been idle takes around 700ms to carry its first command, against
+     * roughly 100ms once it is awake. A pulse shorter than that gets its off queued behind its own
+     * on, and the wearable runs the two back to back for a few milliseconds instead of buzzing:
+     * measured on a Mi Band 10, every burst outside a tracking session lost its leading pulse that
+     * way while none inside one did. This has to stay comfortably above the idle latency.
+     */
+    static final long WAKE_LEAD_MS = 900L;
     static final long PULSE_MS = 500L;
     static final long GAP_MS = 300L;
     static final int ALARM_BURST_PULSES = 3;
@@ -75,7 +92,7 @@ public class SleepAsAndroidVibration {
             return;
         }
         stopNow();
-        burst(pulses, 0, null);
+        wakeThenBurst(pulses, null);
     }
 
     /**
@@ -138,7 +155,12 @@ public class SleepAsAndroidVibration {
             stopNow();
             return;
         }
-        burst(ALARM_BURST_PULSES, 0, () -> handler.postDelayed(this::alarmTick, ALARM_BURST_INTERVAL_MS));
+        wakeThenBurst(ALARM_BURST_PULSES, () -> handler.postDelayed(this::alarmTick, ALARM_BURST_INTERVAL_MS));
+    }
+
+    private void wakeThenBurst(final int pulses, @Nullable final Runnable onComplete) {
+        toggle.wake();
+        handler.postDelayed(() -> burst(pulses, 0, onComplete), WAKE_LEAD_MS);
     }
 
     private void burst(final int pulses, final int index, @Nullable final Runnable onComplete) {
