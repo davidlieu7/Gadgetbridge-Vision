@@ -221,6 +221,28 @@ public final class VeepooConstants {
     public static final int SOCIAL_MSG_TYPE_KAKAOTALK = 21;
     public static final int SOCIAL_MSG_TYPE_VIBER = 25;
 
+    // ---- Text alarms (multi-alarm "alarm2"), opcode 0xB7 (vendor TextAlarmOprate) ---
+    /**
+     * Opcode for text alarms. Variable-length frames: [1]=sub-op (ALARM_OP_*), [2..3]=packet
+     * count/index (always 1/1 here, negotiated MTU is large enough), [4]=0xA0 marker, [5]=2,
+     * [6..7]=CRC16 (vendor Alarm2Util) over the full post-op alarm list as concatenated records,
+     * [8..]=one alarm record. Acks echo the CRC in [7..8] so state drift is detectable.
+     */
+    public static final byte OP_MULTI_ALARM = (byte) 0xB7;
+    /** [1] sub-ops of a 0xB7 frame (1/2 phone-initiated, 3 read; 4-7 pushed by the band). */
+    public static final int ALARM_OP_DELETE = 1;
+    public static final int ALARM_OP_SET = 2;
+    public static final int ALARM_OP_READ = 3;
+    public static final int ALARM_OP_FIRE_REPORT = 4;
+    public static final int ALARM_OP_DEVICE_ADD = 5;
+    public static final int ALARM_OP_DEVICE_DELETE = 6;
+    public static final int ALARM_OP_DEVICE_TOGGLE = 7;
+    /** Trailer marker at [4] of a 0xB7 frame and its ack. */
+    public static final int ALARM_CRC_MARKER = 0xA0;
+    /** Max text alarms this firmware keeps (vendor Alarm2Util.isTextAlarmListFull). */
+    public static final int ALARM_MAX_ALARMS = 10;
+    public static final String CONFIG_ALARMS_SUPPORTED = "veepoo_alarms_supported";
+
     // ---- Custom setting (per-feature monitor toggles), opcode 0xB8 --------
     /** Opcode for reading/writing the classic per-feature monitor settings. */
     public static final byte OP_CUSTOM_SETTING = (byte) 0xB8;
@@ -319,6 +341,8 @@ public final class VeepooConstants {
     public static final int CAP_PKG1_SPO2H_TYPE = 8;
     /** Package 1: max packets per pushed notification (0xC2); 0 -> vendor default. */
     public static final int CAP_PKG1_ALL_MSG_LENGTH = 9;
+    /** Package 1: alarm tag; 5/6/7 -> text alarms + multi-alarm (0xB7) supported. */
+    public static final int CAP_PKG1_ALARM_TAG = 17;
     /** Package 2: days of data kept on the watch; 0 -> default WATCH_DAY_DEFAULT. */
     public static final int CAP_PKG2_WATCH_DAY = 2;
     /** Package 2: origin protocol version; 3 or 5 -> Origin DF (0xDF), else v1 (0xD1). */
