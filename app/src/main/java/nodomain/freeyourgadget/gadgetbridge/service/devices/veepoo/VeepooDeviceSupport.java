@@ -19,6 +19,7 @@ package nodomain.freeyourgadget.gadgetbridge.service.devices.veepoo;
 import android.bluetooth.BluetoothGatt;
 import android.bluetooth.BluetoothGattCharacteristic;
 import android.content.Intent;
+import android.content.SharedPreferences;
 import android.os.Handler;
 import android.os.Looper;
 import android.widget.Toast;
@@ -40,7 +41,9 @@ import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
+import java.util.Map;
 import java.util.TimeZone;
+import java.util.concurrent.ConcurrentHashMap;
 
 import nodomain.freeyourgadget.gadgetbridge.activities.workouts.entries.ActivitySummaryTableBuilder;
 import nodomain.freeyourgadget.gadgetbridge.activities.workouts.entries.ActivitySummaryValue;
@@ -56,6 +59,7 @@ import nodomain.freeyourgadget.gadgetbridge.devices.GenericBloodPressureSamplePr
 import nodomain.freeyourgadget.gadgetbridge.devices.GenericSpo2SampleProvider;
 import nodomain.freeyourgadget.gadgetbridge.devices.GenericStressSampleProvider;
 import nodomain.freeyourgadget.gadgetbridge.devices.GenericTemperatureSampleProvider;
+import nodomain.freeyourgadget.gadgetbridge.devices.veepoo.VeepooAutoMeasureSetting;
 import nodomain.freeyourgadget.gadgetbridge.devices.veepoo.VeepooConstants;
 import nodomain.freeyourgadget.gadgetbridge.entities.BaseActivitySummary;
 import nodomain.freeyourgadget.gadgetbridge.entities.BaseActivitySummaryDao;
@@ -228,6 +232,67 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
         finishBpDetect(null, null, VITAL_FAIL_NONE);
     };
 
+    // Auto-measure settings state (0xB3): per-metric config for the periodic vitals the band
+    // performs. The band refuses a read issued inside the connect burst (it answers with a
+    // set-command NAK), so the first read is deferred to steady state, like the vendor app
+    // which only reads when its health-settings screen is opened.
+    private static final int AUTO_MEASURE_READ_MAX_ATTEMPTS = 3;
+    private final Map<Integer, VeepooAutoMeasureSetting> autoMeasureSettings = new ConcurrentHashMap<>();
+    private final Object autoMeasureLock = new Object();
+    private final List<byte[]> autoMeasureChunks = new ArrayList<>();
+    private int autoMeasureChunkTotal = 0;
+    private boolean autoMeasureReadOutstanding = false;
+    private int autoMeasureReadAttempts = 0;
+    private int autoMeasurePendingFunType = -1; // set waiting for the read baseline to arrive
+    private boolean autoMeasurePendingOn = false;
+    private final Runnable autoMeasureWriteTimeout = () -> {
+        synchronized (autoMeasureLock) {
+            autoMeasurePendingFunType = -1;
+        }
+        LOG.warn("Auto-measure setting write timed out without an acknowledgement");
+        GB.toast(getContext(), R.string.veepoo_auto_measure_failed, Toast.LENGTH_SHORT, GB.WARN);
+    };
+    private final Runnable autoMeasureReadTimeout = () -> {
+        int pending;
+        synchronized (autoMeasureLock) {
+            if (!autoMeasureReadOutstanding) {
+                return;
+            }
+            autoMeasureReadOutstanding = false;
+            autoMeasureChunks.clear();
+            pending = autoMeasurePendingFunType;
+        }
+        LOG.warn("Auto-measure settings read timed out without a reply");
+        if (pending >= 0 && retryAutoMeasureRead()) {
+            return;
+        }
+        synchronized (autoMeasureLock) {
+            autoMeasurePendingFunType = -1;
+        }
+        if (pending >= 0) {
+            GB.toast(getContext(), R.string.veepoo_auto_measure_failed, Toast.LENGTH_SHORT, GB.WARN);
+        }
+    };
+
+    /** Schedules another read attempt while a toggle is waiting for the baseline. */
+    private boolean retryAutoMeasureRead() {
+        synchronized (autoMeasureLock) {
+            if (autoMeasurePendingFunType < 0 || autoMeasureReadAttempts >= AUTO_MEASURE_READ_MAX_ATTEMPTS) {
+                return false;
+            }
+        }
+        LOG.info("Retrying the auto-measure settings read");
+        mainHandler.postDelayed(() -> {
+            synchronized (autoMeasureLock) {
+                if (autoMeasureReadOutstanding) {
+                    return;
+                }
+            }
+            sendAutoMeasureRead();
+        }, 3000L);
+        return true;
+    }
+
     private boolean bcDetectActive = false;
     private final ArrayList<byte[]> bcChunks = new ArrayList<>();
     private final Runnable bcDetectTimeout = () -> {
@@ -289,6 +354,18 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
     private int metType = -1;       // pkg3: 2/3 => MET supported
     private int stressType = -1;    // pkg3: 2/3 => app-triggered stress detection supported
 
+    // Capability from the device-pushed 0xA7 report (package 4): configurable periodic vitals.
+    private boolean autoMeasureSupported = false;
+
+    // 0xB8 CustomSetting: last known basic ([19]==0) and extended ([19]==1) frames, pushed by
+    // the band after every connect and answered after an explicit read request. Toggles are
+    // applied by re-sending the stored frame with the target byte flipped.
+    private final Object customSettingLock = new Object();
+    private byte[] customSettingFrame1;
+    private byte[] customSettingFrame2;
+    private String customSettingPendingKey = null;
+    private boolean customSettingPendingOn = false;
+
     public VeepooDeviceSupport() {
         super(LOG);
         addSupportedService(VeepooConstants.UUID_SERVICE_F008);
@@ -313,6 +390,21 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
         writeFrame(builder, buildSyncTimeFrame());
         writeFrame(builder, new byte[]{VeepooConstants.OP_READ_BATTERY, 0x00});
         writeFrame(builder, new byte[]{VeepooConstants.OP_PRODUCTION_INFO, 0x00});
+        // Defer the auto-measure settings read to steady state: issued inside this connect
+        // burst the band refuses it with a set-command NAK (see handleAutoMeasureFrame). Skip
+        // it entirely when a previous connection already learned the firmware lacks the feature.
+        SharedPreferences capabilities = GBApplication.getDeviceSpecificSharedPrefs(getDevice().getAddress());
+        if (!capabilities.contains(VeepooConstants.CONFIG_AUTO_MEASURE_SUPPORTED)
+                || capabilities.getBoolean(VeepooConstants.CONFIG_AUTO_MEASURE_SUPPORTED, false)) {
+            mainHandler.postDelayed(() -> {
+                synchronized (autoMeasureLock) {
+                    if (autoMeasureReadOutstanding || autoMeasurePendingFunType >= 0) {
+                        return;
+                    }
+                }
+                sendAutoMeasureRead();
+            }, 5000L);
+        }
         // The device pushes its 0xA7 capability report after pairing; it is handled in
         // onCharacteristicChanged() and may arrive before the INITIALIZED state is reached.
         builder.setDeviceState(GBDevice.State.INITIALIZED);
@@ -453,6 +545,12 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
             case 0x8A:
                 handleLipidFrame(data);
                 break;
+            case 0xB3:
+                handleAutoMeasureFrame(data);
+                break;
+            case 0xB8:
+                handleCustomSettingFrame(data);
+                break;
             case 0xDE:
                 handleManualDetectFrame(data);
                 break;
@@ -562,6 +660,175 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
             LOG.info("Capabilities: tempType={} ({}), metType={}, stressType={} ({})",
                     tempType, tempType != 0 ? "supported" : "not supported", metType, stressType,
                     (stressType == 2 || stressType == 3) ? "supported" : "not supported");
+        } else if (packageId == 4) {
+            autoMeasureSupported = (data[12] & 0xFF) == 1;
+            LOG.info("Capabilities: autoMeasure={} ({})", data[12] & 0xFF,
+                    autoMeasureSupported ? "supported" : "not supported");
+            GBApplication.getDeviceSpecificSharedPrefs(getDevice().getAddress())
+                    .edit()
+                    .putBoolean(VeepooConstants.CONFIG_AUTO_MEASURE_SUPPORTED, autoMeasureSupported)
+                    .apply();
+        }
+    }
+
+    /**
+     * Opcode 0xB8 CustomSetting frame: two 20-byte blocks ([19] selects basic/extended) that the
+     * band pushes after connect and answers a read request with. Each carries the live state of
+     * many feature toggles; we persist the monitor ones and use the stored frames as the write
+     * baseline so a toggle flips exactly one byte.
+     */
+    private void handleCustomSettingFrame(byte[] data) {
+        if (data == null || data.length < 20) {
+            LOG.warn("Short 0xB8 custom setting frame: {} bytes", data == null ? 0 : data.length);
+            return;
+        }
+        int index = data[19] & 0xFF;
+        if (index != 0 && index != 1) {
+            LOG.debug("Unknown 0xB8 custom setting index: {}", index);
+            return;
+        }
+        LOG.debug("Custom setting frame {}: {}", index, hexBytes(data));
+        boolean baselineComplete;
+        synchronized (customSettingLock) {
+            if (index == 0) {
+                customSettingFrame1 = data.clone();
+            } else {
+                customSettingFrame2 = data.clone();
+            }
+            baselineComplete = customSettingFrame1 != null && customSettingFrame2 != null;
+        }
+        int hr = stateOf(0, VeepooConstants.CUSTOM_SETTING_F1_AUTO_HEART);
+        int bp = stateOf(0, VeepooConstants.CUSTOM_SETTING_F1_AUTO_BP);
+        int temp = stateOf(1, VeepooConstants.CUSTOM_SETTING_F2_AUTO_TEMP);
+        int stress = stateOf(1, VeepooConstants.CUSTOM_SETTING_F2_STRESS);
+        LOG.info("Custom setting monitors: heart={} bp={} temp={} stress={}", hr, bp, temp, stress);
+        GBApplication.getDeviceSpecificSharedPrefs(getDevice().getAddress()).edit()
+                .putBoolean(VeepooConstants.CONFIG_AUTO_MEASURE_HR, hr == VeepooConstants.CUSTOM_SETTING_VALUE_OPEN)
+                .putBoolean(VeepooConstants.CONFIG_AUTO_MEASURE_BLOOD_PRESSURE, bp == VeepooConstants.CUSTOM_SETTING_VALUE_OPEN)
+                .putBoolean(VeepooConstants.CONFIG_AUTO_MEASURE_TEMPERATURE, temp == VeepooConstants.CUSTOM_SETTING_VALUE_OPEN)
+                .putBoolean(VeepooConstants.CONFIG_AUTO_MEASURE_STRESS, stress == VeepooConstants.CUSTOM_SETTING_VALUE_OPEN)
+                .putBoolean(VeepooConstants.CONFIG_MONITOR_SUPPORTED,
+                        hr != 0 || bp != 0 || temp != 0 || stress != 0)
+                .apply();
+        if (baselineComplete && customSettingPendingKey != null) {
+            applyCustomSettingToggle(customSettingPendingKey, customSettingPendingOn);
+        }
+    }
+
+    private int stateOf(int frameIndex, int offset) {
+        synchronized (customSettingLock) {
+            byte[] frame = frameIndex == 0 ? customSettingFrame1 : customSettingFrame2;
+            return frame == null ? 0 : frame[offset] & 0xFF;
+        }
+    }
+
+    /**
+     * Monitor toggle from the device settings screen. If the band already pushed (or answered)
+     * both custom-setting frames, write immediately with only the target byte changed; otherwise
+     * queue the toggle and request a read so the baseline arrives first.
+     */
+    private void handleCustomSettingToggle(final String config) {
+        int frameIndex;
+        int offset;
+        if (VeepooConstants.CONFIG_AUTO_MEASURE_HR.equals(config)) {
+            frameIndex = 0;
+            offset = VeepooConstants.CUSTOM_SETTING_F1_AUTO_HEART;
+        } else if (VeepooConstants.CONFIG_AUTO_MEASURE_BLOOD_PRESSURE.equals(config)) {
+            frameIndex = 0;
+            offset = VeepooConstants.CUSTOM_SETTING_F1_AUTO_BP;
+        } else if (VeepooConstants.CONFIG_AUTO_MEASURE_TEMPERATURE.equals(config)) {
+            frameIndex = 1;
+            offset = VeepooConstants.CUSTOM_SETTING_F2_AUTO_TEMP;
+        } else if (VeepooConstants.CONFIG_AUTO_MEASURE_STRESS.equals(config)) {
+            frameIndex = 1;
+            offset = VeepooConstants.CUSTOM_SETTING_F2_STRESS;
+        } else {
+            return;
+        }
+        boolean on = GBApplication.getDeviceSpecificSharedPrefs(getDevice().getAddress())
+                .getBoolean(config, false);
+        boolean baselineComplete;
+        synchronized (customSettingLock) {
+            customSettingPendingKey = config;
+            customSettingPendingOn = on;
+            baselineComplete = customSettingFrame1 != null && customSettingFrame2 != null;
+        }
+        if (baselineComplete) {
+            applyCustomSettingToggle(config, on);
+        } else {
+            LOG.info("Custom setting baseline not received yet; requesting a read for toggle {}", config);
+            sendCustomSettingRead();
+        }
+    }
+
+    private void sendCustomSettingRead() {
+        try {
+            TransactionBuilder builder = performInitialized("read custom settings");
+            writeFrame(builder, new byte[]{VeepooConstants.OP_CUSTOM_SETTING,
+                    (byte) VeepooConstants.CUSTOM_SETTING_CMD_READ});
+            builder.queue();
+        } catch (IOException e) {
+            LOG.error("Error requesting custom settings", e);
+        }
+    }
+
+    private void applyCustomSettingToggle(final String config, final boolean on) {
+        int frameIndex;
+        int offset;
+        if (VeepooConstants.CONFIG_AUTO_MEASURE_HR.equals(config)) {
+            frameIndex = 0;
+            offset = VeepooConstants.CUSTOM_SETTING_F1_AUTO_HEART;
+        } else if (VeepooConstants.CONFIG_AUTO_MEASURE_BLOOD_PRESSURE.equals(config)) {
+            frameIndex = 0;
+            offset = VeepooConstants.CUSTOM_SETTING_F1_AUTO_BP;
+        } else if (VeepooConstants.CONFIG_AUTO_MEASURE_TEMPERATURE.equals(config)) {
+            frameIndex = 1;
+            offset = VeepooConstants.CUSTOM_SETTING_F2_AUTO_TEMP;
+        } else if (VeepooConstants.CONFIG_AUTO_MEASURE_STRESS.equals(config)) {
+            frameIndex = 1;
+            offset = VeepooConstants.CUSTOM_SETTING_F2_STRESS;
+        } else {
+            return;
+        }
+        byte[] frame1;
+        byte[] frame2;
+        synchronized (customSettingLock) {
+            customSettingPendingKey = null;
+            customSettingPendingOn = false;
+            // An extended block that never arrived is all-unsupported; synthesize it so the
+            // toggles living in it can still be written.
+            frame1 = customSettingFrame1 != null ? customSettingFrame1.clone() : new byte[20];
+            frame2 = customSettingFrame2 != null ? customSettingFrame2.clone() : new byte[20];
+        }
+        frame1[0] = VeepooConstants.OP_CUSTOM_SETTING;
+        frame1[1] = (byte) VeepooConstants.CUSTOM_SETTING_CMD_SET;
+        frame2[0] = VeepooConstants.OP_CUSTOM_SETTING;
+        frame2[1] = (byte) VeepooConstants.CUSTOM_SETTING_CMD_SET;
+        if (frameIndex == 0) {
+            frame1[offset] = (byte) (on ? VeepooConstants.CUSTOM_SETTING_VALUE_OPEN : VeepooConstants.CUSTOM_SETTING_VALUE_CLOSE);
+        } else {
+            frame2[offset] = (byte) (on ? VeepooConstants.CUSTOM_SETTING_VALUE_OPEN : VeepooConstants.CUSTOM_SETTING_VALUE_CLOSE);
+        }
+        // The vendor re-sends the extended block whenever any of its fields is set; follow suit.
+        boolean sendExtended = frame2[16] != 0;
+        if (!sendExtended) {
+            for (int i = 2; i <= 14; i++) {
+                if (frame2[i] != 0) {
+                    sendExtended = true;
+                    break;
+                }
+            }
+        }
+        LOG.info("Writing custom setting toggle {} -> {}", config, on ? "on" : "off");
+        try {
+            TransactionBuilder builder = performInitialized("write custom settings");
+            writeFrame(builder, frame1);
+            if (sendExtended) {
+                writeFrame(builder, frame2);
+            }
+            builder.queue();
+        } catch (IOException e) {
+            LOG.error("Error writing custom setting toggle {}", config, e);
         }
     }
 
@@ -2109,8 +2376,412 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
         } else if (VeepooConstants.CONFIG_MEASURE_ECG.equals(config)) {
             startEcgDetect();
         } else {
+            if (autoMeasureSupported) {
+                handleAutoMeasureConfiguration(config);
+            } else {
+                handleCustomSettingToggle(config);
+            }
             super.onSendConfiguration(config);
         }
+    }
+
+    /**
+     * Auto-measure configuration changes coming from the device settings screen: the switch
+     * state is already persisted in the per-device prefs; this applies it to the band with a
+     * 0xB3 set command, preserving every other field of that metric's stored configuration.
+     */
+    private void handleAutoMeasureConfiguration(final String config) {
+        if (!autoMeasureSupported) {
+            LOG.debug("Ignoring auto-measure configuration {}: firmware reports the feature unsupported", config);
+            return;
+        }
+        int funType;
+        if (VeepooConstants.CONFIG_AUTO_MEASURE_HR.equals(config)) {
+            funType = VeepooConstants.AUTO_MEASURE_PULSE_RATE;
+        } else if (VeepooConstants.CONFIG_AUTO_MEASURE_SPO2.equals(config)) {
+            funType = VeepooConstants.AUTO_MEASURE_BLOOD_OXYGEN;
+        } else if (VeepooConstants.CONFIG_AUTO_MEASURE_TEMPERATURE.equals(config)) {
+            funType = VeepooConstants.AUTO_MEASURE_BODY_TEMPERATURE;
+        } else if (VeepooConstants.CONFIG_AUTO_MEASURE_STRESS.equals(config)) {
+            funType = VeepooConstants.AUTO_MEASURE_STRESS;
+        } else if (VeepooConstants.CONFIG_AUTO_MEASURE_BLOOD_PRESSURE.equals(config)) {
+            funType = VeepooConstants.AUTO_MEASURE_BLOOD_PRESSURE;
+        } else {
+            return;
+        }
+        SharedPreferences prefs = GBApplication.getDeviceSpecificSharedPrefs(getDevice().getAddress());
+        setAutoMeasureEnabled(funType, prefs.getBoolean(config, false));
+    }
+
+    // ---------------------------------------------------------------------
+    // Auto-measure settings, opcode 0xB3 (vendor AutoMeasureOpt)
+    //
+    // Read: {B3, 02} -> reply chunks {B3, 02, x, idx, payload...}; on chunk idx==1 the total
+    // chunk count is at [6], the payload runs from [4] to end of frame. Chunks concatenate
+    // into a little-endian TLV stream: [C0 <6 bytes>]* and per metric [A1 len <inner TLV>]
+    // with inner tags D0 protocol, D1 funType, D2 switch, D3 stepUnit, D4 slot/interval
+    // modify flags, D5 support window (h,m x2), D6 measure interval, D7 current window.
+    // Set: a 42-byte payload chunked into 17-byte frames {B3, 01, seq, ...}; the first
+    // frame's payload byte 2 carries the total chunk count. Reply ack {B3, 01, ok}.
+    // ---------------------------------------------------------------------
+
+    /** Applies an auto-measure on/off change, requesting the read baseline first if unknown. */
+    private void setAutoMeasureEnabled(int funType, boolean on) {
+        VeepooAutoMeasureSetting current = autoMeasureSettings.get(funType);
+        if (current != null) {
+            sendAutoMeasureWrite(funType, on);
+            return;
+        }
+        boolean readStarted;
+        synchronized (autoMeasureLock) {
+            autoMeasurePendingFunType = funType;
+            autoMeasurePendingOn = on;
+            readStarted = !autoMeasureReadOutstanding;
+            if (readStarted) {
+                autoMeasureReadOutstanding = true;
+            }
+        }
+        LOG.info("Auto-measure baseline for type {} not read yet; {}", funType,
+                readStarted ? "requesting a read" : "waiting for the read already in flight");
+        if (readStarted) {
+            sendAutoMeasureRead();
+        }
+    }
+
+    /** Sends the 0xB3 read request and (re)starts the timeout: the reply is expected promptly. */
+    private void sendAutoMeasureRead() {
+        synchronized (autoMeasureLock) {
+            autoMeasureChunks.clear();
+            autoMeasureChunkTotal = 0;
+            autoMeasureReadOutstanding = true;
+            autoMeasureReadAttempts++;
+        }
+        try {
+            TransactionBuilder builder = performInitialized("read auto-measure settings");
+            writeFrame(builder, new byte[]{VeepooConstants.OP_AUTO_MEASURE, VeepooConstants.AUTO_MEASURE_CMD_DATA});
+            builder.queue();
+            mainHandler.removeCallbacks(autoMeasureReadTimeout);
+            mainHandler.postDelayed(autoMeasureReadTimeout, 20000L);
+        } catch (IOException e) {
+            synchronized (autoMeasureLock) {
+                autoMeasureReadOutstanding = false;
+            }
+            LOG.error("Error requesting auto-measure settings", e);
+        }
+    }
+
+    /** Opcode 0xB3 frame: set acknowledgement or a data chunk of the settings TLV stream. */
+    private void handleAutoMeasureFrame(byte[] data) {
+        if (data.length < 7) {
+            return;
+        }
+        int cmd = data[1] & 0xFF;
+        if (cmd == VeepooConstants.AUTO_MEASURE_CMD_SET) {
+            boolean ok = (data[2] & 0xFF) == 1;
+            boolean readWasOutstanding;
+            int pending;
+            synchronized (autoMeasureLock) {
+                readWasOutstanding = autoMeasureReadOutstanding;
+                autoMeasureReadOutstanding = false;
+                pending = autoMeasurePendingFunType;
+            }
+            if (readWasOutstanding) {
+                // The band answered the settings read with a set-ack frame: zero means it refused.
+                mainHandler.removeCallbacks(autoMeasureReadTimeout);
+                if (!ok && retryAutoMeasureRead()) {
+                    return;
+                }
+                synchronized (autoMeasureLock) {
+                    autoMeasurePendingFunType = -1;
+                }
+                if (!ok) {
+                    if (autoMeasureSupported) {
+                        LOG.warn("Auto-measure settings read was rejected by the band");
+                    } else {
+                        LOG.debug("Auto-measure settings read was rejected by the band (feature unsupported)");
+                    }
+                    if (pending >= 0) {
+                        GB.toast(getContext(), R.string.veepoo_auto_measure_failed, Toast.LENGTH_SHORT, GB.WARN);
+                    }
+                } else {
+                    LOG.info("Auto-measure settings read acknowledged without data chunks");
+                }
+                return;
+            }
+            mainHandler.removeCallbacks(autoMeasureWriteTimeout);
+            synchronized (autoMeasureLock) {
+                autoMeasurePendingFunType = -1;
+            }
+            if (!ok) {
+                LOG.warn("Band rejected the auto-measure setting change");
+                GB.toast(getContext(), R.string.veepoo_auto_measure_failed, Toast.LENGTH_SHORT, GB.WARN);
+            } else {
+                LOG.info("Auto-measure setting acknowledged by the band");
+            }
+            return;
+        }
+        if (cmd != VeepooConstants.AUTO_MEASURE_CMD_DATA) {
+            return;
+        }
+        int chunk = data[3] & 0xFF;
+        if (chunk == 0) {
+            return;
+        }
+        boolean complete = false;
+        byte[] assembled;
+        synchronized (autoMeasureLock) {
+            if (chunk == 1) {
+                autoMeasureChunks.clear();
+                autoMeasureChunkTotal = data[6] & 0xFF;
+            }
+            int payloadLen = data.length - 4;
+            if (payloadLen > 0) {
+                byte[] payload = new byte[payloadLen];
+                System.arraycopy(data, 4, payload, 0, payloadLen);
+                autoMeasureChunks.add(payload);
+            }
+            complete = autoMeasureChunkTotal > 0 && chunk == autoMeasureChunkTotal;
+            if (complete) {
+                ByteArrayOutputStream buffer = new ByteArrayOutputStream();
+                for (byte[] part : autoMeasureChunks) {
+                    buffer.write(part, 0, part.length);
+                }
+                assembled = buffer.toByteArray();
+                autoMeasureReadOutstanding = false;
+                autoMeasureReadAttempts = 0;
+            } else {
+                assembled = null;
+            }
+        }
+        if (!complete) {
+            LOG.debug("Auto-measure settings chunk {}/{} received", chunk, autoMeasureChunkTotal);
+            return;
+        }
+        mainHandler.removeCallbacks(autoMeasureReadTimeout);
+        parseAutoMeasureStream(assembled);
+    }
+
+    /** Parses the assembled 0xB3 TLV stream and stores the per-metric settings. */
+    private void parseAutoMeasureStream(byte[] stream) {
+        Map<Integer, VeepooAutoMeasureSetting> parsed = new ConcurrentHashMap<>();
+        int pos = 0;
+        while (pos < stream.length) {
+            int tag = stream[pos] & 0xFF;
+            pos++;
+            if (tag == 0xC0) {
+                // Header: 2 bytes + a uint32, skipped like the vendor does.
+                pos += 6;
+                if (pos > stream.length) {
+                    break;
+                }
+                continue;
+            }
+            if (tag != 0xA1) {
+                LOG.warn("Unexpected 0xB3 TLV tag {:02X} at position {}; stopping parse", tag, pos - 1);
+                break;
+            }
+            if (pos >= stream.length) {
+                break;
+            }
+            int innerLen = stream[pos] & 0xFF;
+            pos++;
+            if (innerLen == 0 || pos + innerLen > stream.length) {
+                LOG.warn("Truncated 0xB3 metric blob: len={} at position {}", innerLen, pos - 1);
+                break;
+            }
+            VeepooAutoMeasureSetting setting = new VeepooAutoMeasureSetting();
+            int i = 0;
+            while (i < innerLen) {
+                int t2 = stream[pos + i] & 0xFF;
+                i++;
+                if (i >= innerLen) {
+                    break;
+                }
+                int n = stream[pos + i] & 0xFF;
+                i++;
+                if (n == 0 || i + n > innerLen) {
+                    break;
+                }
+                int v = pos + i;
+                switch (t2) {
+                    case 0xD0: // protocol type
+                        setting.setProtocolType(stream[v] & 0xFF);
+                        break;
+                    case 0xD1: // fun type
+                        setting.setFunType(stream[v] & 0xFF);
+                        break;
+                    case 0xD2: // switch open
+                        setting.setEnabled((stream[v] & 0xFF) == 1);
+                        break;
+                    case 0xD3: // step unit (minutes)
+                        setting.setStepUnit(((stream[v] & 0xFF) << 8) | (stream[v + 1] & 0xFF));
+                        break;
+                    case 0xD4: // slot/interval modify flags
+                        setting.setSlotModify((stream[v] & 0xFF) == 1);
+                        setting.setIntervalModify((stream[v + 1] & 0xFF) == 1);
+                        break;
+                    case 0xD5: // support window (h, m) x2
+                        setting.setSupportStartMinute(((stream[v] & 0xFF) * 60) + (stream[v + 1] & 0xFF));
+                        setting.setSupportEndMinute(((stream[v + 2] & 0xFF) * 60) + (stream[v + 3] & 0xFF));
+                        break;
+                    case 0xD6: // measure interval (minutes)
+                        setting.setMeasureInterval(((stream[v] & 0xFF) << 8) | (stream[v + 1] & 0xFF));
+                        break;
+                    case 0xD7: // current window (h, m) x2
+                        setting.setCurrentStartMinute(((stream[v] & 0xFF) * 60) + (stream[v + 1] & 0xFF));
+                        setting.setCurrentEndMinute(((stream[v + 2] & 0xFF) * 60) + (stream[v + 3] & 0xFF));
+                        break;
+                    default:
+                        LOG.debug("Unknown 0xB3 inner tag {:02X}", t2);
+                        break;
+                }
+                i += n;
+            }
+            pos += innerLen;
+            parsed.put(setting.getFunType(), setting);
+        }
+        autoMeasureSettings.clear();
+        autoMeasureSettings.putAll(parsed);
+        for (VeepooAutoMeasureSetting setting : parsed.values()) {
+            LOG.info("Auto-measure {}: {}", setting.getFunType(), setting);
+        }
+        syncAutoMeasurePrefs(parsed);
+        int pendingFunType;
+        boolean pendingOn;
+        synchronized (autoMeasureLock) {
+            pendingFunType = autoMeasurePendingFunType;
+            pendingOn = autoMeasurePendingOn;
+            autoMeasurePendingFunType = -1;
+        }
+        if (pendingFunType >= 0) {
+            sendAutoMeasureWrite(pendingFunType, pendingOn);
+        }
+    }
+
+    /** Mirrors the device state into the per-device prefs so the settings screen shows reality. */
+    private void syncAutoMeasurePrefs(Map<Integer, VeepooAutoMeasureSetting> parsed) {
+        SharedPreferences prefs = GBApplication.getDeviceSpecificSharedPrefs(getDevice().getAddress());
+        SharedPreferences.Editor editor = prefs.edit();
+        for (Map.Entry<Integer, VeepooAutoMeasureSetting> entry : parsed.entrySet()) {
+            String key;
+            switch (entry.getKey()) {
+                case VeepooConstants.AUTO_MEASURE_PULSE_RATE:
+                    key = VeepooConstants.CONFIG_AUTO_MEASURE_HR;
+                    break;
+                case VeepooConstants.AUTO_MEASURE_BLOOD_OXYGEN:
+                    key = VeepooConstants.CONFIG_AUTO_MEASURE_SPO2;
+                    break;
+                case VeepooConstants.AUTO_MEASURE_BODY_TEMPERATURE:
+                    key = VeepooConstants.CONFIG_AUTO_MEASURE_TEMPERATURE;
+                    break;
+                case VeepooConstants.AUTO_MEASURE_STRESS:
+                    key = VeepooConstants.CONFIG_AUTO_MEASURE_STRESS;
+                    break;
+                case VeepooConstants.AUTO_MEASURE_BLOOD_PRESSURE:
+                    key = VeepooConstants.CONFIG_AUTO_MEASURE_BLOOD_PRESSURE;
+                    break;
+                default:
+                    continue;
+            }
+            editor.putBoolean(key, entry.getValue().isEnabled());
+        }
+        editor.apply();
+    }
+
+    /**
+     * Sends a 0xB3 set command for one metric: the stored baseline is copied, only the switch
+     * is flipped (and the modify flags cleared), then the 42-byte payload is chunked exactly
+     * like the vendor (17-byte frames, first frame carries the chunk count in payload byte 2).
+     */
+    private void sendAutoMeasureWrite(int funType, boolean on) {
+        VeepooAutoMeasureSetting base = autoMeasureSettings.get(funType);
+        VeepooAutoMeasureSetting setting = base != null ? new VeepooAutoMeasureSetting(base) : new VeepooAutoMeasureSetting();
+        setting.setFunType(funType);
+        setting.setEnabled(on);
+        setting.setSlotModify(false);
+        setting.setIntervalModify(false);
+        if (base == null) {
+            // No baseline: fall back to a full-day window and a 30-minute interval.
+            setting.setProtocolType(1);
+            setting.setStepUnit(0);
+            setting.setSupportStartMinute(0);
+            setting.setSupportEndMinute(1439);
+            setting.setMeasureInterval(30);
+            setting.setCurrentStartMinute(0);
+            setting.setCurrentEndMinute(1439);
+        }
+        byte[] payload = buildAutoMeasurePayload(setting);
+        int totalChunks = (int) Math.ceil(payload.length / 17.0);
+        try {
+            TransactionBuilder builder = performInitialized("set auto-measure " + funType);
+            for (int i = 0; i < totalChunks; i++) {
+                int seq = i + 1;
+                int len = (i == totalChunks - 1) ? payload.length - 17 * i : 17;
+                byte[] frame = new byte[len + 3];
+                frame[0] = (byte) VeepooConstants.OP_AUTO_MEASURE;
+                frame[1] = (byte) VeepooConstants.AUTO_MEASURE_CMD_SET;
+                frame[2] = (byte) seq;
+                System.arraycopy(payload, 17 * i, frame, 3, len);
+                if (seq == 1) {
+                    frame[5] = (byte) totalChunks;
+                }
+                writeFrame(builder, frame);
+            }
+            builder.queue();
+        } catch (IOException e) {
+            LOG.error("Error sending auto-measure setting", e);
+            GB.toast(getContext(), R.string.veepoo_auto_measure_failed, Toast.LENGTH_SHORT, GB.WARN);
+            return;
+        }
+        synchronized (autoMeasureLock) {
+            autoMeasurePendingFunType = funType;
+            autoMeasurePendingOn = on;
+        }
+        mainHandler.removeCallbacks(autoMeasureWriteTimeout);
+        mainHandler.postDelayed(autoMeasureWriteTimeout, 15000L);
+        // Remember the new switch state locally so a rapid follow-up toggle starts from reality.
+        setting = autoMeasureSettings.get(funType);
+        if (setting != null) {
+            setting.setEnabled(on);
+        }
+        LOG.info("Auto-measure {} set to {}", funType, on ? "on" : "off");
+    }
+
+    /** Builds the 42-byte 0xB3 set payload (vendor AutoMeasureOpt.a layout). */
+    private byte[] buildAutoMeasurePayload(VeepooAutoMeasureSetting s) {
+        byte[] p = new byte[42];
+        p[0] = (byte) 0xC0;
+        p[1] = 0x05;
+        p[2] = 0x01; // overwritten with the chunk count when the payload is split
+        p[3] = 35;   // uint32 LE: 35 (inner blob size)
+        p[4] = 0x00;
+        p[5] = 0x00;
+        p[6] = 0x00;
+        p[7] = (byte) 0xA1; // metric section marker (-95)
+        p[8] = 33;           // inner TLV blob length
+        p[9] = (byte) 0xD0;  p[10] = 0x01;  p[11] = (byte) s.getProtocolType();
+        p[12] = (byte) 0xD1; p[13] = 0x01;  p[14] = (byte) s.getFunType();
+        p[15] = (byte) 0xD2; p[16] = 0x01;  p[17] = (byte) (s.isEnabled() ? 1 : 0);
+        p[18] = (byte) 0xD3; p[19] = 0x02;
+        p[20] = (byte) (s.getStepUnit() & 0xFF);
+        p[21] = (byte) ((s.getStepUnit() >> 8) & 0xFF);
+        p[22] = (byte) 0xD4; p[23] = 0x02;
+        p[24] = (byte) (s.isSlotModify() ? 1 : 0);
+        p[25] = (byte) (s.isIntervalModify() ? 1 : 0);
+        p[26] = (byte) 0xD5; p[27] = 0x04;
+        p[28] = (byte) (s.getSupportStartMinute() / 60);
+        p[29] = (byte) (s.getSupportStartMinute() % 60);
+        p[30] = (byte) (s.getSupportEndMinute() / 60);
+        p[31] = (byte) (s.getSupportEndMinute() % 60);
+        p[32] = (byte) 0xD6; p[33] = 0x02;
+        p[34] = (byte) (s.getMeasureInterval() & 0xFF);
+        p[35] = (byte) ((s.getMeasureInterval() >> 8) & 0xFF);
+        p[36] = (byte) 0xD7; p[37] = 0x04;
+        p[38] = (byte) (s.getCurrentStartMinute() / 60);
+        p[39] = (byte) (s.getCurrentStartMinute() % 60);
+        p[40] = (byte) (s.getCurrentEndMinute() / 60);
+        p[41] = (byte) (s.getCurrentEndMinute() % 60);
+        return p;
     }
 
     /**
@@ -2563,7 +3234,7 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
     /**
      * Opcode 0xD0 stream: [1] = bpm (1/2 = not worn), [5] = sensor status (busy unless 0/2/3).
      * While a single-shot read is active the first plausible reading completes it; frames
-     * outside a read are ignored so a lingering stream cannot spam samples.
+     * outside a read are autonomous auto-measure pushes and are persisted silently.
      */
     private void handleHeartRateMeasurement(byte[] data) {
         if (data.length < 6) {
@@ -2573,6 +3244,7 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
         int status = data[5] & 0xFF;
         synchronized (this) {
             if (!hrDetectActive) {
+                persistAutonomousHeartRate(bpm, status);
                 return;
             }
         }
@@ -2593,6 +3265,18 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
         }
         LOG.info("Heart rate measurement: {} bpm", bpm);
         finishHrDetect(bpm);
+    }
+
+    /** Persists an autonomous auto-measure heart-rate push (no detect session in progress). */
+    private void persistAutonomousHeartRate(int bpm, int status) {
+        if (status != 0 && status != 2 && status != 3) {
+            return;
+        }
+        if (bpm == 1 || bpm == 2 || bpm < 30 || bpm > 210) {
+            return;
+        }
+        LOG.debug("Autonomous heart rate push: {} bpm", bpm);
+        saveHeartRateSample(bpm);
     }
 
     /** Stores a single heart rate sample in the DB; returns it so callers can announce it. */
@@ -2762,6 +3446,7 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
         }
         synchronized (this) {
             if (!spo2DetectActive) {
+                persistAutonomousSpo2(data);
                 return;
             }
         }
@@ -2808,6 +3493,37 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
             finishSpo2Detect(null, hr, VITAL_FAIL_NONE);
         } else {
             LOG.debug("Ignoring implausible SpO2 frame: value={} state={} deviceState={}", value, state, deviceState);
+        }
+    }
+
+    /** Persists an autonomous auto-measure SpO2 push (no detect session in progress). */
+    private void persistAutonomousSpo2(byte[] data) {
+        int state = data[1] & 0xFF;
+        if (state == 0) {
+            return;
+        }
+        int deviceState = data[2] & 0xFF;
+        int value = data[3] & 0xFF;
+        Integer hr = null;
+        if (data.length >= 8 && data[6] == 6) {
+            int rate = data[7] & 0xFF;
+            if (rate >= 30 && rate <= 210) {
+                hr = rate;
+            }
+        }
+        if (value == 1 || deviceState == 12) { // not worn
+            return;
+        }
+        int checking = data[4] & 0xFF;
+        if (checking == 1 || checking == 2) { // still measuring
+            return;
+        }
+        if (value >= 75 && value <= 99) {
+            LOG.debug("Autonomous SpO2 push: {}% (hr={})", value, hr);
+            saveSpo2Sample(value);
+            if (hr != null) {
+                saveHeartRateSample(hr);
+            }
         }
     }
 
@@ -2907,6 +3623,7 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
         }
         synchronized (this) {
             if (!tempDetectActive) {
+                persistAutonomousTemperature(data);
                 return;
             }
         }
@@ -2942,6 +3659,19 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
         }
         LOG.debug("Temperature in progress: {}% (raw [5..8]={})", progress,
                 String.format("%02X %02X %02X %02X", data[5] & 0xFF, data[6] & 0xFF, data[7] & 0xFF, data[8] & 0xFF));
+    }
+
+    /** Persists an autonomous auto-measure temperature push (no detect session in progress). */
+    private void persistAutonomousTemperature(byte[] data) {
+        if ((data[2] & 0xFF) == 0) {
+            return;
+        }
+        int progress = data[4] & 0xFF;
+        Float body = plausibleTemperature(data[5], data[6]);
+        if (progress >= 100 && body != null) {
+            LOG.debug("Autonomous temperature push: {} C", body);
+            saveTemperatureSample(body);
+        }
     }
 
     /**
@@ -3059,6 +3789,7 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
         }
         synchronized (this) {
             if (!stressDetectActive) {
+                persistAutonomousStress(data);
                 return;
             }
         }
@@ -3085,6 +3816,24 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
         } else {
             LOG.warn("Stress detect: device busy (status={})", status);
             finishStressDetect(null, VITAL_FAIL_BUSY);
+        }
+    }
+
+    /** Persists an autonomous auto-measure stress push (no detect session in progress). */
+    private void persistAutonomousStress(byte[] data) {
+        int cmd = data[2] & 0xFF;
+        if (cmd != VeepooConstants.STRESS_DETECT_START) {
+            return;
+        }
+        int status = data[3] & 0xFF;
+        if (status != 0) {
+            return;
+        }
+        int progress = data[4] & 0xFF;
+        int value = data[5] & 0xFF;
+        if (progress == 100 && value > 0) {
+            LOG.debug("Autonomous stress push: {}", value);
+            saveStressSample(value);
         }
     }
 
@@ -3180,6 +3929,7 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
         }
         synchronized (this) {
             if (!bpDetectActive) {
+                persistAutonomousBp(data);
                 return;
             }
         }
@@ -3207,6 +3957,20 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
             finishBpDetect(null, null, VITAL_FAIL_NONE);
         } else {
             LOG.debug("Blood pressure in progress: {}%", data[3] & 0xFF);
+        }
+    }
+
+    /** Persists an autonomous auto-measure blood-pressure push (no detect session in progress). */
+    private void persistAutonomousBp(byte[] data) {
+        int status = data[4] & 0xFF;
+        if (status != 0) {
+            return;
+        }
+        int systolic = data[1] & 0xFF;
+        int diastolic = data[2] & 0xFF;
+        if (systolic >= 60 && systolic <= 300 && diastolic >= 20 && diastolic <= 200) {
+            LOG.debug("Autonomous blood pressure push: {}/{}", systolic, diastolic);
+            saveBpSample(systolic, diastolic);
         }
     }
 

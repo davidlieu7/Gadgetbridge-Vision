@@ -161,6 +161,48 @@ public final class VeepooConstants {
     /** Start a single-shot ECG measurement (waveform capture). */
     public static final String CONFIG_MEASURE_ECG = "veepoo_measure_ecg";
 
+    // ---- Auto-measure (periodic vitals) settings, opcode 0xB3 -------------
+    /** Opcode for reading/writing per-metric auto-measure settings. */
+    public static final byte OP_AUTO_MEASURE = (byte) 0xB3;
+    /** [1] of a 0xB3 frame: set command / set acknowledgement. */
+    public static final int AUTO_MEASURE_CMD_SET = 1;
+    /** [1] of a 0xB3 frame: data (chunked TLV report in reply to a read). */
+    public static final int AUTO_MEASURE_CMD_DATA = 2;
+    // Fun-type values (vendor EAutoMeasureType) addressed by the settings
+    public static final int AUTO_MEASURE_PULSE_RATE = 0;
+    public static final int AUTO_MEASURE_BLOOD_PRESSURE = 1;
+    public static final int AUTO_MEASURE_STRESS = 3;
+    public static final int AUTO_MEASURE_BLOOD_OXYGEN = 4;
+    public static final int AUTO_MEASURE_BODY_TEMPERATURE = 5;
+    // Device settings screen keys (per-device prefs, delivered via onSendConfiguration)
+    public static final String CONFIG_AUTO_MEASURE_HR = "veepoo_auto_measure_hr";
+    public static final String CONFIG_AUTO_MEASURE_SPO2 = "veepoo_auto_measure_spo2";
+    public static final String CONFIG_AUTO_MEASURE_TEMPERATURE = "veepoo_auto_measure_temperature";
+    public static final String CONFIG_AUTO_MEASURE_STRESS = "veepoo_auto_measure_stress";
+    public static final String CONFIG_AUTO_MEASURE_BLOOD_PRESSURE = "veepoo_auto_measure_blood_pressure";
+    // Capability flag from the 0xA7 package 4 report; persisted so the settings UI can hide
+    // the auto-measure screen on firmware that does not support it.
+    public static final String CONFIG_AUTO_MEASURE_SUPPORTED = "veepoo_auto_measure_supported";
+
+    // ---- Custom setting (per-feature monitor toggles), opcode 0xB8 --------
+    /** Opcode for reading/writing the classic per-feature monitor settings. */
+    public static final byte OP_CUSTOM_SETTING = (byte) 0xB8;
+    /** [1] of a 0xB8 frame: set command / set acknowledgement. */
+    public static final int CUSTOM_SETTING_CMD_SET = 1;
+    /** [1] of a 0xB8 frame: read request / read acknowledgement. */
+    public static final int CUSTOM_SETTING_CMD_READ = 2;
+    /** Feature byte values: 0 unsupported, 1 supported + open, 2 supported + closed. */
+    public static final int CUSTOM_SETTING_VALUE_OPEN = 1;
+    public static final int CUSTOM_SETTING_VALUE_CLOSE = 2;
+    // Frame 1 ([19]==0) monitor field offsets.
+    public static final int CUSTOM_SETTING_F1_AUTO_HEART = 4;
+    public static final int CUSTOM_SETTING_F1_AUTO_BP = 5;
+    // Frame 2 ([19]==1) monitor field offsets.
+    public static final int CUSTOM_SETTING_F2_AUTO_TEMP = 4;
+    public static final int CUSTOM_SETTING_F2_STRESS = 9;
+    // Persisted when a 0xB8 report shows at least one configurable monitor.
+    public static final String CONFIG_MONITOR_SUPPORTED = "veepoo_monitor_supported";
+
     // ---- Single-shot vital detection sub-parameters -----------------------
     // 0x80 SpO2: start {0x80,1,2}, stop {0x80,2,2}
     public static final int SPO2_DETECT_START = 1;

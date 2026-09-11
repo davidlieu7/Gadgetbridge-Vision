@@ -37,6 +37,7 @@ import nodomain.freeyourgadget.gadgetbridge.GBApplication;
 import nodomain.freeyourgadget.gadgetbridge.R;
 import nodomain.freeyourgadget.gadgetbridge.activities.VeepooVitalsChooserActivity;
 import nodomain.freeyourgadget.gadgetbridge.activities.VeepooWorkoutStartActivity;
+import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.DeviceSettingsSpec;
 import nodomain.freeyourgadget.gadgetbridge.devices.AbstractBLEDeviceCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.DeviceCardAction;
 import nodomain.freeyourgadget.gadgetbridge.devices.DeviceManager;
@@ -107,6 +108,11 @@ public class VeepooKR96ProCoordinator extends AbstractBLEDeviceCoordinator {
     @Override
     public Class<? extends DeviceSupport> getDeviceSupportClass(@NonNull final GBDevice device) {
         return VeepooDeviceSupport.class;
+    }
+
+    @Override
+    public DeviceSettingsSpec getDeviceSettings(@NonNull final GBDevice device) {
+        return VeepooDeviceSettingsKt.veepooDeviceSettings();
     }
 
     @Override
