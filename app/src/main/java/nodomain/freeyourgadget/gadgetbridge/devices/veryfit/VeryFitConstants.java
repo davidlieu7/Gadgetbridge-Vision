@@ -51,7 +51,7 @@ public final class VeryFitConstants {
     public static final int FRAMED_MUSIC = 0x000a;
     public static final int FRAMED_ALARMS = 0x000e;
     public static final int FRAMED_ALARMS_QUERY = 0x000f;
-    public static final int FRAMED_QUICK_REPLY = 0x0fff;
+    public static final int FRAMED_CANNED_REPLIES = 0x0fff;
     public static final int FRAMED_APP_REGISTRY = 0x003c;
     public static final int FRAMED_WATCHFACE = 0x0008;
     public static final int FRAMED_WATCHFACE_LIST = 0x0031;
@@ -136,6 +136,16 @@ public final class VeryFitConstants {
     public static final byte ALARM_EMPTY = (byte) 0xaa;
     public static final byte ALARM_DELAY_MINUTES = 0x0a;
     public static final byte ALARM_REPEAT_COUNT = 0x03;
+
+    // Canned replies: [kind][count], then one fixed-size record per reply, numbered from one.
+    /** Which list is replaced: the one a message is answered from, or the one a call is refused with. */
+    public static final byte REPLIES_FOR_MESSAGES = 0x00;
+    public static final byte REPLIES_FOR_CALLS = 0x01;
+    /** Slot number, a spare byte, the text's byte count, then the text with zero padding. */
+    public static final int REPLY_RECORD_LEN = 71;
+    public static final int REPLY_TEXT_LEN = 68;
+    /** The vendor's own sender stops copying at this many, whatever the count says. */
+    public static final int REPLY_SLOTS = 10;
 
     // Short packet: [group][key][payload]. An empty payload is a query, anything else a set; both
     // are answered by a notification repeating [group][key].
@@ -264,6 +274,15 @@ public final class VeryFitConstants {
     /** Code `00` says the user changed something on the watch, and byte 2 says what. */
     public static final byte LINK_EVENT_CHANGED = 0x00;
     public static final byte LINK_EVENT_CHANGED_ALARMS = 0x01;
+    /**
+     * Pushed by the watch when a canned reply is picked: {@code [kind:2][notification id:4][slot]},
+     * the id being the one the notification was sent with and zero for a call. Answered with the
+     * outcome in front of the same three.
+     */
+    public static final byte LINK_REPLY = 0x60;
+    public static final int LINK_REPLY_LEN = 7;
+    public static final byte REPLY_SENT = 0x01;
+    public static final byte REPLY_FAILED = 0x00;
     /** Pushed by the watch when a media button on its music screen is pressed. */
     public static final byte LINK_MEDIA = 0x01;
     public static final byte MEDIA_PLAY = 0x01;

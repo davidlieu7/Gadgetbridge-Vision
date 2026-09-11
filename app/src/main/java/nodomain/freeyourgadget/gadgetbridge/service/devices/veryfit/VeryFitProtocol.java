@@ -364,6 +364,35 @@ public class VeryFitProtocol {
     }
 
     /**
+     * Body for {@link VeryFitConstants#FRAMED_CANNED_REPLIES}: which list, how many, then a
+     * fixed-size record per reply. The watch keeps the texts and sends the slot number back.
+     */
+    public static byte[] cannedReplies(final byte kind, final List<String> replies) {
+        final ByteArrayOutputStream out = new ByteArrayOutputStream();
+        out.write(kind);
+        out.write(replies.size());
+
+        int slot = 1;
+        for (final String reply : replies) {
+            final byte[] record = new byte[VeryFitConstants.REPLY_RECORD_LEN];
+            record[0] = (byte) slot++;
+            final byte[] text = StringUtils.truncateToBytes(reply, VeryFitConstants.REPLY_TEXT_LEN);
+            record[2] = (byte) text.length;
+            System.arraycopy(text, 0, record, 3, text.length);
+            out.write(record, 0, record.length);
+        }
+        return out.toByteArray();
+    }
+
+    /** Whether the reply the watch picked went out, with the pick echoed behind the outcome. */
+    public static byte[] replyOutcome(final boolean sent, final byte[] pick) {
+        final byte[] payload = new byte[1 + VeryFitConstants.LINK_REPLY_LEN];
+        payload[0] = sent ? VeryFitConstants.REPLY_SENT : VeryFitConstants.REPLY_FAILED;
+        System.arraycopy(pick, 0, payload, 1, VeryFitConstants.LINK_REPLY_LEN);
+        return command(VeryFitConstants.GROUP_LINK, VeryFitConstants.LINK_REPLY, payload);
+    }
+
+    /**
      * Body for {@link VeryFitConstants#FRAMED_ALARMS}: a count, then one fixed-size record per
      * slot. The watch replaces its whole table, so unused slots are written out as empty rather
      * than left off the end.

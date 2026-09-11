@@ -61,6 +61,8 @@ import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDeviceApp;
 import nodomain.freeyourgadget.gadgetbridge.model.ActivityUser;
 import nodomain.freeyourgadget.gadgetbridge.model.Alarm;
+import nodomain.freeyourgadget.gadgetbridge.model.CallSpec;
+import nodomain.freeyourgadget.gadgetbridge.model.CannedMessagesSpec;
 import nodomain.freeyourgadget.gadgetbridge.model.DeviceService;
 import nodomain.freeyourgadget.gadgetbridge.model.MusicSpec;
 import nodomain.freeyourgadget.gadgetbridge.model.MusicStateSpec;
@@ -99,6 +101,7 @@ public class VeryFitSupport extends AbstractBTLESingleDeviceSupport {
     private final VeryFitWatchfaces watchfaces = new VeryFitWatchfaces();
     private final VeryFitFileUpload fileUpload = new VeryFitFileUpload(this);
     private final VeryFitAppIcons appIcons = new VeryFitAppIcons(this);
+    private final VeryFitCannedReplies cannedReplies = new VeryFitCannedReplies(this);
 
     private MediaManager mediaManager;
     private boolean musicOpen;
@@ -463,6 +466,9 @@ public class VeryFitSupport extends AbstractBTLESingleDeviceSupport {
                 break;
             case VeryFitConstants.LINK_FIND_PHONE:
                 handleFindPhone(packet.payload);
+                break;
+            case VeryFitConstants.LINK_REPLY:
+                cannedReplies.onPick(packet.payload);
                 break;
             default:
                 LOG.debug("Unhandled link event {}", Integer.toHexString(packet.key));
@@ -1071,8 +1077,32 @@ public class VeryFitSupport extends AbstractBTLESingleDeviceSupport {
                     VeryFitProtocol.appRegistry(VeryFitConstants.REGISTRY_ADD, appId));
         }
 
+        cannedReplies.remember(notificationSpec);
         send("veryfit notification", protocol.framed(VeryFitConstants.FRAMED_NOTIFICATION,
                 VeryFitProtocol.notification(notificationSpec.getId(), appId, source, title, body)));
+    }
+
+    /** The call itself is the watch's own business over classic Bluetooth; only the number is kept. */
+    @Override
+    public void onSetCallState(final CallSpec callSpec) {
+        cannedReplies.onCallState(callSpec);
+    }
+
+    @Override
+    public void onSetCannedMessages(final CannedMessagesSpec cannedMessagesSpec) {
+        if (cannedMessagesSpec.type != CannedMessagesSpec.TYPE_GENERIC
+                || !getCapabilities().supports(VeryFitFeature.FRAMED_PROTOCOL)) {
+            return;
+        }
+        final List<String> replies = Arrays.asList(cannedMessagesSpec.cannedMessages);
+        final int count = Math.min(replies.size(), VeryFitConstants.REPLY_SLOTS);
+        LOG.info("Sending {} canned replies", count);
+        send("veryfit canned replies", protocol.framed(VeryFitConstants.FRAMED_CANNED_REPLIES,
+                VeryFitProtocol.cannedReplies(VeryFitConstants.REPLIES_FOR_MESSAGES, replies.subList(0, count))));
+    }
+
+    void sendReplyOutcome(final boolean sent, final byte[] pick) {
+        send("veryfit reply outcome", VeryFitProtocol.replyOutcome(sent, pick));
     }
 
     @Override

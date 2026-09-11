@@ -244,6 +244,11 @@ public abstract class VeryFitCoordinator extends AbstractBLEDeviceCoordinator {
     }
 
     @Override
+    public int getCannedRepliesSlotCount(final GBDevice device) {
+        return getCapabilities(device).supports(VeryFitFeature.FRAMED_PROTOCOL) ? VeryFitConstants.REPLY_SLOTS : 0;
+    }
+
+    @Override
     public boolean supportsAlarmTitle(@NonNull final GBDevice device) {
         return getAlarmSlotCount(device) > 0;
     }
@@ -287,6 +292,7 @@ public abstract class VeryFitCoordinator extends AbstractBLEDeviceCoordinator {
         notifications.add(R.xml.devicesettings_transliteration);
         if (capabilities.supports(VeryFitFeature.FRAMED_PROTOCOL)) {
             notifications.add(R.xml.devicesettings_upload_notifications_app_icon);
+            notifications.add(R.xml.devicesettings_canned_reply_16);
         }
 
         settings.addRootScreen(R.xml.devicesettings_find_phone);
