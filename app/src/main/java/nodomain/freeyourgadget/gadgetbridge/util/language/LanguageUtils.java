@@ -66,7 +66,7 @@ public class LanguageUtils {
     private static final Logger LOG = LoggerFactory.getLogger(LanguageUtils.class);
 
     private static final Map<String, Transliterator> TRANSLITERATORS_MAP = new HashMap<String, Transliterator>() {{
-        put("th", new ThaiTransliterator());
+        put("thai", new ThaiTransliterator());
         put("arabic", new ArabicTransliterator());
         put("bengali", new BengaliTransliterator());
         put("common_symbols", new CommonSymbolsTransliterator());
