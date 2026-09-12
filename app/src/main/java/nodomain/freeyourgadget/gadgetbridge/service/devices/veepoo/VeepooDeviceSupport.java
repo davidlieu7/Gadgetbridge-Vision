@@ -407,6 +407,32 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
     // Capability from the device-pushed 0xA7 report (package 4): configurable periodic vitals.
     private boolean autoMeasureSupported = false;
 
+    // Women's health (cycle tracking), opcode 0x85 (vendor u2 / WomenOperater). The A7 pkg1 [12]
+    // tag selects the read-back layout (3 = extended); -1 until the first capability report.
+    private int womenTag = -1;
+    private final Object womenLock = new Object();
+    private boolean womenSetOutstanding = false;
+    private boolean womenReadOutstanding = false;
+    private final Runnable womenSetWatchdog = () -> {
+        synchronized (womenLock) {
+            if (!womenSetOutstanding) {
+                return;
+            }
+            womenSetOutstanding = false;
+        }
+        LOG.warn("Women's health setting timed out without an acknowledgement");
+        GB.toast(getContext(), R.string.veepoo_women_set_failed, Toast.LENGTH_SHORT, GB.WARN);
+    };
+    private final Runnable womenReadWatchdog = () -> {
+        synchronized (womenLock) {
+            if (!womenReadOutstanding) {
+                return;
+            }
+            womenReadOutstanding = false;
+        }
+        LOG.warn("Women's health read-back timed out without a reply");
+    };
+
     // 0xB8 CustomSetting: last known basic ([19]==0) and extended ([19]==1) frames, pushed by
     // the band after every connect and answered after an explicit read request. Toggles are
     // applied by re-sending the stored frame with the target byte flipped.
@@ -494,6 +520,17 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
         // Read the watch's alarm list once the A7 capability report has had time to arrive; the
         // band verifies a whole-list CRC on every 0xB9 op, so we must know its current state.
         mainHandler.postDelayed(() -> sendAlarmRead(), 8000L);
+        // Re-push the women's health settings so the band keeps fresh LMP-relative state across
+        // reconnects (vendor parity: its device-init re-sends the last saved tuple). Only when
+        // a previous connection learned the firmware supports it and tracking is enabled.
+        mainHandler.postDelayed(() -> {
+            SharedPreferences womenPrefs = GBApplication.getDeviceSpecificSharedPrefs(getDevice().getAddress());
+            if (!womenPrefs.getBoolean(VeepooConstants.CONFIG_WOMEN_SUPPORTED, false)
+                    || !isWomenSettingEnabled(womenPrefs)) {
+                return;
+            }
+            applyWomenSettingFromPrefs(womenPrefs);
+        }, 8000L);
         // The device pushes its 0xA7 capability report after pairing; it is handled in
         // onCharacteristicChanged() and may arrive before the INITIALIZED state is reached.
         builder.setDeviceState(GBDevice.State.INITIALIZED);
@@ -634,6 +671,12 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
             case 0x8A:
                 handleLipidFrame(data);
                 break;
+            case 0x85:
+                // Women's health (cycle tracking). Note: 0x85 is also a PPG light-channel marker,
+                // but that one arrives on F002 and is consumed by handleEcgLightFrame before the
+                // main-channel dispatch; only F008 frames reach this case.
+                handleWomenFrame(data);
+                break;
             case 0xB3:
                 // Two dialects share this opcode; the A7 package 4 capability selects which one
                 // the firmware speaks (newer TLV auto-measure vs legacy AllSet SpO2).
@@ -752,14 +795,20 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
             }
             int alarmTag = data[VeepooConstants.CAP_PKG1_ALARM_TAG] & 0xFF;
             textAlarmsSupported = alarmTag == 5 || alarmTag == 6 || alarmTag == 7;
-            LOG.info("Capabilities: spo2hType={} ({}) maxMessagePackets={} alarmTag={} ({})",
+            int women = data[VeepooConstants.CAP_PKG1_WOMEN_TAG] & 0xFF;
+            boolean womenSupported = women == 1 || women == 2 || women == 3;
+            this.womenTag = women;
+            LOG.info("Capabilities: spo2hType={} ({}) maxMessagePackets={} alarmTag={} ({}) womenTag={} ({})",
                     spo2hType, spo2Supported ? "supported" : "not supported", socialMsgMaxPackets,
-                    alarmTag, textAlarmsSupported ? "text alarms supported" : "no text alarms");
+                    alarmTag, textAlarmsSupported ? "text alarms supported" : "no text alarms",
+                    women, womenSupported ? "women's health supported" : "no women's health");
             LOG.info("All-day vitals capability (pkg1): bpTag={} spo2hType={}", bpTag, spo2hType);
             GBApplication.getDeviceSpecificSharedPrefs(getDevice().getAddress())
                     .edit()
                     .putBoolean(VeepooConstants.CONFIG_AUTO_MEASURE_SPO2_SUPPORTED, spo2Supported)
                     .putBoolean(VeepooConstants.CONFIG_ALARMS_SUPPORTED, textAlarmsSupported)
+                    .putBoolean(VeepooConstants.CONFIG_WOMEN_SUPPORTED, womenSupported)
+                    .putInt(VeepooConstants.CONFIG_WOMEN_TAG, women)
                     .apply();
         } else if (packageId == 2) {
             int watchDay = data[2] & 0xFF;
@@ -2837,6 +2886,8 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
             startLipidDetect();
         } else if (VeepooConstants.CONFIG_MEASURE_ECG.equals(config)) {
             startEcgDetect();
+        } else if (VeepooConstants.CONFIG_WOMEN_APPLY.equals(config)) {
+            applyWomenSettingFromPrefs(GBApplication.getDeviceSpecificSharedPrefs(getDevice().getAddress()));
         } else {
             if (autoMeasureSupported) {
                 handleAutoMeasureConfiguration(config);
@@ -3946,6 +3997,193 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
         p[40] = (byte) (s.getCurrentEndMinute() / 60);
         p[41] = (byte) (s.getCurrentEndMinute() % 60);
         return p;
+    }
+
+    // ---- Women's health (cycle tracking), opcode 0x85 (vendor u2) -----------
+    // Fixed 20-byte frames on the main channel. Set: [1]=status, [2..5]=LMP year BE + month/day,
+    // [6]=cycle length, [7]=period length, rest zero. Read request: {0x85, 0x05}. The band acks
+    // a set with {0x85, result 1|0, status echo} and answers a read with the stored tuple; with
+    // womenTag==3 the date fields shift (yearLo in [3], status in [4], period in [10]).
+
+    private static boolean isWomenSettingEnabled(SharedPreferences prefs) {
+        return prefs.getInt(VeepooConstants.CONFIG_WOMEN_STATUS,
+                VeepooConstants.WOMEN_STATUS_NONE) == VeepooConstants.WOMEN_STATUS_MENES;
+    }
+
+    /**
+     * Pushes the stored women's settings to the band. Called on user-initiated changes and on
+     * reconnect (see initializeDevice) so the watch keeps fresh LMP-relative state.
+     */
+    private void applyWomenSettingFromPrefs(SharedPreferences prefs) {
+        if (!prefs.getBoolean(VeepooConstants.CONFIG_WOMEN_SUPPORTED, false)) {
+            LOG.warn("Skipping women's health push: firmware reported no support");
+            return;
+        }
+        int status = prefs.getInt(VeepooConstants.CONFIG_WOMEN_STATUS, VeepooConstants.WOMEN_STATUS_NONE);
+        String lmp = prefs.getString(VeepooConstants.CONFIG_WOMEN_LMP, null);
+        int cycleLen = prefs.getInt(VeepooConstants.CONFIG_WOMEN_CYCLE_LENGTH,
+                VeepooConstants.WOMEN_CYCLE_LENGTH_DEFAULT);
+        int periodLen = prefs.getInt(VeepooConstants.CONFIG_WOMEN_PERIOD_LENGTH,
+                VeepooConstants.WOMEN_PERIOD_LENGTH_DEFAULT);
+        int year = 0;
+        int month = 0;
+        int day = 0;
+        if (lmp != null) {
+            try {
+                java.text.SimpleDateFormat parser = new java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US);
+                java.util.Date parsed = parser.parse(lmp);
+                java.util.Calendar cal = java.util.Calendar.getInstance();
+                cal.setTime(parsed);
+                year = cal.get(java.util.Calendar.YEAR);
+                month = cal.get(java.util.Calendar.MONTH) + 1;
+                day = cal.get(java.util.Calendar.DAY_OF_MONTH);
+            } catch (java.text.ParseException e) {
+                LOG.error("Stored women's LMP {} is not a valid date", lmp, e);
+                return;
+            }
+        }
+        sendWomenSet(status, year, month, day, cycleLen, periodLen);
+    }
+
+    /**
+     * Sends a women's-health set frame. status only supports NONE (0) and MENES (1) in the MVP;
+     * PREREADY/PREING/MAMAMI are vendor-app extras and rejected with a warning until implemented.
+     */
+    private void sendWomenSet(int status, int lmpYear, int lmpMonth, int lmpDay, int cycleLen, int periodLen) {
+        if (status != VeepooConstants.WOMEN_STATUS_NONE && status != VeepooConstants.WOMEN_STATUS_MENES) {
+            LOG.warn("Women's health status {} not implemented yet; ignoring", status);
+            return;
+        }
+        byte[] frame = new byte[20]; // fixed 20-byte Veepoo main-channel frame
+        frame[0] = VeepooConstants.OP_WOMEN;
+        frame[1] = (byte) status;
+        if (status == VeepooConstants.WOMEN_STATUS_MENES) {
+            frame[2] = (byte) ((lmpYear >> 8) & 0xFF);
+            frame[3] = (byte) (lmpYear & 0xFF);
+            frame[4] = (byte) lmpMonth;
+            frame[5] = (byte) lmpDay;
+            frame[6] = (byte) cycleLen;
+            frame[7] = (byte) periodLen;
+        }
+        try {
+            TransactionBuilder builder = performInitialized("set women's health");
+            writeFrame(builder, frame);
+            builder.queue();
+        } catch (IOException e) {
+            LOG.error("Cannot set women's health: not connected", e);
+            GB.toast(getContext(), R.string.veepoo_women_set_failed, Toast.LENGTH_SHORT, GB.WARN);
+            return;
+        }
+        synchronized (womenLock) {
+            womenSetOutstanding = true;
+        }
+        mainHandler.removeCallbacks(womenSetWatchdog);
+        mainHandler.postDelayed(womenSetWatchdog, 10000L);
+        LOG.info("Women's health set sent (status={} lmp={}-{}-{} cycle={} period={})",
+                status, lmpYear, lmpMonth, lmpDay, cycleLen, periodLen);
+    }
+
+    /** Requests the band's stored women's tuple ({0x85, 0x05}); one outstanding read at a time. */
+    private void sendWomenRead() {
+        synchronized (womenLock) {
+            if (womenReadOutstanding) {
+                return;
+            }
+            womenReadOutstanding = true;
+        }
+        try {
+            TransactionBuilder builder = performInitialized("read women's health");
+            writeFrame(builder, new byte[]{VeepooConstants.OP_WOMEN, (byte) VeepooConstants.WOMEN_OP_READ});
+            builder.queue();
+        } catch (IOException e) {
+            synchronized (womenLock) {
+                womenReadOutstanding = false;
+            }
+            LOG.error("Cannot read women's health: not connected", e);
+            return;
+        }
+        mainHandler.removeCallbacks(womenReadWatchdog);
+        mainHandler.postDelayed(womenReadWatchdog, 10000L);
+    }
+
+    /**
+     * Handles a women's-health reply on the F008 main channel. [1] is the result (1 ok / 0 fail)
+     * for both set acks and read replies; [2] echoes the op: 5 for the read reply, 0..4 for a set
+     * ack (echoing the status). A byte 0x85 on F002 during ECG is a PPG light-channel marker and
+     * never reaches this dispatcher (see onCharacteristicChanged), so no cross-talk guard is
+     * needed here beyond rejecting short/implausible frames.
+     */
+    private void handleWomenFrame(byte[] data) {
+        if (data == null || data.length < 3) {
+            LOG.debug("Ignoring short 0x85 women's frame: {} bytes", data == null ? 0 : data.length);
+            return;
+        }
+        int result = data[1] & 0xFF;
+        if (result > 1) {
+            LOG.warn("Implausible 0x85 women's frame [1]={}; ignoring", result);
+            return;
+        }
+        int op = data[2] & 0xFF;
+        synchronized (womenLock) {
+            if (op == VeepooConstants.WOMEN_OP_READ) {
+                if (!womenReadOutstanding) {
+                    LOG.debug("Unexpected women's read reply: {}", hexBytes(data));
+                    return;
+                }
+                womenReadOutstanding = false;
+                mainHandler.removeCallbacks(womenReadWatchdog);
+                handleWomenReadReply(data, result);
+            } else if (op <= VeepooConstants.WOMEN_STATUS_MENES) {
+                // Set ack: op echoes the requested status (NONE or MENES).
+                if (!womenSetOutstanding) {
+                    LOG.debug("Unexpected women's set ack: {}", hexBytes(data));
+                    return;
+                }
+                womenSetOutstanding = false;
+                mainHandler.removeCallbacks(womenSetWatchdog);
+                if (result == 1) {
+                    LOG.info("Women's health setting acknowledged (status {})", op);
+                    sendWomenRead(); // read back the band state after each successful set
+                } else {
+                    LOG.warn("Band rejected the women's health setting (status {})", op);
+                    GB.toast(getContext(), R.string.veepoo_women_set_failed, Toast.LENGTH_SHORT, GB.WARN);
+                }
+            } else {
+                LOG.debug("Unhandled 0x85 women's op {}: {}", op, hexBytes(data));
+            }
+        }
+    }
+
+    /** Parses the read reply (>= 19 bytes) with the layout selected by the A7 pkg1 [12] tag. */
+    private void handleWomenReadReply(byte[] data, int result) {
+        if (data.length < 19) {
+            LOG.warn("Women's read reply too short ({} bytes): {}", data.length, hexBytes(data));
+            return;
+        }
+        if (result != 1) {
+            LOG.warn("Band NAKed the women's read: {}", hexBytes(data));
+            return;
+        }
+        boolean extended = womenTag == 3;
+        int status = data[extended ? 4 : 3] & 0xFF;
+        int year = extended
+                ? (((data[5] & 0xFF) << 8) | (data[3] & 0xFF))
+                : (((data[4] & 0xFF) << 8) | (data[5] & 0xFF));
+        int month = data[6] & 0xFF;
+        int day = data[7] & 0xFF;
+        int cycleLen = data[8] & 0xFF;
+        int periodLen = data[extended ? 10 : 9] & 0xFF;
+        boolean plausible = status <= VeepooConstants.WOMEN_STATUS_MENES
+                && year >= 1950 && year <= 2100
+                && month >= 1 && month <= 12
+                && day >= 1 && day <= 31
+                && cycleLen >= VeepooConstants.WOMEN_CYCLE_LENGTH_MIN
+                && cycleLen <= VeepooConstants.WOMEN_CYCLE_LENGTH_MAX
+                && periodLen >= VeepooConstants.WOMEN_PERIOD_LENGTH_MIN
+                && periodLen <= VeepooConstants.WOMEN_PERIOD_LENGTH_MAX;
+        LOG.info("Women's band state ({} layout): status={} lmp={}-{}-{} cycle={} period={}{}",
+                extended ? "extended" : "standard", status, year, month, day, cycleLen, periodLen,
+                plausible ? "" : " [implausible values]");
     }
 
     /**

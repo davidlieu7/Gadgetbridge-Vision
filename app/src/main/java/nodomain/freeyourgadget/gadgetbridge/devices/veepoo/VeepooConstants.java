@@ -256,6 +256,44 @@ public final class VeepooConstants {
     /** ECG type byte from A7 pkg2 [15]; selects the warm-up length in VeepooEcgWaveform.dropWarmup(). */
     public static final String CONFIG_ECG_TYPE = "veepoo_ecg_type";
 
+    // ---- Women's health (cycle tracking), opcode 0x85 (vendor u2) -----------
+    /**
+     * Opcode for the women's-health / cycle-tracking settings. Fixed 20-byte frames on the main
+     * channel: set {0x85, status, LMP yHi/yLo/m/d, cycleLen, periodLen, 0 x12}, read request
+     * {0x85, 0x05, 0 x18}. Replies: set ack {0x85, result 1|0, status echo}; read reply carries
+     * the band's stored tuple. Note: byte 0x85 is also a PPG light-channel data marker on F002
+     * during ECG — that path never reaches the main-channel dispatcher.
+     */
+    public static final byte OP_WOMEN = (byte) 0x85;
+    /** Status byte of a women's set frame: feature disabled on the band. */
+    public static final int WOMEN_STATUS_NONE = 0;
+    /** Status byte of a women's set frame: cycle tracking active (LMP + lengths drive the watch). */
+    public static final int WOMEN_STATUS_MENES = 1;
+    /** [2] of a women's read request frame; the read reply echoes it. */
+    public static final int WOMEN_OP_READ = 5;
+    // Vendor-UI ranges mirrored by the settings screen (WomanCyclesSettingFragment).
+    public static final int WOMEN_CYCLE_LENGTH_MIN = 15;
+    public static final int WOMEN_CYCLE_LENGTH_MAX = 100;
+    public static final int WOMEN_CYCLE_LENGTH_DEFAULT = 28;
+    public static final int WOMEN_PERIOD_LENGTH_MIN = 2;
+    public static final int WOMEN_PERIOD_LENGTH_MAX = 14;
+    public static final int WOMEN_PERIOD_LENGTH_DEFAULT = 5;
+    // Per-device prefs.
+    /** Capability flag persisted from the A7 pkg1 [12] report (tag in {1,2,3}). */
+    public static final String CONFIG_WOMEN_SUPPORTED = "veepoo_women_supported";
+    /** Raw A7 pkg1 [12] tag; value 3 selects the extended read-back layout. */
+    public static final String CONFIG_WOMEN_TAG = "veepoo_women_tag";
+    /** Current status: WOMEN_STATUS_NONE (off) or WOMEN_STATUS_MENES (tracking). */
+    public static final String CONFIG_WOMEN_STATUS = "veepoo_women_status";
+    /** Last period start date as "yyyy-MM-dd". */
+    public static final String CONFIG_WOMEN_LMP = "veepoo_women_lmp";
+    /** Cycle length in days (15..100). */
+    public static final String CONFIG_WOMEN_CYCLE_LENGTH = "veepoo_women_cycle_length";
+    /** Period length in days (2..14). */
+    public static final String CONFIG_WOMEN_PERIOD_LENGTH = "veepoo_women_period_length";
+    /** onSendConfiguration key: push the stored women's settings to the band. */
+    public static final String CONFIG_WOMEN_APPLY = "veepoo_women_apply";
+
     // ---- Custom setting (per-feature monitor toggles), opcode 0xB8 --------
     /** Opcode for reading/writing the classic per-feature monitor settings. */
     public static final byte OP_CUSTOM_SETTING = (byte) 0xB8;
@@ -356,6 +394,8 @@ public final class VeepooConstants {
     public static final int CAP_PKG1_ALL_MSG_LENGTH = 9;
     /** Package 1: alarm tag; 5/6/7 -> text alarms + multi-alarm (0xB9) supported. */
     public static final int CAP_PKG1_ALARM_TAG = 17;
+    /** Package 1: women's-health ("cycle tracking") tag; 0/other -> unsupported, 1/3 -> supported, 2 -> supported by the vendor app only in zh/en locale. Value 3 also selects the extended read-back layout. */
+    public static final int CAP_PKG1_WOMEN_TAG = 12;
     /** Package 2: days of data kept on the watch; 0 -> default WATCH_DAY_DEFAULT. */
     public static final int CAP_PKG2_WATCH_DAY = 2;
     /** Package 2: origin protocol version; 3 or 5 -> Origin DF (0xDF), else v1 (0xD1). */

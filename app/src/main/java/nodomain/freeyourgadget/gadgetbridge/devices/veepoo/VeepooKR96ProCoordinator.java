@@ -19,6 +19,7 @@ package nodomain.freeyourgadget.gadgetbridge.devices.veepoo;
 import android.bluetooth.le.ScanFilter;
 import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
 
 import androidx.annotation.NonNull;
 import androidx.localbroadcastmanager.content.LocalBroadcastManager;
@@ -31,11 +32,15 @@ import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import de.greenrobot.dao.AbstractDao;
 import de.greenrobot.dao.Property;
 import nodomain.freeyourgadget.gadgetbridge.GBApplication;
 import nodomain.freeyourgadget.gadgetbridge.R;
 import nodomain.freeyourgadget.gadgetbridge.activities.VeepooVitalsChooserActivity;
+import nodomain.freeyourgadget.gadgetbridge.activities.VeepooWomenHealthActivity;
 import nodomain.freeyourgadget.gadgetbridge.activities.VeepooWorkoutStartActivity;
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.DeviceSettingsSpec;
 import nodomain.freeyourgadget.gadgetbridge.devices.AbstractBLEDeviceCoordinator;
@@ -70,6 +75,8 @@ import nodomain.freeyourgadget.gadgetbridge.service.DeviceSupport;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.veepoo.VeepooDeviceSupport;
 
 public class VeepooKR96ProCoordinator extends AbstractBLEDeviceCoordinator {
+
+    private static final Logger LOG = LoggerFactory.getLogger(VeepooKR96ProCoordinator.class);
 
     @Override
     protected Pattern getSupportedDeviceName() {
@@ -218,6 +225,7 @@ public class VeepooKR96ProCoordinator extends AbstractBLEDeviceCoordinator {
     }
 
     private volatile boolean workoutRunning = false;
+    private volatile boolean womenCapabilityUnknownLogged = false;
 
     public void setWorkoutRunning(final boolean running) {
         if (this.workoutRunning != running) {
@@ -232,7 +240,8 @@ public class VeepooKR96ProCoordinator extends AbstractBLEDeviceCoordinator {
     public List<DeviceCardAction> getCustomActions() {
         return Arrays.asList(
                 new ToggleWorkoutAction(),
-                new VitalsChooserAction());
+                new VitalsChooserAction(),
+                new WomenHealthAction());
     }
 
     private final class ToggleWorkoutAction implements DeviceCardAction {
@@ -275,6 +284,46 @@ public class VeepooKR96ProCoordinator extends AbstractBLEDeviceCoordinator {
         @Override
         public void onClick(@NonNull final GBDevice device, @NonNull final Context context) {
             final Intent intent = new Intent(context, VeepooVitalsChooserActivity.class);
+            intent.putExtra(GBDevice.EXTRA_DEVICE, device);
+            context.startActivity(intent);
+        }
+    }
+
+    /**
+     * Opens the women's health (cycle tracking) settings. Gated on the A7 pkg1 [12] capability:
+     * hidden while no report has arrived yet (logged once) or when the firmware says unsupported.
+     */
+    private final class WomenHealthAction implements DeviceCardAction {
+        @Override
+        public int getIcon(@NonNull final GBDevice device) {
+            return R.drawable.ic_cycle;
+        }
+
+        @NonNull
+        @Override
+        public String getDescription(@NonNull final GBDevice device, @NonNull final Context context) {
+            return context.getString(R.string.veepoo_action_women_health);
+        }
+
+        @Override
+        public boolean isVisible(final GBDevice device) {
+            if (!device.isConnected()) {
+                return false;
+            }
+            SharedPreferences prefs = GBApplication.getDeviceSpecificSharedPrefs(device.getAddress());
+            if (!prefs.contains(VeepooConstants.CONFIG_WOMEN_SUPPORTED)) {
+                if (!womenCapabilityUnknownLogged) {
+                    womenCapabilityUnknownLogged = true;
+                    LOG.info("Women's health entry hidden: the band has not reported its capability yet (A7 pkg1 [12])");
+                }
+                return false;
+            }
+            return prefs.getBoolean(VeepooConstants.CONFIG_WOMEN_SUPPORTED, false);
+        }
+
+        @Override
+        public void onClick(@NonNull final GBDevice device, @NonNull final Context context) {
+            final Intent intent = new Intent(context, VeepooWomenHealthActivity.class);
             intent.putExtra(GBDevice.EXTRA_DEVICE, device);
             context.startActivity(intent);
         }

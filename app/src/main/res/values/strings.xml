@@ -2512,6 +2512,14 @@
     <string name="veepoo_action_measure_blood_pressure">Blood pressure</string>
     <string name="veepoo_bp_ok">Blood pressure: %1$d/%2$d mmHg</string>
     <string name="veepoo_bp_no_reading">No blood pressure reading (timed out)</string>
+    <string name="veepoo_action_women_health">Women\'s health</string>
+    <string name="veepoo_women_title">Women\'s health</string>
+    <string name="veepoo_women_enable">Track cycle on the band</string>
+    <string name="veepoo_women_lmp">Last period start</string>
+    <string name="veepoo_women_cycle_length">Cycle length</string>
+    <string name="veepoo_women_period_length">Period length</string>
+    <string name="veepoo_women_days">%1$d days</string>
+    <string name="veepoo_women_set_failed">The band did not accept the women\'s health change</string>
     <string name="veepoo_settings_auto_measure">Auto measurement</string>
     <string name="veepoo_auto_measure_hr">Heart rate</string>
     <string name="veepoo_auto_measure_spo2">Blood oxygen</string>

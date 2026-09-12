@@ -998,6 +998,10 @@
             android:label="@string/veepoo_ecg_detail_title"
             android:exported="false" />
 
+        <activity android:name=".activities.VeepooWomenHealthActivity"
+            android:label="@string/veepoo_women_title"
+            android:exported="false" />
+
         <activity
             android:name=".activities.ExternalPebbleJSActivity"
             android:label="@string/app_configure"
