@@ -80,6 +80,7 @@ import nodomain.freeyourgadget.gadgetbridge.entities.GenericRespiratoryRateSampl
 import nodomain.freeyourgadget.gadgetbridge.entities.GenericSpo2Sample;
 import nodomain.freeyourgadget.gadgetbridge.entities.GenericSpo2SampleDao;
 import nodomain.freeyourgadget.gadgetbridge.entities.GenericStressSample;
+import nodomain.freeyourgadget.gadgetbridge.entities.GenericStressSampleDao;
 import nodomain.freeyourgadget.gadgetbridge.entities.GenericTemperatureSample;
 import nodomain.freeyourgadget.gadgetbridge.entities.GenericTemperatureSampleDao;
 import nodomain.freeyourgadget.gadgetbridge.entities.GlucoseSample;
@@ -145,6 +146,8 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
     private final List<VeepooActivitySample> pendingSleepSamples = new ArrayList<>();
     private final List<VeepooSleepSummarySample> pendingSleepSummaries = new ArrayList<>();
     private final List<GenericHrvValueSample> pendingHrvSamples = new ArrayList<>();
+    // Per-record all-day stress ("pressure") from the Origin3 0xC1 tag.
+    private final List<GenericStressSample> pendingStressSamples = new ArrayList<>();
     // Per-record all-day vitals from Origin3 (0xDF) tags, persisted when the day completes.
     private final List<GenericSpo2Sample> pendingOriginSpo2Samples = new ArrayList<>();
     private final List<GenericBloodPressureSample> pendingOriginBpSamples = new ArrayList<>();
@@ -2198,6 +2201,8 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
         int kcalTenths = 0;
         int ppgHeartRate = ActivitySample.NOT_MEASURED;
         int ecgHeartRate = ActivitySample.NOT_MEASURED;
+        int ppgHrRecords = 0;
+        int ecgHrRecords = 0;
         // Aggregates of the 0xB9 apnea/hypoxia/cardiac-load groups (null until the tag is seen).
         Integer apneaCount = null;
         Integer hypoxiaMinutes = null;
@@ -2247,11 +2252,13 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
                 int average = averageValidHeartRate(body);
                 if (average > 0) {
                     ppgHeartRate = average;
+                    ppgHrRecords++;
                 }
             } else if (haveRecord && tag == 0xB5) {
                 int average = averageValidHeartRate(body);
                 if (average > 0) {
                     ecgHeartRate = average;
+                    ecgHrRecords++;
                 }
             } else if (haveRecord && tag == 0xB7 && hour <= 23 && minute <= 59 && body.length >= 51) {
                 Calendar stamp = (Calendar) base.clone();
@@ -2359,8 +2366,18 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
                 // MET field, so the value is logged only.
                 LOG.debug("Origin3 day {} MET at {}:{}: {}", dayIndex, hour, minute, (body[0] & 0xFF) / 10.0);
             } else if (haveRecord && tag == 0xC1 && hour <= 23 && minute <= 59 && body.length >= 1) {
-                // Pressure/wear byte; not modeled on VeepooActivitySample, so it is logged only.
-                LOG.debug("Origin3 day {} pressure/wear at {}:{}: raw={}", dayIndex, hour, minute, body[0] & 0xFF);
+                // Per-record stress ("pressure") index, one byte per five-minute record; the vendor
+                // stores this byte and charts it as the all-day stress series.
+                int stress = body[0] & 0xFF;
+                Calendar stamp = origin3RecordStamp(base, hour, minute);
+                if (stamp != null && stress <= 100) {
+                    GenericStressSample sample = new GenericStressSample();
+                    sample.setTimestamp(stamp.getTimeInMillis());
+                    sample.setStress(stress);
+                    pendingStressSamples.add(sample);
+                } else if (stamp != null) {
+                    LOG.debug("Ignoring implausible Origin3 stress at {}:{}: {}", hour, minute, stress);
+                }
             } else if (haveRecord && tag == 0xC2 && hour <= 23 && minute <= 59 && body.length >= 10) {
                 // Lipids: TCHO/TAG/HDL/LDL as LE16 in 0.01 mmol/L steps plus uric acid as LE16 mg/dL.
                 int tcho = ((body[1] & 0xFF) << 8) | (body[0] & 0xFF);
@@ -2408,6 +2425,8 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
             recordsAdded++;
         }
         LOG.debug("Origin3 stream for day {}: {} five-minute records", dayIndex, recordsAdded);
+        LOG.info("Origin3 day {}: heart rate present in {} PPG / {} ECG of {} five-minute records",
+                dayIndex, ppgHrRecords, ecgHrRecords, recordsAdded);
         return recordsAdded;
     }
 
@@ -6341,6 +6360,7 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
      */
     private void persistPendingOriginDay() {
         if (pendingOriginSamples.isEmpty() && pendingHrvSamples.isEmpty()
+                && pendingStressSamples.isEmpty()
                 && pendingOriginSpo2Samples.isEmpty() && pendingOriginBpSamples.isEmpty()
                 && pendingOriginTemperatureSamples.isEmpty() && pendingOriginGlucoseSamples.isEmpty()
                 && pendingOriginBreathSamples.isEmpty() && pendingOriginLipidSamples.isEmpty()) {
@@ -6352,7 +6372,39 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
             persistSamples(batch, false);
         }
         persistPendingHrvSamples();
+        persistPendingStressSamples();
         persistPendingOriginVitalsSamples();
+    }
+
+    private void persistPendingStressSamples() {
+        if (pendingStressSamples.isEmpty()) {
+            return;
+        }
+        List<GenericStressSample> batch = new ArrayList<>(pendingStressSamples);
+        pendingStressSamples.clear();
+        try (DBHandler dbHandler = GBApplication.acquireDB()) {
+            DaoSession session = dbHandler.getDaoSession();
+            long userId = DBHelper.getUser(session).getId();
+            long deviceId = DBHelper.getDevice(getDevice(), session).getId();
+            GenericStressSampleDao dao = session.getGenericStressSampleDao();
+            long from = Long.MAX_VALUE;
+            long to = Long.MIN_VALUE;
+            for (GenericStressSample sample : batch) {
+                sample.setUserId(userId);
+                sample.setDeviceId(deviceId);
+                from = Math.min(from, sample.getTimestamp());
+                to = Math.max(to, sample.getTimestamp());
+            }
+            dao.queryBuilder()
+                    .where(GenericStressSampleDao.Properties.DeviceId.eq(deviceId),
+                            GenericStressSampleDao.Properties.Timestamp.ge(from - 60_000L),
+                            GenericStressSampleDao.Properties.Timestamp.le(to + 60_000L))
+                    .buildDelete()
+                    .executeDeleteWithoutDetachingEntities();
+            dao.insertInTx(batch);
+        } catch (Exception e) {
+            LOG.error("Error saving stress samples", e);
+        }
     }
 
     private void persistPendingHrvSamples() {
@@ -6555,6 +6607,7 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
         pendingOriginSamples.clear();
         pendingSleepSamples.clear();
         pendingSleepSummaries.clear();
+        pendingStressSamples.clear();
         pendingOriginSpo2Samples.clear();
         pendingOriginBpSamples.clear();
         pendingOriginTemperatureSamples.clear();
