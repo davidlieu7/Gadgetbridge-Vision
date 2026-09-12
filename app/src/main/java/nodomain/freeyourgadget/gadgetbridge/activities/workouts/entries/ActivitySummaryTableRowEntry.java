@@ -10,6 +10,7 @@ import androidx.gridlayout.widget.GridLayout;
 
 import java.util.List;
 
+import nodomain.freeyourgadget.gadgetbridge.GBApplication;
 import nodomain.freeyourgadget.gadgetbridge.activities.workouts.WorkoutValueFormatter;
 
 public class ActivitySummaryTableRowEntry extends ActivitySummaryEntry {
@@ -70,6 +71,10 @@ public class ActivitySummaryTableRowEntry extends ActivitySummaryEntry {
             columnTextView.setGravity(Gravity.CENTER);
             if (isHeader || (i == 0 && boldFirstColumn)) {
                 columnTextView.setTypeface(null, Typeface.BOLD);
+            } else {
+                // Data values (everything but the bold step/lap/# column) get the theme's
+                // primary text color, to stand out against the default/dimmer system color.
+                columnTextView.setTextColor(GBApplication.getTextColor(linearLayout.getContext()));
             }
 
             cellLayout.addView(columnTextView);
