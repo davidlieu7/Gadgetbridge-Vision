@@ -33,6 +33,7 @@ import nodomain.freeyourgadget.gadgetbridge.GBApplication;
 import nodomain.freeyourgadget.gadgetbridge.R;
 import nodomain.freeyourgadget.gadgetbridge.activities.appmanager.AppManagerActivity;
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSpecificSettings;
+import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSpecificSettingsCustomizer;
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSpecificSettingsScreen;
 import nodomain.freeyourgadget.gadgetbridge.devices.AbstractBLEDeviceCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.GenericHrvValueSampleProvider;
@@ -304,6 +305,9 @@ public abstract class VeryFitCoordinator extends AbstractBLEDeviceCoordinator {
         if (getContactsSlotCount(device) > 0) {
             settings.addRootScreen(R.xml.devicesettings_contacts);
         }
+        if (capabilities.supports(VeryFitFeature.FRAMED_PROTOCOL)) {
+            settings.addRootScreen(R.xml.devicesettings_veryfit_calls);
+        }
         settings.addRootScreen(R.xml.devicesettings_find_phone);
 
         return settings;
@@ -348,6 +352,11 @@ public abstract class VeryFitCoordinator extends AbstractBLEDeviceCoordinator {
                 "uk_UA",
                 "vi",
         };
+    }
+
+    @Override
+    public DeviceSpecificSettingsCustomizer getDeviceSpecificSettingsCustomizer(final GBDevice device) {
+        return new VeryFitSettingsCustomizer();
     }
 
     protected VeryFitCapabilities getCapabilities(final GBDevice device) {

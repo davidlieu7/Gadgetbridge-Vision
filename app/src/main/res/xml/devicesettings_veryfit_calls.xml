@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.preference.PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android">
+    <PreferenceCategory android:title="@string/veryfit_prefs_calls_header">
+        <Preference
+            android:icon="@drawable/ic_bluetooth"
+            android:key="veryfit_calls_pair"
+            android:summary="@string/veryfit_pref_calls_pair_summary"
+            android:title="@string/veryfit_pref_calls_pair_title" />
+        <Preference
+            android:icon="@drawable/ic_bluetooth_disabled"
+            android:key="veryfit_calls_unpair"
+            android:summary="@string/veryfit_pref_calls_unpair_summary"
+            android:title="@string/veryfit_pref_calls_unpair_title" />
+    </PreferenceCategory>
+</androidx.preference.PreferenceScreen>

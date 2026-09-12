@@ -148,6 +148,10 @@ public final class VeryFitConstants {
     /** The vendor's own sender stops copying at this many, whatever the count says. */
     public static final int REPLY_SLOTS = 10;
 
+    /** Settings buttons for the classic-Bluetooth side, which carries the calls. */
+    public static final String PREF_CALLS_PAIR = "veryfit_calls_pair";
+    public static final String PREF_CALLS_UNPAIR = "veryfit_calls_unpair";
+
     // Favourite contacts: [version][operation][total][already done][in this frame], then one
     // fixed-size record per contact. The reply repeats the counters behind a result byte.
     public static final byte CONTACTS_VERSION = 0x10;
@@ -173,7 +177,9 @@ public final class VeryFitConstants {
 
     public static final byte QUERY_DEVICE = 0x01;
     public static final byte QUERY_FEATURES = 0x02;
+    /** Two addresses: the one this link is on, then the one the watch takes calls on. */
     public static final byte QUERY_ADDRESS = 0x04;
+    public static final int ADDRESS_LEN = 6;
     public static final byte QUERY_BATTERY = 0x05;
     public static final byte QUERY_FEATURES_EXTRA = 0x07;
     public static final byte QUERY_STEP_GOAL = 0x08;

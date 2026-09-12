@@ -103,6 +103,7 @@ public class VeryFitSupport extends AbstractBTLESingleDeviceSupport {
     private final VeryFitFileUpload fileUpload = new VeryFitFileUpload(this);
     private final VeryFitAppIcons appIcons = new VeryFitAppIcons(this);
     private final VeryFitCannedReplies cannedReplies = new VeryFitCannedReplies(this);
+    private final VeryFitCalls calls = new VeryFitCalls(this);
 
     private MediaManager mediaManager;
     private boolean musicOpen;
@@ -171,6 +172,7 @@ public class VeryFitSupport extends AbstractBTLESingleDeviceSupport {
 
     private void queryDevice(final TransactionBuilder builder) {
         write(builder, VeryFitProtocol.query(VeryFitConstants.QUERY_DEVICE));
+        write(builder, VeryFitProtocol.query(VeryFitConstants.QUERY_ADDRESS));
         write(builder, VeryFitProtocol.query(VeryFitConstants.QUERY_FEATURES));
         write(builder, VeryFitProtocol.query(VeryFitConstants.QUERY_FEATURES_EXTRA));
         write(builder, VeryFitProtocol.query(VeryFitConstants.QUERY_FIRMWARE));
@@ -331,6 +333,9 @@ public class VeryFitSupport extends AbstractBTLESingleDeviceSupport {
                 limits = packet.payload;
                 storeFeatures();
                 break;
+            case VeryFitConstants.QUERY_ADDRESS:
+                handleAddresses(packet.payload);
+                break;
             case VeryFitConstants.QUERY_BRIGHTNESS:
                 handleBrightness(packet.payload);
                 break;
@@ -383,6 +388,20 @@ public class VeryFitSupport extends AbstractBTLESingleDeviceSupport {
         final GBDeviceEventVersionInfo event = new GBDeviceEventVersionInfo();
         event.fwVersion = String.format("%d.%d.%d", payload[0] & 0xff, payload[1] & 0xff, payload[2] & 0xff);
         evaluateGBDeviceEvent(event);
+    }
+
+    private void handleAddresses(final byte[] payload) {
+        if (payload.length < 2 * VeryFitConstants.ADDRESS_LEN) {
+            return;
+        }
+        final StringBuilder address = new StringBuilder();
+        for (int i = VeryFitConstants.ADDRESS_LEN; i < 2 * VeryFitConstants.ADDRESS_LEN; i++) {
+            address.append(String.format("%s%02X", address.length() == 0 ? "" : ":", payload[i] & 0xff));
+        }
+        LOG.info("Watch takes calls on {}", address);
+        getDevicePrefs().getPreferences().edit()
+                .putString(VeryFitCapabilities.PREF_CALL_ADDRESS, address.toString())
+                .apply();
     }
 
     private void storeFeatures() {
@@ -689,6 +708,12 @@ public class VeryFitSupport extends AbstractBTLESingleDeviceSupport {
                 break;
             case DeviceSettingsPreferenceConst.PREF_UPLOAD_NOTIFICATIONS_APP_ICON:
                 sendAppIcons();
+                return;
+            case VeryFitConstants.PREF_CALLS_PAIR:
+                calls.pair(prefs.getString(VeryFitCapabilities.PREF_CALL_ADDRESS, null));
+                return;
+            case VeryFitConstants.PREF_CALLS_UNPAIR:
+                calls.unpair(prefs.getString(VeryFitCapabilities.PREF_CALL_ADDRESS, null));
                 return;
             case DeviceSettingsPreferenceConst.PREF_WORKOUT_DETECTION_CATEGORIES:
             case DeviceSettingsPreferenceConst.PREF_WORKOUT_AUTO_PAUSE:
@@ -1187,6 +1212,12 @@ public class VeryFitSupport extends AbstractBTLESingleDeviceSupport {
             return new VeryFitCapabilities(features, featuresExtra, limits);
         }
         return VeryFitCapabilities.fromPreferences(getDevicePrefs());
+    }
+
+    @Override
+    public void dispose() {
+        calls.dispose();
+        super.dispose();
     }
 
     private void send(final String task, final byte[] command) {

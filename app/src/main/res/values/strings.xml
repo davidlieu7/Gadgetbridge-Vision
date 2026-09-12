@@ -1365,6 +1365,17 @@
     <string name="ak102_audio_pairing_started">Pairing call audio, accept the pairing request on phone and watch if prompted</string>
     <string name="ak102_audio_connected">Call audio pairing done</string>
     <string name="ak102_audio_unpaired">Call audio unpaired</string>
+
+    <string name="veryfit_prefs_calls_header">Bluetooth calling</string>
+    <string name="veryfit_pref_calls_pair_title">Pair for calls</string>
+    <string name="veryfit_pref_calls_pair_summary">Pair the watch as a Bluetooth headset. Calls from the watch, and incoming calls on it, go over that link</string>
+    <string name="veryfit_pref_calls_unpair_title">Unpair for calls</string>
+    <string name="veryfit_pref_calls_unpair_summary">Remove the headset pairing with the watch</string>
+    <string name="veryfit_calls_pairing">Pairing for calls, confirm on the phone and the watch if asked</string>
+    <string name="veryfit_calls_pairing_failed">Pairing for calls did not complete</string>
+    <string name="veryfit_calls_paired">Paired for calls</string>
+    <string name="veryfit_calls_unpaired">Unpaired for calls</string>
+    <string name="veryfit_calls_no_address">The watch has not said which address it takes calls on yet</string>
     <string name="ak102_pref_display_items_title">Display items</string>
     <string name="ak102_pref_display_items_summary">Screens shown on the watch</string>
     <string name="automatic">Automatic</string>

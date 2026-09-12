@@ -33,6 +33,7 @@ public class VeryFitCapabilities {
     public static final String PREF_FEATURES = "veryfit_features";
     public static final String PREF_FEATURES_EXTRA = "veryfit_features_extra";
     public static final String PREF_LIMITS = "veryfit_limits";
+    public static final String PREF_CALL_ADDRESS = "veryfit_call_address";
 
     private static final int DEFAULT_ALARM_SLOTS = 3;
 
