@@ -11,6 +11,7 @@ import android.view.ViewGroup
 import android.widget.FrameLayout
 import android.widget.LinearLayout
 import android.widget.TextView
+import androidx.annotation.StringRes
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.distinctUntilChanged
@@ -254,9 +255,27 @@ class WorkoutTabChartsFragment : Fragment(), WorkoutTabScreenshotProvider {
         if (chart.group == ActivitySummaryEntries.GROUP_HEART_RATE) {
             val zoneEntries = groupedEntries[ActivitySummaryEntries.GROUP_HEART_RATE_ZONES].orEmpty()
             if (zoneEntries.isNotEmpty()) {
+                addSectionHeader(chartsLayout, R.string.workout_time_in_zones)
                 addStatRow(chartsLayout, zoneEntries)
             }
         }
+    }
+
+    private fun addSectionHeader(chartsLayout: LinearLayout, @StringRes labelRes: Int) {
+        val labelField = TextView(context).apply {
+            textSize = 18f
+            gravity = Gravity.CENTER
+            setPaddingRelative(dpToPx(16), dpToPx(16), dpToPx(16), dpToPx(8))
+            typeface = Typeface.DEFAULT_BOLD
+            setText(labelRes)
+        }
+        chartsLayout.addView(labelField)
+    }
+
+    @Suppress("SameParameterValue")
+    private fun dpToPx(dp: Int): Int {
+        val density = resources.displayMetrics.density
+        return (dp * density).toInt()
     }
 
     private fun addStatRow(chartsLayout: LinearLayout, entries: List<Pair<String, ActivitySummaryEntry>>) {

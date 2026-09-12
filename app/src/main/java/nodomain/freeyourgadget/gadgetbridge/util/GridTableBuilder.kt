@@ -27,6 +27,7 @@ import nodomain.freeyourgadget.gadgetbridge.GBApplication
 import nodomain.freeyourgadget.gadgetbridge.R
 import nodomain.freeyourgadget.gadgetbridge.activities.workouts.WorkoutValueFormatter
 import nodomain.freeyourgadget.gadgetbridge.activities.workouts.entries.ActivitySummaryEntry
+import nodomain.freeyourgadget.gadgetbridge.activities.workouts.entries.ActivitySummaryProgressEntry
 import nodomain.freeyourgadget.gadgetbridge.activities.workouts.entries.ActivitySummarySimpleEntry
 import nodomain.freeyourgadget.gadgetbridge.activities.workouts.entries.ActivitySummaryTableRowEntry
 
@@ -53,7 +54,8 @@ class GridTableBuilder @JvmOverloads constructor(
             cellNumber++
         }
 
-        val linearLayout = generateLinearLayout(cellNumber, columnSpan, entry is ActivitySummaryTableRowEntry)
+        val compact = entry is ActivitySummaryTableRowEntry || entry is ActivitySummaryProgressEntry
+        val linearLayout = generateLinearLayout(cellNumber, columnSpan, compact)
         entry.populate(key, linearLayout, workoutValueFormatter)
         gridLayout.addView(linearLayout)
         columnSpans.add(columnSpan)
@@ -98,8 +100,8 @@ class GridTableBuilder @JvmOverloads constructor(
             this.layoutParams = layoutParams
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER
-            // Table rows (laps, intervals, sets) pack many rows on screen, so give them
-            // less room than a regular key/value summary cell.
+            // Table rows (laps, intervals, sets) and zone progress bars pack many rows on
+            // screen, so give them less room than a regular key/value summary cell.
             val verticalPadding = if (compact) 8 else 15
             setPadding(dpToPx(15), dpToPx(verticalPadding), dpToPx(15), dpToPx(verticalPadding))
             setBackgroundColor(GBApplication.getWindowBackgroundColor(context))
