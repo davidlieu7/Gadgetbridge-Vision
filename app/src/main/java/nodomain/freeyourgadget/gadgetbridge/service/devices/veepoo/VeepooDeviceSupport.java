@@ -3858,7 +3858,7 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
         autoMeasureSettings.clear();
         autoMeasureSettings.putAll(parsed);
         for (VeepooAutoMeasureSetting setting : parsed.values()) {
-            LOG.info("Auto-measure {}: {}", setting.getFunType(), setting);
+            LOG.info("Auto-measure {}: {}", autoMeasureTypeName(setting.getFunType()), setting);
         }
         syncAutoMeasurePrefs(parsed);
         int pendingFunType;
@@ -3870,6 +3870,22 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
         }
         if (pendingFunType >= 0) {
             sendAutoMeasureWrite(pendingFunType, pendingOn);
+        }
+    }
+
+    /** Maps an auto-measure funType to its display name (vendor EAutoMeasureType). */
+    private static String autoMeasureTypeName(int funType) {
+        switch (funType) {
+            case 0: return "Pulse rate";
+            case 1: return "Blood pressure";
+            case 2: return "Blood glucose";
+            case 3: return "Stress";
+            case 4: return "Blood oxygen";
+            case 5: return "Body temperature";
+            case 6: return "Lorenz";
+            case 7: return "HRV";
+            case 8: return "Blood composition";
+            default: return "Unknown (" + funType + ")";
         }
     }
 
@@ -4636,19 +4652,26 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
     /**
      * Opcode 0xD0 stream: [1] = bpm (1/2 = not worn), [5] = sensor status (busy unless 0/2/3).
      * While a single-shot read is active the first plausible reading completes it; frames
-     * outside a read are autonomous auto-measure pushes and are persisted silently.
+     * outside a read are autonomous auto-measure pushes and are persisted silently. The band
+     * also sends a compact push form ({0xD0, bpm}, no status byte) from its monitor feature.
      */
     private void handleHeartRateMeasurement(byte[] data) {
-        if (data.length < 6) {
+        if (data.length < 2) {
+            LOG.debug("Dropping short 0xD0 frame: {} bytes", data.length);
             return;
         }
+        final boolean longForm = data.length >= 6;
         int bpm = data[1] & 0xFF;
-        int status = data[5] & 0xFF;
+        int status = longForm ? data[5] & 0xFF : 0;
         synchronized (this) {
             if (!hrDetectActive) {
                 persistAutonomousHeartRate(bpm, status);
                 return;
             }
+        }
+        if (!longForm) {
+            LOG.debug("Ignoring compact 0xD0 push during a manual heart-rate detect");
+            return;
         }
         if (status != 0 && status != 2 && status != 3) {
             LOG.debug("Heart rate detect busy: bpm={} status={}", bpm, status);
@@ -4844,6 +4867,7 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
      */
     private void handleSpo2Frame(byte[] data) {
         if (data.length < 6) {
+            LOG.debug("Dropping short 0x80 frame: {}", hexBytes(data));
             return;
         }
         synchronized (this) {
@@ -5021,6 +5045,7 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
      */
     private void handleTemperatureFrame(byte[] data) {
         if (data.length < 9) {
+            LOG.debug("Dropping short 0x87 frame: {}", hexBytes(data));
             return;
         }
         synchronized (this) {
@@ -5187,6 +5212,7 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
      */
     private void handleStressFrame(byte[] data) {
         if (data.length < 6 || data[1] != 6) {
+            LOG.debug("Dropping unexpected 0x89 frame: {}", hexBytes(data));
             return;
         }
         synchronized (this) {
@@ -5324,16 +5350,28 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
      * [5]=hasProgress (1 = the device streams progress frames). Status codes: 1/2/4/5/0xFF
      * busy, 0xFE low battery, 0xFD charging, 0xFC not worn; anything else is a data frame.
      * Systolic/diastolic are 0 while the measurement is running and carry the result at the end.
+     * The monitor feature also sends a compact push ({0x90, sys, dia, pulse}) without a status
+     * byte; outside a manual detect it is persisted directly.
      */
     private void handleBpFrame(byte[] data) {
-        if (data.length < 6) {
+        if (data.length < 4) {
+            LOG.debug("Dropping short 0x90 frame: {} bytes", data.length);
             return;
         }
+        final boolean longForm = data.length >= 6;
         synchronized (this) {
             if (!bpDetectActive) {
-                persistAutonomousBp(data);
+                if (longForm) {
+                    persistAutonomousBp(data);
+                } else {
+                    persistCompactAutonomousBp(data);
+                }
                 return;
             }
+        }
+        if (!longForm) {
+            LOG.debug("Ignoring compact 0x90 push during a manual blood-pressure detect");
+            return;
         }
         LOG.debug("Blood pressure frame: {}", hexBytes(data));
         int status = data[4] & 0xFF;
@@ -5373,6 +5411,19 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
         if (systolic >= 60 && systolic <= 300 && diastolic >= 20 && diastolic <= 200) {
             LOG.info("Autonomous blood pressure push: {}/{}", systolic, diastolic);
             saveBpSample(systolic, diastolic);
+        }
+    }
+
+    /** Persists the compact monitor BP push ({0x90, sys, dia, pulse}). */
+    private void persistCompactAutonomousBp(byte[] data) {
+        int systolic = data[1] & 0xFF;
+        int diastolic = data[2] & 0xFF;
+        if (systolic >= 60 && systolic <= 300 && diastolic >= 20 && diastolic <= 200) {
+            int pulse = data.length >= 4 ? data[3] & 0xFF : -1;
+            LOG.info("Autonomous blood pressure push (compact): {}/{} (pulse {})", systolic, diastolic, pulse);
+            saveBpSample(systolic, diastolic);
+        } else if (systolic > 0 || diastolic > 0) {
+            LOG.debug("Ignoring compact 0x90 push out of range: {}/{}", systolic, diastolic);
         }
     }
 
@@ -5928,6 +5979,7 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
      */
     private void handleLipidFrame(byte[] data) {
         if (data.length < 15 || data[1] != VeepooConstants.LIPID_DETECT_FUNCTION) {
+            LOG.debug("Dropping unexpected 0x8A frame: {}", hexBytes(data));
             return;
         }
         synchronized (this) {
