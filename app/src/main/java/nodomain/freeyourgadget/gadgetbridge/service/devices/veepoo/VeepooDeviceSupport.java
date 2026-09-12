@@ -4677,7 +4677,7 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
         if (bpm == 1 || bpm == 2 || bpm < 30 || bpm > 210) {
             return;
         }
-        LOG.debug("Autonomous heart rate push: {} bpm", bpm);
+        LOG.info("Autonomous heart rate push: {} bpm", bpm);
         saveHeartRateSample(bpm);
     }
 
@@ -4921,7 +4921,7 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
             return;
         }
         if (value >= 75 && value <= 99) {
-            LOG.debug("Autonomous SpO2 push: {}% (hr={})", value, hr);
+            LOG.info("Autonomous SpO2 push: {}% (hr={})", value, hr);
             saveSpo2Sample(value);
             if (hr != null) {
                 saveHeartRateSample(hr);
@@ -5071,7 +5071,7 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
         int progress = data[4] & 0xFF;
         Float body = plausibleTemperature(data[5], data[6]);
         if (progress >= 100 && body != null) {
-            LOG.debug("Autonomous temperature push: {} C", body);
+            LOG.info("Autonomous temperature push: {} C", body);
             saveTemperatureSample(body);
         }
     }
@@ -5234,7 +5234,7 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
         int progress = data[4] & 0xFF;
         int value = data[5] & 0xFF;
         if (progress == 100 && value > 0) {
-            LOG.debug("Autonomous stress push: {}", value);
+            LOG.info("Autonomous stress push: {}", value);
             saveStressSample(value);
         }
     }
@@ -5371,7 +5371,7 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
         int systolic = data[1] & 0xFF;
         int diastolic = data[2] & 0xFF;
         if (systolic >= 60 && systolic <= 300 && diastolic >= 20 && diastolic <= 200) {
-            LOG.debug("Autonomous blood pressure push: {}/{}", systolic, diastolic);
+            LOG.info("Autonomous blood pressure push: {}/{}", systolic, diastolic);
             saveBpSample(systolic, diastolic);
         }
     }
@@ -5921,10 +5921,10 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
     }
 
     /**
-     * Opcode 0x8A frame: [1]=1, [2]=event (1 detect / 2 stop), [3]=state. State 0 carries the
-     * values: [4]=progress %, uric acid = u16([5],[6])/10 and cholesterol, triglycerides, HDL,
-     * LDL = u16 pairs at [7..14] /100; the measurement completes at 100%. States 2/3/4 are low
-     * battery/busy/not worn.
+     * Opcode 0x8A frame: [2]=stop ack, [3]=state (0 ok, 2 low battery, 3 busy, 4 not worn),
+     * [4]=progress percent; at progress 100 [5..14] carry uric acid (/10) then total
+     * cholesterol, triglyceride, HDL and LDL (/100). Frames outside a manual read are
+     * autonomous auto-measure pushes and are persisted.
      */
     private void handleLipidFrame(byte[] data) {
         if (data.length < 15 || data[1] != VeepooConstants.LIPID_DETECT_FUNCTION) {
@@ -5932,6 +5932,7 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
         }
         synchronized (this) {
             if (!lipidDetectActive) {
+                persistAutonomousLipid(data);
                 return;
             }
         }
@@ -5949,17 +5950,30 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
             return;
         }
         int progress = data[4] & 0xFF;
-        float[] values = {
+        if (progress == 100) {
+            finishLipidDetect(parseLipidValues(data), VITAL_FAIL_NONE);
+        } else {
+            LOG.debug("Blood lipid in progress: {}%", progress);
+        }
+    }
+
+    /** Parses the five lipid values (uric acid, TCHO, TAG, HDL, LDL) from a data frame. */
+    private static float[] parseLipidValues(byte[] data) {
+        return new float[]{
                 (((data[6] & 0xFF) << 8) | (data[5] & 0xFF)) / 10f,
                 (((data[8] & 0xFF) << 8) | (data[7] & 0xFF)) / 100f,
                 (((data[10] & 0xFF) << 8) | (data[9] & 0xFF)) / 100f,
                 (((data[12] & 0xFF) << 8) | (data[11] & 0xFF)) / 100f,
                 (((data[14] & 0xFF) << 8) | (data[13] & 0xFF)) / 100f};
-        if (progress == 100) {
-            finishLipidDetect(values, VITAL_FAIL_NONE);
-        } else {
-            LOG.debug("Blood lipid in progress: {}%", progress);
+    }
+
+    private void persistAutonomousLipid(byte[] data) {
+        if (data[2] == 2 || (data[3] & 0xFF) != 0 || (data[4] & 0xFF) != 100) {
+            return; // stop ack, failure frame or still in progress
         }
+        float[] values = parseLipidValues(data);
+        LOG.info("Autonomous blood lipid push: TCHO={} TAG={}", values[1], values[2]);
+        saveLipidSample(values);
     }
 
     /** Completes the blood lipid read: stops the stream, then stores or reports the result. */

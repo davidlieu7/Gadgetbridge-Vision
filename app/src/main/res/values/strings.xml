@@ -1215,6 +1215,7 @@
     <string name="wake_count">Wake count</string>
     <string name="heart_rate_during_sleep">Heart rate during sleep</string>
     <string name="spo2_during_sleep">SpO2 during sleep</string>
+    <string name="temperature_during_sleep">Temperature during sleep</string>
     <string name="respiratory_rate_during_sleep">Respiration during sleep</string>
     <string name="apnea_events">Apnea events</string>
     <string name="hypoxia_minutes">Hypoxia minutes</string>

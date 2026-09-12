@@ -80,8 +80,14 @@ import nodomain.freeyourgadget.gadgetbridge.databinding.FragmentSleepchartBindin
 import nodomain.freeyourgadget.gadgetbridge.devices.DeviceCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.TimeSampleProvider;
 import nodomain.freeyourgadget.gadgetbridge.entities.Device;
+import nodomain.freeyourgadget.gadgetbridge.entities.GenericHeartRateSample;
+import nodomain.freeyourgadget.gadgetbridge.entities.GenericHeartRateSampleDao;
 import nodomain.freeyourgadget.gadgetbridge.entities.GenericRespiratoryRateSample;
 import nodomain.freeyourgadget.gadgetbridge.entities.GenericRespiratoryRateSampleDao;
+import nodomain.freeyourgadget.gadgetbridge.entities.GenericSpo2Sample;
+import nodomain.freeyourgadget.gadgetbridge.entities.GenericSpo2SampleDao;
+import nodomain.freeyourgadget.gadgetbridge.entities.GenericTemperatureSample;
+import nodomain.freeyourgadget.gadgetbridge.entities.GenericTemperatureSampleDao;
 import nodomain.freeyourgadget.gadgetbridge.entities.VeepooActivitySample;
 import nodomain.freeyourgadget.gadgetbridge.entities.VeepooSleepSummarySample;
 import nodomain.freeyourgadget.gadgetbridge.entities.VeepooSleepSummarySampleDao;
@@ -587,7 +593,7 @@ public class SleepDailyFragment extends SleepFragment<SleepDailyFragment.MyChart
             if (sample.getTimestamp() < periodStartSec || sample.getTimestamp() > periodEndSec) {
                 continue;
             }
-            if (ActivityKind.isSleep(sample.getKind()) && heartRateUtils.isValidHeartRateValue(sample.getHeartRate())) {
+            if (heartRateUtils.isValidHeartRateValue(sample.getHeartRate())) {
                 hrAccumulator.add(sample.getHeartRate());
             }
             if (sample instanceof VeepooActivitySample) {
@@ -604,6 +610,20 @@ public class SleepDailyFragment extends SleepFragment<SleepDailyFragment.MyChart
             }
         }
 
+        // Merge standalone heart-rate samples (autonomous overnight pushes, manual reads) into the same stats.
+        final List<GenericHeartRateSample> hrSamples = db.getDaoSession().getGenericHeartRateSampleDao()
+                .queryBuilder()
+                .where(GenericHeartRateSampleDao.Properties.DeviceId.eq(dbDevice.getId()),
+                        GenericHeartRateSampleDao.Properties.Timestamp.ge(periodStartMs),
+                        GenericHeartRateSampleDao.Properties.Timestamp.le(periodEndMs))
+                .build()
+                .list();
+        for (GenericHeartRateSample hrSample : hrSamples) {
+            if (heartRateUtils.isValidHeartRateValue(hrSample.getHeartRate())) {
+                hrAccumulator.add(hrSample.getHeartRate());
+            }
+        }
+
         final Triple<Integer, Integer, Integer> heartRate;
         if (hrAccumulator.getCount() > 0) {
             heartRate = Triple.of((int) hrAccumulator.getMin(), (int) Math.round(hrAccumulator.getAverage()), (int) hrAccumulator.getMax());
@@ -615,7 +635,8 @@ public class SleepDailyFragment extends SleepFragment<SleepDailyFragment.MyChart
                 summary.getQuality(),
                 summary.getWakeCount(),
                 heartRate,
-                prepareSpo2Stats(device, db, periodStartMs, periodEndMs),
+                prepareSpo2Stats(dbDevice.getId(), device, db, periodStartMs, periodEndMs),
+                prepareTemperatureStats(dbDevice.getId(), device, db, periodStartMs, periodEndMs),
                 prepareRespiratoryRateStats(dbDevice.getId(), device, db, periodStartMs, periodEndMs),
                 apneaEvents,
                 hypoxiaMinutes,
@@ -623,19 +644,54 @@ public class SleepDailyFragment extends SleepFragment<SleepDailyFragment.MyChart
         );
     }
 
-    private Triple<Integer, Integer, Integer> prepareSpo2Stats(GBDevice device, DBHandler db, long tsStartMs, long tsEndMs) {
-        final TimeSampleProvider<? extends Spo2Sample> provider = device.getDeviceCoordinator().getSpo2SampleProvider(device, db.getDaoSession());
-        if (provider == null) {
-            return null;
-        }
+    private Triple<Integer, Integer, Integer> prepareSpo2Stats(long deviceId, GBDevice device, DBHandler db, long tsStartMs, long tsEndMs) {
         final Accumulator accumulator = new Accumulator();
-        for (Spo2Sample sample : provider.getAllSamples(tsStartMs, tsEndMs)) {
-            accumulator.add(sample.getSpo2());
+        final TimeSampleProvider<? extends Spo2Sample> provider = device.getDeviceCoordinator().getSpo2SampleProvider(device, db.getDaoSession());
+        if (provider != null) {
+            for (Spo2Sample sample : provider.getAllSamples(tsStartMs, tsEndMs)) {
+                accumulator.add(sample.getSpo2());
+            }
+        } else {
+            final List<GenericSpo2Sample> samples = db.getDaoSession().getGenericSpo2SampleDao()
+                    .queryBuilder()
+                    .where(GenericSpo2SampleDao.Properties.DeviceId.eq(deviceId),
+                            GenericSpo2SampleDao.Properties.Timestamp.ge(tsStartMs),
+                            GenericSpo2SampleDao.Properties.Timestamp.le(tsEndMs))
+                    .build()
+                    .list();
+            for (GenericSpo2Sample sample : samples) {
+                accumulator.add(sample.getSpo2());
+            }
         }
         if (accumulator.getCount() == 0) {
             return null;
         }
         return Triple.of((int) accumulator.getMin(), (int) Math.round(accumulator.getAverage()), (int) accumulator.getMax());
+    }
+
+    private Triple<Float, Float, Float> prepareTemperatureStats(long deviceId, GBDevice device, DBHandler db, long tsStartMs, long tsEndMs) {
+        final Accumulator accumulator = new Accumulator();
+        final TimeSampleProvider<? extends TemperatureSample> provider = device.getDeviceCoordinator().getTemperatureSampleProvider(device, db.getDaoSession());
+        if (provider != null) {
+            for (TemperatureSample sample : provider.getAllSamples(tsStartMs, tsEndMs)) {
+                accumulator.add(sample.getTemperature());
+            }
+        } else {
+            final List<GenericTemperatureSample> samples = db.getDaoSession().getGenericTemperatureSampleDao()
+                    .queryBuilder()
+                    .where(GenericTemperatureSampleDao.Properties.DeviceId.eq(deviceId),
+                            GenericTemperatureSampleDao.Properties.Timestamp.ge(tsStartMs),
+                            GenericTemperatureSampleDao.Properties.Timestamp.le(tsEndMs))
+                    .build()
+                    .list();
+            for (GenericTemperatureSample sample : samples) {
+                accumulator.add(sample.getTemperature());
+            }
+        }
+        if (accumulator.getCount() == 0) {
+            return null;
+        }
+        return Triple.of((float) accumulator.getMin(), (float) Math.round(accumulator.getAverage()), (float) accumulator.getMax());
     }
 
     private Triple<Float, Float, Float> prepareRespiratoryRateStats(long deviceId, GBDevice device, DBHandler db, long tsStartMs, long tsEndMs) {
@@ -711,6 +767,11 @@ public class SleepDailyFragment extends SleepFragment<SleepDailyFragment.MyChart
         if (vitals.getSpo2() != null) {
             vitalsBuilder.addEntry(getString(R.string.spo2_during_sleep),
                     new ActivitySummarySimpleEntry(formatIntegerRange(vitals.getSpo2(), "%"), UNIT_RAW_STRING));
+            hasCells = true;
+        }
+        if (vitals.getTemperature() != null) {
+            vitalsBuilder.addEntry(getString(R.string.temperature_during_sleep),
+                    new ActivitySummarySimpleEntry(formatFloatRange(vitals.getTemperature(), "°C"), UNIT_RAW_STRING));
             hasCells = true;
         }
         if (vitals.getRespiratoryRate() != null) {
@@ -1080,6 +1141,7 @@ public class SleepDailyFragment extends SleepFragment<SleepDailyFragment.MyChart
         private final Integer wakeCount;
         private final Triple<Integer, Integer, Integer> heartRate;
         private final Triple<Integer, Integer, Integer> spo2;
+        private final Triple<Float, Float, Float> temperature;
         private final Triple<Float, Float, Float> respiratoryRate;
         private final long apneaEvents;
         private final long hypoxiaMinutes;
@@ -1089,6 +1151,7 @@ public class SleepDailyFragment extends SleepFragment<SleepDailyFragment.MyChart
                            Integer wakeCount,
                            Triple<Integer, Integer, Integer> heartRate,
                            Triple<Integer, Integer, Integer> spo2,
+                           Triple<Float, Float, Float> temperature,
                            Triple<Float, Float, Float> respiratoryRate,
                            long apneaEvents,
                            long hypoxiaMinutes,
@@ -1097,6 +1160,7 @@ public class SleepDailyFragment extends SleepFragment<SleepDailyFragment.MyChart
             this.wakeCount = wakeCount;
             this.heartRate = heartRate;
             this.spo2 = spo2;
+            this.temperature = temperature;
             this.respiratoryRate = respiratoryRate;
             this.apneaEvents = apneaEvents;
             this.hypoxiaMinutes = hypoxiaMinutes;
@@ -1121,6 +1185,11 @@ public class SleepDailyFragment extends SleepFragment<SleepDailyFragment.MyChart
         @Nullable
         public Triple<Integer, Integer, Integer> getSpo2() {
             return spo2;
+        }
+
+        @Nullable
+        public Triple<Float, Float, Float> getTemperature() {
+            return temperature;
         }
 
         @Nullable
