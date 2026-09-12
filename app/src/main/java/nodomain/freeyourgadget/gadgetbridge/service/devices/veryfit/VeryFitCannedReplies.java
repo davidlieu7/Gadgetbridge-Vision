@@ -83,9 +83,9 @@ class VeryFitCannedReplies {
     }
 
     void onCallState(final CallSpec spec) {
-        if (spec.command == CallSpec.CALL_INCOMING) {
-            callNumber = spec.number;
-        } else if (spec.command == CallSpec.CALL_END || spec.command == CallSpec.CALL_REJECT) {
+        if (spec.getCommand() == CallSpec.CALL_INCOMING) {
+            callNumber = spec.getNumber();
+        } else if (spec.getCommand() == CallSpec.CALL_END || spec.getCommand() == CallSpec.CALL_REJECT) {
             callNumber = null;
         }
     }
@@ -140,15 +140,15 @@ class VeryFitCannedReplies {
             return false;
         }
         event.handle = spec.getId();
-        if ((spec.type == NotificationType.GENERIC_SMS || spec.type == NotificationType.GENERIC_PHONE)
-                && spec.phoneNumber != null) {
-            event.phoneNumber = spec.phoneNumber;
+        if ((spec.getType() == NotificationType.GENERIC_SMS || spec.getType() == NotificationType.GENERIC_PHONE)
+                && spec.getPhoneNumber() != null) {
+            event.phoneNumber = spec.getPhoneNumber();
             return true;
         }
-        if (spec.attachedActions != null) {
-            for (final NotificationSpec.Action action : spec.attachedActions) {
+        if (spec.getAttachedActions() != null) {
+            for (final NotificationSpec.Action action : spec.getAttachedActions()) {
                 if (action.isReply()) {
-                    event.handle = action.handle;
+                    event.handle = action.getHandle();
                     return true;
                 }
             }

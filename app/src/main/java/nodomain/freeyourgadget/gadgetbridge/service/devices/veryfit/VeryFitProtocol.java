@@ -340,19 +340,19 @@ public class VeryFitProtocol {
             return body;
         }
 
-        body[0] = state.state == MusicStateSpec.STATE_PLAYING
+        body[0] = state.getState() == MusicStateSpec.STATE_PLAYING
                 ? VeryFitConstants.MUSIC_PLAYING : VeryFitConstants.MUSIC_PAUSED;
-        writeShortLE(body, 1, state.position);
-        writeShortLE(body, 3, spec.duration);
+        writeShortLE(body, 1, state.getPosition());
+        writeShortLE(body, 3, spec.getDuration());
 
-        final byte[] track = text(spec.track);
+        final byte[] track = text(spec.getTrack());
         writeShortLE(body, 5, track.length);
         System.arraycopy(track, 0, body, 7, track.length);
 
         body[71] = VeryFitConstants.MUSIC_VOLUME_STEPS;
         body[72] = (byte) volume;
 
-        final byte[] artist = text(spec.artist);
+        final byte[] artist = text(spec.getArtist());
         writeShortLE(body, 73, artist.length);
         System.arraycopy(artist, 0, body, 75, artist.length);
         return body;

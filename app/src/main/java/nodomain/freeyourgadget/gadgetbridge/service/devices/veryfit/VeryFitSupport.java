@@ -1063,11 +1063,11 @@ public class VeryFitSupport extends AbstractBTLESingleDeviceSupport {
     @Override
     public void onNotification(final NotificationSpec notificationSpec) {
         // The watch shows the source as the notification's header, so it wants the app's own name.
-        final String source = StringUtils.getFirstOf(notificationSpec.sourceName,
-                notificationSpec.type != null ? notificationSpec.type.name() : "");
-        final String title = StringUtils.getFirstOf(notificationSpec.title, notificationSpec.sender);
-        final String body = StringUtils.ensureNotNull(notificationSpec.body);
-        final int appId = appId(notificationSpec.sourceAppId);
+        final String source = StringUtils.getFirstOf(notificationSpec.getSourceName(),
+                notificationSpec.getType() != null ? notificationSpec.getType().name() : "");
+        final String title = StringUtils.getFirstOf(notificationSpec.getTitle(), notificationSpec.getSender());
+        final String body = StringUtils.ensureNotNull(notificationSpec.getBody());
+        final int appId = appId(notificationSpec.getSourceAppId());
 
         // An app the watch has only just been told about is not one it will quote back, so the
         // two go out as separate writes rather than back to back in one.
@@ -1090,11 +1090,11 @@ public class VeryFitSupport extends AbstractBTLESingleDeviceSupport {
 
     @Override
     public void onSetCannedMessages(final CannedMessagesSpec cannedMessagesSpec) {
-        if (cannedMessagesSpec.type != CannedMessagesSpec.TYPE_GENERIC
+        if (cannedMessagesSpec.getType() != CannedMessagesSpec.TYPE_GENERIC
                 || !getCapabilities().supports(VeryFitFeature.FRAMED_PROTOCOL)) {
             return;
         }
-        final List<String> replies = Arrays.asList(cannedMessagesSpec.cannedMessages);
+        final List<String> replies = Arrays.asList(cannedMessagesSpec.getCannedMessages());
         final int count = Math.min(replies.size(), VeryFitConstants.REPLY_SLOTS);
         LOG.info("Sending {} canned replies", count);
         send("veryfit canned replies", protocol.framed(VeryFitConstants.FRAMED_CANNED_REPLIES,
@@ -1106,7 +1106,7 @@ public class VeryFitSupport extends AbstractBTLESingleDeviceSupport {
     }
 
     @Override
-    public void onReset(final int flags) {
+    public void onReboot() {
         send("veryfit reboot", VeryFitProtocol.command(VeryFitConstants.GROUP_RESTART,
                 VeryFitConstants.RESTART_REBOOT));
     }
