@@ -2461,6 +2461,10 @@
     <string name="veepoo_ecg_failed_no_contact">Failed: no probe contact detected. Place your finger on the ECG probe and retry.</string>
     <string name="veepoo_ecg_failed_device">Failed: the device reported an ECG error</string>
     <string name="veepoo_ecg_failed_timeout">Failed: timed out waiting for the measurement to finish</string>
+    <string name="veepoo_ecg_waveform">Waveform</string>
+    <string name="veepoo_ecg_detail_title">ECG waveform</string>
+    <string name="veepoo_ecg_duration">Duration</string>
+    <string name="veepoo_ecg_not_found">No ECG sample found</string>
     <string name="veepoo_bc_ok">Body composition measurement complete</string>
     <string name="veepoo_bc_no_reading">No body composition reading (timed out)</string>
     <string name="veepoo_lipids_ok">Lipids: TCHO %1$.1f · TAG %2$.1f</string>

@@ -31,6 +31,8 @@ import android.widget.Toast;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
+import java.util.Arrays;
+
 import nodomain.freeyourgadget.gadgetbridge.GBApplication;
 import nodomain.freeyourgadget.gadgetbridge.R;
 import nodomain.freeyourgadget.gadgetbridge.devices.veepoo.VeepooConstants;
@@ -88,28 +90,42 @@ public class VeepooVitalsChooserActivity extends Activity {
             finish();
             return;
         }
+        // The ECG entry is hidden only when the firmware explicitly reported no ECG support in
+        // its capability report; devices without a stored report keep the full list.
+        final boolean ecgSupported = GBApplication.getDeviceSpecificSharedPrefs(device.getAddress())
+                .getBoolean(VeepooConstants.CONFIG_ECG_SUPPORTED, true);
+        int[] positions = new int[TITLES.length];
+        int visibleCount = 0;
+        for (int i = 0; i < TITLES.length; i++) {
+            if (!ecgSupported && CONFIG_KEYS[i].equals(VeepooConstants.CONFIG_MEASURE_ECG)) {
+                continue;
+            }
+            positions[visibleCount++] = i;
+        }
         ListView listView = new ListView(this);
-        listView.setAdapter(new VitalAdapter(this, device));
+        listView.setAdapter(new VitalAdapter(this, device, Arrays.copyOf(positions, visibleCount)));
         setContentView(listView);
     }
 
     private final class VitalAdapter extends ArrayAdapter<String> {
         private final GBDevice device;
+        private final int[] positions;
 
-        VitalAdapter(Context context, GBDevice device) {
+        VitalAdapter(Context context, GBDevice device, int[] positions) {
             super(context, 0);
             this.device = device;
+            this.positions = positions;
         }
 
         @Override
         public int getCount() {
-            return TITLES.length;
+            return positions.length;
         }
 
         @NonNull
         @Override
         public String getItem(int position) {
-            return getString(TITLES[position]);
+            return getString(TITLES[positions[position]]);
         }
 
         @Override
@@ -118,13 +134,14 @@ public class VeepooVitalsChooserActivity extends Activity {
             if (view == null) {
                 view = LayoutInflater.from(getContext()).inflate(R.layout.veepoo_vital_item, parent, false);
             }
+            int entry = positions[position];
             ImageView icon = view.findViewById(R.id.veepoo_vital_item_icon);
             TextView title = view.findViewById(R.id.veepoo_vital_item_title);
-            icon.setImageResource(ICONS[position]);
+            icon.setImageResource(ICONS[entry]);
             title.setText(getItem(position));
             view.setOnClickListener(v -> {
-                GBApplication.deviceService(device).onSendConfiguration(CONFIG_KEYS[position]);
-                new HeartRateDialog(device, VeepooVitalsChooserActivity.this, DIALOG_TYPES[position]).show();
+                GBApplication.deviceService(device).onSendConfiguration(CONFIG_KEYS[entry]);
+                new HeartRateDialog(device, VeepooVitalsChooserActivity.this, DIALOG_TYPES[entry]).show();
             });
             return view;
         }

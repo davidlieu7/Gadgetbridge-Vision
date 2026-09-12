@@ -251,6 +251,10 @@ public final class VeepooConstants {
     /** Max text alarms this firmware keeps (vendor Alarm2Util.isTextAlarmListFull). */
     public static final int ALARM_MAX_ALARMS = 10;
     public static final String CONFIG_ALARMS_SUPPORTED = "veepoo_alarms_supported";
+    /** ECG capability persisted from the A7 pkg2 [15] report; false only when the firmware says so. */
+    public static final String CONFIG_ECG_SUPPORTED = "veepoo_ecg_supported";
+    /** ECG type byte from A7 pkg2 [15]; selects the warm-up length in VeepooEcgWaveform.dropWarmup(). */
+    public static final String CONFIG_ECG_TYPE = "veepoo_ecg_type";
 
     // ---- Custom setting (per-feature monitor toggles), opcode 0xB8 --------
     /** Opcode for reading/writing the classic per-feature monitor settings. */
@@ -362,6 +366,8 @@ public final class VeepooConstants {
     public static final int CAP_PKG2_SPORT_MODEL_DAY = 5;
     /** Package 2: multi-sport mode type; 4/5/6 -> GPS variant of the 0xD4 layout. */
     public static final int CAP_PKG2_MULTISPORT_MODE_TYPE = 16;
+    /** Package 2: ECG capability/type byte; 0 -> no ECG, non-zero -> supported (value is the ecgType). */
+    public static final int CAP_PKG2_ECG_TYPE = 15;
     /** Package 3: temperature type; 0 -> no app-triggered temperature measurement. */
     public static final int CAP_PKG3_TEMP_TYPE = 7;
     /** Package 3: MET (metabolic rate) type; 2/3 -> supported. */

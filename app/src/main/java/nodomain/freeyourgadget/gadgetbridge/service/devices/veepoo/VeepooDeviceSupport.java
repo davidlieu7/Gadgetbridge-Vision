@@ -708,7 +708,7 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
     /**
      * Opcode 0xA7 capability report (device push, package id in byte [19]). Package 2 carries the
      * fields we need: watch data days [2], workout history days [5], origin protocol version [10],
-     * precision sleep tag [13], multi-sport mode type [16].
+     * precision sleep tag [13], ECG capability/type [15], multi-sport mode type [16].
      */
     private void handleDeviceFunctionReport(byte[] data) {
         if (data.length < 20) {
@@ -742,10 +742,18 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
             preciseSleepCapable = (data[13] & 0xFF) != 0;
             sportModelDay = data[VeepooConstants.CAP_PKG2_SPORT_MODEL_DAY] & 0xFF;
             multSportModeType = data[VeepooConstants.CAP_PKG2_MULTISPORT_MODE_TYPE] & 0xFF;
-            LOG.info("Capabilities: watchDataDay={}, originProtocolVersion={} ({}), preciseSleep={}, workoutDays={}, multisport={}",
+            int ecgType = data[VeepooConstants.CAP_PKG2_ECG_TYPE] & 0xFF;
+            boolean ecgSupported = ecgType != 0;
+            LOG.info("Capabilities: watchDataDay={}, originProtocolVersion={} ({}), preciseSleep={}, workoutDays={}, multisport={}, ecg={} (ecgType={})",
                     watchDataDay, originProtocolVersion,
                     (originProtocolVersion == 3 || originProtocolVersion == 5) ? "Origin3/DF" : "v1",
-                    preciseSleepCapable, sportModelDay, multSportModeType);
+                    preciseSleepCapable, sportModelDay, multSportModeType,
+                    ecgSupported ? "supported" : "not supported", ecgType);
+            GBApplication.getDeviceSpecificSharedPrefs(getDevice().getAddress())
+                    .edit()
+                    .putBoolean(VeepooConstants.CONFIG_ECG_SUPPORTED, ecgSupported)
+                    .putInt(VeepooConstants.CONFIG_ECG_TYPE, ecgType)
+                    .apply();
         } else if (packageId == 3) {
             tempType = data[VeepooConstants.CAP_PKG3_TEMP_TYPE] & 0xFF;
             metType = data[VeepooConstants.CAP_PKG3_MET_TYPE] & 0xFF;
