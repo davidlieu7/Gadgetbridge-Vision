@@ -25,6 +25,7 @@ import java.util.Locale;
 
 import nodomain.freeyourgadget.gadgetbridge.devices.veryfit.VeryFitConstants;
 import nodomain.freeyourgadget.gadgetbridge.model.Alarm;
+import nodomain.freeyourgadget.gadgetbridge.model.Contact;
 import nodomain.freeyourgadget.gadgetbridge.model.MusicSpec;
 import nodomain.freeyourgadget.gadgetbridge.model.MusicStateSpec;
 import nodomain.freeyourgadget.gadgetbridge.model.WeatherSpec;
@@ -382,6 +383,32 @@ public class VeryFitProtocol {
             out.write(record, 0, record.length);
         }
         return out.toByteArray();
+    }
+
+    /**
+     * One frame of a {@link VeryFitConstants#FRAMED_CONTACTS} list: the counters that let the
+     * watch place the frame within the whole list, then a fixed-size record per contact.
+     */
+    public static byte[] contacts(final int total, final int done, final List<? extends Contact> chunk) {
+        final byte[] body = new byte[VeryFitConstants.CONTACTS_HEADER_LEN
+                + chunk.size() * VeryFitConstants.CONTACT_RECORD_LEN];
+        body[0] = VeryFitConstants.CONTACTS_VERSION;
+        body[1] = VeryFitConstants.CONTACTS_SET;
+        body[2] = (byte) total;
+        body[3] = (byte) done;
+        body[4] = (byte) chunk.size();
+
+        int offset = VeryFitConstants.CONTACTS_HEADER_LEN;
+        for (final Contact contact : chunk) {
+            final byte[] number = StringUtils.truncateToBytes(contact.getNumber(), VeryFitConstants.CONTACT_NUMBER_LEN);
+            final byte[] name = StringUtils.truncateToBytes(contact.getName(), VeryFitConstants.CONTACT_NAME_LEN);
+            body[offset] = (byte) number.length;
+            System.arraycopy(number, 0, body, offset + 1, number.length);
+            body[offset + 1 + VeryFitConstants.CONTACT_NUMBER_LEN] = (byte) name.length;
+            System.arraycopy(name, 0, body, offset + 2 + VeryFitConstants.CONTACT_NUMBER_LEN, name.length);
+            offset += VeryFitConstants.CONTACT_RECORD_LEN;
+        }
+        return body;
     }
 
     /** Whether the reply the watch picked went out, with the pick echoed behind the outcome. */

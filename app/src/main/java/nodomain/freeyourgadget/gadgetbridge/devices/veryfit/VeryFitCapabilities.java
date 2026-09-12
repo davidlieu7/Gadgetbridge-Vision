@@ -32,16 +32,19 @@ import nodomain.freeyourgadget.gadgetbridge.util.StringUtils;
 public class VeryFitCapabilities {
     public static final String PREF_FEATURES = "veryfit_features";
     public static final String PREF_FEATURES_EXTRA = "veryfit_features_extra";
+    public static final String PREF_LIMITS = "veryfit_limits";
 
     private static final int DEFAULT_ALARM_SLOTS = 3;
 
     private final byte[] base;
     private final byte[] extra;
+    private final byte[] limits;
     private final Set<VeryFitFeature> features = EnumSet.noneOf(VeryFitFeature.class);
 
-    public VeryFitCapabilities(final byte[] base, final byte[] extra) {
+    public VeryFitCapabilities(final byte[] base, final byte[] extra, final byte[] limits) {
         this.base = base != null ? base : new byte[0];
         this.extra = extra != null ? extra : new byte[0];
+        this.limits = limits != null ? limits : new byte[0];
 
         for (final VeryFitFeature feature : VeryFitFeature.values()) {
             final byte[] table = feature.getTable() == VeryFitFeature.Table.BASE ? this.base : this.extra;
@@ -54,7 +57,8 @@ public class VeryFitCapabilities {
     public static VeryFitCapabilities fromPreferences(final Prefs prefs) {
         return new VeryFitCapabilities(
                 fromHex(prefs.getString(PREF_FEATURES, "")),
-                fromHex(prefs.getString(PREF_FEATURES_EXTRA, ""))
+                fromHex(prefs.getString(PREF_FEATURES_EXTRA, "")),
+                fromHex(prefs.getString(PREF_LIMITS, ""))
         );
     }
 
@@ -73,6 +77,11 @@ public class VeryFitCapabilities {
 
     public int getAlarmSlots() {
         return base.length > 1 ? base[1] & 0xff : DEFAULT_ALARM_SLOTS;
+    }
+
+    /** Favourite contacts the watch has room for; none until it has said. */
+    public int getContactSlots() {
+        return limits.length > 1 ? (limits[0] & 0xff) | ((limits[1] & 0xff) << 8) : 0;
     }
 
     public String getBaseHex() {

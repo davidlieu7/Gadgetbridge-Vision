@@ -55,6 +55,7 @@ public final class VeryFitConstants {
     public static final int FRAMED_APP_REGISTRY = 0x003c;
     public static final int FRAMED_WATCHFACE = 0x0008;
     public static final int FRAMED_WATCHFACE_LIST = 0x0031;
+    public static final int FRAMED_CONTACTS = 0x0039;
 
     /** What to do with the face named in the fixed-size slot behind it. */
     public static final byte WATCHFACE_SELECT = 0x01;
@@ -146,6 +147,17 @@ public final class VeryFitConstants {
     public static final int REPLY_TEXT_LEN = 68;
     /** The vendor's own sender stops copying at this many, whatever the count says. */
     public static final int REPLY_SLOTS = 10;
+
+    // Favourite contacts: [version][operation][total][already done][in this frame], then one
+    // fixed-size record per contact. The reply repeats the counters behind a result byte.
+    public static final byte CONTACTS_VERSION = 0x10;
+    public static final byte CONTACTS_SET = 0x01;
+    public static final int CONTACTS_HEADER_LEN = 5;
+    public static final int CONTACTS_PER_FRAME = 10;
+    /** Number byte count, number, name byte count, name; both texts zero padded. */
+    public static final int CONTACT_RECORD_LEN = 49;
+    public static final int CONTACT_NUMBER_LEN = 15;
+    public static final int CONTACT_NAME_LEN = 32;
 
     // Short packet: [group][key][payload]. An empty payload is a query, anything else a set; both
     // are answered by a notification repeating [group][key].
@@ -246,6 +258,8 @@ public final class VeryFitConstants {
     public static final int SLEEP_REM = 4;
     public static final byte QUERY_FIRMWARE = (byte) 0xeb;
     public static final byte QUERY_MTU = (byte) 0xf0;
+    /** How many of each list the watch keeps; the contact count comes first. */
+    public static final byte QUERY_LIMITS = (byte) 0xf9;
 
     public static final byte SETTING_TIME = 0x01;
     public static final byte SETTING_STEP_GOAL = 0x03;

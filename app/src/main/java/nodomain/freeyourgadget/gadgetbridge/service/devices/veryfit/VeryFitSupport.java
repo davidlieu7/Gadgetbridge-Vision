@@ -63,6 +63,7 @@ import nodomain.freeyourgadget.gadgetbridge.model.ActivityUser;
 import nodomain.freeyourgadget.gadgetbridge.model.Alarm;
 import nodomain.freeyourgadget.gadgetbridge.model.CallSpec;
 import nodomain.freeyourgadget.gadgetbridge.model.CannedMessagesSpec;
+import nodomain.freeyourgadget.gadgetbridge.model.Contact;
 import nodomain.freeyourgadget.gadgetbridge.model.DeviceService;
 import nodomain.freeyourgadget.gadgetbridge.model.MusicSpec;
 import nodomain.freeyourgadget.gadgetbridge.model.MusicStateSpec;
@@ -113,6 +114,8 @@ public class VeryFitSupport extends AbstractBTLESingleDeviceSupport {
     private byte[] pendingAuth;
     private byte[] features;
     private byte[] featuresExtra;
+    private byte[] limits;
+    private List<? extends Contact> pendingContacts;
     private final Map<Integer, Boolean> apps = new HashMap<>();
 
     public VeryFitSupport() {
@@ -140,6 +143,7 @@ public class VeryFitSupport extends AbstractBTLESingleDeviceSupport {
             GB.updateTransferNotification(null, "", false, 100, getContext());
         }
         fileUpload.reset();
+        pendingContacts = null;
         features = null;
         featuresExtra = null;
         apps.clear();
@@ -170,6 +174,7 @@ public class VeryFitSupport extends AbstractBTLESingleDeviceSupport {
         write(builder, VeryFitProtocol.query(VeryFitConstants.QUERY_FEATURES));
         write(builder, VeryFitProtocol.query(VeryFitConstants.QUERY_FEATURES_EXTRA));
         write(builder, VeryFitProtocol.query(VeryFitConstants.QUERY_FIRMWARE));
+        write(builder, VeryFitProtocol.query(VeryFitConstants.QUERY_LIMITS));
         write(builder, VeryFitProtocol.query(VeryFitConstants.QUERY_BATTERY));
     }
 
@@ -276,6 +281,10 @@ public class VeryFitSupport extends AbstractBTLESingleDeviceSupport {
             handleWatchfaceOperation(packet.payload);
             return;
         }
+        if (packet.cmd == VeryFitConstants.FRAMED_CONTACTS) {
+            handleContacts(packet.payload);
+            return;
+        }
         if (packet.cmd == VeryFitConstants.FRAMED_HEALTH
                 || packet.cmd == VeryFitConstants.FRAMED_HEALTH_TYPES) {
             healthSync.onPacket(packet.cmd, packet.payload);
@@ -317,6 +326,10 @@ public class VeryFitSupport extends AbstractBTLESingleDeviceSupport {
                 break;
             case VeryFitConstants.QUERY_FIRMWARE:
                 handleFirmware(packet.payload);
+                break;
+            case VeryFitConstants.QUERY_LIMITS:
+                limits = packet.payload;
+                storeFeatures();
                 break;
             case VeryFitConstants.QUERY_BRIGHTNESS:
                 handleBrightness(packet.payload);
@@ -380,11 +393,14 @@ public class VeryFitSupport extends AbstractBTLESingleDeviceSupport {
                 GBApplication.getDeviceSpecificSharedPrefs(gbDevice.getAddress()).edit();
         editor.putString(VeryFitCapabilities.PREF_FEATURES, GB.hexdump(features));
         editor.putString(VeryFitCapabilities.PREF_FEATURES_EXTRA, GB.hexdump(featuresExtra));
+        if (limits != null) {
+            editor.putString(VeryFitCapabilities.PREF_LIMITS, GB.hexdump(limits));
+        }
         editor.apply();
 
         final VeryFitCapabilities capabilities = getCapabilities();
-        LOG.info("Device reports {} alarm slots and features {}",
-                capabilities.getAlarmSlots(), capabilities.getFeatures());
+        LOG.info("Device reports {} alarm slots, {} contact slots and features {}",
+                capabilities.getAlarmSlots(), capabilities.getContactSlots(), capabilities.getFeatures());
     }
 
     private void finishInitialization() {
@@ -1105,6 +1121,50 @@ public class VeryFitSupport extends AbstractBTLESingleDeviceSupport {
         send("veryfit reply outcome", VeryFitProtocol.replyOutcome(sent, pick));
     }
 
+    /**
+     * The list goes up ten at a time; each frame carries the total and how many the watch already
+     * holds, and its answer repeats those counters so the next frame can follow.
+     */
+    @Override
+    public void onSetContacts(final ArrayList<? extends Contact> contacts) {
+        final int slots = getCapabilities().getContactSlots();
+        if (slots == 0) {
+            return;
+        }
+        final List<Contact> kept = new ArrayList<>();
+        for (final Contact contact : contacts) {
+            if (!StringUtils.isNullOrEmpty(contact.getNumber()) && kept.size() < slots) {
+                kept.add(contact);
+            }
+        }
+        LOG.info("Sending {} contacts", kept.size());
+        pendingContacts = kept;
+        sendContacts(0);
+    }
+
+    private void sendContacts(final int done) {
+        final int count = Math.min(pendingContacts.size() - done, VeryFitConstants.CONTACTS_PER_FRAME);
+        sendFramed("veryfit contacts", VeryFitConstants.FRAMED_CONTACTS, VeryFitProtocol.contacts(
+                pendingContacts.size(), done, pendingContacts.subList(done, done + count)));
+    }
+
+    private void handleContacts(final byte[] payload) {
+        if (payload.length < VeryFitConstants.CONTACTS_HEADER_LEN + 1 || pendingContacts == null) {
+            return;
+        }
+        final int result = payload[1] & 0xff;
+        final int done = payload[4] & 0xff;
+        if (result != 0) {
+            LOG.warn("Contacts refused with {} after {} of {}", result, done, pendingContacts.size());
+            pendingContacts = null;
+        } else if (done < pendingContacts.size()) {
+            sendContacts(done);
+        } else {
+            LOG.debug("Contacts accepted");
+            pendingContacts = null;
+        }
+    }
+
     @Override
     public void onReboot() {
         send("veryfit reboot", VeryFitProtocol.command(VeryFitConstants.GROUP_RESTART,
@@ -1124,7 +1184,7 @@ public class VeryFitSupport extends AbstractBTLESingleDeviceSupport {
 
     private VeryFitCapabilities getCapabilities() {
         if (features != null) {
-            return new VeryFitCapabilities(features, featuresExtra);
+            return new VeryFitCapabilities(features, featuresExtra, limits);
         }
         return VeryFitCapabilities.fromPreferences(getDevicePrefs());
     }
