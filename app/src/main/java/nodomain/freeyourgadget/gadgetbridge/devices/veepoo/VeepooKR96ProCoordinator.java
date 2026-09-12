@@ -209,6 +209,16 @@ public class VeepooKR96ProCoordinator extends AbstractBLEDeviceCoordinator {
     }
 
     @Override
+    public boolean supportsRemSleep(@NonNull final GBDevice device) {
+        return true;
+    }
+
+    @Override
+    public boolean supportsAwakeSleep(@NonNull final GBDevice device) {
+        return true;
+    }
+
+    @Override
     public boolean supportsFindDevice(@NonNull final GBDevice device) {
         return true;
     }
