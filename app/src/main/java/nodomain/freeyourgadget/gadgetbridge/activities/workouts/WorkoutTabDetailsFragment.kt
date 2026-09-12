@@ -135,6 +135,7 @@ class WorkoutTabDetailsFragment : Fragment(), WorkoutTabScreenshotProvider {
             gravity = Gravity.START
             setPaddingRelative(dpToPx(16), dpToPx(16), dpToPx(16), dpToPx(8))
             typeface = Typeface.DEFAULT_BOLD
+            setTextColor(GBApplication.getTextColor(context))
             text = groupLabel(groupKey, activityKind)
         }
         binding.summaryDetails.addView(labelField)

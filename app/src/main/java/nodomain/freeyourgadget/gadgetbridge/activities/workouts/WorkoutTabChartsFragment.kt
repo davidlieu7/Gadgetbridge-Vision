@@ -156,6 +156,7 @@ class WorkoutTabChartsFragment : Fragment(), WorkoutTabScreenshotProvider {
                 gravity = Gravity.CENTER
                 textSize = 18f
                 typeface = Typeface.DEFAULT_BOLD
+                setTextColor(GBApplication.getTextColor(context))
 
                 val paddingPx = (16 * resources.displayMetrics.density).toInt()
                 setPaddingRelative(paddingPx, paddingPx, paddingPx, paddingPx)
@@ -267,6 +268,7 @@ class WorkoutTabChartsFragment : Fragment(), WorkoutTabScreenshotProvider {
             gravity = Gravity.CENTER
             setPaddingRelative(dpToPx(16), dpToPx(16), dpToPx(16), dpToPx(8))
             typeface = Typeface.DEFAULT_BOLD
+            setTextColor(GBApplication.getTextColor(context))
             setText(labelRes)
         }
         chartsLayout.addView(labelField)

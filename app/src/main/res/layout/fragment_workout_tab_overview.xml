@@ -34,7 +34,7 @@
                     android:fontFamily="sans-serif-black"
                     android:scrollHorizontally="false"
                     android:text="Activity Name"
-                    android:textSize="16sp"
+                    android:textSize="18sp"
                     tools:ignore="HardcodedText" />
 
                 <TextView

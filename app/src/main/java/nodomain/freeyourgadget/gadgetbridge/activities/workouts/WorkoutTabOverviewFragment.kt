@@ -157,6 +157,7 @@ class WorkoutTabOverviewFragment : Fragment(), WorkoutTabScreenshotProvider {
             gravity = Gravity.START
             setPaddingRelative(dpToPx(16), dpToPx(16), dpToPx(16), dpToPx(8))
             typeface = Typeface.DEFAULT_BOLD
+            setTextColor(GBApplication.getTextColor(context))
             text = workoutValueFormatter.getStringResourceByName(groupKey)
         }
         binding.summaryDetails.addView(labelField)
@@ -195,6 +196,7 @@ class WorkoutTabOverviewFragment : Fragment(), WorkoutTabScreenshotProvider {
             // Activity name
             binding.activityname.apply {
                 text = activityName
+                setTextColor(GBApplication.getTextColor(context))
                 visibility = if (StringUtils.isBlank(activityName)) View.GONE else View.VISIBLE
             }
 
