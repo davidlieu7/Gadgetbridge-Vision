@@ -67,6 +67,7 @@ public class ActivitySummaryTableRowEntry extends ActivitySummaryEntry {
             columnTextView.setLayoutParams(new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT));
             columnTextView.setText(columns.get(i).format(workoutValueFormatter));
             columnTextView.setTextSize(12);
+            columnTextView.setGravity(Gravity.CENTER);
             if (isHeader || (i == 0 && boldFirstColumn)) {
                 columnTextView.setTypeface(null, Typeface.BOLD);
             }
