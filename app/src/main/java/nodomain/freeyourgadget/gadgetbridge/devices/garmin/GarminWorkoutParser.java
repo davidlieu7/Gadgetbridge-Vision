@@ -550,7 +550,9 @@ public class GarminWorkoutParser implements ActivitySummaryParser {
             speedAvg = session.getAvgSpeed();
         }
         if (speedAvg != null) {
-            if (ActivityKind.isPaceActivity(activityKind)) {
+            if (ActivityKind.isSwimActivity(activityKind)) {
+                summaryData.add(PACE_AVG_SECONDS_KM, 100.0 / speedAvg.doubleValue(), UNIT_SECONDS_PER_100_METERS);
+            } else if (ActivityKind.isPaceActivity(activityKind)) {
                 summaryData.add(PACE_AVG_SECONDS_KM, 1000.0 / speedAvg.doubleValue(), UNIT_SECONDS_PER_KM);
             } else if (ActivityKind.isDiving(activityKind)) {
                 // Hide speed for diving activities
@@ -564,7 +566,9 @@ public class GarminWorkoutParser implements ActivitySummaryParser {
             speedMax = session.getMaxSpeed();
         }
         if (speedMax != null) {
-            if (ActivityKind.isPaceActivity(activityKind)) {
+            if (ActivityKind.isSwimActivity(activityKind)) {
+                summaryData.add(PACE_MAX, 100.0 / speedMax.doubleValue(), UNIT_SECONDS_PER_100_METERS);
+            } else if (ActivityKind.isPaceActivity(activityKind)) {
                 summaryData.add(PACE_MAX, 1000.0 / speedMax.doubleValue(), UNIT_SECONDS_PER_KM);
             } else if (ActivityKind.isDiving(activityKind)) {
                 // Hide speed for diving activities
