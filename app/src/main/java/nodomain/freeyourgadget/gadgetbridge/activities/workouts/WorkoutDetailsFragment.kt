@@ -19,60 +19,37 @@ package nodomain.freeyourgadget.gadgetbridge.activities.workouts
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.Canvas
-import android.graphics.Typeface
-import android.net.Uri
 import android.os.Bundle
-import android.util.TypedValue
-import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.Menu
 import android.view.MenuInflater
 import android.view.MenuItem
-import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
-import android.widget.FrameLayout
-import android.widget.LinearLayout
-import android.widget.TableRow
-import android.widget.TextView
 import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
-import androidx.core.content.ContextCompat
 import androidx.core.content.FileProvider
 import androidx.core.graphics.createBitmap
 import androidx.core.view.MenuProvider
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.viewModels
 import androidx.lifecycle.Lifecycle
+import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.lifecycleScope
-import com.github.mikephil.charting.charts.BarLineChartBase
-import com.github.mikephil.charting.charts.LineChart
-import com.github.mikephil.charting.charts.ScatterChart
-import com.github.mikephil.charting.components.LegendEntry
-import com.github.mikephil.charting.components.XAxis
-import com.github.mikephil.charting.data.LineData
-import com.github.mikephil.charting.data.ScatterData
-import com.github.mikephil.charting.listener.ChartTouchListener
-import com.github.mikephil.charting.listener.OnChartGestureListener
+import com.google.android.material.tabs.TabLayoutMediator
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import nodomain.freeyourgadget.gadgetbridge.GBApplication
 import nodomain.freeyourgadget.gadgetbridge.R
-import nodomain.freeyourgadget.gadgetbridge.activities.ActivitySummariesChartFragment
-import nodomain.freeyourgadget.gadgetbridge.activities.charts.DurationXLabelFormatter
 import nodomain.freeyourgadget.gadgetbridge.activities.endurain.EndurainApiClient
 import nodomain.freeyourgadget.gadgetbridge.activities.endurain.EndurainSetupViewModel
 import nodomain.freeyourgadget.gadgetbridge.activities.endurain.WandererApiClient
 import nodomain.freeyourgadget.gadgetbridge.activities.endurain.WandererTokenManager
 import nodomain.freeyourgadget.gadgetbridge.activities.fit.FitViewerActivity
-import nodomain.freeyourgadget.gadgetbridge.activities.workouts.charts.ChartDataRepository
 import nodomain.freeyourgadget.gadgetbridge.activities.workouts.charts.DefaultWorkoutCharts
-import nodomain.freeyourgadget.gadgetbridge.activities.workouts.charts.WorkoutChartsActivity
-import nodomain.freeyourgadget.gadgetbridge.activities.workouts.entries.ActivitySummaryEntry
 import nodomain.freeyourgadget.gadgetbridge.activities.workouts.entries.ActivitySummaryGroup
 import nodomain.freeyourgadget.gadgetbridge.databinding.FragmentWorkoutDetailsBinding
-import nodomain.freeyourgadget.gadgetbridge.entities.BaseActivitySummary
 import nodomain.freeyourgadget.gadgetbridge.entities.Device
 import nodomain.freeyourgadget.gadgetbridge.export.FitExporter
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice
@@ -80,15 +57,12 @@ import nodomain.freeyourgadget.gadgetbridge.model.ActivityKind
 import nodomain.freeyourgadget.gadgetbridge.model.ActivitySummaryData
 import nodomain.freeyourgadget.gadgetbridge.model.ActivitySummaryEntries
 import nodomain.freeyourgadget.gadgetbridge.model.workout.Workout
-import nodomain.freeyourgadget.gadgetbridge.model.workout.WorkoutChart
+import nodomain.freeyourgadget.gadgetbridge.model.workout.WorkoutViewModel
 import nodomain.freeyourgadget.gadgetbridge.util.ActivitySummaryUtils
 import nodomain.freeyourgadget.gadgetbridge.util.AndroidUtils
 import nodomain.freeyourgadget.gadgetbridge.util.DateTimeUtils
 import nodomain.freeyourgadget.gadgetbridge.util.FileUtils
 import nodomain.freeyourgadget.gadgetbridge.util.GB
-import nodomain.freeyourgadget.gadgetbridge.util.GridTableBuilder
-import org.apache.commons.lang3.StringUtils
-import org.apache.commons.lang3.tuple.Pair
 import org.slf4j.LoggerFactory
 import java.io.File
 import java.io.FileOutputStream
@@ -96,9 +70,7 @@ import java.io.IOException
 import java.io.PrintWriter
 import java.io.StringWriter
 import java.nio.charset.StandardCharsets
-import java.util.Calendar
 import java.util.Locale
-import java.util.concurrent.TimeUnit
 
 class WorkoutDetailsFragment : Fragment(), MenuProvider {
     private var workoutId: Long = -1
@@ -107,8 +79,7 @@ class WorkoutDetailsFragment : Fragment(), MenuProvider {
 
     private lateinit var binding: FragmentWorkoutDetailsBinding
 
-    private var chartFragment: ActivitySummariesChartFragment? = null
-    private var gpsFragment: WorkoutGpsFragment? = null
+    private lateinit var tabsPagerAdapter: WorkoutTabsPagerAdapter
 
     private lateinit var workoutEditor: WorkoutEditor
 
@@ -116,9 +87,12 @@ class WorkoutDetailsFragment : Fragment(), MenuProvider {
 
     private var menu: Menu? = null
 
+    private lateinit var workoutViewModel: WorkoutViewModel
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         workoutEditor = WorkoutEditor(requireContext(), this)
+        workoutViewModel = ViewModelProvider(requireActivity()).get(WorkoutViewModel::class.java)
         arguments?.let {
             workoutId = it.getLong(ARG_WORKOUT_ID, -1)
         }
@@ -136,23 +110,19 @@ class WorkoutDetailsFragment : Fragment(), MenuProvider {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        chartFragment = ActivitySummariesChartFragment()
-        gpsFragment = WorkoutGpsFragment()
-
-        childFragmentManager.beginTransaction()
-            .replace(R.id.chartsFragmentHolder, chartFragment!!)
-            .replace(R.id.gpsFragmentHolder, gpsFragment!!)
-            .commit()
-
-        // Toggle raw data when long pressing the workout image
-        binding.itemImage.setOnLongClickListener {
-            workoutValueFormatter.toggleRawData()
-            currentWorkout?.let { workout ->
-                updateWorkoutHeader(workout.summary)
-                updateWorkoutDetails(workout)
-            }
-            false
-        }
+        // Attach workout tabs.
+        val viewPager = binding.tabsViewPager
+        val tabLayout = binding.tabLayout
+        tabsPagerAdapter = WorkoutTabsPagerAdapter(childFragmentManager, lifecycle, workoutId)
+        viewPager.adapter = tabsPagerAdapter
+        // Keep every tab's fragment (and its view) alive once created instead of the ViewPager2
+        // default, which tears a tab's view down as soon as it's swiped away and rebuilds it
+        // from scratch next time — expensive for Charts, which builds a fresh chart view per
+        // metric. There are only a handful of tabs, so keeping them all resident is cheap.
+        viewPager.offscreenPageLimit = WorkoutTab.entries.size
+        TabLayoutMediator(tabLayout, viewPager) { tab, position ->
+            tab.text = tabsPagerAdapter.titleAt(position)
+        }.attach()
 
         loadWorkoutData()
     }
@@ -231,10 +201,9 @@ class WorkoutDetailsFragment : Fragment(), MenuProvider {
 
                 currentWorkout?.let { workout ->
                     workoutValueFormatter.setActivityKind(ActivityKind.fromCode(workout.summary.activityKind))
+                    workoutViewModel.setWorkout(workout, workoutId)
+                    tabsPagerAdapter.setLapsTab(hasLaps(workout))
 
-                    updateWorkoutHeader(workout.summary)
-                    updateWorkoutDetails(workout)
-                    updateFragments(workout)
                     showLoading(false)
                 } ?: run {
                     showError("Workout not found")
@@ -250,291 +219,24 @@ class WorkoutDetailsFragment : Fragment(), MenuProvider {
 
     private fun showLoading(isLoading: Boolean) {
         binding.loadingSpinner.visibility = if (isLoading) View.VISIBLE else View.GONE
-        binding.scrollView.visibility = if (isLoading) View.GONE else View.VISIBLE
+        binding.tabLayout.visibility = if (isLoading) View.GONE else View.VISIBLE
+        binding.tabsViewPager.visibility = if (isLoading) View.GONE else View.VISIBLE
         binding.errorMessage.visibility = View.GONE
     }
 
     private fun showError(message: String) {
         binding.loadingSpinner.visibility = View.GONE
-        binding.scrollView.visibility = View.GONE
+        binding.tabLayout.visibility = View.GONE
+        binding.tabsViewPager.visibility = View.GONE
         binding.errorMessage.visibility = View.VISIBLE
         binding.errorMessage.text = message
     }
 
-    private fun updateWorkoutHeader(summary: BaseActivitySummary) {
-        val activityName = summary.name
-        val startTime = summary.startTime
-        val endTime = summary.endTime
-        val durationHms = DateTimeUtils.formatDurationHoursMinutes(
-            endTime.time - startTime.time, TimeUnit.MILLISECONDS
-        )
-
-        view?.let {
-            // Header photo
-            val headerPhoto = summary.headerPhoto
-            if (headerPhoto == null) {
-                binding.headerphoto.setImageDrawable(null)
-            } else {
-                binding.headerphoto.setImageURI(Uri.fromFile(File(headerPhoto)))
-            }
-
-            // Activity icon
-            binding.itemImage.setImageResource(
-                ActivityKind.fromCode(summary.activityKind).icon
-            )
-
-            // Activity name
-            binding.activityname.apply {
-                text = activityName
-                visibility = if (StringUtils.isBlank(activityName)) View.GONE else View.VISIBLE
-            }
-
-            // Date
-            binding.activitydate.apply {
-                val timeString = if (DateTimeUtils.isSameDay(startTime, endTime)) {
-                    val endTimeCal = Calendar.getInstance().apply { time = endTime }
-                    context.getString(
-                        R.string.date_placeholders__start_time__end_time,
-                        DateTimeUtils.formatDateTimeRelative(context, startTime),
-                        DateTimeUtils.formatTime(
-                            endTimeCal.get(Calendar.HOUR_OF_DAY),
-                            endTimeCal.get(Calendar.MINUTE)
-                        )
-                    )
-                } else {
-                    context.getString(
-                        R.string.date_placeholders__start_time__end_time,
-                        DateTimeUtils.formatDateTimeRelative(context, startTime),
-                        DateTimeUtils.formatDateTimeRelative(context, endTime)
-                    )
-                }
-                text = timeString
-            }
-
-            // Duration
-            binding.activityduration.text = durationHms
-        }
-    }
-
-    private fun updateWorkoutDetails(workout: Workout) {
-        binding.summaryDetails.removeAllViews()
-
+    /** Whether the workout has laps/intervals data (cardio-type workouts), and so gets a Laps tab. */
+    private fun hasLaps(workout: Workout): Boolean {
         val groups = ActivitySummaryGroup.buildGroupedList(workout.data)
-
-        for ((groupKey, entries) in groups) {
-            val groupCharts = workout.charts.filter { chart -> groupKey == chart.group }
-            if (entries.isEmpty() && groupCharts.isEmpty()) {
-                continue
-            }
-
-            if (ActivitySummaryEntries.GROUP_ACTIVITY != groupKey) {
-                addGroupHeader(groupKey)
-            }
-
-            if (!entries.isEmpty()) {
-                addGroupContent(entries)
-            }
-
-            if (!groupCharts.isEmpty() && entries.isEmpty()) {
-                // Add the initial separator
-                binding.summaryDetails.addView(createSeparator())
-            }
-
-            groupCharts.forEach { chart ->
-                addChart(binding.summaryDetails, false, chart, workout.charts)
-            }
-        }
-    }
-
-    private fun addGroupHeader(groupKey: String) {
-        val labelRow = TableRow(context)
-        val labelField = TextView(context).apply {
-            id = View.generateViewId()
-            textSize = 18f
-            gravity = Gravity.CENTER
-            setPaddingRelative(dpToPx(16), dpToPx(16), dpToPx(16), dpToPx(16))
-            typeface = Typeface.DEFAULT_BOLD
-            text = workoutValueFormatter.getStringResourceByName(groupKey)
-        }
-        labelRow.addView(labelField)
-        binding.summaryDetails.addView(labelRow)
-    }
-
-    private fun addGroupContent(entries: List<Pair<String, ActivitySummaryEntry>>) {
-        val gridTableBuilder = GridTableBuilder(requireContext(), workoutValueFormatter)
-        for ((key, entry) in entries) {
-            gridTableBuilder.addEntry(workoutValueFormatter.getStringResourceByName(key), entry)
-        }
-        binding.summaryDetails.addView(gridTableBuilder.build())
-    }
-
-    @Suppress("SameParameterValue")
-    private fun dpToPx(dp: Int): Int {
-        val density = resources.displayMetrics.density
-        return (dp * density).toInt()
-    }
-
-    private fun updateFragments(workout: Workout) {
-        // If there's a device-specific HR chart, prefer it over the default one
-        if (workout.charts.any { chart -> chart.group == ActivitySummaryEntries.GROUP_HEART_RATE }) {
-            binding.heartRateChartWrapper.visibility = View.GONE
-        } else if (!gbDevice.deviceCoordinator.supportsHeartRateMeasurement(gbDevice)) {
-            binding.heartRateChartWrapper.visibility = View.GONE
-        } else {
-            chartFragment?.setDateAndGetData(
-                workout.summary,
-                gbDevice,
-                workout.summary.startTime.time / 1000,
-                workout.summary.endTime.time / 1000
-            )
-        }
-
-        if (workoutHasGps(workout)) {
-            showGpsCanvas()
-            gpsFragment?.setTrackData(workout.summary, gbDevice)
-        } else {
-            hideGpsCanvas()
-        }
-    }
-
-    @Suppress("KotlinConstantConditions", "SameParameterValue")
-    private fun addChart(
-        chartsLayout: LinearLayout,
-        includeHeader: Boolean,
-        chart: WorkoutChart,
-        allChartsData: List<WorkoutChart>
-    ) {
-        if (includeHeader) {
-            val chartTitle = TextView(context).apply {
-                id = View.generateViewId()
-                layoutParams = LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.MATCH_PARENT,
-                    LinearLayout.LayoutParams.WRAP_CONTENT
-                )
-                text = chart.title
-                gravity = Gravity.CENTER
-                setTextSize(TypedValue.COMPLEX_UNIT_SP, 18f)
-                typeface = Typeface.create("sans-serif-black", Typeface.NORMAL)
-
-                val paddingPx = (16 * resources.displayMetrics.density).toInt()
-                setPadding(paddingPx, paddingPx, paddingPx, paddingPx)
-            }
-
-            chartsLayout.addView(createSeparator())
-            chartsLayout.addView(chartTitle)
-            chartsLayout.addView(createSeparator())
-        }
-
-        val chartsFragmentHolder = FrameLayout(requireContext()).apply {
-            id = View.generateViewId()
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                (300 * resources.displayMetrics.density).toInt()
-            )
-        }
-
-        val chartTextColor = GBApplication.getSecondaryTextColor(context)
-        val lineChart: BarLineChartBase<*> = when (chart.chartData) {
-            is ScatterData -> ScatterChart(requireContext())
-            else -> LineChart(requireContext())
-        }.apply {
-            layoutParams = FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.MATCH_PARENT,
-                FrameLayout.LayoutParams.MATCH_PARENT
-            )
-            legend.textColor = GBApplication.getTextColor(context)
-            isScaleXEnabled = false
-            isScaleYEnabled = false
-            isHighlightPerDragEnabled = false
-            isHighlightPerTapEnabled = false
-            isDragEnabled = false
-        }
-        lineChart.xAxis.apply {
-            setDrawLabels(true)
-            setDrawGridLines(false)
-            setDrawLimitLinesBehindData(true)
-            isEnabled = true
-            textColor = chartTextColor
-            position = XAxis.XAxisPosition.BOTTOM
-            valueFormatter = DurationXLabelFormatter()
-        }
-        lineChart.axisLeft.apply {
-            setDrawGridLines(false)
-            setDrawTopYLabelEntry(true)
-            textColor = chartTextColor
-            isEnabled = true
-            if (chart.chartYLabelFormatter != null) {
-                valueFormatter = chart.chartYLabelFormatter
-            }
-        }
-        lineChart.axisRight.apply {
-            isEnabled = false
-        }
-        chart.lineChart(lineChart)
-        when (lineChart) {
-            is LineChart if chart.chartData is LineData -> {
-                lineChart.data = chart.chartData
-            }
-
-            is ScatterChart if chart.chartData is ScatterData -> {
-                lineChart.data = chart.chartData
-            }
-        }
-        // A metric may be split into several gapped segments (all sharing one label), which
-        // would otherwise each add their own auto-generated legend entry for the same metric.
-        val legendDataSet = chart.chartData.dataSets.firstOrNull()
-        if (legendDataSet != null) {
-            lineChart.legend.setCustom(
-                listOf(
-                    LegendEntry(
-                        legendDataSet.label,
-                        legendDataSet.form,
-                        legendDataSet.formSize,
-                        legendDataSet.formLineWidth,
-                        legendDataSet.formLineDashEffect,
-                        legendDataSet.color
-                    )
-                )
-            )
-        }
-        lineChart.description.isEnabled = false
-        lineChart.onChartGestureListener = object : OnChartGestureListener {
-            override fun onChartLongPressed(me: MotionEvent?) {}
-            override fun onChartGestureStart(me: MotionEvent?, lastPerformedGesture: ChartTouchListener.ChartGesture?) {}
-            override fun onChartGestureEnd(me: MotionEvent?, lastPerformedGesture: ChartTouchListener.ChartGesture?) {}
-            override fun onChartSingleTapped(me: MotionEvent?) {
-                ChartDataRepository.chartData = allChartsData
-                val intent = Intent(requireContext(), WorkoutChartsActivity::class.java).apply {
-                    putExtra(WorkoutChartsActivity.INIT_CHART_ID, chart.id)
-                    workoutLabel()?.let {
-                        putExtra(WorkoutChartsActivity.EXTRA_TITLE, "${getString(R.string.charts)} · $it")
-                    }
-                }
-                startActivity(intent)
-            }
-            override fun onChartDoubleTapped(me: MotionEvent?) {}
-            override fun onChartFling(me1: MotionEvent?, me2: MotionEvent?, velocityX: Float, velocityY: Float) {}
-            override fun onChartScale(me: MotionEvent?, scaleX: Float, scaleY: Float) {}
-            override fun onChartTranslate(me: MotionEvent?, dX: Float, dY: Float) {}
-        }
-        lineChart.invalidate()
-        chartsFragmentHolder.addView(lineChart)
-
-        chartsLayout.addView(chartsFragmentHolder)
-        chartsLayout.addView(createSeparator())
-    }
-
-    private fun createSeparator(): View {
-        return View(context).apply {
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                (2 * resources.displayMetrics.density).toInt()
-            )
-
-            val typedValue = TypedValue()
-            context.theme.resolveAttribute(R.attr.row_separator, typedValue, true)
-            setBackgroundColor(ContextCompat.getColor(context, typedValue.resourceId))
-        }
+        return !groups[ActivitySummaryEntries.GROUP_LAPS].isNullOrEmpty() ||
+            !groups[ActivitySummaryEntries.GROUP_INTERVALS].isNullOrEmpty()
     }
 
     private fun workoutHasGps(workout: Workout): Boolean {
@@ -550,18 +252,6 @@ class WorkoutDetailsFragment : Fragment(), MenuProvider {
         }
 
         return false
-    }
-
-    private fun showGpsCanvas() {
-        val params = binding.gpsFragmentHolder.layoutParams
-        params.height = (300 * requireContext().resources.displayMetrics.density).toInt()
-        binding.gpsFragmentHolder.layoutParams = params
-    }
-
-    private fun hideGpsCanvas() {
-        val params = binding.gpsFragmentHolder.layoutParams
-        params.height = 0
-        binding.gpsFragmentHolder.layoutParams = params
     }
 
     override fun onCreateMenu(menu: Menu, menuInflater: MenuInflater) {
@@ -634,8 +324,8 @@ class WorkoutDetailsFragment : Fragment(), MenuProvider {
                     workoutEditor.editWorkoutName(it, object : WorkoutEditor.Callback {
                         override fun onWorkoutUpdated() {
                             notifyWorkoutChanged()
-                            updateWorkoutHeader(workout.summary)
                             updateActionBarTitle()
+                            workoutViewModel.refreshWorkout(workoutId)
                         }
                     })
                 }
@@ -647,8 +337,9 @@ class WorkoutDetailsFragment : Fragment(), MenuProvider {
                     workoutEditor.setHeaderPhoto(it, object : WorkoutEditor.Callback {
                         override fun onWorkoutUpdated() {
                             notifyWorkoutChanged()
-                            // Reload only the workout header
-                            updateWorkoutHeader(it.summary)
+                            workoutViewModel.refreshWorkout(workoutId)
+                            // Swap which of add/remove-photo is visible in the overflow menu.
+                            requireActivity().invalidateMenu()
                         }
                     })
                 }
@@ -660,8 +351,9 @@ class WorkoutDetailsFragment : Fragment(), MenuProvider {
                     workoutEditor.removeHeaderPhoto(it, object : WorkoutEditor.Callback {
                         override fun onWorkoutUpdated() {
                             notifyWorkoutChanged()
-                            // Reload only the workout header
-                            updateWorkoutHeader(it.summary)
+                            workoutViewModel.refreshWorkout(workoutId)
+                            // Swap which of add/remove-photo is visible in the overflow menu.
+                            requireActivity().invalidateMenu()
                         }
                     })
                 }
@@ -731,19 +423,28 @@ class WorkoutDetailsFragment : Fragment(), MenuProvider {
         overflowMenu?.findItem(R.id.activity_action_upload_to_wanderer)?.isVisible = hasGpx && wandererServer != null && WandererTokenManager(requireContext()).isLoggedIn()
     }
 
+    /**
+     * Screenshots whichever tab is currently visible (each tab fragment exposes its own root via
+     * [WorkoutTabScreenshotProvider], since the host no longer owns a single scrollable view now
+     * that Overview/Charts/Laps/Details are split into tabs).
+     */
     private fun takeSharedScreenshot() {
-        lifecycleScope.launch(Dispatchers.IO) {
+        lifecycleScope.launch {
             try {
                 val workout = currentWorkout ?: return@launch
-                val width = binding.scrollView.getChildAt(0).width
-                val height = binding.scrollView.getChildAt(0).height
+                val screenshotView = (tabsPagerAdapter.fragmentAt(binding.tabsViewPager.currentItem)
+                        as? WorkoutTabScreenshotProvider)?.screenshotView ?: return@launch
+
+                // Capture the full scrollable content, not just what's currently visible on screen.
+                val content = (screenshotView as? ViewGroup)?.getChildAt(0) ?: screenshotView
+                val width = content.width
+                val height = content.height
+                if (width <= 0 || height <= 0) return@launch
+
                 val bitmap = createBitmap(width, height)
                 val canvas = Canvas(bitmap)
-
-                withContext(Dispatchers.Main) {
-                    canvas.drawColor(GBApplication.getWindowBackgroundColor(requireContext()))
-                    binding.scrollView.draw(canvas)
-                }
+                canvas.drawColor(GBApplication.getWindowBackgroundColor(requireContext()))
+                screenshotView.draw(canvas)
 
                 val fileName = FileUtils.makeValidFileName(
                     "Screenshot-${
@@ -751,15 +452,14 @@ class WorkoutDetailsFragment : Fragment(), MenuProvider {
                     }-${DateTimeUtils.formatIso8601(workout.summary.startTime)}.png"
                 )
                 val targetFile = File(FileUtils.getExternalFilesDir(), fileName)
-                val fOut = FileOutputStream(targetFile)
-                bitmap.compress(Bitmap.CompressFormat.PNG, 85, fOut)
-                fOut.flush()
-                fOut.close()
-
-                withContext(Dispatchers.Main) {
-                    shareScreenshot(targetFile)
-                    GB.toast(requireContext(), "Screenshot saved", Toast.LENGTH_LONG, GB.INFO)
+                withContext(Dispatchers.IO) {
+                    FileOutputStream(targetFile).use { fOut ->
+                        bitmap.compress(Bitmap.CompressFormat.PNG, 85, fOut)
+                    }
                 }
+
+                shareScreenshot(targetFile)
+                GB.toast(requireContext(), "Screenshot saved", Toast.LENGTH_LONG, GB.INFO)
             } catch (e: IOException) {
                 LOG.error("Error taking screenshot", e)
             }

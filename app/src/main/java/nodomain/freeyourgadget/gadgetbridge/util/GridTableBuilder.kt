@@ -100,8 +100,9 @@ class GridTableBuilder @JvmOverloads constructor(
             setPadding(dpToPx(15), dpToPx(15), dpToPx(15), dpToPx(15))
             setBackgroundColor(GBApplication.getWindowBackgroundColor(context))
 
-            val marginLeft = if (i % 2 == 0) 0 else 1
-            val marginRight = if (i % 2 == 0) 1 else 0
+            // A full-width (2-column-span) cell has no adjacent column, so it gets no side border.
+            val marginLeft = if (columnSize == 2 || i % 2 == 0) 0 else 1
+            val marginRight = if (columnSize == 2) 0 else if (i % 2 == 0) 1 else 0
             val marginTop = 2
             val marginBottom = 0 // will be changed to 2 for the last row
 
