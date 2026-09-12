@@ -110,7 +110,7 @@ public class GBDaoGenerator {
             outputDir.mkdirs();
         }
 
-        final Schema schema = new Schema(142, MAIN_PACKAGE + ".entities");
+        final Schema schema = new Schema(143, MAIN_PACKAGE + ".entities");
 
         final List<Entity> sampleProvidersToGenerate = new LinkedList<>();
         final List<Entity> batterySampleProvidersToGenerate = new LinkedList<>();
@@ -241,6 +241,7 @@ public class GBDaoGenerator {
         addKeephealthTemperatureSample(schema, user, device);
         addVeepooActivitySample(schema, user, device);
         addVeepooEcgSample(schema, user, device);
+        addVeepooSleepSummarySample(schema, user, device);
 
         addHuaweiActivitySample(schema, user, device);
         sampleProvidersToGenerate.add(addHuaweiStressSample(schema, user, device));
@@ -1505,6 +1506,12 @@ public class GBDaoGenerator {
         activitySample.addIntProperty("caloriesBurnt").notNull();
         activitySample.addIntProperty("distanceMeters").notNull();
         addHeartRateProperties(activitySample);
+        // Aggregated from the apnea/hypoxia/cardiac-load groups of the 0xB9 Origin3 tag
+        // (five 1-byte values per group, one per minute of a five-minute record).
+        activitySample.addIntProperty("apneaCount");
+        activitySample.addIntProperty("hypoxiaMinutes");
+        activitySample.addIntProperty("hypoxiaTimeSum");
+        activitySample.addIntProperty("cardiacLoadMinutes");
         return activitySample;
     }
 
@@ -1525,6 +1532,27 @@ public class GBDaoGenerator {
         ecg.addByteArrayProperty("resultBlob");
         ecg.addByteArrayProperty("waveform");
         return ecg;
+    }
+
+    private static Entity addVeepooSleepSummarySample(Schema schema, Entity user, Entity device) {
+        Entity sleepSummary = addEntity(schema, "VeepooSleepSummarySample");
+        sleepSummary.setJavaDoc("A per-night Veepoo sleep summary: overall quality, wake count and (for the\n" +
+                "precision firmware dialect) the individual quality scores. One row per synced night.");
+        sleepSummary.addIdProperty();
+        Property userId = sleepSummary.addLongProperty("userId").notNull().getProperty();
+        sleepSummary.addToOne(user, userId);
+        Property deviceId = sleepSummary.addLongProperty("deviceId").notNull().getProperty();
+        sleepSummary.addToOne(device, deviceId);
+        sleepSummary.addLongProperty("timestamp").notNull().index();
+        sleepSummary.addIntProperty("durationMin").notNull();
+        sleepSummary.addIntProperty("quality");
+        sleepSummary.addIntProperty("wakeCount");
+        sleepSummary.addIntProperty("scoreGetUp");
+        sleepSummary.addIntProperty("scoreDeep");
+        sleepSummary.addIntProperty("scoreEfficiency");
+        sleepSummary.addIntProperty("scoreFallAsleep");
+        sleepSummary.addIntProperty("scoreTime");
+        return sleepSummary;
     }
 
     private static Entity addGloryFitStepsSample(Schema schema, Entity user, Entity device) {

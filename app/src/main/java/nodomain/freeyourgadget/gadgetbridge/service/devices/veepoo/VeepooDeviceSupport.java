@@ -88,6 +88,8 @@ import nodomain.freeyourgadget.gadgetbridge.entities.User;
 import nodomain.freeyourgadget.gadgetbridge.model.TemperatureSample;
 import nodomain.freeyourgadget.gadgetbridge.entities.VeepooActivitySample;
 import nodomain.freeyourgadget.gadgetbridge.entities.VeepooEcgSample;
+import nodomain.freeyourgadget.gadgetbridge.entities.VeepooSleepSummarySample;
+import nodomain.freeyourgadget.gadgetbridge.entities.VeepooSleepSummarySampleDao;
 import nodomain.freeyourgadget.gadgetbridge.export.GPXExporter;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
 import nodomain.freeyourgadget.gadgetbridge.model.ActivityKind;
@@ -141,6 +143,7 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
     private final Runnable sportWatchdog = () -> runSportWatchdog();
     private final List<VeepooActivitySample> pendingOriginSamples = new ArrayList<>();
     private final List<VeepooActivitySample> pendingSleepSamples = new ArrayList<>();
+    private final List<VeepooSleepSummarySample> pendingSleepSummaries = new ArrayList<>();
     private final List<GenericHrvValueSample> pendingHrvSamples = new ArrayList<>();
     // Per-record all-day vitals from Origin3 (0xDF) tags, persisted when the day completes.
     private final List<GenericSpo2Sample> pendingOriginSpo2Samples = new ArrayList<>();
@@ -2128,7 +2131,9 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
      * [8]=pose, [9]=wear. B4 carries the PPG heart-rate array, B5 the ECG one (B4 wins for the
      * record when both are present). The all-day vitals tags are handled per tag and queued for
      * batch persistence: 0xB6 breath rate (1 byte/minute), 0xB8 blood pressure (systolic,
-     * diastolic), 0xB9 SpO2 (up to five 1-byte percentages, one per minute), 0xBE glucose (LE16,
+     * diastolic), 0xB9 SpO2 (up to five 1-byte percentages, one per minute) plus the trailing
+     * apnea count / hypoxia time / cardiac load groups (aggregated onto the activity record),
+     * 0xBE glucose (LE16,
      * 0.01 mmol/L steps), 0xBF MET (1 byte, /10; log-only), 0xC1 pressure/wear (log-only) and
      * 0xC2 lipids (TCHO/TAG/HDL/LDL as LE16 in 0.01 mmol/L steps + uric acid in mg/dL).
      */
@@ -2144,6 +2149,11 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
         int kcalTenths = 0;
         int ppgHeartRate = ActivitySample.NOT_MEASURED;
         int ecgHeartRate = ActivitySample.NOT_MEASURED;
+        // Aggregates of the 0xB9 apnea/hypoxia/cardiac-load groups (null until the tag is seen).
+        Integer apneaCount = null;
+        Integer hypoxiaMinutes = null;
+        Integer hypoxiaTimeSum = null;
+        Integer cardiacLoadMinutes = null;
         int recordsAdded = 0;
 
         int pos = 0;
@@ -2161,7 +2171,7 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
 
             if (tag == 0xB1) {
                 if (flushOrigin3Record(base, dayIndex, haveRecord, hour, minute, steps, distanceMeters, kcalTenths,
-                        ppgHeartRate, ecgHeartRate)) {
+                        ppgHeartRate, ecgHeartRate, apneaCount, hypoxiaMinutes, hypoxiaTimeSum, cardiacLoadMinutes)) {
                     recordsAdded++;
                 }
                 if (body.length == 4 && ((body[0] & 0xFF) | (body[1] & 0xFF)) != 0) {
@@ -2176,6 +2186,10 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
                 kcalTenths = 0;
                 ppgHeartRate = ActivitySample.NOT_MEASURED;
                 ecgHeartRate = ActivitySample.NOT_MEASURED;
+                apneaCount = null;
+                hypoxiaMinutes = null;
+                hypoxiaTimeSum = null;
+                cardiacLoadMinutes = null;
             } else if (haveRecord && tag == 0xB2 && body.length >= 10) {
                 steps = ((body[0] & 0xFF) << 8) | (body[1] & 0xFF);
                 distanceMeters = ((body[4] & 0xFF) << 8) | (body[5] & 0xFF);
@@ -2228,9 +2242,7 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
                     LOG.debug("Ignoring implausible Origin3 BP at {}:{}: {}/{}", hour, minute, systolic, diastolic);
                 }
             } else if (haveRecord && tag == 0xB9 && hour <= 23 && minute <= 59) {
-                // SpO2: up to five 1-byte percentages, one per minute. The vendor packs further groups
-                // (apnea count/result, hypoxia time, cardiac load, check flag) after byte 5; those have
-                // no Gadgetbridge model and are dropped.
+                // SpO2: up to five 1-byte percentages, one per minute.
                 Calendar stamp = origin3RecordStamp(base, hour, minute);
                 for (int m = 0; stamp != null && m < body.length && m < 5; m++) {
                     int spo2 = body[m] & 0xFF;
@@ -2239,6 +2251,44 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
                         sample.setTimestamp(stamp.getTimeInMillis() + m * 60_000L);
                         sample.setSpo2(spo2);
                         pendingOriginSpo2Samples.add(sample);
+                    }
+                }
+                // Apnea count [5..9], hypoxia time [15..19] and cardiac load [20..24]: five 1-byte
+                // values per group, one per minute. Aggregated like the vendor app: apnea events are
+                // summed; a hypoxia-time or cardiac-load byte is counted only when plausible.
+                if (body.length > 5) {
+                    int recordApnea = 0;
+                    int recordHypoxiaMinutes = 0;
+                    int recordHypoxiaTimeSum = 0;
+                    int recordCardiacLoadMinutes = 0;
+                    for (int m = 0; m < 5; m++) {
+                        if (body.length > 5 + m) {
+                            int apnea = body[5 + m] & 0xFF;
+                            if (apnea > 0) {
+                                recordApnea += apnea;
+                            }
+                        }
+                        if (body.length > 15 + m) {
+                            int hypoxia = body[15 + m] & 0xFF;
+                            if (hypoxia >= 1 && hypoxia <= 60) {
+                                recordHypoxiaMinutes++;
+                                recordHypoxiaTimeSum += hypoxia;
+                            }
+                        }
+                        if (body.length > 20 + m) {
+                            int cardiacLoad = body[20 + m] & 0xFF;
+                            if (cardiacLoad >= 1 && cardiacLoad <= 100) {
+                                recordCardiacLoadMinutes++;
+                            }
+                        }
+                    }
+                    apneaCount = recordApnea;
+                    hypoxiaMinutes = recordHypoxiaMinutes;
+                    hypoxiaTimeSum = recordHypoxiaTimeSum;
+                    cardiacLoadMinutes = recordCardiacLoadMinutes;
+                    if (recordApnea == 0 && recordHypoxiaMinutes == 0 && recordCardiacLoadMinutes == 0) {
+                        LOG.debug("Origin3 day {} 0xB9 at {}:{}: apnea/hypoxia/cardiac groups present ({} bytes) but all zero",
+                                dayIndex, hour, minute, body.length);
                     }
                 }
             } else if (haveRecord && tag == 0xBE && hour <= 23 && minute <= 59 && body.length >= 2) {
@@ -2305,7 +2355,7 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
             pos += 2 + length;
         }
         if (flushOrigin3Record(base, dayIndex, haveRecord, hour, minute, steps, distanceMeters, kcalTenths,
-                ppgHeartRate, ecgHeartRate)) {
+                ppgHeartRate, ecgHeartRate, apneaCount, hypoxiaMinutes, hypoxiaTimeSum, cardiacLoadMinutes)) {
             recordsAdded++;
         }
         LOG.debug("Origin3 stream for day {}: {} five-minute records", dayIndex, recordsAdded);
@@ -2330,7 +2380,9 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
 
     private boolean flushOrigin3Record(Calendar base, int dayIndex, boolean valid, int hour, int minute,
                                        int steps, int distanceMeters, int kcalTenths,
-                                       int ppgHeartRate, int ecgHeartRate) {
+                                       int ppgHeartRate, int ecgHeartRate,
+                                       Integer apneaCount, Integer hypoxiaMinutes,
+                                       Integer hypoxiaTimeSum, Integer cardiacLoadMinutes) {
         if (!valid || hour > 23 || minute > 59) {
             return false;
         }
@@ -2357,6 +2409,10 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
         sample.setCaloriesBurnt((kcalTenths + 5) / 10);
         sample.setDistanceMeters(distanceMeters);
         sample.setDataSource(DATA_SOURCE_ACTIVITY_SUMMARY);
+        sample.setApneaCount(apneaCount);
+        sample.setHypoxiaMinutes(hypoxiaMinutes);
+        sample.setHypoxiaTimeSum(hypoxiaTimeSum);
+        sample.setCardiacLoadMinutes(cardiacLoadMinutes);
         pendingOriginSamples.add(sample);
         return true;
     }
@@ -2561,6 +2617,12 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
             sample.setDataSource(DATA_SOURCE_SLEEP_SUMMARY);
             pendingSleepSamples.add(sample);
         }
+        VeepooSleepSummarySample summary = new VeepooSleepSummarySample();
+        summary.setTimestamp(start.getTimeInMillis());
+        summary.setDurationMin(totalMinutes);
+        summary.setQuality(quality);
+        summary.setWakeCount(rec[55] & 0xFF);
+        pendingSleepSummaries.add(summary);
         LOG.info("Parsed sleep record for day {}: {} minutes ({} deep slots, {} light slots, quality {})",
                 dayIndex, totalMinutes, deepSlots, lightSlots, quality);
     }
@@ -2688,6 +2750,18 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
             sample.setDataSource(DATA_SOURCE_SLEEP_SUMMARY);
             pendingSleepSamples.add(sample);
         }
+        int rawQuality = a3[15] & 0xFF;
+        VeepooSleepSummarySample summary = new VeepooSleepSummarySample();
+        summary.setTimestamp(start.getTimeInMillis());
+        summary.setDurationMin(allSleepTime);
+        summary.setQuality(rawQuality >= 1 && rawQuality <= 5 ? rawQuality : null);
+        summary.setWakeCount(a3[16] & 0xFF);
+        summary.setScoreGetUp(a3[9] & 0xFF);
+        summary.setScoreDeep(a3[10] & 0xFF);
+        summary.setScoreEfficiency(a3[11] & 0xFF);
+        summary.setScoreFallAsleep(a3[12] & 0xFF);
+        summary.setScoreTime(a3[13] & 0xFF);
+        pendingSleepSummaries.add(summary);
         LOG.info("Parsed precise sleep record for day {}: {} minutes ({} deep, {} light)", dayIndex, minutes, deepSleepTime, lightSleepTime);
     }
 
@@ -6161,6 +6235,7 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
             pendingSleepSamples.clear();
             persistSamples(sleepBatch, true);
         }
+        persistPendingSleepSummaries();
         getDevice().unsetBusyTask();
         getDevice().sendDeviceUpdateIntent(getContext());
         LOG.info("VeePoo data fetch complete");
@@ -6175,6 +6250,7 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
         }
         pendingOriginSamples.clear();
         pendingSleepSamples.clear();
+        pendingSleepSummaries.clear();
         pendingOriginSpo2Samples.clear();
         pendingOriginBpSamples.clear();
         pendingOriginTemperatureSamples.clear();
@@ -6204,6 +6280,42 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
             LOG.error("Error saving VeePoo {} samples", isSleep ? "sleep" : "activity", e);
         }
         getDevice().sendDeviceUpdateIntent(getContext());
+    }
+
+    /**
+     * Persist the per-night sleep summaries collected while parsing sleep records. Rows inside
+     * each batch's time window are deleted first so re-syncing a night replaces instead of
+     * duplicates; the window is padded by two days to absorb clock/anchoring drift.
+     */
+    private void persistPendingSleepSummaries() {
+        if (pendingSleepSummaries.isEmpty()) {
+            return;
+        }
+        List<VeepooSleepSummarySample> batch = new ArrayList<>(pendingSleepSummaries);
+        pendingSleepSummaries.clear();
+        try (DBHandler dbHandler = GBApplication.acquireDB()) {
+            DaoSession session = dbHandler.getDaoSession();
+            long userId = DBHelper.getUser(session).getId();
+            long deviceId = DBHelper.getDevice(getDevice(), session).getId();
+            VeepooSleepSummarySampleDao dao = session.getVeepooSleepSummarySampleDao();
+            long from = Long.MAX_VALUE;
+            long to = Long.MIN_VALUE;
+            for (VeepooSleepSummarySample summary : batch) {
+                summary.setUserId(userId);
+                summary.setDeviceId(deviceId);
+                from = Math.min(from, summary.getTimestamp());
+                to = Math.max(to, summary.getTimestamp());
+            }
+            dao.queryBuilder()
+                    .where(VeepooSleepSummarySampleDao.Properties.DeviceId.eq(deviceId),
+                            VeepooSleepSummarySampleDao.Properties.Timestamp.ge(from - 2 * MILLIS_PER_DAY),
+                            VeepooSleepSummarySampleDao.Properties.Timestamp.le(to + 2 * MILLIS_PER_DAY))
+                    .buildDelete()
+                    .executeDeleteWithoutDetachingEntities();
+            dao.insertInTx(batch);
+        } catch (Exception e) {
+            LOG.error("Error saving VeePoo sleep summaries", e);
+        }
     }
 
     @Override
