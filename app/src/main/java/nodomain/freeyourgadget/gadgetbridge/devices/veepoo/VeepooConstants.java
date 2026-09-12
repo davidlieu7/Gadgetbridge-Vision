@@ -377,6 +377,20 @@ public final class VeepooConstants {
     /** Package 3: find-device-by-phone flag; non-zero -> the vendor UI shows "Find device". */
     public static final int CAP_PKG3_FIND_DEVICE_BY_PHONE = 8;
 
+    // ---- A7 all-day vitals capability bytes (informational) -----------------
+    // Captured for logging/diagnostics only; Origin3 tag parsing is unconditional so an
+    // unknown or stale capability report never suppresses a dataset the band actually kept.
+    /** Package 1: passive blood pressure tag; non-zero -> continuous BP (0xDF tag 0xB8) supported. */
+    public static final int CAP_PKG1_BP_TAG = 1;
+    /** Package 2: respiration (breath) function byte; non-zero -> breath rate (tag 0xB6) supported. Vendor field name: beathFunction. */
+    public static final int CAP_PKG2_BREATH_FUNCTION = 7;
+    /** Package 2: HRV type; 3/4/6/7/8 -> all-day HRV (tag 0xB7) supported. */
+    public static final int CAP_PKG2_HRV_TYPE = 8;
+    /** Package 3: blood glucose tag; non-zero -> glucose (tag 0xBE) supported, value 5 selects the packed risk+value encoding. */
+    public static final int CAP_PKG3_BLOOD_GLUCOSE_TAG = 15;
+    /** Package 4: blood component (lipid) tag; non-zero -> lipids (tag 0xC2) supported, 2 = single-calibration variant. */
+    public static final int CAP_PKG4_BLOOD_COMPONENT_TAG = 1;
+
     /**
      * Maximum total days to request from the 0xD4 workout history, even when the device
      * advertises fewer via sportModelDay. The firmware keeps a compacted ring of sessions

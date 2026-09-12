@@ -68,14 +68,22 @@ import nodomain.freeyourgadget.gadgetbridge.entities.DaoSession;
 import nodomain.freeyourgadget.gadgetbridge.entities.Device;
 import nodomain.freeyourgadget.gadgetbridge.entities.GenericBodyCompositionSample;
 import nodomain.freeyourgadget.gadgetbridge.entities.GenericBloodLipidSample;
+import nodomain.freeyourgadget.gadgetbridge.entities.GenericBloodLipidSampleDao;
 import nodomain.freeyourgadget.gadgetbridge.entities.GenericBloodPressureSample;
+import nodomain.freeyourgadget.gadgetbridge.entities.GenericBloodPressureSampleDao;
 import nodomain.freeyourgadget.gadgetbridge.entities.GenericHeartRateSample;
 import nodomain.freeyourgadget.gadgetbridge.entities.GenericHeartRateSampleDao;
 import nodomain.freeyourgadget.gadgetbridge.entities.GenericHrvValueSample;
 import nodomain.freeyourgadget.gadgetbridge.entities.GenericHrvValueSampleDao;
+import nodomain.freeyourgadget.gadgetbridge.entities.GenericRespiratoryRateSample;
+import nodomain.freeyourgadget.gadgetbridge.entities.GenericRespiratoryRateSampleDao;
 import nodomain.freeyourgadget.gadgetbridge.entities.GenericSpo2Sample;
+import nodomain.freeyourgadget.gadgetbridge.entities.GenericSpo2SampleDao;
 import nodomain.freeyourgadget.gadgetbridge.entities.GenericStressSample;
 import nodomain.freeyourgadget.gadgetbridge.entities.GenericTemperatureSample;
+import nodomain.freeyourgadget.gadgetbridge.entities.GenericTemperatureSampleDao;
+import nodomain.freeyourgadget.gadgetbridge.entities.GlucoseSample;
+import nodomain.freeyourgadget.gadgetbridge.entities.GlucoseSampleDao;
 import nodomain.freeyourgadget.gadgetbridge.entities.User;
 import nodomain.freeyourgadget.gadgetbridge.model.TemperatureSample;
 import nodomain.freeyourgadget.gadgetbridge.entities.VeepooActivitySample;
@@ -134,6 +142,13 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
     private final List<VeepooActivitySample> pendingOriginSamples = new ArrayList<>();
     private final List<VeepooActivitySample> pendingSleepSamples = new ArrayList<>();
     private final List<GenericHrvValueSample> pendingHrvSamples = new ArrayList<>();
+    // Per-record all-day vitals from Origin3 (0xDF) tags, persisted when the day completes.
+    private final List<GenericSpo2Sample> pendingOriginSpo2Samples = new ArrayList<>();
+    private final List<GenericBloodPressureSample> pendingOriginBpSamples = new ArrayList<>();
+    private final List<GenericTemperatureSample> pendingOriginTemperatureSamples = new ArrayList<>();
+    private final List<GlucoseSample> pendingOriginGlucoseSamples = new ArrayList<>();
+    private final List<GenericRespiratoryRateSample> pendingOriginBreathSamples = new ArrayList<>();
+    private final List<GenericBloodLipidSample> pendingOriginLipidSamples = new ArrayList<>();
 
     // Phone-initiated workout state (0xDA sport control)
     private final Object liveWorkoutLock = new Object();
@@ -359,6 +374,14 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
     private int tempType = -1;      // pkg3: 0 => no app-triggered temperature measurement
     private int metType = -1;       // pkg3: 2/3 => MET supported
     private int stressType = -1;    // pkg3: 2/3 => app-triggered stress detection supported
+
+    // All-day vitals capability bytes from the A7 report. Captured for logging only: Origin3 tag
+    // parsing is unconditional, so an unknown device build must not hide data the band kept.
+    private int bpTag = -1;             // pkg1: non-zero => continuous blood pressure (tag 0xB8)
+    private int breathFunction = -1;    // pkg2: non-zero => breath rate (tag 0xB6); vendor: beathFunction
+    private int hrvType = -1;           // pkg2: 3/4/6/7/8 => all-day HRV (tag 0xB7)
+    private int bloodGlucoseTag = -1;   // pkg3: non-zero => glucose (tag 0xBE); 5 => packed risk+value encoding
+    private int bloodComponentTag = -1; // pkg4: non-zero => lipids (tag 0xC2)
 
     // Text alarms (0xB9): the band verifies a CRC over the whole alarm list on every op, so we
     // track its exact state and re-read whenever an op fails or the band edits alarms locally.
@@ -717,6 +740,7 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
         int packageId = data[19] & 0xFF;
         LOG.info("Device capability report, package {}: {}", packageId, hexBytes(data));
         if (packageId == 1) {
+            bpTag = data[VeepooConstants.CAP_PKG1_BP_TAG] & 0xFF;
             spo2hType = data[VeepooConstants.CAP_PKG1_SPO2H_TYPE] & 0xFF;
             boolean spo2Supported = isSpo2hTypeSupported(spo2hType) && spo2hType != 8;
             int allMsgLength = data[VeepooConstants.CAP_PKG1_ALL_MSG_LENGTH] & 0xFF;
@@ -728,6 +752,7 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
             LOG.info("Capabilities: spo2hType={} ({}) maxMessagePackets={} alarmTag={} ({})",
                     spo2hType, spo2Supported ? "supported" : "not supported", socialMsgMaxPackets,
                     alarmTag, textAlarmsSupported ? "text alarms supported" : "no text alarms");
+            LOG.info("All-day vitals capability (pkg1): bpTag={} spo2hType={}", bpTag, spo2hType);
             GBApplication.getDeviceSpecificSharedPrefs(getDevice().getAddress())
                     .edit()
                     .putBoolean(VeepooConstants.CONFIG_AUTO_MEASURE_SPO2_SUPPORTED, spo2Supported)
@@ -744,11 +769,14 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
             multSportModeType = data[VeepooConstants.CAP_PKG2_MULTISPORT_MODE_TYPE] & 0xFF;
             int ecgType = data[VeepooConstants.CAP_PKG2_ECG_TYPE] & 0xFF;
             boolean ecgSupported = ecgType != 0;
+            breathFunction = data[VeepooConstants.CAP_PKG2_BREATH_FUNCTION] & 0xFF;
+            hrvType = data[VeepooConstants.CAP_PKG2_HRV_TYPE] & 0xFF;
             LOG.info("Capabilities: watchDataDay={}, originProtocolVersion={} ({}), preciseSleep={}, workoutDays={}, multisport={}, ecg={} (ecgType={})",
                     watchDataDay, originProtocolVersion,
                     (originProtocolVersion == 3 || originProtocolVersion == 5) ? "Origin3/DF" : "v1",
                     preciseSleepCapable, sportModelDay, multSportModeType,
                     ecgSupported ? "supported" : "not supported", ecgType);
+            LOG.info("All-day vitals capability (pkg2): breathFunction={} hrvType={}", breathFunction, hrvType);
             GBApplication.getDeviceSpecificSharedPrefs(getDevice().getAddress())
                     .edit()
                     .putBoolean(VeepooConstants.CONFIG_ECG_SUPPORTED, ecgSupported)
@@ -759,13 +787,18 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
             metType = data[VeepooConstants.CAP_PKG3_MET_TYPE] & 0xFF;
             stressType = data[VeepooConstants.CAP_PKG3_STRESS_TYPE] & 0xFF;
             int findDeviceByPhone = data[VeepooConstants.CAP_PKG3_FIND_DEVICE_BY_PHONE] & 0xFF;
+            bloodGlucoseTag = data[VeepooConstants.CAP_PKG3_BLOOD_GLUCOSE_TAG] & 0xFF;
             LOG.info("Capabilities: tempType={} ({}), metType={}, stressType={} ({}), findDeviceByPhone={}",
                     tempType, tempType != 0 ? "supported" : "not supported", metType, stressType,
                     (stressType == 2 || stressType == 3) ? "supported" : "not supported", findDeviceByPhone);
+            LOG.info("All-day vitals capability (pkg3): bloodGlucoseTag={} metType={} stressType={}",
+                    bloodGlucoseTag, metType, stressType);
         } else if (packageId == 4) {
             autoMeasureSupported = (data[12] & 0xFF) == 1;
+            bloodComponentTag = data[VeepooConstants.CAP_PKG4_BLOOD_COMPONENT_TAG] & 0xFF;
             LOG.info("Capabilities: autoMeasure={} ({})", data[12] & 0xFF,
                     autoMeasureSupported ? "supported" : "not supported");
+            LOG.info("All-day vitals capability (pkg4): bloodComponentTag={}", bloodComponentTag);
             GBApplication.getDeviceSpecificSharedPrefs(getDevice().getAddress())
                     .edit()
                     .putBoolean(VeepooConstants.CONFIG_AUTO_MEASURE_SUPPORTED, autoMeasureSupported)
@@ -2092,7 +2125,12 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
      * Parses one Origin3 block stream. Each 0xB1 tag starts a new 5-minute record (hour [2],
      * minute [3]); fields accumulate until the next 0xB1 or the 0xC0 terminator. B2 (SportFiveMinuteData):
      * [0..1]=steps BE16, [2..3]=sport BE16, [4..5]=distance meters BE16, [6..7]=kcal tenths BE16,
-     * [8]=pose, [9]=wear. B4/B5 carry heart-rate sample arrays.
+     * [8]=pose, [9]=wear. B4 carries the PPG heart-rate array, B5 the ECG one (B4 wins for the
+     * record when both are present). The all-day vitals tags are handled per tag and queued for
+     * batch persistence: 0xB6 breath rate (1 byte/minute), 0xB8 blood pressure (systolic,
+     * diastolic), 0xB9 SpO2 (up to five 1-byte percentages, one per minute), 0xBE glucose (LE16,
+     * 0.01 mmol/L steps), 0xBF MET (1 byte, /10; log-only), 0xC1 pressure/wear (log-only) and
+     * 0xC2 lipids (TCHO/TAG/HDL/LDL as LE16 in 0.01 mmol/L steps + uric acid in mg/dL).
      */
     private int parseOrigin3TlvStream(byte[] payload, int dayIndex) {
         Calendar base = Calendar.getInstance();
@@ -2104,7 +2142,8 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
         int steps = 0;
         int distanceMeters = 0;
         int kcalTenths = 0;
-        int heartRate = ActivitySample.NOT_MEASURED;
+        int ppgHeartRate = ActivitySample.NOT_MEASURED;
+        int ecgHeartRate = ActivitySample.NOT_MEASURED;
         int recordsAdded = 0;
 
         int pos = 0;
@@ -2121,7 +2160,8 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
             byte[] body = Arrays.copyOfRange(payload, pos + 2, pos + 2 + length);
 
             if (tag == 0xB1) {
-                if (flushOrigin3Record(base, dayIndex, haveRecord, hour, minute, steps, distanceMeters, kcalTenths, heartRate)) {
+                if (flushOrigin3Record(base, dayIndex, haveRecord, hour, minute, steps, distanceMeters, kcalTenths,
+                        ppgHeartRate, ecgHeartRate)) {
                     recordsAdded++;
                 }
                 if (body.length == 4 && ((body[0] & 0xFF) | (body[1] & 0xFF)) != 0) {
@@ -2134,15 +2174,21 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
                 steps = 0;
                 distanceMeters = 0;
                 kcalTenths = 0;
-                heartRate = ActivitySample.NOT_MEASURED;
+                ppgHeartRate = ActivitySample.NOT_MEASURED;
+                ecgHeartRate = ActivitySample.NOT_MEASURED;
             } else if (haveRecord && tag == 0xB2 && body.length >= 10) {
                 steps = ((body[0] & 0xFF) << 8) | (body[1] & 0xFF);
                 distanceMeters = ((body[4] & 0xFF) << 8) | (body[5] & 0xFF);
                 kcalTenths = ((body[6] & 0xFF) << 8) | (body[7] & 0xFF);
-            } else if (haveRecord && (tag == 0xB4 || tag == 0xB5)) {
+            } else if (haveRecord && tag == 0xB4) {
                 int average = averageValidHeartRate(body);
-                if (average > 0 && heartRate == ActivitySample.NOT_MEASURED) {
-                    heartRate = average;
+                if (average > 0) {
+                    ppgHeartRate = average;
+                }
+            } else if (haveRecord && tag == 0xB5) {
+                int average = averageValidHeartRate(body);
+                if (average > 0) {
+                    ecgHeartRate = average;
                 }
             } else if (haveRecord && tag == 0xB7 && hour <= 23 && minute <= 59 && body.length >= 51) {
                 Calendar stamp = (Calendar) base.clone();
@@ -2153,18 +2199,138 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
                 if (stamp.getTimeInMillis() <= System.currentTimeMillis() + 60_000L) {
                     parseHrvFiveMinuteRecord(stamp, body, dayIndex);
                 }
+            } else if (haveRecord && tag == 0xB6 && hour <= 23 && minute <= 59) {
+                // Breath rate: one byte per minute (breaths/min).
+                Calendar stamp = origin3RecordStamp(base, hour, minute);
+                for (int m = 0; stamp != null && m < body.length && m < 5; m++) {
+                    int breaths = body[m] & 0xFF;
+                    if (breaths >= 5 && breaths <= 100) {
+                        GenericRespiratoryRateSample sample = new GenericRespiratoryRateSample();
+                        sample.setTimestamp(stamp.getTimeInMillis() + m * 60_000L);
+                        sample.setRespiratoryRate(breaths);
+                        pendingOriginBreathSamples.add(sample);
+                    }
+                }
+            } else if (haveRecord && tag == 0xB8 && hour <= 23 && minute <= 59 && body.length >= 2) {
+                // Blood pressure: systolic then diastolic, one reading per record.
+                int systolic = body[0] & 0xFF;
+                int diastolic = body[1] & 0xFF;
+                Calendar stamp = origin3RecordStamp(base, hour, minute);
+                if (stamp != null && systolic >= 50 && systolic <= 250
+                        && diastolic >= 30 && diastolic <= 150) {
+                    GenericBloodPressureSample sample = new GenericBloodPressureSample();
+                    sample.setTimestamp(stamp.getTimeInMillis());
+                    sample.setBpSystolic(systolic);
+                    sample.setBpDiastolic(diastolic);
+                    sample.setMeanArterialPressure((systolic + 2 * diastolic) / 3);
+                    pendingOriginBpSamples.add(sample);
+                } else if (stamp != null) {
+                    LOG.debug("Ignoring implausible Origin3 BP at {}:{}: {}/{}", hour, minute, systolic, diastolic);
+                }
+            } else if (haveRecord && tag == 0xB9 && hour <= 23 && minute <= 59) {
+                // SpO2: up to five 1-byte percentages, one per minute. The vendor packs further groups
+                // (apnea count/result, hypoxia time, cardiac load, check flag) after byte 5; those have
+                // no Gadgetbridge model and are dropped.
+                Calendar stamp = origin3RecordStamp(base, hour, minute);
+                for (int m = 0; stamp != null && m < body.length && m < 5; m++) {
+                    int spo2 = body[m] & 0xFF;
+                    if (spo2 > 0 && spo2 <= 100) {
+                        GenericSpo2Sample sample = new GenericSpo2Sample();
+                        sample.setTimestamp(stamp.getTimeInMillis() + m * 60_000L);
+                        sample.setSpo2(spo2);
+                        pendingOriginSpo2Samples.add(sample);
+                    }
+                }
+            } else if (haveRecord && tag == 0xBE && hour <= 23 && minute <= 59 && body.length >= 2) {
+                // Blood glucose: LE16 in 0.01 mmol/L steps (the vendor app stores value/100 as mmol/L).
+                int raw = ((body[1] & 0xFF) << 8) | (body[0] & 0xFF);
+                if (bloodGlucoseTag == 5) {
+                    // Tag-5 encoding packs the risk level into the top three bits.
+                    raw &= 0x1FFF;
+                }
+                Calendar stamp = origin3RecordStamp(base, hour, minute);
+                if (stamp != null && raw > 0) {
+                    GlucoseSample sample = new GlucoseSample();
+                    sample.setTimestamp(stamp.getTimeInMillis());
+                    sample.setValueMgDl(raw * 0.18); // GB stores mg/dL; the wire value is 0.01 mmol/L
+                    pendingOriginGlucoseSamples.add(sample);
+                }
+            } else if (haveRecord && tag == 0xBF && hour <= 23 && minute <= 59 && body.length >= 1) {
+                // MET (metabolic equivalent): one byte, value = byte/10. VeepooActivitySample has no
+                // MET field, so the value is logged only.
+                LOG.debug("Origin3 day {} MET at {}:{}: {}", dayIndex, hour, minute, (body[0] & 0xFF) / 10.0);
+            } else if (haveRecord && tag == 0xC1 && hour <= 23 && minute <= 59 && body.length >= 1) {
+                // Pressure/wear byte; not modeled on VeepooActivitySample, so it is logged only.
+                LOG.debug("Origin3 day {} pressure/wear at {}:{}: raw={}", dayIndex, hour, minute, body[0] & 0xFF);
+            } else if (haveRecord && tag == 0xC2 && hour <= 23 && minute <= 59 && body.length >= 10) {
+                // Lipids: TCHO/TAG/HDL/LDL as LE16 in 0.01 mmol/L steps plus uric acid as LE16 mg/dL.
+                int tcho = ((body[1] & 0xFF) << 8) | (body[0] & 0xFF);
+                int trig = ((body[3] & 0xFF) << 8) | (body[2] & 0xFF);
+                int hdl = ((body[5] & 0xFF) << 8) | (body[4] & 0xFF);
+                int ldl = ((body[7] & 0xFF) << 8) | (body[6] & 0xFF);
+                int uricAcid = ((body[9] & 0xFF) << 8) | (body[8] & 0xFF);
+                Calendar stamp = origin3RecordStamp(base, hour, minute);
+                if (stamp != null && tcho > 0 && trig > 0 && hdl > 0 && ldl > 0 && uricAcid > 0) {
+                    GenericBloodLipidSample sample = new GenericBloodLipidSample();
+                    sample.setTimestamp(stamp.getTimeInMillis());
+                    sample.setTotalCholesterol(tcho / 100.0f);
+                    sample.setTriglyceride(trig / 100.0f);
+                    sample.setHdl(hdl / 100.0f);
+                    sample.setLdl(ldl / 100.0f);
+                    sample.setUricAcid(uricAcid / 10.0f);
+                    pendingOriginLipidSamples.add(sample);
+                    LOG.debug("Origin3 day {} lipids at {}:{}: tcho={} trig={} hdl={} ldl={} uricAcid={}",
+                            dayIndex, hour, minute, tcho / 100.0f, trig / 100.0f, hdl / 100.0f,
+                            ldl / 100.0f, uricAcid / 10.0f);
+                } else if (stamp != null) {
+                    LOG.debug("Ignoring empty Origin3 lipid record at {}:{}: tcho={} trig={} hdl={} ldl={} uricAcid={}",
+                            dayIndex, hour, minute, tcho, trig, hdl, ldl, uricAcid);
+                }
+            } else if (haveRecord && tag == 0xC3 && hour <= 23 && minute <= 59 && body.length >= 4) {
+                // Body temperature: LE16 base and measured values, each in tenths of a degree; the
+                // vendor drops the record when either value is outside 120..480 (12.0..48.0 C).
+                int baseTenths = ((body[1] & 0xFF) << 8) | (body[0] & 0xFF);
+                int measuredTenths = ((body[3] & 0xFF) << 8) | (body[2] & 0xFF);
+                Calendar stamp = origin3RecordStamp(base, hour, minute);
+                if (stamp != null && baseTenths >= 120 && baseTenths <= 480
+                        && measuredTenths >= 120 && measuredTenths <= 480) {
+                    GenericTemperatureSample sample = new GenericTemperatureSample();
+                    sample.setTimestamp(stamp.getTimeInMillis());
+                    sample.setTemperature(measuredTenths / 10.0f);
+                    sample.setTemperatureType(TemperatureSample.TYPE_BODY);
+                    sample.setTemperatureLocation(TemperatureSample.LOCATION_WRIST);
+                    pendingOriginTemperatureSamples.add(sample);
+                }
             }
             pos += 2 + length;
         }
-        if (flushOrigin3Record(base, dayIndex, haveRecord, hour, minute, steps, distanceMeters, kcalTenths, heartRate)) {
+        if (flushOrigin3Record(base, dayIndex, haveRecord, hour, minute, steps, distanceMeters, kcalTenths,
+                ppgHeartRate, ecgHeartRate)) {
             recordsAdded++;
         }
         LOG.debug("Origin3 stream for day {}: {} five-minute records", dayIndex, recordsAdded);
         return recordsAdded;
     }
 
+    /**
+     * Record start time for hour/minute within {@code base}, or null when the record lies in the
+     * future (the band clock can run ahead of the phone).
+     */
+    private static Calendar origin3RecordStamp(Calendar base, int hour, int minute) {
+        Calendar stamp = (Calendar) base.clone();
+        stamp.set(Calendar.HOUR_OF_DAY, hour);
+        stamp.set(Calendar.MINUTE, minute);
+        stamp.set(Calendar.SECOND, 0);
+        stamp.set(Calendar.MILLISECOND, 0);
+        if (stamp.getTimeInMillis() > System.currentTimeMillis() + 60_000L) {
+            return null;
+        }
+        return stamp;
+    }
+
     private boolean flushOrigin3Record(Calendar base, int dayIndex, boolean valid, int hour, int minute,
-                                       int steps, int distanceMeters, int kcalTenths, int heartRate) {
+                                       int steps, int distanceMeters, int kcalTenths,
+                                       int ppgHeartRate, int ecgHeartRate) {
         if (!valid || hour > 23 || minute > 59) {
             return false;
         }
@@ -2176,6 +2342,12 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
         if (stamp.getTimeInMillis() > System.currentTimeMillis() + 60_000L) {
             LOG.debug("Skipping Origin3 record for day {} with a future timestamp ({})", dayIndex, stamp);
             return false;
+        }
+        // Prefer the PPG (0xB4) average when both it and the ECG (0xB5) array were present.
+        int heartRate = ppgHeartRate != ActivitySample.NOT_MEASURED ? ppgHeartRate : ecgHeartRate;
+        if (ppgHeartRate != ActivitySample.NOT_MEASURED && ecgHeartRate != ActivitySample.NOT_MEASURED) {
+            LOG.debug("Origin3 day {} record at {}:{}: PPG HR {} preferred over ECG HR {}",
+                    dayIndex, hour, minute, ppgHeartRate, ecgHeartRate);
         }
         VeepooActivitySample sample = new VeepooActivitySample();
         sample.setTimestamp((int) (stamp.getTimeInMillis() / 1000L));
@@ -5790,7 +5962,10 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
      * win over overlapping activity rows within the sleep window.
      */
     private void persistPendingOriginDay() {
-        if (pendingOriginSamples.isEmpty() && pendingHrvSamples.isEmpty()) {
+        if (pendingOriginSamples.isEmpty() && pendingHrvSamples.isEmpty()
+                && pendingOriginSpo2Samples.isEmpty() && pendingOriginBpSamples.isEmpty()
+                && pendingOriginTemperatureSamples.isEmpty() && pendingOriginGlucoseSamples.isEmpty()
+                && pendingOriginBreathSamples.isEmpty() && pendingOriginLipidSamples.isEmpty()) {
             return;
         }
         List<VeepooActivitySample> batch = new ArrayList<>(pendingOriginSamples);
@@ -5799,6 +5974,7 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
             persistSamples(batch, false);
         }
         persistPendingHrvSamples();
+        persistPendingOriginVitalsSamples();
     }
 
     private void persistPendingHrvSamples() {
@@ -5832,6 +6008,152 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
         }
     }
 
+    /**
+     * Persist the per-record all-day vitals (SpO2, blood pressure, temperature, glucose, breath
+     * rate, lipids) collected while parsing Origin3 days. Like the HRV batch, rows inside each
+     * batch's time window are deleted first so re-syncing a day replaces instead of duplicates.
+     */
+    private void persistPendingOriginVitalsSamples() {
+        if (pendingOriginSpo2Samples.isEmpty() && pendingOriginBpSamples.isEmpty()
+                && pendingOriginTemperatureSamples.isEmpty() && pendingOriginGlucoseSamples.isEmpty()
+                && pendingOriginBreathSamples.isEmpty() && pendingOriginLipidSamples.isEmpty()) {
+            return;
+        }
+        List<GenericSpo2Sample> spo2Batch = new ArrayList<>(pendingOriginSpo2Samples);
+        List<GenericBloodPressureSample> bpBatch = new ArrayList<>(pendingOriginBpSamples);
+        List<GenericTemperatureSample> temperatureBatch = new ArrayList<>(pendingOriginTemperatureSamples);
+        List<GlucoseSample> glucoseBatch = new ArrayList<>(pendingOriginGlucoseSamples);
+        List<GenericRespiratoryRateSample> breathBatch = new ArrayList<>(pendingOriginBreathSamples);
+        List<GenericBloodLipidSample> lipidBatch = new ArrayList<>(pendingOriginLipidSamples);
+        pendingOriginSpo2Samples.clear();
+        pendingOriginBpSamples.clear();
+        pendingOriginTemperatureSamples.clear();
+        pendingOriginGlucoseSamples.clear();
+        pendingOriginBreathSamples.clear();
+        pendingOriginLipidSamples.clear();
+        try (DBHandler dbHandler = GBApplication.acquireDB()) {
+            DaoSession session = dbHandler.getDaoSession();
+            long userId = DBHelper.getUser(session).getId();
+            long deviceId = DBHelper.getDevice(getDevice(), session).getId();
+
+            if (!spo2Batch.isEmpty()) {
+                GenericSpo2SampleDao dao = session.getGenericSpo2SampleDao();
+                long from = Long.MAX_VALUE;
+                long to = Long.MIN_VALUE;
+                for (GenericSpo2Sample sample : spo2Batch) {
+                    sample.setUserId(userId);
+                    sample.setDeviceId(deviceId);
+                    from = Math.min(from, sample.getTimestamp());
+                    to = Math.max(to, sample.getTimestamp());
+                }
+                dao.queryBuilder()
+                        .where(GenericSpo2SampleDao.Properties.DeviceId.eq(deviceId),
+                                GenericSpo2SampleDao.Properties.Timestamp.ge(from - 60_000L),
+                                GenericSpo2SampleDao.Properties.Timestamp.le(to + 60_000L))
+                        .buildDelete()
+                        .executeDeleteWithoutDetachingEntities();
+                dao.insertInTx(spo2Batch);
+            }
+
+            if (!bpBatch.isEmpty()) {
+                GenericBloodPressureSampleDao dao = session.getGenericBloodPressureSampleDao();
+                long from = Long.MAX_VALUE;
+                long to = Long.MIN_VALUE;
+                for (GenericBloodPressureSample sample : bpBatch) {
+                    sample.setUserId(userId);
+                    sample.setDeviceId(deviceId);
+                    from = Math.min(from, sample.getTimestamp());
+                    to = Math.max(to, sample.getTimestamp());
+                }
+                dao.queryBuilder()
+                        .where(GenericBloodPressureSampleDao.Properties.DeviceId.eq(deviceId),
+                                GenericBloodPressureSampleDao.Properties.Timestamp.ge(from - 60_000L),
+                                GenericBloodPressureSampleDao.Properties.Timestamp.le(to + 60_000L))
+                        .buildDelete()
+                        .executeDeleteWithoutDetachingEntities();
+                dao.insertInTx(bpBatch);
+            }
+
+            if (!temperatureBatch.isEmpty()) {
+                GenericTemperatureSampleDao dao = session.getGenericTemperatureSampleDao();
+                long from = Long.MAX_VALUE;
+                long to = Long.MIN_VALUE;
+                for (GenericTemperatureSample sample : temperatureBatch) {
+                    sample.setUserId(userId);
+                    sample.setDeviceId(deviceId);
+                    from = Math.min(from, sample.getTimestamp());
+                    to = Math.max(to, sample.getTimestamp());
+                }
+                dao.queryBuilder()
+                        .where(GenericTemperatureSampleDao.Properties.DeviceId.eq(deviceId),
+                                GenericTemperatureSampleDao.Properties.Timestamp.ge(from - 60_000L),
+                                GenericTemperatureSampleDao.Properties.Timestamp.le(to + 60_000L))
+                        .buildDelete()
+                        .executeDeleteWithoutDetachingEntities();
+                dao.insertInTx(temperatureBatch);
+            }
+
+            if (!glucoseBatch.isEmpty()) {
+                GlucoseSampleDao dao = session.getGlucoseSampleDao();
+                long from = Long.MAX_VALUE;
+                long to = Long.MIN_VALUE;
+                for (GlucoseSample sample : glucoseBatch) {
+                    sample.setUserId(userId);
+                    sample.setDeviceId(deviceId);
+                    from = Math.min(from, sample.getTimestamp());
+                    to = Math.max(to, sample.getTimestamp());
+                }
+                dao.queryBuilder()
+                        .where(GlucoseSampleDao.Properties.DeviceId.eq(deviceId),
+                                GlucoseSampleDao.Properties.Timestamp.ge(from - 60_000L),
+                                GlucoseSampleDao.Properties.Timestamp.le(to + 60_000L))
+                        .buildDelete()
+                        .executeDeleteWithoutDetachingEntities();
+                dao.insertInTx(glucoseBatch);
+            }
+
+            if (!breathBatch.isEmpty()) {
+                GenericRespiratoryRateSampleDao dao = session.getGenericRespiratoryRateSampleDao();
+                long from = Long.MAX_VALUE;
+                long to = Long.MIN_VALUE;
+                for (GenericRespiratoryRateSample sample : breathBatch) {
+                    sample.setUserId(userId);
+                    sample.setDeviceId(deviceId);
+                    from = Math.min(from, sample.getTimestamp());
+                    to = Math.max(to, sample.getTimestamp());
+                }
+                dao.queryBuilder()
+                        .where(GenericRespiratoryRateSampleDao.Properties.DeviceId.eq(deviceId),
+                                GenericRespiratoryRateSampleDao.Properties.Timestamp.ge(from - 60_000L),
+                                GenericRespiratoryRateSampleDao.Properties.Timestamp.le(to + 60_000L))
+                        .buildDelete()
+                        .executeDeleteWithoutDetachingEntities();
+                dao.insertInTx(breathBatch);
+            }
+
+            if (!lipidBatch.isEmpty()) {
+                GenericBloodLipidSampleDao dao = session.getGenericBloodLipidSampleDao();
+                long from = Long.MAX_VALUE;
+                long to = Long.MIN_VALUE;
+                for (GenericBloodLipidSample sample : lipidBatch) {
+                    sample.setUserId(userId);
+                    sample.setDeviceId(deviceId);
+                    from = Math.min(from, sample.getTimestamp());
+                    to = Math.max(to, sample.getTimestamp());
+                }
+                dao.queryBuilder()
+                        .where(GenericBloodLipidSampleDao.Properties.DeviceId.eq(deviceId),
+                                GenericBloodLipidSampleDao.Properties.Timestamp.ge(from - 60_000L),
+                                GenericBloodLipidSampleDao.Properties.Timestamp.le(to + 60_000L))
+                        .buildDelete()
+                        .executeDeleteWithoutDetachingEntities();
+                dao.insertInTx(lipidBatch);
+            }
+        } catch (Exception e) {
+            LOG.error("Error saving Origin3 vital samples", e);
+        }
+    }
+
     private void finishFetch() {
         persistPendingOriginDay();
         if (!pendingSleepSamples.isEmpty()) {
@@ -5853,6 +6175,12 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
         }
         pendingOriginSamples.clear();
         pendingSleepSamples.clear();
+        pendingOriginSpo2Samples.clear();
+        pendingOriginBpSamples.clear();
+        pendingOriginTemperatureSamples.clear();
+        pendingOriginGlucoseSamples.clear();
+        pendingOriginBreathSamples.clear();
+        pendingOriginLipidSamples.clear();
         sleepDayPayload.reset();
         dfDayFrames.clear();
         sportDayFrames.clear();
