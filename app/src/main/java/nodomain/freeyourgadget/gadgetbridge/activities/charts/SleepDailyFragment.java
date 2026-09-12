@@ -18,18 +18,23 @@
 package nodomain.freeyourgadget.gadgetbridge.activities.charts;
 
 import static nodomain.freeyourgadget.gadgetbridge.model.ActivitySummaryEntries.UNIT_BPM;
+import static nodomain.freeyourgadget.gadgetbridge.model.ActivitySummaryEntries.UNIT_RAW_STRING;
 
 import android.content.Context;
 import android.content.Intent;
 import android.graphics.Color;
+import android.graphics.Typeface;
 import android.os.Bundle;
 import android.text.method.ScrollingMovementMethod;
 import android.util.TypedValue;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.LinearLayout;
+import android.widget.TextView;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.core.content.ContextCompat;
 
 import com.github.mikephil.charting.animation.Easing;
@@ -53,6 +58,7 @@ import java.util.Arrays;
 import java.util.Date;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
@@ -69,9 +75,16 @@ import nodomain.freeyourgadget.gadgetbridge.activities.charts.sleep.SleepDetails
 import nodomain.freeyourgadget.gadgetbridge.activities.charts.sleep.SleepDetailsView;
 import nodomain.freeyourgadget.gadgetbridge.activities.dashboard.GaugeDrawer;
 import nodomain.freeyourgadget.gadgetbridge.database.DBHandler;
+import nodomain.freeyourgadget.gadgetbridge.database.DBHelper;
 import nodomain.freeyourgadget.gadgetbridge.databinding.FragmentSleepchartBinding;
 import nodomain.freeyourgadget.gadgetbridge.devices.DeviceCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.TimeSampleProvider;
+import nodomain.freeyourgadget.gadgetbridge.entities.Device;
+import nodomain.freeyourgadget.gadgetbridge.entities.GenericRespiratoryRateSample;
+import nodomain.freeyourgadget.gadgetbridge.entities.GenericRespiratoryRateSampleDao;
+import nodomain.freeyourgadget.gadgetbridge.entities.VeepooActivitySample;
+import nodomain.freeyourgadget.gadgetbridge.entities.VeepooSleepSummarySample;
+import nodomain.freeyourgadget.gadgetbridge.entities.VeepooSleepSummarySampleDao;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
 import nodomain.freeyourgadget.gadgetbridge.model.ActivityKind;
 import nodomain.freeyourgadget.gadgetbridge.model.ActivitySample;
@@ -162,6 +175,8 @@ public class SleepDailyFragment extends SleepFragment<SleepDailyFragment.MyChart
         final DeviceChartsProvider chartsProvider = device.getDeviceCoordinator().getChartsProvider();
         final Map<String, ActivitySummarySimpleEntry> customStats = chartsProvider.getDailySleepStats(requireContext(), db, device, getTSStart(), getTSEnd());
 
+        final SleepVitals sleepVitals = prepareSleepVitals(db, device, samples, mySleepChartsData.sleepSessions);
+
         return new MyChartsData(
                 mySleepChartsData,
                 chartsData,
@@ -173,7 +188,8 @@ public class SleepDailyFragment extends SleepFragment<SleepDailyFragment.MyChart
                 intensityData.getRight(),
                 stages,
                 overlay,
-                customStats
+                customStats,
+                sleepVitals
         );
     }
 
@@ -470,6 +486,11 @@ public class SleepDailyFragment extends SleepFragment<SleepDailyFragment.MyChart
 
         binding.sleepStatsContainer.addView(statsBuilder.build());
 
+        final SleepVitals sleepVitals = mcd.getSleepVitals();
+        if (sleepVitals != null) {
+            addSleepVitalsSection(sleepVitals);
+        }
+
         if (supportsHeartrate(getChartsHost().getDevice()) && SHOW_CHARTS_AVERAGE) {
             if (mcd.getHeartRateAxisMax() != 0 || mcd.getHeartRateAxisMin() != 0) {
                 binding.sleepchart.getAxisRight().setAxisMaximum(mcd.getHeartRateAxisMax() + (mcd.getHeartRateAxisMin() / 2f));
@@ -525,6 +546,123 @@ public class SleepDailyFragment extends SleepFragment<SleepDailyFragment.MyChart
         return Triple.of((float) accumulator.getSum(), (float) accumulator.getMin(), (float) accumulator.getMax());
     }
 
+    private SleepVitals prepareSleepVitals(DBHandler db, GBDevice device, List<? extends ActivitySample> samples, List<SleepSession> sleepSessions) {
+        long periodStartMs;
+        long periodEndMs;
+        if (!sleepSessions.isEmpty()) {
+            periodStartMs = sleepSessions.get(0).getSleepStart().getTime();
+            periodEndMs = sleepSessions.get(sleepSessions.size() - 1).getSleepEnd().getTime();
+        } else {
+            periodStartMs = (long) getTSStart() * 1000L;
+            periodEndMs = (long) getTSEnd() * 1000L;
+        }
+
+        final Device dbDevice = DBHelper.findDevice(device, db.getDaoSession());
+        if (dbDevice == null) {
+            return null;
+        }
+
+        final List<VeepooSleepSummarySample> summaries = db.getDaoSession().getVeepooSleepSummarySampleDao()
+                .queryBuilder()
+                .where(VeepooSleepSummarySampleDao.Properties.DeviceId.eq(dbDevice.getId()),
+                        VeepooSleepSummarySampleDao.Properties.Timestamp.ge(periodStartMs),
+                        VeepooSleepSummarySampleDao.Properties.Timestamp.le(periodEndMs))
+                .orderDesc(VeepooSleepSummarySampleDao.Properties.Timestamp)
+                .build()
+                .list();
+        if (summaries.isEmpty()) {
+            return null;
+        }
+        final VeepooSleepSummarySample summary = summaries.get(0);
+
+        final int periodStartSec = (int) (periodStartMs / 1000L);
+        final int periodEndSec = (int) (periodEndMs / 1000L);
+        final HeartRateUtils heartRateUtils = HeartRateUtils.getInstance();
+
+        final Accumulator hrAccumulator = new Accumulator();
+        long apneaEvents = 0;
+        long hypoxiaMinutes = 0;
+        long cardiacLoadMinutes = 0;
+        for (ActivitySample sample : samples) {
+            if (sample.getTimestamp() < periodStartSec || sample.getTimestamp() > periodEndSec) {
+                continue;
+            }
+            if (ActivityKind.isSleep(sample.getKind()) && heartRateUtils.isValidHeartRateValue(sample.getHeartRate())) {
+                hrAccumulator.add(sample.getHeartRate());
+            }
+            if (sample instanceof VeepooActivitySample) {
+                final VeepooActivitySample veepooSample = (VeepooActivitySample) sample;
+                if (veepooSample.getApneaCount() != null) {
+                    apneaEvents += veepooSample.getApneaCount();
+                }
+                if (veepooSample.getHypoxiaMinutes() != null) {
+                    hypoxiaMinutes += veepooSample.getHypoxiaMinutes();
+                }
+                if (veepooSample.getCardiacLoadMinutes() != null) {
+                    cardiacLoadMinutes += veepooSample.getCardiacLoadMinutes();
+                }
+            }
+        }
+
+        final Triple<Integer, Integer, Integer> heartRate;
+        if (hrAccumulator.getCount() > 0) {
+            heartRate = Triple.of((int) hrAccumulator.getMin(), (int) Math.round(hrAccumulator.getAverage()), (int) hrAccumulator.getMax());
+        } else {
+            heartRate = null;
+        }
+
+        return new SleepVitals(
+                summary.getQuality(),
+                summary.getWakeCount(),
+                heartRate,
+                prepareSpo2Stats(device, db, periodStartMs, periodEndMs),
+                prepareRespiratoryRateStats(dbDevice.getId(), device, db, periodStartMs, periodEndMs),
+                apneaEvents,
+                hypoxiaMinutes,
+                cardiacLoadMinutes
+        );
+    }
+
+    private Triple<Integer, Integer, Integer> prepareSpo2Stats(GBDevice device, DBHandler db, long tsStartMs, long tsEndMs) {
+        final TimeSampleProvider<? extends Spo2Sample> provider = device.getDeviceCoordinator().getSpo2SampleProvider(device, db.getDaoSession());
+        if (provider == null) {
+            return null;
+        }
+        final Accumulator accumulator = new Accumulator();
+        for (Spo2Sample sample : provider.getAllSamples(tsStartMs, tsEndMs)) {
+            accumulator.add(sample.getSpo2());
+        }
+        if (accumulator.getCount() == 0) {
+            return null;
+        }
+        return Triple.of((int) accumulator.getMin(), (int) Math.round(accumulator.getAverage()), (int) accumulator.getMax());
+    }
+
+    private Triple<Float, Float, Float> prepareRespiratoryRateStats(long deviceId, GBDevice device, DBHandler db, long tsStartMs, long tsEndMs) {
+        final Accumulator accumulator = new Accumulator();
+        final TimeSampleProvider<? extends RespiratoryRateSample> provider = device.getDeviceCoordinator().getRespiratoryRateSampleProvider(device, db.getDaoSession());
+        if (provider != null) {
+            for (RespiratoryRateSample sample : provider.getAllSamples(tsStartMs, tsEndMs)) {
+                accumulator.add(sample.getRespiratoryRate());
+            }
+        } else {
+            final List<GenericRespiratoryRateSample> samples = db.getDaoSession().getGenericRespiratoryRateSampleDao()
+                    .queryBuilder()
+                    .where(GenericRespiratoryRateSampleDao.Properties.DeviceId.eq(deviceId),
+                            GenericRespiratoryRateSampleDao.Properties.Timestamp.ge(tsStartMs),
+                            GenericRespiratoryRateSampleDao.Properties.Timestamp.le(tsEndMs))
+                    .build()
+                    .list();
+            for (GenericRespiratoryRateSample sample : samples) {
+                accumulator.add(sample.getRespiratoryRate());
+            }
+        }
+        if (accumulator.getCount() == 0) {
+            return null;
+        }
+        return Triple.of((float) accumulator.getMin(), (float) accumulator.getAverage(), (float) accumulator.getMax());
+    }
+
     private String buildYouSleptText(MySleepChartsData pieData) {
         final StringBuilder result = new StringBuilder();
         if (!pieData.getSleepSessions().isEmpty()) {
@@ -538,6 +676,101 @@ public class SleepDailyFragment extends SleepFragment<SleepDailyFragment.MyChart
             }
         }
         return result.toString();
+    }
+
+    private void addSleepVitalsSection(SleepVitals vitals) {
+        final Context context = requireContext();
+
+        final TextView title = new TextView(context);
+        title.setText(getString(R.string.sleep_vitals_title));
+        title.setTextSize(TypedValue.COMPLEX_UNIT_SP, 16);
+        title.setTypeface(Typeface.DEFAULT_BOLD);
+        title.setTextColor(GBApplication.getTextColor(context));
+        final LinearLayout.LayoutParams titleParams = new LinearLayout.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+        titleParams.setMargins(0, dpToPx(10), 0, dpToPx(2));
+        binding.sleepStatsContainer.addView(title, titleParams);
+
+        boolean hasCells = false;
+        final GridTableBuilder vitalsBuilder = new GridTableBuilder(context);
+        if (vitals.getQuality() != null) {
+            vitalsBuilder.addEntry(getString(R.string.sleep_quality),
+                    new ActivitySummarySimpleEntry(formatSleepQualityStars(vitals.getQuality()), UNIT_RAW_STRING));
+            hasCells = true;
+        }
+        if (vitals.getWakeCount() != null) {
+            vitalsBuilder.addEntry(getString(R.string.wake_count),
+                    new ActivitySummarySimpleEntry(String.valueOf(vitals.getWakeCount()), UNIT_RAW_STRING));
+            hasCells = true;
+        }
+        if (vitals.getHeartRate() != null) {
+            vitalsBuilder.addEntry(getString(R.string.heart_rate_during_sleep),
+                    new ActivitySummarySimpleEntry(formatIntegerRange(vitals.getHeartRate(), getString(R.string.bpm)), UNIT_RAW_STRING));
+            hasCells = true;
+        }
+        if (vitals.getSpo2() != null) {
+            vitalsBuilder.addEntry(getString(R.string.spo2_during_sleep),
+                    new ActivitySummarySimpleEntry(formatIntegerRange(vitals.getSpo2(), "%"), UNIT_RAW_STRING));
+            hasCells = true;
+        }
+        if (vitals.getRespiratoryRate() != null) {
+            vitalsBuilder.addEntry(getString(R.string.respiratory_rate_during_sleep),
+                    new ActivitySummarySimpleEntry(formatFloatRange(vitals.getRespiratoryRate(), getString(R.string.breaths_per_min)), UNIT_RAW_STRING));
+            hasCells = true;
+        }
+
+        final boolean apneaEmpty = vitals.getApneaEvents() == 0 && vitals.getHypoxiaMinutes() == 0 && vitals.getCardiacLoadMinutes() == 0;
+        if (!apneaEmpty) {
+            vitalsBuilder.addEntry(getString(R.string.apnea_events),
+                    new ActivitySummarySimpleEntry(String.valueOf(vitals.getApneaEvents()), UNIT_RAW_STRING));
+            hasCells = true;
+            if (vitals.getHypoxiaMinutes() > 0) {
+                vitalsBuilder.addEntry(getString(R.string.hypoxia_minutes),
+                        new ActivitySummarySimpleEntry(String.valueOf(vitals.getHypoxiaMinutes()), UNIT_RAW_STRING));
+                hasCells = true;
+            }
+            if (vitals.getCardiacLoadMinutes() > 0) {
+                vitalsBuilder.addEntry(getString(R.string.cardiac_load_minutes),
+                        new ActivitySummarySimpleEntry(String.valueOf(vitals.getCardiacLoadMinutes()), UNIT_RAW_STRING));
+                hasCells = true;
+            }
+        }
+
+        if (hasCells) {
+            binding.sleepStatsContainer.addView(vitalsBuilder.build());
+        }
+        if (apneaEmpty) {
+            final TextView noApnea = new TextView(context);
+            noApnea.setText(getString(R.string.no_apnea_events));
+            noApnea.setTextColor(GBApplication.getSecondaryTextColor(context));
+            final LinearLayout.LayoutParams noApneaParams = new LinearLayout.LayoutParams(
+                    ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT);
+            noApneaParams.setMargins(dpToPx(15), dpToPx(10), dpToPx(15), dpToPx(10));
+            binding.sleepStatsContainer.addView(noApnea, noApneaParams);
+        }
+    }
+
+    private String formatSleepQualityStars(int quality) {
+        final int clamped = Math.max(1, Math.min(5, quality));
+        final StringBuilder stars = new StringBuilder();
+        for (int i = 0; i < 5; i++) {
+            stars.append(i < clamped ? "★" : "☆");
+        }
+        return stars.toString();
+    }
+
+    private String formatIntegerRange(Triple<Integer, Integer, Integer> value, String unit) {
+        return String.format(Locale.getDefault(), "%d / %d / %d %s",
+                value.getLeft(), value.getMiddle(), value.getRight(), unit);
+    }
+
+    private String formatFloatRange(Triple<Float, Float, Float> value, String unit) {
+        return String.format(Locale.getDefault(), "%d / %d / %d %s",
+                Math.round(value.getLeft()), Math.round(value.getMiddle()), Math.round(value.getRight()), unit);
+    }
+
+    private int dpToPx(int dp) {
+        return (int) TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, dp, GBApplication.getContext().getResources().getDisplayMetrics());
     }
 
     private enum OverlayType {
@@ -764,6 +997,8 @@ public class SleepDailyFragment extends SleepFragment<SleepDailyFragment.MyChart
 
         private final AbstractOverlayData overlayData;
 
+        private final SleepVitals sleepVitals;
+
         public MyChartsData(MySleepChartsData pieData,
                             DefaultChartsData<LineData> chartsData,
                             float heartRateAverage,
@@ -774,7 +1009,8 @@ public class SleepDailyFragment extends SleepFragment<SleepDailyFragment.MyChart
                             float intensityAxisMax,
                             List<SleepDetailsView.SleepDetail> stages,
                             AbstractOverlayData overlayData,
-                            Map<String, ActivitySummarySimpleEntry> customStats) {
+                            Map<String, ActivitySummarySimpleEntry> customStats,
+                            SleepVitals sleepVitals) {
             this.pieData = pieData;
             this.chartsData = chartsData;
             this.heartRateAverage = heartRateAverage;
@@ -786,6 +1022,7 @@ public class SleepDailyFragment extends SleepFragment<SleepDailyFragment.MyChart
             this.stages = stages;
             this.overlayData = overlayData;
             this.customStats = customStats;
+            this.sleepVitals = sleepVitals;
         }
 
         public MySleepChartsData getPieData() {
@@ -830,6 +1067,77 @@ public class SleepDailyFragment extends SleepFragment<SleepDailyFragment.MyChart
 
         public Map<String, ActivitySummarySimpleEntry> getCustomStats() {
             return customStats;
+        }
+
+        @Nullable
+        public SleepVitals getSleepVitals() {
+            return sleepVitals;
+        }
+    }
+
+    protected static class SleepVitals {
+        private final Integer quality;
+        private final Integer wakeCount;
+        private final Triple<Integer, Integer, Integer> heartRate;
+        private final Triple<Integer, Integer, Integer> spo2;
+        private final Triple<Float, Float, Float> respiratoryRate;
+        private final long apneaEvents;
+        private final long hypoxiaMinutes;
+        private final long cardiacLoadMinutes;
+
+        public SleepVitals(Integer quality,
+                           Integer wakeCount,
+                           Triple<Integer, Integer, Integer> heartRate,
+                           Triple<Integer, Integer, Integer> spo2,
+                           Triple<Float, Float, Float> respiratoryRate,
+                           long apneaEvents,
+                           long hypoxiaMinutes,
+                           long cardiacLoadMinutes) {
+            this.quality = quality;
+            this.wakeCount = wakeCount;
+            this.heartRate = heartRate;
+            this.spo2 = spo2;
+            this.respiratoryRate = respiratoryRate;
+            this.apneaEvents = apneaEvents;
+            this.hypoxiaMinutes = hypoxiaMinutes;
+            this.cardiacLoadMinutes = cardiacLoadMinutes;
+        }
+
+        @Nullable
+        public Integer getQuality() {
+            return quality;
+        }
+
+        @Nullable
+        public Integer getWakeCount() {
+            return wakeCount;
+        }
+
+        @Nullable
+        public Triple<Integer, Integer, Integer> getHeartRate() {
+            return heartRate;
+        }
+
+        @Nullable
+        public Triple<Integer, Integer, Integer> getSpo2() {
+            return spo2;
+        }
+
+        @Nullable
+        public Triple<Float, Float, Float> getRespiratoryRate() {
+            return respiratoryRate;
+        }
+
+        public long getApneaEvents() {
+            return apneaEvents;
+        }
+
+        public long getHypoxiaMinutes() {
+            return hypoxiaMinutes;
+        }
+
+        public long getCardiacLoadMinutes() {
+            return cardiacLoadMinutes;
         }
     }
 }
