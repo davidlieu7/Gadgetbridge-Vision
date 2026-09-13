@@ -2203,6 +2203,8 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
         int ecgHeartRate = ActivitySample.NOT_MEASURED;
         int ppgHrRecords = 0;
         int ecgHrRecords = 0;
+        int hrvRecords = 0;
+        int hrvSamplesAdded = 0;
         // Aggregates of the 0xB9 apnea/hypoxia/cardiac-load groups (null until the tag is seen).
         Integer apneaCount = null;
         Integer hypoxiaMinutes = null;
@@ -2267,7 +2269,8 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
                 stamp.set(Calendar.SECOND, 0);
                 stamp.set(Calendar.MILLISECOND, 0);
                 if (stamp.getTimeInMillis() <= System.currentTimeMillis() + 60_000L) {
-                    parseHrvFiveMinuteRecord(stamp, body, dayIndex);
+                    hrvRecords++;
+                    hrvSamplesAdded += parseHrvFiveMinuteRecord(stamp, body, dayIndex);
                 }
             } else if (haveRecord && tag == 0xB6 && hour <= 23 && minute <= 59) {
                 // Breath rate: one byte per minute (breaths/min).
@@ -2425,8 +2428,8 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
             recordsAdded++;
         }
         LOG.debug("Origin3 stream for day {}: {} five-minute records", dayIndex, recordsAdded);
-        LOG.info("Origin3 day {}: heart rate present in {} PPG / {} ECG of {} five-minute records",
-                dayIndex, ppgHrRecords, ecgHrRecords, recordsAdded);
+        LOG.info("Origin3 day {}: heart rate in {} PPG / {} ECG of {} five-minute records; HRV tags {} ({} minute samples)",
+                dayIndex, ppgHrRecords, ecgHrRecords, recordsAdded, hrvRecords, hrvSamplesAdded);
         return recordsAdded;
     }
 
@@ -2490,7 +2493,7 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
      * bitmask (bit 7-m for minute m), [1..50] hold raw RR values. The per-minute HRV value in
      * milliseconds is the average absolute difference of consecutive valid RR values, scaled x10.
      */
-    private void parseHrvFiveMinuteRecord(Calendar stamp, byte[] body, int dayIndex) {
+    private int parseHrvFiveMinuteRecord(Calendar stamp, byte[] body, int dayIndex) {
         int hrvType = body[0] & 0xFF;
         int added = 0;
         for (int m = 0; m < 5; m++) {
@@ -2520,7 +2523,7 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
             pendingHrvSamples.add(sample);
             added++;
         }
-        LOG.debug("Origin3 day {}: {} HRV minute samples from a five-minute record", dayIndex, added);
+        return added;
     }
 
     /** Averages the heart-rate bytes inside the plausible 30..200 range; 0 when none qualify. */
