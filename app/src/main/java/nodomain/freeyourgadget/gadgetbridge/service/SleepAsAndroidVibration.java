@@ -71,12 +71,19 @@ public class SleepAsAndroidVibration {
      * still ringing is the louder failure of the two.
      */
     static final long ALARM_MAX_DURATION_MS = 10 * 60_000L;
+    /**
+     * The cap for an alarm that rang with no Sleep as Android session behind it. Such an alarm has
+     * been seen to get no STOP_ALARM at all, and there is no session whose end could stop it
+     * either, so it is the case most likely to run to the cap rather than be stopped.
+     */
+    static final long ALARM_MAX_DURATION_NO_SESSION_MS = 2 * 60_000L;
 
     private final Handler handler;
     private final Toggle toggle;
 
     private boolean alarmRunning = false;
     private boolean toggledOn = false;
+    private long maxDuration = ALARM_MAX_DURATION_MS;
     private long alarmDeadline = 0;
 
     public SleepAsAndroidVibration(final Handler handler, final Toggle toggle) {
@@ -96,17 +103,20 @@ public class SleepAsAndroidVibration {
     }
 
     /**
-     * Start alarming after {@code delayMs}, repeating until {@link #stop()} or the safety cap.
-     * A delay of -1 is Sleep as Android's cancel convention.
+     * Start alarming after {@code delayMs}, repeating until {@link #stop()} or {@code maxDurationMs}
+     * of alarming has passed. A delay of -1 is Sleep as Android's cancel convention.
+     * <p>
+     * The cap measures alarming rather than waiting, so a delay does not eat into it.
      */
-    public void startAlarm(final int delayMs) {
+    public void startAlarm(final int delayMs, final long maxDurationMs) {
         stopNow();
         if (delayMs == -1) {
             return;
         }
 
         alarmRunning = true;
-        alarmDeadline = SystemClock.elapsedRealtime() + ALARM_MAX_DURATION_MS;
+        maxDuration = maxDurationMs;
+        alarmDeadline = 0;
         handler.postDelayed(this::alarmTick, Math.max(0, delayMs));
     }
 
@@ -151,7 +161,9 @@ public class SleepAsAndroidVibration {
         if (!alarmRunning) {
             return;
         }
-        if (SystemClock.elapsedRealtime() > alarmDeadline) {
+        if (alarmDeadline == 0) {
+            alarmDeadline = SystemClock.elapsedRealtime() + maxDuration;
+        } else if (SystemClock.elapsedRealtime() > alarmDeadline) {
             stopNow();
             return;
         }
