@@ -50,7 +50,16 @@ public class SleepDetailsParser extends XiaomiActivityParser {
 
     @Override
     public boolean parse(final Context context, final GBDevice gbDevice, final XiaomiActivityFileId fileId, final byte[] bytes) {
-        // Seems to come both as DetailType.DETAILS (version 2) and DetailType.SUMMARY (version 4, 5)
+        try {
+            return parseSleep(context, gbDevice, fileId, bytes);
+        } catch (final BufferUnderflowException | IllegalArgumentException e) {
+            LOG.warn("Invalid sleep details payload for {}", fileId, e);
+            return false;
+        }
+    }
+
+    private boolean parseSleep(final Context context, final GBDevice gbDevice, final XiaomiActivityFileId fileId, final byte[] bytes) {
+        // Comes as DetailType.DETAILS (version 2) and DetailType.SUMMARY (versions 4-6).
         final int version = fileId.getVersion();
         final int headerSize;
         switch (version) {
@@ -62,6 +71,9 @@ public class SleepDetailsParser extends XiaomiActivityParser {
                 break;
             case 5:
                 headerSize = 2;
+                break;
+            case 6:
+                headerSize = 3;
                 break;
             default:
                 LOG.warn("Unknown sleep details version {}", fileId.getVersion());
@@ -125,6 +137,21 @@ public class SleepDetailsParser extends XiaomiActivityParser {
             final int bedTime2 = buf.getInt(); // around ~30 min before bedTime, is previous one fall asleep time?
             final int wakeupTime2 = buf.getInt(); // == wakeupTime
             headerIdx += 5;
+        }
+
+        if (version == 6) {
+            // Mi Band 10 Pro (M2551B1, firmware 3.101.043) adds nine summary
+            // fields before the sample arrays: 4, 2, 2, 4, 4, 2, 2, 2, 2 bytes.
+            // Their meanings are not yet confirmed. Keep using the sleep packets
+            // below for durations and stages rather than guessing these metrics.
+            for (int i = headerIdx; i < headerIdx + 9; i++) {
+                if (!validData(header, i)) {
+                    LOG.warn("Unsupported version 6 sleep summary bitmap");
+                    return false;
+                }
+            }
+            buf.position(buf.position() + 24);
+            headerIdx += 9;
         }
 
         // Heart rate samples
@@ -218,7 +245,8 @@ public class SleepDetailsParser extends XiaomiActivityParser {
                 //  - Summary = 16,
                 //  - Stages = 17
 
-                if (type == 0x2 || type == 0x3 || type == 0x9 || type == 0xc || type == 0xd || type == 0xe || type == 0xf) {
+                if (type == 0x2 || type == 0x3 || type == 0x9 || type == 0xc || type == 0xd || type == 0xe || type == 0xf
+                        || (version == 6 && (type == 0x12 || type == 0x13))) {
                     // the bytes reserved for the data length are believed to be flags, as they
                     // do not actually have any data following the headers
                     continue;
@@ -271,6 +299,7 @@ public class SleepDetailsParser extends XiaomiActivityParser {
 
                     sample.setTimestamp(bedTime * 1000L);
                     sample.setWakeupTime(wakeupTime * 1000L);
+                    sample.setIsAwake(isAwake == 1);
                     sample.setTotalDuration(sleep_duration);
                     sample.setDeepSleepDuration(deep_duration);
                     sample.setLightSleepDuration(light_duration);
