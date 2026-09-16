@@ -78,6 +78,7 @@ import nodomain.freeyourgadget.gadgetbridge.devices.galaxy_buds.GalaxyBuds3ProDe
 import nodomain.freeyourgadget.gadgetbridge.devices.galaxy_buds.GalaxyBudsDeviceCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.galaxy_buds.GalaxyBudsLiveDeviceCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.galaxy_buds.GalaxyBudsProDeviceCoordinator;
+import nodomain.freeyourgadget.gadgetbridge.devices.galaxywatch7.GalaxyWatch7Coordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.garmin.bike.GarminEdge1000Coordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.garmin.bike.GarminEdge1030Coordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.garmin.bike.GarminEdge1030PlusCoordinator;
@@ -1014,6 +1015,7 @@ public enum DeviceType {
     GALAXY_BUDS2(GalaxyBuds2DeviceCoordinator.class),
     GALAXY_BUDS2_PRO(GalaxyBuds2ProDeviceCoordinator.class),
     GALAXY_BUDS3_PRO(GalaxyBuds3ProDeviceCoordinator.class),
+    GALAXY_WATCH7(GalaxyWatch7Coordinator.class),
     SONY_WH_1000XM3(SonyWH1000XM3Coordinator.class),
     SONY_WF_SP800N(SonyWFSP800NCoordinator.class),
     SONY_WI_C100(SonyWIC100Coordinator.class),
