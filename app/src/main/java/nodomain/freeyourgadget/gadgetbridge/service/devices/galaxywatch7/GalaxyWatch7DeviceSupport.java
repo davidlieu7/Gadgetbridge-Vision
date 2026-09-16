@@ -58,12 +58,20 @@ public class GalaxyWatch7DeviceSupport extends AbstractBTBRDeviceSupport {
     }
 
     @Override
-    protected boolean useInsecureRfcommSocket() {
-        // The secure socket variant consistently fails connect() with a spurious
-        // "read failed, socket might closed or timeout, read ret: -1" IOException against this
-        // device, even on an already-bonded/authenticated link and with getConnectDelayMillis()
-        // in place. Trying the insecure variant as a workaround.
-        return true;
+    protected int getExtraConnectRetries() {
+        // The secure socket variant's connect() consistently fails with a spurious "read
+        // failed, socket might closed or timeout, read ret: -1" IOException against this
+        // device, on both a near-instant and a genuine ~3s-then-explicit-failure timing
+        // pattern (see research notes) - possibly transient/flaky at the native BT stack
+        // level. Retrying immediately (recreating the socket each time) a few times is much
+        // cheaper than waiting for Gadgetbridge's own multi-second auto-reconnect backoff,
+        // and costs nothing if it doesn't help.
+        return 5;
+    }
+
+    @Override
+    protected int getConnectRetryDelayMillis() {
+        return 400;
     }
 
     @Override

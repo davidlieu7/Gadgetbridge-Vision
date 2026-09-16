@@ -106,6 +106,7 @@ public abstract class AbstractBTBRDeviceSupport extends AbstractBluetoothDeviceS
                         getRfcommChannel()
                 );
                 mQueue.setInsecure(useInsecureRfcommSocket());
+                mQueue.setExtraConnectRetries(getExtraConnectRetries(), getConnectRetryDelayMillis());
             }
             return mQueue.connect();
         }
@@ -280,6 +281,23 @@ public abstract class AbstractBTBRDeviceSupport extends AbstractBluetoothDeviceS
      */
     protected boolean useInsecureRfcommSocket() {
         return false;
+    }
+
+    /**
+     * Extra socket-connect attempts to make immediately (recreating the socket each time) before
+     * surfacing a connect failure normally. Defaults to 0 (single attempt, previous behaviour).
+     * Some devices/stacks intermittently fail the first attempt(s) but succeed on an immediate
+     * retry; this is cheaper than waiting for the external auto-reconnect backoff.
+     */
+    protected int getExtraConnectRetries() {
+        return 0;
+    }
+
+    /**
+     * Delay between retries triggered by {@link #getExtraConnectRetries()}.
+     */
+    protected int getConnectRetryDelayMillis() {
+        return 300;
     }
 
     /**

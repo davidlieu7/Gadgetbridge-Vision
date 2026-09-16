@@ -69,6 +69,11 @@ public final class BtBRQueue {
     /// {@link #mRfcommChannel} (the reflective {@code createRfcommSocket} path has no
     /// secure/insecure distinction).
     private boolean mInsecure = false;
+    /// Extra socket-connect attempts to make (immediately, recreating the socket each time)
+    /// before giving up and surfacing the failure normally. 0 preserves the previous,
+    /// single-attempt behaviour.
+    private int mExtraConnectRetries = 0;
+    private int mRetryDelayMillis = 300;
 
     private final int mRfcommChannel;
     /// When true this queue drives a secondary ("aux") socket: it shares the device's
@@ -210,9 +215,43 @@ public final class BtBRQueue {
                         }
 
                         try {
-                            LOG.debug("Connecting to RFCOMM socket for {}", mGbDevice.getName());
+                            IOException lastException = null;
+                            boolean connected = false;
+                            for (int attempt = 0; attempt <= mExtraConnectRetries; attempt++) {
+                                if (attempt > 0) {
+                                    // A failed connect() leaves the socket unusable; a fresh one
+                                    // must be created for each retry.
+                                    try {
+                                        mBtSocket.close();
+                                    } catch (final IOException ignored) {
+                                    }
+                                    LOG.debug("Retry {}/{}: recreating RFCOMM socket for {}", attempt, mExtraConnectRetries, mGbDevice.getName());
+                                    try {
+                                        Thread.sleep(mRetryDelayMillis);
+                                    } catch (final InterruptedException ignored) {
+                                    }
+                                    final BluetoothDevice btDevice = mBtAdapter.getRemoteDevice(mGbDevice.getAddress());
+                                    if (mInsecure) {
+                                        mBtSocket = btDevice.createInsecureRfcommSocketToServiceRecord(mService);
+                                    } else {
+                                        mBtSocket = btDevice.createRfcommSocketToServiceRecord(mService);
+                                    }
+                                }
 
-                            mBtSocket.connect();
+                                LOG.debug("Connecting to RFCOMM socket for {} (attempt {}/{})", mGbDevice.getName(), attempt + 1, mExtraConnectRetries + 1);
+                                try {
+                                    mBtSocket.connect();
+                                    connected = true;
+                                    break;
+                                } catch (final IOException e) {
+                                    lastException = e;
+                                    LOG.warn("Attempt {}/{} failed to connect RFCOMM socket for {}: {}", attempt + 1, mExtraConnectRetries + 1, mGbDevice.getName(), e.getMessage());
+                                }
+                            }
+
+                            if (!connected) {
+                                throw lastException;
+                            }
 
                             LOG.info("Connected to RFCOMM socket for {}{}", mGbDevice.getName(), mIsAux ? " (aux channel " + mRfcommChannel + ")" : "");
 
@@ -304,6 +343,14 @@ public final class BtBRQueue {
      */
     public void setInsecure(final boolean insecure) {
         mInsecure = insecure;
+    }
+
+    /**
+     * Must be called before {@link #connect()} to take effect. See {@link #mExtraConnectRetries}.
+     */
+    public void setExtraConnectRetries(final int extraRetries, final int retryDelayMillis) {
+        mExtraConnectRetries = extraRetries;
+        mRetryDelayMillis = retryDelayMillis;
     }
 
     /**
