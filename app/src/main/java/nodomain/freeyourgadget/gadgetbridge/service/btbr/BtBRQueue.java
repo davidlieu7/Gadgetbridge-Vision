@@ -74,6 +74,15 @@ public final class BtBRQueue {
     /// single-attempt behaviour.
     private int mExtraConnectRetries = 0;
     private int mRetryDelayMillis = 300;
+    /// If the socket connects but the read thread exits again within
+    /// {@link #mFastReconnectWindowMillis}, immediately (re)post a connect attempt instead of
+    /// falling back to the external, multi-second auto-reconnect backoff — some devices/
+    /// sessions need several quick back-to-back connect cycles before "settling" into a
+    /// stable session. Budget is consumed per quick cycle and NOT reset on repeated fast
+    /// failures, so this can't loop forever.
+    private int mFastReconnectBudget = 0;
+    private int mFastReconnectWindowMillis = 1000;
+    private volatile long mConnectedAtMillis = 0;
 
     private final int mRfcommChannel;
     /// When true this queue drives a secondary ("aux") socket: it shares the device's
@@ -131,9 +140,20 @@ public final class BtBRQueue {
 
                 // An aux socket dropping must not tear down the primary device connection.
                 if (!mIsAux) {
+                    final boolean quickDrop = mConnectedAtMillis > 0
+                            && (System.currentTimeMillis() - mConnectedAtMillis) < mFastReconnectWindowMillis;
                     if (mDisposed.get() || !GBApplication.getPrefs().getAutoReconnect(mGbDevice)) {
                         LOG.debug("Exited read thread loop, disconnecting");
                         mGbDevice.setUpdateState(GBDevice.State.NOT_CONNECTED, mContext);
+                    } else if (quickDrop && mFastReconnectBudget > 0) {
+                        mFastReconnectBudget--;
+                        LOG.debug("Exited read thread loop quickly ({}ms after connect) - fast-reconnecting immediately, {} attempt(s) left",
+                                System.currentTimeMillis() - mConnectedAtMillis, mFastReconnectBudget);
+                        mGbDevice.setUpdateState(GBDevice.State.WAITING_FOR_RECONNECT, mContext);
+                        // connect() (re)creates mBtSocket (cleanup() above nulled it) and then
+                        // posts HANDLER_SUBJECT_CONNECT itself - just sending the message here
+                        // would hit the "socket is null" guard in the handler.
+                        connect();
                     } else {
                         LOG.debug("Exited read thread loop, will wait for reconnect");
                         mGbDevice.setUpdateState(GBDevice.State.WAITING_FOR_RECONNECT, mContext);
@@ -254,6 +274,7 @@ public final class BtBRQueue {
                             }
 
                             LOG.info("Connected to RFCOMM socket for {}{}", mGbDevice.getName(), mIsAux ? " (aux channel " + mRfcommChannel + ")" : "");
+                            mConnectedAtMillis = System.currentTimeMillis();
 
                             if (readThread == null || !readThread.isAlive()) {
                                 readThread = createReadThread();
@@ -351,6 +372,14 @@ public final class BtBRQueue {
     public void setExtraConnectRetries(final int extraRetries, final int retryDelayMillis) {
         mExtraConnectRetries = extraRetries;
         mRetryDelayMillis = retryDelayMillis;
+    }
+
+    /**
+     * Must be called before {@link #connect()} to take effect. See {@link #mFastReconnectBudget}.
+     */
+    public void setFastReconnect(final int budget, final int windowMillis) {
+        mFastReconnectBudget = budget;
+        mFastReconnectWindowMillis = windowMillis;
     }
 
     /**

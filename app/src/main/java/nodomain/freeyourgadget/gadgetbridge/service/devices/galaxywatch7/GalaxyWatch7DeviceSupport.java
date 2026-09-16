@@ -75,6 +75,22 @@ public class GalaxyWatch7DeviceSupport extends AbstractBTBRDeviceSupport {
     }
 
     @Override
+    protected int getFastReconnectBudget() {
+        // The watch consistently sends its own NodeInfo reply and then closes the channel
+        // again within ~10-100ms - observed in raw HCI captures to be a deliberate,
+        // near-instant disconnect from the watch's side, not a timeout. Real captured
+        // sessions (stock app) show several such quick reconnect cycles before "settling"
+        // into a stable, long-lived session - testing whether reconnecting fast (rather
+        // than waiting Gadgetbridge's multi-second external backoff) reproduces that.
+        return 10;
+    }
+
+    @Override
+    protected int getFastReconnectWindowMillis() {
+        return 1000;
+    }
+
+    @Override
     protected int getConnectDelayMillis() {
         // Empirically, connecting the RFCOMM socket right after the ACL link comes up (which
         // needs a fresh authentication + encryption + SDP + RFCOMM-multiplexer round trip,
@@ -84,12 +100,33 @@ public class GalaxyWatch7DeviceSupport extends AbstractBTBRDeviceSupport {
         return 500;
     }
 
+    // EXPERIMENT: hardcoded, empirically-observed-stable node id of this specific watch, to
+    // test whether promptly following the NodeInfo handshake with a SeqAck/Ping message (as
+    // seen in real captured sessions) is what keeps the channel from being closed ~100ms
+    // after the handshake exchange. Needs to be learned dynamically (by parsing the watch's
+    // own NodeInfo reply) rather than hardcoded, if this pans out.
+    private static final String EXPERIMENT_WATCH_NODE_ID = "19eaaf8";
+
+    // EXPERIMENT: send nothing at all after connecting, to check whether the watch closes
+    // the channel on its own timer regardless of client behavior, or only in reaction to
+    // something we send. Findings: sessions last noticeably longer (500ms-2s vs ~100ms)
+    // when nothing is sent, but still get cut short - correlated with Samsung's own
+    // watch7plugin reactivating mid-session. See research notes for the full picture.
+    private static final boolean EXPERIMENT_SEND_NOTHING = false;
+
     @Override
     protected TransactionBuilder initializeDevice(final TransactionBuilder builder) {
+        if (EXPERIMENT_SEND_NOTHING) {
+            LOG.info("Galaxy Watch7: Data Layer channel connected, sending NOTHING (experiment)");
+            builder.setDeviceState(GBDevice.State.INITIALIZED);
+            return builder;
+        }
+
         LOG.info("Galaxy Watch7: Data Layer channel connected, sending node handshake as {}", localNodeId);
 
         final String localName = "Gadgetbridge";
         builder.write(WearDataLayerProtocol.buildNodeInfoHandshake(localNodeId, localName));
+        builder.write(WearDataLayerProtocol.buildSeqAck(EXPERIMENT_WATCH_NODE_ID, 0));
         builder.setDeviceState(GBDevice.State.INITIALIZED);
 
         return builder;

@@ -107,6 +107,7 @@ public abstract class AbstractBTBRDeviceSupport extends AbstractBluetoothDeviceS
                 );
                 mQueue.setInsecure(useInsecureRfcommSocket());
                 mQueue.setExtraConnectRetries(getExtraConnectRetries(), getConnectRetryDelayMillis());
+                mQueue.setFastReconnect(getFastReconnectBudget(), getFastReconnectWindowMillis());
             }
             return mQueue.connect();
         }
@@ -298,6 +299,25 @@ public abstract class AbstractBTBRDeviceSupport extends AbstractBluetoothDeviceS
      */
     protected int getConnectRetryDelayMillis() {
         return 300;
+    }
+
+    /**
+     * Number of times to immediately (re)connect (recreating the socket, re-running device
+     * init) if the connection drops again within {@link #getFastReconnectWindowMillis()} of
+     * having connected, instead of falling back to the external, multi-second auto-reconnect
+     * backoff. Defaults to 0 (previous behaviour: always defer to the external backoff). Some
+     * devices/sessions need several quick back-to-back connect cycles before "settling" into
+     * a stable session.
+     */
+    protected int getFastReconnectBudget() {
+        return 0;
+    }
+
+    /**
+     * See {@link #getFastReconnectBudget()}.
+     */
+    protected int getFastReconnectWindowMillis() {
+        return 1000;
     }
 
     /**

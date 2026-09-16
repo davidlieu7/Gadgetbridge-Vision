@@ -907,6 +907,97 @@ or this connection pattern), not about a specific required channel-open sequence
    the native RFCOMM/L2CAP events precisely against the ~3s Java-side wait and see
    exactly what (if anything) the watch sends back that gets interpreted as failure.
 
+## 8. BREAKTHROUGH: the RFCOMM connect() failure is fixed
+
+The persistent `BluetoothSocket.connect()` "read failed ... ret -1" failure from §7 is
+**solved**. Root cause was never fully pinned down at the Android-internals level, but the
+practical fix is simple and reliable: **immediately retry, recreating the `BluetoothSocket`
+each time**, rather than waiting for Gadgetbridge's multi-second external auto-reconnect
+backoff. The failure is apparently transient/flaky at the native BT stack level — it
+almost always succeeds within 1-2 immediate retries (observed consistently across many
+runs). Implemented as two new, reusable, opt-in (default-off, zero behavior change for
+other devices) hooks on `AbstractBTBRDeviceSupport`:
+
+- `getExtraConnectRetries()` / `getConnectRetryDelayMillis()` — retries the initial
+  `connect()` call itself (recreating the socket) up to N times with a short delay, before
+  surfacing a failure. Galaxy Watch7 uses 5 retries / 400ms.
+- `getFastReconnectBudget()` / `getFastReconnectWindowMillis()` — if the connection
+  succeeds but then drops again within the window (see §9), immediately reconnects
+  (consuming the budget) instead of deferring to the external backoff. Galaxy Watch7 uses
+  a budget of 10 / 1000ms window.
+
+Both live in `BtBRQueue.java` (the shared low-level connect loop) + `AbstractBTBRDeviceSupport.java`
+(the hook methods), not in Galaxy-Watch7-specific code, so any other BT Classic device
+support hitting a similar flaky-connect issue can opt in the same way.
+
+**Verified against the real device**: the RFCOMM socket connects successfully, our
+NodeInfo handshake is written to it, and — confirmed via raw HCI capture — **the watch
+correctly parses it and replies with its own valid NodeInfo** (`nodeId="19eaaf8"`,
+`name="Galaxy Watch7 (CLMP)"`, `role=2`, `sdk=36`), matching the format documented in §3
+exactly. This is a full, correct, bidirectional protocol handshake between Gadgetbridge
+and a real Galaxy Watch7 — the reverse-engineered protocol understanding from earlier in
+this document is now empirically confirmed correct at the wire level, not just inferred
+from passive observation of the stock app.
+
+## 9. Remaining issue: the channel closes ~100ms-2s after the handshake exchange
+
+Not yet solved, but well-characterized. After the successful NodeInfo exchange (§8), the
+watch closes the RFCOMM channel again shortly after — confirmed via raw native Bluetooth
+stack logs (`RFC_PORT_EVENT_DISC`) to be the **watch actively sending the DISC**, not a
+timeout or error on our end. Investigated extensively this session:
+
+- **Not caused by our SeqAck follow-up message**: tested with and without sending the
+  field-8 SeqAck message (§3) right after NodeInfo — both cases still get cut short by
+  the watch. Verified our SeqAck encoding is byte-correct (decodes cleanly with the
+  project's own parser, matches the real captured field8 structure including the
+  10-byte two's-complement varint encoding of the `-1` sentinel).
+- **Not fixed by fast/immediate reconnection**: gave the connection a budget of 10
+  immediate reconnect attempts (recreating the socket + resending the handshake each
+  time, no multi-second gap) to test whether several quick back-to-back cycles are
+  needed to "settle" into a stable session (as hinted at by early stock-app captures
+  showing several closely-spaced NodeInfo exchanges before settling) — exhausted the
+  whole budget, cut short every single time, never settled.
+- **Sending nothing at all extends the session noticeably**: with `initializeDevice()`
+  sending zero bytes (just listening), sessions lasted 500ms-2000ms instead of the
+  ~90-150ms seen when sending NodeInfo(+SeqAck) — the watch still spontaneously sends
+  its own NodeInfo even with no client message, and the channel still eventually closes,
+  but later. This is a meaningful, reproducible difference, not noise.
+- **Correlates with Samsung's own `watch7plugin` reactivating mid-session**: in the
+  "send nothing" test, `watch7plugin` (Samsung's app) resumed doing its own thing
+  (posting to `Notification4Watch7_AM`, writing `wcs_extension/sysui/notification/
+  switch/app_settings`) roughly 1 second before our own connection got cut — strongly
+  suggesting Samsung's app winning/disrupting a concurrent session, not (only) a
+  protocol-level rejection of our client.
+- **Samsung's `watch7plugin` reactivates despite every isolation attempt tried**:
+  `am force-stop` alone doesn't stick (comes back within seconds). Investigated and
+  ruled out two specific persistence mechanisms:
+  - `NotificationListenerService` registration (`android.service.notification.
+    NotificationListenerService`, `CompanionNotificationListenerService`) — stripped via
+    `settings put secure enabled_notification_listeners "<gadgetbridge-only>"`.
+  - `CompanionDeviceManager` association (`cmd companiondevice disassociate ...`,
+    confirmed removed via `dumpsys companiondevice` — `Bound Companion Applications:
+    <empty>` immediately after) — **also confirmed to NOT be the (sole) mechanism**:
+    watch7plugin reactivated again in a later test with the CDM association still
+    empty. The actual trigger is still unidentified — no manifest `<receiver>` for
+    `ACL_CONNECTED`/`ACL_DISCONNECTED` was found in watch7plugin's resolver table
+    (`dumpsys package com.samsung.wearable.watch7plugin`), so it's likely either a
+    dynamically-`registerReceiver()`'d listener in watchmanager.apk (§1's
+    `VerificationManager` has exactly this pattern, though instance-level registration
+    shouldn't normally survive force-stop) or a lower-level Bluetooth profile
+    auto-connect policy (HFP `connectionPolicy=100` was observed set at the system
+    `BluetoothDatabaseManager` level, independent of any app) that indirectly wakes it.
+
+**For a future session**: the most promising next step is getting a genuinely
+Samsung-app-free test — e.g. temporarily uninstalling `com.samsung.wearable.watch7plugin`
+entirely (APK already saved at `apks/watch7plugin.apk` in this session's scratchpad for
+reinstalling afterward) rather than trying to suppress it while installed, to get a clean
+signal on whether the channel would stay open without any interference. If it still closes
+even then, the next angle is matching the exact `wear://` DataItem/MessageApi traffic
+pattern the stock app sends in the first 1-2 seconds after NodeInfo (already catalogued in
+§5) and proactively sending some of it (e.g. `wearable/supported/features`, a
+`capabilities/...` announcement) rather than staying silent, in case the watch expects the
+client to immediately start "behaving like a real companion" rather than just idling.
+
 ## 6. Suggested next steps
 
 1. Capture a **normal-use session** (watch worn, phone nearby, trigger a

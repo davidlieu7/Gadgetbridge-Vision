@@ -60,7 +60,14 @@ public final class WearDataLayerProtocol {
     private static final int FIELD_ENVELOPE_FLAG_B = 4;
 
     private static final int PAYLOAD_NODE_INFO = 7;
+    private static final int PAYLOAD_SEQ_ACK = 8;
     private static final int PAYLOAD_DATA_ITEM = 9;
+
+    private static final int SEQACK_SENTINEL = 1;
+    private static final int SEQACK_NODE_REF = 2;
+    private static final int SEQACK_FLAG = 3;
+    private static final int NODE_REF_ID = 1;
+    private static final int NODE_REF_COUNTER = 2;
 
     // NodeInfo fields
     private static final int NODE_ID = 1;
@@ -147,6 +154,31 @@ public final class WearDataLayerProtocol {
 
         final ProtoWriter payload = new ProtoWriter();
         payload.writeMessage(PAYLOAD_DATA_ITEM, dataItem.toByteArray());
+
+        return frame(wrapEnvelope(payload.toByteArray()));
+    }
+
+    /**
+     * Builds the "SeqAck/Ping" message observed sent early (and periodically) in real
+     * captured sessions, shortly after the NodeInfo handshake — a plausible candidate for
+     * "why does the watch close the channel ~100ms after we send NodeInfo and it replies":
+     * it may expect this as a prompt follow-up and time out otherwise.
+     *
+     * @param remoteNodeId the OTHER side's node id (learned from its NodeInfo reply)
+     * @param counter      a small counter value, meaning not fully confirmed
+     */
+    public static byte[] buildSeqAck(final String remoteNodeId, final long counter) {
+        final ProtoWriter nodeRef = new ProtoWriter();
+        nodeRef.writeString(NODE_REF_ID, remoteNodeId);
+        nodeRef.writeVarint(NODE_REF_COUNTER, counter);
+
+        final ProtoWriter seqAck = new ProtoWriter();
+        seqAck.writeVarint(SEQACK_SENTINEL, -1L); // 0xFFFFFFFFFFFFFFFF as seen on the wire
+        seqAck.writeMessage(SEQACK_NODE_REF, nodeRef.toByteArray());
+        seqAck.writeVarint(SEQACK_FLAG, 2);
+
+        final ProtoWriter payload = new ProtoWriter();
+        payload.writeMessage(PAYLOAD_SEQ_ACK, seqAck.toByteArray());
 
         return frame(wrapEnvelope(payload.toByteArray()));
     }
