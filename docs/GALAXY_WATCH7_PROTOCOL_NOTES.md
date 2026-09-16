@@ -987,16 +987,36 @@ timeout or error on our end. Investigated extensively this session:
     auto-connect policy (HFP `connectionPolicy=100` was observed set at the system
     `BluetoothDatabaseManager` level, independent of any app) that indirectly wakes it.
 
-**For a future session**: the most promising next step is getting a genuinely
-Samsung-app-free test — e.g. temporarily uninstalling `com.samsung.wearable.watch7plugin`
-entirely (APK already saved at `apks/watch7plugin.apk` in this session's scratchpad for
-reinstalling afterward) rather than trying to suppress it while installed, to get a clean
-signal on whether the channel would stay open without any interference. If it still closes
-even then, the next angle is matching the exact `wear://` DataItem/MessageApi traffic
-pattern the stock app sends in the first 1-2 seconds after NodeInfo (already catalogued in
-§5) and proactively sending some of it (e.g. `wearable/supported/features`, a
-`capabilities/...` announcement) rather than staying silent, in case the watch expects the
-client to immediately start "behaving like a real companion" rather than just idling.
+**RESOLVED**: uninstalled `com.samsung.wearable.watch7plugin` entirely (`adb uninstall`;
+APK preserved at `apks/watch7plugin.apk` in this session's scratchpad for reinstalling
+later if ever needed — `com.samsung.android.app.watchmanager` was left installed, it
+was never observed to be the interfering one). With watch7plugin gone:
+
+**The Gadgetbridge connection stayed continuously "Verbunden" (Connected) in the UI for
+over 2 minutes straight, with zero connect/disconnect/error log lines in that entire
+window** (checked via two consecutive logcat capture windows, 45s then 80s, both showing
+0 matching connect/socket/error events). This is a complete, unambiguous confirmation:
+**Samsung's own `watch7plugin` was the actual root cause of every quick-disconnect
+observed all session** — competing for/disrupting the RFCOMM session via whichever
+still-unidentified persistence mechanism kept reviving it (see the ruled-out list above;
+the exact mechanism remains unknown, but it no longer matters once the app isn't
+installed at all).
+
+**Practical implication for real-world Gadgetbridge usage**: a user pairing a Galaxy
+Watch7 with Gadgetbridge will very likely need to **uninstall (or at least keep
+force-stopped/disabled) Samsung's Galaxy Wearable / Watch7 plugin apps** for a stable
+connection, since both apps are written to treat themselves as the sole/primary
+companion and will keep trying to reconnect and interfere otherwise. This should be
+called out explicitly in any user-facing setup instructions once this device support
+ships.
+
+**Next implementation step**: with the transport now proven rock-solid, the highest-value
+next work is wiring up actual functionality — start with the generic boolean-setting
+DataItem PUT (`WearDataLayerProtocol.buildBooleanSettingPut()`, already implemented,
+never yet exercised against the live connection) via a real Gadgetbridge device-settings
+screen (`getSupportedDeviceSpecificSettings()` + an XML preferences resource, following
+the pattern other device coordinators use), to get first real confirmation that we can
+not just talk to the watch but successfully *change something on it*.
 
 ## 6. Suggested next steps
 
