@@ -105,6 +105,7 @@ public abstract class AbstractBTBRDeviceSupport extends AbstractBluetoothDeviceS
                         getConnectDelayMillis(),
                         getRfcommChannel()
                 );
+                mQueue.setInsecure(useInsecureRfcommSocket());
             }
             return mQueue.connect();
         }
@@ -267,6 +268,18 @@ public abstract class AbstractBTBRDeviceSupport extends AbstractBluetoothDeviceS
 
     protected int getBufferSize() {
         return mBufferSize;
+    }
+
+    /**
+     * Whether to create the primary RFCOMM socket via {@link android.bluetooth.BluetoothDevice
+     * #createInsecureRfcommSocketToServiceRecord} instead of the secure variant. Defaults to
+     * {@code false} (secure), matching the previous, only behaviour. Some devices/Android BT
+     * stacks fail the secure socket's connect() handshake even on an already-bonded/
+     * authenticated link; the insecure variant skips that extra socket-level handshake and can
+     * work around it.
+     */
+    protected boolean useInsecureRfcommSocket() {
+        return false;
     }
 
     /**

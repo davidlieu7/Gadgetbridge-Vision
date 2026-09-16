@@ -61,6 +61,14 @@ public final class BtBRQueue {
     private final Context mContext;
     private final int mBufferSize;
     private final int mConnectDelayMillis;
+    /// When true, the primary socket is created via {@link BluetoothDevice#createInsecureRfcommSocketToServiceRecord}
+    /// instead of the secure variant. Some devices/Android BT stacks fail the secure socket's
+    /// connect() handshake (observed as a spurious "read failed ... ret -1" IOException) even
+    /// though the underlying link is already bonded/authenticated; the insecure variant skips
+    /// that extra socket-level handshake. Has no effect when connecting via an explicit
+    /// {@link #mRfcommChannel} (the reflective {@code createRfcommSocket} path has no
+    /// secure/insecure distinction).
+    private boolean mInsecure = false;
 
     private final int mRfcommChannel;
     /// When true this queue drives a secondary ("aux") socket: it shares the device's
@@ -292,6 +300,13 @@ public final class BtBRQueue {
     }
 
     /**
+     * Must be called before {@link #connect()} to take effect. See {@link #mInsecure}.
+     */
+    public void setInsecure(final boolean insecure) {
+        mInsecure = insecure;
+    }
+
+    /**
      * Connects to the given remote device. Note that this does not perform any device
      * specific initialization. This should be done in the specific {@link DeviceSupport}
      * class.
@@ -337,6 +352,8 @@ public final class BtBRQueue {
                     cleanup();
                     return false;
                 }
+            } else if (mInsecure) {
+                mBtSocket = btDevice.createInsecureRfcommSocketToServiceRecord(mService);
             } else {
                 mBtSocket = btDevice.createRfcommSocketToServiceRecord(mService);
             }

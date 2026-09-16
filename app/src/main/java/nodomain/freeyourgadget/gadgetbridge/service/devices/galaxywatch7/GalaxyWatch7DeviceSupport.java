@@ -58,6 +58,15 @@ public class GalaxyWatch7DeviceSupport extends AbstractBTBRDeviceSupport {
     }
 
     @Override
+    protected boolean useInsecureRfcommSocket() {
+        // The secure socket variant consistently fails connect() with a spurious
+        // "read failed, socket might closed or timeout, read ret: -1" IOException against this
+        // device, even on an already-bonded/authenticated link and with getConnectDelayMillis()
+        // in place. Trying the insecure variant as a workaround.
+        return true;
+    }
+
+    @Override
     protected int getConnectDelayMillis() {
         // Empirically, connecting the RFCOMM socket right after the ACL link comes up (which
         // needs a fresh authentication + encryption + SDP + RFCOMM-multiplexer round trip,

@@ -826,26 +826,74 @@ spurious EOF, not a real rejection by the watch. This is a widely-reported categ
 AOSP/OEM Bluetooth stack bug (search "BluetoothSocket read failed ret -1 connect"), not
 unique to this project.
 
-**Not yet tried** (candidate next steps for a future session):
-1. `BluetoothDevice.createInsecureRfcommSocketToServiceRecord(...)` instead of the secure
-   variant — a commonly-reported fix for exactly this symptom on some devices/Android
-   versions. Would require a small framework change (`BtBRQueue.java` line ~341 is
-   hardcoded to the secure variant) — e.g. a new overridable
-   `AbstractBTBRDeviceSupport` method like `useInsecureRfcommSocket()`, defaulting to
-   `false` to preserve existing device behavior.
+**Update after further debugging this session**: tried both `getConnectDelayMillis()`
+(500ms) and `createInsecureRfcommSocketToServiceRecord` (added as a new, reusable
+`AbstractBTBRDeviceSupport.useInsecureRfcommSocket()` hook + `BtBRQueue.setInsecure()`,
+committed) — **neither fixed it**. Also ruled out competing apps (Samsung's
+`watchmanager`/`watch7plugin` fully killed via `pm disable-user` AND stripped of
+`enabled_notification_listeners` access, which is what had been silently reviving them
+after a plain `force-stop` — they're a registered `NotificationListenerService` and
+Android auto-rebinds those) and stale Bluetooth stack state (toggled BT off/on for a
+clean slate) — failure reproduces identically regardless.
+
+**Crucial new data point**: captured the failure with full system-wide logcat (`-b all`,
+including the native `bluetooth`/`BluetoothSocket` process logs, not just Gadgetbridge's
+own). One particular attempt showed:
+```
+18:47:52.687 I/BluetoothSocket(13854): connect(), SocketState: INIT, mPfd: {...}
+18:47:55.739 V/BluetoothSocket(13854): inputStream.read ret: 4
+18:47:55.740 E/...BtBRQueue: IO exception ... read failed ... ret: -1
+```
+A genuine **~3 second gap** between issuing connect() and the failure — with an actual
+`inputStream.read ret: 4` (4 bytes legitimately read from the control LocalSocket used
+for app↔Bluetooth-service IPC) immediately preceding it. This is NOT the same as the
+earlier near-instant (~100-300ms) failures seen before adding the connect delay — this
+one genuinely waited for and received a real response before failing. **This changes the
+diagnosis**: it isn't a spurious client-side race in `BluetoothSocket`'s internal
+signaling (which would fail near-instantly or with no real response) — the Bluetooth
+*system service* itself waited ~3s (consistent with an actual RFCOMM
+connect/negotiation attempt happening) and then reported back a genuine failure/refusal.
+Also notable: the failing attempts and a separately-observed successful native-level
+data read both referenced RFCOMM channel/SCN **12** — inconclusive on its own (Android
+may cache the SDP-resolved channel per UUID+device rather than re-resolving fresh each
+time), but suggests channel reuse across attempts rather than a fresh SDP negotiation
+each time, worth keeping in mind.
+
+**Leading hypothesis given this**: the watch's RFCOMM server for the DATA_LAYER UUID may
+only accept the connection from a client that has first "introduced" itself over the
+SAK_INSECURE channel (UUID `0bb62597-f040-42ef-82e4-0314fdfb7478`, from §2/§5c) — i.e.
+even though the *cryptographic* SAK/GAK attestation verification itself is skippable for
+non-Samsung phones (per watchmanager.apk's own `VerificationManager.isSupportSAKVerify()`
+logic, §1), the watch might still expect SOME minimal exchange on that channel (even a
+failed/incomplete one) as a signal that a "real" companion client is attempting to pair,
+before it grants RFCOMM access to the actual data channel to a previously-unseen
+requester. Not confirmed — would need connecting to SAK_INSECURE first (even just
+opening/closing the socket, or exchanging a minimal handshake per the `BluetoothInsecureManager`/
+`InsecureConnectionCallback` classes in watchmanager.apk, §1) immediately before
+attempting DATA_LAYER, then checking if that changes the outcome. This is real
+follow-up engineering work, not a quick fix — flagged here for a future session.
+
+**Tried and ruled out this session**: connect delay (500ms), insecure RFCOMM socket,
+killing/disabling competing Samsung apps, Bluetooth stack restart, several rounds of
+Gadgetbridge's own exponential-backoff auto-reconnect (2s/4s/8s/16s/32s — none of those
+spaced-out retries succeeded either).
+
+**Not yet tried** (candidate next steps for a future session, roughly in priority order):
+1. **Connect to SAK_INSECURE (`0bb62597-f040-42ef-82e4-0314fdfb7478`) first**, even just
+   opening/closing the socket or doing a minimal partial handshake per the
+   `BluetoothInsecureManager`/`InsecureConnectionCallback` classes in watchmanager.apk
+   (§1), immediately before attempting DATA_LAYER — current leading hypothesis (see
+   above) given the ~3s-then-explicit-failure evidence. Real engineering work: needs
+   understanding/replicating enough of that channel's framing to open it cleanly, not
+   just a config flag.
 2. Test on a different phone/Android build to rule out this being specific to this
-   LineageOS 23.2 (Android 16) build's Bluetooth stack.
-3. Try connecting to the SAK_SECURE/SAK_INSECURE UUIDs first (the classes it references
-   from watchmanager.apk in §1) before DATA_LAYER, in case the watch's RFCOMM server
-   genuinely expects that handshake sequence first despite SAK verification itself being
-   skippable — the successful raw-HCI connection observed during this session happened to
-   be preceded by exactly that kind of multi-channel activity, which could be coincidence
-   or could matter.
-4. A simple bare-bones retry loop (catch the IOException, retry connect() 2-3x with a
-   short pause) might paper over this if it truly is a spurious/flaky failure — cheap to
-   try, already partially exercised via Gadgetbridge's own `AutoConnectIntervalReceiver`
-   backoff (2s/4s/8s/16s/...) without success in the several retries observed this
-   session, but a tighter immediate retry (no multi-second gap) wasn't tried.
+   LineageOS 23.2 (Android 16) build's Bluetooth stack (e.g. a stock/GSI build, or an
+   older Android version) — would help isolate "our code/protocol understanding" from
+   "this specific phone's BT stack" as the variable.
+3. Capture the SAME failing attempt with `btsnoop` running AND full system logcat
+   simultaneously (this session only managed one or the other per attempt) to line up
+   the native RFCOMM/L2CAP events precisely against the ~3s Java-side wait and see
+   exactly what (if anything) the watch sends back that gets interpreted as failure.
 
 ## 6. Suggested next steps
 
