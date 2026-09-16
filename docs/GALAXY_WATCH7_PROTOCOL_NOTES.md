@@ -878,14 +878,26 @@ killing/disabling competing Samsung apps, Bluetooth stack restart, several round
 Gadgetbridge's own exponential-backoff auto-reconnect (2s/4s/8s/16s/32s — none of those
 spaced-out retries succeeded either).
 
+**SAK_INSECURE hypothesis tested and REJECTED**: pointed `GalaxyWatch7DeviceSupport`
+at `0bb62597-f040-42ef-82e4-0314fdfb7478` (SAK_INSECURE) instead of DATA_LAYER as an
+experiment — **fails identically** (`read failed ... ret -1`, same near-instant timing
+pattern). This rules out "the watch specifically gates the data channel behind a SAK
+precursor" — the failure is generic to ANY RFCOMM UUID our app tries to connect to, not
+specific to DATA_LAYER. This actually narrows the problem usefully: whatever is
+happening is about how/when the connection is attempted in general (this app/client,
+or this connection pattern), not about a specific required channel-open sequence.
+
 **Not yet tried** (candidate next steps for a future session, roughly in priority order):
-1. **Connect to SAK_INSECURE (`0bb62597-f040-42ef-82e4-0314fdfb7478`) first**, even just
-   opening/closing the socket or doing a minimal partial handshake per the
-   `BluetoothInsecureManager`/`InsecureConnectionCallback` classes in watchmanager.apk
-   (§1), immediately before attempting DATA_LAYER — current leading hypothesis (see
-   above) given the ~3s-then-explicit-failure evidence. Real engineering work: needs
-   understanding/replicating enough of that channel's framing to open it cleanly, not
-   just a config flag.
+1. Investigate whether the explicit `action.disconnect` that Gadgetbridge's
+   `DeviceCommunicationService` issues immediately before every `action.connect` (visible
+   in every log excerpt this session) causes the ACL link to actually drop each time,
+   forcing a full fresh authenticate+encrypt+SDP+multiplex negotiation per attempt (which
+   IS what the raw HCI traces show) — versus Samsung's own app/service, which manages its
+   connection more continuously and may attempt RFCOMM on an already-warm, already-
+   multiplexed ACL link. If confirmed, avoiding the redundant disconnect (or at least not
+   tearing down the ACL) before a fresh connect attempt might matter. This is shared
+   framework behavior (`DeviceCommunicationService`), so a fix would need to be
+   general-purpose, not Galaxy-Watch7-specific.
 2. Test on a different phone/Android build to rule out this being specific to this
    LineageOS 23.2 (Android 16) build's Bluetooth stack (e.g. a stock/GSI build, or an
    older Android version) — would help isolate "our code/protocol understanding" from
