@@ -1828,3 +1828,44 @@ node connection for it, or set its connectionConfigurations row disabled), THEN
 test GB alone on the channel. If GB then sustains, the blocker was ownership/
 collision, not protocol — and a standalone GB companion becomes viable (with GMS
 Wear disabled for the watch). This is the clean experiment §17 wrongly skipped.
+
+---
+
+## 19. Option 2 tested — not collision either; drop cause still open (2026-09-18)
+
+Durably removed GMS Wear from the watch connection and tested GB alone:
+- Disabled both Samsung apps (`pm disable-user`), force-stopped GMS, and set the
+  watch's `connectionConfigurations.connectionEnabled=0`. Confirmed **no
+  `Wear_Transport` activity** in logcat during the test — GMS was genuinely out.
+- GB still dropped ~90 ms after the watch's NodeInfo reply, every cycle. The watch
+  sends its NodeInfo (112 B) but never its peer-sync, then tears down.
+
+Also tried, all with no change:
+- Impersonated node id `e1b1cd8b` vs GB's own fresh random id.
+- peer-sync field8.field1 = -1 (0xffff…ff) vs 0.
+- Eager (bundled) vs reply-driven peer-sync.
+- Correct live watch node id (`1cf38db4`); correct RFCOMM channel (same as GMS).
+
+So the drop is **not crypto (§18), not connection-collision, and not any app-level
+field we can currently vary.** The watch exchanges NodeInfo with GB and then
+declines to proceed.
+
+### Leading remaining hypotheses (untested)
+1. **Concurrent BLE companion presence.** GMS keeps a BLE/GATT connection to the
+   watch alongside RFCOMM; the watch may drop an RFCOMM Data Layer peer that has no
+   accompanying BLE companion session. (This would re-implicate the GATT service
+   `3675c0ff…`/`c8625a0b…` from §8 — as a presence/keepalive channel, not crypto.)
+2. **RFCOMM socket security/mode** GB's `BluetoothSocket` negotiates differently
+   from GMS's (secure vs insecure, credit-based flow control, MTU/PN parameters).
+3. A NodeInfo/peer-sync detail still not matched byte-for-byte (e.g. per-node
+   seqId counters from `node.db.nodeinfo` instead of 0; field 11 SDK value).
+
+### Bounded next experiments for a future session
+- btsnoop byte-diff GB's exact NodeInfo+peer-sync vs GMS's opening on this watch,
+  incl. RFCOMM PN/credit/MTU parameters (the mux-level negotiation).
+- Hold a BLE GATT connection to the watch (companion presence) while GB does the
+  RFCOMM handshake, and see if the watch then proceeds.
+- Present real per-node seqId counters in peer-sync.
+
+Phone left restored: Samsung apps re-enabled, GMS connection config re-enabled,
+Gadgetbridge stopped.
