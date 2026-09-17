@@ -41,6 +41,7 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.TimeZone;
@@ -1546,6 +1547,7 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
             int dayIndex = originDayIndex;
             LOG.info("Origin3 day {} complete ({} frames)", dayIndex, frames.size());
             boolean hadData = parseOrigin3Day(frames, dayIndex);
+            mergeOriginHeartRateIntoSleep();
             persistPendingOriginDay();
             afterOriginDayComplete(dayIndex, hadData);
             return;
@@ -1587,6 +1589,7 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
             LOG.warn("Origin3 read stalled for {} ms; finishing the day with partial data", idle);
             hadData = parseOrigin3Day(frames, dayIndex);
         }
+        mergeOriginHeartRateIntoSleep();
         persistPendingOriginDay();
         afterOriginDayComplete(dayIndex, hadData);
     }
@@ -2395,15 +2398,19 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
                     ecgHeartRate = average;
                     ecgHrRecords++;
                 }
-            } else if (haveRecord && tag == 0xB7 && hour <= 23 && minute <= 59 && body.length >= 51) {
-                Calendar stamp = (Calendar) base.clone();
-                stamp.set(Calendar.HOUR_OF_DAY, hour);
-                stamp.set(Calendar.MINUTE, minute);
-                stamp.set(Calendar.SECOND, 0);
-                stamp.set(Calendar.MILLISECOND, 0);
-                if (stamp.getTimeInMillis() <= System.currentTimeMillis() + 60_000L) {
-                    hrvRecords++;
-                    hrvSamplesAdded += parseHrvFiveMinuteRecord(stamp, body, dayIndex);
+            } else if (haveRecord && tag == 0xB7) {
+                LOG.debug("Origin3 day {} HRV tag at {}:{} len={} body={}",
+                        dayIndex, hour, minute, body.length, hexBytes(body));
+                if (hour <= 23 && minute <= 59 && body.length >= 51) {
+                    Calendar stamp = (Calendar) base.clone();
+                    stamp.set(Calendar.HOUR_OF_DAY, hour);
+                    stamp.set(Calendar.MINUTE, minute);
+                    stamp.set(Calendar.SECOND, 0);
+                    stamp.set(Calendar.MILLISECOND, 0);
+                    if (stamp.getTimeInMillis() <= System.currentTimeMillis() + 60_000L) {
+                        hrvRecords++;
+                        hrvSamplesAdded += parseHrvFiveMinuteRecord(stamp, body, dayIndex);
+                    }
                 }
             } else if (haveRecord && tag == 0xB6 && hour <= 23 && minute <= 59) {
                 // Breath rate: one byte per minute (breaths/min).
@@ -2622,17 +2629,51 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
     }
 
     /**
-     * Parses one Origin3 0xB7 five-minute HRV record: [0] holds the per-minute validity
-     * bitmask (bit 7-m for minute m), [1..50] hold raw RR values. The per-minute HRV value in
-     * milliseconds is the average absolute difference of consecutive valid RR values, scaled x10.
+     * Back-fills per-minute heart rate for the pending sleep rows from the Origin3 five-minute
+     * records covering them: the 0xE0 sleep stream carries no heart rate of its own, but the band
+     * stores PPG/ECG averages in the activity stream. Runs after each Origin3 day parse, while
+     * both lists are still in memory (sleep rows persist last, so without this merge they would
+     * replace the overlapping activity rows and drop their heart rate).
      */
-    private int parseHrvFiveMinuteRecord(Calendar stamp, byte[] body, int dayIndex) {
-        int hrvType = body[0] & 0xFF;
-        int added = 0;
-        for (int m = 0; m < 5; m++) {
-            if (((hrvType >> (7 - m)) & 1) == 0) {
+    private void mergeOriginHeartRateIntoSleep() {
+        if (pendingOriginSamples.isEmpty() || pendingSleepSamples.isEmpty()) {
+            return;
+        }
+        Map<Integer, Integer> heartRateBySlot = new HashMap<>();
+        for (VeepooActivitySample sample : pendingOriginSamples) {
+            int heartRate = sample.getHeartRate();
+            if (heartRate >= 30 && heartRate <= 200) {
+                heartRateBySlot.put((sample.getTimestamp() / 300) * 300, heartRate);
+            }
+        }
+        if (heartRateBySlot.isEmpty()) {
+            return;
+        }
+        int filled = 0;
+        for (VeepooActivitySample sleep : pendingSleepSamples) {
+            if (sleep.getHeartRate() != ActivitySample.NOT_MEASURED) {
                 continue;
             }
+            Integer heartRate = heartRateBySlot.get((sleep.getTimestamp() / 300) * 300);
+            if (heartRate != null) {
+                sleep.setHeartRate(heartRate);
+                filled++;
+            }
+        }
+        if (filled > 0) {
+            LOG.info("Back-filled heart rate into {} sleep minutes from Origin3 records", filled);
+        }
+    }
+
+    /**
+     * Parses one Origin3 0xB7 five-minute HRV record: body[0] is unused on this firmware (always
+     * 0) and bytes [1..50] hold 50 RR-interval samples in centiseconds, ten per minute. The
+     * per-minute HRV value in milliseconds is the average absolute difference of consecutive valid
+     * RR samples (centiseconds × 10). A minute with fewer than two valid samples is skipped.
+     */
+    private int parseHrvFiveMinuteRecord(Calendar stamp, byte[] body, int dayIndex) {
+        int added = 0;
+        for (int m = 0; m < 5; m++) {
             int sumAbsDiff = 0;
             int diffs = 0;
             int prevRr = -1;
@@ -2646,8 +2687,8 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
                     prevRr = rr;
                 }
             }
-            int value = diffs > 0 ? (sumAbsDiff * 10 / diffs) % 211 : 0;
-            if (value <= 0) {
+            int value = diffs > 0 ? sumAbsDiff * 10 / diffs : 0;
+            if (value <= 0 || value > 600) {
                 continue;
             }
             GenericHrvValueSample sample = new GenericHrvValueSample();
