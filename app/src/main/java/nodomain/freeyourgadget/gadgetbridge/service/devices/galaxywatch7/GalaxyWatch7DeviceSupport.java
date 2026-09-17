@@ -151,6 +151,9 @@ public class GalaxyWatch7DeviceSupport extends AbstractBTBRDeviceSupport {
     @Override
     protected TransactionBuilder initializeDevice(final TransactionBuilder builder) {
         peerSyncSent = false;
+        synchronized (incomingLock) {
+            incoming = new byte[0];
+        }
         final SharedPreferences prefs = GBApplication.getDeviceSpecificSharedPrefs(getDevice().getAddress());
         // EXPERIMENT (§16): impersonate the enrolled GMS companion node id. Trust looks node-id
         // based (no crypto challenge on the wire), so presenting the id the watch already trusts
@@ -239,11 +242,44 @@ public class GalaxyWatch7DeviceSupport extends AbstractBTBRDeviceSupport {
         builder.queue();
     }
 
+    // Reassembly buffer for the incoming Data Layer stream. Socket reads do not align to message
+    // boundaries, so we accumulate and split on the 4-byte big-endian length prefix.
+    private final Object incomingLock = new Object();
+    private byte[] incoming = new byte[0];
+    private static final int MAX_FRAME_LEN = 1 << 20;
+
     @Override
     public void onSocketRead(final byte[] data) {
-        LOG.info("Galaxy Watch7 <<< {} bytes:\n{}", data.length, GB.hexdump(data));
+        synchronized (incomingLock) {
+            byte[] merged = new byte[incoming.length + data.length];
+            System.arraycopy(incoming, 0, merged, 0, incoming.length);
+            System.arraycopy(data, 0, merged, incoming.length, data.length);
 
-        final String parsed = WearDataLayerProtocol.parseWatchNodeId(data);
+            int off = 0;
+            while (merged.length - off >= 4) {
+                final int len = ((merged[off] & 0xff) << 24) | ((merged[off + 1] & 0xff) << 16)
+                        | ((merged[off + 2] & 0xff) << 8) | (merged[off + 3] & 0xff);
+                if (len < 0 || len > MAX_FRAME_LEN) {
+                    LOG.warn("Galaxy Watch7: bad frame length {}, dropping {} buffered bytes",
+                            len, merged.length - off);
+                    off = merged.length;
+                    break;
+                }
+                if (merged.length - off - 4 < len) {
+                    break; // incomplete message, wait for more bytes
+                }
+                final byte[] message = java.util.Arrays.copyOfRange(merged, off + 4, off + 4 + len);
+                off += 4 + len;
+                processIncomingMessage(message);
+            }
+            incoming = java.util.Arrays.copyOfRange(merged, off, merged.length);
+        }
+    }
+
+    private void processIncomingMessage(final byte[] message) {
+        LOG.info("Galaxy Watch7 <<< {}", WearDataLayerProtocol.describeMessage(message));
+
+        final String parsed = WearDataLayerProtocol.parseWatchNodeId(message);
         if (parsed == null) {
             return;
         }
@@ -257,7 +293,7 @@ public class GalaxyWatch7DeviceSupport extends AbstractBTBRDeviceSupport {
             }
         }
 
-        final String connId = WearDataLayerProtocol.parseWatchConnectionId(data);
+        final String connId = WearDataLayerProtocol.parseWatchConnectionId(message);
         if (connId != null && !connId.equals(watchConnectionId)) {
             LOG.info("Galaxy Watch7: learned connection id {} (used on next connect)", connId);
             watchConnectionId = connId;

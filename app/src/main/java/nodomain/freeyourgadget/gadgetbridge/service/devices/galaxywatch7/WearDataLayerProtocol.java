@@ -65,6 +65,7 @@ public final class WearDataLayerProtocol {
     private static final int PAYLOAD_NODE_INFO = 7;
     private static final int PAYLOAD_SEQ_ACK = 8;
     private static final int PAYLOAD_DATA_ITEM = 9;
+    private static final int PAYLOAD_MESSAGE_EVENT = 10;
 
     // Peer-sync (payload field 8) structure, decoded from the reference capture:
     //   field 1 = varint counter (the highest sequence this node has seen from the peer it is
@@ -311,6 +312,59 @@ public final class WearDataLayerProtocol {
         } catch (final RuntimeException e) {
             return null;
         }
+    }
+
+    /**
+     * Decodes one incoming envelope (4-byte length prefix stripped if present) into a short,
+     * human-readable description of its payload - for logging what the watch sends. DataItem
+     * payloads include their {@code wear://…} path and source package.
+     */
+    public static String describeMessage(final byte[] message) {
+        final byte[] envelope = stripLengthPrefix(message);
+        if (envelope == null) {
+            return "empty";
+        }
+        try {
+            final byte[] payload = new ProtoReader(envelope).findMessage(FIELD_ENVELOPE_PAYLOAD);
+            if (payload == null) {
+                return "non-envelope (" + envelope.length + "B)";
+            }
+            final ProtoReader p = new ProtoReader(payload);
+            if (p.findMessage(PAYLOAD_NODE_INFO) != null) {
+                final byte[] ni = new ProtoReader(payload).findMessage(PAYLOAD_NODE_INFO);
+                return "NodeInfo node=" + new ProtoReader(ni).findString(NODE_ID);
+            }
+            if (new ProtoReader(payload).findMessage(PAYLOAD_SEQ_ACK) != null) {
+                return "peer-sync";
+            }
+            final byte[] dataItem = new ProtoReader(payload).findMessage(PAYLOAD_DATA_ITEM);
+            if (dataItem != null) {
+                final ProtoReader d = new ProtoReader(dataItem);
+                final String path = d.findString(DATAITEM_PATH);
+                final String src = new ProtoReader(dataItem).findString(DATAITEM_SOURCE_PACKAGE);
+                return "DataItem path=" + path + " src=" + src;
+            }
+            if (new ProtoReader(payload).findMessage(PAYLOAD_MESSAGE_EVENT) != null) {
+                return "MessageEvent";
+            }
+            return "payload(other, " + payload.length + "B)";
+        } catch (final RuntimeException e) {
+            return "undecodable (" + envelope.length + "B)";
+        }
+    }
+
+    private static byte[] stripLengthPrefix(final byte[] message) {
+        if (message == null || message.length == 0) {
+            return null;
+        }
+        if (message.length >= 4) {
+            final int declared = ((message[0] & 0xff) << 24) | ((message[1] & 0xff) << 16)
+                    | ((message[2] & 0xff) << 8) | (message[3] & 0xff);
+            if (declared == message.length - 4) {
+                return java.util.Arrays.copyOfRange(message, 4, message.length);
+            }
+        }
+        return message;
     }
 
     /**

@@ -2001,3 +2001,37 @@ secret was needed.
   rather than just holding the sockets open, as far as features require.
 - Keep GMS Wear from re-claiming the watch while GB owns it (single-owner channel).
 - Parse the watch's incoming DataItems and wire up settings/notifications.
+
+---
+
+## 23. Incoming DataItem stream decoded; watch settings model (2026-09-18)
+
+With the connection sustained, Gadgetbridge now reassembles the incoming stream
+(4-byte length prefix) and decodes each envelope. The watch streams its full state
+on connect; observed DataItem paths (all sustained, no drop):
+
+- Settings (`wear://<node>/protogensettings/<group>/<key>/<node>`):
+  `display/always_on_display`, `display/tilt_to_wake`, `display/touch_to_wake`,
+  `display/screen_off_timeout_ms`, `display/font_scale`,
+  `modes/audio_volume_muted`, `modes/use_mode_ringer`, `modes/mode_ringer`,
+  `unread_dot/show_unread_dot`, `wrist_orientation/wrist_orientation_mode`,
+  `location/network_location_opt_in`, `location/combined_location`,
+  `accessibility/talkback_enabled`, `accessibility/wear_accessibility_gesture_enabled`,
+  `accessibility/magnification`, `media_controls/auto_launch`,
+  `wear_launcher_ui_mode`.
+- Notifications: `notification_settings/smart_replies_enabled`,
+  `notification_settings/notification_cooldown_enabled`,
+  `bridge_mode/bridge_mode/<app package>` (calendar, messaging, reminder, …).
+- Also: `settings/home_info`, `trusted_packages`, `wcs_extension/internal/status`,
+  `installed_apps/…`, `complication_providers/…`, `capabilities/…`, `cloud/peers`.
+
+The real always_on_display path is
+`…/protogensettings/display/always_on_display/<node>` (source
+`com.samsung.wearable.watch7plugin`) — GB's placeholder
+`/w_module_sec_watch_setting/display/always_on_display` needs updating to the
+`protogensettings` scheme before settings writes will take effect.
+
+Implemented: incoming stream reassembler + `WearDataLayerProtocol.describeMessage()`
+(NodeInfo / peer-sync / DataItem-with-path / MessageEvent). Larger DataItems arrive
+as multi-KB segmented transport messages (seen as `payload(other, …B)`); segment
+reassembly (GMS `gkds` queueId/piece/digest) is still to be implemented for those.
