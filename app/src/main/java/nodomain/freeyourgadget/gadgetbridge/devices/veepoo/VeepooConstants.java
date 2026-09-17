@@ -47,6 +47,20 @@ public final class VeepooConstants {
     public static final UUID UUID_CHARACTERISTIC_F002_DATA =
             UUID.fromString("F0020002-0451-4000-B000-000000000000");
 
+    // Auxiliary channel discovered at connect (suspected auto-measure push channel)
+    public static final UUID UUID_SERVICE_F003 =
+            UUID.fromString("F0030001-0451-4000-B000-000000000000");
+    public static final UUID UUID_CHARACTERISTIC_F003_DATA =
+            UUID.fromString("F0030002-0451-4000-B000-000000000000");
+
+    // "Sinilink-APP" service (firmware vendor handshake channel): the vendor app performs a
+    // C0BADCFE challenge/response here on every connect. Subscribed for diagnostics in case
+    // autonomous measurement pushes travel on this channel.
+    public static final UUID UUID_SERVICE_AE00 =
+            UUID.fromString("0000AE00-0000-1000-8000-00805F9B34FB");
+    public static final UUID UUID_CHARACTERISTIC_AE02_DATA =
+            UUID.fromString("0000AE02-0000-1000-8000-00805F9B34FB");
+
     public static final int PACKET_SIZE = 20;
     /** Pairing password used in the 0xA1 confirm command. Factory default is "no password" (0). */
     public static final int DEFAULT_PASSWORD = 0;
@@ -73,6 +87,12 @@ public final class VeepooConstants {
     public static final byte OP_SPORT_ORIGIN = (byte) 0xD4;
     /** Real-time heart-rate stream start/stop. */
     public static final byte OP_HR_REALTIME = (byte) 0xD0;
+    /**
+     * Status poll {0xD8, 0x00}: today's cumulative activity in one reply — steps u32 LE at [2..5],
+     * distance meters u32 LE at [6..9], calories x10 u32 LE at [10..13]. The vendor app polls this
+     * every ~5 s to drive its real-time step counter.
+     */
+    public static final byte OP_STATUS_POLL = (byte) 0xD8;
     /** Real-time SpO2 stream start {0x80,1,2} / stop {0x80,2,2}. */
     public static final byte OP_SPO2_REALTIME = (byte) 0x80;
     /**

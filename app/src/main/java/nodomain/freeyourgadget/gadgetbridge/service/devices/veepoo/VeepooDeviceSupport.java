@@ -444,6 +444,7 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
     private byte[] customSettingFrame2;
     private String customSettingPendingKey = null;
     private boolean customSettingPendingOn = false;
+    private boolean customSettingEchoDone = false;
 
     // 0xB3 AllSet (legacy dialect): night SpO2 auto-detect with a time window. Used on firmware
     // that does not report the newer 0xB3 TLV auto-measure capability (see A7 package 4).
@@ -451,6 +452,7 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
     private boolean allSetReadOutstanding = false;
     private boolean allSetPending = false;
     private boolean allSetPendingOn = false;
+    private boolean allSetEchoDone = false;
     private int allSetOpen = -1;   // last known open state (-1 unknown), 0 closed, 1 open
     private int allSetStartHour;
     private int allSetStartMinute;
@@ -467,10 +469,36 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
         LOG.warn("SpO2 auto-detect settings read timed out");
     };
 
+    // 0xD8 status poll: today's cumulative steps/distance/calories. Runs only while the live
+    // activity screen requests realtime step tracking (onEnableRealtimeSteps), so no
+    // background BLE traffic is generated; the vendor app polls at the same ~5 s cadence.
+    private boolean realtimeStepsRequested = false;
+    private long lastStatusSteps = -1;
+    private int lastStatusDay = -1;
+    private final Runnable statusPollTask = () -> {
+        if (!realtimeStepsRequested) {
+            return;
+        }
+        try {
+            TransactionBuilder builder = performInitialized("status poll");
+            writeFrame(builder, new byte[]{VeepooConstants.OP_STATUS_POLL, 0x00});
+        } catch (Exception e) {
+            LOG.debug("Status poll skipped: {}", e.getMessage());
+        }
+        scheduleStatusPoll(5_000L);
+    };
+
+    private void scheduleStatusPoll(long delayMillis) {
+        mainHandler.removeCallbacks(statusPollTask);
+        mainHandler.postDelayed(statusPollTask, delayMillis);
+    }
+
     public VeepooDeviceSupport() {
         super(LOG);
         addSupportedService(VeepooConstants.UUID_SERVICE_F008);
         addSupportedService(VeepooConstants.UUID_SERVICE_F002);
+        addSupportedService(VeepooConstants.UUID_SERVICE_F003);
+        addSupportedService(VeepooConstants.UUID_SERVICE_AE00);
     }
 
     @Override
@@ -486,6 +514,11 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
         // Light-origin channel: carries live PPG/ECG waveform frames; only active during
         // measurements, but must be subscribed before an ECG detection can start.
         builder.notify(VeepooConstants.UUID_CHARACTERISTIC_F002_DATA, true);
+        // Auxiliary channel: unknown purpose, suspected carrier of auto-measure pushes.
+        builder.notify(VeepooConstants.UUID_CHARACTERISTIC_F003_DATA, true);
+        // "Sinilink-APP" handshake channel: vendor app does a C0BADCFE challenge/response here;
+        // subscribe to observe whether autonomous pushes travel on it.
+        builder.notify(VeepooConstants.UUID_CHARACTERISTIC_AE02_DATA, true);
         // Password confirmation carries the phone time; followed by an explicit time sync.
         writeFrame(builder, buildPwdConfirmTimeFrame());
         writeFrame(builder, buildSyncTimeFrame());
@@ -536,6 +569,10 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
         }, 8000L);
         // The device pushes its 0xA7 capability report after pairing; it is handled in
         // onCharacteristicChanged() and may arrive before the INITIALIZED state is reached.
+        // If the live activity screen is still open across a reconnect, resume the status poll.
+        if (realtimeStepsRequested) {
+            scheduleStatusPoll(5_000L);
+        }
         builder.setDeviceState(GBDevice.State.INITIALIZED);
         return builder;
     }
@@ -608,6 +645,16 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
         }
         if (value != null && characteristic.getUuid().equals(VeepooConstants.UUID_CHARACTERISTIC_F002_DATA)) {
             handleEcgLightFrame(value);
+            return true;
+        }
+        if (value != null && characteristic.getUuid().equals(VeepooConstants.UUID_CHARACTERISTIC_F003_DATA)) {
+            // Diagnostic: newly subscribed channel of unknown purpose; log raw frames first.
+            LOG.debug("F003 notification ({} bytes): {}", value.length, GB.hexdump(value));
+            return true;
+        }
+        if (value != null && characteristic.getUuid().equals(VeepooConstants.UUID_CHARACTERISTIC_AE02_DATA)) {
+            // Diagnostic: "Sinilink-APP" channel of unknown purpose; log raw frames first.
+            LOG.debug("AE02 notification ({} bytes): {}", value.length, GB.hexdump(value));
             return true;
         }
         return super.onCharacteristicChanged(gatt, characteristic, value);
@@ -701,8 +748,52 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
             case 0xDE:
                 handleManualDetectFrame(data);
                 break;
+            case 0xD8:
+                handleStatusFrame(data);
+                break;
             default:
                 LOG.debug("Unhandled VeePoo opcode: {}", String.format("%02X", (int) opcode));
+        }
+    }
+
+    /**
+     * Opcode 0xD8 status reply: [2..5]=today's steps u32 LE, [6..9]=distance meters u32 LE,
+     * [10..13]=calories x10 u32 LE. The band keeps the daily total itself and resets it at
+     * midnight; we turn consecutive polls into per-poll deltas for the live activity view.
+     */
+    private void handleStatusFrame(byte[] data) {
+        if (data.length < 14) {
+            return;
+        }
+        long steps = ((long) (data[2] & 0xFF)) | ((long) (data[3] & 0xFF) << 8)
+                | ((long) (data[4] & 0xFF) << 16) | ((long) (data[5] & 0xFF) << 24);
+        int day = (int) (System.currentTimeMillis() / 86_400_000L);
+        if (day != lastStatusDay || lastStatusSteps < 0) {
+            // First poll after screen open, reconnect, or midnight rollover: baseline only.
+            lastStatusDay = day;
+            lastStatusSteps = steps;
+            return;
+        }
+        long delta = steps - lastStatusSteps;
+        lastStatusSteps = steps;
+        if (delta <= 0 || delta > 1000) {
+            // Counter moved backwards (band reset, manual clear) or an implausible jump.
+            return;
+        }
+        VeepooActivitySample sample = new VeepooActivitySample();
+        sample.setTimestamp((int) (System.currentTimeMillis() / 1000L));
+        sample.setSteps((int) delta);
+        notifyVitalSample(sample);
+    }
+
+    @Override
+    public void onEnableRealtimeSteps(boolean enable) {
+        realtimeStepsRequested = enable;
+        if (enable) {
+            mainHandler.removeCallbacks(statusPollTask);
+            mainHandler.post(statusPollTask);
+        } else {
+            mainHandler.removeCallbacks(statusPollTask);
         }
     }
 
@@ -887,6 +978,12 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
             }
             baselineComplete = customSettingFrame1 != null && customSettingFrame2 != null;
         }
+        if (baselineComplete && !customSettingEchoDone) {
+            customSettingEchoDone = true;
+            // Vendor parity: the reference app re-sends these frames on every connect; treat
+            // that as a possible "app armed" handshake for autonomous measurement pushes.
+            mainHandler.postDelayed(this::echoCustomSettings, 2000L);
+        }
         int hr = stateOf(0, VeepooConstants.CUSTOM_SETTING_F1_AUTO_HEART);
         int bp = stateOf(0, VeepooConstants.CUSTOM_SETTING_F1_AUTO_BP);
         int hrv = stateOf(0, VeepooConstants.CUSTOM_SETTING_F1_AUTO_HRV);
@@ -1029,6 +1126,32 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
     }
 
     /**
+     * Vendor parity: the reference app re-sends the custom-setting frames on every connect, and
+     * the band may treat that write as an "app armed" handshake for autonomous measurement
+     * pushes. Echo back exactly what was just read at connect, so no setting changes state.
+     */
+    private void echoCustomSettings() {
+        byte[] frame1;
+        byte[] frame2;
+        synchronized (customSettingLock) {
+            if (customSettingFrame1 == null || customSettingFrame2 == null) {
+                return;
+            }
+            frame1 = customSettingFrame1.clone();
+            frame2 = customSettingFrame2.clone();
+        }
+        LOG.info("Echoing custom settings at connect (no state change): {}", hexBytes(frame1));
+        try {
+            TransactionBuilder builder = performInitialized("echo custom settings at connect");
+            writeFrame(builder, frame1);
+            writeFrame(builder, frame2);
+            builder.queue();
+        } catch (IOException e) {
+            LOG.error("Error echoing custom settings at connect", e);
+        }
+    }
+
+    /**
      * Opcode 0xB3 AllSet frame (legacy dialect, only SpO2 night auto-detect on this generation):
      * response [1]==1, [3]=oprate (0 set ack / 1 read data), [4..7]=window start h/m + end h/m,
      * [8]=open state.
@@ -1064,6 +1187,15 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
                     .edit()
                     .putBoolean(VeepooConstants.CONFIG_AUTO_MEASURE_SPO2, open == 1)
                     .apply();
+            // Vendor parity: the reference app re-writes the SpO2 auto-detect settings on every
+            // connect; echo back exactly what was just read so no setting changes state.
+            synchronized (allSetLock) {
+                if (!allSetEchoDone && !allSetPending) {
+                    allSetEchoDone = true;
+                    LOG.info("Echoing SpO2 auto-detect at connect (no state change): open={}", open);
+                    writeAllSet(open == 1);
+                }
+            }
         } else {
             LOG.info("SpO2 auto-detect set acknowledged (open={})", open);
         }
@@ -6724,6 +6856,8 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
         mainHandler.removeCallbacks(stressIdleWatchdog);
         mainHandler.removeCallbacks(bpDetectTimeout);
         mainHandler.removeCallbacks(bpIdleWatchdog);
+        mainHandler.removeCallbacks(statusPollTask);
+        realtimeStepsRequested = false;
         synchronized (syncLock) {
             fetchPhase = FetchPhase.IDLE;
         }
