@@ -1689,3 +1689,102 @@ adb shell am broadcast -a nodomain.freeyourgadget.gadgetbridge.BLUETOOTH_CONNECT
 ```
 Success = channel stays up well past ~1 s (no ~100 ms drop), `learned watch node
 id …` appears in the log, and the socket keeps reading the watch's DataItem PUTs.
+
+---
+
+## 16. Enrollment capture + why standalone GB still fails (2026-09-18)
+
+Re-installed Samsung watch7plugin + watchmanager2, ran the full companion setup
+once (enrollment), captured the resulting Data Layer session, then uninstalled
+them again and tested Gadgetbridge against the now-enrolled watch.
+
+### New ground truth from the enrolled session
+- **Enrolled phone node id = `e1b1cd8b`** (a GMS Wear node id, stable; identical
+  to the original reference capture and survives the watch factory-reset).
+- **Watch node id changed to `1cf38db4`** (was `1bce196f`) after enrollment.
+- **NodeInfo connection id (field 7) = `4935776994476044983`** — same value both
+  sides, stable across resets.
+- **peer-sync field8.field1 = `0xffffffffffffffff`** for a fresh session (BOTH
+  sides send it), NOT `0`. The original GB code's `-1` was accidentally right for
+  this field; the "fix" to `0` in §15 was wrong. Corrected back to `-1`.
+- No crypto challenge anywhere on the wire — after NodeInfo the watch immediately
+  streams DataItems (observed: real German quick-settings JSON: "Nicht stören",
+  "WLAN (automatisch)", "Wassersperre", "Offline-Modus", ...). So trust is by
+  node identity, not a handshake secret.
+
+### What was tried in GB (all still dropped ~40-90 ms after the watch's NodeInfo)
+- Correct NodeInfo incl. field 3 (nonce) + field 7 (connection id echoed).
+- peer-sync field8.field1 = 0xffffffffffffffff.
+- **Impersonating the enrolled node id `e1b1cd8b`.**
+- Eager (bundled) vs reply-driven peer-sync ordering.
+- Correct current watch node id (`1cf38db4`, learned live).
+- Confirmed GB connects on the SAME RFCOMM channel as GMS (scn 7 / dlci 0x0e);
+  channel number is dynamic per boot and is not the issue.
+
+### Conclusion — two compounding blockers
+1. **GMS Wear owns the bonded watch.** `com.google.android.gms` (Wear_Transport)
+   auto-connects the bonded watch's Data Layer channel on its own, even with the
+   Samsung apps uninstalled. Only one Data Layer RFCOMM connection exists; GB and
+   GMS fight over it and both get dropped (observed: GB drop + `Wear_Transport ...
+   read return: -1` in lockstep).
+2. **GB's app-level handshake alone is not sufficient.** Even with GMS momentarily
+   force-stopped and GB presenting the trusted identity, the watch still dropped
+   GB within ~90 ms, whereas GMS on the identical node id/channel sustains and
+   streams settings. GMS clearly performs additional connection-layer negotiation
+   (the small control frames seen on the mux, credit-based flow control, and/or a
+   connection-setup exchange) beyond the NodeInfo/peer-sync/DataItem envelope we
+   reversed. That lower layer is inside GMS core (`com.google.android.gms`), not in
+   the Samsung app, and is not yet reversed.
+
+### Implication for the "no wear manager" goal
+The reversed envelope protocol (NodeInfo / peer-sync / DataItem, incl. the
+settings-PUT format) is correct and confirmed against a live enrolled watch.
+But a standalone GB companion over plain RFCOMM needs to (a) stop GMS Wear from
+claiming the watch, and (b) replicate GMS's connection-management layer. Both are
+substantial; (b) requires reversing the GMS Wear bluetooth transport, not just
+the app data protocol. This is the current wall.
+
+---
+
+## 17. Blocker 2 root cause — Fast Pair secret handshake (VERDICT, 2026-09-18)
+
+Decompiled GMS core (`com.google.android.gms` 26.32.34, base.apk classes12.dex)
+and traced the Wear transport's connection handshake (`WearableTransport`,
+`Wear_Transport`, `gms/wearable/node/TransportWriter`, obfuscated handshake class
+`defpackage/gntt`).
+
+The Data Layer transport is gated by a **Fast Pair secret handshake over GATT**:
+- `gntt.a(byte[])`: a 16-byte input → "using the given secret" (a stored Fast
+  Pair **account key**); a 64-byte input → **ECDH** (EC P-256 public key) with the
+  device anti-spoofing key. Imports `com.google.android.libraries.bluetooth.fastpair`.
+- `gntt.d()` writes/reads "handshake packet" bytes over a **GATT characteristic**
+  (short 0x1234), i.e. this is the BLE side we earlier wrote off as a dead end (§8)
+  — it is actually the auth channel.
+- Log strings: "generates key by ECDH", "Handshake challenge/confirmation",
+  "Handshake verification failed. Invalid ACK code", "Connection handshake
+  complete", "GATT_CONNECTION_AND_SECRET_HANDSHAKE".
+- The 16-byte account key is **Google-account-bound**: stored in
+  `com.google.android.gms/shared_prefs/fastpair_common_preferences.xml` +
+  account "footprints" (`FPDC: ... already paired with the account`).
+
+**Verdict:** the secret is NOT derivable from the plain Bluetooth bond. It is a
+Fast Pair account key (or ECDH with a Google-held anti-spoofing key) established
+during the Google-account-bound enrollment and stored inside GMS. The watch's
+RFCOMM Data Layer only proceeds for a peer that has completed this GATT secret
+handshake — which is why every GB attempt (even impersonating the enrolled node
+id `e1b1cd8b`, correct NodeInfo/peer-sync, correct channel) is dropped ~40-90 ms
+after the watch's courtesy NodeInfo.
+
+### Feasibility of a standalone Gadgetbridge companion
+Not feasible cleanly. The only theoretical paths:
+1. Root-extract the 16-byte Fast Pair account key from GMS for this watch AND
+   reimplement the full Fast Pair GATT secret handshake + the authenticated Wear
+   transport in Gadgetbridge. Very large, fragile (account-bound, rotates), and
+   depends on GMS internals.
+2. Google-side keys / official enrollment — not available to third parties.
+
+The reversed **application** protocol (NodeInfo / peer-sync / DataItem, incl. the
+settings-PUT and notification formats) remains correct and is confirmed against a
+live enrolled watch — but it rides on top of a transport that Gadgetbridge cannot
+authenticate to without GMS's Fast Pair account key. This is the wall for the
+"companion without Galaxy Wearable / watch7plugin" goal for Data-Layer features.

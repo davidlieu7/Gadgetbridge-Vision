@@ -83,9 +83,18 @@ public final class WearDataLayerProtocol {
     // NodeInfo fields
     private static final int NODE_ID = 1;
     private static final int NODE_NAME = 2;
+    // A large per-node varint (a random ~63-bit connection/instance nonce, distinct per side)
+    // present in every real NodeInfo. Its exact value is not validated across sides, but the
+    // watch expects the field to be there.
+    private static final int NODE_EPOCH = 3;
     private static final int NODE_TYPE = 4;
     private static final int NODE_ROLE = 5;
     private static final int NODE_UNKNOWN6 = 6;
+    // A shared connection long-id (a decimal string) that BOTH sides present identically. The
+    // watch keeps sending the same value across factory resets, and it drops a peer whose
+    // NodeInfo omits (or mismatches) it - this was why the watch replied then immediately
+    // DISCed. Learned from the watch's own NodeInfo reply and echoed back on the next connect.
+    private static final int NODE_CONNECTION_ID = 7;
     private static final int NODE_SDK_LEVEL = 11;
 
     // DataItem fields
@@ -110,24 +119,36 @@ public final class WearDataLayerProtocol {
     }
 
     /**
-     * Builds the initial handshake message a client is expected to send right after the RFCOMM
-     * socket connects, announcing itself as a Wear Data Layer node. Modeled on the phone-side
-     * NodeInfo message captured from the stock Galaxy Wearable app; field 7 (this node's own
-     * numeric id, a large integer of unclear meaning on the real app) and field 6 are omitted
-     * here since their purpose wasn't determined.
+     * Builds the initial handshake message a client sends right after the RFCOMM socket connects,
+     * announcing itself as a Wear Data Layer node. Modeled byte-for-byte on the phone-side
+     * NodeInfo captured from the stock Galaxy Wearable app.
+     * <p/>
+     * Crucially includes field 7, the shared connection long-id: the watch drops any peer whose
+     * NodeInfo omits (or mismatches) it. It is not known on the very first connect, so pass
+     * {@code null} then; parse it from the watch's own NodeInfo reply
+     * ({@link #parseWatchConnectionId(byte[])}), cache it, and pass it on the next connect.
      *
-     * @param localNodeId  an 8-hex-char id identifying this "phone" node, same shape as the ids
-     *                     seen on the wire (e.g. derived from a random/stable per-install value)
-     * @param localName    a human-readable name for this node, shown as the connected device name
-     *                     in some of the watch's own UI
+     * @param localNodeId   an 8-hex-char id identifying this "phone" node, same shape as the ids
+     *                      seen on the wire (e.g. derived from a random/stable per-install value)
+     * @param localName     a human-readable name for this node, shown as the connected device name
+     *                      in some of the watch's own UI
+     * @param nodeEpoch     a large per-node nonce for field 3 (value not validated across sides;
+     *                      keep it stable per node so reconnects look consistent)
+     * @param connectionId  the shared connection long-id (field 7) learned from the watch, or
+     *                      {@code null} if not yet known (first ever connect)
      */
-    public static byte[] buildNodeInfoHandshake(final String localNodeId, final String localName) {
+    public static byte[] buildNodeInfoHandshake(final String localNodeId, final String localName,
+                                                final long nodeEpoch, final String connectionId) {
         final ProtoWriter nodeInfo = new ProtoWriter();
         nodeInfo.writeString(NODE_ID, localNodeId);
         nodeInfo.writeString(NODE_NAME, localName);
+        nodeInfo.writeVarint(NODE_EPOCH, nodeEpoch);
         nodeInfo.writeVarint(NODE_TYPE, 3);
         nodeInfo.writeVarint(NODE_ROLE, 1); // 1 = phone/initiator role, per captured traffic
         nodeInfo.writeVarint(NODE_UNKNOWN6, 0);
+        if (connectionId != null) {
+            nodeInfo.writeString(NODE_CONNECTION_ID, connectionId);
+        }
         nodeInfo.writeVarint(NODE_SDK_LEVEL, Build.VERSION.SDK_INT);
 
         final ProtoWriter payload = new ProtoWriter();
@@ -187,8 +208,10 @@ public final class WearDataLayerProtocol {
      */
     public static byte[] buildSeqAck(final String ownNodeId, final String watchNodeId) {
         final ProtoWriter seqAck = new ProtoWriter();
-        // field 1: our current sequence counter for the peer - 0 for a fresh session.
-        seqAck.writeVarint(SEQACK_COUNTER, 0);
+        // field 1: the highest sequence seen from the peer. A fresh session with no history sends
+        // 0xffffffffffffffff ("I have nothing - send me everything"); confirmed on the wire from
+        // BOTH sides of a real enrolled session (research notes §16).
+        seqAck.writeVarint(SEQACK_COUNTER, -1L);
         appendNodeRef(seqAck, CLOUD_NODE_ID, 0);
         appendNodeRef(seqAck, ownNodeId, 0);
         appendNodeRef(seqAck, watchNodeId, 0);
@@ -245,6 +268,42 @@ public final class WearDataLayerProtocol {
      * @param message raw bytes as delivered by the socket read
      */
     public static String parseWatchNodeId(final byte[] message) {
+        final byte[] nodeInfo = extractNodeInfo(message);
+        if (nodeInfo == null) {
+            return null;
+        }
+        try {
+            // NodeInfo field 1 = node id (string)
+            return new ProtoReader(nodeInfo).findString(NODE_ID);
+        } catch (final RuntimeException e) {
+            return null;
+        }
+    }
+
+    /**
+     * If the message is a NodeInfo, returns its field 7 (the shared connection long-id). Echo
+     * this back in our own NodeInfo on the next connect so the watch accepts us as a known peer.
+     *
+     * @param message raw bytes as delivered by the socket read
+     */
+    public static String parseWatchConnectionId(final byte[] message) {
+        final byte[] nodeInfo = extractNodeInfo(message);
+        if (nodeInfo == null) {
+            return null;
+        }
+        try {
+            return new ProtoReader(nodeInfo).findString(NODE_CONNECTION_ID);
+        } catch (final RuntimeException e) {
+            return null;
+        }
+    }
+
+    /**
+     * Navigates envelope field 1 (payload) → payload field 7 (NodeInfo) and returns the NodeInfo
+     * submessage bytes, or {@code null} if the message is not a well-formed NodeInfo. The 4-byte
+     * big-endian length prefix is stripped if still present.
+     */
+    private static byte[] extractNodeInfo(final byte[] message) {
         if (message == null || message.length == 0) {
             return null;
         }
@@ -264,12 +323,7 @@ public final class WearDataLayerProtocol {
                 return null;
             }
             // payload field 7 = NodeInfo
-            final byte[] nodeInfo = new ProtoReader(payload).findMessage(PAYLOAD_NODE_INFO);
-            if (nodeInfo == null) {
-                return null;
-            }
-            // NodeInfo field 1 = node id (string)
-            return new ProtoReader(nodeInfo).findString(NODE_ID);
+            return new ProtoReader(payload).findMessage(PAYLOAD_NODE_INFO);
         } catch (final RuntimeException e) {
             return null;
         }

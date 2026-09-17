@@ -50,12 +50,22 @@ public class GalaxyWatch7DeviceSupport extends AbstractBTBRDeviceSupport {
     private static final Logger LOG = LoggerFactory.getLogger(GalaxyWatch7DeviceSupport.class);
     private static final SecureRandom RANDOM = new SecureRandom();
 
+    private static final String PREF_LOCAL_NODE_ID = "galaxywatch7_local_node_id";
+
+    // EXPERIMENT (§16): set to a captured enrolled GMS Wear node id to impersonate it; null uses
+    // GB's own persisted random id. Impersonation alone does NOT get past the watch's Fast Pair
+    // GATT secret handshake (§17), so left disabled.
+    private static final String EXPERIMENT_IMPERSONATE_NODE_ID = null;
+
     /**
-     * This phone's own Data Layer node id. Randomly generated per device-support instance for
-     * now; a real implementation should probably persist this per paired device so it stays
-     * stable across reconnects (unclear yet whether the watch actually depends on that).
+     * This phone's own Data Layer node id, persisted per paired device so it stays STABLE across
+     * reconnects (a peer that changes identity on every connect looks abnormal to the watch).
+     * Initialised lazily in {@link #initializeDevice} from the per-device prefs.
      */
-    private final String localNodeId = randomNodeId();
+    private volatile String localNodeId;
+
+    /** This node's field-3 nonce; value isn't validated by the watch, only its presence. */
+    private final long nodeEpoch = RANDOM.nextLong() & 0x7fffffffffffffffL;
 
     public GalaxyWatch7DeviceSupport() {
         super(LOG, 4096);
@@ -124,32 +134,61 @@ public class GalaxyWatch7DeviceSupport extends AbstractBTBRDeviceSupport {
     // reconnects we can send the peer-sync straight after our NodeInfo (as the stock app does)
     // instead of having to wait for the watch's NodeInfo reply first.
     private static final String PREF_WATCH_NODE_ID = "galaxywatch7_watch_node_id";
+    // Per-device cache of the shared connection long-id (NodeInfo field 7) the watch expects us
+    // to echo. Learned from the watch's NodeInfo reply; without it the watch drops us right after
+    // the handshake. Stable across factory resets (it is a watch-side identifier).
+    private static final String PREF_WATCH_CONNECTION_ID = "galaxywatch7_watch_connection_id";
 
     // The watch's current Data Layer node id, learned by parsing its NodeInfo reply (falls back to
     // the cached value on reconnect). Changes across factory resets / re-pairings.
     private volatile String watchNodeId;
+    // The shared connection long-id (NodeInfo field 7) we must echo back to the watch.
+    private volatile String watchConnectionId;
     // Whether we've already sent the peer-sync for the current session (avoids sending it twice
     // when we both send it eagerly on connect and would otherwise resend on the NodeInfo reply).
     private volatile boolean peerSyncSent;
 
     @Override
     protected TransactionBuilder initializeDevice(final TransactionBuilder builder) {
-        LOG.info("Galaxy Watch7: Data Layer channel connected, sending node handshake as {}", localNodeId);
-
         peerSyncSent = false;
-        if (watchNodeId == null) {
-            final SharedPreferences prefs = GBApplication.getDeviceSpecificSharedPrefs(getDevice().getAddress());
-            watchNodeId = prefs == null ? null : prefs.getString(PREF_WATCH_NODE_ID, null);
+        final SharedPreferences prefs = GBApplication.getDeviceSpecificSharedPrefs(getDevice().getAddress());
+        // EXPERIMENT (§16): impersonate the enrolled GMS companion node id. Trust looks node-id
+        // based (no crypto challenge on the wire), so presenting the id the watch already trusts
+        // is what should make it sustain the session instead of dropping us as an unknown peer.
+        localNodeId = EXPERIMENT_IMPERSONATE_NODE_ID != null ? EXPERIMENT_IMPERSONATE_NODE_ID : localNodeId;
+        if (localNodeId == null) {
+            String stored = prefs == null ? null : prefs.getString(PREF_LOCAL_NODE_ID, null);
+            if (stored == null) {
+                stored = randomNodeId();
+                if (prefs != null) {
+                    prefs.edit().putString(PREF_LOCAL_NODE_ID, stored).apply();
+                }
+            }
+            localNodeId = stored;
+        }
+        if (watchNodeId == null && prefs != null) {
+            watchNodeId = prefs.getString(PREF_WATCH_NODE_ID, null);
+        }
+        if (watchConnectionId == null && prefs != null) {
+            watchConnectionId = prefs.getString(PREF_WATCH_CONNECTION_ID, null);
         }
 
-        final String localName = "Gadgetbridge";
-        builder.write(WearDataLayerProtocol.buildNodeInfoHandshake(localNodeId, localName));
+        LOG.info("Galaxy Watch7: Data Layer channel connected, sending node handshake as {}", localNodeId);
 
-        // If we already know the watch's node id (from a previous session), send the peer-sync
-        // immediately after NodeInfo, mirroring the stock app. On the very first connect we don't
-        // know it yet and send it from onSocketRead once the watch's NodeInfo reply arrives.
+        final String localName = "Gadgetbridge";
+        if (watchConnectionId == null) {
+            LOG.info("Galaxy Watch7: connection id not known yet - handshake will be rejected, "
+                    + "learning it from the watch's reply for the next connect");
+        }
+        builder.write(WearDataLayerProtocol.buildNodeInfoHandshake(
+                localNodeId, localName, nodeEpoch, watchConnectionId));
+
+        // EXPERIMENT (§16): send the peer-sync eagerly (bundled after NodeInfo) when we already
+        // know the watch's node id, so it reaches the watch within ~ms instead of via the slower
+        // reply-driven queue path - the watch drops us ~40ms in, likely before a queued peer-sync
+        // arrives. onSocketRead still covers the first-ever connect (no cached watch id yet).
         if (watchNodeId != null) {
-            LOG.info("Galaxy Watch7: sending peer-sync eagerly for known watch node {}", watchNodeId);
+            LOG.info("Galaxy Watch7: sending peer-sync eagerly for watch node {}", watchNodeId);
             builder.write(WearDataLayerProtocol.buildSeqAck(localNodeId, watchNodeId));
             peerSyncSent = true;
         }
@@ -209,12 +248,21 @@ public class GalaxyWatch7DeviceSupport extends AbstractBTBRDeviceSupport {
             return;
         }
 
+        final SharedPreferences prefs = GBApplication.getDeviceSpecificSharedPrefs(getDevice().getAddress());
         if (!parsed.equals(watchNodeId)) {
             LOG.info("Galaxy Watch7: learned watch node id {}", parsed);
             watchNodeId = parsed;
-            final SharedPreferences prefs = GBApplication.getDeviceSpecificSharedPrefs(getDevice().getAddress());
             if (prefs != null) {
                 prefs.edit().putString(PREF_WATCH_NODE_ID, parsed).apply();
+            }
+        }
+
+        final String connId = WearDataLayerProtocol.parseWatchConnectionId(data);
+        if (connId != null && !connId.equals(watchConnectionId)) {
+            LOG.info("Galaxy Watch7: learned connection id {} (used on next connect)", connId);
+            watchConnectionId = connId;
+            if (prefs != null) {
+                prefs.edit().putString(PREF_WATCH_CONNECTION_ID, connId).apply();
             }
         }
 
