@@ -2035,3 +2035,40 @@ Implemented: incoming stream reassembler + `WearDataLayerProtocol.describeMessag
 (NodeInfo / peer-sync / DataItem-with-path / MessageEvent). Larger DataItems arrive
 as multi-KB segmented transport messages (seen as `payload(other, …B)`); segment
 reassembly (GMS `gkds` queueId/piece/digest) is still to be implemented for those.
+
+---
+
+## 24. Settings write works end-to-end (2026-09-18)
+
+Gadgetbridge changed a real watch setting over its own connection, no Samsung app.
+
+Wire format of a `protogensettings` boolean write (confirmed by round-trip):
+- DataItem at `wear://<ownNode>/protogensettings/<group>/<key>/<ownNode>`, e.g.
+  `.../protogensettings/display/always_on_display/<ownNode>`.
+- field 1 = source package (`com.samsung.wearable.watch7plugin`).
+- field 2 = path.
+- field 4 = value proto `{ field1 = { field2 = 0|1 }, field2 = <write time ms> }`
+  (bool uses inner field 2; int uses inner field 1; float uses inner field 5).
+- field 5 = seq, field 6 = 0 (not a delete), field 7 = ownNode.
+- field 9 = the source app's signing-cert SHA digest
+  (`9ca5170f381919dfe0446fcdab18b19a143b3163`) — the watch checks source package +
+  signature against its trusted_packages.
+- field 10 = write time ms. Envelope field 2 digest as always (§22).
+
+Test: authored `always_on_display=ON` as our connection node e1b1cd8b. The
+connection survived (no drop) and the watch applied it and echoed it back on its
+own node: `wear://1cf38db4/protogensettings/display/always_on_display/1cf38db4`
+value flipped 0→1, and the legacy `w_module_sec_watch_setting/display/
+always_on_display` DataMap showed `booleanIsChecked=true`. Timestamp is the
+logical clock — a write with a higher ms wins, so a fresh System.currentTimeMillis()
+always takes effect.
+
+Implemented `WearDataLayerProtocol.buildProtogenBooleanSettingPut()`, wired
+`onSendConfiguration(always_on_display)` to it, plus a temporary one-shot test
+(`EXPERIMENT_TEST_SETTINGS_WRITE`) that pushes ON once per connect.
+
+### Next
+- Wire the remaining protogensettings (tilt_to_wake, touch_to_wake, unread_dot,
+  modes/*, etc.) and int/float types to the GB settings UI; drop the test hook.
+- Read current values (decode the protogen value proto) to reflect state in the UI.
+- Notifications: the notification_settings + bridge_mode paths are the levers.

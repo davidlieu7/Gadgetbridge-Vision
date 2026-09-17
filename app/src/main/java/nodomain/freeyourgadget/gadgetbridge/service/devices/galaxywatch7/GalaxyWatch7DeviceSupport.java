@@ -151,6 +151,7 @@ public class GalaxyWatch7DeviceSupport extends AbstractBTBRDeviceSupport {
     @Override
     protected TransactionBuilder initializeDevice(final TransactionBuilder builder) {
         peerSyncSent = false;
+        settingsTestSent = false;
         synchronized (incomingLock) {
             incoming = new byte[0];
         }
@@ -202,9 +203,13 @@ public class GalaxyWatch7DeviceSupport extends AbstractBTBRDeviceSupport {
 
     // Preference key from res/xml/devicesettings_galaxy_watch7.xml.
     private static final String PREF_ALWAYS_ON_DISPLAY = "pref_galaxywatch7_always_on_display";
-    // See §5h of the research notes: any simple on/off watch setting is a DataItem PUT of a
-    // single-key {"booleanIsChecked": value} DataMap at wear://<watchNodeId>/<path>.
-    private static final String SETTINGS_PATH_ALWAYS_ON_DISPLAY = "/w_module_sec_watch_setting/display/always_on_display";
+    // Real protogensettings group/key confirmed on the wire (§23):
+    // wear://<node>/protogensettings/display/always_on_display/<node>.
+    private static final String SETTINGS_KEY_ALWAYS_ON_DISPLAY = "display/always_on_display";
+    // The watch validates a setting DataItem's source package + signing-cert digest against its
+    // trusted_packages. Use the stock companion's identity so the write is accepted.
+    private static final String SETTINGS_SOURCE_PACKAGE = "com.samsung.wearable.watch7plugin";
+    private static final String SETTINGS_SOURCE_SIGNATURE = "9ca5170f381919dfe0446fcdab18b19a143b3163";
 
     private long nextSettingsSeq = 1;
 
@@ -213,15 +218,16 @@ public class GalaxyWatch7DeviceSupport extends AbstractBTBRDeviceSupport {
         final boolean enabled = prefs != null && prefs.getBoolean(PREF_ALWAYS_ON_DISPLAY, false);
         LOG.info("Galaxy Watch7: sending always_on_display = {}", enabled);
 
-        final String node = watchNodeId;
+        final String node = localNodeId;
         if (node == null) {
-            LOG.warn("Galaxy Watch7: cannot send always_on_display - watch node id not known yet");
+            LOG.warn("Galaxy Watch7: cannot send always_on_display - own node id not known yet");
             return null;
         }
-        return WearDataLayerProtocol.buildBooleanSettingPut(
-                BuildConfig.APPLICATION_ID,
+        return WearDataLayerProtocol.buildProtogenBooleanSettingPut(
+                SETTINGS_SOURCE_PACKAGE,
+                SETTINGS_SOURCE_SIGNATURE,
                 node,
-                SETTINGS_PATH_ALWAYS_ON_DISPLAY,
+                SETTINGS_KEY_ALWAYS_ON_DISPLAY,
                 enabled,
                 nextSettingsSeq++
         );
@@ -310,7 +316,23 @@ public class GalaxyWatch7DeviceSupport extends AbstractBTBRDeviceSupport {
             builder.write(WearDataLayerProtocol.buildSeqAck(localNodeId, parsed));
             builder.queue();
         }
+
+        // EXPERIMENT (§24): one-shot settings-write test. Once the session is up, push
+        // always_on_display=ON and watch whether the connection survives it and whether the watch
+        // echoes the value back. Remove once settings writes are wired to the UI.
+        if (EXPERIMENT_TEST_SETTINGS_WRITE && !settingsTestSent && watchNodeId != null) {
+            settingsTestSent = true;
+            LOG.info("Galaxy Watch7: TEST sending always_on_display=ON");
+            final TransactionBuilder b = createTransactionBuilder("test always_on_display");
+            b.write(WearDataLayerProtocol.buildProtogenBooleanSettingPut(
+                    SETTINGS_SOURCE_PACKAGE, SETTINGS_SOURCE_SIGNATURE, localNodeId,
+                    SETTINGS_KEY_ALWAYS_ON_DISPLAY, true, nextSettingsSeq++));
+            b.queue();
+        }
     }
+
+    private static final boolean EXPERIMENT_TEST_SETTINGS_WRITE = true;
+    private volatile boolean settingsTestSent;
 
     @Override
     public boolean useAutoConnect() {

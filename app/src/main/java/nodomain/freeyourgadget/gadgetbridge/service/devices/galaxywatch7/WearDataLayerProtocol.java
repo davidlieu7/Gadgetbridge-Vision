@@ -105,6 +105,18 @@ public final class WearDataLayerProtocol {
     private static final int DATAITEM_SEQ = 5;
     private static final int DATAITEM_DELETE_FLAG = 6;
     private static final int DATAITEM_DEST_NODE_ID = 7;
+    // The source app's signing-certificate SHA digest (hex) and a write timestamp; the watch
+    // checks the source package + signature against its trusted_packages before applying.
+    private static final int DATAITEM_SIGNATURE = 9;
+    private static final int DATAITEM_TIMESTAMP = 10;
+
+    // protogensettings value proto: field 1 = a typed-value submessage, field 2 = write time (ms).
+    // The typed submessage uses inner field 1 (varint) for ints, field 2 (varint 0/1) for bools,
+    // field 5 (fixed32) for floats. field 2 (the timestamp) is a logical clock: the watch applies
+    // whichever write has the highest timestamp.
+    private static final int PROTOGEN_VALUE = 1;
+    private static final int PROTOGEN_TIMESTAMP = 2;
+    private static final int PROTOGEN_BOOL = 2;
 
     // DataMap entry fields (a repeated {key, value} list, itself protobuf-encoded)
     private static final int DATAMAP_ENTRY = 1;
@@ -160,31 +172,43 @@ public final class WearDataLayerProtocol {
     }
 
     /**
-     * Builds a DataItem PUT for the simple, generic boolean-setting mechanism confirmed live
-     * against a real Watch7: writing a single-key DataMap {@code {"booleanIsChecked": value}} to
-     * a {@code w_module_sec_watch_setting/...} (or similar) path is enough to change most simple
-     * on/off watch settings — see the settings path catalog in the project's research notes for
-     * concrete paths (e.g. {@code /w_module_sec_watch_setting/display/always_on_display}).
+     * Builds a DataItem PUT that changes a boolean {@code protogensettings} watch setting, in the
+     * exact wire shape captured from the stock app (research notes §23): a DataItem at
+     * {@code wear://<node>/protogensettings/<group>/<key>/<node>} whose value proto is
+     * {@code { field1 = { field2 = 0|1 }, field2 = <write time ms> }}, carrying the source
+     * package and its signing-cert digest so the watch's trusted_packages check passes.
      *
-     * @param sourcePackage this app's own applicationId (used as the DataItem's source package)
-     * @param destNodeId    the target watch's node id (learned from its own NodeInfo handshake)
-     * @param settingsPath  the settings path, WITHOUT the {@code wear://<nodeId>} prefix, e.g.
-     *                      {@code "/w_module_sec_watch_setting/display/always_on_display"}
-     * @param value         the boolean value to set
-     * @param seq           a monotonically increasing per-path sequence number
+     * @param sourcePackage the trusted source app package (the watch verifies it)
+     * @param signatureHex  that package's signing-certificate SHA digest, as lowercase hex
+     * @param ownNodeId     the node this side authors DataItems under (our connection node)
+     * @param groupAndKey   e.g. {@code "display/always_on_display"}
+     * @param value         the boolean to set
+     * @param seq           a monotonically increasing sequence number
      */
-    public static byte[] buildBooleanSettingPut(final String sourcePackage, final String destNodeId,
-                                                 final String settingsPath, final boolean value,
-                                                 final long seq) {
-        final byte[] dataMap = buildSingleKeyBooleanDataMap("booleanIsChecked", value);
+    public static byte[] buildProtogenBooleanSettingPut(final String sourcePackage,
+                                                        final String signatureHex,
+                                                        final String ownNodeId,
+                                                        final String groupAndKey,
+                                                        final boolean value, final long seq) {
+        final long now = System.currentTimeMillis();
+
+        final ProtoWriter typed = new ProtoWriter();
+        typed.writeVarint(PROTOGEN_BOOL, value ? 1 : 0);
+        final ProtoWriter valueProto = new ProtoWriter();
+        valueProto.writeMessage(PROTOGEN_VALUE, typed.toByteArray());
+        valueProto.writeVarint(PROTOGEN_TIMESTAMP, now);
+
+        final String path = "wear://" + ownNodeId + "/protogensettings/" + groupAndKey + "/" + ownNodeId;
 
         final ProtoWriter dataItem = new ProtoWriter();
         dataItem.writeString(DATAITEM_SOURCE_PACKAGE, sourcePackage);
-        dataItem.writeString(DATAITEM_PATH, "wear://" + destNodeId + settingsPath);
-        dataItem.writeMessage(DATAITEM_PAYLOAD, dataMap);
+        dataItem.writeString(DATAITEM_PATH, path);
+        dataItem.writeMessage(DATAITEM_PAYLOAD, valueProto.toByteArray());
         dataItem.writeVarint(DATAITEM_SEQ, seq);
         dataItem.writeVarint(DATAITEM_DELETE_FLAG, 0);
-        dataItem.writeString(DATAITEM_DEST_NODE_ID, destNodeId);
+        dataItem.writeString(DATAITEM_DEST_NODE_ID, ownNodeId);
+        dataItem.writeString(DATAITEM_SIGNATURE, signatureHex);
+        dataItem.writeVarint(DATAITEM_TIMESTAMP, now);
 
         final ProtoWriter payload = new ProtoWriter();
         payload.writeMessage(PAYLOAD_DATA_ITEM, dataItem.toByteArray());
@@ -339,10 +363,10 @@ public final class WearDataLayerProtocol {
             }
             final byte[] dataItem = new ProtoReader(payload).findMessage(PAYLOAD_DATA_ITEM);
             if (dataItem != null) {
-                final ProtoReader d = new ProtoReader(dataItem);
-                final String path = d.findString(DATAITEM_PATH);
-                final String src = new ProtoReader(dataItem).findString(DATAITEM_SOURCE_PACKAGE);
-                return "DataItem path=" + path + " src=" + src;
+                final String path = new ProtoReader(dataItem).findString(DATAITEM_PATH);
+                final byte[] value = new ProtoReader(dataItem).findMessage(DATAITEM_PAYLOAD);
+                final String valHex = value == null ? "-" : toHex(value, 40);
+                return "DataItem path=" + path + " val=" + valHex;
             }
             if (new ProtoReader(payload).findMessage(PAYLOAD_MESSAGE_EVENT) != null) {
                 return "MessageEvent";
@@ -351,6 +375,18 @@ public final class WearDataLayerProtocol {
         } catch (final RuntimeException e) {
             return "undecodable (" + envelope.length + "B)";
         }
+    }
+
+    private static String toHex(final byte[] b, final int max) {
+        final int n = Math.min(b.length, max);
+        final StringBuilder sb = new StringBuilder(n * 2 + 3);
+        for (int i = 0; i < n; i++) {
+            sb.append(Character.forDigit((b[i] >> 4) & 0xf, 16)).append(Character.forDigit(b[i] & 0xf, 16));
+        }
+        if (b.length > max) {
+            sb.append("..");
+        }
+        return sb.toString();
     }
 
     private static byte[] stripLengthPrefix(final byte[] message) {
