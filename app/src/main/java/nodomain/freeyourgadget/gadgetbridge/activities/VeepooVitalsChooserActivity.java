@@ -71,13 +71,13 @@ public class VeepooVitalsChooserActivity extends Activity {
     };
 
     private static final int[] DIALOG_TYPES = {
-            HeartRateDialog.TYPE_SPO2,
-            HeartRateDialog.TYPE_TEMPERATURE,
-            HeartRateDialog.TYPE_STRESS,
-            HeartRateDialog.TYPE_BLOOD_PRESSURE,
-            HeartRateDialog.TYPE_BODY_COMPOSITION,
-            HeartRateDialog.TYPE_BLOOD_LIPID,
-            HeartRateDialog.TYPE_ECG
+            VeepooVitalsResultDialog.TYPE_SPO2,
+            VeepooVitalsResultDialog.TYPE_TEMPERATURE,
+            VeepooVitalsResultDialog.TYPE_STRESS,
+            VeepooVitalsResultDialog.TYPE_BLOOD_PRESSURE,
+            VeepooVitalsResultDialog.TYPE_BODY_COMPOSITION,
+            VeepooVitalsResultDialog.TYPE_BLOOD_LIPID,
+            VeepooVitalsResultDialog.TYPE_ECG
     };
 
     @Override
@@ -141,7 +141,7 @@ public class VeepooVitalsChooserActivity extends Activity {
             title.setText(getItem(position));
             view.setOnClickListener(v -> {
                 GBApplication.deviceService(device).onSendConfiguration(CONFIG_KEYS[entry]);
-                new HeartRateDialog(device, VeepooVitalsChooserActivity.this, DIALOG_TYPES[entry]).show();
+                new VeepooVitalsResultDialog(device, VeepooVitalsChooserActivity.this, DIALOG_TYPES[entry]).show();
             });
             return view;
         }
