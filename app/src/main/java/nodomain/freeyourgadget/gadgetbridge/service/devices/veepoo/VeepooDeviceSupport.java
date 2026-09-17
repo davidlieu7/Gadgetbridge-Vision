@@ -4718,9 +4718,11 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
     /** Persists an autonomous auto-measure heart-rate push (no detect session in progress). */
     private void persistAutonomousHeartRate(int bpm, int status) {
         if (status != 0 && status != 2 && status != 3) {
+            LOG.debug("Ignoring autonomous heart rate push: sensor status {} (expected 0/2/3)", status);
             return;
         }
         if (bpm == 1 || bpm == 2 || bpm < 30 || bpm > 210) {
+            LOG.debug("Ignoring autonomous heart rate push: bpm {} not plausible", bpm);
             return;
         }
         LOG.info("Autonomous heart rate push: {} bpm", bpm);
@@ -4949,6 +4951,7 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
     private void persistAutonomousSpo2(byte[] data) {
         int state = data[1] & 0xFF;
         if (state == 0) {
+            LOG.debug("Ignoring autonomous SpO2 push: state byte 0");
             return;
         }
         int deviceState = data[2] & 0xFF;
@@ -4961,10 +4964,12 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
             }
         }
         if (value == 1 || deviceState == 12) { // not worn
+            LOG.debug("Ignoring autonomous SpO2 push: not worn (value={} deviceState={})", value, deviceState);
             return;
         }
         int checking = data[4] & 0xFF;
         if (checking == 1 || checking == 2) { // still measuring
+            LOG.debug("Ignoring autonomous SpO2 push: still measuring (checking={}) value={}", checking, value);
             return;
         }
         if (value >= 75 && value <= 99) {
@@ -5114,6 +5119,7 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
     /** Persists an autonomous auto-measure temperature push (no detect session in progress). */
     private void persistAutonomousTemperature(byte[] data) {
         if ((data[2] & 0xFF) == 0) {
+            LOG.debug("Ignoring autonomous temperature push: data[2]=0");
             return;
         }
         int progress = data[4] & 0xFF;
@@ -5121,6 +5127,8 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
         if (progress >= 100 && body != null) {
             LOG.info("Autonomous temperature push: {} C", body);
             saveTemperatureSample(body);
+        } else {
+            LOG.debug("Ignoring autonomous temperature push: progress={} body={}", progress, body);
         }
     }
 
@@ -5274,10 +5282,12 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
     private void persistAutonomousStress(byte[] data) {
         int cmd = data[2] & 0xFF;
         if (cmd != VeepooConstants.STRESS_DETECT_START) {
+            LOG.debug("Ignoring autonomous 0x89 frame: cmd={} (expected stress detect)", cmd);
             return;
         }
         int status = data[3] & 0xFF;
         if (status != 0) {
+            LOG.debug("Ignoring autonomous stress push: status={}", status);
             return;
         }
         int progress = data[4] & 0xFF;
@@ -5285,6 +5295,8 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
         if (progress == 100 && value > 0) {
             LOG.info("Autonomous stress push: {}", value);
             saveStressSample(value);
+        } else {
+            LOG.debug("Ignoring autonomous stress push: progress={} value={}", progress, value);
         }
     }
 
@@ -5427,6 +5439,7 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
     private void persistAutonomousBp(byte[] data) {
         int status = data[4] & 0xFF;
         if (status != 0) {
+            LOG.debug("Ignoring autonomous blood pressure push: status={}", status);
             return;
         }
         int systolic = data[1] & 0xFF;
@@ -5434,6 +5447,8 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
         if (systolic >= 60 && systolic <= 300 && diastolic >= 20 && diastolic <= 200) {
             LOG.info("Autonomous blood pressure push: {}/{}", systolic, diastolic);
             saveBpSample(systolic, diastolic);
+        } else if (systolic > 0 || diastolic > 0) {
+            LOG.debug("Ignoring autonomous blood pressure push out of range: {}/{}", systolic, diastolic);
         }
     }
 
@@ -5445,7 +5460,7 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
             int pulse = data.length >= 4 ? data[3] & 0xFF : -1;
             LOG.info("Autonomous blood pressure push (compact): {}/{} (pulse {})", systolic, diastolic, pulse);
             saveBpSample(systolic, diastolic);
-        } else if (systolic > 0 || diastolic > 0) {
+        } else {
             LOG.debug("Ignoring compact 0x90 push out of range: {}/{}", systolic, diastolic);
         }
     }
@@ -5930,6 +5945,8 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
     private void handleEcgLightFrame(byte[] value) {
         synchronized (this) {
             if (!ecgDetectActive) {
+                LOG.debug("Dropping non-ECG F002 frame: {} bytes, first byte 0x{:02X}",
+                        value.length, value[0] & 0xFF);
                 return; // non-ECG light traffic (e.g. live PPG) outside a measurement
             }
         }
@@ -6044,6 +6061,8 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
 
     private void persistAutonomousLipid(byte[] data) {
         if (data[2] == 2 || (data[3] & 0xFF) != 0 || (data[4] & 0xFF) != 100) {
+            LOG.debug("Ignoring autonomous lipid push: data[2]={} data[3]={} data[4]={}",
+                    data[2] & 0xFF, data[3] & 0xFF, data[4] & 0xFF);
             return; // stop ack, failure frame or still in progress
         }
         float[] values = parseLipidValues(data);
