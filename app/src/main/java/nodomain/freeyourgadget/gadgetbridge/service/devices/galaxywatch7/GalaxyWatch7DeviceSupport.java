@@ -120,33 +120,39 @@ public class GalaxyWatch7DeviceSupport extends AbstractBTBRDeviceSupport {
         return 500;
     }
 
-    // EXPERIMENT: hardcoded, empirically-observed-stable node id of this specific watch, to
-    // test whether promptly following the NodeInfo handshake with a SeqAck/Ping message (as
-    // seen in real captured sessions) is what keeps the channel from being closed ~100ms
-    // after the handshake exchange. Needs to be learned dynamically (by parsing the watch's
-    // own NodeInfo reply) rather than hardcoded, if this pans out.
-    private static final String EXPERIMENT_WATCH_NODE_ID = "19eaaf8";
+    // Per-device pref key under which we cache the watch's learned Data Layer node id, so that on
+    // reconnects we can send the peer-sync straight after our NodeInfo (as the stock app does)
+    // instead of having to wait for the watch's NodeInfo reply first.
+    private static final String PREF_WATCH_NODE_ID = "galaxywatch7_watch_node_id";
 
-    // EXPERIMENT: send nothing at all after connecting, to check whether the watch closes
-    // the channel on its own timer regardless of client behavior, or only in reaction to
-    // something we send. Findings: sessions last noticeably longer (500ms-2s vs ~100ms)
-    // when nothing is sent, but still get cut short - correlated with Samsung's own
-    // watch7plugin reactivating mid-session. See research notes for the full picture.
-    private static final boolean EXPERIMENT_SEND_NOTHING = false;
+    // The watch's current Data Layer node id, learned by parsing its NodeInfo reply (falls back to
+    // the cached value on reconnect). Changes across factory resets / re-pairings.
+    private volatile String watchNodeId;
+    // Whether we've already sent the peer-sync for the current session (avoids sending it twice
+    // when we both send it eagerly on connect and would otherwise resend on the NodeInfo reply).
+    private volatile boolean peerSyncSent;
 
     @Override
     protected TransactionBuilder initializeDevice(final TransactionBuilder builder) {
-        if (EXPERIMENT_SEND_NOTHING) {
-            LOG.info("Galaxy Watch7: Data Layer channel connected, sending NOTHING (experiment)");
-            builder.setDeviceState(GBDevice.State.INITIALIZED);
-            return builder;
-        }
-
         LOG.info("Galaxy Watch7: Data Layer channel connected, sending node handshake as {}", localNodeId);
+
+        peerSyncSent = false;
+        if (watchNodeId == null) {
+            final SharedPreferences prefs = GBApplication.getDeviceSpecificSharedPrefs(getDevice().getAddress());
+            watchNodeId = prefs == null ? null : prefs.getString(PREF_WATCH_NODE_ID, null);
+        }
 
         final String localName = "Gadgetbridge";
         builder.write(WearDataLayerProtocol.buildNodeInfoHandshake(localNodeId, localName));
-        builder.write(WearDataLayerProtocol.buildSeqAck(EXPERIMENT_WATCH_NODE_ID, 0));
+
+        // If we already know the watch's node id (from a previous session), send the peer-sync
+        // immediately after NodeInfo, mirroring the stock app. On the very first connect we don't
+        // know it yet and send it from onSocketRead once the watch's NodeInfo reply arrives.
+        if (watchNodeId != null) {
+            LOG.info("Galaxy Watch7: sending peer-sync eagerly for known watch node {}", watchNodeId);
+            builder.write(WearDataLayerProtocol.buildSeqAck(localNodeId, watchNodeId));
+            peerSyncSent = true;
+        }
         builder.setDeviceState(GBDevice.State.INITIALIZED);
 
         return builder;
@@ -165,9 +171,14 @@ public class GalaxyWatch7DeviceSupport extends AbstractBTBRDeviceSupport {
         final boolean enabled = prefs != null && prefs.getBoolean(PREF_ALWAYS_ON_DISPLAY, false);
         LOG.info("Galaxy Watch7: sending always_on_display = {}", enabled);
 
+        final String node = watchNodeId;
+        if (node == null) {
+            LOG.warn("Galaxy Watch7: cannot send always_on_display - watch node id not known yet");
+            return null;
+        }
         return WearDataLayerProtocol.buildBooleanSettingPut(
                 BuildConfig.APPLICATION_ID,
-                EXPERIMENT_WATCH_NODE_ID,
+                node,
                 SETTINGS_PATH_ALWAYS_ON_DISPLAY,
                 enabled,
                 nextSettingsSeq++
@@ -180,14 +191,41 @@ public class GalaxyWatch7DeviceSupport extends AbstractBTBRDeviceSupport {
             return;
         }
 
+        final byte[] write = buildAlwaysOnDisplayWrite();
+        if (write == null) {
+            return;
+        }
         final TransactionBuilder builder = createTransactionBuilder("send always_on_display setting");
-        builder.write(buildAlwaysOnDisplayWrite());
+        builder.write(write);
         builder.queue();
     }
 
     @Override
     public void onSocketRead(final byte[] data) {
         LOG.info("Galaxy Watch7 <<< {} bytes:\n{}", data.length, GB.hexdump(data));
+
+        final String parsed = WearDataLayerProtocol.parseWatchNodeId(data);
+        if (parsed == null) {
+            return;
+        }
+
+        if (!parsed.equals(watchNodeId)) {
+            LOG.info("Galaxy Watch7: learned watch node id {}", parsed);
+            watchNodeId = parsed;
+            final SharedPreferences prefs = GBApplication.getDeviceSpecificSharedPrefs(getDevice().getAddress());
+            if (prefs != null) {
+                prefs.edit().putString(PREF_WATCH_NODE_ID, parsed).apply();
+            }
+        }
+
+        // First-connect path: we couldn't send the peer-sync until we learned the watch's node id.
+        if (!peerSyncSent) {
+            peerSyncSent = true;
+            LOG.info("Galaxy Watch7: sending peer-sync in response to NodeInfo reply from {}", parsed);
+            final TransactionBuilder builder = createTransactionBuilder("peer-sync");
+            builder.write(WearDataLayerProtocol.buildSeqAck(localNodeId, parsed));
+            builder.queue();
+        }
     }
 
     @Override

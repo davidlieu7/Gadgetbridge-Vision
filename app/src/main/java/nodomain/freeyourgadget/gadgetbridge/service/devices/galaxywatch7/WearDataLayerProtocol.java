@@ -58,16 +58,27 @@ public final class WearDataLayerProtocol {
     private static final int FIELD_ENVELOPE_REQUEST_ID = 2;
     private static final int FIELD_ENVELOPE_FLAG_A = 3;
     private static final int FIELD_ENVELOPE_FLAG_B = 4;
+    // Present (= 3) on peer-sync and DataItem envelopes, ABSENT on the NodeInfo handshake
+    // envelope - confirmed against the reference capture (see research notes §14).
+    private static final int FIELD_ENVELOPE_FLAG_C = 5;
 
     private static final int PAYLOAD_NODE_INFO = 7;
     private static final int PAYLOAD_SEQ_ACK = 8;
     private static final int PAYLOAD_DATA_ITEM = 9;
 
-    private static final int SEQACK_SENTINEL = 1;
+    // Peer-sync (payload field 8) structure, decoded from the reference capture:
+    //   field 1 = varint counter (the highest sequence this node has seen from the peer it is
+    //             syncing with; 0 for a fresh session with no history)
+    //   field 2 = repeated {field1 = nodeId string, field2 = per-peer counter varint}
+    //   field 3 = varint flag, always 2
+    private static final int SEQACK_COUNTER = 1;
     private static final int SEQACK_NODE_REF = 2;
     private static final int SEQACK_FLAG = 3;
     private static final int NODE_REF_ID = 1;
     private static final int NODE_REF_COUNTER = 2;
+
+    /** The Wear Data Layer "cloud" sync anchor node; present in every real peer-sync list. */
+    public static final String CLOUD_NODE_ID = "cloud";
 
     // NodeInfo fields
     private static final int NODE_ID = 1;
@@ -122,7 +133,8 @@ public final class WearDataLayerProtocol {
         final ProtoWriter payload = new ProtoWriter();
         payload.writeMessage(PAYLOAD_NODE_INFO, nodeInfo.toByteArray());
 
-        return frame(wrapEnvelope(payload.toByteArray()));
+        // NodeInfo envelopes carry no field 5 (unlike peer-sync/DataItem) - see reference capture.
+        return frame(wrapEnvelope(payload.toByteArray(), false));
     }
 
     /**
@@ -155,32 +167,44 @@ public final class WearDataLayerProtocol {
         final ProtoWriter payload = new ProtoWriter();
         payload.writeMessage(PAYLOAD_DATA_ITEM, dataItem.toByteArray());
 
-        return frame(wrapEnvelope(payload.toByteArray()));
+        return frame(wrapEnvelope(payload.toByteArray(), true));
     }
 
     /**
-     * Builds the "SeqAck/Ping" message observed sent early (and periodically) in real
-     * captured sessions, shortly after the NodeInfo handshake — a plausible candidate for
-     * "why does the watch close the channel ~100ms after we send NodeInfo and it replies":
-     * it may expect this as a prompt follow-up and time out otherwise.
+     * Builds the peer-sync ("SeqAck") message the Data Layer expects immediately after the
+     * NodeInfo handshake. In the reference capture the phone sends this right after its own
+     * NodeInfo; sending a malformed one (a single stale node id + a garbage sentinel) is what
+     * made the watch close the channel ~100ms after connecting (research notes §14).
+     * <p/>
+     * A correct message announces the set of Data Layer nodes this side knows about, each with
+     * the highest sequence number it has seen from that node. For a fresh Gadgetbridge session
+     * with no sync history the honest, minimal-viable set is {@code cloud}, our own node and the
+     * watch's node, all at counter 0.
      *
-     * @param remoteNodeId the OTHER side's node id (learned from its NodeInfo reply)
-     * @param counter      a small counter value, meaning not fully confirmed
+     * @param ownNodeId   this phone node's id (the same id sent in the NodeInfo handshake)
+     * @param watchNodeId the watch's node id, learned by parsing its NodeInfo reply
+     *                    ({@link #parseWatchNodeId(byte[])})
      */
-    public static byte[] buildSeqAck(final String remoteNodeId, final long counter) {
-        final ProtoWriter nodeRef = new ProtoWriter();
-        nodeRef.writeString(NODE_REF_ID, remoteNodeId);
-        nodeRef.writeVarint(NODE_REF_COUNTER, counter);
-
+    public static byte[] buildSeqAck(final String ownNodeId, final String watchNodeId) {
         final ProtoWriter seqAck = new ProtoWriter();
-        seqAck.writeVarint(SEQACK_SENTINEL, -1L); // 0xFFFFFFFFFFFFFFFF as seen on the wire
-        seqAck.writeMessage(SEQACK_NODE_REF, nodeRef.toByteArray());
+        // field 1: our current sequence counter for the peer - 0 for a fresh session.
+        seqAck.writeVarint(SEQACK_COUNTER, 0);
+        appendNodeRef(seqAck, CLOUD_NODE_ID, 0);
+        appendNodeRef(seqAck, ownNodeId, 0);
+        appendNodeRef(seqAck, watchNodeId, 0);
         seqAck.writeVarint(SEQACK_FLAG, 2);
 
         final ProtoWriter payload = new ProtoWriter();
         payload.writeMessage(PAYLOAD_SEQ_ACK, seqAck.toByteArray());
 
-        return frame(wrapEnvelope(payload.toByteArray()));
+        return frame(wrapEnvelope(payload.toByteArray(), true));
+    }
+
+    private static void appendNodeRef(final ProtoWriter seqAck, final String nodeId, final long counter) {
+        final ProtoWriter nodeRef = new ProtoWriter();
+        nodeRef.writeString(NODE_REF_ID, nodeId);
+        nodeRef.writeVarint(NODE_REF_COUNTER, counter);
+        seqAck.writeMessage(SEQACK_NODE_REF, nodeRef.toByteArray());
     }
 
     private static byte[] buildSingleKeyBooleanDataMap(final String key, final boolean value) {
@@ -197,13 +221,58 @@ public final class WearDataLayerProtocol {
         return dataMap.toByteArray();
     }
 
-    private static byte[] wrapEnvelope(final byte[] payload) {
+    private static byte[] wrapEnvelope(final byte[] payload, final boolean withFlagC) {
         final ProtoWriter envelope = new ProtoWriter();
         envelope.writeMessage(FIELD_ENVELOPE_PAYLOAD, payload);
         envelope.writeString(FIELD_ENVELOPE_REQUEST_ID, randomRequestId());
         envelope.writeVarint(FIELD_ENVELOPE_FLAG_A, 1);
         envelope.writeVarint(FIELD_ENVELOPE_FLAG_B, 1);
+        if (withFlagC) {
+            envelope.writeVarint(FIELD_ENVELOPE_FLAG_C, 3);
+        }
         return envelope.toByteArray();
+    }
+
+    /**
+     * Parses an incoming Data Layer message and, if it is a NodeInfo message, returns the
+     * sender's node id. Used to learn the watch's current node id from the NodeInfo reply it
+     * sends right after our handshake, instead of hardcoding it (the id changes across factory
+     * resets / re-pairings).
+     * <p/>
+     * The message may or may not still carry the 4-byte big-endian length prefix; both are
+     * handled. Returns {@code null} if the bytes are not a well-formed NodeInfo message.
+     *
+     * @param message raw bytes as delivered by the socket read
+     */
+    public static String parseWatchNodeId(final byte[] message) {
+        if (message == null || message.length == 0) {
+            return null;
+        }
+        try {
+            byte[] envelope = message;
+            // Strip the 4-byte length prefix if present (length == remaining byte count).
+            if (message.length >= 4) {
+                final int declared = ((message[0] & 0xff) << 24) | ((message[1] & 0xff) << 16)
+                        | ((message[2] & 0xff) << 8) | (message[3] & 0xff);
+                if (declared == message.length - 4) {
+                    envelope = java.util.Arrays.copyOfRange(message, 4, message.length);
+                }
+            }
+            // envelope field 1 = payload wrapper
+            final byte[] payload = new ProtoReader(envelope).findMessage(FIELD_ENVELOPE_PAYLOAD);
+            if (payload == null) {
+                return null;
+            }
+            // payload field 7 = NodeInfo
+            final byte[] nodeInfo = new ProtoReader(payload).findMessage(PAYLOAD_NODE_INFO);
+            if (nodeInfo == null) {
+                return null;
+            }
+            // NodeInfo field 1 = node id (string)
+            return new ProtoReader(nodeInfo).findString(NODE_ID);
+        } catch (final RuntimeException e) {
+            return null;
+        }
     }
 
     /**
@@ -270,6 +339,85 @@ public final class WearDataLayerProtocol {
 
         byte[] toByteArray() {
             return out.toByteArray();
+        }
+    }
+
+    /**
+     * Minimal protobuf wire-format reader - just enough to walk one message level and pull out a
+     * length-delimited field (sub-message or string) by field number. Not a general-purpose codec.
+     */
+    static final class ProtoReader {
+        private final byte[] buf;
+        private int pos;
+        private final int end;
+
+        ProtoReader(final byte[] buf) {
+            this.buf = buf;
+            this.pos = 0;
+            this.end = buf.length;
+        }
+
+        /** Returns the bytes of the first length-delimited field with the given number, or null. */
+        byte[] findMessage(final int fieldNumber) {
+            final byte[] bytes = findLenField(fieldNumber);
+            return bytes;
+        }
+
+        /** Returns the first length-delimited field with the given number decoded as UTF-8, or null. */
+        String findString(final int fieldNumber) {
+            final byte[] bytes = findLenField(fieldNumber);
+            return bytes == null ? null : new String(bytes, StandardCharsets.UTF_8);
+        }
+
+        private byte[] findLenField(final int fieldNumber) {
+            pos = 0;
+            while (pos < end) {
+                final long tag = readRawVarint();
+                final int field = (int) (tag >>> 3);
+                final int wireType = (int) (tag & 0x7);
+                switch (wireType) {
+                    case 0: // varint
+                        readRawVarint();
+                        break;
+                    case 2: { // length-delimited
+                        final int len = (int) readRawVarint();
+                        if (len < 0 || pos + len > end) {
+                            return null;
+                        }
+                        if (field == fieldNumber) {
+                            return java.util.Arrays.copyOfRange(buf, pos, pos + len);
+                        }
+                        pos += len;
+                        break;
+                    }
+                    case 1: // 64-bit
+                        pos += 8;
+                        break;
+                    case 5: // 32-bit
+                        pos += 4;
+                        break;
+                    default:
+                        return null; // unknown/unsupported wire type - give up
+                }
+            }
+            return null;
+        }
+
+        private long readRawVarint() {
+            long result = 0;
+            int shift = 0;
+            while (pos < end) {
+                final byte b = buf[pos++];
+                result |= (long) (b & 0x7f) << shift;
+                if ((b & 0x80) == 0) {
+                    return result;
+                }
+                shift += 7;
+                if (shift >= 64) {
+                    break;
+                }
+            }
+            return result;
         }
     }
 }

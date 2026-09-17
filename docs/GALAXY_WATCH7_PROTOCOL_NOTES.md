@@ -29,11 +29,15 @@
   length-prefixed message dump both directions
   (`watch7plugin_datalayer_messages.txt`).
 
-**Concrete next implementation step** (from §14): (1) parse the watch's
-NodeInfo reply to learn its current node id dynamically — drop the hardcoded
-`EXPERIMENT_WATCH_NODE_ID`; (2) build the SeqAck/peer-sync as a real repeated
-`{nodeId, seq}` map with a real request-id; (3) answer the watch's DataItem
-PUTs to keep the session alive.
+**Fix implemented (§15, 2026-09-17):** all three §14 steps are now in code and
+byte-verified against the reference capture. Watch node id is parsed live; the
+peer-sync is built as a correct `{cloud,0}/{ownNode,0}/{watchNode,0}` map with
+`field8.field1=0` (not the old `0xff…` garbage). **Keep-alive turned out to be
+unnecessary** — btsnoop shows an 8.8 s silence gap with no drop and a
+phone-initiated final DISC, so the malformed peer-sync alone caused the ~100 ms
+drop. Byte-level build spec: `docs/captures/SEQACK_BUILD_SPEC.md`. **Still
+untested against the live watch** (phone dropped off adb before a connect could
+be triggered) — test procedure at the end of §15.
 
 **How the sections below read:** §1-§6 (protocol/pairing basics) and §13-§14
 (the breakthrough) are current. §7-§12 document the multi-hour path that
@@ -1626,3 +1630,62 @@ W1 peer-sync: 0a5d425b089e4e120a0a05636c6f756410cb14120d0a08656662336331383510f4
 
 This is the first path that could plausibly yield a *sustained* session
 and real settings/notification exchange over the transport GB already has.
+
+---
+
+## 15. FIX IMPLEMENTED (2026-09-17)
+
+The §14 path is now implemented in code and byte-verified against the reference
+capture. A dedicated byte-level build spec lives in
+`docs/captures/SEQACK_BUILD_SPEC.md` (annotated hex, field tables, worked frame).
+
+### What changed
+- **`WearDataLayerProtocol.java`**
+  - `parseWatchNodeId(byte[])` + a minimal `ProtoReader`: reads the watch's live
+    node id from its NodeInfo reply (envelope field 1 → payload field 7 →
+    NodeInfo field 1, a length-delimited ASCII string). Strips the 4-byte length
+    prefix if still present. Drops the hardcoded `19eaaf8`.
+  - `buildSeqAck(ownNodeId, watchNodeId)` rewritten to emit the correct
+    peer-sync: `field8{ field1=varint(0), {cloud,0}, {ownNode,0}, {watchNode,0},
+    field3=2 }`. The old code's `field1 = 0xffff…` sentinel + single stale node
+    was the bug — that value was a mis-parse; field1 is really the sender's
+    sequence counter *for the recipient* (0 for a fresh session).
+  - `wrapEnvelope(payload, withFlagC)`: NodeInfo envelopes carry no field 5;
+    peer-sync and DataItem envelopes end with `field5 = 3` (`28 03`). requestId
+    (field 2) and the 1/1 flags (fields 3/4) sit on the **outer** envelope, not
+    inside field 8 — corrects the earlier §14 mis-parse.
+- **`GalaxyWatch7DeviceSupport.java`**
+  - Learns + caches the watch node id (per-device pref `galaxywatch7_watch_node_id`).
+  - First connect: send NodeInfo → on the watch's NodeInfo reply, parse its id
+    and send the peer-sync. Reconnects with a cached id send the peer-sync
+    eagerly right after NodeInfo (mirrors the stock app's ordering).
+  - Removed the hardcoded `EXPERIMENT_WATCH_NODE_ID` and the `EXPERIMENT_SEND_NOTHING`
+    branch; the boolean-setting PUT now targets the learned node id.
+
+### Correction to §14 point 3 — keep-alive is NOT required
+btsnoop analysis of the reference session (DLCI 0x18): an **8.8 s gap of total
+silence with no disconnect**, and the session's final DISC was **phone-initiated**
+(graceful), not a watch-side drop. So the ~100 ms drop is caused *solely* by the
+malformed peer-sync. Minimum to survive past ~1 s: valid NodeInfo → parse watch
+id → valid peer-sync → keep reading. No app-level acks, no DataItem, no periodic
+ping needed. (Answering the watch's DataItem PUTs is still desirable for real
+feature exchange, but not for staying connected.)
+
+### Build + test status
+- Builds clean: `./gradlew :app:assembleMainlineDebug` (BUILD SUCCESSFUL).
+- `buildSeqAck` output verified byte-exact against the spec's worked 82-byte frame.
+- **Not yet tested against the live watch** — the test phone dropped off adb
+  before a connection could be triggered. Test procedure: see below.
+
+### Test procedure (once the phone is back on adb)
+```
+adb install -r app/build/outputs/apk/mainline/debug/app-mainline-debug.apk
+adb logcat -c
+adb logcat -v time GalaxyWatch7DeviceSupport:V WearDataLayerProtocol:V \
+  AbstractBTBRDeviceSupport:V BtBRQueue:V '*:S' &
+# trigger connect (watch MAC BC:A0:80:DB:08:07):
+adb shell am broadcast -a nodomain.freeyourgadget.gadgetbridge.BLUETOOTH_CONNECT \
+  --es EXTRA_DEVICE_ADDRESS BC:A0:80:DB:08:07
+```
+Success = channel stays up well past ~1 s (no ~100 ms drop), `learned watch node
+id …` appears in the log, and the socket keeps reading the watch's DataItem PUTs.
