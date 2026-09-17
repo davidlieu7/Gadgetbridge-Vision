@@ -16,13 +16,22 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 package nodomain.freeyourgadget.gadgetbridge.service.devices.galaxywatch7;
 
+import android.bluetooth.BluetoothAdapter;
+import android.bluetooth.BluetoothServerSocket;
+import android.bluetooth.BluetoothSocket;
+import android.content.SharedPreferences;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.IOException;
+import java.io.InputStream;
 import java.security.SecureRandom;
 import java.util.Locale;
 import java.util.UUID;
 
+import nodomain.freeyourgadget.gadgetbridge.BuildConfig;
+import nodomain.freeyourgadget.gadgetbridge.GBApplication;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
 import nodomain.freeyourgadget.gadgetbridge.service.btbr.AbstractBTBRDeviceSupport;
 import nodomain.freeyourgadget.gadgetbridge.service.btbr.TransactionBuilder;
@@ -50,6 +59,17 @@ public class GalaxyWatch7DeviceSupport extends AbstractBTBRDeviceSupport {
 
     public GalaxyWatch7DeviceSupport() {
         super(LOG, 4096);
+    }
+
+    private boolean proxyProbeStarted = false;
+
+    @Override
+    public boolean connect() {
+        if (!proxyProbeStarted) {
+            proxyProbeStarted = true;
+            startWearProxyListenerProbe();
+        }
+        return super.connect();
     }
 
     @Override
@@ -132,6 +152,39 @@ public class GalaxyWatch7DeviceSupport extends AbstractBTBRDeviceSupport {
         return builder;
     }
 
+    // Preference key from res/xml/devicesettings_galaxy_watch7.xml.
+    private static final String PREF_ALWAYS_ON_DISPLAY = "pref_galaxywatch7_always_on_display";
+    // See §5h of the research notes: any simple on/off watch setting is a DataItem PUT of a
+    // single-key {"booleanIsChecked": value} DataMap at wear://<watchNodeId>/<path>.
+    private static final String SETTINGS_PATH_ALWAYS_ON_DISPLAY = "/w_module_sec_watch_setting/display/always_on_display";
+
+    private long nextSettingsSeq = 1;
+
+    private byte[] buildAlwaysOnDisplayWrite() {
+        final SharedPreferences prefs = GBApplication.getDeviceSpecificSharedPrefs(getDevice().getAddress());
+        final boolean enabled = prefs != null && prefs.getBoolean(PREF_ALWAYS_ON_DISPLAY, false);
+        LOG.info("Galaxy Watch7: sending always_on_display = {}", enabled);
+
+        return WearDataLayerProtocol.buildBooleanSettingPut(
+                BuildConfig.APPLICATION_ID,
+                EXPERIMENT_WATCH_NODE_ID,
+                SETTINGS_PATH_ALWAYS_ON_DISPLAY,
+                enabled,
+                nextSettingsSeq++
+        );
+    }
+
+    @Override
+    public void onSendConfiguration(final String config) {
+        if (!PREF_ALWAYS_ON_DISPLAY.equals(config)) {
+            return;
+        }
+
+        final TransactionBuilder builder = createTransactionBuilder("send always_on_display setting");
+        builder.write(buildAlwaysOnDisplayWrite());
+        builder.queue();
+    }
+
     @Override
     public void onSocketRead(final byte[] data) {
         LOG.info("Galaxy Watch7 <<< {} bytes:\n{}", data.length, GB.hexdump(data));
@@ -141,6 +194,44 @@ public class GalaxyWatch7DeviceSupport extends AbstractBTBRDeviceSupport {
     public boolean useAutoConnect() {
         // Matches the stock app's behaviour: the connection is driven explicitly, not opportunistically.
         return false;
+    }
+
+    // EXPERIMENT: Frida instrumentation of watch7plugin (research notes section 11) showed the watch
+    // opening an RFCOMM connection *to the phone* on this UUID and tunnelling TCP streams through it
+    // ("WearProxy"). Listen on it read-only and dump whatever the watch sends, to learn the framing.
+    private static final UUID WEAR_PROXY_UUID = UUID.fromString("fafbdd20-83f0-4389-addf-917ac9dae5b2");
+
+    private void startWearProxyListenerProbe() {
+        final Thread thread = new Thread(() -> {
+            final BluetoothAdapter adapter = BluetoothAdapter.getDefaultAdapter();
+            try (BluetoothServerSocket server = adapter.listenUsingRfcommWithServiceRecord("WearProxyProbe", WEAR_PROXY_UUID)) {
+                LOG.info("Galaxy Watch7 proxy probe: listening on {}", WEAR_PROXY_UUID);
+                for (int n = 0; n < 5; n++) {
+                    final BluetoothSocket socket = server.accept(120_000);
+                    LOG.info("Galaxy Watch7 proxy probe: accepted #{} from {}", n, socket.getRemoteDevice().getAddress());
+                    new Thread(() -> dumpProxySocket(socket), "WearProxyProbe-read").start();
+                }
+            } catch (final IOException e) {
+                LOG.warn("Galaxy Watch7 proxy probe: listener ended", e);
+            }
+        }, "WearProxyProbe-listen");
+        thread.setDaemon(true);
+        thread.start();
+    }
+
+    private static void dumpProxySocket(final BluetoothSocket socket) {
+        final byte[] buf = new byte[4096];
+        try (BluetoothSocket s = socket; InputStream in = s.getInputStream()) {
+            for (int i = 0; i < 200; i++) {
+                final int len = in.read(buf);
+                if (len < 0) {
+                    break;
+                }
+                LOG.info("Galaxy Watch7 proxy probe <<< {} bytes: {}", len, GB.hexdump(buf, 0, len));
+            }
+        } catch (final IOException e) {
+            LOG.info("Galaxy Watch7 proxy probe: socket closed: {}", e.getMessage());
+        }
     }
 
     private static String randomNodeId() {

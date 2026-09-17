@@ -75,4 +75,11 @@ public class GalaxyWatch7Coordinator extends AbstractBLClassicDeviceCoordinator 
     public int getDeviceNameResource() {
         return R.string.devicetype_galaxy_watch7;
     }
+
+    @Override
+    public int[] getSupportedDeviceSpecificSettings(final GBDevice device) {
+        return new int[]{
+                R.xml.devicesettings_galaxy_watch7,
+        };
+    }
 }

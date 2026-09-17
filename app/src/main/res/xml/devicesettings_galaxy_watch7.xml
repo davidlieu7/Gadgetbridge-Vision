@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.preference.PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android">
+    <SwitchPreferenceCompat
+        android:defaultValue="false"
+        android:key="pref_galaxywatch7_always_on_display"
+        android:summary="@string/prefs_always_on_display_summary"
+        android:title="@string/prefs_always_on_display" />
+</androidx.preference.PreferenceScreen>

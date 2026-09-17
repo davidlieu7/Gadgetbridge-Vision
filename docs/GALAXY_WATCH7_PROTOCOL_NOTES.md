@@ -1,5 +1,48 @@
 # Galaxy Watch7 <-> Phone Protocol — Reverse Engineering Notes
 
+## STATUS / TL;DR (last updated 2026-09-17, read this first)
+
+**Current understanding (supersedes the pessimistic conclusions in §7-§12):**
+
+- The classic RFCOMM Data Layer channel (UUID
+  `5e8945b0-9525-11e3-a5e2-0800200c9a66`, RFCOMM channel 12) **works and is
+  the right transport.** A real `watch7plugin` session on it runs for many
+  seconds with continuous two-way DataItem traffic (§14). It is NOT a legacy
+  stub.
+- **Why Gadgetbridge is dropped after ~100 ms:** GB's post-NodeInfo handshake
+  is malformed. The real client sends a **SeqAck / peer-sync message
+  (payload field 8) containing a full `{nodeId, sequence}` map of all known
+  peers** (`cloud`, own node, current watch node, historical nodes) + a
+  request-id. GB sends a single stale hardcoded entry (`19eaaf8`, seq 0) plus
+  a garbage `0xff…` value, so the watch can't start the sync session and
+  disconnects. See §14 for decoded reference bytes.
+- **BLE L2CAP PSM path (§8) is a dead end** for us: the PSM GATT service
+  `3675c0ff-…` is never exposed to a plain bonded peer, even after a full
+  real companion setup (§10, §12). Ignore it; use classic RFCOMM.
+- **Pairing:** plain Android `createBond()` is enough; no Samsung
+  attestation, no Google account needed (§1). Samsung's Galaxy Wearable /
+  watch7plugin apps are NOT required for the transport and actively
+  interfere with a third-party client — keep them uninstalled (§6).
+- **Captured reference material:** `docs/captures/` holds a real
+  watch7plugin↔watch session — the raw btsnoop
+  (`watch7plugin_datalayer_session.btsnoop`) and the fully decoded,
+  length-prefixed message dump both directions
+  (`watch7plugin_datalayer_messages.txt`).
+
+**Concrete next implementation step** (from §14): (1) parse the watch's
+NodeInfo reply to learn its current node id dynamically — drop the hardcoded
+`EXPERIMENT_WATCH_NODE_ID`; (2) build the SeqAck/peer-sync as a real repeated
+`{nodeId, seq}` map with a real request-id; (3) answer the watch's DataItem
+PUTs to keep the session alive.
+
+**How the sections below read:** §1-§6 (protocol/pairing basics) and §13-§14
+(the breakthrough) are current. §7-§12 document the multi-hour path that
+*wrongly* concluded the channel was a dead stub — kept for the reasoning
+trail and the ruled-out alternatives, but their headline conclusion is
+overturned by §14. Read §14 as the authority.
+
+---
+
 Session date: 2026-09-16
 Test rig: Xiaomi Mi 10T (LineageOS 23.2 / Android 16, `lineage_apollon`, rooted via adb-root
 userdebug build, no Magisk) + Galaxy Watch7. Captured via `bluetooth_hci_log` btsnoop +
@@ -1038,3 +1081,548 @@ not just talk to the watch but successfully *change something on it*.
    and `com.samsung.android.companionservice.*` packages for exact proto field
    names (would replace the inferred field numbers above with real semantics) —
    deferred so far due to APK size (180MB / 8 dex files).
+
+## 7. Regression after adding settings-write code (2026-09-16)
+
+After the "rock-solid 2+ minutes" state documented in section 6, a later APK
+reinstall (which added the `onSendConfiguration()` / Always-On-Display
+settings-write path) came back with the connection dropping again, every
+single time, 60-115ms after connect. Re-confirmed watch7plugin/watchmanager
+are still uninstalled on the phone (`pm list packages` — no matches), so this
+is **not** a repeat of the section 6 cause.
+
+**Findings from this investigation round:**
+
+- Ruled out, phone-side: GMS/Play Services contention (`pm disable-user
+  com.google.android.gms` — no change), stale BT bond (fresh unbond/re-pair —
+  no change), host BT stack staleness (`svc bluetooth` restart, full phone
+  reboot — no change).
+- The watch's NodeInfo reply (111 bytes) is **byte-for-byte identical across
+  every attempt** observed — spanning hours, an app restart, GMS
+  disable/enable, a BT stack restart, a fresh bond, and a full phone reboot.
+  This includes fields that should vary (a 27-char request-id-shaped string).
+  This is a cached/static reply, not a live per-session response.
+- Connected directly to the watch via wireless adb. `dumpsys bluetooth_manager`
+  confirmed the bond is intact and symmetric (watch's bonded-device MAC
+  matches our phone's BT MAC exactly; the "Mi 10T" name shown is just a stale
+  cached label, not a different device).
+- **On the watch itself**, `com.google.android.gms` (PID varies, respawns
+  ~1s after any `force-stop` — it's a protected system process, same as
+  observed on the phone) registers an RFCOMM listener on the **exact UUID**
+  Gadgetbridge uses (`5e8945b0-9525-11e3-a5e2-0800200c9a66`, SDP service name
+  `WearableBt`) — this is Google's own native Wear Data Layer server, not
+  anything Samsung-specific. That UUID is genuinely the standard Wear OS BT
+  Classic data-layer transport, owned by GMS on the watch side.
+- With GMS on the watch freshly force-stopped (it respawns before the test
+  window completes, so this only tests "just-restarted GMS", not "GMS truly
+  absent" — a clean negative test isn't possible since it's a protected
+  process): triggered an explicit connect via UI tap on the device card
+  (`DeviceCommunicationService` action `connect`, not just relaunching the
+  app — relaunching alone does **not** trigger an automatic reconnect
+  attempt, contrary to earlier assumption). Full RFCOMM handshake completes,
+  Gadgetbridge sends its NodeInfo + SeqAck, and **this time the watch's
+  111-byte NodeInfo reply is actually received end-to-end** (first
+  confirmed real payload receipt this session). But: the socket is closed
+  by the remote side (`IOException: bt socket closed, read return: -1`)
+  consistently **~15ms after the reply is received, ~90-134ms after
+  connect** — every fast-reconnect cycle, repeatedly. The reply payload
+  content is identical to what was seen in every earlier capture.
+
+**Working conclusion**: raw app-level RFCOMM against this UUID gets accepted
+and receives one static/cached NodeInfo-shaped reply, then is deliberately
+closed by the watch side — most consistent with the connection being
+terminated by GMS's own Wear Data Layer service because Gadgetbridge never
+completed whatever additional handshake/authentication that service expects
+from a genuine paired Wear OS companion (this app was never taken through
+Google's real phone↔watch companion pairing flow, only a raw BT Classic
+bond). The static reply may be a generic/cached "hello" the service always
+sends before checking companion validity and hanging up. Not yet proven —
+next step would be checking watch-side logs for the GMS-owned RFCOMM
+accept/close pair with full context (uid/session identifiers) at the moment
+of drop, which wasn't isolated cleanly in this round because GMS's respawn
+timing couldn't be controlled precisely enough for a clean A/B test.
+
+## 8. Decompiling watch7plugin.apk — dual transport discovery (2026-09-17)
+
+Per user request, pulled `com.samsung.wearable.watch7plugin` (v2.2.15) and
+`com.samsung.android.app.watchmanager2` (v2.2.70) APKs (via APKMirror, since
+the test phone — a LineageOS ROM on Mi 10T hardware, no Google account — had
+no way to get them from Play Store; there is no second real phone, the "Mi
+10T" name shown in the watch's bonded-device list earlier was simply this
+same test phone's stock BT device name, not a stale/different device). Both
+pulled to `apks/` locally (untracked, not committed — too large for git).
+
+watch7plugin.apk is 180MB / 8 dex files, mostly obfuscated (R8/ProGuard,
+single/double-letter class names). Located the relevant code by grepping raw
+dex bytes for our UUID and protocol keywords rather than decompiling
+everything:
+
+- `com/samsung/android/companionservice/connection/bluetooth/util/
+  ConnectionUtil.java` (classes5.dex, **not obfuscated** — Samsung's own
+  code) confirms `DATA_LAYER = 5e8945b0-9525-11e3-a5e2-0800200c9a66`, plus
+  two more UUIDs used for a "SAK" (Setup Assistant Kit?) setup-mode
+  handshake: `SAK_SECURE = 0aa62597-f040-42ef-82e4-0314fdfb7478` and
+  `SAK_INSECURE = 0bb62597-f040-42ef-82e4-0314fdfb7478`. Critically,
+  **Samsung's app does not talk raw sockets itself** — it goes through
+  `com.google.android.libraries.wear.companion.*`, Google's official OEM
+  Wear Companion library, which is bundled in the APK (classes3.dex) as
+  `com.google.android.gms.internal.wear_companion.*` (obfuscated,
+  e.g. class `Ov` = `BluetoothConnectionManager`).
+
+- **`Ov` (BluetoothConnectionManager) runs two transport mechanisms in
+  parallel, not one**:
+  1. Classic BT RFCOMM, SDP service name `"Flow15"`, on the configured
+     `DATA_LAYER` UUID — split into a "legacy" job
+     (`produceLegacyRfcommSocketJob`) and a normal job
+     (`produceRfcommSocketJob`), both always started.
+  2. **A BLE-based L2CAP CoC channel** (`listenUsingL2capChannel()`,
+     internal flag name `"l2cap_sysproxy_server"`) via a `PsmGattManager`
+     component, started **only when `Build.VERSION.SDK_INT >= 35` AND** a
+     server-supplied `enableBleProxy` configuration flag is set
+     (`produceBleSocketJob`).
+
+  The watch (`ro.build.version.release` = 16, i.e. Android 16 / SDK 36)
+  qualifies for the BLE path. **Working theory: on a modern Wear OS device,
+  the real, live Data Layer session runs over the BLE L2CAP proxy channel,
+  and the classic RFCOMM path is kept alive only as a legacy/compatibility
+  stub** — accept the connection, send one static capability/identity
+  reply, then close, exactly matching every observation from section 7
+  (byte-identical reply, deterministic ~15ms-after-reply close, unaffected
+  by any phone- or watch-side reset). This is not proven from the
+  decompiled code alone (the actual accept-loop method, `zzfsu.
+  invokeSuspend`, is a coroutine state machine too complex for jadx to
+  fully decompile — "Regions stack size limit reached" — smali-level
+  tracing would be needed to nail this down further), but it is the most
+  parsimonious explanation that fits every data point gathered so far, and
+  it reframes the whole effort: **a classic-RFCOMM-only implementation
+  (which is all `AbstractBTBRDeviceSupport`/`BtBRQueue` in Gadgetbridge
+  currently supports) may be structurally unable to get a real, sustained
+  session with a modern Galaxy Watch7** — the real traffic may require
+  implementing the BLE L2CAP CoC transport instead (or in addition).
+
+**Not yet done**: confirming this theory needs either (a) capturing the
+watch-side `l2cap_sysproxy_server`/GATT PSM negotiation while a real
+Samsung phone + Watch7 pair talk to each other (would need a live A/B
+reference capture, not available with only this one dev watch), or (b)
+smali-level tracing of `zzfsu`/`zzfsy` to find the actual PSM value and
+characteristic UUIDs used to bootstrap the L2CAP channel, then testing
+whether Gadgetbridge can open that channel directly via Android's
+`BluetoothDevice.createL2capChannel(psm)` / `listenUsingL2cap()` APIs
+(added in Android 10, no special permission beyond BLUETOOTH_CONNECT).
+
+**Update**: (b) is now mostly done. Found and read
+`com/google/android/gms/internal/wear_companion/C0602aw.java` (implements
+the `Kv`/`psmGattManager` interface referenced from `Ov`). The mechanism is
+fully concrete:
+
+- GATT **service** UUID `3675c0ff-21a6-4f96-9984-09d4f10c64f9`
+- GATT **characteristic** UUID `c8625a0b-28c8-4460-874d-0cf9a7538b46`
+  (inside that service)
+
+Flow: the phone opens its own L2CAP CoC server socket
+(`listenUsingL2capChannel()`, which lets Android auto-assign a free PSM),
+then `connectGatt()`s to the watch over BLE (transport `TRANSPORT_LE`,
+autoConnect=true), finds that service/characteristic on the watch's GATT
+server, and **writes** a small protobuf message (`C1623sc`, 3 int-ish
+fields — one of them is clearly the PSM number, the meaning of the other
+two, one of which is always literal `99999`, is not yet determined) into
+it — telling the watch which PSM to dial back on to open the actual L2CAP
+data channel. (Whether the reverse also happens — watch publishing its own
+PSM for the phone to dial as client — wasn't checked; `C0602aw` here only
+shows the phone-as-L2CAP-server / phone-writes-characteristic direction.)
+
+This confirms a full second BLE-based protocol layer really exists and is
+concrete enough to eventually reimplement, but it's a substantial chunk of
+new work (BLE GATT connect/discover/write, the `C1623sc` protobuf shape,
+L2CAP CoC socket handling — none of which overlaps with Gadgetbridge's
+existing BT-Classic-only `AbstractBTBRDeviceSupport`/`BtBRQueue`
+framework) — **paused here rather than continued blind**, pending a
+decision on whether it's worth pursuing before doing anything productive
+with the classic-RFCOMM path (see next section for the current pragmatic
+test instead).
+
+## 9. Pragmatic test: does the ~100ms classic-RFCOMM window accept a real write?
+
+Rather than continuing to reverse-engineer the BLE path, tested whether the
+already-working classic RFCOMM connection — despite being closed by the
+watch ~100-130ms after every connect — is long enough to get a real,
+acted-upon settings write out. Observed captures show our own outbound
+writes (NodeInfo handshake, SeqAck) reliably complete in ~1-2ms each once
+the socket is open, well within the ~90ms window before the watch's reply
+arrives and the ~15ms after that before it closes. So there is a real
+window to fit one more small write.
+
+Change made (temporary, for this test only): `initializeDevice()` now also
+queues the Always-On-Display `DataItem` PUT (using the current preference
+value) as part of the same initial 3-action transaction, immediately after
+the NodeInfo handshake + SeqAck, instead of only sending it reactively from
+`onSendConfiguration()` when the user toggles the switch in the UI (which
+is very unlikely to land inside a ~100ms window by chance). This makes
+every single fast-reconnect cycle attempt the write automatically, without
+needing precise manual timing.
+
+**Result: negative, but clean and conclusive.** Built + installed this
+version, confirmed via phone logcat that the write completes successfully
+(`Action ok: WriteAction`) on essentially every fast-reconnect cycle, for
+both `enabled=true` and (after toggling the device-settings switch back
+off) `enabled=false` — several times each, sent seconds apart. Checked the
+watch's own Settings → Display → Always On Display toggle after each
+(force-stopping `com.google.android.apps.wearable.settings` between checks
+to rule out stale/cached UI) — **it stayed ON the entire time, regardless
+of which value Gadgetbridge sent, including several sends of `false`
+after it was confirmed on.** The watch never changed state in response to
+either value.
+
+This settles the open question from section 8: the classic RFCOMM "legacy"
+channel on this watch accepts a connection, exchanges its static
+NodeInfo/SeqAck handshake, accepts (does not reject/error on) an arbitrary
+DataItem PUT write, and then closes — but **does not act on the DataItem
+content at all**. It's a stub/compat shim, not a functioning settings
+channel. Real settings control almost certainly requires the BLE L2CAP
+proxy channel described in section 8 (GATT service
+`3675c0ff-21a6-4f96-9984-09d4f10c64f9` / characteristic
+`c8625a0b-28c8-4460-874d-0cf9a7538b46` PSM handshake, then an L2CAP CoC
+data channel) — or possibly the full Google account-linked companion
+pairing flow, which is a separate question from transport alone.
+
+**Reverted**: the `initializeDevice()` change that piggybacks the
+Always-On-Display write has been left in place in the working tree for
+now (harmless — it's a fire-and-forget write the watch ignores) but should
+be reverted before any commit, since it conflates device init with an
+unrelated settings push and the experiment is concluded.
+
+**Bottom line for next steps**: further work on Galaxy Watch7 support
+needs a decision on scope — either (a) invest in implementing the BLE
+L2CAP proxy transport (concrete UUIDs known, PSM handshake protobuf shape
+partially known, L2CAP CoC socket handling needed — a genuinely new
+transport layer, no overlap with Gadgetbridge's existing BT-Classic-only
+framework), or (b) treat classic-RFCOMM Watch7 support as capped at
+"connect + identify" with no real settings/notification functionality
+achievable this way, and look for a fundamentally different integration
+point.
+
+## 10. BLE GATT reachability probe — the PSM service isn't exposed to us (2026-09-17)
+
+Before committing to the large effort in (a) above, did the cheapest
+possible check first: added a one-shot, read-only diagnostic
+(`probeBleDataLayerGatt()` in `GalaxyWatch7DeviceSupport`, fired once from
+`connect()`) that does a plain `BluetoothDevice.connectGatt(..., TRANSPORT_LE)`
+against the watch and dumps whatever GATT services it advertises — no
+writes, just discovery, to test reachability before investing in the full
+PSM-negotiation protocol.
+
+**Result**: the BLE GATT connection itself works fine (connects,
+discovers services in ~1s). But the watch only exposes 5 services:
+`00001801-...` (Generic Attribute), `00001800-...` (Generic Access),
+`0000180a-...` (Device Information), and two custom ones
+(`e73e0001-ef1b-4e74-8291-2e4f3164f3b5`, `eed6d5cc-c3b2-4d7b-8c6b-7acbf7965bb6`
+— not investigated further). **The PSM negotiation service
+(`3675c0ff-21a6-4f96-9984-09d4f10c64f9`) from §8 is not among them.**
+
+This means the GATT service that would let us negotiate an L2CAP PSM is
+not just "there but unauthenticated" — it isn't exposed at all under a
+plain classic-BT-bonded-but-not-companion-paired connection. The most
+likely explanation: GMS's Wear Companion library only registers/exposes
+that GATT service dynamically, gated on the connecting device already
+being a recognized, authenticated companion (i.e. having gone through the
+real Google-account-linked Wear OS pairing flow — Galaxy Wearable / Wear
+OS by Google app, not just a raw BT Classic bond). That flow is backed by
+Google's servers and isn't something a reverse-engineered client can
+plausibly replicate from the protocol alone.
+
+**This changes the earlier "decision on scope" framing**: option (a) —
+implementing the BLE L2CAP proxy transport — is likely not viable at all
+via reverse engineering alone, not just "a lot of work", because the
+entry point into it (the GATT service) appears to require passing through
+Google's real companion authentication first. Realistic paths forward, in
+rough order of promise:
+
+1. **Accept the cap**: classic RFCOMM gets you "the watch is nearby and
+   bonded" (connect/disconnect state, maybe basic presence), nothing more
+   — no settings, no notifications, no real Data Layer functionality.
+   Gadgetbridge's Galaxy Watch7 support stays a stub/proof-of-concept.
+2. **Investigate whether the GATT service appears after actually
+   completing Google's account-linked companion pairing once** (e.g. via
+   a real Wear OS/Galaxy Wearable app pairing session), to see if the
+   service then becomes visible to any bonded device afterward (not just
+   the one that paired) — would need a live test with the real apps
+   still installed, which conflicts with §6's finding that they interfere
+   with Gadgetbridge's own connection. Unclear if even worth trying.
+3. Revisit whether Wear OS exposes *any* other, non-Google-proprietary
+   integration surface for third parties on this generation of hardware
+   (e.g. Health Connect, notification listener sync via a different
+   mechanism, or something at the Tizen/One-UI-Watch layer rather than
+   stock Wear OS) — would be a different research thread entirely, not a
+   continuation of this protocol reverse-engineering effort.
+
+The BLE probe code (`probeBleDataLayerGatt()` and its call from
+`connect()`) has been left in the working tree as a harmless read-only
+diagnostic, not reverted — it costs nothing to leave in and documents the
+finding directly in code, but should be removed before any real commit
+along with the rest of the experimental scaffolding once a direction is
+chosen.
+
+## 11. Frida instrumentation of watch7plugin.apk — the real architecture is a TCP tunnel over Bluetooth ("WearProxy") (2026-09-17)
+
+Per user suggestion, used Frida (via `objection patchapk`) to inject
+`frida-gadget` into `watch7plugin.apk` (root-less — no device root needed,
+just an APK repackage) to observe its real runtime behavior instead of
+continuing to infer everything from static/obfuscated decompilation.
+Process: `objection patchapk -s watch7plugin.apk -a arm64-v8a -t
+com.samsung.android.waterplugin.WaterPluginApplication -V 17.17.0`
+(had to specify the Application class explicitly — the app declares no
+launchable activity at all, being a plugin meant to be hosted by
+`com.samsung.android.app.watchmanager2` / Galaxy Wearable, not launched
+standalone; also had to pin the gadget version to match the local `frida`
+CLI version, `17.18.0` vs `17.17.0` silently broke the attach protocol).
+
+Directly starting the plugin's activities via `adb shell am start -n
+com.samsung.wearable.watch7plugin/...` is blocked (`SecurityException:
+... requires com.samsung.android.hostmanager.permission.
+ACCESS_UNIFIED_HOST_MANAGER`, or "not exported") for every activity that
+does real work — **confirmed by the user's hint** that watch7plugin only
+runs when hosted by the actual Watch Manager app. Installed
+`com.samsung.android.app.watchmanager2` (pulled from APKMirror alongside
+watch7plugin) and drove its setup wizard (Bluetooth/notification/call
+permission dialogs) via `input tap` — it immediately recognized the
+already-bonded Watch7 under "Gekoppelte Geräte" and, once tapped, launched
+watch7plugin's real entry point (`HMLaunchActivity`) on our behalf, now
+successfully (proves watchmanager itself is what's normally granted/holds
+`ACCESS_UNIFIED_HOST_MANAGER`, not something inherent to the plugin).
+
+**What this revealed, with the plugin actually running (background
+processes `:plugin` and `:persistent` stayed alive even though the
+foreground UI reverted to the home screen / hit a startup ANR — logcat
+kept flowing regardless):**
+
+- `WearInit: ... SecurityException: GoogleCertificatesRslt: not allowed:
+  pkg=com.samsung.wearable.watch7plugin ... (go/gsrlt)` followed by
+  `WearProxy: [Service]v6.1.9-eap02 Couldn't get watches, error:
+  API_UNAVAILABLE` — GMS's official Wearable API rejects our repackaged
+  APK because objection re-signed it with a debug key (expected: Google's
+  cert pinning check fails on any non-Samsung-signed build). This closes
+  off observing the *fully authenticated* path this way, but —
+- **A separate, lower-level mechanism kept working anyway**: tagged
+  `WearProxy` at the `[BTConnMgr]` level, it accepted an **incoming**
+  classic-RFCOMM connection *from the watch* (watch is the client here,
+  phone is the server — the reverse of what Gadgetbridge does) on a
+  **third UUID**: `fafbdd20-83f0-4389-addf-917ac9dae5b2` — which is
+  exactly the previously-unexplained static field `u` in the decompiled
+  `Ov` (`BluetoothConnectionManager`) class from §8. Log sequence:
+  `[BTConnMgr] rfcomm socket accepted: BC:A0:80:DB:08:07 on fafbdd20-...`
+  → `[BTConn:...] Bluetooth node connected` → `[BTNode:...] Bluetooth
+  read/write loop started` → `[NetConnMgr] Node connected: [BTNode:...]`.
+- Once that Bluetooth "node" connects, **`WearProxy` opens multiple
+  numbered virtual TCP channels over it**: `[T:BC:A0:80:DB:08:07@e67a7e1:1]
+  TCP OPEN`, `:2 TCP OPEN`, `:3 TCP OPEN`, `:4 TCP OPEN`, `:5 TCP OPEN`,
+  interleaved with `TCP CLOSE`. Each one attempts
+  `SocketChannelImpl.finishConnect()` to some **local TCP port on the
+  phone** and fails with `java.net.ConnectException: Connection refused`
+  (call stack: `com.google.android.gms.internal.wear_companion.qw.a` →
+  `zzftk.invokeSuspend` → `com.samsung.android.sdk.accessory.l.R` →
+  `zzftl.invokeSuspend`) — refused because whatever local service is
+  supposed to be listening on that port isn't running in our broken/
+  unauthenticated instance.
+
+**Interpretation**: the real Wear Data Layer transport is not a single
+flat protobuf-over-RFCOMM envelope channel the way Gadgetbridge's current
+implementation (and this document's earlier sections) modeled it. It's a
+**generic multiplexed TCP-over-Bluetooth tunnel** ("WearProxy") — the
+watch opens a classic RFCOMM connection *to the phone* on UUID
+`fafbdd20-83f0-4389-addf-917ac9dae5b2`, and tunnels arbitrary TCP
+connections through it, each addressed to some local port on the phone
+side. This looks structurally like the well-known Wear OS "Bluetooth
+internet proxy" feature (letting a watch without its own connectivity
+route TCP traffic through the paired phone) — and quite plausibly the
+*same* tunnel (or an equivalent one) is how the actual Data Layer
+settings/notification sync traffic reaches whatever local service
+implements it, i.e. what we've been calling "the Data Layer protocol"
+(NodeInfo/SeqAck/DataItem on UUID `5e8945b0-...`) may be a distinct,
+narrower, possibly legacy/compat channel, while the *real* modern
+traffic — and almost certainly the BLE L2CAP PSM path from §8 too — rides
+inside this TCP tunnel concept instead.
+
+This reframes the whole investigation once more: there isn't just "one
+alternate transport" (BLE L2CAP) to consider — there's a whole
+tunnel/proxy layer, on both classic RFCOMM and BLE, that the real
+companion software implements and Gadgetbridge's current architecture has
+no analog for at all.
+
+**Not done / blocked**: going further (seeing what's actually inside
+those tunneled TCP connections — likely where real settings/notification
+traffic would appear) needs the GMS certificate check bypassed, since
+nothing meaningful flows until watch7plugin authenticates as a real
+companion. This is a well-known but nontrivial Frida technique (hooking
+`GoogleCertificatesRslt`/package signature verification to return
+success) — not attempted yet. Also worth doing: hook
+`com.samsung.android.sdk.accessory.l.R` / `qw.a` directly to log the
+actual target host:port each `SocketChannelImpl.connect()` call is aiming
+at, which would show immediately what local service this is supposed to
+bridge to, without needing the cert bypass at all — cheaper next step
+than the full bypass.
+
+**Paused here** — this is a deep enough rabbit hole, with enough new
+information, that it warrants a explicit decision with the user on
+whether to keep pulling this thread (cert bypass + connect-target
+logging) or stop and use everything gathered so far (§7-11) to make the
+scope call this document has been building toward since §9.
+
+## 12. Decisive confirmation: real companion setup doesn't change the classic-RFCOMM behavior (2026-09-17)
+
+After the factory reset (below), the user asked to go all the way: install
+watchmanager + watch7plugin (original, unpatched — not the Frida-debug-
+signed build), let the *real* companion setup actually complete, then
+remove both apps again and see whether the watch stays in a properly
+paired state usable standalone.
+
+**Setup completed successfully** — no Google/Samsung account login
+required, watchmanager's full "Uhreneinstellungen" (watch settings) UI
+came up with working sections (Benachrichtigungen, Anzeige, Health, Pay,
+Sicherheit, Konten, Erweiterte Funktionen), confirming a genuine,
+fully-authenticated companion pairing this time (unlike the Frida-patched
+attempt in §11, which failed GMS's certificate check). Both apps were
+then uninstalled; the classic BT bond survived, and the watch left its
+stuck "check your phone" screen and returned to normal standalone
+operation.
+
+**Gadgetbridge reconnect test, immediately after**: same exact pattern as
+every single earlier attempt in this document — one real NodeInfo reply
+(112 bytes) received, then `IOException: bt socket closed, read return:
+-1` roughly 50ms later, fast-reconnect loop kicks in. A UI screenshot
+happened to land in the brief "Verbunden" window and looked like a
+breakthrough, but the log makes it clear it's the same ~50-110ms
+connect/reply/disconnect cycle as always.
+
+**This is the decisive result the whole investigation (§7-11) was
+building toward**: whether or not the watch has ever been through a real,
+fully-authenticated Galaxy Wearable companion pairing makes **no
+difference whatsoever** to the classic-RFCOMM channel's behavior. This
+rules out "incomplete/unauthenticated pairing" as the cause once and for
+all. The classic RFCOMM Data Layer channel (UUID `5e8945b0-...`) is
+conclusively a legacy/compat stub on this hardware+software combination,
+full stop — real functionality lives elsewhere (almost certainly the BLE
+L2CAP tunnel from §8/§11, which was never actually tested end-to-end
+since the GATT PSM service wasn't reachable in that round). Any future
+work on real Galaxy Watch7 functionality (settings, notifications) must
+target that transport, not this one.
+
+**Correction after an unrelated watch factory reset** (user reset the
+watch mid-session after a stuck Wear Companion setup screen; classic BT
+bond was lost and re-paired from scratch via plain Android Bluetooth
+settings — no Galaxy apps needed, confirming §6's point that raw BT
+Classic pairing is sufficient for Gadgetbridge regardless of Samsung/
+Google companion apps). Post-reset, the watch generated a fresh node id
+and its NodeInfo reply changed accordingly (83 bytes, node id `efb3c185`,
+vs. the previously-always-seen 111-byte reply with node id tied to the
+pre-reset pairing) — **so the reply is not perfectly static/cached as
+earlier sections assumed, it's tied to the watch's current pairing/node
+state**, which still changes once per pairing lifetime rather than per
+connection attempt. The core finding stands: one real reply, then the
+channel is closed by the watch ~110ms after connect, every time,
+regardless of pairing freshness.
+
+**Follow-up attempt**: tried to get the actual `SocketChannel.connect()`
+target address (cheaper than a full cert bypass) via a second Frida hook
+(`SocketChannel`/`SocketChannelImpl`/`Socket` `.connect()` — see
+`hook2.js`). Confirmed the exact component name:
+`com.samsung.wearable.watch7plugin/com.google.android.libraries.wear.
+companion.proxy.service.WearProxyService`. But reproducing the live
+`WearProxy` traffic from §11 turned out to need the *specific* code path
+where watchmanager's UI passes the selected device explicitly (intent
+extras) — a plain background/StartupListener-triggered start of the same
+service immediately logs `Couldn't get watches, error: API_UNAVAILABLE`
+and gives up before touching Bluetooth at all, since it has no device
+context and the (broken, due to our re-signed APK) GMS API can't supply
+one. Re-driving the watchmanager UI to reproduce it hit a wall: **the
+classic BT bond between phone and watch disappeared entirely**
+(`dumpsys bluetooth_manager` → `Bonded devices: 0`) partway through this
+round of testing — exact cause not identified, most likely fallout from
+the repeated app force-stops/reinstalls and the two host apps' own
+bond-management logic (see §6 for a previously-seen case of an app
+silently re-triggering bond changes). Re-pairing would need physical
+interaction at the watch and is a reasonable point to stop for this
+session.
+
+## 13. Gadgetbridge as WearProxy server: the watch connects in (2026-09-17)
+
+- Re-ran the BLE GATT probe after the real companion setup (§12): still only
+  5 services, PSM service `3675c0ff-...` still absent. The two custom services
+  were looked up: `eed6d5cc-c3b2-4d7b-8c6b-7acbf7965bb6` is
+  `AUTO_CONNECTION_MODE_UUID` in watchmanager's `BluetoothUuidUtil` (a marker,
+  not a data channel); `e73e0001-ef1b-4e74-8291-2e4f3164f3b5` is referenced by
+  neither app. BLE path stays closed.
+- Replaced the BLE probe with a read-only RFCOMM **listener** probe
+  (`startWearProxyListenerProbe()`): `listenUsingRfcommWithServiceRecord` on
+  the WearProxy UUID `fafbdd20-83f0-4389-addf-917ac9dae5b2`, accept, hexdump.
+- **Result: the watch connects to Gadgetbridge's listener within ~3 s of it
+  opening, and keeps reconnecting every ~2-5 s** (5 accepts in 20 s) — with
+  watch7plugin/watchmanager uninstalled. The watch sends **zero bytes** and
+  closes each connection after 0.05-3 s. So after a real companion setup the
+  watch actively seeks the phone on this channel; the phone is expected to
+  speak first.
+- Next: capture the phone's opening bytes from a real watch7plugin session
+  via Android HCI snoop log (no root or APK patching needed), then replay
+  them from Gadgetbridge.
+
+## 14. BREAKTHROUGH: the classic RFCOMM channel is NOT a stub — GB's handshake is incomplete (2026-09-17)
+
+Enabled `adb root` (phone is a `userdebug` build) + full HCI snoop
+(`persist.bluetooth.btsnooplogmode full`), captured a **real watch7plugin
+session** on the *same* UUID Gadgetbridge uses (`5e8945b0-...`, RFCOMM
+channel 12), decoded with tshark.
+
+**This overturns sections 7-12.** The watch7plugin session on
+`5e8945b0-...` ran for **13 seconds** (02:16:46.834 SABM → 02:16:59.051
+DISC) with **272 length-prefixed messages phone→watch and continuous
+DataItem traffic both ways** — not a 100 ms stub. The classic RFCOMM Data
+Layer channel is fully functional. The reason Gadgetbridge gets dropped
+after ~100 ms is that **its handshake is malformed**, so the watch tears
+the session down.
+
+Decoded opening sequence (each message = 4-byte big-endian length prefix +
+protobuf):
+
+- **P0 phone→watch = NodeInfo** (same shape GB sends): node id, name,
+  sdk level, a request-id string.
+- **P1 phone→watch = SeqAck / peer-sync (payload field 8)** — THE missing
+  piece. It is a **full peer sequence map**: a repeated list of
+  `{nodeId, sequenceNumber}` for every peer the phone knows —
+  `cloud`, the phone's own node, the watch's *current* node id, and
+  several historical node ids — plus a request-id. Decoded:
+  `field8{ field1=1856, [ {"cloud",2635}, {"a980b4",605},
+  {"efb3c185",1144}, {"e1b1cd8b",20127}, {"6e64a622",1779},
+  {"8de0a095",2506}, {"1bce196f",3776}, {"b35b35d6",3037},
+  {"19eaaf8",6560} ], reqid, f3=1,f4=1,f5=3 }`.
+- Then P2, P3, … = a stream of DataItem PUTs
+  (`com.google.android.gms → wear://<node>/peers`,
+  `.../trusted_packages`, `com.samsung.wearable.watch7plugin →
+  wear://<node>/settings/home_info`, `/bridge_mode/...`,
+  `/protogensettings/...`, etc.).
+- The watch answers symmetrically: W0 NodeInfo, W1 its own peer-sync map,
+  W2/W3 its DataItem PUTs (`wear://<watchnode>/peers`,
+  `com.samsung.android.wcs.extension → w_callservice/notification...`).
+
+**Contrast with Gadgetbridge's SeqAck** (from GB's own logs):
+`field8{ field1=0xffffffffffffffffff01(garbage), field2={"19eaaf8",0},
+field3=2, reqid, f3=1,f4=1 }` — a single peer entry, the stale hardcoded
+`EXPERIMENT_WATCH_NODE_ID = "19eaaf8"`, sequence 0, and a bogus field1.
+The watch cannot establish the sync session from that and disconnects.
+
+**Reference bytes captured (in scratchpad, snoop `snoop1.log`):**
+```
+P0 NodeInfo:  0a3b3a390a08653162316364386212064d692031305418dac5e5acea91f4873e2003280130003a13343933353737363939343437363034343938335824121b746f6d4b5649463342786b6777344471723063524369642d66464118012001
+P1 peer-sync: 0a890142860108c00e120a0a05636c6f756410cb14120b0a0661393830623410dd04120d0a08656662336331383510f808120d0a086531623163643862109f4e120d0a08366536346136323210f306120d0a08386465306130393510ca09120d0a08316263653139366610c00e120d0a08623335623335643610dd0b120c0a073139656161663810a0191802121b396a6f7055564261547a6347727a4e484f5f35646265577a36334d180120012803
+W1 peer-sync: 0a5d425b089e4e120a0a05636c6f756410cb14120d0a08656662336331383510f405120d0a086531623163643862109e4e120d0a08366536346136323210f306120d0a08316263653139366610c10e120c0a073139656161663810a0191802121b79396172537a79516576522d6e5169614c7a415f6a447449714767180120012803
+```
+
+**Actionable implementation path (finally concrete):**
+1. Parse the watch's NodeInfo reply (W0) to learn its *current* node id
+   dynamically (drop the hardcoded `19eaaf8`).
+2. Build the SeqAck/peer-sync (payload field 8) as a proper repeated
+   `{nodeId, seq}` map — at minimum `{cloud,0}`, `{ownNode,0}`,
+   `{watchNode,0}` — with a real request-id, not the `0xff…` garbage.
+3. Respond to the watch's DataItem PUTs / peers announcements to keep the
+   session alive, then the channel should stay up like watch7plugin's.
+
+This is the first path that could plausibly yield a *sustained* session
+and real settings/notification exchange over the transport GB already has.
