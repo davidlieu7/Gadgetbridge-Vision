@@ -1788,3 +1788,43 @@ settings-PUT and notification formats) remains correct and is confirmed against 
 live enrolled watch — but it rides on top of a transport that Gadgetbridge cannot
 authenticate to without GMS's Fast Pair account key. This is the wall for the
 "companion without Galaxy Wearable / watch7plugin" goal for Data-Layer features.
+
+---
+
+## 18. CORRECTION to §17 — the RFCOMM Data Layer is NOT crypto-gated (2026-09-18)
+
+Deeper inspection of GMS storage and the transport code retracts the §17 verdict:
+
+- `com.google.android.gms/databases/connectionconfig.db` → table
+  `connectionConfigurations` has a per-connection `crypto` column, BUT for the
+  watch's row it is **empty** (connectionType=5 = Bluetooth/RFCOMM, role=1,
+  nodeId=1cf38db4, packageName=com.samsung.wearable.watch7plugin, crypto NULL).
+- The Wear RFCOMM transport classes (obfuscated glis/gjxs/glyc = "Wear_Transport")
+  contain **no** Cipher/encrypt/AES/HMAC references — the RFCOMM path is not
+  encrypted.
+- "Connection handshake in progress/complete" are just states of
+  `ConnectionStateEventParcelable`, not a crypto handshake.
+- The ECDH / Fast Pair account-key handshake (obfuscated `gntt`, imports
+  `libraries.bluetooth.fastpair`) is the **Fast Pair** flow for BLE accessories
+  (earbuds), NOT the watch's RFCOMM Data Layer. §17 conflated the two.
+
+So there is most likely **no cryptographic wall** on the RFCOMM Data Layer. The
+remaining, better-supported explanation for GB being dropped ~40-90 ms in while
+GMS is sustained on the identical channel/node id:
+
+- **Single-owner connection.** The watch appears to allow only one Data Layer
+  RFCOMM session, and `com.google.android.gms` (Wear_Transport) auto-connects and
+  owns it. GB and GMS were observed dropping in lockstep — the watch tears down
+  the duplicate. GMS reclaims within ~1 s, so GB never keeps it.
+
+`node.db.nodeinfo` also stores a per-node `enrollmentId` (UUID) and seqId
+(watch 1cf38db4 → d95cdffb-..., phone e1b1cd8b → 6e4488f9-...); the peer-sync
+counters GB should ideally present are those seqIds, not 0. Not proven to be the
+drop cause, but relevant for a faithful client.
+
+### Revised next step (was dismissed prematurely)
+Durably stop GMS Wear from connecting to this watch (disable the GMS wearable
+node connection for it, or set its connectionConfigurations row disabled), THEN
+test GB alone on the channel. If GB then sustains, the blocker was ownership/
+collision, not protocol — and a standalone GB companion becomes viable (with GMS
+Wear disabled for the watch). This is the clean experiment §17 wrongly skipped.
