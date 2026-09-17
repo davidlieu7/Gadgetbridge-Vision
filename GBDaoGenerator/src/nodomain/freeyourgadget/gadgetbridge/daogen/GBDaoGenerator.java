@@ -1503,7 +1503,14 @@ public class GBDaoGenerator {
         activitySample.addIntProperty(SAMPLE_STEPS).notNull().codeBeforeGetterAndSetter(OVERRIDE);
         activitySample.addIntProperty(SAMPLE_RAW_KIND).notNull().codeBeforeGetterAndSetter(OVERRIDE);
         activitySample.addIntProperty("dataSource").notNull();
-        activitySample.addIntProperty("caloriesBurnt").notNull();
+        activitySample.addIntProperty("caloriesBurnt").notNull().codeBeforeGetter(
+                """
+                        @Override
+                            public int getActiveCalories() {
+                                return caloriesBurnt;
+                            }
+                        """
+        );
         activitySample.addIntProperty("distanceMeters").notNull();
         addHeartRateProperties(activitySample);
         // Aggregated from the apnea/hypoxia/cardiac-load groups of the 0xB9 Origin3 tag

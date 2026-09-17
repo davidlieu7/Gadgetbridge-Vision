@@ -108,6 +108,13 @@ public class VeepooKR96ProCoordinator extends AbstractBLEDeviceCoordinator {
         return DeviceKind.FITNESS_BAND;
     }
 
+    @Override
+    public boolean supportsRecordedActivities(@NonNull final GBDevice device) {
+        // Workout history (0xD4) sessions are persisted as BaseActivitySummary rows with an
+        // optional GPX track, so the Health Connect workout syncer can export them.
+        return true;
+    }
+
     @NonNull
     @Override
     public Collection<? extends ScanFilter> createBLEScanFilters() {
@@ -241,7 +248,7 @@ public class VeepooKR96ProCoordinator extends AbstractBLEDeviceCoordinator {
     @Override
     public int getBondingStyle() {
         // The band pairs via its own password command (0xA1), not BLE pairing.
-        return BONDING_STYLE_LAZY;
+        return BONDING_STYLE_BOND;
     }
 
     private volatile boolean workoutRunning = false;
