@@ -1909,3 +1909,51 @@ Established at enrollment (Fast Pair ECDH with the device anti-spoofing key, or 
 named fastpair prefs; likely the account "footprints" / an encrypted store). A
 faithful standalone client would have to complete the GATT secret handshake, which
 needs that secret — the crux of feasibility.
+
+---
+
+## 21. BREAKTHROUGH — the connection is bidirectional; watch needs back-channels (2026-09-18)
+
+Enabled ADB on the Watch7 (Wear OS) and captured the watch-side log during a
+Gadgetbridge connect. This is the authoritative reason for the drop, and it is
+neither crypto nor identity:
+
+Watch-side sequence when GB connects the Data Layer:
+```
+RFCOMM_CreateConnectionWithSecurity scn=9 is_server=true uuid=5e8945b0…  (watch accepts GB)
+BluetoothRemoteDevices: ### RFCOMM : STATE_CONNECTED(uuid 5e8945b0…)
+WearBluetooth: Data layer connected. Request proxy RFCOMM connection      ← wants back-channel
+WearBluetoothHelper: Request Helper Connection … connect to <phone>
+   → Creating BluetoothSocket(uuid: cee50b63-5f79-4727-8b5d-504eb07e1e22)
+   → java.io.IOException: bt socket closed, read return: -1               ← back-channel FAILS
+CompanionProxyShard: start up new sysproxy connection
+   → Creating BluetoothSocket(uuid: fafbdd20-83f0-4389-addf-917ac9dae5b2)  ← WearProxy
+BluetoothRemoteDevices: ### RFCOMM : STATE_DISCONNECTED(uuid 5e8945b0…)    ← watch drops Data Layer
+```
+
+**The Wear connection is bidirectional.** After the phone opens the Data Layer
+(phone→watch, UUID `5e8945b0…`), the WATCH immediately connects BACK to the phone
+on two RFCOMM services:
+- `cee50b63-5f79-4727-8b5d-504eb07e1e22` — `WearBluetoothHelper` (control channel)
+- `fafbdd20-83f0-4389-addf-917ac9dae5b2` — `CompanionProxyShard` / sysproxy (the
+  WearProxy TCP-over-BT tunnel; = §13).
+
+Normally GMS on the phone runs RFCOMM **server** sockets (with SDP records) for
+these, accepts the watch's back-connections, and keeps them open. Gadgetbridge
+does not, so the watch's back-connections fail (`read return: -1`) and the watch
+tears down the Data Layer within ~90 ms. This also explains why force-stopping GMS
+never helped GB: with GMS gone, nothing answers the back-channels either.
+
+### The fix (correct, not a hack)
+Gadgetbridge must act as the full companion:
+1. Keep the phone→watch Data Layer client (5e8945b0) — already done.
+2. Register SDP + **listen** as an RFCOMM server on the phone for
+   `cee50b63-…` (Helper) and `fafbdd20-…` (WearProxy/sysproxy), accept the watch's
+   connections and keep them open.
+   - Minimum viable test: accept and hold both sockets open (don't close) and see
+     if the watch keeps the Data Layer up.
+   - Full: implement the Helper control protocol and the sysproxy tunnel (TCP-over-
+     BT for the watch's internet access) as needed.
+
+This was found via watch-side logcat (Wear OS ADB) — the phone APKs alone could
+not show it, because the drop is the watch reacting to a failed back-connection.
