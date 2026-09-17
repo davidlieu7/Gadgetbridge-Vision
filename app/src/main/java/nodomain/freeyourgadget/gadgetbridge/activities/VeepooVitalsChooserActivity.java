@@ -30,6 +30,9 @@ import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.core.graphics.Insets;
+import androidx.core.view.ViewCompat;
+import androidx.core.view.WindowInsetsCompat;
 
 import java.util.Arrays;
 
@@ -105,6 +108,13 @@ public class VeepooVitalsChooserActivity extends Activity {
         ListView listView = new ListView(this);
         listView.setAdapter(new VitalAdapter(this, device, Arrays.copyOf(positions, visibleCount)));
         setContentView(listView);
+        // targetSdk 35 forces edge-to-edge, so pad the content below the status bar
+        final View content = findViewById(android.R.id.content);
+        ViewCompat.setOnApplyWindowInsetsListener(content, (v, windowInsets) -> {
+            final Insets insets = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars() | WindowInsetsCompat.Type.displayCutout());
+            v.setPadding(insets.left, insets.top, insets.right, insets.bottom);
+            return windowInsets;
+        });
     }
 
     private final class VitalAdapter extends ArrayAdapter<String> {
