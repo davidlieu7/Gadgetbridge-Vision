@@ -42,6 +42,7 @@ import nodomain.freeyourgadget.gadgetbridge.R;
 import nodomain.freeyourgadget.gadgetbridge.activities.VeepooVitalsChooserActivity;
 import nodomain.freeyourgadget.gadgetbridge.activities.VeepooWomenHealthActivity;
 import nodomain.freeyourgadget.gadgetbridge.activities.VeepooWorkoutStartActivity;
+import nodomain.freeyourgadget.gadgetbridge.activities.charts.DeviceChartsProvider;
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.DeviceSettingsSpec;
 import nodomain.freeyourgadget.gadgetbridge.devices.AbstractBLEDeviceCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.DeviceCardAction;
@@ -64,6 +65,8 @@ import nodomain.freeyourgadget.gadgetbridge.entities.GenericSpo2SampleDao;
 import nodomain.freeyourgadget.gadgetbridge.entities.GenericStressSampleDao;
 import nodomain.freeyourgadget.gadgetbridge.entities.GenericTemperatureSampleDao;
 import nodomain.freeyourgadget.gadgetbridge.entities.VeepooActivitySampleDao;
+import nodomain.freeyourgadget.gadgetbridge.entities.VeepooEcgSampleDao;
+import nodomain.freeyourgadget.gadgetbridge.entities.VeepooSleepSummarySampleDao;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
 import nodomain.freeyourgadget.gadgetbridge.model.ActivitySample;
 import nodomain.freeyourgadget.gadgetbridge.model.BloodPressureSample;
@@ -123,9 +126,16 @@ public class VeepooKR96ProCoordinator extends AbstractBLEDeviceCoordinator {
     }
 
     @Override
+    public DeviceChartsProvider getChartsProvider() {
+        return new VeepooChartsProvider();
+    }
+
+    @Override
     public java.util.Map<AbstractDao<?, ?>, Property> getAllDeviceDao(@NonNull final DaoSession session) {
         return new java.util.HashMap<>() {{
             put(session.getVeepooActivitySampleDao(), VeepooActivitySampleDao.Properties.DeviceId);
+            put(session.getVeepooSleepSummarySampleDao(), VeepooSleepSummarySampleDao.Properties.DeviceId);
+            put(session.getVeepooEcgSampleDao(), VeepooEcgSampleDao.Properties.DeviceId);
             put(session.getGenericHeartRateSampleDao(), GenericHeartRateSampleDao.Properties.DeviceId);
             put(session.getGenericSpo2SampleDao(), GenericSpo2SampleDao.Properties.DeviceId);
             put(session.getGenericTemperatureSampleDao(), GenericTemperatureSampleDao.Properties.DeviceId);

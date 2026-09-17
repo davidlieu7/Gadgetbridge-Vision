@@ -1210,7 +1210,6 @@
     <string name="sleep_score">Sleep Score</string>
     <string name="sleep_score_value">Score: %1d</string>
     <string name="stats_empty_value">-</string>
-    <string name="sleep_vitals_title">Sleep vitals</string>
     <string name="sleep_quality">Sleep quality</string>
     <string name="wake_count">Wake count</string>
     <string name="heart_rate_during_sleep">Heart rate during sleep</string>
@@ -1220,7 +1219,6 @@
     <string name="apnea_events">Apnea events</string>
     <string name="hypoxia_minutes">Hypoxia minutes</string>
     <string name="cardiac_load_minutes">Cardiac load minutes</string>
-    <string name="no_apnea_events">No apnea events</string>
     <string name="time_empty_value" translatable="false">--:--</string>
     <string name="date_placeholders__date__time">%1$s, %2$s</string>
     <string name="date_placeholders__start_time__end_time">%1$s – %2$s</string>
