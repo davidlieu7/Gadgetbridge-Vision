@@ -1153,6 +1153,7 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
             sportDayFrames.clear();
         }
         getDevice().setBusyTask(R.string.busy_task_fetch_activity_data, getContext());
+        getDevice().sendDeviceUpdateIntent(getContext());
         LOG.info("Starting data fetch: {} days (sleep then activity)", watchDataDay);
         requestSleepDay(0);
     }
@@ -6597,6 +6598,7 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
         persistPendingSleepSummaries();
         getDevice().unsetBusyTask();
         getDevice().sendDeviceUpdateIntent(getContext());
+        GB.signalActivityDataFinish(getDevice());
         LOG.info("VeePoo data fetch complete");
     }
 
