@@ -1869,3 +1869,43 @@ declines to proceed.
 
 Phone left restored: Samsung apps re-enabled, GMS connection config re-enabled,
 Gadgetbridge stopped.
+
+---
+
+## 20. Reconciled model — connection setup is GATT-auth-gated; data is plaintext (2026-09-18)
+
+Deeper GMS teardown reconciles §17 and §18. Both were partially right:
+
+- GMS's Wear connection setup is a **state machine** (obfuscated enum `ioom`,
+  action codes): `ESTABLISH_CONNECTION`, `BEFORE_CREATE_BOND_BONDING`,
+  `SECRET_HANDSHAKE`, `SECRET_HANDSHAKE_GATT_COMMUNICATION`,
+  `GATT_CONNECTION_AND_SECRET_HANDSHAKE`, `CANCEL_BLE_BONDING_BEFORE_HANDSHAKE`,
+  `HIGH_QUALITY_MEDIUM_SETUP`, ...
+- The secret handshake is executed by `gnte` (Fast Pair Device Config, "FPDC"),
+  which builds the handshake via `gntt` (ECDH / 16-byte account key, over a GATT
+  characteristic). So connection **setup is authenticated over GATT/BLE**.
+- Separately, the RFCOMM **data** transport (Wear_Transport / TransportWriter)
+  is **not encrypted** (no cipher in those classes; connectionConfigurations.crypto
+  empty). So §18 was right that the data channel is plaintext — but §17 was right
+  that a GATT secret handshake gates the *connection*.
+
+Net: to be accepted, a companion must complete the GATT connection + secret
+handshake (auth), after which the plaintext RFCOMM Data Layer flows. Gadgetbridge
+does only the plaintext RFCOMM half, so the watch exchanges NodeInfo as a courtesy
+and then drops it — consistent with every observation.
+
+### Limit of phone-side RE
+The phone APKs show what the phone SENDS and how GMS sets up the connection, but
+the drop DECISION is made by the watch's own GMS/Wear stack, which is not in these
+APKs. To get the authoritative rejection reason (and confirm whether the GATT
+secret handshake is strictly required for this specific BT/RFCOMM watch), the next
+step is **watch-side logcat**: enable ADB on the Watch7 (Wear OS developer options)
+and capture its log during (a) a normal GMS connect and (b) a Gadgetbridge connect.
+The watch's log should state directly why it closes the GB connection.
+
+### The secret, concretely
+Established at enrollment (Fast Pair ECDH with the device anti-spoofing key, or a
+16-byte account key), Google-account-bound, stored in GMS (not in the plainly
+named fastpair prefs; likely the account "footprints" / an encrypted store). A
+faithful standalone client would have to complete the GATT secret handshake, which
+needs that secret — the crux of feasibility.
