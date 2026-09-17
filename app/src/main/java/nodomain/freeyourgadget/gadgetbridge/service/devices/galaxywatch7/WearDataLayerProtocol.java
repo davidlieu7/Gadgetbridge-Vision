@@ -247,13 +247,28 @@ public final class WearDataLayerProtocol {
     private static byte[] wrapEnvelope(final byte[] payload, final boolean withFlagC) {
         final ProtoWriter envelope = new ProtoWriter();
         envelope.writeMessage(FIELD_ENVELOPE_PAYLOAD, payload);
-        envelope.writeString(FIELD_ENVELOPE_REQUEST_ID, randomRequestId());
+        // Field 2 is NOT a random request id (as first assumed) - it is a message-integrity
+        // digest that the watch's Wear transport verifies: base64url(SHA-1(payload)), no padding.
+        // A mismatch makes the watch abort with "message digest should match the received digest"
+        // and tear the connection down. Confirmed byte-for-byte against the reference capture
+        // (research notes §22).
+        envelope.writeString(FIELD_ENVELOPE_REQUEST_ID, payloadDigest(payload));
         envelope.writeVarint(FIELD_ENVELOPE_FLAG_A, 1);
         envelope.writeVarint(FIELD_ENVELOPE_FLAG_B, 1);
         if (withFlagC) {
             envelope.writeVarint(FIELD_ENVELOPE_FLAG_C, 3);
         }
         return envelope.toByteArray();
+    }
+
+    /** base64url(SHA-1(payload)) without padding - the Wear transport's per-message digest. */
+    private static String payloadDigest(final byte[] payload) {
+        try {
+            final byte[] sha1 = java.security.MessageDigest.getInstance("SHA-1").digest(payload);
+            return java.util.Base64.getUrlEncoder().withoutPadding().encodeToString(sha1);
+        } catch (final java.security.NoSuchAlgorithmException e) {
+            throw new IllegalStateException("SHA-1 not available", e);
+        }
     }
 
     /**

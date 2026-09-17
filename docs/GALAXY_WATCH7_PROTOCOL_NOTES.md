@@ -1957,3 +1957,47 @@ Gadgetbridge must act as the full companion:
 
 This was found via watch-side logcat (Wear OS ADB) — the phone APKs alone could
 not show it, because the drop is the watch reacting to a failed back-connection.
+
+---
+
+## 22. SOLVED — sustained Data Layer connection achieved (2026-09-18)
+
+Gadgetbridge now holds a stable Data Layer session with the Galaxy Watch7: the
+watch streams its full DataItem set (settings, complications, ...) to GB and the
+connection stays up for minutes with no teardown. Watch-side log shows no
+`STATE_DISCONNECTED`, no `Mismatched node`, no digest error.
+
+The watch-side logcat (Wear OS ADB) was decisive: each fix exposed the next gate,
+and all are now resolved. The three things that mattered, in order of discovery:
+
+1. **Message-integrity digest (the core bug).** Envelope field 2 is NOT a random
+   request id — it is `base64url(SHA-1(payload))` without padding (GMS `gjys.r`,
+   verified byte-for-byte against the reference capture). GB was filling it with a
+   random value, so the watch's transport aborted with
+   `Unsegmented message digest should match the received digest`. Fixed in
+   `WearDataLayerProtocol.payloadDigest()` / `wrapEnvelope()`.
+2. **Node id must equal the enrolled companion node.** After the digest fix, the
+   watch complained `Mismatched node is attempting to connect: clientNodeId is
+   e1b1cd8b and message nodeId is <random>`. The watch records the enrolled
+   companion's node id (`e1b1cd8b`, the phone's GMS Wear node id) and rejects any
+   other. GB must present it (currently `EXPERIMENT_IMPERSONATE_NODE_ID`).
+3. **Bidirectional back-channels (§21).** GB must run RFCOMM servers for the
+   watch's return connections: `fafbdd20-…` (WearProxy/sysproxy) and
+   `cee50b63-…` (WearBluetoothHelper), accept them and keep them open.
+
+Plus the earlier-established pieces: NodeInfo with field 3 (nonce) + field 7 (the
+shared connection long-id), peer-sync field8.field1 = 0xffffffffffffffff for a
+fresh session, correct live watch node id, correct RFCOMM channel.
+
+Note this reconciles §17/§18/§20: there IS a Fast Pair GATT secret handshake in
+GMS, but it is NOT required for this bonded BT/RFCOMM watch — the actual gates were
+the SHA-1 message digest, the node-id match, and the back-channels. No crypto
+secret was needed.
+
+### Remaining work (connection works; now build features on it)
+- Learn the enrolled node id dynamically instead of hardcoding `e1b1cd8b`
+  (readable from GMS `node.db`/`connectionconfig.db`, or captured once).
+- Implement the back-channel protocols properly (sysproxy tunnel + Helper control)
+  rather than just holding the sockets open, as far as features require.
+- Keep GMS Wear from re-claiming the watch while GB owns it (single-owner channel).
+- Parse the watch's incoming DataItems and wire up settings/notifications.

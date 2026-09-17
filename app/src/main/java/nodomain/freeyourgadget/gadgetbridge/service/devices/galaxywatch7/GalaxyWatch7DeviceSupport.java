@@ -55,7 +55,7 @@ public class GalaxyWatch7DeviceSupport extends AbstractBTBRDeviceSupport {
     // EXPERIMENT (§16): set to a captured enrolled GMS Wear node id to impersonate it; null uses
     // GB's own persisted random id. Impersonation alone does NOT get past the watch's Fast Pair
     // GATT secret handshake (§17), so left disabled.
-    private static final String EXPERIMENT_IMPERSONATE_NODE_ID = null;
+    private static final String EXPERIMENT_IMPERSONATE_NODE_ID = "e1b1cd8b";
 
     /**
      * This phone's own Data Layer node id, persisted per paired device so it stays STABLE across
@@ -77,7 +77,7 @@ public class GalaxyWatch7DeviceSupport extends AbstractBTBRDeviceSupport {
     public boolean connect() {
         if (!proxyProbeStarted) {
             proxyProbeStarted = true;
-            startWearProxyListenerProbe();
+            startBackChannelListeners();
         }
         return super.connect();
     }
@@ -282,41 +282,61 @@ public class GalaxyWatch7DeviceSupport extends AbstractBTBRDeviceSupport {
         return false;
     }
 
-    // EXPERIMENT: Frida instrumentation of watch7plugin (research notes section 11) showed the watch
-    // opening an RFCOMM connection *to the phone* on this UUID and tunnelling TCP streams through it
-    // ("WearProxy"). Listen on it read-only and dump whatever the watch sends, to learn the framing.
+    // The Wear connection is bidirectional (research notes §21): right after the phone opens the
+    // Data Layer (phone->watch), the WATCH connects BACK to the phone on two RFCOMM services. If
+    // nothing is listening for them, the watch tears the Data Layer down within ~90ms. We must run
+    // RFCOMM servers (with SDP records) for both and keep the accepted sockets open.
+    //  - WearProxy / CompanionProxy sysproxy tunnel (watch's TCP-over-BT / internet proxy).
     private static final UUID WEAR_PROXY_UUID = UUID.fromString("fafbdd20-83f0-4389-addf-917ac9dae5b2");
+    //  - WearBluetoothHelper control channel.
+    private static final UUID WEAR_HELPER_UUID = UUID.fromString("cee50b63-5f79-4727-8b5d-504eb07e1e22");
 
-    private void startWearProxyListenerProbe() {
+    private void startBackChannelListeners() {
+        startBackChannelListener("WearProxy", WEAR_PROXY_UUID);
+        startBackChannelListener("WearHelper", WEAR_HELPER_UUID);
+    }
+
+    private void startBackChannelListener(final String name, final UUID uuid) {
         final Thread thread = new Thread(() -> {
             final BluetoothAdapter adapter = BluetoothAdapter.getDefaultAdapter();
-            try (BluetoothServerSocket server = adapter.listenUsingRfcommWithServiceRecord("WearProxyProbe", WEAR_PROXY_UUID)) {
-                LOG.info("Galaxy Watch7 proxy probe: listening on {}", WEAR_PROXY_UUID);
-                for (int n = 0; n < 5; n++) {
-                    final BluetoothSocket socket = server.accept(120_000);
-                    LOG.info("Galaxy Watch7 proxy probe: accepted #{} from {}", n, socket.getRemoteDevice().getAddress());
-                    new Thread(() -> dumpProxySocket(socket), "WearProxyProbe-read").start();
+            while (!Thread.currentThread().isInterrupted()) {
+                try (BluetoothServerSocket server = adapter.listenUsingRfcommWithServiceRecord(name, uuid)) {
+                    LOG.info("Galaxy Watch7 back-channel {}: listening on {}", name, uuid);
+                    while (true) {
+                        final BluetoothSocket socket = server.accept();
+                        LOG.info("Galaxy Watch7 back-channel {}: accepted from {}", name, socket.getRemoteDevice().getAddress());
+                        new Thread(() -> holdBackChannelSocket(name, socket), name + "-conn").start();
+                    }
+                } catch (final IOException e) {
+                    LOG.warn("Galaxy Watch7 back-channel {}: listener error, retrying: {}", name, e.getMessage());
+                    try {
+                        Thread.sleep(1000);
+                    } catch (final InterruptedException ie) {
+                        return;
+                    }
                 }
-            } catch (final IOException e) {
-                LOG.warn("Galaxy Watch7 proxy probe: listener ended", e);
             }
-        }, "WearProxyProbe-listen");
+        }, name + "-listen");
         thread.setDaemon(true);
         thread.start();
     }
 
-    private static void dumpProxySocket(final BluetoothSocket socket) {
+    // Hold the watch's back-channel socket open and drain whatever it sends. Keeping the socket
+    // open (rather than closing it) is what stops the watch from tearing down the Data Layer. We
+    // do not yet speak the sysproxy/helper protocols; draining and staying connected is the
+    // minimum viable behaviour to test the bidirectional-connection hypothesis (§21).
+    private static void holdBackChannelSocket(final String name, final BluetoothSocket socket) {
         final byte[] buf = new byte[4096];
         try (BluetoothSocket s = socket; InputStream in = s.getInputStream()) {
-            for (int i = 0; i < 200; i++) {
+            while (true) {
                 final int len = in.read(buf);
                 if (len < 0) {
                     break;
                 }
-                LOG.info("Galaxy Watch7 proxy probe <<< {} bytes: {}", len, GB.hexdump(buf, 0, len));
+                LOG.info("Galaxy Watch7 back-channel {} <<< {} bytes: {}", name, len, GB.hexdump(buf, 0, len));
             }
         } catch (final IOException e) {
-            LOG.info("Galaxy Watch7 proxy probe: socket closed: {}", e.getMessage());
+            LOG.info("Galaxy Watch7 back-channel {}: socket closed: {}", name, e.getMessage());
         }
     }
 
