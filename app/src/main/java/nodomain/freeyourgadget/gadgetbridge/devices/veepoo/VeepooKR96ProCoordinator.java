@@ -115,6 +115,13 @@ public class VeepooKR96ProCoordinator extends AbstractBLEDeviceCoordinator {
         return true;
     }
 
+    @Override
+    public boolean supportsActiveCalories(@NonNull final GBDevice device) {
+        // The Origin3 0xB2 tag carries per-slot active kcal, exposed through
+        // VeepooActivitySample.getActiveCalories; the Health Connect syncer gates on this.
+        return true;
+    }
+
     @NonNull
     @Override
     public Collection<? extends ScanFilter> createBLEScanFilters() {
@@ -248,7 +255,7 @@ public class VeepooKR96ProCoordinator extends AbstractBLEDeviceCoordinator {
     @Override
     public int getBondingStyle() {
         // The band pairs via its own password command (0xA1), not BLE pairing.
-        return BONDING_STYLE_BOND;
+        return BONDING_STYLE_LAZY;
     }
 
     private volatile boolean workoutRunning = false;
