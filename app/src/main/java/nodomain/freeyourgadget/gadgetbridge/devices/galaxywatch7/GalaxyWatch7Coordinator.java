@@ -82,4 +82,10 @@ public class GalaxyWatch7Coordinator extends AbstractBLClassicDeviceCoordinator 
                 R.xml.devicesettings_galaxy_watch7,
         };
     }
+
+    @Override
+    public nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSpecificSettingsCustomizer getDeviceSpecificSettingsCustomizer(final GBDevice device) {
+        // Attaches change handlers so the settings switches actually reach onSendConfiguration.
+        return new GalaxyWatch7SettingsCustomizer();
+    }
 }

@@ -239,12 +239,18 @@ public class GalaxyWatch7DeviceSupport extends AbstractBTBRDeviceSupport {
         final SharedPreferences prefs = GBApplication.getDeviceSpecificSharedPrefs(getDevice().getAddress());
         final boolean enabled = prefs != null && prefs.getBoolean(config, false);
         LOG.info("Galaxy Watch7: sending {} = {}", groupKey, enabled);
+        recentlySentSetting.put(groupKey, System.currentTimeMillis());
         final byte[] write = WearDataLayerProtocol.buildProtogenBooleanSettingPut(
                 SETTINGS_SOURCE_PACKAGE, SETTINGS_SOURCE_SIGNATURE, node, groupKey, enabled, nextSettingsSeq++);
         final TransactionBuilder builder = createTransactionBuilder("send " + config);
         builder.write(write);
         builder.queue();
     }
+
+    // group/key -> time we last sent it, so the watch's still-streaming old value does not revert
+    // a just-toggled setting in the UI before the watch applies our write.
+    private final java.util.Map<String, Long> recentlySentSetting = new java.util.concurrent.ConcurrentHashMap<>();
+    private static final long SETTING_WRITE_SETTLE_MS = 8000;
 
     // Reassembly buffer for the incoming Data Layer stream. Socket reads do not align to message
     // boundaries, so we accumulate and split on the 4-byte big-endian length prefix.
@@ -343,6 +349,10 @@ public class GalaxyWatch7DeviceSupport extends AbstractBTBRDeviceSupport {
         final String prefKey = BOOLEAN_SETTINGS_BY_PATH.get(groupKey);
         if (prefKey == null) {
             return;
+        }
+        final Long sentAt = recentlySentSetting.get(groupKey);
+        if (sentAt != null && System.currentTimeMillis() - sentAt < SETTING_WRITE_SETTLE_MS) {
+            return; // we just wrote this; don't let the watch's old streamed value revert it
         }
         final Boolean value = WearDataLayerProtocol.parseProtogenBool(
                 WearDataLayerProtocol.parseDataItemValue(message));
