@@ -2249,3 +2249,20 @@ Special / not yet wired (need extra handling):
 
 These use the same proven write path; wiring the string/numeric ones needs UI
 widgets (list/slider) and value enumeration, left as follow-up.
+
+---
+
+## 30. Battery level reporting (2026-09-18)
+
+The watch streams its battery in a DataItem `wear://<watchNode>/batterystate/data/
+batterystate`. Decoded value proto: field 1 = level 0-100 (verified against the
+watch's `dumpsys battery` level=100), field 5 = AOSP BatteryManager status
+(2=charging, 3=discharging, 5=full); field 2 is the plugged type. (There is also a
+richer `c_devicecare/battery/change` DataMap with a `battery_level` key, not needed.)
+
+Implemented `WearDataLayerProtocol.parseBatteryState` (returns {level, status}) and
+`GalaxyWatch7DeviceSupport.reflectBattery`, which posts a GBDeviceEventBatteryInfo
+(level + BatteryState mapped from status) on each change. The coordinator already
+reports one battery (default getBatteryCount=1), so it shows in the GB UI. Builds
+clean; live-verified against dumpsys (level 100 / full) - end-to-end UI check
+pending the phone's USB ADB coming back.

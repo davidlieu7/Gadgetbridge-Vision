@@ -31,6 +31,8 @@ import java.util.Locale;
 import java.util.UUID;
 
 import nodomain.freeyourgadget.gadgetbridge.GBApplication;
+import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEventBatteryInfo;
+import nodomain.freeyourgadget.gadgetbridge.model.BatteryState;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
 import nodomain.freeyourgadget.gadgetbridge.service.btbr.AbstractBTBRDeviceSupport;
 import nodomain.freeyourgadget.gadgetbridge.service.btbr.TransactionBuilder;
@@ -328,6 +330,7 @@ public class GalaxyWatch7DeviceSupport extends AbstractBTBRDeviceSupport {
 
         trackSettingsSeq(message);
         reflectIncomingSetting(message);
+        reflectBattery(message);
 
         final String parsed = WearDataLayerProtocol.parseWatchNodeId(message);
         if (parsed == null) {
@@ -368,6 +371,32 @@ public class GalaxyWatch7DeviceSupport extends AbstractBTBRDeviceSupport {
     // node id -> highest DataItem seq we've seen for it, learned from the incoming stream. Used to
     // build a fuller peer-sync (like the stock client) that declares all nodes with their counters.
     private final java.util.concurrent.ConcurrentHashMap<String, Long> nodeCounters = new java.util.concurrent.ConcurrentHashMap<>();
+
+    private int lastBatteryLevel = -1;
+
+    // Report the watch's battery level/state to Gadgetbridge from its batterystate DataItem.
+    private void reflectBattery(final byte[] message) {
+        final int[] bs = WearDataLayerProtocol.parseBatteryState(message);
+        if (bs == null || bs[0] == lastBatteryLevel) {
+            return;
+        }
+        lastBatteryLevel = bs[0];
+        final GBDeviceEventBatteryInfo info = new GBDeviceEventBatteryInfo();
+        info.level = bs[0];
+        switch (bs[1]) {
+            case 5: // BATTERY_STATUS_FULL
+                info.state = BatteryState.BATTERY_CHARGING_FULL;
+                break;
+            case 2: // BATTERY_STATUS_CHARGING
+                info.state = BatteryState.BATTERY_CHARGING;
+                break;
+            default:
+                info.state = bs[0] <= 15 ? BatteryState.BATTERY_LOW : BatteryState.BATTERY_NORMAL;
+                break;
+        }
+        LOG.info("Galaxy Watch7: battery {}% state {}", info.level, info.state);
+        handleGBDeviceEvent(info);
+    }
 
     private void trackSettingsSeq(final byte[] message) {
         final String path = WearDataLayerProtocol.parseDataItemPath(message);

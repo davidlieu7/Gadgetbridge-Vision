@@ -336,6 +336,29 @@ public final class WearDataLayerProtocol {
         return dataItem == null ? null : new ProtoReader(dataItem).findVarint(DATAITEM_SEQ);
     }
 
+    /**
+     * If the message is the watch's `batterystate/data/batterystate` DataItem, returns
+     * {@code {level, status}} where level is 0-100 (proto field 1, verified against dumpsys) and
+     * status is the AOSP BatteryManager status (field 5: 2=charging, 3=discharging, 5=full);
+     * status is -1 if absent. Returns {@code null} for other messages.
+     */
+    public static int[] parseBatteryState(final byte[] message) {
+        final String path = parseDataItemPath(message);
+        if (path == null || !path.contains("/batterystate/data/batterystate")) {
+            return null;
+        }
+        final byte[] value = parseDataItemValue(message);
+        if (value == null) {
+            return null;
+        }
+        final Long level = new ProtoReader(value).findVarint(1);
+        if (level == null || level < 0 || level > 100) {
+            return null;
+        }
+        final Long status = new ProtoReader(value).findVarint(5);
+        return new int[]{level.intValue(), status == null ? -1 : status.intValue()};
+    }
+
     private static byte[] extractDataItem(final byte[] message) {
         final byte[] envelope = stripLengthPrefix(message);
         if (envelope == null) {
