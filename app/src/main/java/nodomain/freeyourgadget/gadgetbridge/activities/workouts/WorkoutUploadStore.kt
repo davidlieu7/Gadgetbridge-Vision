@@ -42,6 +42,7 @@ object WorkoutUploadStore {
     // would start pointing at the wrong service. See WorkoutUploadTarget for what each supports.
     const val SERVICE_ENDURAIN = 0
     const val SERVICE_WANDERER = 1
+    const val SERVICE_RIDEHUB = 2
 
     const val STATUS_SUCCESS = 1
     const val STATUS_FAILED = 2
