@@ -1,24 +1,42 @@
 <?xml version="1.0" encoding="utf-8"?>
 <androidx.preference.PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android">
-    <SwitchPreferenceCompat
-        android:defaultValue="false"
-        android:key="pref_galaxywatch7_always_on_display"
-        android:summary="@string/prefs_always_on_display_summary"
-        android:title="@string/prefs_always_on_display" />
-    <SwitchPreferenceCompat
-        android:defaultValue="false"
-        android:key="pref_galaxywatch7_tilt_to_wake"
-        android:title="@string/prefs_galaxywatch7_tilt_to_wake" />
-    <SwitchPreferenceCompat
-        android:defaultValue="false"
-        android:key="pref_galaxywatch7_touch_to_wake"
-        android:title="@string/prefs_galaxywatch7_touch_to_wake" />
-    <SwitchPreferenceCompat
-        android:defaultValue="false"
-        android:key="pref_galaxywatch7_show_unread_dot"
-        android:title="@string/prefs_galaxywatch7_show_unread_dot" />
-    <SwitchPreferenceCompat
-        android:defaultValue="false"
-        android:key="pref_galaxywatch7_use_mode_ringer"
-        android:title="@string/prefs_galaxywatch7_use_mode_ringer" />
+    <PreferenceCategory android:title="Display">
+        <SwitchPreferenceCompat android:defaultValue="false" android:key="pref_galaxywatch7_display_always_on_display" android:title="Always On Display" />
+        <SwitchPreferenceCompat android:defaultValue="false" android:key="pref_galaxywatch7_display_auto_low_brightness" android:title="Auto low brightness" />
+        <SwitchPreferenceCompat android:defaultValue="false" android:key="pref_galaxywatch7_display_bold_font" android:title="Bold font" />
+        <SwitchPreferenceCompat android:defaultValue="false" android:key="pref_galaxywatch7_display_show_charging_info" android:title="Show charging info" />
+        <SwitchPreferenceCompat android:defaultValue="false" android:key="pref_galaxywatch7_display_touch_sensitivity" android:title="Touch sensitivity (gloves)" />
+        <SwitchPreferenceCompat android:defaultValue="false" android:key="pref_galaxywatch7_display_wake_on_touch_screen" android:title="Wake on touch" />
+        <SwitchPreferenceCompat android:defaultValue="false" android:key="pref_galaxywatch7_display_wake_on_turning_bezel" android:title="Wake on bezel turn" />
+        <SwitchPreferenceCompat android:defaultValue="false" android:key="pref_galaxywatch7_display_wake_on_wrist_raised" android:title="Wake on wrist raise" />
+    </PreferenceCategory>
+    <PreferenceCategory android:title="Gestures &amp; buttons">
+        <SwitchPreferenceCompat android:defaultValue="false" android:key="pref_galaxywatch7_advanced_action_button_siren_enabled" android:title="Action button: siren" />
+        <SwitchPreferenceCompat android:defaultValue="false" android:key="pref_galaxywatch7_advanced_gestures_dismiss_alerts_and_reject_calls" android:title="Gesture: dismiss alerts / reject calls" />
+        <SwitchPreferenceCompat android:defaultValue="false" android:key="pref_galaxywatch7_advanced_gestures_quick_action" android:title="Gesture: quick action (double pinch)" />
+        <SwitchPreferenceCompat android:defaultValue="false" android:key="pref_galaxywatch7_advanced_gestures_quick_action_watchface_second_action_enabled" android:title="Quick action: second action" />
+        <SwitchPreferenceCompat android:defaultValue="false" android:key="pref_galaxywatch7_advanced_gestures_raise_to_talk_enabled" android:title="Raise to talk" />
+        <SwitchPreferenceCompat android:defaultValue="false" android:key="pref_galaxywatch7_advanced_labs_quicklaunch_enabled" android:title="Quick launch (labs)" />
+        <SwitchPreferenceCompat android:defaultValue="false" android:key="pref_galaxywatch7_advanced_media_control_auto_launch_media_controls" android:title="Auto-launch media controls" />
+        <SwitchPreferenceCompat android:defaultValue="false" android:key="pref_galaxywatch7_advanced_media_control_show_ongoing_icon" android:title="Media: show ongoing icon" />
+    </PreferenceCategory>
+    <PreferenceCategory android:title="General">
+        <SwitchPreferenceCompat android:defaultValue="false" android:key="pref_galaxywatch7_general_touch_bezel" android:title="Touch bezel" />
+        <SwitchPreferenceCompat android:defaultValue="false" android:key="pref_galaxywatch7_general_touch_bezel_feedback" android:title="Touch bezel feedback" />
+    </PreferenceCategory>
+    <PreferenceCategory android:title="Bedtime">
+        <SwitchPreferenceCompat android:defaultValue="false" android:key="pref_galaxywatch7_bedtime_turn_on_scheduled" android:title="Bedtime mode: scheduled" />
+    </PreferenceCategory>
+    <PreferenceCategory android:title="System sounds &amp; vibration">
+        <SwitchPreferenceCompat android:defaultValue="false" android:key="pref_galaxywatch7_sound_settings_system_sounds_charging_sound" android:title="Sound: charging" />
+        <SwitchPreferenceCompat android:defaultValue="false" android:key="pref_galaxywatch7_sound_settings_system_sounds_dialing_keypad_tone" android:title="Sound: dialing keypad" />
+        <SwitchPreferenceCompat android:defaultValue="false" android:key="pref_galaxywatch7_sound_settings_system_sounds_hourly_chime" android:title="Sound: hourly chime" />
+        <SwitchPreferenceCompat android:defaultValue="false" android:key="pref_galaxywatch7_sound_settings_system_sounds_samsung_keyboard" android:title="Sound: Samsung keyboard" />
+        <SwitchPreferenceCompat android:defaultValue="false" android:key="pref_galaxywatch7_sound_settings_system_sounds_ticking_sound" android:title="Sound: ticking" />
+        <SwitchPreferenceCompat android:defaultValue="false" android:key="pref_galaxywatch7_sound_settings_system_sounds_touch_sound" android:title="Sound: touch" />
+        <SwitchPreferenceCompat android:defaultValue="false" android:key="pref_galaxywatch7_sound_settings_system_sounds_unlock_sound" android:title="Sound: unlock" />
+        <SwitchPreferenceCompat android:defaultValue="false" android:key="pref_galaxywatch7_sound_settings_system_vibration_charging" android:title="Vibration: charging" />
+        <SwitchPreferenceCompat android:defaultValue="false" android:key="pref_galaxywatch7_sound_settings_system_vibration_dialing_keypad" android:title="Vibration: dialing keypad" />
+        <SwitchPreferenceCompat android:defaultValue="false" android:key="pref_galaxywatch7_sound_settings_system_vibration_samsung_keyboard" android:title="Vibration: Samsung keyboard" />
+    </PreferenceCategory>
 </androidx.preference.PreferenceScreen>

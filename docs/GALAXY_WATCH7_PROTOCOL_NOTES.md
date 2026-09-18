@@ -2211,3 +2211,41 @@ really ...` and the behaviour changed on the watch. Implemented as
 
 Read + connection + settings write now all work as a standalone companion (Samsung
 app disabled). protogensettings write path is retained in code but unused.
+
+---
+
+## 29. Full settings catalog wired (2026-09-18)
+
+Decompiled all StDataLayer*Manager classes in SecClockworkSettings and cataloged
+every `w_module_sec_watch_setting/*` setting. Wired all 29 boolean (`booleanIsChecked`)
+toggles into the GB device settings UI (grouped: Display, Gestures & buttons,
+General, Bedtime, System sounds & vibration), each written via
+buildWatchSettingBooleanPut under the connection node with from:"mobile".
+
+Boolean toggles wired (sub-path under /w_module_sec_watch_setting/):
+- display/always_on_display, display/wake_on_touch_screen, display/wake_on_wrist_raised,
+  display/wake_on_turning_bezel, display/auto_low_brightness, display/bold_font,
+  display/show_charging_info, display/touch_sensitivity
+- advanced/gestures/quick_action, .../quick_action/watchface/second_action_enabled,
+  advanced/gestures/dismiss_alerts_and_reject_calls, advanced/gestures/raise_to_talk/enabled,
+  advanced/action_button/siren/enabled, advanced/labs/quicklaunch/enabled,
+  advanced/media_control/auto_launch_media_controls, advanced/media_control/show_ongoing_icon
+- general/touch_bezel, general/touch_bezel_feedback, bedtime/turn_on_scheduled
+- sound_settings/system_sounds/{charging_sound,dialing_keypad_tone,hourly_chime,
+  samsung_keyboard,ticking_sound,touch_sound,unlock_sound}
+- sound_settings/system_vibration/{charging,dialing_keypad,samsung_keyboard}
+
+Special / not yet wired (need extra handling):
+- securitysetting/wrist_detection uses key `booleanIsDisabled` (INVERTED) - not wired.
+- String settings (key + selection list needed): display/font_style/selected_item
+  (fontNameString), sound_settings/sound_mode (stringMode),
+  sound_settings/{ringtone,ringtone_vibration,notification_sound,notification_vibration}/
+  selected_name (selectedNameString), advanced/action_button/*, advanced/double_press/
+  selected_package (stringPackageId), advanced/press_and_hold/selected_name,
+  advanced/recents_key/selected_name, advanced/status_indicator/selected_item,
+  advanced/gestures/quick_action/*/setting, advanced/labs/quicklaunch/launch_package.
+- Numeric (e.g. display/brightness key `intLevel`, screen timeout, font size, volume,
+  vibration intensity) - separate managers, need slider UI + value mapping.
+
+These use the same proven write path; wiring the string/numeric ones needs UI
+widgets (list/slider) and value enumeration, left as follow-up.

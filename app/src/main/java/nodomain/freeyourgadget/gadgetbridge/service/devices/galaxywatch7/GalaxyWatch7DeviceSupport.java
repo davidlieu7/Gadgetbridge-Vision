@@ -215,9 +215,35 @@ public class GalaxyWatch7DeviceSupport extends AbstractBTBRDeviceSupport {
     // {booleanIsChecked, from:"mobile"} DataMap.
     private static final java.util.Map<String, String> BOOLEAN_SETTINGS = new java.util.HashMap<>();
     static {
-        BOOLEAN_SETTINGS.put("pref_galaxywatch7_always_on_display", "display/always_on_display");
-        BOOLEAN_SETTINGS.put("pref_galaxywatch7_tilt_to_wake", "display/wake_on_wrist_raised");
-        BOOLEAN_SETTINGS.put("pref_galaxywatch7_touch_to_wake", "display/wake_on_touch_screen");
+        BOOLEAN_SETTINGS.put("pref_galaxywatch7_advanced_action_button_siren_enabled", "advanced/action_button/siren/enabled");
+        BOOLEAN_SETTINGS.put("pref_galaxywatch7_advanced_gestures_dismiss_alerts_and_reject_calls", "advanced/gestures/dismiss_alerts_and_reject_calls");
+        BOOLEAN_SETTINGS.put("pref_galaxywatch7_advanced_gestures_quick_action", "advanced/gestures/quick_action");
+        BOOLEAN_SETTINGS.put("pref_galaxywatch7_advanced_gestures_quick_action_watchface_second_action_enabled", "advanced/gestures/quick_action/watchface/second_action_enabled");
+        BOOLEAN_SETTINGS.put("pref_galaxywatch7_advanced_gestures_raise_to_talk_enabled", "advanced/gestures/raise_to_talk/enabled");
+        BOOLEAN_SETTINGS.put("pref_galaxywatch7_advanced_labs_quicklaunch_enabled", "advanced/labs/quicklaunch/enabled");
+        BOOLEAN_SETTINGS.put("pref_galaxywatch7_advanced_media_control_auto_launch_media_controls", "advanced/media_control/auto_launch_media_controls");
+        BOOLEAN_SETTINGS.put("pref_galaxywatch7_advanced_media_control_show_ongoing_icon", "advanced/media_control/show_ongoing_icon");
+        BOOLEAN_SETTINGS.put("pref_galaxywatch7_bedtime_turn_on_scheduled", "bedtime/turn_on_scheduled");
+        BOOLEAN_SETTINGS.put("pref_galaxywatch7_display_always_on_display", "display/always_on_display");
+        BOOLEAN_SETTINGS.put("pref_galaxywatch7_display_auto_low_brightness", "display/auto_low_brightness");
+        BOOLEAN_SETTINGS.put("pref_galaxywatch7_display_bold_font", "display/bold_font");
+        BOOLEAN_SETTINGS.put("pref_galaxywatch7_display_show_charging_info", "display/show_charging_info");
+        BOOLEAN_SETTINGS.put("pref_galaxywatch7_display_touch_sensitivity", "display/touch_sensitivity");
+        BOOLEAN_SETTINGS.put("pref_galaxywatch7_display_wake_on_touch_screen", "display/wake_on_touch_screen");
+        BOOLEAN_SETTINGS.put("pref_galaxywatch7_display_wake_on_turning_bezel", "display/wake_on_turning_bezel");
+        BOOLEAN_SETTINGS.put("pref_galaxywatch7_display_wake_on_wrist_raised", "display/wake_on_wrist_raised");
+        BOOLEAN_SETTINGS.put("pref_galaxywatch7_general_touch_bezel", "general/touch_bezel");
+        BOOLEAN_SETTINGS.put("pref_galaxywatch7_general_touch_bezel_feedback", "general/touch_bezel_feedback");
+        BOOLEAN_SETTINGS.put("pref_galaxywatch7_sound_settings_system_sounds_charging_sound", "sound_settings/system_sounds/charging_sound");
+        BOOLEAN_SETTINGS.put("pref_galaxywatch7_sound_settings_system_sounds_dialing_keypad_tone", "sound_settings/system_sounds/dialing_keypad_tone");
+        BOOLEAN_SETTINGS.put("pref_galaxywatch7_sound_settings_system_sounds_hourly_chime", "sound_settings/system_sounds/hourly_chime");
+        BOOLEAN_SETTINGS.put("pref_galaxywatch7_sound_settings_system_sounds_samsung_keyboard", "sound_settings/system_sounds/samsung_keyboard");
+        BOOLEAN_SETTINGS.put("pref_galaxywatch7_sound_settings_system_sounds_ticking_sound", "sound_settings/system_sounds/ticking_sound");
+        BOOLEAN_SETTINGS.put("pref_galaxywatch7_sound_settings_system_sounds_touch_sound", "sound_settings/system_sounds/touch_sound");
+        BOOLEAN_SETTINGS.put("pref_galaxywatch7_sound_settings_system_sounds_unlock_sound", "sound_settings/system_sounds/unlock_sound");
+        BOOLEAN_SETTINGS.put("pref_galaxywatch7_sound_settings_system_vibration_charging", "sound_settings/system_vibration/charging");
+        BOOLEAN_SETTINGS.put("pref_galaxywatch7_sound_settings_system_vibration_dialing_keypad", "sound_settings/system_vibration/dialing_keypad");
+        BOOLEAN_SETTINGS.put("pref_galaxywatch7_sound_settings_system_vibration_samsung_keyboard", "sound_settings/system_vibration/samsung_keyboard");
     }
     // Reverse map: the protogensettings "<group>/<key>" -> GB preference key, to reflect the
     // watch's reported values back into the device prefs so the UI shows the real state.
