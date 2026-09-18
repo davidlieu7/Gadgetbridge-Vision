@@ -20,6 +20,7 @@ import nodomain.freeyourgadget.gadgetbridge.R
 import nodomain.freeyourgadget.gadgetbridge.activities.workouts.WorkoutValueFormatter
 import nodomain.freeyourgadget.gadgetbridge.activities.workouts.entries.ActivitySummaryEntry
 import nodomain.freeyourgadget.gadgetbridge.activities.workouts.entries.ActivitySummaryGroup
+import nodomain.freeyourgadget.gadgetbridge.activities.workouts.entries.ActivitySummarySimpleEntry
 import nodomain.freeyourgadget.gadgetbridge.databinding.FragmentWorkoutTabOverviewBinding
 import nodomain.freeyourgadget.gadgetbridge.entities.BaseActivitySummary
 import nodomain.freeyourgadget.gadgetbridge.entities.Device
@@ -104,7 +105,7 @@ class WorkoutTabOverviewFragment : Fragment(), WorkoutTabScreenshotProvider {
         for ((groupKey, entries) in groups) {
             if (ActivitySummaryEntries.GROUP_ACTIVITY == groupKey) {
                 if (!entries.isEmpty()) {
-                    addGroupContent(entries)
+                    addActivityStatTiles(entries)
                 }
             }
         }
@@ -158,6 +159,17 @@ class WorkoutTabOverviewFragment : Fragment(), WorkoutTabScreenshotProvider {
             gridTableBuilder.addEntry(workoutValueFormatter.getStringResourceByName(key), entry)
         }
         binding.summaryDetails.addView(gridTableBuilder.build())
+    }
+
+    private fun addActivityStatTiles(entries: List<Pair<String, ActivitySummaryEntry>>) {
+        val stats = entries.mapNotNull { (key, entry) ->
+            (entry as? ActivitySummarySimpleEntry)?.takeIf { it.value != null }?.let {
+                StatTileData(workoutValueFormatter.formatValue(it.value, it.unit), workoutValueFormatter.getStringResourceByName(key))
+            }
+        }
+        if (stats.isNotEmpty()) {
+            addStatTileGrid(binding.summaryDetails, requireContext(), stats)
+        }
     }
 
     private fun addGroupHeader(groupKey: String) {

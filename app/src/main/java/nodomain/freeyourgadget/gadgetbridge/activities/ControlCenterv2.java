@@ -253,9 +253,17 @@ public class ControlCenterv2 extends AppCompatActivity
             theme.resolveAttribute(com.google.android.material.R.attr.colorSurface, typedValue, true);
             @ColorInt int toolbarBackground = typedValue.data;
             toolbar.setBackgroundColor(toolbarBackground);
+            // Title/icon colors are left at the MaterialToolbar defaults here - Dynamic Color
+            // already ties them to colorOnSurface/colorControlNormal, which contrasts correctly
+            // against colorSurface in both Dynamic Light and Dynamic Dark.
+        } else if (GBApplication.isDarkThemeEnabled()) {
+            TypedValue typedValue = new TypedValue();
+            getTheme().resolveAttribute(R.attr.toolbar_bg, typedValue, true);
+            toolbar.setBackgroundColor(typedValue.data);
+            toolbar.setTitleTextColor(GBApplication.getTextColor(this));
         } else {
-            toolbar.setBackgroundColor(getResources().getColor(R.color.primarydark_light));
-            toolbar.setTitleTextColor(getResources().getColor(android.R.color.white));
+            toolbar.setBackgroundColor(GBApplication.getWindowBackgroundColor(this));
+            toolbar.setTitleTextColor(GBApplication.getTextColor(this));
         }
 
         // Configure ViewPager2 with fragment adapter and default fragment

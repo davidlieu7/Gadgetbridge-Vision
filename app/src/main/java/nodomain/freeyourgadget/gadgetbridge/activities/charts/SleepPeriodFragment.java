@@ -24,6 +24,8 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 
+import androidx.core.content.ContextCompat;
+
 import com.github.mikephil.charting.charts.BarChart;
 import com.github.mikephil.charting.charts.Chart;
 import com.github.mikephil.charting.components.Legend;
@@ -53,6 +55,8 @@ import java.util.concurrent.TimeUnit;
 
 import nodomain.freeyourgadget.gadgetbridge.GBApplication;
 import nodomain.freeyourgadget.gadgetbridge.R;
+import nodomain.freeyourgadget.gadgetbridge.activities.workouts.StatTileData;
+import nodomain.freeyourgadget.gadgetbridge.activities.workouts.StatTileGridUtilKt;
 import nodomain.freeyourgadget.gadgetbridge.database.DBHandler;
 import nodomain.freeyourgadget.gadgetbridge.databinding.FragmentWeeksleepChartBinding;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
@@ -238,29 +242,36 @@ public class SleepPeriodFragment extends SleepFragment<SleepPeriodFragment.MyCha
 
         final MySleepWeeklyData sleepWeeklyData = mcd.getSleepWeeklyData();
         final int totalDaysForAverage = sleepWeeklyData.getTotalDaysForAverage();
+        final List<StatTileData> legendStats = new ArrayList<>();
         if (totalDaysForAverage > 0) {
             float avgDeep = Math.abs(sleepWeeklyData.getTotalDeep() / totalDaysForAverage);
-            binding.sleepChartLegendDeepTime.setText(DateTimeUtils.formatDurationHoursMinutes((int) avgDeep, TimeUnit.MINUTES));
+            legendStats.add(buildSleepStageTile(R.color.chart_deep_sleep_dark, R.string.sleep_colored_stats_deep_avg,
+                    DateTimeUtils.formatDurationHoursMinutes((int) avgDeep, TimeUnit.MINUTES)));
             float avgLight = Math.abs(sleepWeeklyData.getTotalLight() / totalDaysForAverage);
-            binding.sleepChartLegendLightTime.setText(DateTimeUtils.formatDurationHoursMinutes((int) avgLight, TimeUnit.MINUTES));
-            float avgRem = Math.abs(sleepWeeklyData.getTotalRem() / totalDaysForAverage);
-            binding.sleepChartLegendRemTime.setText(DateTimeUtils.formatDurationHoursMinutes((int) avgRem, TimeUnit.MINUTES));
-            float avgAwake = Math.abs(sleepWeeklyData.getTotalAwake() / totalDaysForAverage);
-            binding.sleepChartLegendAwakeTime.setText(DateTimeUtils.formatDurationHoursMinutes((int) avgAwake, TimeUnit.MINUTES));
+            legendStats.add(buildSleepStageTile(R.color.chart_light_sleep_dark, R.string.sleep_colored_stats_light_avg,
+                    DateTimeUtils.formatDurationHoursMinutes((int) avgLight, TimeUnit.MINUTES)));
+            if (supportsRemSleep(getChartsHost().getDevice())) {
+                float avgRem = Math.abs(sleepWeeklyData.getTotalRem() / totalDaysForAverage);
+                legendStats.add(buildSleepStageTile(R.color.chart_rem_sleep_dark, R.string.sleep_colored_stats_rem_avg,
+                        DateTimeUtils.formatDurationHoursMinutes((int) avgRem, TimeUnit.MINUTES)));
+            }
+            if (supportsAwakeSleep(getChartsHost().getDevice())) {
+                float avgAwake = Math.abs(sleepWeeklyData.getTotalAwake() / totalDaysForAverage);
+                legendStats.add(buildSleepStageTile(R.color.chart_awake_sleep_dark, R.string.sleep_colored_stats_awake_avg,
+                        DateTimeUtils.formatDurationHoursMinutes((int) avgAwake, TimeUnit.MINUTES)));
+            }
         } else {
-            binding.sleepChartLegendDeepTime.setText("-");
-            binding.sleepChartLegendLightTime.setText("-");
-            binding.sleepChartLegendRemTime.setText("-");
-            binding.sleepChartLegendAwakeTime.setText("-");
+            legendStats.add(buildSleepStageTile(R.color.chart_deep_sleep_dark, R.string.sleep_colored_stats_deep_avg, "-"));
+            legendStats.add(buildSleepStageTile(R.color.chart_light_sleep_dark, R.string.sleep_colored_stats_light_avg, "-"));
+            if (supportsRemSleep(getChartsHost().getDevice())) {
+                legendStats.add(buildSleepStageTile(R.color.chart_rem_sleep_dark, R.string.sleep_colored_stats_rem_avg, "-"));
+            }
+            if (supportsAwakeSleep(getChartsHost().getDevice())) {
+                legendStats.add(buildSleepStageTile(R.color.chart_awake_sleep_dark, R.string.sleep_colored_stats_awake_avg, "-"));
+            }
         }
-
-        if (!supportsRemSleep(getChartsHost().getDevice())) {
-            binding.sleepChartLegendRemTimeWrapper.setVisibility(View.GONE);
-        }
-
-        if (!supportsAwakeSleep(getChartsHost().getDevice())) {
-            binding.sleepChartLegendAwakeTimeWrapper.setVisibility(View.GONE);
-        }
+        binding.sleepLegendStatsContainer.removeAllViews();
+        StatTileGridUtilKt.addStatTileGrid(binding.sleepLegendStatsContainer, requireContext(), legendStats, 0);
 
         binding.sleepDates.setText(DateTimeUtils.formatDaysUntil(TOTAL_DAYS, getTSEnd()));
 
@@ -612,6 +623,10 @@ public class SleepPeriodFragment extends SleepFragment<SleepPeriodFragment.MyCha
 
     private String getHM(long value) {
         return DateTimeUtils.formatDurationHoursMinutes(value, TimeUnit.MINUTES);
+    }
+
+    private StatTileData buildSleepStageTile(final int colorRes, final int labelRes, final String value) {
+        return new StatTileData(value, getString(labelRes), null, null, null, null, ContextCompat.getColor(requireContext(), colorRes));
     }
 
     String getAverage(float value) {

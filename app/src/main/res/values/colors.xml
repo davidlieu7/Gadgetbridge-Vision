@@ -18,6 +18,36 @@
 
     <color name="divider" type="color">#1f000000</color>
 
+    <!-- Pill-style tab bars: dark theme (bar + solid pill) -->
+    <color name="tab_bar_bg_dark" type="color">#141414</color>
+    <color name="tab_text_off_dark" type="color">#CFCFCF</color>
+    <color name="subtab_pill_dark" type="color">#3A1512</color>
+    <color name="subtab_pill_on_dark" type="color">#FF6E5C</color>
+    <color name="subtab_text_off_dark" type="color">#BDBDBD</color>
+
+    <!-- Pill-style tab bars: light theme (tab_pill/tab_pill_on/text-off reuse existing brand colors) -->
+    <color name="tab_bar_bg_light" type="color">#F4F4F4</color>
+    <color name="tab_text_off_light" type="color">#4A4A4A</color>
+    <color name="subtab_text_off_light" type="color">#5A5A5A</color>
+    <color name="subtab_pill_light" type="color">#FBDBD5</color>
+
+    <!-- Date-step pill buttons: dark theme -->
+    <color name="datestep_row_bg_dark" type="color">#000000</color>
+    <color name="datestep_bg_dark" type="color">#1C1C1C</color>
+    <color name="datestep_icon_dark" type="color">#CFCFCF</color>
+    <color name="datestep_caption_dark" type="color">#9A9A9A</color>
+    <color name="datestep_primary_bg_dark" type="color">#E02F00</color>
+
+    <!-- Date-step pill buttons: light theme -->
+    <color name="datestep_row_bg_light" type="color">#EDEDED</color>
+    <color name="datestep_bg_light" type="color">#DCDCDC</color>
+    <color name="datestep_icon_light" type="color">#4A4A4A</color>
+    <color name="datestep_caption_light" type="color">#6E6E6E</color>
+
+    <!-- App-wide toolbar (3b, dark chrome regardless of theme - same rationale as the tab/date bars) -->
+    <color name="toolbar_bg" type="color">#141414</color>
+    <color name="toolbar_subtitle" type="color">#CCFFFFFF</color>
+
     <color name="chart_heartrate" type="color">#ffab40</color>
     <color name="chart_heartrate_alternative" type="color">#8B0000</color>
     <color name="chart_heartrate_fill" type="color">#fadab1</color>

@@ -25,6 +25,38 @@
     <attr name="deviceIconLight" format="color" />
     <attr name="deviceIconDark" format="color" />
 
+    <!-- Pill-style tab bars (workout tabs, charts tabs, Day/Week/Month sub-tabs) -->
+    <attr name="tab_bar_bg" format="color" />
+    <attr name="tab_pill" format="color" />
+    <attr name="tab_pill_on" format="color" />
+    <attr name="tab_text_off" format="color" />
+    <attr name="subtab_pill" format="color" />
+    <attr name="subtab_pill_on" format="color" />
+    <attr name="subtab_text_off" format="color" />
+    <attr name="subtab_active" format="color" />
+    <attr name="chip_border_off" format="color" />
+    <attr name="chip_text_off" format="color" />
+
+    <!-- Date-step pill buttons (charts date bar, dashboard day arrows) -->
+    <attr name="datestep_row_bg" format="color" />
+    <attr name="datestep_bg" format="color" />
+    <attr name="datestep_icon" format="color" />
+    <attr name="datestep_caption" format="color" />
+    <attr name="datestep_primary_bg" format="color" />
+    <attr name="datestep_primary_icon" format="color" />
+    <attr name="datestep_primary_caption" format="color" />
+    <attr name="datestep_label" format="color" />
+
+    <!-- App-wide toolbar (dark chrome, 3b variant) -->
+    <attr name="toolbar_bg" format="color" />
+    <attr name="toolbar_title" format="color" />
+    <attr name="toolbar_subtitle" format="color" />
+    <attr name="toolbar_icon" format="color" />
+
+    <!-- Main screen's top toolbar / bottom nav bar background - matches the fragment
+         background, kept as one attr so both bars always share the exact same color. -->
+    <attr name="main_bar_bg" format="color" />
+
     <declare-styleable name="SubtitleListPreference">
         <!-- One subtitle per entry, shown as a second line below each entry's title. -->
         <attr name="entrySubtitles" format="reference" />

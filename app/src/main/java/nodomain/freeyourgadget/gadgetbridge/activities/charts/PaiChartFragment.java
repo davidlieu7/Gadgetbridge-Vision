@@ -52,6 +52,8 @@ import java.util.Optional;
 import nodomain.freeyourgadget.gadgetbridge.GBApplication;
 import nodomain.freeyourgadget.gadgetbridge.R;
 import nodomain.freeyourgadget.gadgetbridge.activities.dashboard.GaugeDrawer;
+import nodomain.freeyourgadget.gadgetbridge.activities.workouts.StatTileData;
+import nodomain.freeyourgadget.gadgetbridge.activities.workouts.StatTileGridUtilKt;
 import nodomain.freeyourgadget.gadgetbridge.database.DBHandler;
 import nodomain.freeyourgadget.gadgetbridge.devices.DeviceCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.TimeSampleProvider;
@@ -69,17 +71,16 @@ public class PaiChartFragment extends AbstractChartFragment<PaiChartFragment.Pai
     protected ImageView mGoalMinutesGauge;
     protected BarChart mWeekChart;
     protected TextView mDateView;
-    protected TextView mLineToday;
-    protected TextView mLineTotal;
+    protected LinearLayout mSummaryStatsContainer;
     protected TextView mLineLowInc;
     protected TextView mLineLowTime;
     protected TextView mLineModerateInc;
     protected TextView mLineModerateTime;
     protected TextView mLineHighInc;
     protected TextView mLineHighTime;
-    protected LinearLayout mTileLow;
-    protected LinearLayout mTileModerate;
-    protected LinearLayout mTileHigh;
+    protected View mTileLow;
+    protected View mTileModerate;
+    protected View mTileHigh;
 
     protected int BACKGROUND_COLOR;
     protected int DESCRIPTION_COLOR;
@@ -115,8 +116,7 @@ public class PaiChartFragment extends AbstractChartFragment<PaiChartFragment.Pai
         mGoalMinutesGauge = rootView.findViewById(R.id.goal_minutes_gauge);
         mWeekChart = rootView.findViewById(R.id.pai_chart_week);
         mDateView = rootView.findViewById(R.id.pai_date_view);
-        mLineToday = rootView.findViewById(R.id.pai_line_today);
-        mLineTotal = rootView.findViewById(R.id.pai_line_total);
+        mSummaryStatsContainer = rootView.findViewById(R.id.pai_summary_stats_container);
         mLineLowInc = rootView.findViewById(R.id.pai_line_low_inc);
         mLineLowTime = rootView.findViewById(R.id.pai_line_low_time);
         mLineModerateInc = rootView.findViewById(R.id.pai_line_moderate_inc);
@@ -247,8 +247,23 @@ public class PaiChartFragment extends AbstractChartFragment<PaiChartFragment.Pai
                 Math.max(pcd.getWeekBeforeData().getMaxPai(), getPaiTarget()) + 20);
 
         mDateView.setText(DateTimeUtils.formatDate(pcd.getDayData().day.getTime()));
-        mLineToday.setText(requireContext().getString(R.string.pai_plus_num, pcd.getDayData().today));
-        mLineTotal.setText(String.valueOf(pcd.getDayData().total));
+
+        final List<StatTileData> summaryStats = new ArrayList<>();
+        summaryStats.add(new StatTileData(
+                requireContext().getString(R.string.pai_plus_num, pcd.getDayData().today),
+                getString(R.string.activity_summary_today),
+                null, null, null, null,
+                PAI_DAY_COLOR
+        ));
+        summaryStats.add(new StatTileData(
+                String.valueOf(pcd.getDayData().total),
+                getString(R.string.weekly_total),
+                null, null, null, null,
+                PAI_TOTAL_COLOR
+        ));
+        mSummaryStatsContainer.removeAllViews();
+        StatTileGridUtilKt.addStatTileGrid(mSummaryStatsContainer, requireContext(), summaryStats, 0);
+
         mLineLowInc.setText(String.valueOf(pcd.getDayData().paiLow));
         mLineLowTime.setText(requireContext().getString(R.string.num_min, pcd.getDayData().minutesLow));
         mLineModerateInc.setText(String.valueOf(pcd.getDayData().paiModerate));

@@ -111,11 +111,16 @@
         android:orientation="vertical">
 
         <!-- Map for gpx track -->
-        <FrameLayout
+        <com.google.android.material.card.MaterialCardView
             android:id="@+id/gpsFragmentHolder"
             android:layout_width="match_parent"
             android:layout_height="300dp"
-            android:visibility="gone" />
+            android:layout_marginBottom="16dp"
+            android:visibility="gone"
+            app:cardCornerRadius="8dp"
+            app:cardElevation="0dp"
+            app:strokeWidth="0dp"
+            app:cardBackgroundColor="@android:color/transparent" />
 
         <!-- details -->
         <LinearLayout
