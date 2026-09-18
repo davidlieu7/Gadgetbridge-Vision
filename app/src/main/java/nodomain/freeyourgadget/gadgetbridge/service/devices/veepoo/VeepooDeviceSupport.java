@@ -114,7 +114,6 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
     private final VeepooLiveWorkoutModule liveWorkoutModule = new VeepooLiveWorkoutModule(this);
     private final VeepooManualDetectModule manualDetectModule = new VeepooManualDetectModule(this);
     private final VeepooVitalDetectModule vitalDetectModule = new VeepooVitalDetectModule(this);
-    private final VeepooWomenHealthModule womenHealthModule = new VeepooWomenHealthModule(this);
 
     static final int DATA_SOURCE_ACTIVITY_SUMMARY = 2; // daily summary records (D1)
     static final int DATA_SOURCE_SLEEP_SUMMARY = 4;    // sleep function records (E0)
@@ -251,10 +250,6 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
     // Capability from the device-pushed 0xA7 report (package 4): configurable periodic vitals.
     boolean autoMeasureSupported = false;
 
-    // Women's health (cycle tracking), opcode 0x85 (vendor u2 / WomenOperater). The A7 pkg1 [12]
-    // tag selects the read-back layout (3 = extended); -1 until the first capability report.
-    int womenTag = -1;
-
     // 0xB8 CustomSetting: last known basic ([19]==0) and extended ([19]==1) frames, pushed by
     // the band after every connect and answered after an explicit read request. Toggles are
     // applied by re-sending the stored frame with the target byte flipped.
@@ -376,10 +371,6 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
         // runs this exchange on every connect and the band answers with a device info
         // notification on AE02 (fe dc ba 00 ...).
         sendSinilinkHandshake();
-        // Re-push the women's health settings so the band keeps fresh LMP-relative state across
-        // reconnects (vendor parity: its device-init re-sends the last saved tuple). Only when
-        // a previous connection learned the firmware supports it and tracking is enabled.
-        womenHealthModule.scheduleConnectPush();
         // The device pushes its 0xA7 capability report after pairing; it is handled in
         // onCharacteristicChanged() and may arrive before the INITIALIZED state is reached.
         // If the live activity screen is still open across a reconnect, resume the status poll.
@@ -585,12 +576,6 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
             case 0x8A:
                 vitalDetectModule.handleLipidFrame(data);
                 break;
-            case 0x85:
-                // Women's health (cycle tracking). Note: 0x85 is also a PPG light-channel marker,
-                // but that one arrives on F002 and is consumed by VeepooEcgModule before the
-                // main-channel dispatch; only F008 frames reach this case.
-                womenHealthModule.handleFrame(data);
-                break;
             case 0xB3:
                 // Two dialects share this opcode; the A7 package 4 capability selects which one
                 // the firmware speaks (newer TLV auto-measure vs legacy AllSet SpO2).
@@ -759,20 +744,14 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
             }
             int alarmTag = data[VeepooConstants.CAP_PKG1_ALARM_TAG] & 0xFF;
             textAlarmsSupported = alarmTag == 5 || alarmTag == 6 || alarmTag == 7;
-            int women = data[VeepooConstants.CAP_PKG1_WOMEN_TAG] & 0xFF;
-            boolean womenSupported = women == 1 || women == 2 || women == 3;
-            this.womenTag = women;
-            LOG.info("Capabilities: spo2hType={} ({}) maxMessagePackets={} alarmTag={} ({}) womenTag={} ({})",
+            LOG.info("Capabilities: spo2hType={} ({}) maxMessagePackets={} alarmTag={} ({})",
                     spo2hType, spo2Supported ? "supported" : "not supported", socialMsgMaxPackets,
-                    alarmTag, textAlarmsSupported ? "text alarms supported" : "no text alarms",
-                    women, womenSupported ? "women's health supported" : "no women's health");
+                    alarmTag, textAlarmsSupported ? "text alarms supported" : "no text alarms");
             LOG.info("All-day vitals capability (pkg1): bpTag={} spo2hType={}", bpTag, spo2hType);
             GBApplication.getDeviceSpecificSharedPrefs(getDevice().getAddress())
                     .edit()
                     .putBoolean(VeepooConstants.CONFIG_AUTO_MEASURE_SPO2_SUPPORTED, spo2Supported)
                     .putBoolean(VeepooConstants.CONFIG_ALARMS_SUPPORTED, textAlarmsSupported)
-                    .putBoolean(VeepooConstants.CONFIG_WOMEN_SUPPORTED, womenSupported)
-                    .putInt(VeepooConstants.CONFIG_WOMEN_TAG, women)
                     .apply();
         } else if (packageId == 2) {
             int watchDay = data[2] & 0xFF;
@@ -1843,8 +1822,6 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
             vitalDetectModule.startLipidDetect();
         } else if (VeepooConstants.CONFIG_MEASURE_ECG.equals(config)) {
             ecgModule.startEcgDetect();
-        } else if (VeepooConstants.CONFIG_WOMEN_APPLY.equals(config)) {
-            womenHealthModule.applyWomenSettingFromPrefs(GBApplication.getDeviceSpecificSharedPrefs(getDevice().getAddress()));
         } else {
             if (autoMeasureSupported) {
                 autoMeasureModule.handleConfiguration(config);
@@ -2639,7 +2616,6 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
         mainHandler.removeCallbacks(statusPollTask);
         alarmModule.dispose();
         autoMeasureModule.dispose();
-        womenHealthModule.dispose();
         realtimeStepsRequested = false;
         synchronized (syncLock) {
             fetchPhase = FetchPhase.IDLE;
