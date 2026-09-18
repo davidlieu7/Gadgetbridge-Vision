@@ -265,6 +265,12 @@ public final class WearDataLayerProtocol {
         return dataItem == null ? null : new ProtoReader(dataItem).findMessage(DATAITEM_PAYLOAD);
     }
 
+    /** If the message is a DataItem, returns its per-node sequence number (field 5), else null. */
+    public static Long parseDataItemSeq(final byte[] message) {
+        final byte[] dataItem = extractDataItem(message);
+        return dataItem == null ? null : new ProtoReader(dataItem).findVarint(DATAITEM_SEQ);
+    }
+
     private static byte[] extractDataItem(final byte[] message) {
         final byte[] envelope = stripLengthPrefix(message);
         if (envelope == null) {

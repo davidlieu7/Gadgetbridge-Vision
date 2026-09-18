@@ -203,6 +203,11 @@ public class GalaxyWatch7DeviceSupport extends AbstractBTBRDeviceSupport {
     // trusted_packages. Use the stock companion's identity so the write is accepted.
     private static final String SETTINGS_SOURCE_PACKAGE = "com.samsung.wearable.watch7plugin";
     private static final String SETTINGS_SOURCE_SIGNATURE = "9ca5170f381919dfe0446fcdab18b19a143b3163";
+    // The phone-side node the watch's settings service actually reads protogensettings from.
+    // NOT the connection node (e1b1cd8b): the stock client connects as e1b1cd8b but authors
+    // settings under efb3c185 (reference capture §23/§24). Writing under the connection node only
+    // relays the DataItem; the watch applies settings written under this node.
+    private static final String SETTINGS_NODE = "efb3c185";
 
     // Boolean protogensettings, confirmed on the wire (§23): GB preference key -> the
     // "<group>/<key>" written at wear://<node>/protogensettings/<group>/<key>/<node>.
@@ -223,7 +228,10 @@ public class GalaxyWatch7DeviceSupport extends AbstractBTBRDeviceSupport {
         }
     }
 
-    private long nextSettingsSeq = 1;
+    // Highest DataItem sequence number seen for the settings node (efb3c185). The watch ignores a
+    // DataItem whose seq is not greater than the node's current seq (treats it as stale), so our
+    // writes must use a seq above what the watch already has. Seeded from the incoming stream.
+    private final java.util.concurrent.atomic.AtomicLong settingsSeq = new java.util.concurrent.atomic.AtomicLong(0);
 
     @Override
     public void onSendConfiguration(final String config) {
@@ -231,17 +239,13 @@ public class GalaxyWatch7DeviceSupport extends AbstractBTBRDeviceSupport {
         if (groupKey == null) {
             return;
         }
-        final String node = localNodeId;
-        if (node == null) {
-            LOG.warn("Galaxy Watch7: cannot send {} - own node id not known yet", config);
-            return;
-        }
         final SharedPreferences prefs = GBApplication.getDeviceSpecificSharedPrefs(getDevice().getAddress());
         final boolean enabled = prefs != null && prefs.getBoolean(config, false);
-        LOG.info("Galaxy Watch7: sending {} = {}", groupKey, enabled);
+        final long seq = settingsSeq.incrementAndGet();
+        LOG.info("Galaxy Watch7: sending {} = {} (seq {})", groupKey, enabled, seq);
         recentlySentSetting.put(groupKey, System.currentTimeMillis());
         final byte[] write = WearDataLayerProtocol.buildProtogenBooleanSettingPut(
-                SETTINGS_SOURCE_PACKAGE, SETTINGS_SOURCE_SIGNATURE, node, groupKey, enabled, nextSettingsSeq++);
+                SETTINGS_SOURCE_PACKAGE, SETTINGS_SOURCE_SIGNATURE, SETTINGS_NODE, groupKey, enabled, seq);
         final TransactionBuilder builder = createTransactionBuilder("send " + config);
         builder.write(write);
         builder.queue();
@@ -289,6 +293,7 @@ public class GalaxyWatch7DeviceSupport extends AbstractBTBRDeviceSupport {
     private void processIncomingMessage(final byte[] message) {
         LOG.info("Galaxy Watch7 <<< {}", WearDataLayerProtocol.describeMessage(message));
 
+        trackSettingsSeq(message);
         reflectIncomingSetting(message);
 
         final String parsed = WearDataLayerProtocol.parseWatchNodeId(message);
@@ -323,6 +328,20 @@ public class GalaxyWatch7DeviceSupport extends AbstractBTBRDeviceSupport {
             builder.queue();
         }
 
+    }
+
+    // Keep our outgoing settings seq above the settings node's current seq, learned from the
+    // incoming stream, so the watch does not reject our writes as stale.
+    private void trackSettingsSeq(final byte[] message) {
+        final String path = WearDataLayerProtocol.parseDataItemPath(message);
+        if (path == null || !path.startsWith("wear://" + SETTINGS_NODE + "/")) {
+            return;
+        }
+        final Long seq = WearDataLayerProtocol.parseDataItemSeq(message);
+        if (seq == null) {
+            return;
+        }
+        settingsSeq.getAndUpdate(cur -> Math.max(cur, seq));
     }
 
     // Reflect a watch-reported protogensettings boolean back into the device prefs so the GB

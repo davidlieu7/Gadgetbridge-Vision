@@ -2097,3 +2097,45 @@ bridge_mode/<app>). Notification *delivery* (showing a phone notification on the
 watch) is a separate message whose format is not yet captured - needs a capture of
 watch7plugin posting a real notification (watch7plugin temporarily re-enabled +
 a phone notification), which requires user setup. Not guessed here.
+
+---
+
+## 26. Settings WRITE reaches the watch but is not applied (2026-09-18)
+
+Fixed the settings-dispatch bug (§ the switches never called onSendConfiguration —
+added GalaxyWatch7SettingsCustomizer with addPreferenceHandlerFor). After that,
+toggles do send writes. But the watch does not APPLY them. Investigated with
+watch-side logcat (Wear OS ADB, now stable):
+
+- GB writes e.g. `wear://efb3c185/protogensettings/display/touch_to_wake/efb3c185`
+  = false (correct scheme + node + structure, matching stock client [11]).
+- Watch side: `WearServices [DispatchingGmsEventListener] onDataChanged:
+  type = CHANGED, uri = wear://efb3c185/protogensettings/display/touch_to_wake/efb3c185`
+  — so the watch's Data Layer ACCEPTS the write and fires the change event. It is
+  NOT a sync/seq/stale rejection (seq 757+, above current; timestamp higher than
+  the watch's own value; all ruled out).
+- But NO component logs applying it, and the setting/behaviour does not change.
+  The real client's identical write applies; GB's does not.
+
+So the block is in the watch's protogensettings APPLIER, not the transport. Also
+noted: Samsung's own settings mirror uses `w_module_sec_watch_setting/*` handled by
+`StDataLayerListener` (pid = com.google.android.apps.wearable.settings), which
+explicitly skips `from : watch` and processes phone-originated changes — a separate
+path from the Google `protogensettings/*` applier.
+
+Ruled out for the non-application: DataItem seq (raised above the node's current
+via tracking the incoming stream), logical-clock timestamp (ours > watch's),
+authoring node (tried both e1b1cd8b connection node and efb3c185 settings node),
+and message structure (byte-shape matches the reference).
+
+### Open — needs deeper watch RE
+Find the watch component that consumes `protogensettings/display/*` and applies it
+to the system, and why it ignores GB's (vs the stock client's) otherwise-identical
+write — likely a source/authority check not visible at default log level. This is
+the remaining nut for write control; read + connection are solid.
+
+### Connection stability note
+GB ran as the sole companion (GMS Wear disabled for the watch) for ~20+ minutes
+across these tests with zero drops — the earlier watch destabilisation was from
+GB and GMS both active, not from GB alone. A clean handover (GMS Wear off, then GB)
+is stable; flip-flopping GMS on/off while GB is active is what breaks it.
