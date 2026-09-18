@@ -186,12 +186,12 @@
         <item name="actionmenu_icon_color">?attr/colorOnSurface</item>
         <item name="alternate_row_background">?attr/colorSecondaryContainer</item>
         <item name="row_separator">@color/row_separator_light</item>
-        <item name="stat_tile_bg">@color/stat_tile_bg_light</item>
-        <item name="stat_tile_border">@color/stat_tile_border_light</item>
-        <item name="activity_icon_bg">@color/activity_icon_bg_light</item>
-        <item name="fab_bg">@color/fab_bg_light</item>
-        <item name="fab_icon">@color/fab_icon_light</item>
-        <item name="table_header_rule">@color/table_header_rule_light</item>
+        <item name="stat_tile_bg">?attr/colorSurfaceContainer</item>
+        <item name="stat_tile_border">?attr/colorOutlineVariant</item>
+        <item name="activity_icon_bg">?attr/colorSurfaceContainerHigh</item>
+        <item name="fab_bg">?attr/colorPrimaryContainer</item>
+        <item name="fab_icon">?attr/colorOnPrimaryContainer</item>
+        <item name="table_header_rule">?attr/colorOutlineVariant</item>
         <item name="preferenceTheme">@style/AppPreferenceThemeOverlay</item>
         <item name="android:navigationBarColor">?attr/colorSurface</item>
         <!-- FIXME: SDK 21 to 27 has light navbar on light background -->
@@ -243,12 +243,12 @@
         <item name="actionmenu_icon_color">?attr/colorOnSurface</item>
         <item name="alternate_row_background">?attr/colorSecondaryContainer</item>
         <item name="row_separator">@color/row_separator_dark</item>
-        <item name="stat_tile_bg">@color/stat_tile_bg_dark</item>
-        <item name="stat_tile_border">@color/stat_tile_border_dark</item>
-        <item name="activity_icon_bg">@color/activity_icon_bg_dark</item>
-        <item name="fab_bg">@color/fab_bg_dark</item>
-        <item name="fab_icon">@color/fab_icon_dark</item>
-        <item name="table_header_rule">@color/table_header_rule_dark</item>
+        <item name="stat_tile_bg">?attr/colorSurfaceContainer</item>
+        <item name="stat_tile_border">?attr/colorOutlineVariant</item>
+        <item name="activity_icon_bg">?attr/colorSurfaceContainerHigh</item>
+        <item name="fab_bg">?attr/colorPrimaryContainer</item>
+        <item name="fab_icon">?attr/colorOnPrimaryContainer</item>
+        <item name="table_header_rule">?attr/colorOutlineVariant</item>
         <item name="preferenceTheme">@style/AppPreferenceThemeOverlay</item>
         <item name="android:navigationBarColor">?attr/colorSurface</item>
         <item name="android:windowLightNavigationBar" tools:targetApi="27">false</item>
