@@ -553,6 +553,7 @@ import nodomain.freeyourgadget.gadgetbridge.devices.sony.headphones.coordinators
 import nodomain.freeyourgadget.gadgetbridge.devices.sony.wena3.SonyWena3Coordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.sonyswr12.SonySWR12DeviceCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.soundbrenner.SoundbrennerCoordinator;
+import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.a30i.SoundcoreA30iCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.aerofit.SoundcoreAeroFit2Coordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.liberty3_pro.SoundcoreLiberty3ProCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.liberty4_nc.SoundcoreLiberty4NCCoordinator;
@@ -1051,6 +1052,7 @@ public enum DeviceType {
     SOUNDCORE_LIFE_TUNE_XR(SoundcoreLifeTuneXRCoordinator.class),
     SOUNDCORE_AEROFIT2(SoundcoreAeroFit2Coordinator.class),
     SOUNDCORE_SPORT_X20(SoundcoreSportX20Coordinator.class),
+    SOUNDCORE_A30i(SoundcoreA30iCoordinator.class),
     HAYLOU_S35_ANC(HaylouS35AncCoordinator.class),
     MOONDROP_SPACE_TRAVEL(MoondropSpaceTravelCoordinator.class),
     MOONDROP_SPACE_TRAVEL_2(MoondropSpaceTravel2Coordinator.class),

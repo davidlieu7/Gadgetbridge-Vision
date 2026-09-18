@@ -4818,6 +4818,42 @@
         <item>9</item>
     </string-array>
 
+    <string-array name="soundcore_find_left_earbud_names">
+        <item>@string/off</item>
+        <item>@string/earfun_find_headphones_hint</item>
+    </string-array>
+
+    <string-array name="soundcore_find_left_earbud_values">
+        <item>0</item>
+        <item>1</item>
+    </string-array>
+
+    <string-array name="soundcore_find_right_earbud_names">
+        <item>@string/off</item>
+        <item>@string/earfun_find_headphones_hint</item>
+    </string-array>
+
+    <string-array name="soundcore_find_right_earbud_values">
+        <item>0</item>
+        <item>1</item>
+    </string-array>
+
+    <string-array name="soundcore_ambient_sound_control_names">
+        <item>@string/sony_ambient_sound_off</item>
+        <item>@string/prefs_active_noise_cancelling_transparency</item>
+        <item>@string/sony_ambient_sound_noise_cancelling</item>
+        <item>@string/pref_adaptive_noise_cancelling_title</item>
+        <item>@string/sony_ambient_sound_ambient_sound</item>
+    </string-array>
+
+    <string-array name="soundcore_ambient_sound_control_values">
+        <item>off</item>
+        <item>transparency</item>
+        <item>noise_cancelling</item>
+        <item>adaptive_anc</item>
+        <item>ambient_sound</item>
+    </string-array>
+
     <string-array name="moondrop_equalizer_preset_names">
         <item>@string/moondrop_equalizer_preset_reference</item>
         <item>@string/moondrop_equalizer_preset_basshead</item>

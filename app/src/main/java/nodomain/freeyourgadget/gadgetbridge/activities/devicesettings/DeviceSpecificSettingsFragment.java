@@ -1070,6 +1070,11 @@ public class DeviceSpecificSettingsFragment extends AbstractPreferenceFragment i
         addPreferenceHandlerFor(PREF_SOUNDCORE_EQUALIZER_BAND8_VALUE);
         addPreferenceHandlerFor(PREF_SOUNDCORE_EQUALIZER_BAND9_FREQ);
         addPreferenceHandlerFor(PREF_SOUNDCORE_EQUALIZER_BAND9_VALUE);
+        addPreferenceHandlerFor(PREF_SOUNDCORE_FIND_LEFT_EARBUD);
+        addPreferenceHandlerFor(PREF_SOUNDCORE_FIND_RIGHT_EARBUD);
+        addPreferenceHandlerFor(PREF_SOUNDCORE_A30I_DISABLE_OPTION_AMBIENT_MODE);
+        addPreferenceHandlerFor(PREF_SOUNDCORE_A30I_DISABLE_OPTION_AMBIENT_SOUND_LEVEL);
+        addPreferenceHandlerFor(PREF_SOUNDCORE_A30I_DISABLE_OPTION_WIND_NOISE_REDUCTION);
 
         addPreferenceHandlerFor(PREF_MOONDROP_EQUALIZER_PRESET);
         addPreferenceHandlerFor(PREF_MOONDROP_ANC_MODE);
