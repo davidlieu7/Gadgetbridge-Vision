@@ -242,12 +242,17 @@ public class GalaxyWatch7DeviceSupport extends AbstractBTBRDeviceSupport {
         final SharedPreferences prefs = GBApplication.getDeviceSpecificSharedPrefs(getDevice().getAddress());
         final boolean enabled = prefs != null && prefs.getBoolean(config, false);
         final long seq = settingsSeq.incrementAndGet();
-        LOG.info("Galaxy Watch7: sending {} = {} (seq {})", groupKey, enabled, seq);
+        LOG.info("Galaxy Watch7: sending {} = {} (seq {}, {} known nodes)", groupKey, enabled, seq, nodeCounters.size());
         recentlySentSetting.put(groupKey, System.currentTimeMillis());
-        final byte[] write = WearDataLayerProtocol.buildProtogenBooleanSettingPut(
-                SETTINGS_SOURCE_PACKAGE, SETTINGS_SOURCE_SIGNATURE, SETTINGS_NODE, groupKey, enabled, seq);
         final TransactionBuilder builder = createTransactionBuilder("send " + config);
-        builder.write(write);
+        // Assert ownership of the phone-side nodes (incl. the settings node) with a fuller peer-sync
+        // right before the write, mirroring the stock client, in case the watch's settings applier
+        // only applies writes from a node it sees us represent (research notes §26).
+        if (watchNodeId != null && !nodeCounters.isEmpty()) {
+            builder.write(WearDataLayerProtocol.buildSeqAck(nodeCounters, watchNodeId));
+        }
+        builder.write(WearDataLayerProtocol.buildProtogenBooleanSettingPut(
+                SETTINGS_SOURCE_PACKAGE, SETTINGS_SOURCE_SIGNATURE, SETTINGS_NODE, groupKey, enabled, seq));
         builder.queue();
     }
 
@@ -332,16 +337,25 @@ public class GalaxyWatch7DeviceSupport extends AbstractBTBRDeviceSupport {
 
     // Keep our outgoing settings seq above the settings node's current seq, learned from the
     // incoming stream, so the watch does not reject our writes as stale.
+    // node id -> highest DataItem seq we've seen for it, learned from the incoming stream. Used to
+    // build a fuller peer-sync (like the stock client) that declares all nodes with their counters.
+    private final java.util.concurrent.ConcurrentHashMap<String, Long> nodeCounters = new java.util.concurrent.ConcurrentHashMap<>();
+
     private void trackSettingsSeq(final byte[] message) {
         final String path = WearDataLayerProtocol.parseDataItemPath(message);
-        if (path == null || !path.startsWith("wear://" + SETTINGS_NODE + "/")) {
+        if (path == null || !path.startsWith("wear://")) {
             return;
         }
         final Long seq = WearDataLayerProtocol.parseDataItemSeq(message);
         if (seq == null) {
             return;
         }
-        settingsSeq.getAndUpdate(cur -> Math.max(cur, seq));
+        final int slash = path.indexOf('/', "wear://".length());
+        final String node = slash < 0 ? path.substring("wear://".length()) : path.substring("wear://".length(), slash);
+        nodeCounters.merge(node, seq, Math::max);
+        if (node.equals(SETTINGS_NODE)) {
+            settingsSeq.getAndUpdate(cur -> Math.max(cur, seq));
+        }
     }
 
     // Reflect a watch-reported protogensettings boolean back into the device prefs so the GB

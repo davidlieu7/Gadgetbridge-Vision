@@ -319,6 +319,31 @@ public final class WearDataLayerProtocol {
         return frame(wrapEnvelope(payload.toByteArray(), true));
     }
 
+    /**
+     * Fuller peer-sync that declares every node this side has observed with its current counter
+     * (like the stock client, whose peer-sync lists all phone nodes, cloud and the watch - not
+     * just three at counter 0). field 1 is our counter for the watch. Used to assert ownership of
+     * the phone-side settings node before writing a setting (research notes §26).
+     */
+    public static byte[] buildSeqAck(final java.util.Map<String, Long> nodeCounters,
+                                     final String watchNodeId) {
+        final ProtoWriter seqAck = new ProtoWriter();
+        final Long watchCounter = nodeCounters.get(watchNodeId);
+        seqAck.writeVarint(SEQACK_COUNTER, watchCounter != null ? watchCounter : -1L);
+        if (!nodeCounters.containsKey(CLOUD_NODE_ID)) {
+            appendNodeRef(seqAck, CLOUD_NODE_ID, 0);
+        }
+        for (final java.util.Map.Entry<String, Long> e : nodeCounters.entrySet()) {
+            appendNodeRef(seqAck, e.getKey(), e.getValue());
+        }
+        seqAck.writeVarint(SEQACK_FLAG, 2);
+
+        final ProtoWriter payload = new ProtoWriter();
+        payload.writeMessage(PAYLOAD_SEQ_ACK, seqAck.toByteArray());
+
+        return frame(wrapEnvelope(payload.toByteArray(), true));
+    }
+
     private static void appendNodeRef(final ProtoWriter seqAck, final String nodeId, final long counter) {
         final ProtoWriter nodeRef = new ProtoWriter();
         nodeRef.writeString(NODE_REF_ID, nodeId);

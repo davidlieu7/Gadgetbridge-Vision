@@ -2139,3 +2139,35 @@ GB ran as the sole companion (GMS Wear disabled for the watch) for ~20+ minutes
 across these tests with zero drops — the earlier watch destabilisation was from
 GB and GMS both active, not from GB alone. A clean handover (GMS Wear off, then GB)
 is stable; flip-flopping GMS on/off while GB is active is what breaks it.
+
+---
+
+## 27. Fuller peer-sync did NOT fix write application (2026-09-18)
+
+Implemented the ownership hypothesis from §26: track every node's counter from the
+incoming stream and, right before a settings write, send a fuller peer-sync that
+declares all observed nodes with their counters (like the stock client's 9-node
+peer-sync), asserting ownership of the settings node efb3c185.
+
+Result: no change. The watch still does not apply the write (touch_to_wake toggle
+had no effect). So the block is not the peer-sync node declaration.
+
+Everything phone-side that can be varied has now been ruled out: authoring node,
+DataItem seq, logical-clock timestamp, message structure/signature, and peer-sync
+node ownership. The write reaches the watch (§26 onDataChanged) but its
+protogensettings applier ignores it for a reason only visible inside that watch
+component.
+
+### The remaining path
+Decompile the watch's settings applier (com.google.android.apps.wearable.settings /
+the protogensettings consumer) to read its validation and see why it skips our
+otherwise-identical write. This needs a stable watch ADB to pull the APK - the
+watch's wireless ADB has been too flaky (drops within seconds) to reliably grab it.
+A rock-solid channel (ADB over USB / a dock, or keeping the watch awake on charger
+in the same network) would let this be finished.
+
+### Deliverable state
+Solid and durable: GB establishes and holds the Data Layer connection as the sole
+companion without the Samsung app, decodes the full incoming DataItem stream
+(settings, apps, battery, ...), and delivers correctly-framed writes that reach the
+watch. Only the watch-side application of setting writes is unresolved.
