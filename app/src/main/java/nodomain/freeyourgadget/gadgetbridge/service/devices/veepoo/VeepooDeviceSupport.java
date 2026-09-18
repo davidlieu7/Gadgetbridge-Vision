@@ -2611,8 +2611,9 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
                             dayIndex, hour, minute, tcho, trig, hdl, ldl, uricAcid);
                 }
             } else if (haveRecord && tag == 0xC3 && hour <= 23 && minute <= 59 && body.length >= 4) {
-                // Body temperature: LE16 base and measured values, each in tenths of a degree; the
-                // vendor drops the record when either value is outside 120..480 (12.0..48.0 C).
+                // Wrist skin temperature: LE16 base and measured values, each in tenths of a
+                // degree; the vendor drops the record when either value is outside 120..480
+                // (12.0..48.0 C). The on-demand 0x87 measurement stays TYPE_BODY.
                 int baseTenths = ((body[1] & 0xFF) << 8) | (body[0] & 0xFF);
                 int measuredTenths = ((body[3] & 0xFF) << 8) | (body[2] & 0xFF);
                 Calendar stamp = origin3RecordStamp(base, hour, minute);
@@ -2621,7 +2622,7 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
                     GenericTemperatureSample sample = new GenericTemperatureSample();
                     sample.setTimestamp(stamp.getTimeInMillis());
                     sample.setTemperature(measuredTenths / 10.0f);
-                    sample.setTemperatureType(TemperatureSample.TYPE_BODY);
+                    sample.setTemperatureType(TemperatureSample.TYPE_SKIN);
                     sample.setTemperatureLocation(TemperatureSample.LOCATION_WRIST);
                     pendingOriginTemperatureSamples.add(sample);
                 }
