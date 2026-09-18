@@ -43,8 +43,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.TimeZone;
 
-import nodomain.freeyourgadget.gadgetbridge.activities.workouts.entries.ActivitySummaryTableBuilder;
-import nodomain.freeyourgadget.gadgetbridge.activities.workouts.entries.ActivitySummaryValue;
 import nodomain.freeyourgadget.gadgetbridge.GBApplication;
 import nodomain.freeyourgadget.gadgetbridge.R;
 import nodomain.freeyourgadget.gadgetbridge.database.DBHandler;
@@ -91,7 +89,6 @@ import nodomain.freeyourgadget.gadgetbridge.model.ActivityKind;
 import nodomain.freeyourgadget.gadgetbridge.model.ActivityPoint;
 import nodomain.freeyourgadget.gadgetbridge.model.ActivitySample;
 import nodomain.freeyourgadget.gadgetbridge.model.ActivitySummaryData;
-import nodomain.freeyourgadget.gadgetbridge.model.ActivitySummaryEntries;
 import nodomain.freeyourgadget.gadgetbridge.model.ActivityTrack;
 import nodomain.freeyourgadget.gadgetbridge.model.Alarm;
 import nodomain.freeyourgadget.gadgetbridge.model.BatteryState;
@@ -1581,349 +1578,26 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
     /** Parses one 0xD4 day: GPS layout for multi-sport types 4/5/6, plain layout otherwise. */
     private boolean parseSportDay(List<byte[]> frames, int dayIndex) {
         try {
+            VeepooSportDayParser.SportDay day;
             if (multSportModeType == 4 || multSportModeType == 5 || multSportModeType == 6) {
-                return parseSportGpsDay(frames, dayIndex);
+                day = VeepooSportDayParser.parseGpsDay(frames, dayIndex);
             } else {
-                return parseSportPlainDay(frames, dayIndex);
+                day = VeepooSportDayParser.parsePlainDay(frames, dayIndex);
             }
+            if (day == null) {
+                return false;
+            }
+            saveSportSession(day.startTime, day.stopTime, day.sportType, day.summary, day.gpsPoints, dayIndex);
+            return true;
         } catch (Exception e) {
             LOG.error("Error parsing workout day {}", dayIndex, e);
             return false;
         }
     }
 
-    /**
-     * Plain (non-GPS) workout layout. The head is the [6..19] slice of the first three frames
-     * concatenated (42 bytes): start year BE16 [1..2], start month/day/hour/min/sec [3..7], end
-     * year BE16 [8..9], end month/day/hour/min/sec [10..14], LE u32 steps [15..18], LE u32
-     * distance (meters) [19..22], LE u32 kcal x 1000 [23..26], LE u32 sport seconds [27..30],
-     * BE u16 record count [31..32], pause count [33], BE u16 pause seconds [34..35], BE u16 CRC
-     * [36..37], sport type [38]. Item frames (index >= 3) carry one per-minute record: rate [6],
-     * BE u16 minute index [1..2] (3-based), BE u16 total minutes [3..4] (3-based), BE u16 steps
-     * [9..10], BE u16 kcal x 1000 [11..12], BE u16 distance (meters) [13..14].
-     */
-    private boolean parseSportPlainDay(List<byte[]> frames, int dayIndex) {
-        if (frames.size() < 3) {
-            LOG.info("Workout day {}: no workout data ({} frame(s))", dayIndex, frames.size());
-            return false;
-        }
-        byte[] head = new byte[42];
-        for (int k = 0; k < 3; k++) {
-            System.arraycopy(frames.get(k), 6, head, k * 14, 14);
-        }
-
-        Date startTime = dateFromParts(be16(head, 1), head[3] & 0xFF, head[4] & 0xFF,
-                head[5] & 0xFF, head[6] & 0xFF, head[7] & 0xFF);
-        Date stopTime = dateFromParts(be16(head, 8), head[10] & 0xFF, head[11] & 0xFF,
-                head[12] & 0xFF, head[13] & 0xFF, head[14] & 0xFF);
-        if (startTime == null || stopTime == null || stopTime.before(startTime)) {
-            if (startTime == null && stopTime == null) {
-                LOG.info("Workout day {}: empty slot", dayIndex);
-            } else {
-                LOG.warn("Workout day {}: implausible workout window in the head; skipping", dayIndex);
-            }
-            return false;
-        }
-
-        int steps = (int) le32(head, 15);
-        int distanceMeters = (int) le32(head, 19);
-        float kcal = (int) le32(head, 23) / 1000f;
-        long sportSeconds = le32(head, 27);
-        int pauseSeconds = be16(head, 34);
-        int sportType = head[38] & 0xFF;
-
-        long totalSeconds = Math.abs(stopTime.getTime() - startTime.getTime()) / 1000L;
-        long activeSeconds = sportSeconds > 0 ? sportSeconds : Math.max(0L, totalSeconds - pauseSeconds);
-
-        ActivitySummaryData summary = new ActivitySummaryData();
-        addSportEntries(summary, activeSeconds, distanceMeters, kcal, steps);
-
-        int hrCount = 0;
-        long hrSum = 0;
-        int hrMin = Integer.MAX_VALUE;
-        int hrMax = 0;
-        ActivitySummaryTableBuilder perMinute = newPerMinuteTable();
-        for (int i = 3; i < frames.size(); i++) {
-            byte[] frame = frames.get(i);
-            int minuteIndex = be16(frame, 1) - 3;
-            int allMinutes = be16(frame, 3) - 3;
-            int rate = frame[6] & 0xFF;
-            int itemSteps = be16(frame, 9);
-            int itemKcalRaw = be16(frame, 11);
-            int itemDistance = be16(frame, 13);
-            if (minuteIndex < 0 || allMinutes < 0) {
-                continue; // zero-padded frame, no record data
-            }
-            boolean validHr = rate >= 30 && rate <= 200;
-            if (!validHr && itemSteps == 0 && itemDistance == 0 && itemKcalRaw == 0) {
-                continue;
-            }
-            if (validHr) {
-                hrCount++;
-                hrSum += rate;
-                hrMin = Math.min(hrMin, rate);
-                hrMax = Math.max(hrMax, rate);
-            }
-            perMinute.addRow("minute_" + (minuteIndex + 1), Arrays.asList(
-                    new ActivitySummaryValue(minuteIndex + 1, ActivitySummaryEntries.UNIT_NONE),
-                    new ActivitySummaryValue(validHr ? rate : null, ActivitySummaryEntries.UNIT_BPM),
-                    new ActivitySummaryValue(itemSteps > 0 ? itemSteps : null, ActivitySummaryEntries.UNIT_STEPS),
-                    new ActivitySummaryValue(itemDistance > 0 ? itemDistance : null, ActivitySummaryEntries.UNIT_METERS),
-                    new ActivitySummaryValue(itemKcalRaw > 0 ? itemKcalRaw / 1000f : null, ActivitySummaryEntries.UNIT_KCAL)));
-        }
-        if (hrCount > 0) {
-            summary.add(ActivitySummaryEntries.HR_AVG, hrSum / hrCount, ActivitySummaryEntries.UNIT_BPM);
-            summary.add(ActivitySummaryEntries.HR_MIN, hrMin, ActivitySummaryEntries.UNIT_BPM);
-            summary.add(ActivitySummaryEntries.HR_MAX, hrMax, ActivitySummaryEntries.UNIT_BPM);
-        }
-        perMinute.addToSummaryData(summary);
-        saveSportSession(startTime, stopTime, sportType, summary, new ArrayList<>(), dayIndex);
-        return true;
-    }
-
-    /**
-     * GPS workout layout: strip the 5-byte frame prefix from every frame and join the payloads
-     * into one blob. Head: [0]=0xA1, [1]=headLen-2, start/stop/sport-duration LE u32 [4..7]/
-     * [8..11]/[12..15], block base offset [17], steps LE u32 [18..21], distance (meters) LE u32
-      * [22..25], kcal x 1000 LE u32 [26..29], max/avg/min HR [34..36], avg pace LE16 [39..40].
-      * Optional altitude block (base + 2 > 39): max/avg/min altitude LE u32 at [55..66], climb
-      * LE u32 [67..70], decline LE u32 [71..74]. Sport block at base: pause seconds LE16
-      * [base+23..24], sport type LE u16 [base+31..32], data type [base+33] (1/2/5/6 => per-point
-       * altitude). Items follow as TLV: tag 0xA2, LE u16 length (the KR96 Pro firmware sends the
-       * length little-endian; the vendor app's big-endian read rejects them), then one per-minute
-       * record (HR [2], steps LE16 [5..6], distance LE16 [7..8], kcal x 1000 LE16 [9..10]) plus
-       * any trailing GPS points. On the KR96 Pro every item is exactly 16 bytes, i.e. no GPS
-       * points are embedded in the workout history stream.
-     */
-    private boolean parseSportGpsDay(List<byte[]> frames, int dayIndex) {
-        if (frames.isEmpty()) {
-            LOG.info("Workout day {}: no workout data", dayIndex);
-            return false;
-        }
-        int blobLength = 0;
-        for (byte[] frame : frames) {
-            blobLength += frame.length - 5;
-        }
-        byte[] blob = new byte[blobLength];
-        int position = 0;
-        for (byte[] frame : frames) {
-            System.arraycopy(frame, 5, blob, position, frame.length - 5);
-            position += frame.length - 5;
-        }
-
-        if (blob.length < 40 || (blob[0] & 0xFF) != 0xA1) {
-            LOG.info("Workout day {}: no GPS workout data in {}-byte blob", dayIndex, blob.length);
-            return false;
-        }
-        int headLength = Math.min((blob[1] & 0xFF) + 2, blob.length);
-        long fieldA = le32(blob, 4);
-        long fieldB = le32(blob, 8);
-        if (fieldA == 0 && fieldB == 0) {
-            LOG.info("Workout day {}: empty slot", dayIndex);
-            return false;
-        }
-        // Older firmware versions stamped the start epoch with a wrong timezone (future date),
-        // leaving the two epochs out of order. Normalize with min/max so those sessions are
-        // still saved.
-        long startUnix = Math.min(fieldA, fieldB);
-        long stopUnix = Math.max(fieldA, fieldB);
-        if (startUnix < 946684800L || startUnix > 4102444800L || headLength < 40) {
-            LOG.warn("Workout day {}: implausible GPS head (epochs {} and {}); skipping",
-                    dayIndex, fieldA, fieldB);
-            return false;
-        }
-        if (fieldB < fieldA) {
-            LOG.warn("Workout day {}: start/stop epochs out of order ({}, {}); using min/max",
-                    dayIndex, fieldA, fieldB);
-        }
-
-        int sportSeconds = (int) le32(blob, 12);
-        int base = blob[17] & 0xFF;
-        int steps = (int) le32(blob, 18);
-        int distanceMeters = (int) le32(blob, 22);
-        float kcal = (int) le32(blob, 26) / 1000f;
-        int maxHr = blob[34] & 0xFF;
-        int avgHr = blob[35] & 0xFF;
-        int minHr = blob[36] & 0xFF;
-        int avgPace = le16(blob, 39);
-        int maxSpeed = le16(blob, 43);
-        int avgSpeed = le16(blob, 45);
-        int minSpeed = le16(blob, 47);
-        int maxCadence = le16(blob, 49);
-        int avgCadence = le16(blob, 51);
-        int minCadence = le16(blob, 53);
-
-        long maxAltitude = 0;
-        long avgAltitude = 0;
-        long minAltitude = 0;
-        long climb = 0;
-        long decline = 0;
-        boolean hasAltitudeBlock = base + 2 > 39 && blob.length >= 75;
-        if (hasAltitudeBlock) {
-            maxAltitude = le32(blob, 55);
-            avgAltitude = le32(blob, 59);
-            minAltitude = le32(blob, 63);
-            climb = le32(blob, 67);
-            decline = le32(blob, 71);
-        }
-
-        if (blob.length < base + 34) {
-            LOG.warn("Workout day {}: GPS blob truncated before the sport block; skipping", dayIndex);
-            return false;
-        }
-        int pauseSeconds = le16(blob, base + 23);
-        int sportType = le16(blob, base + 31);
-        int dataType = blob[base + 33] & 0xFF;
-
-        Date startTime = new Date(startUnix * 1000L);
-        Date stopTime = new Date(stopUnix * 1000L);
-        long totalSeconds = Math.max(0L, stopUnix - startUnix);
-        long activeSeconds = sportSeconds > 0 ? sportSeconds : Math.max(0L, totalSeconds - pauseSeconds);
-
-        ActivitySummaryData summary = new ActivitySummaryData();
-        addSportEntries(summary, activeSeconds, distanceMeters, kcal, steps);
-        if (avgHr >= 30 && avgHr <= 200) {
-            summary.add(ActivitySummaryEntries.HR_AVG, avgHr, ActivitySummaryEntries.UNIT_BPM);
-        }
-        if (maxHr >= 30 && maxHr <= 200) {
-            summary.add(ActivitySummaryEntries.HR_MAX, maxHr, ActivitySummaryEntries.UNIT_BPM);
-        }
-        if (minHr >= 30 && minHr <= 200) {
-            summary.add(ActivitySummaryEntries.HR_MIN, minHr, ActivitySummaryEntries.UNIT_BPM);
-        }
-        if (avgPace > 0) {
-            summary.add(ActivitySummaryEntries.PACE_AVG_SECONDS_KM, avgPace, ActivitySummaryEntries.UNIT_SECONDS_PER_KM);
-        }
-        if (avgSpeed > 0) {
-            summary.add(ActivitySummaryEntries.SPEED_AVG, avgSpeed / 1000f, ActivitySummaryEntries.UNIT_KMPH);
-        }
-        if (maxSpeed > 0) {
-            summary.add(ActivitySummaryEntries.SPEED_MAX, maxSpeed / 1000f, ActivitySummaryEntries.UNIT_KMPH);
-        }
-        if (minSpeed > 0) {
-            summary.add(ActivitySummaryEntries.SPEED_MIN, minSpeed / 1000f, ActivitySummaryEntries.UNIT_KMPH);
-        }
-        if (avgCadence >= 30 && avgCadence <= 400) {
-            summary.add(ActivitySummaryEntries.CADENCE_AVG, avgCadence, ActivitySummaryEntries.UNIT_SPM);
-        }
-        if (maxCadence >= 30 && maxCadence <= 400) {
-            summary.add(ActivitySummaryEntries.CADENCE_MAX, maxCadence, ActivitySummaryEntries.UNIT_SPM);
-        }
-        if (minCadence >= 30 && minCadence <= 400) {
-            summary.add(ActivitySummaryEntries.CADENCE_MIN, minCadence, ActivitySummaryEntries.UNIT_SPM);
-        }
-        if (hasAltitudeBlock) {
-            if (maxAltitude > 0) {
-                summary.add(ActivitySummaryEntries.ALTITUDE_MAX, maxAltitude, ActivitySummaryEntries.UNIT_METERS);
-            }
-            if (avgAltitude > 0) {
-                summary.add(ActivitySummaryEntries.ALTITUDE_AVG, avgAltitude, ActivitySummaryEntries.UNIT_METERS);
-            }
-            if (minAltitude > 0) {
-                summary.add(ActivitySummaryEntries.ALTITUDE_MIN, minAltitude, ActivitySummaryEntries.UNIT_METERS);
-            }
-            if (climb > 0) {
-                summary.add(ActivitySummaryEntries.TOTAL_ASCENT, climb, ActivitySummaryEntries.UNIT_METERS);
-            }
-            if (decline > 0) {
-                summary.add(ActivitySummaryEntries.TOTAL_DESCENT, decline, ActivitySummaryEntries.UNIT_METERS);
-            }
-        }
-
-        ActivitySummaryTableBuilder perMinute = newPerMinuteTable();
-        List<GpxPoint> gpsPoints = new ArrayList<>();
-        int offset = headLength;
-        int itemIndex = 0;
-        int rowsAdded = 0;
-        while (offset + 3 <= blob.length) {
-            if ((blob[offset] & 0xFF) != 0xA2) {
-                break;
-            }
-            int recordLength = le16(blob, offset + 1);
-            int dataStart = offset + 3;
-            if (recordLength < 12 || dataStart + recordLength > blob.length) {
-                break;
-            }
-            int rate = blob[dataStart + 2] & 0xFF;
-            int itemSteps = le16(blob, dataStart + 5);
-            int itemDistance = le16(blob, dataStart + 7);
-            int itemKcalRaw = le16(blob, dataStart + 9);
-            boolean validHr = rate >= 30 && rate <= 200;
-            if (validHr || itemSteps > 0 || itemDistance > 0 || itemKcalRaw > 0) {
-                perMinute.addRow("minute_" + (itemIndex + 1), Arrays.asList(
-                        new ActivitySummaryValue(itemIndex + 1, ActivitySummaryEntries.UNIT_NONE),
-                        new ActivitySummaryValue(validHr ? rate : null, ActivitySummaryEntries.UNIT_BPM),
-                        new ActivitySummaryValue(itemSteps > 0 ? itemSteps : null, ActivitySummaryEntries.UNIT_STEPS),
-                        new ActivitySummaryValue(itemDistance > 0 ? itemDistance : null, ActivitySummaryEntries.UNIT_METERS),
-                        new ActivitySummaryValue(itemKcalRaw > 0 ? itemKcalRaw / 1000f : null, ActivitySummaryEntries.UNIT_KCAL)));
-                rowsAdded++;
-            }
-            int pointStart = hasAltitudeBlock ? 22 : 18;
-            long itemAltitude = hasAltitudeBlock && recordLength > 16 ? le32(blob, dataStart + 13) : 0;
-            int pointCount = Math.max(0, (recordLength - 16) / 11);
-            for (int p = 0; p < pointCount; p++) {
-                int pos = dataStart + pointStart + p * 11;
-                if (pos + 11 > dataStart + recordLength) {
-                    break;
-                }
-                long lon = le32(blob, pos + 1);
-                long lat = le32(blob, pos + 5);
-                if (lon != 0 && lat != 0) {
-                    long timeMs = startUnix * 1000L + itemIndex * 60000L
-                            + (pointCount > 1 ? p * 60000L / pointCount : 30000L);
-                    gpsPoints.add(new GpxPoint(lon, lat, itemAltitude, timeMs));
-                }
-            }
-            itemIndex++;
-            offset = dataStart + recordLength;
-        }
-        perMinute.addToSummaryData(summary);
-        LOG.info("Workout day {}: parsed {} item records, saved {} per-minute rows ({} GPS points)",
-                dayIndex, itemIndex, rowsAdded, gpsPoints.size());
-        if (rowsAdded == 0 && blob.length > headLength + 3) {
-            StringBuilder hex = new StringBuilder();
-            int dumpEnd = Math.min(blob.length, headLength + 48);
-            for (int i = headLength; i < dumpEnd; i++) {
-                hex.append(String.format("%02x ", blob[i] & 0xFF));
-            }
-            StringBuilder a2Offsets = new StringBuilder();
-            int a2Count = 0;
-            for (int i = 0; i < blob.length && a2Count < 40; i++) {
-                if ((blob[i] & 0xFF) == 0xA2) {
-                    a2Offsets.append(i).append(' ');
-                    a2Count++;
-                }
-            }
-            LOG.info("Workout day {}: no 0xA2 item records at offset {}; bytes there: [{}]; 0xA2 byte offsets in blob: [{}]",
-                    dayIndex, headLength, hex.toString().trim(), a2Offsets.toString().trim());
-        }
-        saveSportSession(startTime, stopTime, sportType, summary, gpsPoints, dayIndex);
-        return true;
-    }
-
-    private static void addSportEntries(ActivitySummaryData summary, long activeSeconds, int distanceMeters, float kcal, int steps) {
-        if (activeSeconds > 0) {
-            summary.add(ActivitySummaryEntries.ACTIVE_SECONDS, activeSeconds, ActivitySummaryEntries.UNIT_SECONDS);
-        }
-        if (distanceMeters > 0) {
-            summary.add(ActivitySummaryEntries.DISTANCE_METERS, distanceMeters, ActivitySummaryEntries.UNIT_METERS);
-        }
-        if (kcal > 0f) {
-            summary.add(ActivitySummaryEntries.CALORIES_BURNT, kcal, ActivitySummaryEntries.UNIT_KCAL);
-        }
-        if (steps > 0) {
-            summary.add(ActivitySummaryEntries.STEPS, steps, ActivitySummaryEntries.UNIT_STEPS);
-        }
-    }
-
-    private static ActivitySummaryTableBuilder newPerMinuteTable() {
-        return new ActivitySummaryTableBuilder(ActivitySummaryEntries.GROUP_LAPS, "per_minute_header",
-                Arrays.asList("minute", "heartRate", "steps", "distanceMeters", "caloriesBurnt"));
-    }
-
     /** Persists one parsed workout as a BaseActivitySummary; identical sessions are skipped. */
     private void saveSportSession(Date startTime, Date stopTime, int sportType, ActivitySummaryData summary,
-                                  List<GpxPoint> gpsPoints, int dayIndex) {
+                                  List<VeepooSportDayParser.GpxPoint> gpsPoints, int dayIndex) {
         try (DBHandler dbHandler = GBApplication.acquireDB()) {
             DaoSession session = dbHandler.getDaoSession();
             User user = DBHelper.getUser(session);
@@ -1965,7 +1639,7 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
     }
 
     /** Writes the collected GPS track points as a .gpx file in the export directory. */
-    private String writeSportGpx(Date startTime, String name, Device device, User user, List<GpxPoint> gpsPoints) throws Exception {
+    private String writeSportGpx(Date startTime, String name, Device device, User user, List<VeepooSportDayParser.GpxPoint> gpsPoints) throws Exception {
         File dir = getDevice().getDeviceCoordinator().getWritableExportDirectory(getDevice(), true);
         File gpxFile = new File(dir, "veepoo_sport_" + (startTime.getTime() / 1000L) + ".gpx");
         ActivityTrack track = new ActivityTrack();
@@ -1973,7 +1647,7 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
         track.setName(name);
         track.setDevice(device);
         track.setUser(user);
-        for (GpxPoint point : gpsPoints) {
+        for (VeepooSportDayParser.GpxPoint point : gpsPoints) {
             ActivityPoint activityPoint = new ActivityPoint(new Date(point.timeMs));
             if (point.altitude > 0) {
                 activityPoint.setLocation(new GPSCoordinate(point.longitude / 1e6, point.latitude / 1e6, point.altitude));
@@ -1984,21 +1658,6 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
         }
         new GPXExporter().performExport(track, gpxFile, null);
         return gpxFile.getAbsolutePath();
-    }
-
-    /** One decoded GPS track point from a per-minute sport item (coordinates in micro-degrees). */
-    private static final class GpxPoint {
-        private final long longitude;
-        private final long latitude;
-        private final long altitude;
-        private final long timeMs;
-
-        private GpxPoint(long longitude, long latitude, long altitude, long timeMs) {
-            this.longitude = longitude;
-            this.latitude = latitude;
-            this.altitude = altitude;
-            this.timeMs = timeMs;
-        }
     }
 
     /** Maps the VeePoo ESportType value to the closest Gadgetbridge activity kind. */
@@ -2062,7 +1721,7 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
         }
     }
 
-    private static Date dateFromParts(int year, int month, int day, int hour, int minute, int second) {
+    static Date dateFromParts(int year, int month, int day, int hour, int minute, int second) {
         if (year < 2000 || year > 2100 || !isValidDatePart(month, day, hour, minute) || second > 60) {
             return null;
         }
@@ -2827,11 +2486,11 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
         LOG.info("Parsed precise sleep record for day {}: {} minutes ({} deep, {} light)", dayIndex, minutes, deepSleepTime, lightSleepTime);
     }
 
-    private static int le16(byte[] buf, int offset) {
+    static int le16(byte[] buf, int offset) {
         return (buf[offset] & 0xFF) | ((buf[offset + 1] & 0xFF) << 8);
     }
 
-    private static int be16(byte[] buf, int offset) {
+    static int be16(byte[] buf, int offset) {
         return ((buf[offset] & 0xFF) << 8) | (buf[offset + 1] & 0xFF);
     }
 
