@@ -21,8 +21,8 @@ import androidx.annotation.IdRes
 import androidx.annotation.StringRes
 import nodomain.freeyourgadget.gadgetbridge.GBApplication
 import nodomain.freeyourgadget.gadgetbridge.R
-import nodomain.freeyourgadget.gadgetbridge.activities.endurain.EndurainTokenManager
-import nodomain.freeyourgadget.gadgetbridge.activities.endurain.WandererTokenManager
+import nodomain.freeyourgadget.gadgetbridge.externalservices.endurain.EndurainTokenManager
+import nodomain.freeyourgadget.gadgetbridge.externalservices.wanderer.WandererTokenManager
 import nodomain.freeyourgadget.gadgetbridge.entities.BaseActivitySummary
 import nodomain.freeyourgadget.gadgetbridge.entities.WorkoutUpload
 import nodomain.freeyourgadget.gadgetbridge.util.GBPrefs

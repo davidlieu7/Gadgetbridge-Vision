@@ -71,7 +71,7 @@ import java.util.Locale;
 import java.util.Set;
 
 import nodomain.freeyourgadget.gadgetbridge.activities.ControlCenterv2;
-import nodomain.freeyourgadget.gadgetbridge.activities.endurain.PeriodicEndurainTokenRefresher;
+import nodomain.freeyourgadget.gadgetbridge.externalservices.endurain.EndurainPeriodicTokenRefresher;
 import nodomain.freeyourgadget.gadgetbridge.database.DBHandler;
 import nodomain.freeyourgadget.gadgetbridge.database.DBHelper;
 import nodomain.freeyourgadget.gadgetbridge.database.PeriodicDbExporter;
@@ -295,7 +295,7 @@ public class GBApplication extends Application {
 
         // Refresh Endurain tokens and schedule periodic refresh
         if (!GBEnvironment.env().isTest()) {
-            PeriodicEndurainTokenRefresher.INSTANCE.scheduleNextExecution(context);
+            EndurainPeriodicTokenRefresher.INSTANCE.scheduleNextExecution(context);
         }
     }
 

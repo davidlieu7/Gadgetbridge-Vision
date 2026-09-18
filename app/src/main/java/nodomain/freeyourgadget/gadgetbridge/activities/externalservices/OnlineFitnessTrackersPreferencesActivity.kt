@@ -14,7 +14,7 @@
 
     You should have received a copy of the GNU Affero General Public License
     along with this program.  If not, see <https://www.gnu.org/licenses/>. */
-package nodomain.freeyourgadget.gadgetbridge.activities.endurain
+package nodomain.freeyourgadget.gadgetbridge.activities.externalservices
 
 import android.os.Bundle
 import android.widget.Toast
@@ -25,6 +25,11 @@ import nodomain.freeyourgadget.gadgetbridge.GBApplication
 import nodomain.freeyourgadget.gadgetbridge.R
 import nodomain.freeyourgadget.gadgetbridge.activities.AbstractPreferenceFragment
 import nodomain.freeyourgadget.gadgetbridge.activities.AbstractSettingsActivityV2
+import nodomain.freeyourgadget.gadgetbridge.externalservices.endurain.EndurainSetupBottomSheet
+import nodomain.freeyourgadget.gadgetbridge.externalservices.endurain.EndurainSetupViewModel
+import nodomain.freeyourgadget.gadgetbridge.externalservices.endurain.EndurainTokenManager
+import nodomain.freeyourgadget.gadgetbridge.externalservices.wanderer.WandererSetupBottomSheet
+import nodomain.freeyourgadget.gadgetbridge.externalservices.wanderer.WandererTokenManager
 import nodomain.freeyourgadget.gadgetbridge.util.DateTimeUtils
 import nodomain.freeyourgadget.gadgetbridge.util.GB
 

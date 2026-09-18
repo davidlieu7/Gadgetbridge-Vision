@@ -14,7 +14,7 @@
 
     You should have received a copy of the GNU Affero General Public License
     along with this program.  If not, see <https://www.gnu.org/licenses/>. */
-package nodomain.freeyourgadget.gadgetbridge.activities.endurain
+package nodomain.freeyourgadget.gadgetbridge.externalservices.endurain
 
 import android.content.Context
 import androidx.work.ExistingPeriodicWorkPolicy
@@ -28,8 +28,8 @@ import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import java.util.concurrent.TimeUnit
 
-object PeriodicEndurainTokenRefresher {
-    private val LOG: Logger = LoggerFactory.getLogger(PeriodicEndurainTokenRefresher::class.java)
+object EndurainPeriodicTokenRefresher {
+    private val LOG: Logger = LoggerFactory.getLogger(EndurainPeriodicTokenRefresher::class.java)
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.IO)
 
     const val TAG_CREATED_AT = "createdAt-"

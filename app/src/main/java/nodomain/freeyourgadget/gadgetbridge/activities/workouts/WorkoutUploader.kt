@@ -19,11 +19,11 @@ package nodomain.freeyourgadget.gadgetbridge.activities.workouts
 import android.content.Context
 import nodomain.freeyourgadget.gadgetbridge.GBApplication
 import nodomain.freeyourgadget.gadgetbridge.R
-import nodomain.freeyourgadget.gadgetbridge.activities.endurain.EndurainActivityLookup
-import nodomain.freeyourgadget.gadgetbridge.activities.endurain.EndurainApiClient
-import nodomain.freeyourgadget.gadgetbridge.activities.endurain.EndurainTokenManager
-import nodomain.freeyourgadget.gadgetbridge.activities.endurain.WandererApiClient
-import nodomain.freeyourgadget.gadgetbridge.activities.endurain.WandererTokenManager
+import nodomain.freeyourgadget.gadgetbridge.externalservices.endurain.EndurainActivityLookup
+import nodomain.freeyourgadget.gadgetbridge.externalservices.endurain.EndurainApiClient
+import nodomain.freeyourgadget.gadgetbridge.externalservices.endurain.EndurainTokenManager
+import nodomain.freeyourgadget.gadgetbridge.externalservices.wanderer.WandererApiClient
+import nodomain.freeyourgadget.gadgetbridge.externalservices.wanderer.WandererTokenManager
 import nodomain.freeyourgadget.gadgetbridge.entities.BaseActivitySummary
 import nodomain.freeyourgadget.gadgetbridge.entities.WorkoutUpload
 import nodomain.freeyourgadget.gadgetbridge.export.FitExporter

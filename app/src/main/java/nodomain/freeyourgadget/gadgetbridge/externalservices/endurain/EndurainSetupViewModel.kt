@@ -14,7 +14,7 @@
 
     You should have received a copy of the GNU Affero General Public License
     along with this program.  If not, see <https://www.gnu.org/licenses/>. */
-package nodomain.freeyourgadget.gadgetbridge.activities.endurain
+package nodomain.freeyourgadget.gadgetbridge.externalservices.endurain
 
 import android.app.Application
 import android.content.Context
@@ -23,6 +23,7 @@ import androidx.core.net.toUri
 import androidx.lifecycle.AndroidViewModel
 import nodomain.freeyourgadget.gadgetbridge.BuildConfig
 import nodomain.freeyourgadget.gadgetbridge.GBApplication
+import nodomain.freeyourgadget.gadgetbridge.externalservices.PkceHelper
 import nodomain.freeyourgadget.gadgetbridge.util.InternetUtils
 import org.slf4j.LoggerFactory
 

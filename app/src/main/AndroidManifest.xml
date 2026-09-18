@@ -255,7 +255,7 @@
             android:label="@string/healthconnect_settings"
             android:parentActivityName=".activities.SettingsActivity" />
         <activity
-            android:name=".activities.endurain.OnlineFitnessTrackersPreferencesActivity"
+            android:name=".activities.externalservices.OnlineFitnessTrackersPreferencesActivity"
             android:label="@string/prefs_online_fitness_trackers_title"
             android:parentActivityName=".activities.SettingsActivity" />
         <activity
@@ -1225,7 +1225,7 @@
         </activity>
 
         <activity
-            android:name=".activities.endurain.EndurainOAuthCallbackActivity"
+            android:name=".externalservices.endurain.EndurainOAuthCallbackActivity"
             android:exported="true"
             android:launchMode="singleTop">
             <intent-filter>
