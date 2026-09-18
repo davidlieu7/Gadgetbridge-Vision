@@ -45,7 +45,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.TimeZone;
-import java.util.concurrent.ConcurrentHashMap;
 
 import nodomain.freeyourgadget.gadgetbridge.activities.workouts.entries.ActivitySummaryTableBuilder;
 import nodomain.freeyourgadget.gadgetbridge.activities.workouts.entries.ActivitySummaryValue;
@@ -61,7 +60,6 @@ import nodomain.freeyourgadget.gadgetbridge.devices.GenericBloodPressureSamplePr
 import nodomain.freeyourgadget.gadgetbridge.devices.GenericSpo2SampleProvider;
 import nodomain.freeyourgadget.gadgetbridge.devices.GenericStressSampleProvider;
 import nodomain.freeyourgadget.gadgetbridge.devices.GenericTemperatureSampleProvider;
-import nodomain.freeyourgadget.gadgetbridge.devices.veepoo.VeepooAutoMeasureSetting;
 import nodomain.freeyourgadget.gadgetbridge.devices.veepoo.VeepooConstants;
 import nodomain.freeyourgadget.gadgetbridge.entities.BaseActivitySummary;
 import nodomain.freeyourgadget.gadgetbridge.entities.BaseActivitySummaryDao;
@@ -121,6 +119,10 @@ import nodomain.freeyourgadget.gadgetbridge.util.GB;
 public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
     private static final Logger LOG = LoggerFactory.getLogger(VeepooDeviceSupport.class);
 
+    private final VeepooAlarmModule alarmModule = new VeepooAlarmModule(this);
+    private final VeepooAutoMeasureModule autoMeasureModule = new VeepooAutoMeasureModule(this);
+    private final VeepooWomenHealthModule womenHealthModule = new VeepooWomenHealthModule(this);
+
     private static final int DATA_SOURCE_ACTIVITY_SUMMARY = 2; // daily summary records (D1)
     private static final int DATA_SOURCE_SLEEP_SUMMARY = 4;    // sleep function records (E0)
     private static final long MILLIS_PER_DAY = 86400_000L;
@@ -139,7 +141,7 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
     private long dfLastFrameAt = 0;
     private final List<byte[]> sportDayFrames = new ArrayList<>();
     private long sportLastFrameAt = 0;
-    private final Handler mainHandler = new Handler(Looper.getMainLooper());
+    final Handler mainHandler = new Handler(Looper.getMainLooper());
     private final Runnable sleepWatchdog = () -> runSleepWatchdog();
     private final Runnable dfWatchdog = () -> runDfWatchdog();
     private final Runnable sportWatchdog = () -> runSportWatchdog();
@@ -258,67 +260,6 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
         finishBpDetect(null, null, VITAL_FAIL_NONE);
     };
 
-    // Auto-measure settings state (0xB3): per-metric config for the periodic vitals the band
-    // performs. The band refuses a read issued inside the connect burst (it answers with a
-    // set-command NAK), so the first read is deferred to steady state, like the vendor app
-    // which only reads when its health-settings screen is opened.
-    private static final int AUTO_MEASURE_READ_MAX_ATTEMPTS = 3;
-    private final Map<Integer, VeepooAutoMeasureSetting> autoMeasureSettings = new ConcurrentHashMap<>();
-    private final Object autoMeasureLock = new Object();
-    private final List<byte[]> autoMeasureChunks = new ArrayList<>();
-    private int autoMeasureChunkTotal = 0;
-    private boolean autoMeasureReadOutstanding = false;
-    private int autoMeasureReadAttempts = 0;
-    private int autoMeasurePendingFunType = -1; // set waiting for the read baseline to arrive
-    private boolean autoMeasurePendingOn = false;
-    private final Runnable autoMeasureWriteTimeout = () -> {
-        synchronized (autoMeasureLock) {
-            autoMeasurePendingFunType = -1;
-        }
-        LOG.warn("Auto-measure setting write timed out without an acknowledgement");
-        GB.toast(getContext(), R.string.veepoo_auto_measure_failed, Toast.LENGTH_SHORT, GB.WARN);
-    };
-    private final Runnable autoMeasureReadTimeout = () -> {
-        int pending;
-        synchronized (autoMeasureLock) {
-            if (!autoMeasureReadOutstanding) {
-                return;
-            }
-            autoMeasureReadOutstanding = false;
-            autoMeasureChunks.clear();
-            pending = autoMeasurePendingFunType;
-        }
-        LOG.warn("Auto-measure settings read timed out without a reply");
-        if (pending >= 0 && retryAutoMeasureRead()) {
-            return;
-        }
-        synchronized (autoMeasureLock) {
-            autoMeasurePendingFunType = -1;
-        }
-        if (pending >= 0) {
-            GB.toast(getContext(), R.string.veepoo_auto_measure_failed, Toast.LENGTH_SHORT, GB.WARN);
-        }
-    };
-
-    /** Schedules another read attempt while a toggle is waiting for the baseline. */
-    private boolean retryAutoMeasureRead() {
-        synchronized (autoMeasureLock) {
-            if (autoMeasurePendingFunType < 0 || autoMeasureReadAttempts >= AUTO_MEASURE_READ_MAX_ATTEMPTS) {
-                return false;
-            }
-        }
-        LOG.info("Retrying the auto-measure settings read");
-        mainHandler.postDelayed(() -> {
-            synchronized (autoMeasureLock) {
-                if (autoMeasureReadOutstanding) {
-                    return;
-                }
-            }
-            sendAutoMeasureRead();
-        }, 3000L);
-        return true;
-    }
-
     private boolean bcDetectActive = false;
     private final ArrayList<byte[]> bcChunks = new ArrayList<>();
     private final Runnable bcDetectTimeout = () -> {
@@ -390,52 +331,16 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
     private int bloodGlucoseTag = -1;   // pkg3: non-zero => glucose (tag 0xBE); 5 => packed risk+value encoding
     private int bloodComponentTag = -1; // pkg4: non-zero => lipids (tag 0xC2)
 
-    // Text alarms (0xB9): the band verifies a CRC over the whole alarm list on every op, so we
-    // track its exact state and re-read whenever an op fails or the band edits alarms locally.
-    private final Object alarmLock = new Object();
-    private final List<VeepooAlarm> alarmList = new ArrayList<>();
-    private int alarmCrc = 0;
-    private volatile boolean textAlarmsSupported = false;
-    private boolean alarmReadOutstanding = false;
-    private final List<byte[]> alarmReadPackets = new ArrayList<>();
-    private final Runnable alarmResync = () -> sendAlarmRead();
-    private final Runnable alarmReadWatchdog = () -> {
-        synchronized (alarmLock) {
-            if (alarmReadOutstanding) {
-                LOG.warn("Alarm read timed out; resetting outstanding flag");
-                alarmReadOutstanding = false;
-            }
-        }
-    };
+    // Capability from the device-pushed 0xA7 report (package 1): text alarms (0xB9). The alarm
+    // state itself is tracked by VeepooAlarmModule, which re-reads the list whenever needed.
+    volatile boolean textAlarmsSupported = false;
 
     // Capability from the device-pushed 0xA7 report (package 4): configurable periodic vitals.
-    private boolean autoMeasureSupported = false;
+    boolean autoMeasureSupported = false;
 
     // Women's health (cycle tracking), opcode 0x85 (vendor u2 / WomenOperater). The A7 pkg1 [12]
     // tag selects the read-back layout (3 = extended); -1 until the first capability report.
-    private int womenTag = -1;
-    private final Object womenLock = new Object();
-    private boolean womenSetOutstanding = false;
-    private boolean womenReadOutstanding = false;
-    private final Runnable womenSetWatchdog = () -> {
-        synchronized (womenLock) {
-            if (!womenSetOutstanding) {
-                return;
-            }
-            womenSetOutstanding = false;
-        }
-        LOG.warn("Women's health setting timed out without an acknowledgement");
-        GB.toast(getContext(), R.string.veepoo_women_set_failed, Toast.LENGTH_SHORT, GB.WARN);
-    };
-    private final Runnable womenReadWatchdog = () -> {
-        synchronized (womenLock) {
-            if (!womenReadOutstanding) {
-                return;
-            }
-            womenReadOutstanding = false;
-        }
-        LOG.warn("Women's health read-back timed out without a reply");
-    };
+    int womenTag = -1;
 
     // 0xB8 CustomSetting: last known basic ([19]==0) and extended ([19]==1) frames, pushed by
     // the band after every connect and answered after an explicit read request. Toggles are
@@ -530,19 +435,12 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
         writeFrame(builder, new byte[]{VeepooConstants.OP_READ_BATTERY, 0x00});
         writeFrame(builder, new byte[]{VeepooConstants.OP_PRODUCTION_INFO, 0x00});
         // Defer the auto-measure settings read to steady state: issued inside this connect
-        // burst the band refuses it with a set-command NAK (see handleAutoMeasureFrame). Skip
+        // burst the band refuses it with a set-command NAK (see VeepooAutoMeasureModule). Skip
         // it entirely when a previous connection already learned the firmware lacks the feature.
         SharedPreferences capabilities = GBApplication.getDeviceSpecificSharedPrefs(getDevice().getAddress());
         if (!capabilities.contains(VeepooConstants.CONFIG_AUTO_MEASURE_SUPPORTED)
                 || capabilities.getBoolean(VeepooConstants.CONFIG_AUTO_MEASURE_SUPPORTED, false)) {
-            mainHandler.postDelayed(() -> {
-                synchronized (autoMeasureLock) {
-                    if (autoMeasureReadOutstanding || autoMeasurePendingFunType >= 0) {
-                        return;
-                    }
-                }
-                sendAutoMeasureRead();
-            }, 5000L);
+            autoMeasureModule.scheduleSteadyStateRead();
         }
         // Same steady-state deferral for the legacy SpO2 auto-detect read; the A7 package 1
         // report (which sets the capability) has arrived by then on supported firmware.
@@ -560,7 +458,7 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
         }, 5000L);
         // Read the watch's alarm list once the A7 capability report has had time to arrive; the
         // band verifies a whole-list CRC on every 0xB9 op, so we must know its current state.
-        mainHandler.postDelayed(() -> sendAlarmRead(), 8000L);
+        alarmModule.scheduleConnectReadBack();
         // Vendor parity: Jieli "Sinilink-APP" challenge/response on AE01. The vendor's BLE stack
         // runs this exchange on every connect and the band answers with a device info
         // notification on AE02 (fe dc ba 00 ...).
@@ -568,14 +466,7 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
         // Re-push the women's health settings so the band keeps fresh LMP-relative state across
         // reconnects (vendor parity: its device-init re-sends the last saved tuple). Only when
         // a previous connection learned the firmware supports it and tracking is enabled.
-        mainHandler.postDelayed(() -> {
-            SharedPreferences womenPrefs = GBApplication.getDeviceSpecificSharedPrefs(getDevice().getAddress());
-            if (!womenPrefs.getBoolean(VeepooConstants.CONFIG_WOMEN_SUPPORTED, false)
-                    || !isWomenSettingEnabled(womenPrefs)) {
-                return;
-            }
-            applyWomenSettingFromPrefs(womenPrefs);
-        }, 8000L);
+        womenHealthModule.scheduleConnectPush();
         // The device pushes its 0xA7 capability report after pairing; it is handled in
         // onCharacteristicChanged() and may arrive before the INITIALIZED state is reached.
         // If the live activity screen is still open across a reconnect, resume the status poll.
@@ -587,7 +478,7 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
     }
 
     /** Writes a command frame to the F008 write characteristic, zero-padded to 20 bytes. */
-    private void writeFrame(TransactionBuilder builder, byte[] frame) {
+    void writeFrame(TransactionBuilder builder, byte[] frame) {
         if (frame.length > VeepooConstants.PACKET_SIZE) {
             throw new IllegalArgumentException("VeePoo frames must be at most " + VeepooConstants.PACKET_SIZE + " bytes");
         }
@@ -785,13 +676,13 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
                 // Women's health (cycle tracking). Note: 0x85 is also a PPG light-channel marker,
                 // but that one arrives on F002 and is consumed by handleEcgLightFrame before the
                 // main-channel dispatch; only F008 frames reach this case.
-                handleWomenFrame(data);
+                womenHealthModule.handleFrame(data);
                 break;
             case 0xB3:
                 // Two dialects share this opcode; the A7 package 4 capability selects which one
                 // the firmware speaks (newer TLV auto-measure vs legacy AllSet SpO2).
                 if (autoMeasureSupported) {
-                    handleAutoMeasureFrame(data);
+                    autoMeasureModule.handleFrame(data);
                 } else {
                     handleAllSetFrame(data);
                 }
@@ -800,7 +691,7 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
                 handleCustomSettingFrame(data);
                 break;
             case 0xB9:
-                handleAlarmFrame(data);
+                alarmModule.handleFrame(data);
                 break;
             case 0xB5:
                 handleFindDeviceAck(data);
@@ -3149,10 +3040,10 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
         } else if (VeepooConstants.CONFIG_MEASURE_ECG.equals(config)) {
             startEcgDetect();
         } else if (VeepooConstants.CONFIG_WOMEN_APPLY.equals(config)) {
-            applyWomenSettingFromPrefs(GBApplication.getDeviceSpecificSharedPrefs(getDevice().getAddress()));
+            womenHealthModule.applyWomenSettingFromPrefs(GBApplication.getDeviceSpecificSharedPrefs(getDevice().getAddress()));
         } else {
             if (autoMeasureSupported) {
-                handleAutoMeasureConfiguration(config);
+                autoMeasureModule.handleConfiguration(config);
             } else if (VeepooConstants.CONFIG_AUTO_MEASURE_SPO2.equals(config)) {
                 handleSpo2Configuration(config);
             } else {
@@ -3184,13 +3075,13 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
                 || firstNonEmpty(spec.getPhoneNumber()).length() > 0;
         List<byte[]> frames = new ArrayList<>();
         if (type == NotificationType.GENERIC_PHONE) {
-            byte[] nameBytes = truncateUtf8(firstNonEmpty(sender, spec.getPhoneNumber()), 12)
+            byte[] nameBytes = VeepooAlarmModule.truncateUtf8(firstNonEmpty(sender, spec.getPhoneNumber()), 12)
                     .getBytes(StandardCharsets.UTF_8);
             frames.add(socialMsgFrame(VeepooConstants.SOCIAL_MSG_TYPE_PHONE, 1, 1,
                     hasSenderName ? 1 : 0, nameBytes));
         } else if (smsLayout) {
             String body = firstNonEmpty(spec.getBody(), spec.getTitle());
-            byte[] nameBytes = truncateUtf8(firstNonEmpty(sender, spec.getPhoneNumber(), " "), 12)
+            byte[] nameBytes = VeepooAlarmModule.truncateUtf8(firstNonEmpty(sender, spec.getPhoneNumber(), " "), 12)
                     .getBytes(StandardCharsets.UTF_8);
             byte[] bodyBytes = body.getBytes(StandardCharsets.UTF_8);
             int total = Math.min(1 + (bodyBytes.length + 13) / 14, socialMsgMaxPackets);
@@ -3210,7 +3101,7 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
             } else if (firstNonEmpty(spec.getBody()).isEmpty()) {
                 text = title;
             } else {
-                text = truncateUtf8(title, 12) + ":" + spec.getBody();
+                text = VeepooAlarmModule.truncateUtf8(title, 12) + ":" + spec.getBody();
             }
             byte[] bytes = text.getBytes(StandardCharsets.UTF_8);
             if (bytes.length > 0) {
@@ -3335,522 +3226,9 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
         }
     }
 
-    // ------------------------------------------------------------------------
-    // Text alarms (0xB9), mirroring the vendor TextAlarmOprate. Every op frame carries a CRC
-    // over the whole post-op alarm list; the band echoes it back in the ack and rejects the op
-    // on mismatch, so alarmList below must always mirror the watch exactly.
-    // ------------------------------------------------------------------------
-
-    /** One text alarm as stored on the band (vendor TextAlarm2Setting). */
-    private static final class VeepooAlarm {
-        int id;
-        int hour;
-        int minute;
-        boolean open;
-        int repeatInt;   // 7-bit weekday mask, bit6=Sunday ... bit0=Saturday; 0 = one-shot
-        int yearOffset;  // year - 2000; 0 for repeating alarms
-        int month;       // 1-12; 0 for repeating alarms
-        int day;         // 1-31; 0 for repeating alarms
-        String label = "";
-
-        boolean sameTimeAs(VeepooAlarm other) {
-            return hour == other.hour && minute == other.minute && repeatInt == other.repeatInt
-                    && yearOffset == other.yearOffset && month == other.month && day == other.day;
-        }
-
-        boolean sameAs(VeepooAlarm other) {
-            return sameTimeAs(other) && open == other.open && label.equals(other.label);
-        }
-    }
-
-    /** Vendor Alarm2Util alarm CRC16 table (CCITT, init 0xFFFF, no final xor). */
-    private static final int[] ALARM_CRC_TABLE = {
-            0, 49345, 49537, 320, 49921, 960, 640, 49729, 50689, 1728, 1920, 51009, 1280, 50625, 50305, 1088,
-            52225, 3264, 3456, 52545, 3840, 53185, 52865, 3648, 2560, 51905, 52097, 2880, 51457, 2496, 2176, 51265,
-            55297, 6336, 6528, 55617, 6912, 56257, 55937, 6720, 7680, 57025, 57217, 8000, 56577, 7616, 7296, 56385,
-            5120, 54465, 54657, 5440, 55041, 6080, 5760, 54849, 53761, 4800, 4992, 54081, 4352, 53697, 53377, 4160,
-            61441, 12480, 12672, 61761, 13056, 62401, 62081, 12864, 13824, 63169, 63361, 14144, 62721, 13760, 13440, 62529,
-            15360, 64705, 64897, 15680, 65281, 16320, 16000, 65089, 64001, 15040, 15232, 64321, 14592, 63937, 63617, 14400,
-            10240, 59585, 59777, 10560, 60161, 11200, 10880, 59969, 60929, 11968, 12160, 61249, 11520, 60865, 60545, 11328,
-            58369, 9408, 9600, 58689, 9984, 59329, 59009, 9792, 8704, 58049, 58241, 9024, 57601, 8640, 8320, 57409,
-            40961, 24768, 24960, 41281, 25344, 41921, 41601, 25152, 26112, 42689, 42881, 26432, 42241, 26048, 25728, 42049,
-            27648, 44225, 44417, 27968, 44801, 28608, 28288, 44609, 43521, 27328, 27520, 43841, 26880, 43457, 43137, 26688,
-            30720, 47297, 47489, 31040, 47873, 31680, 31360, 47681, 48641, 32448, 32640, 48961, 32000, 48577, 48257, 31808,
-            46081, 29888, 30080, 46401, 30464, 47041, 46721, 30272, 29184, 45761, 45953, 29504, 45313, 29120, 28800, 45121,
-            20480, 37057, 37249, 20800, 37633, 21440, 21120, 37441, 38401, 22208, 22400, 38721, 21760, 38337, 38017, 21568,
-            39937, 23744, 23936, 40257, 24320, 40897, 40577, 24128, 23040, 39617, 39809, 23360, 39169, 22976, 22656, 38977,
-            34817, 18624, 18816, 35137, 19200, 35777, 35457, 19008, 19968, 36545, 36737, 20288, 36097, 19904, 19584, 35905,
-            17408, 33985, 34177, 17728, 34561, 18368, 18048, 34369, 33281, 17088, 17280, 33601, 16640, 33217, 32897, 16448
-    };
-
     @Override
     public void onSetAlarms(ArrayList<? extends Alarm> alarms) {
-        if (!alarmsSupported()) {
-            LOG.warn("Watch does not support text alarms (no A7 alarm tag); ignoring onSetAlarms");
-            return;
-        }
-        List<VeepooAlarm> desired = new ArrayList<>();
-        Calendar now = Calendar.getInstance();
-        for (Alarm alarm : alarms) {
-            if (alarm == null || alarm.getUnused()) {
-                continue;
-            }
-            VeepooAlarm watchAlarm = new VeepooAlarm();
-            watchAlarm.hour = Math.min(alarm.getHour(), 23);
-            watchAlarm.minute = Math.min(alarm.getMinute(), 59);
-            watchAlarm.open = alarm.getEnabled();
-            if (alarm.isRepetitive()) {
-                watchAlarm.repeatInt = gbRepeatToVendorRepeat(alarm.getRepetition());
-            } else {
-                // One-shot: the band wants a concrete date; use today when the time is still ahead.
-                Calendar when = (Calendar) now.clone();
-                when.set(Calendar.HOUR_OF_DAY, watchAlarm.hour);
-                when.set(Calendar.MINUTE, watchAlarm.minute);
-                when.set(Calendar.SECOND, 0);
-                when.set(Calendar.MILLISECOND, 0);
-                if (!when.after(now)) {
-                    when.add(Calendar.DAY_OF_MONTH, 1);
-                }
-                watchAlarm.yearOffset = when.get(Calendar.YEAR) - 2000;
-                watchAlarm.month = when.get(Calendar.MONTH) + 1;
-                watchAlarm.day = when.get(Calendar.DAY_OF_MONTH);
-            }
-            watchAlarm.label = truncateUtf8(alarm.getTitle(), 100);
-            desired.add(watchAlarm);
-        }
-        if (desired.size() > VeepooConstants.ALARM_MAX_ALARMS) {
-            LOG.error("Watch supports at most {} alarms; dropping the extras", VeepooConstants.ALARM_MAX_ALARMS);
-            desired = new ArrayList<>(desired.subList(0, VeepooConstants.ALARM_MAX_ALARMS));
-        }
-        List<byte[]> frames;
-        synchronized (alarmLock) {
-            frames = buildAlarmSyncFrames(desired);
-        }
-        if (frames.isEmpty()) {
-            LOG.info("Alarm list already in sync with watch");
-            return;
-        }
-        LOG.info("Syncing {} alarm(s) to watch ({} frame(s))", desired.size(), frames.size());
-        try {
-            TransactionBuilder builder = performInitialized("sync alarms");
-            for (byte[] frame : frames) {
-                writeAlarmFrame(builder, frame);
-            }
-            builder.queue();
-        } catch (IOException e) {
-            LOG.error("Error syncing alarms to watch", e);
-            return;
-        }
-        // Verify the push a few seconds later: the read rebuilds our state from ground truth.
-        scheduleAlarmResync(3000L);
-    }
-
-    /** True once the A7 report says this band speaks text alarms (or a previous connect learned it). */
-    private boolean alarmsSupported() {
-        if (textAlarmsSupported) {
-            return true;
-        }
-        return GBApplication.getDeviceSpecificSharedPrefs(getDevice().getAddress())
-                .getBoolean(VeepooConstants.CONFIG_ALARMS_SUPPORTED, false);
-    }
-
-    /** Maps Gadgetbridge's MON=1..SUN=64 mask onto the band's weekday value (bit6=Sunday .. bit0=Saturday). */
-    private static int gbRepeatToVendorRepeat(int gbRepetition) {
-        int vendor = 0;
-        if ((gbRepetition & Alarm.ALARM_SUN) != 0) vendor |= 0x40;
-        if ((gbRepetition & Alarm.ALARM_MON) != 0) vendor |= 0x20;
-        if ((gbRepetition & Alarm.ALARM_TUE) != 0) vendor |= 0x10;
-        if ((gbRepetition & Alarm.ALARM_WED) != 0) vendor |= 0x08;
-        if ((gbRepetition & Alarm.ALARM_THU) != 0) vendor |= 0x04;
-        if ((gbRepetition & Alarm.ALARM_FRI) != 0) vendor |= 0x02;
-        if ((gbRepetition & Alarm.ALARM_SAT) != 0) vendor |= 0x01;
-        return vendor;
-    }
-
-    /**
-     * Diffs the desired list against the tracked watch state and produces the 0xB9 frames that
-     * reach it, in wire order. Each frame's CRC covers the simulated post-op list; the tracked
-     * state is updated optimistically and a verification read follows the push.
-     */
-    private List<byte[]> buildAlarmSyncFrames(List<VeepooAlarm> desired) {
-        List<VeepooAlarm> state = new ArrayList<>(alarmList);
-        List<byte[]> frames = new ArrayList<>();
-        // Match by time/repetition/date so re-sending an unchanged list stays a no-op.
-        List<VeepooAlarm> matchedState = new ArrayList<>();
-        for (VeepooAlarm want : desired) {
-            for (VeepooAlarm have : state) {
-                if (!matchedState.contains(have) && have.sameTimeAs(want)) {
-                    want.id = have.id;
-                    matchedState.add(have);
-                    break;
-                }
-            }
-        }
-        // Delete watch alarms that are no longer wanted.
-        for (VeepooAlarm have : new ArrayList<>(state)) {
-            if (!matchedState.contains(have)) {
-                state.remove(have);
-                frames.add(alarmOpFrame(VeepooConstants.ALARM_OP_DELETE, have, computeAlarmCrc(state)));
-            }
-        }
-        // Update matched entries whose content changed.
-        for (VeepooAlarm want : desired) {
-            int position = -1;
-            for (int i = 0; i < state.size(); i++) {
-                if (state.get(i).id == want.id) {
-                    position = i;
-                    break;
-                }
-            }
-            if (position >= 0 && !state.get(position).sameAs(want)) {
-                state.set(position, want);
-                frames.add(alarmOpFrame(VeepooConstants.ALARM_OP_SET, want, computeAlarmCrc(state)));
-            }
-        }
-        // Add new alarms with the lowest free ids.
-        for (VeepooAlarm want : desired) {
-            boolean present = false;
-            for (VeepooAlarm have : state) {
-                if (have.id == want.id) {
-                    present = true;
-                    break;
-                }
-            }
-            if (!present) {
-                want.id = nextFreeAlarmId(state);
-                if (want.id <= 0) {
-                    LOG.error("Watch alarm list is full; dropping an alarm");
-                    continue;
-                }
-                state.add(want);
-                frames.add(alarmOpFrame(VeepooConstants.ALARM_OP_SET, want, computeAlarmCrc(state)));
-            }
-        }
-        alarmList.clear();
-        alarmList.addAll(state);
-        alarmCrc = computeAlarmCrc(alarmList);
-        return frames;
-    }
-
-    private static int nextFreeAlarmId(List<VeepooAlarm> state) {
-        for (int id = 1; id <= VeepooConstants.ALARM_MAX_ALARMS; id++) {
-            boolean used = false;
-            for (VeepooAlarm have : state) {
-                if (have.id == id) {
-                    used = true;
-                    break;
-                }
-            }
-            if (!used) {
-                return id;
-            }
-        }
-        return -1;
-    }
-
-    /** Builds a 0xB9 frame carrying one alarm record plus the whole-list CRC. */
-    private static byte[] alarmOpFrame(int op, VeepooAlarm alarm, int crc) {
-        byte[] record = alarmRecord(alarm);
-        byte[] frame = new byte[8 + record.length];
-        frame[0] = VeepooConstants.OP_MULTI_ALARM;
-        frame[1] = (byte) op;
-        frame[2] = 1;
-        frame[3] = 1;
-        frame[4] = (byte) VeepooConstants.ALARM_CRC_MARKER;
-        frame[5] = 2;
-        frame[6] = (byte) (crc & 0xFF);
-        frame[7] = (byte) ((crc >> 8) & 0xFF);
-        System.arraycopy(record, 0, frame, 8, record.length);
-        return frame;
-    }
-
-    /** One alarm record: [A1, len, B1, 8, id, open, repeat, h, m, y-2000, M, d, B2, textLen, text...]. */
-    private static byte[] alarmRecord(VeepooAlarm alarm) {
-        byte[] label = alarm.label.getBytes(StandardCharsets.UTF_8);
-        byte[] record = new byte[label.length + 14];
-        record[0] = (byte) 0xA1;
-        record[1] = (byte) (label.length + 12);
-        record[2] = (byte) 0xB1;
-        record[3] = 8;
-        record[4] = (byte) alarm.id;
-        record[5] = (byte) (alarm.open ? 1 : 0);
-        record[6] = (byte) alarm.repeatInt;
-        record[7] = (byte) alarm.hour;
-        record[8] = (byte) alarm.minute;
-        record[9] = (byte) alarm.yearOffset;
-        record[10] = (byte) alarm.month;
-        record[11] = (byte) alarm.day;
-        record[12] = (byte) 0xB2;
-        record[13] = (byte) label.length;
-        System.arraycopy(label, 0, record, 14, label.length);
-        return record;
-    }
-
-    /** CRC over all records of the list in order (vendor Alarm2Util.getAlarmCrc16 semantics). */
-    private static int computeAlarmCrc(List<VeepooAlarm> alarms) {
-        if (alarms.isEmpty()) {
-            return 0;
-        }
-        int total = 0;
-        for (VeepooAlarm alarm : alarms) {
-            total += alarmRecord(alarm).length;
-        }
-        byte[] all = new byte[total];
-        int offset = 0;
-        for (VeepooAlarm alarm : alarms) {
-            byte[] record = alarmRecord(alarm);
-            System.arraycopy(record, 0, all, offset, record.length);
-            offset += record.length;
-        }
-        return alarmCrc16(all);
-    }
-
-    private static int alarmCrc16(byte[] data) {
-        if (data == null || data.length == 0) {
-            return 0;
-        }
-        int crc = 0xFFFF;
-        for (byte b : data) {
-            crc = (((crc >> 8) & 0xFF) ^ ALARM_CRC_TABLE[(b & 0xFF) ^ (crc & 0xFF)]) & 0xFFFF;
-        }
-        return crc & 0xFFFF;
-    }
-
-    /** Sends a read request for the full alarm list; the response rebuilds the tracked state. */
-    private void sendAlarmRead() {
-        if (!alarmsSupported()) {
-            return;
-        }
-        int crc;
-        synchronized (alarmLock) {
-            if (alarmReadOutstanding) {
-                return;
-            }
-            alarmReadOutstanding = true;
-            crc = alarmCrc;
-        }
-        byte[] frame = new byte[VeepooConstants.PACKET_SIZE];
-        frame[0] = VeepooConstants.OP_MULTI_ALARM;
-        frame[1] = VeepooConstants.ALARM_OP_READ;
-        frame[4] = (byte) VeepooConstants.ALARM_CRC_MARKER;
-        frame[5] = 2;
-        frame[6] = (byte) (crc & 0xFF);
-        frame[7] = (byte) ((crc >> 8) & 0xFF);
-        try {
-            TransactionBuilder builder = performInitialized("read alarms");
-            writeFrame(builder, frame);
-            builder.queue();
-            mainHandler.postDelayed(alarmReadWatchdog, 10000L);
-        } catch (IOException e) {
-            LOG.error("Error reading alarms from watch", e);
-            synchronized (alarmLock) {
-                alarmReadOutstanding = false;
-            }
-        }
-    }
-
-    private void scheduleAlarmResync(long delayMillis) {
-        mainHandler.removeCallbacks(alarmResync);
-        mainHandler.postDelayed(alarmResync, delayMillis);
-    }
-
-    /** Dispatches 0xB9 frames: our op acks, read responses, and band-initiated alarm changes. */
-    private void handleAlarmFrame(byte[] data) {
-        if (data == null || data.length < 2) {
-            return;
-        }
-        int op = data[1] & 0xFF;
-        switch (op) {
-            case VeepooConstants.ALARM_OP_DELETE:
-            case VeepooConstants.ALARM_OP_SET:
-                handleAlarmOpAck(data);
-                break;
-            case VeepooConstants.ALARM_OP_READ:
-                handleAlarmReadPacket(data);
-                break;
-            case VeepooConstants.ALARM_OP_FIRE_REPORT:
-                LOG.info("Band alarm fired: {}", hexBytes(data));
-                scheduleAlarmResync(2000L);
-                break;
-            case VeepooConstants.ALARM_OP_DEVICE_ADD:
-                LOG.info("Band added an alarm from its own UI; re-reading the list");
-                scheduleAlarmResync(2000L);
-                break;
-            case VeepooConstants.ALARM_OP_DEVICE_DELETE:
-                if (data.length >= 5) {
-                    removeAlarmById(data[4] & 0xFF);
-                }
-                break;
-            case VeepooConstants.ALARM_OP_DEVICE_TOGGLE:
-                if (data.length >= 6) {
-                    setAlarmOpen(data[4] & 0xFF, data[5] == 1);
-                }
-                break;
-            default:
-                LOG.debug("Unhandled alarm frame: {}", hexBytes(data));
-        }
-    }
-
-    /** Ack for a delete/set op: [B7, op, x, x, A0, 3, result, crcLo, crcHi]. */
-    private void handleAlarmOpAck(byte[] data) {
-        if (data.length < 9 || (data[4] & 0xFF) != VeepooConstants.ALARM_CRC_MARKER || data[5] != 3) {
-            LOG.debug("Unexpected alarm ack shape: {}", hexBytes(data));
-            return;
-        }
-        int result = data[6] & 0xFF;
-        int crcEcho = (data[7] & 0xFF) | ((data[8] & 0xFF) << 8);
-        if (result != 1) {
-            LOG.warn("Watch rejected an alarm op (crc {}); re-reading the list",
-                    String.format("%04X", crcEcho));
-            scheduleAlarmResync(2000L);
-        } else {
-            LOG.debug("Alarm op ack ok, crc={}", String.format("%04X", crcEcho));
-        }
-    }
-
-    /** One packet of a (possibly multi-packet) read response; the last one rebuilds the state. */
-    private void handleAlarmReadPacket(byte[] data) {
-        if (data.length < 8) {
-            return;
-        }
-        int total = data[2] & 0xFF;
-        int index = data[3] & 0xFF;
-        List<byte[]> packets;
-        synchronized (alarmLock) {
-            if (index == 1 || alarmReadPackets.isEmpty()) {
-                alarmReadPackets.clear();
-            }
-            alarmReadPackets.add(data);
-            if (!(total >= 1 && index == total)) {
-                return;
-            }
-            packets = new ArrayList<>(alarmReadPackets);
-            alarmReadPackets.clear();
-            alarmReadOutstanding = false;
-        }
-        mainHandler.removeCallbacks(alarmReadWatchdog);
-        int payloadLength = 0;
-        for (byte[] packet : packets) {
-            payloadLength += Math.max(0, packet.length - 4);
-        }
-        byte[] combined = new byte[payloadLength];
-        int offset = 0;
-        for (byte[] packet : packets) {
-            if (packet.length > 4) {
-                System.arraycopy(packet, 4, combined, offset, packet.length - 4);
-                offset += packet.length - 4;
-            }
-        }
-        List<VeepooAlarm> list = new ArrayList<>();
-        // Records are A1-framed right after the first packet's A0 status section.
-        int i = combined.length >= 2 ? (combined[1] & 0xFF) + 2 : 0;
-        while (i + 3 <= combined.length && (combined[i] & 0xFF) == 0xA1) {
-            int recordLength = combined[i + 1] & 0xFF;
-            if (recordLength < 12 || i + 2 + recordLength > combined.length) {
-                break;
-            }
-            VeepooAlarm alarm = parseAlarmRecord(combined, i + 2);
-            if (alarm == null) {
-                break;
-            }
-            list.add(alarm);
-            i += 2 + recordLength;
-        }
-        synchronized (alarmLock) {
-            alarmList.clear();
-            alarmList.addAll(list);
-            alarmCrc = computeAlarmCrc(alarmList);
-        }
-        LOG.info("Read {} alarm(s) from watch: {}", list.size(), describeAlarms(list));
-    }
-
-    /** Parses one alarm record starting at the 0xB1 marker byte. */
-    private static VeepooAlarm parseAlarmRecord(byte[] buffer, int off) {
-        if ((buffer[off] & 0xFF) != 0xB1) {
-            return null;
-        }
-        VeepooAlarm alarm = new VeepooAlarm();
-        alarm.id = buffer[off + 2] & 0xFF;
-        alarm.open = (buffer[off + 3] & 0xFF) != 0;
-        alarm.repeatInt = buffer[off + 4] & 0xFF;
-        alarm.hour = buffer[off + 5] & 0xFF;
-        alarm.minute = buffer[off + 6] & 0xFF;
-        alarm.yearOffset = buffer[off + 7] & 0xFF;
-        alarm.month = buffer[off + 8] & 0xFF;
-        alarm.day = buffer[off + 9] & 0xFF;
-        if ((buffer[off + 10] & 0xFF) == 0xB2) {
-            int textLength = buffer[off + 11] & 0xFF;
-            if (off + 12 + textLength <= buffer.length) {
-                alarm.label = new String(buffer, off + 12, textLength, StandardCharsets.UTF_8);
-            }
-        }
-        return alarm;
-    }
-
-    private void removeAlarmById(int id) {
-        synchronized (alarmLock) {
-            alarmList.removeIf(alarm -> alarm.id == id);
-        }
-        LOG.info("Band deleted alarm {} from its own UI", id);
-    }
-
-    private void setAlarmOpen(int id, boolean open) {
-        synchronized (alarmLock) {
-            for (VeepooAlarm alarm : alarmList) {
-                if (alarm.id == id) {
-                    alarm.open = open;
-                }
-            }
-        }
-        LOG.info("Band {} alarm {} from its own UI", open ? "enabled" : "disabled", id);
-    }
-
-    /** Writes an alarm frame (up to MTU-3 bytes, unlike the fixed 20-byte writeFrame). */
-    private void writeAlarmFrame(TransactionBuilder builder, byte[] frame) {
-        if (frame.length > VeepooConstants.MTU - 3) {
-            throw new IllegalArgumentException("alarm frames must fit the negotiated MTU");
-        }
-        builder.write(getCharacteristic(VeepooConstants.UUID_CHARACTERISTIC_F008_CMD), frame);
-    }
-
-    private static String describeAlarms(List<VeepooAlarm> alarms) {
-        StringBuilder sb = new StringBuilder();
-        for (VeepooAlarm alarm : alarms) {
-            if (sb.length() > 0) {
-                sb.append(", ");
-            }
-            sb.append('#').append(alarm.id).append(' ')
-                    .append(String.format("%02d:%02d", alarm.hour, alarm.minute));
-            if (alarm.repeatInt == 0) {
-                sb.append(String.format(" once %04d-%02d-%02d",
-                        alarm.yearOffset + 2000, alarm.month, alarm.day));
-            } else {
-                sb.append(String.format(" weekly(0x%02X)", alarm.repeatInt));
-            }
-            if (!alarm.open) {
-                sb.append(" off");
-            }
-            if (!alarm.label.isEmpty()) {
-                sb.append(" '").append(alarm.label).append('\'');
-            }
-        }
-        return sb.toString();
-    }
-
-    /** Truncates to at most {@code maxBytes} UTF-8 bytes without splitting a multibyte character. */
-    private static String truncateUtf8(String value, int maxBytes) {
-        if (value == null) {
-            return "";
-        }
-        byte[] bytes = value.getBytes(StandardCharsets.UTF_8);
-        if (bytes.length <= maxBytes) {
-            return value;
-        }
-        int end = maxBytes;
-        while (end > 0 && (bytes[end] & 0xC0) == 0x80) {
-            end--;
-        }
-        return new String(bytes, 0, end, StandardCharsets.UTF_8);
+        alarmModule.onSetAlarms(alarms);
     }
 
     private static String firstNonEmpty(String... values) {
@@ -3860,608 +3238,6 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
             }
         }
         return "";
-    }
-
-    /**
-     * Auto-measure configuration changes coming from the device settings screen: the switch
-     * state is already persisted in the per-device prefs; this applies it to the band with a
-     * 0xB3 set command, preserving every other field of that metric's stored configuration.
-     */
-    private void handleAutoMeasureConfiguration(final String config) {
-        if (!autoMeasureSupported) {
-            LOG.debug("Ignoring auto-measure configuration {}: firmware reports the feature unsupported", config);
-            return;
-        }
-        int funType;
-        if (VeepooConstants.CONFIG_AUTO_MEASURE_HR.equals(config)) {
-            funType = VeepooConstants.AUTO_MEASURE_PULSE_RATE;
-        } else if (VeepooConstants.CONFIG_AUTO_MEASURE_SPO2.equals(config)) {
-            funType = VeepooConstants.AUTO_MEASURE_BLOOD_OXYGEN;
-        } else if (VeepooConstants.CONFIG_AUTO_MEASURE_TEMPERATURE.equals(config)) {
-            funType = VeepooConstants.AUTO_MEASURE_BODY_TEMPERATURE;
-        } else if (VeepooConstants.CONFIG_AUTO_MEASURE_STRESS.equals(config)) {
-            funType = VeepooConstants.AUTO_MEASURE_STRESS;
-        } else if (VeepooConstants.CONFIG_AUTO_MEASURE_BLOOD_PRESSURE.equals(config)) {
-            funType = VeepooConstants.AUTO_MEASURE_BLOOD_PRESSURE;
-        } else {
-            return;
-        }
-        SharedPreferences prefs = GBApplication.getDeviceSpecificSharedPrefs(getDevice().getAddress());
-        setAutoMeasureEnabled(funType, prefs.getBoolean(config, false));
-    }
-
-    // ---------------------------------------------------------------------
-    // Auto-measure settings, opcode 0xB3 (vendor AutoMeasureOpt)
-    //
-    // Read: {B3, 02} -> reply chunks {B3, 02, x, idx, payload...}; on chunk idx==1 the total
-    // chunk count is at [6], the payload runs from [4] to end of frame. Chunks concatenate
-    // into a little-endian TLV stream: [C0 <6 bytes>]* and per metric [A1 len <inner TLV>]
-    // with inner tags D0 protocol, D1 funType, D2 switch, D3 stepUnit, D4 slot/interval
-    // modify flags, D5 support window (h,m x2), D6 measure interval, D7 current window.
-    // Set: a 42-byte payload chunked into 17-byte frames {B3, 01, seq, ...}; the first
-    // frame's payload byte 2 carries the total chunk count. Reply ack {B3, 01, ok}.
-    // ---------------------------------------------------------------------
-
-    /** Applies an auto-measure on/off change, requesting the read baseline first if unknown. */
-    private void setAutoMeasureEnabled(int funType, boolean on) {
-        VeepooAutoMeasureSetting current = autoMeasureSettings.get(funType);
-        if (current != null) {
-            sendAutoMeasureWrite(funType, on);
-            return;
-        }
-        boolean readStarted;
-        synchronized (autoMeasureLock) {
-            autoMeasurePendingFunType = funType;
-            autoMeasurePendingOn = on;
-            readStarted = !autoMeasureReadOutstanding;
-            if (readStarted) {
-                autoMeasureReadOutstanding = true;
-            }
-        }
-        LOG.info("Auto-measure baseline for type {} not read yet; {}", funType,
-                readStarted ? "requesting a read" : "waiting for the read already in flight");
-        if (readStarted) {
-            sendAutoMeasureRead();
-        }
-    }
-
-    /** Sends the 0xB3 read request and (re)starts the timeout: the reply is expected promptly. */
-    private void sendAutoMeasureRead() {
-        synchronized (autoMeasureLock) {
-            autoMeasureChunks.clear();
-            autoMeasureChunkTotal = 0;
-            autoMeasureReadOutstanding = true;
-            autoMeasureReadAttempts++;
-        }
-        try {
-            TransactionBuilder builder = performInitialized("read auto-measure settings");
-            writeFrame(builder, new byte[]{VeepooConstants.OP_AUTO_MEASURE, VeepooConstants.AUTO_MEASURE_CMD_DATA});
-            builder.queue();
-            mainHandler.removeCallbacks(autoMeasureReadTimeout);
-            mainHandler.postDelayed(autoMeasureReadTimeout, 20000L);
-        } catch (IOException e) {
-            synchronized (autoMeasureLock) {
-                autoMeasureReadOutstanding = false;
-            }
-            LOG.error("Error requesting auto-measure settings", e);
-        }
-    }
-
-    /** Opcode 0xB3 frame: set acknowledgement or a data chunk of the settings TLV stream. */
-    private void handleAutoMeasureFrame(byte[] data) {
-        if (data.length < 7) {
-            return;
-        }
-        int cmd = data[1] & 0xFF;
-        if (cmd == VeepooConstants.AUTO_MEASURE_CMD_SET) {
-            boolean ok = (data[2] & 0xFF) == 1;
-            boolean readWasOutstanding;
-            int pending;
-            synchronized (autoMeasureLock) {
-                readWasOutstanding = autoMeasureReadOutstanding;
-                autoMeasureReadOutstanding = false;
-                pending = autoMeasurePendingFunType;
-            }
-            if (readWasOutstanding) {
-                // The band answered the settings read with a set-ack frame: zero means it refused.
-                mainHandler.removeCallbacks(autoMeasureReadTimeout);
-                if (!ok && retryAutoMeasureRead()) {
-                    return;
-                }
-                synchronized (autoMeasureLock) {
-                    autoMeasurePendingFunType = -1;
-                }
-                if (!ok) {
-                    if (autoMeasureSupported) {
-                        LOG.warn("Auto-measure settings read was rejected by the band");
-                    } else {
-                        LOG.debug("Auto-measure settings read was rejected by the band (feature unsupported)");
-                    }
-                    if (pending >= 0) {
-                        GB.toast(getContext(), R.string.veepoo_auto_measure_failed, Toast.LENGTH_SHORT, GB.WARN);
-                    }
-                } else {
-                    LOG.info("Auto-measure settings read acknowledged without data chunks");
-                }
-                return;
-            }
-            mainHandler.removeCallbacks(autoMeasureWriteTimeout);
-            synchronized (autoMeasureLock) {
-                autoMeasurePendingFunType = -1;
-            }
-            if (!ok) {
-                LOG.warn("Band rejected the auto-measure setting change");
-                GB.toast(getContext(), R.string.veepoo_auto_measure_failed, Toast.LENGTH_SHORT, GB.WARN);
-            } else {
-                LOG.info("Auto-measure setting acknowledged by the band");
-            }
-            return;
-        }
-        if (cmd != VeepooConstants.AUTO_MEASURE_CMD_DATA) {
-            return;
-        }
-        int chunk = data[3] & 0xFF;
-        if (chunk == 0) {
-            return;
-        }
-        boolean complete = false;
-        byte[] assembled;
-        synchronized (autoMeasureLock) {
-            if (chunk == 1) {
-                autoMeasureChunks.clear();
-                autoMeasureChunkTotal = data[6] & 0xFF;
-            }
-            int payloadLen = data.length - 4;
-            if (payloadLen > 0) {
-                byte[] payload = new byte[payloadLen];
-                System.arraycopy(data, 4, payload, 0, payloadLen);
-                autoMeasureChunks.add(payload);
-            }
-            complete = autoMeasureChunkTotal > 0 && chunk == autoMeasureChunkTotal;
-            if (complete) {
-                ByteArrayOutputStream buffer = new ByteArrayOutputStream();
-                for (byte[] part : autoMeasureChunks) {
-                    buffer.write(part, 0, part.length);
-                }
-                assembled = buffer.toByteArray();
-                autoMeasureReadOutstanding = false;
-                autoMeasureReadAttempts = 0;
-            } else {
-                assembled = null;
-            }
-        }
-        if (!complete) {
-            LOG.debug("Auto-measure settings chunk {}/{} received", chunk, autoMeasureChunkTotal);
-            return;
-        }
-        mainHandler.removeCallbacks(autoMeasureReadTimeout);
-        parseAutoMeasureStream(assembled);
-    }
-
-    /** Parses the assembled 0xB3 TLV stream and stores the per-metric settings. */
-    private void parseAutoMeasureStream(byte[] stream) {
-        Map<Integer, VeepooAutoMeasureSetting> parsed = new ConcurrentHashMap<>();
-        int pos = 0;
-        while (pos < stream.length) {
-            int tag = stream[pos] & 0xFF;
-            pos++;
-            if (tag == 0xC0) {
-                // Header: 2 bytes + a uint32, skipped like the vendor does.
-                pos += 6;
-                if (pos > stream.length) {
-                    break;
-                }
-                continue;
-            }
-            if (tag != 0xA1) {
-                LOG.warn("Unexpected 0xB3 TLV tag {:02X} at position {}; stopping parse", tag, pos - 1);
-                break;
-            }
-            if (pos >= stream.length) {
-                break;
-            }
-            int innerLen = stream[pos] & 0xFF;
-            pos++;
-            if (innerLen == 0 || pos + innerLen > stream.length) {
-                LOG.warn("Truncated 0xB3 metric blob: len={} at position {}", innerLen, pos - 1);
-                break;
-            }
-            VeepooAutoMeasureSetting setting = new VeepooAutoMeasureSetting();
-            int i = 0;
-            while (i < innerLen) {
-                int t2 = stream[pos + i] & 0xFF;
-                i++;
-                if (i >= innerLen) {
-                    break;
-                }
-                int n = stream[pos + i] & 0xFF;
-                i++;
-                if (n == 0 || i + n > innerLen) {
-                    break;
-                }
-                int v = pos + i;
-                switch (t2) {
-                    case 0xD0: // protocol type
-                        setting.setProtocolType(stream[v] & 0xFF);
-                        break;
-                    case 0xD1: // fun type
-                        setting.setFunType(stream[v] & 0xFF);
-                        break;
-                    case 0xD2: // switch open
-                        setting.setEnabled((stream[v] & 0xFF) == 1);
-                        break;
-                    case 0xD3: // step unit (minutes)
-                        setting.setStepUnit(((stream[v] & 0xFF) << 8) | (stream[v + 1] & 0xFF));
-                        break;
-                    case 0xD4: // slot/interval modify flags
-                        setting.setSlotModify((stream[v] & 0xFF) == 1);
-                        setting.setIntervalModify((stream[v + 1] & 0xFF) == 1);
-                        break;
-                    case 0xD5: // support window (h, m) x2
-                        setting.setSupportStartMinute(((stream[v] & 0xFF) * 60) + (stream[v + 1] & 0xFF));
-                        setting.setSupportEndMinute(((stream[v + 2] & 0xFF) * 60) + (stream[v + 3] & 0xFF));
-                        break;
-                    case 0xD6: // measure interval (minutes)
-                        setting.setMeasureInterval(((stream[v] & 0xFF) << 8) | (stream[v + 1] & 0xFF));
-                        break;
-                    case 0xD7: // current window (h, m) x2
-                        setting.setCurrentStartMinute(((stream[v] & 0xFF) * 60) + (stream[v + 1] & 0xFF));
-                        setting.setCurrentEndMinute(((stream[v + 2] & 0xFF) * 60) + (stream[v + 3] & 0xFF));
-                        break;
-                    default:
-                        LOG.debug("Unknown 0xB3 inner tag {:02X}", t2);
-                        break;
-                }
-                i += n;
-            }
-            pos += innerLen;
-            parsed.put(setting.getFunType(), setting);
-        }
-        autoMeasureSettings.clear();
-        autoMeasureSettings.putAll(parsed);
-        for (VeepooAutoMeasureSetting setting : parsed.values()) {
-            LOG.info("Auto-measure {}: {}", autoMeasureTypeName(setting.getFunType()), setting);
-        }
-        syncAutoMeasurePrefs(parsed);
-        int pendingFunType;
-        boolean pendingOn;
-        synchronized (autoMeasureLock) {
-            pendingFunType = autoMeasurePendingFunType;
-            pendingOn = autoMeasurePendingOn;
-            autoMeasurePendingFunType = -1;
-        }
-        if (pendingFunType >= 0) {
-            sendAutoMeasureWrite(pendingFunType, pendingOn);
-        }
-    }
-
-    /** Maps an auto-measure funType to its display name (vendor EAutoMeasureType). */
-    private static String autoMeasureTypeName(int funType) {
-        switch (funType) {
-            case 0: return "Pulse rate";
-            case 1: return "Blood pressure";
-            case 2: return "Blood glucose";
-            case 3: return "Stress";
-            case 4: return "Blood oxygen";
-            case 5: return "Body temperature";
-            case 6: return "Lorenz";
-            case 7: return "HRV";
-            case 8: return "Blood composition";
-            default: return "Unknown (" + funType + ")";
-        }
-    }
-
-    /** Mirrors the device state into the per-device prefs so the settings screen shows reality. */
-    private void syncAutoMeasurePrefs(Map<Integer, VeepooAutoMeasureSetting> parsed) {
-        SharedPreferences prefs = GBApplication.getDeviceSpecificSharedPrefs(getDevice().getAddress());
-        SharedPreferences.Editor editor = prefs.edit();
-        for (Map.Entry<Integer, VeepooAutoMeasureSetting> entry : parsed.entrySet()) {
-            String key;
-            switch (entry.getKey()) {
-                case VeepooConstants.AUTO_MEASURE_PULSE_RATE:
-                    key = VeepooConstants.CONFIG_AUTO_MEASURE_HR;
-                    break;
-                case VeepooConstants.AUTO_MEASURE_BLOOD_OXYGEN:
-                    key = VeepooConstants.CONFIG_AUTO_MEASURE_SPO2;
-                    break;
-                case VeepooConstants.AUTO_MEASURE_BODY_TEMPERATURE:
-                    key = VeepooConstants.CONFIG_AUTO_MEASURE_TEMPERATURE;
-                    break;
-                case VeepooConstants.AUTO_MEASURE_STRESS:
-                    key = VeepooConstants.CONFIG_AUTO_MEASURE_STRESS;
-                    break;
-                case VeepooConstants.AUTO_MEASURE_BLOOD_PRESSURE:
-                    key = VeepooConstants.CONFIG_AUTO_MEASURE_BLOOD_PRESSURE;
-                    break;
-                default:
-                    continue;
-            }
-            editor.putBoolean(key, entry.getValue().isEnabled());
-        }
-        editor.apply();
-    }
-
-    /**
-     * Sends a 0xB3 set command for one metric: the stored baseline is copied, only the switch
-     * is flipped (and the modify flags cleared), then the 42-byte payload is chunked exactly
-     * like the vendor (17-byte frames, first frame carries the chunk count in payload byte 2).
-     */
-    private void sendAutoMeasureWrite(int funType, boolean on) {
-        VeepooAutoMeasureSetting base = autoMeasureSettings.get(funType);
-        VeepooAutoMeasureSetting setting = base != null ? new VeepooAutoMeasureSetting(base) : new VeepooAutoMeasureSetting();
-        setting.setFunType(funType);
-        setting.setEnabled(on);
-        setting.setSlotModify(false);
-        setting.setIntervalModify(false);
-        if (base == null) {
-            // No baseline: fall back to a full-day window and a 30-minute interval.
-            setting.setProtocolType(1);
-            setting.setStepUnit(0);
-            setting.setSupportStartMinute(0);
-            setting.setSupportEndMinute(1439);
-            setting.setMeasureInterval(30);
-            setting.setCurrentStartMinute(0);
-            setting.setCurrentEndMinute(1439);
-        }
-        byte[] payload = buildAutoMeasurePayload(setting);
-        int totalChunks = (int) Math.ceil(payload.length / 17.0);
-        try {
-            TransactionBuilder builder = performInitialized("set auto-measure " + funType);
-            for (int i = 0; i < totalChunks; i++) {
-                int seq = i + 1;
-                int len = (i == totalChunks - 1) ? payload.length - 17 * i : 17;
-                byte[] frame = new byte[len + 3];
-                frame[0] = (byte) VeepooConstants.OP_AUTO_MEASURE;
-                frame[1] = (byte) VeepooConstants.AUTO_MEASURE_CMD_SET;
-                frame[2] = (byte) seq;
-                System.arraycopy(payload, 17 * i, frame, 3, len);
-                if (seq == 1) {
-                    frame[5] = (byte) totalChunks;
-                }
-                writeFrame(builder, frame);
-            }
-            builder.queue();
-        } catch (IOException e) {
-            LOG.error("Error sending auto-measure setting", e);
-            GB.toast(getContext(), R.string.veepoo_auto_measure_failed, Toast.LENGTH_SHORT, GB.WARN);
-            return;
-        }
-        synchronized (autoMeasureLock) {
-            autoMeasurePendingFunType = funType;
-            autoMeasurePendingOn = on;
-        }
-        mainHandler.removeCallbacks(autoMeasureWriteTimeout);
-        mainHandler.postDelayed(autoMeasureWriteTimeout, 15000L);
-        // Remember the new switch state locally so a rapid follow-up toggle starts from reality.
-        setting = autoMeasureSettings.get(funType);
-        if (setting != null) {
-            setting.setEnabled(on);
-        }
-        LOG.info("Auto-measure {} set to {}", funType, on ? "on" : "off");
-    }
-
-    /** Builds the 42-byte 0xB3 set payload (vendor AutoMeasureOpt.a layout). */
-    private byte[] buildAutoMeasurePayload(VeepooAutoMeasureSetting s) {
-        byte[] p = new byte[42];
-        p[0] = (byte) 0xC0;
-        p[1] = 0x05;
-        p[2] = 0x01; // overwritten with the chunk count when the payload is split
-        p[3] = 35;   // uint32 LE: 35 (inner blob size)
-        p[4] = 0x00;
-        p[5] = 0x00;
-        p[6] = 0x00;
-        p[7] = (byte) 0xA1; // metric section marker (-95)
-        p[8] = 33;           // inner TLV blob length
-        p[9] = (byte) 0xD0;  p[10] = 0x01;  p[11] = (byte) s.getProtocolType();
-        p[12] = (byte) 0xD1; p[13] = 0x01;  p[14] = (byte) s.getFunType();
-        p[15] = (byte) 0xD2; p[16] = 0x01;  p[17] = (byte) (s.isEnabled() ? 1 : 0);
-        p[18] = (byte) 0xD3; p[19] = 0x02;
-        p[20] = (byte) (s.getStepUnit() & 0xFF);
-        p[21] = (byte) ((s.getStepUnit() >> 8) & 0xFF);
-        p[22] = (byte) 0xD4; p[23] = 0x02;
-        p[24] = (byte) (s.isSlotModify() ? 1 : 0);
-        p[25] = (byte) (s.isIntervalModify() ? 1 : 0);
-        p[26] = (byte) 0xD5; p[27] = 0x04;
-        p[28] = (byte) (s.getSupportStartMinute() / 60);
-        p[29] = (byte) (s.getSupportStartMinute() % 60);
-        p[30] = (byte) (s.getSupportEndMinute() / 60);
-        p[31] = (byte) (s.getSupportEndMinute() % 60);
-        p[32] = (byte) 0xD6; p[33] = 0x02;
-        p[34] = (byte) (s.getMeasureInterval() & 0xFF);
-        p[35] = (byte) ((s.getMeasureInterval() >> 8) & 0xFF);
-        p[36] = (byte) 0xD7; p[37] = 0x04;
-        p[38] = (byte) (s.getCurrentStartMinute() / 60);
-        p[39] = (byte) (s.getCurrentStartMinute() % 60);
-        p[40] = (byte) (s.getCurrentEndMinute() / 60);
-        p[41] = (byte) (s.getCurrentEndMinute() % 60);
-        return p;
-    }
-
-    // ---- Women's health (cycle tracking), opcode 0x85 (vendor u2) -----------
-    // Fixed 20-byte frames on the main channel. Set: [1]=status, [2..5]=LMP year BE + month/day,
-    // [6]=cycle length, [7]=period length, rest zero. Read request: {0x85, 0x05}. The band acks
-    // a set with {0x85, result 1|0, status echo} and answers a read with the stored tuple; with
-    // womenTag==3 the date fields shift (yearLo in [3], status in [4], period in [10]).
-
-    private static boolean isWomenSettingEnabled(SharedPreferences prefs) {
-        return prefs.getInt(VeepooConstants.CONFIG_WOMEN_STATUS,
-                VeepooConstants.WOMEN_STATUS_NONE) == VeepooConstants.WOMEN_STATUS_MENES;
-    }
-
-    /**
-     * Pushes the stored women's settings to the band. Called on user-initiated changes and on
-     * reconnect (see initializeDevice) so the watch keeps fresh LMP-relative state.
-     */
-    private void applyWomenSettingFromPrefs(SharedPreferences prefs) {
-        if (!prefs.getBoolean(VeepooConstants.CONFIG_WOMEN_SUPPORTED, false)) {
-            LOG.warn("Skipping women's health push: firmware reported no support");
-            return;
-        }
-        int status = prefs.getInt(VeepooConstants.CONFIG_WOMEN_STATUS, VeepooConstants.WOMEN_STATUS_NONE);
-        String lmp = prefs.getString(VeepooConstants.CONFIG_WOMEN_LMP, null);
-        int cycleLen = prefs.getInt(VeepooConstants.CONFIG_WOMEN_CYCLE_LENGTH,
-                VeepooConstants.WOMEN_CYCLE_LENGTH_DEFAULT);
-        int periodLen = prefs.getInt(VeepooConstants.CONFIG_WOMEN_PERIOD_LENGTH,
-                VeepooConstants.WOMEN_PERIOD_LENGTH_DEFAULT);
-        int year = 0;
-        int month = 0;
-        int day = 0;
-        if (lmp != null) {
-            try {
-                java.text.SimpleDateFormat parser = new java.text.SimpleDateFormat("yyyy-MM-dd", java.util.Locale.US);
-                java.util.Date parsed = parser.parse(lmp);
-                java.util.Calendar cal = java.util.Calendar.getInstance();
-                cal.setTime(parsed);
-                year = cal.get(java.util.Calendar.YEAR);
-                month = cal.get(java.util.Calendar.MONTH) + 1;
-                day = cal.get(java.util.Calendar.DAY_OF_MONTH);
-            } catch (java.text.ParseException e) {
-                LOG.error("Stored women's LMP {} is not a valid date", lmp, e);
-                return;
-            }
-        }
-        sendWomenSet(status, year, month, day, cycleLen, periodLen);
-    }
-
-    /**
-     * Sends a women's-health set frame. status only supports NONE (0) and MENES (1) in the MVP;
-     * PREREADY/PREING/MAMAMI are vendor-app extras and rejected with a warning until implemented.
-     */
-    private void sendWomenSet(int status, int lmpYear, int lmpMonth, int lmpDay, int cycleLen, int periodLen) {
-        if (status != VeepooConstants.WOMEN_STATUS_NONE && status != VeepooConstants.WOMEN_STATUS_MENES) {
-            LOG.warn("Women's health status {} not implemented yet; ignoring", status);
-            return;
-        }
-        byte[] frame = new byte[20]; // fixed 20-byte Veepoo main-channel frame
-        frame[0] = VeepooConstants.OP_WOMEN;
-        frame[1] = (byte) status;
-        if (status == VeepooConstants.WOMEN_STATUS_MENES) {
-            frame[2] = (byte) ((lmpYear >> 8) & 0xFF);
-            frame[3] = (byte) (lmpYear & 0xFF);
-            frame[4] = (byte) lmpMonth;
-            frame[5] = (byte) lmpDay;
-            frame[6] = (byte) cycleLen;
-            frame[7] = (byte) periodLen;
-        }
-        try {
-            TransactionBuilder builder = performInitialized("set women's health");
-            writeFrame(builder, frame);
-            builder.queue();
-        } catch (IOException e) {
-            LOG.error("Cannot set women's health: not connected", e);
-            GB.toast(getContext(), R.string.veepoo_women_set_failed, Toast.LENGTH_SHORT, GB.WARN);
-            return;
-        }
-        synchronized (womenLock) {
-            womenSetOutstanding = true;
-        }
-        mainHandler.removeCallbacks(womenSetWatchdog);
-        mainHandler.postDelayed(womenSetWatchdog, 10000L);
-        LOG.info("Women's health set sent (status={} lmp={}-{}-{} cycle={} period={})",
-                status, lmpYear, lmpMonth, lmpDay, cycleLen, periodLen);
-    }
-
-    /** Requests the band's stored women's tuple ({0x85, 0x05}); one outstanding read at a time. */
-    private void sendWomenRead() {
-        synchronized (womenLock) {
-            if (womenReadOutstanding) {
-                return;
-            }
-            womenReadOutstanding = true;
-        }
-        try {
-            TransactionBuilder builder = performInitialized("read women's health");
-            writeFrame(builder, new byte[]{VeepooConstants.OP_WOMEN, (byte) VeepooConstants.WOMEN_OP_READ});
-            builder.queue();
-        } catch (IOException e) {
-            synchronized (womenLock) {
-                womenReadOutstanding = false;
-            }
-            LOG.error("Cannot read women's health: not connected", e);
-            return;
-        }
-        mainHandler.removeCallbacks(womenReadWatchdog);
-        mainHandler.postDelayed(womenReadWatchdog, 10000L);
-    }
-
-    /**
-     * Handles a women's-health reply on the F008 main channel. [1] is the result (1 ok / 0 fail)
-     * for both set acks and read replies; [2] echoes the op: 5 for the read reply, 0..4 for a set
-     * ack (echoing the status). A byte 0x85 on F002 during ECG is a PPG light-channel marker and
-     * never reaches this dispatcher (see onCharacteristicChanged), so no cross-talk guard is
-     * needed here beyond rejecting short/implausible frames.
-     */
-    private void handleWomenFrame(byte[] data) {
-        if (data == null || data.length < 3) {
-            LOG.debug("Ignoring short 0x85 women's frame: {} bytes", data == null ? 0 : data.length);
-            return;
-        }
-        int result = data[1] & 0xFF;
-        if (result > 1) {
-            LOG.warn("Implausible 0x85 women's frame [1]={}; ignoring", result);
-            return;
-        }
-        int op = data[2] & 0xFF;
-        synchronized (womenLock) {
-            if (op == VeepooConstants.WOMEN_OP_READ) {
-                if (!womenReadOutstanding) {
-                    LOG.debug("Unexpected women's read reply: {}", hexBytes(data));
-                    return;
-                }
-                womenReadOutstanding = false;
-                mainHandler.removeCallbacks(womenReadWatchdog);
-                handleWomenReadReply(data, result);
-            } else if (op <= VeepooConstants.WOMEN_STATUS_MENES) {
-                // Set ack: op echoes the requested status (NONE or MENES).
-                if (!womenSetOutstanding) {
-                    LOG.debug("Unexpected women's set ack: {}", hexBytes(data));
-                    return;
-                }
-                womenSetOutstanding = false;
-                mainHandler.removeCallbacks(womenSetWatchdog);
-                if (result == 1) {
-                    LOG.info("Women's health setting acknowledged (status {})", op);
-                    sendWomenRead(); // read back the band state after each successful set
-                } else {
-                    LOG.warn("Band rejected the women's health setting (status {})", op);
-                    GB.toast(getContext(), R.string.veepoo_women_set_failed, Toast.LENGTH_SHORT, GB.WARN);
-                }
-            } else {
-                LOG.debug("Unhandled 0x85 women's op {}: {}", op, hexBytes(data));
-            }
-        }
-    }
-
-    /** Parses the read reply (>= 19 bytes) with the layout selected by the A7 pkg1 [12] tag. */
-    private void handleWomenReadReply(byte[] data, int result) {
-        if (data.length < 19) {
-            LOG.warn("Women's read reply too short ({} bytes): {}", data.length, hexBytes(data));
-            return;
-        }
-        if (result != 1) {
-            LOG.warn("Band NAKed the women's read: {}", hexBytes(data));
-            return;
-        }
-        boolean extended = womenTag == 3;
-        int status = data[extended ? 4 : 3] & 0xFF;
-        int year = extended
-                ? (((data[5] & 0xFF) << 8) | (data[3] & 0xFF))
-                : (((data[4] & 0xFF) << 8) | (data[5] & 0xFF));
-        int month = data[6] & 0xFF;
-        int day = data[7] & 0xFF;
-        int cycleLen = data[8] & 0xFF;
-        int periodLen = data[extended ? 10 : 9] & 0xFF;
-        boolean plausible = status <= VeepooConstants.WOMEN_STATUS_MENES
-                && year >= 1950 && year <= 2100
-                && month >= 1 && month <= 12
-                && day >= 1 && day <= 31
-                && cycleLen >= VeepooConstants.WOMEN_CYCLE_LENGTH_MIN
-                && cycleLen <= VeepooConstants.WOMEN_CYCLE_LENGTH_MAX
-                && periodLen >= VeepooConstants.WOMEN_PERIOD_LENGTH_MIN
-                && periodLen <= VeepooConstants.WOMEN_PERIOD_LENGTH_MAX;
-        LOG.info("Women's band state ({} layout): status={} lmp={}-{}-{} cycle={} period={}{}",
-                extended ? "extended" : "standard", status, year, month, day, cycleLen, periodLen,
-                plausible ? "" : " [implausible values]");
     }
 
     /**
@@ -4746,7 +3522,7 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
         applyLiveWorkoutData(payload);
     }
 
-    private static String hexBytes(byte[] bytes) {
+    static String hexBytes(byte[] bytes) {
         StringBuilder sb = new StringBuilder();
         for (byte b : bytes) {
             sb.append(String.format("%02X", b));
@@ -6975,6 +5751,9 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
         mainHandler.removeCallbacks(bpDetectTimeout);
         mainHandler.removeCallbacks(bpIdleWatchdog);
         mainHandler.removeCallbacks(statusPollTask);
+        alarmModule.dispose();
+        autoMeasureModule.dispose();
+        womenHealthModule.dispose();
         realtimeStepsRequested = false;
         synchronized (syncLock) {
             fetchPhase = FetchPhase.IDLE;
