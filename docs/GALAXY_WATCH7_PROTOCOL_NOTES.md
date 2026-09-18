@@ -2072,3 +2072,28 @@ Implemented `WearDataLayerProtocol.buildProtogenBooleanSettingPut()`, wired
   modes/*, etc.) and int/float types to the GB settings UI; drop the test hook.
 - Read current values (decode the protogen value proto) to reflect state in the UI.
 - Notifications: the notification_settings + bridge_mode paths are the levers.
+
+---
+
+## 25. Settings feature: 5 booleans wired both ways; int/float writers (2026-09-18)
+
+- Generic protogensettings writers: `buildProtogenBooleanSettingPut` (inner field 2),
+  `buildProtogenIntSettingPut` (inner field 1), `buildProtogenFloatSettingPut`
+  (inner field 5, fixed32). Int/float encodings byte-verified against captured
+  values (screen_off_timeout_ms=60100 → `08 c4d503`; font_scale=1.0f → `2d 0000803f`).
+- Wired 5 confirmed boolean settings to the GB UI (SwitchPreferenceCompat + strings):
+  always_on_display, tilt_to_wake, touch_to_wake, unread_dot/show_unread_dot,
+  modes/use_mode_ringer. `onSendConfiguration` maps the pref key → group/key and
+  writes via the protogen PUT.
+- Incoming reflection: `reflectIncomingSetting` parses the watch's own-node
+  protogensettings DataItems and mirrors the boolean into the device pref, so the
+  UI shows the real current state. Verified live: tilt_to_wake/touch_to_wake/
+  show_unread_dot/always_on_display all reflected = true; connection stayed up.
+
+### Notifications - what's needed next
+Notification *settings* paths are known (notification_settings/smart_replies_enabled
+[int-style inner field 1], notification_cooldown_enabled [bool inner field 2],
+bridge_mode/<app>). Notification *delivery* (showing a phone notification on the
+watch) is a separate message whose format is not yet captured - needs a capture of
+watch7plugin posting a real notification (watch7plugin temporarily re-enabled +
+a phone notification), which requires user setup. Not guessed here.

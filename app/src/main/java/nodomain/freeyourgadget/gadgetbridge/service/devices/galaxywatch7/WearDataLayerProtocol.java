@@ -116,7 +116,9 @@ public final class WearDataLayerProtocol {
     // whichever write has the highest timestamp.
     private static final int PROTOGEN_VALUE = 1;
     private static final int PROTOGEN_TIMESTAMP = 2;
+    private static final int PROTOGEN_INT = 1;
     private static final int PROTOGEN_BOOL = 2;
+    private static final int PROTOGEN_FLOAT = 5;
 
     // DataMap entry fields (a repeated {key, value} list, itself protobuf-encoded)
     private static final int DATAMAP_ENTRY = 1;
@@ -190,12 +192,36 @@ public final class WearDataLayerProtocol {
                                                         final String ownNodeId,
                                                         final String groupAndKey,
                                                         final boolean value, final long seq) {
-        final long now = System.currentTimeMillis();
-
         final ProtoWriter typed = new ProtoWriter();
         typed.writeVarint(PROTOGEN_BOOL, value ? 1 : 0);
+        return buildProtogenSettingPut(sourcePackage, signatureHex, ownNodeId, groupAndKey, typed, seq);
+    }
+
+    /** int protogen setting (typed inner field 1, e.g. screen_off_timeout_ms, mode_ringer). */
+    public static byte[] buildProtogenIntSettingPut(final String sourcePackage, final String signatureHex,
+                                                    final String ownNodeId, final String groupAndKey,
+                                                    final long value, final long seq) {
+        final ProtoWriter typed = new ProtoWriter();
+        typed.writeVarint(PROTOGEN_INT, value);
+        return buildProtogenSettingPut(sourcePackage, signatureHex, ownNodeId, groupAndKey, typed, seq);
+    }
+
+    /** float protogen setting (typed inner field 5, fixed32, e.g. font_scale). */
+    public static byte[] buildProtogenFloatSettingPut(final String sourcePackage, final String signatureHex,
+                                                      final String ownNodeId, final String groupAndKey,
+                                                      final float value, final long seq) {
+        final ProtoWriter typed = new ProtoWriter();
+        typed.writeFixed32(PROTOGEN_FLOAT, Float.floatToIntBits(value));
+        return buildProtogenSettingPut(sourcePackage, signatureHex, ownNodeId, groupAndKey, typed, seq);
+    }
+
+    private static byte[] buildProtogenSettingPut(final String sourcePackage, final String signatureHex,
+                                                  final String ownNodeId, final String groupAndKey,
+                                                  final ProtoWriter typedValue, final long seq) {
+        final long now = System.currentTimeMillis();
+
         final ProtoWriter valueProto = new ProtoWriter();
-        valueProto.writeMessage(PROTOGEN_VALUE, typed.toByteArray());
+        valueProto.writeMessage(PROTOGEN_VALUE, typedValue.toByteArray());
         valueProto.writeVarint(PROTOGEN_TIMESTAMP, now);
 
         final String path = "wear://" + ownNodeId + "/protogensettings/" + groupAndKey + "/" + ownNodeId;
@@ -214,6 +240,54 @@ public final class WearDataLayerProtocol {
         payload.writeMessage(PAYLOAD_DATA_ITEM, dataItem.toByteArray());
 
         return frame(wrapEnvelope(payload.toByteArray(), true));
+    }
+
+    /**
+     * Decodes a protogensettings value proto (DataItem field 4) to a readable string, and returns
+     * the boolean if it is a bool setting. Format: {@code { field1 = { f1=int | f2=bool | f5=float }, field2 = ts }}.
+     */
+    public static Boolean parseProtogenBool(final byte[] valueProto) {
+        if (valueProto == null) {
+            return null;
+        }
+        try {
+            final byte[] typed = new ProtoReader(valueProto).findMessage(PROTOGEN_VALUE);
+            if (typed == null) {
+                return null;
+            }
+            final Long b = new ProtoReader(typed).findVarint(PROTOGEN_BOOL);
+            return b == null ? null : (b != 0);
+        } catch (final RuntimeException e) {
+            return null;
+        }
+    }
+
+    /** If the message is a DataItem, returns its path (field 2), else null. */
+    public static String parseDataItemPath(final byte[] message) {
+        final byte[] dataItem = extractDataItem(message);
+        return dataItem == null ? null : new ProtoReader(dataItem).findString(DATAITEM_PATH);
+    }
+
+    /** If the message is a DataItem, returns its value proto (field 4) bytes, else null. */
+    public static byte[] parseDataItemValue(final byte[] message) {
+        final byte[] dataItem = extractDataItem(message);
+        return dataItem == null ? null : new ProtoReader(dataItem).findMessage(DATAITEM_PAYLOAD);
+    }
+
+    private static byte[] extractDataItem(final byte[] message) {
+        final byte[] envelope = stripLengthPrefix(message);
+        if (envelope == null) {
+            return null;
+        }
+        try {
+            final byte[] payload = new ProtoReader(envelope).findMessage(FIELD_ENVELOPE_PAYLOAD);
+            if (payload == null) {
+                return null;
+            }
+            return new ProtoReader(payload).findMessage(PAYLOAD_DATA_ITEM);
+        } catch (final RuntimeException e) {
+            return null;
+        }
     }
 
     /**
@@ -475,6 +549,14 @@ public final class WearDataLayerProtocol {
             writeBytes(fieldNumber, nested);
         }
 
+        void writeFixed32(final int fieldNumber, final int value) {
+            writeTag(fieldNumber, 5);
+            out.write(value & 0xff);
+            out.write((value >>> 8) & 0xff);
+            out.write((value >>> 16) & 0xff);
+            out.write((value >>> 24) & 0xff);
+        }
+
         private void writeBytes(final int fieldNumber, final byte[] value) {
             writeTag(fieldNumber, 2);
             writeRawVarint(value.length);
@@ -526,6 +608,35 @@ public final class WearDataLayerProtocol {
         String findString(final int fieldNumber) {
             final byte[] bytes = findLenField(fieldNumber);
             return bytes == null ? null : new String(bytes, StandardCharsets.UTF_8);
+        }
+
+        /** Returns the first varint field with the given number, or null. */
+        Long findVarint(final int fieldNumber) {
+            pos = 0;
+            while (pos < end) {
+                final long tag = readRawVarint();
+                final int field = (int) (tag >>> 3);
+                final int wireType = (int) (tag & 0x7);
+                if (wireType == 0) {
+                    final long v = readRawVarint();
+                    if (field == fieldNumber) {
+                        return v;
+                    }
+                } else if (wireType == 2) {
+                    final int len = (int) readRawVarint();
+                    if (len < 0 || pos + len > end) {
+                        return null;
+                    }
+                    pos += len;
+                } else if (wireType == 1) {
+                    pos += 8;
+                } else if (wireType == 5) {
+                    pos += 4;
+                } else {
+                    return null;
+                }
+            }
+            return null;
         }
 
         private byte[] findLenField(final int fieldNumber) {

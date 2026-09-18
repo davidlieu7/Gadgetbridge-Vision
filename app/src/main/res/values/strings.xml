@@ -1279,6 +1279,10 @@
     <string name="prefs_always_on_display_follow_watchface">Style follows Watchface</string>
     <string name="prefs_always_on_display_style">Style</string>
     <string name="prefs_always_on_display_summary">Keep the band\'s display always on</string>
+    <string name="prefs_galaxywatch7_tilt_to_wake">Tilt to wake</string>
+    <string name="prefs_galaxywatch7_touch_to_wake">Touch to wake</string>
+    <string name="prefs_galaxywatch7_show_unread_dot">Unread notifications dot</string>
+    <string name="prefs_galaxywatch7_use_mode_ringer">Ringer sound mode</string>
     <string name="prefs_device_id">Device ID</string>
     <string name="prefs_device_name">Device name</string>
     <string name="prefs_device_alias">Device alias</string>
