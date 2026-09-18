@@ -58,6 +58,8 @@ public final class VeepooConstants {
     // autonomous measurement pushes travel on this channel.
     public static final UUID UUID_SERVICE_AE00 =
             UUID.fromString("0000AE00-0000-1000-8000-00805F9B34FB");
+    public static final UUID UUID_CHARACTERISTIC_AE01_WRITE =
+            UUID.fromString("0000AE01-0000-1000-8000-00805F9B34FB");
     public static final UUID UUID_CHARACTERISTIC_AE02_DATA =
             UUID.fromString("0000AE02-0000-1000-8000-00805F9B34FB");
 

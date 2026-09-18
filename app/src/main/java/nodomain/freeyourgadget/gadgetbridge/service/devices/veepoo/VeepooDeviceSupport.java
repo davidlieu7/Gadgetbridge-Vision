@@ -482,7 +482,11 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
         }
         try {
             TransactionBuilder builder = performInitialized("status poll");
-            writeFrame(builder, new byte[]{VeepooConstants.OP_STATUS_POLL, 0x00});
+            // The vendor app sends exactly {D8, 00} (2 bytes); zero-padded 20-byte frames get no reply.
+            builder.write(getCharacteristic(VeepooConstants.UUID_CHARACTERISTIC_F008_CMD),
+                    new byte[]{VeepooConstants.OP_STATUS_POLL, 0x00});
+            builder.queue();
+            LOG.info("Status poll sent (0xD8)");
         } catch (Exception e) {
             LOG.debug("Status poll skipped: {}", e.getMessage());
         }
@@ -557,6 +561,10 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
         // Read the watch's alarm list once the A7 capability report has had time to arrive; the
         // band verifies a whole-list CRC on every 0xB9 op, so we must know its current state.
         mainHandler.postDelayed(() -> sendAlarmRead(), 8000L);
+        // Vendor parity: Jieli "Sinilink-APP" challenge/response on AE01. The vendor's BLE stack
+        // runs this exchange on every connect and the band answers with a device info
+        // notification on AE02 (fe dc ba 00 ...).
+        sendSinilinkHandshake();
         // Re-push the women's health settings so the band keeps fresh LMP-relative state across
         // reconnects (vendor parity: its device-init re-sends the last saved tuple). Only when
         // a previous connection learned the firmware supports it and tracking is enabled.
@@ -590,6 +598,57 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
         byte[] padded = new byte[VeepooConstants.PACKET_SIZE];
         System.arraycopy(frame, 0, padded, 0, frame.length);
         builder.write(getCharacteristic(VeepooConstants.UUID_CHARACTERISTIC_F008_CMD), padded);
+    }
+
+    /**
+     * Jieli "Sinilink-APP" handshake on the AE01 write characteristic (AE00 service), replayed
+     * from vendor app captures: challenge, nonce, password token ("pass"), second nonce (twice),
+     * final frame. The vendor's BLE stack runs it automatically on every connect; the band
+     * answers the nonce steps with notifications on AE02.
+     */
+    private void sendSinilinkHandshake() {
+        BluetoothGattCharacteristic c = getCharacteristic(VeepooConstants.UUID_CHARACTERISTIC_AE01_WRITE);
+        if (c == null) {
+            LOG.warn("AE01 characteristic missing; skipping Sinilink handshake");
+            return;
+        }
+        java.util.Random rnd = new java.util.Random();
+        byte[] nonce1 = new byte[16];
+        byte[] nonce2 = new byte[16];
+        rnd.nextBytes(nonce1);
+        rnd.nextBytes(nonce2);
+        byte xx = (byte) rnd.nextInt(256);
+
+        byte[] challenge = {(byte) 0xFE, (byte) 0xDC, (byte) 0xBA, (byte) 0xC0, 0x06, 0x00, 0x02, 0x00, 0x01, (byte) 0xEF};
+        byte[] token = {0x02, 'p', 'a', 's', 's'};
+        byte[] n1 = new byte[1 + nonce1.length];
+        n1[0] = 0x00;
+        System.arraycopy(nonce1, 0, n1, 1, nonce1.length);
+        byte[] n2 = new byte[1 + nonce2.length];
+        n2[0] = 0x01;
+        System.arraycopy(nonce2, 0, n2, 1, nonce2.length);
+        byte[] finalFrame = {(byte) 0xFE, (byte) 0xDC, (byte) 0xBA, (byte) 0xC0, 0x03, 0x00, 0x06, xx,
+                (byte) 0xFF, (byte) 0xFF, (byte) 0xFF, (byte) 0xFF, 0x00, (byte) 0xEF};
+
+        ae01WriteAt(3_000L, challenge, "challenge");
+        ae01WriteAt(3_500L, n1, "nonce1");
+        ae01WriteAt(4_200L, token, "token");
+        ae01WriteAt(4_300L, n2, "nonce2a");
+        ae01WriteAt(4_400L, n2, "nonce2b");
+        ae01WriteAt(4_600L, finalFrame, "final");
+    }
+
+    private void ae01WriteAt(long delay, byte[] frame, String name) {
+        mainHandler.postDelayed(() -> {
+            try {
+                TransactionBuilder b = performInitialized("ae01 " + name);
+                b.write(getCharacteristic(VeepooConstants.UUID_CHARACTERISTIC_AE01_WRITE), frame);
+                b.queue();
+                LOG.info("Sinilink {} sent: {}", name, GB.hexdump(frame));
+            } catch (Exception e) {
+                LOG.warn("Sinilink {} failed: {}", name, e.getMessage());
+            }
+        }, delay);
     }
 
     /**
@@ -762,8 +821,10 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
      * [10..13]=calories x10 u32 LE. The band keeps the daily total itself and resets it at
      * midnight; we turn consecutive polls into per-poll deltas for the live activity view.
      */
-    private void handleStatusFrame(byte[] data) {
+     private void handleStatusFrame(byte[] data) {
+        LOG.info("D8 status frame received: len={} hex={}", data.length, GB.hexdump(data));
         if (data.length < 14) {
+            LOG.warn("D8 status frame too short ({}), ignoring", data.length);
             return;
         }
         long steps = ((long) (data[2] & 0xFF)) | ((long) (data[3] & 0xFF) << 8)
@@ -771,6 +832,7 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
         int day = (int) (System.currentTimeMillis() / 86_400_000L);
         if (day != lastStatusDay || lastStatusSteps < 0) {
             // First poll after screen open, reconnect, or midnight rollover: baseline only.
+            LOG.info("D8 status: steps={} (baseline)", steps);
             lastStatusDay = day;
             lastStatusSteps = steps;
             return;
@@ -779,8 +841,10 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
         lastStatusSteps = steps;
         if (delta <= 0 || delta > 1000) {
             // Counter moved backwards (band reset, manual clear) or an implausible jump.
+            LOG.info("D8 status: steps={} delta={} (dropped)", steps, delta);
             return;
         }
+        LOG.info("D8 status: steps={} delta={}", steps, delta);
         VeepooActivitySample sample = new VeepooActivitySample();
         sample.setTimestamp((int) (System.currentTimeMillis() / 1000L));
         sample.setSteps((int) delta);
@@ -789,6 +853,7 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
 
     @Override
     public void onEnableRealtimeSteps(boolean enable) {
+        LOG.info("Live step tracking {}", enable ? "enabled" : "disabled");
         realtimeStepsRequested = enable;
         if (enable) {
             mainHandler.removeCallbacks(statusPollTask);
