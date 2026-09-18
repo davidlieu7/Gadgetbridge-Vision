@@ -20,7 +20,6 @@ import android.os.Build;
 
 import java.io.ByteArrayOutputStream;
 import java.nio.charset.StandardCharsets;
-import java.security.SecureRandom;
 import java.util.UUID;
 
 /**
@@ -120,15 +119,7 @@ public final class WearDataLayerProtocol {
     private static final int PROTOGEN_BOOL = 2;
     private static final int PROTOGEN_FLOAT = 5;
 
-    // DataMap entry fields (a repeated {key, value} list, itself protobuf-encoded)
-    private static final int DATAMAP_ENTRY = 1;
-    private static final int DATAMAP_ENTRY_KEY = 1;
-    private static final int DATAMAP_ENTRY_VALUE = 2;
-    private static final int DATAMAP_VALUE_TYPE_TAG = 1;
-    private static final int DATAMAP_VALUE_TYPE_STRING = 2;
-    private static final int DATAMAP_VALUE_TYPE_BOOL = 8;
 
-    private static final SecureRandom RANDOM = new SecureRandom();
 
     private WearDataLayerProtocol() {
     }
@@ -329,20 +320,6 @@ public final class WearDataLayerProtocol {
         seqAck.writeMessage(SEQACK_NODE_REF, nodeRef.toByteArray());
     }
 
-    private static byte[] buildSingleKeyBooleanDataMap(final String key, final boolean value) {
-        final ProtoWriter valueWrapper = new ProtoWriter();
-        valueWrapper.writeVarint(DATAMAP_VALUE_TYPE_TAG, DATAMAP_VALUE_TYPE_BOOL);
-        valueWrapper.writeVarint(DATAMAP_VALUE_TYPE_BOOL, value ? 1 : 0);
-
-        final ProtoWriter entry = new ProtoWriter();
-        entry.writeString(DATAMAP_ENTRY_KEY, key);
-        entry.writeMessage(DATAMAP_ENTRY_VALUE, valueWrapper.toByteArray());
-
-        final ProtoWriter dataMap = new ProtoWriter();
-        dataMap.writeMessage(DATAMAP_ENTRY, entry.toByteArray());
-        return dataMap.toByteArray();
-    }
-
     private static byte[] wrapEnvelope(final byte[] payload, final boolean withFlagC) {
         final ProtoWriter envelope = new ProtoWriter();
         envelope.writeMessage(FIELD_ENVELOPE_PAYLOAD, payload);
@@ -506,16 +483,6 @@ public final class WearDataLayerProtocol {
         } catch (final RuntimeException e) {
             return null;
         }
-    }
-
-    /**
-     * Request ids observed on the wire look like ~27-character URL-safe base64 strings (no
-     * padding) — matches a base64url-encoded 20-byte random value.
-     */
-    private static String randomRequestId() {
-        final byte[] raw = new byte[20];
-        RANDOM.nextBytes(raw);
-        return java.util.Base64.getUrlEncoder().withoutPadding().encodeToString(raw);
     }
 
     /** Prepends the 4-byte big-endian length prefix used to frame every message on the wire. */
