@@ -253,7 +253,10 @@ public abstract class AbstractVeepooCoordinator extends AbstractBLEDeviceCoordin
     private final class ToggleWorkoutAction implements DeviceCardAction {
         @Override
         public int getIcon(@NonNull final GBDevice device) {
-            return workoutRunning ? R.drawable.ic_stop : R.drawable.ic_activity_running;
+            // ic_timer: the built-in "show activity tracks" card button already uses the
+            // running-man glyph (ic_activity_tracks == ic_activity_running), so the start
+            // workout action needs a clearly distinct icon.
+            return workoutRunning ? R.drawable.ic_stop : R.drawable.ic_timer;
         }
 
         @NonNull
