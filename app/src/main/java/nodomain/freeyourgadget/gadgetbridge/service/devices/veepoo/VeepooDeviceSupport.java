@@ -2683,7 +2683,7 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
         sample.setRawKind(VeepooConstants.RAW_KIND_ACTIVITY);
         sample.setSteps(steps);
         sample.setHeartRate(heartRate);
-        sample.setCaloriesBurnt((kcalTenths + 5) / 10);
+        sample.setCaloriesBurnt(kcalTenths * 100);
         sample.setDistanceMeters(distanceMeters);
         sample.setDataSource(DATA_SOURCE_ACTIVITY_SUMMARY);
         sample.setApneaCount(apneaCount);
