@@ -91,6 +91,13 @@ public abstract class AbstractVeepooCoordinator extends AbstractBLEDeviceCoordin
         return true;
     }
 
+    @Override
+    public int getAlarmSlotCount(@NonNull final GBDevice device) {
+        // Exposes the built-in "set alarms" card action (ConfigureAlarms); the 0xB9 module
+        // enforces the firmware capability at send time and reads back the band's state.
+        return VeepooConstants.ALARM_MAX_ALARMS;
+    }
+
     @NonNull
     @Override
     public Class<? extends DeviceSupport> getDeviceSupportClass(@NonNull final GBDevice device) {
