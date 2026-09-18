@@ -33,6 +33,7 @@ import java.util.EnumSet;
 import java.util.Set;
 
 import nodomain.freeyourgadget.gadgetbridge.entities.BaseActivitySummary;
+import nodomain.freeyourgadget.gadgetbridge.externalservices.dreeve.DreeveService;
 import nodomain.freeyourgadget.gadgetbridge.model.ActivityKind;
 import nodomain.freeyourgadget.gadgetbridge.test.TestBase;
 
@@ -79,6 +80,14 @@ public class UploadCapabilitiesTest extends TestBase {
         final UploadCapabilities fitOnly = capabilities(WorkoutPayloadFormat.FIT);
         assertEquals(WorkoutPayloadFormat.FIT, fitOnly.formatFor(summary(false)));
         assertTrue(fitOnly.appliesTo(summary(false)));
+    }
+
+    @Test
+    public void testDreeveTakesEveryWorkoutAsFit() throws Exception {
+        final UploadCapabilities dreeve = DreeveService.INSTANCE.getCapabilities();
+        assertEquals(WorkoutPayloadFormat.FIT, dreeve.formatFor(summary(false)));
+        assertEquals(WorkoutPayloadFormat.FIT, dreeve.formatFor(summary(true)));
+        assertTrue(dreeve.appliesTo(summary(false)));
     }
 
     @Test

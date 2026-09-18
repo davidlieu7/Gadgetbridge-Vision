@@ -5912,6 +5912,7 @@
     <string name="service_setup_next">Next</string>
     <string name="service_logged_in">Logged in</string>
     <string name="service_logged_in_to">Logged in to %s</string>
+    <string name="dreeve_setup_api_token_error">API token should start with drv_</string>
     <string name="wanderer_setup_api_token_error">API token should start with wanderer_key_</string>
     <string name="wanderer_setup_missing_information">Please fill both fields</string>
     <string name="pref_wanderer_status_title">Wanderer status</string>
@@ -5921,6 +5922,8 @@
     <string name="pref_category_endurain" translatable="false">Endurain</string>
     <string name="pref_category_wanderer" translatable="false">Wanderer</string>
     <string name="pref_category_ridehub" translatable="false">RideHub</string>
+    <string name="pref_category_dreeve" translatable="false">Dreeve</string>
+    <string name="dreeve_error_uploads_disabled">This Dreeve server imports activities from Strava and does not accept uploaded files</string>
     <string name="select_at_least_option">Please select at least %1$d option</string>
 
     <!-- Auto-upload to online fitness trackers -->

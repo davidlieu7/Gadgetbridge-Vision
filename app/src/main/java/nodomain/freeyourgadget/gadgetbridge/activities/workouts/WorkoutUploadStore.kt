@@ -43,6 +43,7 @@ object WorkoutUploadStore {
     const val SERVICE_ENDURAIN = 0
     const val SERVICE_WANDERER = 1
     const val SERVICE_RIDEHUB = 2
+    const val SERVICE_DREEVE = 3
 
     const val STATUS_SUCCESS = 1
     const val STATUS_FAILED = 2

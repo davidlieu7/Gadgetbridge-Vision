@@ -17,6 +17,7 @@
 package nodomain.freeyourgadget.gadgetbridge.externalservices
 
 import android.content.Context
+import nodomain.freeyourgadget.gadgetbridge.externalservices.dreeve.DreeveService
 import nodomain.freeyourgadget.gadgetbridge.externalservices.endurain.EndurainService
 import nodomain.freeyourgadget.gadgetbridge.externalservices.ridehub.RideHubService
 import nodomain.freeyourgadget.gadgetbridge.externalservices.wanderer.WandererService
@@ -30,6 +31,7 @@ object ExternalServiceRegistry {
         EndurainService,
         WandererService,
         RideHubService,
+        DreeveService,
     )
 
     fun byId(id: String): ExternalService? = services.firstOrNull { it.id == id }

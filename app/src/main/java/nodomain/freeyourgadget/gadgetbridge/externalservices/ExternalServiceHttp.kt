@@ -37,8 +37,9 @@ object ExternalServiceHttp {
     /**
      * Asks [uri] whether [token] is accepted, treating a response [validateResponse] recognises as
      * proof that it is. Answers (accepted, reason), where reason is a message to show the user when
-     * it is not: [invalidTokenMessage] when the server answered and refused, and why the server
-     * could not be reached when it did not answer at all.
+     * it is not: [invalidTokenMessage] when the server answered and refused, why the server could
+     * not be reached when it did not answer at all, and whatever [rejectReason] names when the
+     * token is accepted but the server still cannot be used.
      */
     fun checkToken(
         context: Context,
@@ -46,6 +47,7 @@ object ExternalServiceHttp {
         token: String,
         validateResponse: (JSONObject) -> Boolean,
         invalidTokenMessage: String,
+        rejectReason: (JSONObject) -> String? = { null },
     ): Pair<Boolean, String?> {
         return try {
             var networkReason: String? = null
@@ -58,9 +60,9 @@ object ExternalServiceHttp {
                 response == null ->
                     false to (networkReason ?: InternetUtils.connectFailureReason(context, uri.toString()))
 
-                validateResponse(response) -> true to null
+                !validateResponse(response) -> false to invalidTokenMessage
 
-                else -> false to invalidTokenMessage
+                else -> rejectReason(response)?.let { false to it } ?: (true to null)
             }
         } catch (e: Exception) {
             LOG.error("Reachability check for {} failed", uri, e)
