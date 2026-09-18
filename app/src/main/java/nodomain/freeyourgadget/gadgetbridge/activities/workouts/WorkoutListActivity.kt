@@ -5,6 +5,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.content.res.ColorStateList
 import android.os.Bundle
 import android.view.ActionMode
 import android.view.Menu
@@ -19,7 +20,9 @@ import androidx.recyclerview.widget.RecyclerView
 import androidx.recyclerview.widget.SimpleItemAnimator
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import com.google.android.material.color.MaterialColors
 import com.google.android.material.floatingactionbutton.FloatingActionButton
+import com.google.android.material.shape.CornerFamily
 import nodomain.freeyourgadget.gadgetbridge.GBApplication
 import nodomain.freeyourgadget.gadgetbridge.R
 import nodomain.freeyourgadget.gadgetbridge.activities.AbstractListActivity
@@ -231,6 +234,12 @@ class WorkoutListActivity : AbstractListActivity<BaseActivitySummary>() {
 
         val fab: FloatingActionButton = findViewById(R.id.fab)
         fab.setOnClickListener { fetchTrackData() }
+        // The FAB comes from the layout shared by every list screen, so it is only restyled here.
+        fab.backgroundTintList = ColorStateList.valueOf(MaterialColors.getColor(fab, R.attr.fab_bg))
+        fab.imageTintList = ColorStateList.valueOf(MaterialColors.getColor(fab, R.attr.fab_icon))
+        fab.shapeAppearanceModel = fab.shapeAppearanceModel.toBuilder()
+            .setAllCorners(CornerFamily.ROUNDED, 16 * resources.displayMetrics.density)
+            .build()
     }
 
     private fun setupViewModel() {
@@ -508,6 +517,16 @@ class WorkoutListActivity : AbstractListActivity<BaseActivitySummary>() {
     }
 
     private fun refresh(silent: Boolean) {
+        // The adapter only reads the kind and date filters to title the dashboard, so it has to
+        // be kept in sync here: the filter screen result only updates this activity's fields.
+        summariesAdapter?.let { adapter ->
+            adapter.setActivityKindFilter(activityFilter)
+            adapter.setDateFromFilter(dateFromFilter)
+            adapter.setDateToFilter(dateToFilter)
+            adapter.setNameContainsFilter(nameContainsFilter)
+            adapter.setItemsFilter(itemsFilter)
+            adapter.setDeviceFilter(deviceFilter)
+        }
         gbDevice?.let { device ->
             viewModel.loadSummaries(
                 device,

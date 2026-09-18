@@ -123,6 +123,19 @@
     <color name="value_line_color" type="color">#858585</color>
     <color name="row_separator_light" type="color">#ffe2e2e5</color>
     <color name="row_separator_dark" type="color">#19808080</color>
+
+    <color name="stat_tile_bg_light" type="color">#F5F2EF</color>
+    <color name="stat_tile_bg_dark" type="color">#0F0F0F</color>
+    <color name="stat_tile_border_light" type="color">#D8D4D0</color>
+    <color name="stat_tile_border_dark" type="color">#3A3A3A</color>
+    <color name="activity_icon_bg_light" type="color">#EBE7E3</color>
+    <color name="activity_icon_bg_dark" type="color">#1F1F1F</color>
+    <color name="fab_bg_light" type="color">#1B1B1B</color>
+    <color name="fab_bg_dark" type="color">#EDEDED</color>
+    <color name="fab_icon_light" type="color">#FFFFFF</color>
+    <color name="fab_icon_dark" type="color">#0A0A0A</color>
+    <color name="table_header_rule_light" type="color">#D8D4D0</color>
+    <color name="table_header_rule_dark" type="color">#3A3A3A</color>
     <color name="gauge_line_color" type="color">#19808080</color>
 
     <color name="hr_zone_warm_up_color" type="color">#92a4ad</color>
@@ -161,6 +174,12 @@
     <color name="chart_battery_temperature" type="color">#ff8f00</color>
 
     <attr name="row_separator" format="color" />
+    <attr name="stat_tile_bg" format="color" />
+    <attr name="stat_tile_border" format="color" />
+    <attr name="activity_icon_bg" format="color" />
+    <attr name="fab_bg" format="color" />
+    <attr name="fab_icon" format="color" />
+    <attr name="table_header_rule" format="color" />
     <color name="alternate_row_background_light">#FFEDEDED</color>
     <color name="alternate_row_background_dark">#545254</color>
 

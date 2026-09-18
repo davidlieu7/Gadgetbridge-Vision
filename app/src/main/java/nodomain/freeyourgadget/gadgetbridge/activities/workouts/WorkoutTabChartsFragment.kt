@@ -154,7 +154,7 @@ class WorkoutTabChartsFragment : Fragment(), WorkoutTabScreenshotProvider {
             val statEntries = groupedEntries[chart.group].orEmpty().filter { (key, _) -> key in statKeys }
             val stats = statEntries.mapNotNull { (key, entry) ->
                 (entry as? ActivitySummarySimpleEntry)?.takeIf { it.value != null }?.let {
-                    StatTileData(workoutValueFormatter.formatValue(it.value, it.unit), workoutValueFormatter.getStringResourceByName(key))
+                    StatTileData(workoutValueFormatter.formatTileValue(it.value, it.unit), workoutValueFormatter.getStringResourceByName(key))
                 }
             }
             if (stats.isNotEmpty()) {

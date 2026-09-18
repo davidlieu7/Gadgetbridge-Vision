@@ -1,10 +1,12 @@
 package nodomain.freeyourgadget.gadgetbridge.activities.workouts
 
 import android.content.Context
+import android.content.res.ColorStateList
 import android.graphics.Typeface
 import android.view.Gravity
 import android.view.View
 import android.widget.FrameLayout
+import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.TextView
 import androidx.annotation.DrawableRes
@@ -21,13 +23,19 @@ private const val TILE_PADDING_HORIZONTAL_DP = 12
 private const val TILE_PADDING_VERTICAL_DP = 16
 private const val SUBTEXT_TOP_MARGIN_DP = 2
 private const val SUBTEXT_DRAWABLE_PADDING_DP = 4
+private const val ICON_TILE_ICON_SIZE_DP = 22
+private const val ICON_TILE_GAP_DP = 12
+private const val ICON_TILE_PADDING_HORIZONTAL_DP = 12
+private const val ICON_TILE_PADDING_VERTICAL_DP = 14
+private const val ICON_TILE_LABEL_TOP_MARGIN_DP = 3
 
 /**
  * [subtext] is an optional line rendered between [value] and [label] (e.g. a trend indicator),
  * shown with a leading [subtextIcon] tinted and colored with [subtextColor]. Omitted entirely
  * (no reserved space) when [subtext] is null. [borderColor], when set, replaces the tile's
  * neutral border with that color (e.g. to identify one series/zone among several tiles) in place
- * of a separate colored swatch.
+ * of a separate colored swatch. [icon], when set, switches to the horizontal variant: the icon on
+ * the left, then the value and label start-aligned next to it, instead of the centered layout.
  */
 data class StatTileData @JvmOverloads constructor(
     val value: String,
@@ -37,6 +45,7 @@ data class StatTileData @JvmOverloads constructor(
     @DrawableRes val subtextIcon: Int? = null,
     val subtextColor: Int? = null,
     val borderColor: Int? = null,
+    @DrawableRes val icon: Int? = null,
 )
 
 /**
@@ -106,76 +115,16 @@ private fun buildStatTile(context: Context, stat: StatTileData): MaterialCardVie
     return MaterialCardView(context).apply {
         radius = dpToPx(context, CARD_CORNER_RADIUS_DP).toFloat()
         cardElevation = 0f
-        strokeWidth = dpToPx(context, 2)
-        setStrokeColor(stat.borderColor ?: MaterialColors.getColor(context, R.attr.row_separator, "StatTile"))
-        setCardBackgroundColor(MaterialColors.getColor(context, android.R.attr.windowBackground, "StatTile"))
+        // A colored border identifies one series/zone among several tiles, so it stays thicker
+        // to remain visible; the neutral border is a thin outline.
+        strokeWidth = dpToPx(context, if (stat.borderColor != null) 2 else 1)
+        setStrokeColor(stat.borderColor ?: MaterialColors.getColor(context, R.attr.stat_tile_border, "StatTile"))
+        setCardBackgroundColor(MaterialColors.getColor(context, R.attr.stat_tile_bg, "StatTile"))
 
-        val content = LinearLayout(context).apply {
-            orientation = LinearLayout.VERTICAL
-            gravity = Gravity.CENTER_HORIZONTAL
-            setPaddingRelative(
-                dpToPx(context, TILE_PADDING_HORIZONTAL_DP),
-                dpToPx(context, TILE_PADDING_VERTICAL_DP),
-                dpToPx(context, TILE_PADDING_HORIZONTAL_DP),
-                dpToPx(context, TILE_PADDING_VERTICAL_DP)
-            )
-
-            addView(TextView(context).apply {
-                text = stat.value
-                textSize = 20f
-                typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
-                gravity = Gravity.CENTER_HORIZONTAL
-                setTextColor(stat.valueColor ?: MaterialColors.getColor(context, R.attr.textColorPrimary, "StatTile"))
-                // MATCH_PARENT width (content's vertical LinearLayout would default to this
-                // anyway) so the gravity above actually centers the text - a WRAP_CONTENT-width
-                // TextView here would just get centered as a box, not the text within it.
-                layoutParams = LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.MATCH_PARENT,
-                    LinearLayout.LayoutParams.WRAP_CONTENT
-                )
-            })
-            if (stat.subtext != null) {
-                addView(TextView(context).apply {
-                    text = stat.subtext
-                    textSize = 12f
-                    gravity = Gravity.CENTER
-                    typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
-                    includeFontPadding = false
-                    compoundDrawablePadding = dpToPx(context, SUBTEXT_DRAWABLE_PADDING_DP)
-                    val color = stat.subtextColor ?: MaterialColors.getColor(context, R.attr.textColorPrimary, "StatTile")
-                    setTextColor(color)
-                    if (stat.subtextIcon != null) {
-                        TextViewCompat.setCompoundDrawablesRelativeWithIntrinsicBounds(
-                            this,
-                            ResourcesCompat.getDrawable(resources, stat.subtextIcon, context.theme),
-                            null,
-                            null,
-                            null
-                        )
-                        TextViewCompat.setCompoundDrawableTintList(this, android.content.res.ColorStateList.valueOf(color))
-                    }
-                    layoutParams = LinearLayout.LayoutParams(
-                        LinearLayout.LayoutParams.WRAP_CONTENT,
-                        LinearLayout.LayoutParams.WRAP_CONTENT
-                    ).apply {
-                        gravity = Gravity.CENTER_HORIZONTAL
-                        topMargin = dpToPx(context, SUBTEXT_TOP_MARGIN_DP)
-                    }
-                })
-            }
-            addView(TextView(context).apply {
-                text = stat.label
-                textSize = 12f
-                maxLines = 2
-                gravity = Gravity.CENTER_HORIZONTAL
-                setTextColor(MaterialColors.getColor(context, com.google.android.material.R.attr.colorOnSurfaceVariant, "StatTile"))
-                layoutParams = LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.WRAP_CONTENT,
-                    LinearLayout.LayoutParams.WRAP_CONTENT
-                ).apply {
-                    topMargin = dpToPx(context, 4)
-                }
-            })
+        val content = if (stat.icon != null) {
+            buildIconTileContent(context, stat, stat.icon)
+        } else {
+            buildCenteredTileContent(context, stat)
         }
 
         // content's parent here is a MaterialCardView (a FrameLayout), not a LinearLayout, so it
@@ -193,6 +142,126 @@ private fun buildStatTile(context: Context, stat: StatTileData): MaterialCardVie
                 Gravity.CENTER_VERTICAL
             )
         )
+    }
+}
+
+private fun buildIconTileContent(context: Context, stat: StatTileData, @DrawableRes icon: Int): LinearLayout {
+    val mutedColor = MaterialColors.getColor(context, com.google.android.material.R.attr.colorOnSurfaceVariant, "StatTile")
+    return LinearLayout(context).apply {
+        orientation = LinearLayout.HORIZONTAL
+        gravity = Gravity.CENTER_VERTICAL
+        setPaddingRelative(
+            dpToPx(context, ICON_TILE_PADDING_HORIZONTAL_DP),
+            dpToPx(context, ICON_TILE_PADDING_VERTICAL_DP),
+            dpToPx(context, ICON_TILE_PADDING_HORIZONTAL_DP),
+            dpToPx(context, ICON_TILE_PADDING_VERTICAL_DP)
+        )
+
+        addView(ImageView(context).apply {
+            setImageResource(icon)
+            imageTintList = ColorStateList.valueOf(mutedColor)
+            importantForAccessibility = View.IMPORTANT_FOR_ACCESSIBILITY_NO
+            layoutParams = LinearLayout.LayoutParams(
+                dpToPx(context, ICON_TILE_ICON_SIZE_DP),
+                dpToPx(context, ICON_TILE_ICON_SIZE_DP)
+            )
+        })
+
+        addView(LinearLayout(context).apply {
+            orientation = LinearLayout.VERTICAL
+            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f).apply {
+                marginStart = dpToPx(context, ICON_TILE_GAP_DP)
+            }
+
+            addView(TextView(context).apply {
+                text = stat.value
+                textSize = 18f
+                typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+                setTextColor(stat.valueColor ?: MaterialColors.getColor(context, R.attr.textColorPrimary, "StatTile"))
+            })
+            addView(TextView(context).apply {
+                text = stat.label
+                textSize = 11f
+                maxLines = 2
+                setTextColor(mutedColor)
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                ).apply {
+                    topMargin = dpToPx(context, ICON_TILE_LABEL_TOP_MARGIN_DP)
+                }
+            })
+        })
+    }
+}
+
+private fun buildCenteredTileContent(context: Context, stat: StatTileData): LinearLayout {
+    return LinearLayout(context).apply {
+        orientation = LinearLayout.VERTICAL
+        gravity = Gravity.CENTER_HORIZONTAL
+        setPaddingRelative(
+            dpToPx(context, TILE_PADDING_HORIZONTAL_DP),
+            dpToPx(context, TILE_PADDING_VERTICAL_DP),
+            dpToPx(context, TILE_PADDING_HORIZONTAL_DP),
+            dpToPx(context, TILE_PADDING_VERTICAL_DP)
+        )
+
+        addView(TextView(context).apply {
+            text = stat.value
+            textSize = 20f
+            typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+            gravity = Gravity.CENTER_HORIZONTAL
+            setTextColor(stat.valueColor ?: MaterialColors.getColor(context, R.attr.textColorPrimary, "StatTile"))
+            // MATCH_PARENT width (content's vertical LinearLayout would default to this
+            // anyway) so the gravity above actually centers the text - a WRAP_CONTENT-width
+            // TextView here would just get centered as a box, not the text within it.
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            )
+        })
+        if (stat.subtext != null) {
+            addView(TextView(context).apply {
+                text = stat.subtext
+                textSize = 12f
+                gravity = Gravity.CENTER
+                typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+                includeFontPadding = false
+                compoundDrawablePadding = dpToPx(context, SUBTEXT_DRAWABLE_PADDING_DP)
+                val color = stat.subtextColor ?: MaterialColors.getColor(context, R.attr.textColorPrimary, "StatTile")
+                setTextColor(color)
+                if (stat.subtextIcon != null) {
+                    TextViewCompat.setCompoundDrawablesRelativeWithIntrinsicBounds(
+                        this,
+                        ResourcesCompat.getDrawable(resources, stat.subtextIcon, context.theme),
+                        null,
+                        null,
+                        null
+                    )
+                    TextViewCompat.setCompoundDrawableTintList(this, android.content.res.ColorStateList.valueOf(color))
+                }
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.WRAP_CONTENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                ).apply {
+                    gravity = Gravity.CENTER_HORIZONTAL
+                    topMargin = dpToPx(context, SUBTEXT_TOP_MARGIN_DP)
+                }
+            })
+        }
+        addView(TextView(context).apply {
+            text = stat.label
+            textSize = 12f
+            maxLines = 2
+            gravity = Gravity.CENTER_HORIZONTAL
+            setTextColor(MaterialColors.getColor(context, com.google.android.material.R.attr.colorOnSurfaceVariant, "StatTile"))
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply {
+                topMargin = dpToPx(context, 4)
+            }
+        })
     }
 }
 
