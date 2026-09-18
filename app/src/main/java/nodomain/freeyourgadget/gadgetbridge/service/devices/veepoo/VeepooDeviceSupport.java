@@ -33,8 +33,6 @@ import java.io.ByteArrayOutputStream;
 import java.io.File;
 import java.io.IOException;
 import java.io.Serializable;
-import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -70,7 +68,6 @@ import nodomain.freeyourgadget.gadgetbridge.entities.GenericBloodLipidSampleDao;
 import nodomain.freeyourgadget.gadgetbridge.entities.GenericBloodPressureSample;
 import nodomain.freeyourgadget.gadgetbridge.entities.GenericBloodPressureSampleDao;
 import nodomain.freeyourgadget.gadgetbridge.entities.GenericHeartRateSample;
-import nodomain.freeyourgadget.gadgetbridge.entities.GenericHeartRateSampleDao;
 import nodomain.freeyourgadget.gadgetbridge.entities.GenericHrvValueSample;
 import nodomain.freeyourgadget.gadgetbridge.entities.GenericHrvValueSampleDao;
 import nodomain.freeyourgadget.gadgetbridge.entities.GenericRespiratoryRateSample;
@@ -86,7 +83,6 @@ import nodomain.freeyourgadget.gadgetbridge.entities.GlucoseSampleDao;
 import nodomain.freeyourgadget.gadgetbridge.entities.User;
 import nodomain.freeyourgadget.gadgetbridge.model.TemperatureSample;
 import nodomain.freeyourgadget.gadgetbridge.entities.VeepooActivitySample;
-import nodomain.freeyourgadget.gadgetbridge.entities.VeepooEcgSample;
 import nodomain.freeyourgadget.gadgetbridge.entities.VeepooSleepSummarySample;
 import nodomain.freeyourgadget.gadgetbridge.entities.VeepooSleepSummarySampleDao;
 import nodomain.freeyourgadget.gadgetbridge.export.GPXExporter;
@@ -120,7 +116,9 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
 
     private final VeepooAlarmModule alarmModule = new VeepooAlarmModule(this);
     private final VeepooAutoMeasureModule autoMeasureModule = new VeepooAutoMeasureModule(this);
+    private final VeepooEcgModule ecgModule = new VeepooEcgModule(this);
     private final VeepooLiveWorkoutModule liveWorkoutModule = new VeepooLiveWorkoutModule(this);
+    private final VeepooManualDetectModule manualDetectModule = new VeepooManualDetectModule(this);
     private final VeepooVitalDetectModule vitalDetectModule = new VeepooVitalDetectModule(this);
     private final VeepooWomenHealthModule womenHealthModule = new VeepooWomenHealthModule(this);
 
@@ -167,37 +165,8 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
     private final List<GenericRespiratoryRateSample> pendingOriginBreathSamples = new ArrayList<>();
     private final List<GenericBloodLipidSample> pendingOriginLipidSamples = new ArrayList<>();
 
-    // Manual heart rate read-back state (0xDE)
-    private final Object manualDetectLock = new Object();
-    private boolean manualDetectActive = false;
-    private int manualDetectTotal = -1;
-    private int manualDetectNextIndex = 0;
-    private final ByteArrayOutputStream manualDetectPayload = new ByteArrayOutputStream();
-    private final Runnable manualDetectWatchdog = () -> {
-        LOG.warn("Manual heart rate read timed out");
-        GB.toast(getContext(), R.string.veepoo_manual_hr_failed, Toast.LENGTH_SHORT, GB.WARN);
-        resetManualDetect();
-    };
-
     // On-demand vital detection state is tracked by VeepooVitalDetectModule (HR 0xD0, SpO2 0x80,
     // temperature 0x87, stress 0x89, BP 0x90, body composition 0x93, lipids 0x8A).
-
-    private boolean ecgDetectActive = false;
-    private int ecgFrameCount = 0;
-    private int ecgLatestHr = 0;
-    private int ecgFinalHr = 0; // heart rate from the result frame, when the device sends one
-    private int ecgProgress = 0; // acquisition progress 0-100 % from the per-second status frames
-    private int ecgDrawFrequency = 0; // sample rate from the info frame (Hz)
-    private int ecgNoContactStreak = 0; // consecutive status frames with the wear flag set
-    private long ecgStartedAtMs = 0L;
-    private long ecgLastNotifyMs = 0L;
-    private final ByteArrayOutputStream ecgWaveformBuffer = new ByteArrayOutputStream();
-    private final ByteArrayOutputStream ecgResultBlobBuffer = new ByteArrayOutputStream();
-    private int ecgSampleCount = 0;
-    private final Runnable ecgDetectTimeout = () -> {
-        LOG.warn("ECG measurement window elapsed without a device completion event");
-        finishEcgDetect(false, R.string.veepoo_ecg_failed_timeout);
-    };
 
     // Capabilities from the device-pushed 0xA7 report (package 2)
     private int watchDataDay = VeepooConstants.WATCH_DAY_DEFAULT;
@@ -486,7 +455,7 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
             return true;
         }
         if (value != null && characteristic.getUuid().equals(VeepooConstants.UUID_CHARACTERISTIC_F002_DATA)) {
-            handleEcgLightFrame(value);
+            ecgModule.handleLightFrame(value);
             return true;
         }
         if (value != null && characteristic.getUuid().equals(VeepooConstants.UUID_CHARACTERISTIC_F003_DATA)) {
@@ -558,14 +527,14 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
             case 0x93:
                 // Shared opcode: [1]==4 body composition, [1]==1 ECG; each handler self-guards.
                 vitalDetectModule.handleBodyCompositionFrame(data);
-                handleEcgDetectFrame(data);
+                ecgModule.handleFrame(data);
                 break;
             case 0x8A:
                 vitalDetectModule.handleLipidFrame(data);
                 break;
             case 0x85:
                 // Women's health (cycle tracking). Note: 0x85 is also a PPG light-channel marker,
-                // but that one arrives on F002 and is consumed by handleEcgLightFrame before the
+                // but that one arrives on F002 and is consumed by VeepooEcgModule before the
                 // main-channel dispatch; only F008 frames reach this case.
                 womenHealthModule.handleFrame(data);
                 break;
@@ -588,7 +557,7 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
                 handleFindDeviceAck(data);
                 break;
             case 0xDE:
-                handleManualDetectFrame(data);
+                manualDetectModule.handleFrame(data);
                 break;
             case 0xD8:
                 handleStatusFrame(data);
@@ -2866,7 +2835,7 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
         return ((buf[offset] & 0xFF) << 8) | (buf[offset + 1] & 0xFF);
     }
 
-    private static long le32(byte[] buf, int offset) {
+    static long le32(byte[] buf, int offset) {
         return (buf[offset] & 0xFFL)
                 | ((buf[offset + 1] & 0xFFL) << 8)
                 | ((buf[offset + 2] & 0xFFL) << 16)
@@ -2929,7 +2898,7 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
         } else if (VeepooConstants.CONFIG_MEASURE_BLOOD_LIPIDS.equals(config)) {
             vitalDetectModule.startLipidDetect();
         } else if (VeepooConstants.CONFIG_MEASURE_ECG.equals(config)) {
-            startEcgDetect();
+            ecgModule.startEcgDetect();
         } else if (VeepooConstants.CONFIG_WOMEN_APPLY.equals(config)) {
             womenHealthModule.applyWomenSettingFromPrefs(GBApplication.getDeviceSpecificSharedPrefs(getDevice().getAddress()));
         } else {
@@ -3331,10 +3300,6 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
         }
     }
 
-    // ---------------------------------------------------------------------
-    // ECG single-lead detection, opcode 0x93 function 1 (capture phase)
-    // ---------------------------------------------------------------------
-
     /**
      * Result announced to HeartRateDialog during and after an ECG measurement. {@code sampleCount}
      * is the number of decoded waveform samples captured so far; {@code savedId} is the id of the
@@ -3365,268 +3330,6 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
         }
     }
 
-    private static final long ECG_NOTIFY_INTERVAL_MS = 800L;
-    /** Safety net only: normally the device signals completion itself (subcommand 4). */
-    private static final long ECG_DETECTION_WINDOW_MS = 90_000L;
-
-    /**
-     * On-demand single-lead ECG measurement: start {0x93,1,1,1}; the device streams the waveform
-     * for a fixed ~40 s acquisition and then signals completion (subcommand 4) or failure
-     * (subcommand 3). The {@link #ECG_DETECTION_WINDOW_MS} timer is only a safety net, and a
-     * no-contact watchdog aborts early when the wear flag stays set.
-     */
-    private void startEcgDetect() {
-        synchronized (this) {
-            if (ecgDetectActive) {
-                LOG.warn("An ECG measurement is already in progress");
-                GB.toast(getContext(), R.string.veepoo_measure_in_progress, Toast.LENGTH_SHORT, GB.WARN);
-                return;
-            }
-            synchronized (syncLock) {
-                if (fetchPhase != FetchPhase.IDLE) {
-                    LOG.warn("ECG measurement ignored: a data fetch is in progress");
-                    GB.toast(getContext(), R.string.veepoo_sync_in_progress, Toast.LENGTH_SHORT, GB.WARN);
-                    return;
-                }
-            }
-            ecgDetectActive = true;
-            ecgFrameCount = 0;
-            ecgSampleCount = 0;
-            ecgLatestHr = 0;
-            ecgFinalHr = 0;
-            ecgProgress = 0;
-            ecgDrawFrequency = 0;
-            ecgNoContactStreak = 0;
-            ecgStartedAtMs = System.currentTimeMillis();
-            ecgLastNotifyMs = 0L;
-            ecgWaveformBuffer.reset();
-            ecgResultBlobBuffer.reset();
-        }
-        try {
-            TransactionBuilder builder = performInitialized("ECG detect");
-            writeFrame(builder, new byte[]{VeepooConstants.OP_ECG_REALTIME,
-                    (byte) VeepooConstants.ECG_DETECT_FUNCTION, (byte) VeepooConstants.ECG_DETECT_START, 0x01});
-            builder.queue();
-            mainHandler.postDelayed(ecgDetectTimeout, ECG_DETECTION_WINDOW_MS);
-            LOG.info("ECG detection started");
-        } catch (IOException e) {
-            synchronized (this) {
-                ecgDetectActive = false;
-            }
-            LOG.error("Error starting ECG detection", e);
-        }
-    }
-
-    /**
-     * Ends the measurement: stops the stream (unless the device already signalled completion),
-     * stores what was captured and announces it. {@code failCode} 0 means success; otherwise a
-     * string resource id describing why it failed (no storage, toast shown). Runs the
-     * persistence on the main handler.
-     */
-    private void finishEcgDetect(boolean deviceSignalled, int failCode) {
-        synchronized (this) {
-            if (!ecgDetectActive) {
-                return;
-            }
-            ecgDetectActive = false;
-        }
-        mainHandler.removeCallbacks(ecgDetectTimeout);
-        if (!deviceSignalled) {
-            try {
-                TransactionBuilder builder = performInitialized("stop ECG detect");
-                writeFrame(builder, new byte[]{VeepooConstants.OP_ECG_REALTIME,
-                        (byte) VeepooConstants.ECG_DETECT_FUNCTION,
-                        (byte) VeepooConstants.ECG_DETECT_STOP, 0x01});
-                builder.queue();
-            } catch (IOException e) {
-                LOG.warn("Error stopping ECG detection", e);
-            }
-        }
-        long durationMs = System.currentTimeMillis() - ecgStartedAtMs;
-        int frameCount = ecgFrameCount;
-        int sampleCount = ecgSampleCount;
-        int heartRate = ecgFinalHr > 0 ? ecgFinalHr : ecgLatestHr;
-        LOG.info("ECG measurement finished ({}): {} samples in {} frames over {} ms (HR {}, progress {} %, sample rate {} Hz, failCode {})",
-                deviceSignalled ? "device event" : "timeout", sampleCount, frameCount, durationMs,
-                heartRate, ecgProgress, ecgDrawFrequency, failCode);
-        mainHandler.post(() -> {
-            if (failCode != 0) {
-                GB.toast(getContext(), failCode, Toast.LENGTH_LONG, GB.ERROR);
-            }
-            long savedId = failCode == 0 ? saveEcgSample(durationMs, frameCount, sampleCount) : 0L;
-            notifyVitalSample(new VeepooEcgMeasurementResult(frameCount, sampleCount, heartRate,
-                    ecgProgress, ecgDrawFrequency, savedId, failCode));
-        });
-    }
-
-    /** Persists the measurement (summary + raw waveform) and returns the new row id (0 on failure). */
-    private long saveEcgSample(long durationMs, int frameCount, int sampleCount) {
-        if (sampleCount == 0) {
-            LOG.warn("ECG measurement produced no samples; not storing");
-            return 0L;
-        }
-        try (DBHandler dbHandler = GBApplication.acquireDB()) {
-            DaoSession session = dbHandler.getDaoSession();
-            Long userId = DBHelper.getUser(session).getId();
-            Long deviceId = DBHelper.getDevice(getDevice(), session).getId();
-            VeepooEcgSample sample = new VeepooEcgSample();
-            sample.setTimestamp(ecgStartedAtMs);
-            sample.setHeartRate(ecgLatestHr);
-            sample.setSampleRate(ecgDrawFrequency);
-            sample.setDurationMs((int) durationMs);
-            sample.setSampleCount(sampleCount);
-            sample.setResultBlob(ecgResultBlobBuffer.toByteArray());
-            sample.setWaveform(ecgWaveformBuffer.toByteArray());
-            sample.setUserId(userId);
-            sample.setDeviceId(deviceId);
-            return session.getVeepooEcgSampleDao().insert(sample);
-        } catch (Exception e) {
-            LOG.error("Error saving ECG sample", e);
-            return 0L;
-        }
-    }
-
-    /**
-     * Opcode 0x93 frame with [1]==1: ECG control/status on the main channel. The subcommand is
-     * at [3]: 0 = info (little-endian u16 sample rate at [4..5]), 1 = per-second status (see
-     * {@link VeepooConstants} for the layout; live HR is a single byte at [5], progress at [19],
-     * wear flag at [12]), 2 = result frame (average heart rate at [13]; not sent by all
-     * firmwares), 3 = failed on the device, 4 = finished successfully (the device-side
-     * completion event; result chunks arrive just before it), 5 = diagnosis chunk (seq/total at
-     * [4]/[5]) whose 14-byte payload at [6..19] is stored raw.
-     */
-    private void handleEcgDetectFrame(byte[] data) {
-        if (data.length < 4 || data[1] != VeepooConstants.ECG_DETECT_FUNCTION) {
-            return;
-        }
-        synchronized (this) {
-            if (!ecgDetectActive) {
-                return;
-            }
-        }
-        LOG.debug("ECG control frame: {}", hexBytes(data));
-        int sub = data[3];
-        if (sub == 4) {
-            finishEcgDetect(true, 0);
-            return;
-        }
-        if (sub == 3) {
-            LOG.warn("ECG device reported measurement failure");
-            finishEcgDetect(true, R.string.veepoo_ecg_failed_device);
-            return;
-        }
-        if (sub == 2 && data.length >= 18) {
-            int hr = data[13] & 0xFF;
-            if (hr >= 30 && hr <= 250) {
-                ecgFinalHr = hr;
-            }
-            return;
-        }
-        if (data.length < 20) {
-            return;
-        }
-        if (sub == 0) {
-            ecgDrawFrequency = (data[VeepooConstants.ECG_INFO_SAMPLE_RATE_OFFSET] & 0xFF)
-                    | ((data[VeepooConstants.ECG_INFO_SAMPLE_RATE_OFFSET + 1] & 0xFF) << 8);
-            LOG.info("ECG info frame: sample rate {} Hz", ecgDrawFrequency);
-        } else if (sub == 1) {
-            int deviceState = data[VeepooConstants.ECG_STATUS_DEVICE_STATE_OFFSET] & 0xFF;
-            int hr = data[VeepooConstants.ECG_STATUS_HR_OFFSET] & 0xFF;
-            if (hr >= 30 && hr <= 250) {
-                ecgLatestHr = hr;
-            }
-            int wear = data[VeepooConstants.ECG_STATUS_WEAR_OFFSET];
-            int progress = data[VeepooConstants.ECG_STATUS_PROGRESS_OFFSET] & 0xFF;
-            if (progress <= 100) {
-                ecgProgress = progress;
-            }
-            // No-contact watchdog: the vendor app aborts once the wear flag stays set for about
-            // five consecutive status frames (after a couple of seconds of data).
-            boolean noContact = (wear == 1) || deviceState == VeepooConstants.ECG_DEVICE_STATE_UNPASS_WEAR;
-            synchronized (this) {
-                if (!ecgDetectActive) {
-                    return;
-                }
-                long runningMs = System.currentTimeMillis() - ecgStartedAtMs;
-                if (noContact && runningMs > 3000) {
-                    ecgNoContactStreak++;
-                    LOG.warn("ECG status reports no contact/wear (streak {})", ecgNoContactStreak);
-                    if (ecgNoContactStreak >= 5) {
-                        finishEcgDetect(false, R.string.veepoo_ecg_failed_no_contact);
-                        return;
-                    }
-                } else {
-                    ecgNoContactStreak = 0;
-                }
-            }
-            notifyEcgProgress();
-        } else if (sub == 5) {
-            synchronized (this) {
-                int seq = data[4] & 0xFF;
-                if (seq == 1) {
-                    ecgResultBlobBuffer.reset();
-                }
-                if (data.length >= 20) {
-                    ecgResultBlobBuffer.write(data, 6, 14);
-                }
-            }
-        }
-    }
-
-    /** Throttled progress announcement while the measurement is running. */
-    private void notifyEcgProgress() {
-        synchronized (this) {
-            if (!ecgDetectActive) {
-                return;
-            }
-            long now = System.currentTimeMillis();
-            if (now - ecgLastNotifyMs < ECG_NOTIFY_INTERVAL_MS) {
-                return;
-            }
-            ecgLastNotifyMs = now;
-            notifyVitalSample(new VeepooEcgMeasurementResult(ecgFrameCount, ecgSampleCount,
-                    ecgLatestHr, ecgProgress, ecgDrawFrequency, 0L, 0));
-        }
-    }
-
-    /**
-     * Light-origin channel frame: {@code 0x88} + waveform samples (big-endian signed int24,
-     * 3 bytes each) + a 4-byte constant tail ending in a per-frame sequence counter. Decoded
-     * samples are appended to the measurement buffer; invalid markers (0xFFFFFF / 0x020202) are
-     * skipped. Full frames stay in the debug log for protocol verification.
-     */
-    private void handleEcgLightFrame(byte[] value) {
-        synchronized (this) {
-            if (!ecgDetectActive) {
-                LOG.debug("Dropping non-ECG F002 frame: {} bytes, first byte 0x{:02X}",
-                        value.length, value[0] & 0xFF);
-                return; // non-ECG light traffic (e.g. live PPG) outside a measurement
-            }
-        }
-        int payloadStart = 1;
-        int payloadLen = value.length - VeepooConstants.ECG_LIGHT_TAIL_LEN - payloadStart;
-        if (value.length >= VeepooConstants.ECG_LIGHT_MIN_FRAME_LEN && payloadLen >= 3 && payloadLen % 3 == 0) {
-            synchronized (this) {
-                ecgFrameCount++;
-                for (int i = 0; i < payloadLen / 3; i++) {
-                    int b0 = value[payloadStart + 3 * i] & 0xFF;
-                    int b1 = value[payloadStart + 3 * i + 1] & 0xFF;
-                    int b2 = value[payloadStart + 3 * i + 2] & 0xFF;
-                    int raw = (b0 << 16) | (b1 << 8) | b2;
-                    if (raw == 0xFFFFFF || raw == 0x020202) {
-                        continue; // invalid-sample marker
-                    }
-                    ecgWaveformBuffer.write(b0);
-                    ecgWaveformBuffer.write(b1);
-                    ecgWaveformBuffer.write(b2);
-                    ecgSampleCount++;
-                }
-            }
-            notifyEcgProgress();
-        }
-        LOG.debug("ECG light frame: len={}: {}", value.length, hexBytes(value));
-    }
-
     /** Stores a blood lipid sample; returns the saved sample, or null on failure. */
     GenericBloodLipidSample saveLipidSample(float[] v) {
         try (DBHandler dbHandler = GBApplication.acquireDB()) {
@@ -3647,225 +3350,6 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
         } catch (Exception e) {
             LOG.error("Error saving blood lipid sample", e);
             return null;
-        }
-    }
-
-    /**
-     * Triggers the manual heart rate read-back (0xDE). The band stores its on-demand measurement
-     * results on-device, so the vendor app reads them back instead of streaming; pos=0 means
-     * "all stored records" and only the heart-rate type bit is requested.
-     */
-    private void readManualHeartRate() {
-        synchronized (manualDetectLock) {
-            if (manualDetectActive) {
-                LOG.warn("A manual heart rate read is already in progress");
-                GB.toast(getContext(), R.string.veepoo_manual_hr_in_progress, Toast.LENGTH_SHORT, GB.WARN);
-                return;
-            }
-            synchronized (syncLock) {
-                if (fetchPhase != FetchPhase.IDLE) {
-                    LOG.warn("Manual heart rate read ignored: a data fetch is in progress");
-                    GB.toast(getContext(), R.string.veepoo_sync_in_progress, Toast.LENGTH_SHORT, GB.WARN);
-                    return;
-                }
-            }
-            manualDetectActive = true;
-            manualDetectTotal = -1;
-            manualDetectNextIndex = 0;
-            manualDetectPayload.reset();
-        }
-        try {
-            TransactionBuilder builder = performInitialized("manual heart rate read");
-            byte[] command = new byte[VeepooConstants.PACKET_SIZE];
-            command[0] = VeepooConstants.OP_MANUAL_DETECT;
-            command[1] = 0x02;
-            // command[2..5] pos = 0 (no cursor: read all stored records)
-            command[6] = (byte) VeepooConstants.MANUAL_MASK_HEART_RATE; // readMask: heart rate only
-            writeFrame(builder, command);
-            builder.queue();
-            mainHandler.postDelayed(manualDetectWatchdog, 120_000L);
-            LOG.info("Manual heart rate read requested (all stored HR records)");
-        } catch (IOException e) {
-            resetManualDetect();
-            LOG.error("Error triggering manual heart rate read", e);
-        }
-    }
-
-    /**
-     * Opcode 0xDE response: [2..5] record index (LE32, 0-based), first frame only carries the
-     * total count at [8..11], payload bytes start at [6]. Frames arrive in strict sequence; the
-     * concatenated stream is parsed once all {@code total} frames have been received.
-     */
-    private void handleManualDetectFrame(byte[] data) {
-        if (data.length < 12) {
-            return;
-        }
-        int index = (int) le32(data, 2);
-        boolean complete = false;
-        synchronized (manualDetectLock) {
-            if (!manualDetectActive) {
-                LOG.debug("Ignoring unexpected manual detect frame (index {})", index);
-                return;
-            }
-            if (index == 0) {
-                manualDetectTotal = (int) le32(data, 8);
-                manualDetectNextIndex = 1;
-                manualDetectPayload.reset();
-                LOG.info("Manual heart rate read: {} payload frame(s) expected", manualDetectTotal);
-                if (manualDetectTotal == 0) {
-                    complete = true;
-                }
-            } else if (index != manualDetectNextIndex) {
-                LOG.warn("Out-of-sequence manual detect frame: got index {}, expected {}", index, manualDetectNextIndex);
-                GB.toast(getContext(), R.string.veepoo_manual_hr_failed, Toast.LENGTH_SHORT, GB.WARN);
-                resetManualDetect();
-                return;
-            }
-            if (!complete) {
-                manualDetectPayload.write(data, 6, data.length - 6);
-                manualDetectNextIndex = index + 1;
-                if (manualDetectTotal > 0 && manualDetectNextIndex >= manualDetectTotal) {
-                    complete = true;
-                }
-            }
-        }
-        if (!complete) {
-            return;
-        }
-        mainHandler.removeCallbacks(manualDetectWatchdog);
-        byte[] stream = manualDetectPayload.toByteArray();
-        int saved = parseAndSaveManualHeartRate(stream);
-        synchronized (manualDetectLock) {
-            manualDetectActive = false;
-            manualDetectTotal = -1;
-            manualDetectNextIndex = 0;
-            manualDetectPayload.reset();
-        }
-        LOG.info("Manual heart rate read complete: {} byte(s) of stream, {} reading(s) saved", stream.length, saved);
-        if (saved > 0) {
-            GB.toast(getContext(), getContext().getString(R.string.veepoo_manual_hr_saved, saved), Toast.LENGTH_SHORT, GB.INFO);
-        } else {
-            GB.toast(getContext(), R.string.veepoo_manual_hr_empty, Toast.LENGTH_SHORT, GB.WARN);
-        }
-    }
-
-    /**
-     * Parses the concatenated 0xDE stream and saves the heart rate records (type 1), mirroring
-     * the vendor parser (p000if/y.java): 0xA0 blocks are skipped; a 0xA1 block is
-     * [0xA1][unused byte][type][len LE32] followed by len bytes of [0xB0][recLen LE32][record].
-     * Each HR record carries sub-TLVs 0xC0 (timestamp), 0xC1 (version) and 0xC2 (n × bpm).
-     */
-    private int parseAndSaveManualHeartRate(byte[] stream) {
-        int saved = 0;
-        ByteBuffer bb = ByteBuffer.wrap(stream).order(ByteOrder.LITTLE_ENDIAN);
-        try {
-            while (bb.hasRemaining()) {
-                int tag = bb.get() & 0xFF;
-                if (tag == 0xA0) {
-                    int skip = bb.get() & 0xFF;
-                    bb.position(bb.position() + skip);
-                } else if (tag == 0xA1) {
-                    bb.get(); // unused length/count byte (discarded by the vendor parser)
-                    int type = bb.get() & 0xFF;
-                    byte[] group = new byte[bb.getInt()];
-                    bb.get(group);
-                    if (type != 1) {
-                        continue;
-                    }
-                    ByteBuffer gb = ByteBuffer.wrap(group).order(ByteOrder.LITTLE_ENDIAN);
-                    while (gb.hasRemaining()) {
-                        if ((gb.get() & 0xFF) != 0xB0) {
-                            continue;
-                        }
-                        byte[] record = new byte[gb.getInt()];
-                        gb.get(record);
-                        saved += saveManualHeartRateRecord(record);
-                    }
-                }
-            }
-        } catch (Exception e) {
-            LOG.warn("Failed to parse the manual heart rate stream ({} bytes)", stream.length, e);
-        }
-        return saved;
-    }
-
-    /** Parses one HR record and stores it as a heart rate sample if it carries valid samples. */
-    private int saveManualHeartRateRecord(byte[] record) {
-        long timestampSeconds = 0;
-        List<Integer> samples = null;
-        ByteBuffer rb = ByteBuffer.wrap(record).order(ByteOrder.LITTLE_ENDIAN);
-        try {
-            while (rb.hasRemaining()) {
-                switch (rb.get() & 0xFF) {
-                    case 0xC0:
-                        rb.get(); // len byte (discarded)
-                        timestampSeconds = Integer.toUnsignedLong(rb.getInt());
-                        break;
-                    case 0xC1:
-                        rb.get(); // len byte (discarded)
-                        rb.get(); // version
-                        break;
-                    case 0xC2:
-                        int count = rb.get() & 0xFF;
-                        samples = new ArrayList<>(count);
-                        for (int i = 0; i < count && rb.hasRemaining(); i++) {
-                            samples.add(rb.get() & 0xFF);
-                        }
-                        break;
-                    default:
-                        break;
-                }
-            }
-        } catch (Exception e) {
-            LOG.warn("Failed to parse a manual heart rate record", e);
-            return 0;
-        }
-        if (samples == null || samples.isEmpty()) {
-            return 0;
-        }
-        int sum = 0;
-        for (int bpm : samples) {
-            sum += bpm;
-        }
-        int average = sum / samples.size();
-        if (average < 30 || average > 220) {
-            LOG.debug("Ignoring implausible manual heart rate record: {} bpm over {} sample(s)", average, samples.size());
-            return 0;
-        }
-        long timestampMs = timestampSeconds > 0 ? timestampSeconds * 1000L : System.currentTimeMillis();
-        try (DBHandler dbHandler = GBApplication.acquireDB()) {
-            DaoSession session = dbHandler.getDaoSession();
-            Long userId = DBHelper.getUser(session).getId();
-            Long deviceId = DBHelper.getDevice(getDevice(), session).getId();
-            GenericHeartRateSampleDao dao = session.getGenericHeartRateSampleDao();
-            boolean alreadySaved = !dao.queryBuilder()
-                    .where(GenericHeartRateSampleDao.Properties.Timestamp.eq(timestampMs),
-                            GenericHeartRateSampleDao.Properties.DeviceId.eq(deviceId))
-                    .list().isEmpty();
-            if (alreadySaved) {
-                LOG.debug("Manual heart rate reading already saved ({})", new Date(timestampMs));
-                return 0;
-            }
-            GenericHeartRateSample sample = new GenericHeartRateSample();
-            sample.setTimestamp(timestampMs);
-            sample.setHeartRate(average);
-            sample.setUserId(userId);
-            sample.setDeviceId(deviceId);
-            new nodomain.freeyourgadget.gadgetbridge.devices.GenericHeartRateSampleProvider(getDevice(), session).addSample(sample);
-            return 1;
-        } catch (Exception e) {
-            LOG.error("Error saving manual heart rate record", e);
-            return 0;
-        }
-    }
-
-    private void resetManualDetect() {
-        mainHandler.removeCallbacks(manualDetectWatchdog);
-        synchronized (manualDetectLock) {
-            manualDetectActive = false;
-            manualDetectTotal = -1;
-            manualDetectNextIndex = 0;
-            manualDetectPayload.reset();
         }
     }
 
@@ -4205,7 +3689,8 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
     @Override
     public void dispose() {
         liveWorkoutModule.dispose();
-        mainHandler.removeCallbacks(manualDetectWatchdog);
+        ecgModule.dispose();
+        manualDetectModule.dispose();
         vitalDetectModule.dispose();
         mainHandler.removeCallbacks(statusPollTask);
         alarmModule.dispose();
