@@ -35,12 +35,9 @@ import java.io.IOException;
 import java.io.Serializable;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Date;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.TimeZone;
 
 import nodomain.freeyourgadget.gadgetbridge.GBApplication;
@@ -119,9 +116,9 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
     private final VeepooVitalDetectModule vitalDetectModule = new VeepooVitalDetectModule(this);
     private final VeepooWomenHealthModule womenHealthModule = new VeepooWomenHealthModule(this);
 
-    private static final int DATA_SOURCE_ACTIVITY_SUMMARY = 2; // daily summary records (D1)
-    private static final int DATA_SOURCE_SLEEP_SUMMARY = 4;    // sleep function records (E0)
-    private static final long MILLIS_PER_DAY = 86400_000L;
+    static final int DATA_SOURCE_ACTIVITY_SUMMARY = 2; // daily summary records (D1)
+    static final int DATA_SOURCE_SLEEP_SUMMARY = 4;    // sleep function records (E0)
+    static final long MILLIS_PER_DAY = 86400_000L;
 
     /** Phases of the data-fetch state machine. Sleep is fetched first, then activity, then workouts. */
     private enum FetchPhase {IDLE, SLEEP, ORIGIN, SPORT}
@@ -161,6 +158,65 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
     private final List<GlucoseSample> pendingOriginGlucoseSamples = new ArrayList<>();
     private final List<GenericRespiratoryRateSample> pendingOriginBreathSamples = new ArrayList<>();
     private final List<GenericBloodLipidSample> pendingOriginLipidSamples = new ArrayList<>();
+
+    // Adapter handed to the pure day parsers (VeepooSleepParser / VeepooOrigin3Parser) so they
+    // can append to the pending lists without knowing about them.
+    private final VeepooSampleCollector pendingListCollector = new VeepooSampleCollector() {
+        @Override
+        public void addSleepSample(VeepooActivitySample sample) {
+            pendingSleepSamples.add(sample);
+        }
+
+        @Override
+        public void addSleepSummary(VeepooSleepSummarySample summary) {
+            pendingSleepSummaries.add(summary);
+        }
+
+        @Override
+        public void addOriginSample(VeepooActivitySample sample) {
+            pendingOriginSamples.add(sample);
+        }
+
+        @Override
+        public void addHrvSample(GenericHrvValueSample sample) {
+            pendingHrvSamples.add(sample);
+        }
+
+        @Override
+        public void addStressSample(GenericStressSample sample) {
+            pendingStressSamples.add(sample);
+        }
+
+        @Override
+        public void addBreathSample(GenericRespiratoryRateSample sample) {
+            pendingOriginBreathSamples.add(sample);
+        }
+
+        @Override
+        public void addBpSample(GenericBloodPressureSample sample) {
+            pendingOriginBpSamples.add(sample);
+        }
+
+        @Override
+        public void addSpo2Sample(GenericSpo2Sample sample) {
+            pendingOriginSpo2Samples.add(sample);
+        }
+
+        @Override
+        public void addGlucoseSample(GlucoseSample sample) {
+            pendingOriginGlucoseSamples.add(sample);
+        }
+
+        @Override
+        public void addLipidSample(GenericBloodLipidSample sample) {
+            pendingOriginLipidSamples.add(sample);
+        }
+
+        @Override
+        public void addTemperatureSample(GenericTemperatureSample sample) {
+            pendingOriginTemperatureSamples.add(sample);
+        }
+    };
 
     // On-demand vital detection state is tracked by VeepooVitalDetectModule (HR 0xD0, SpO2 0x80,
     // temperature 0x87, stress 0x89, BP 0x90, body composition 0x93, lipids 0x8A).
@@ -1166,10 +1222,10 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
         sleepDayPayload.reset();
         LOG.info("Sleep day {} complete: {} payload bytes", dayIndex, stream.length);
         if (preciseSleepCapable) {
-            parsePrecisionSleepStream(stream, dayIndex);
+            VeepooSleepParser.parsePrecisionStream(stream, dayIndex, pendingListCollector);
         } else {
             for (int offset = 0; offset + VeepooConstants.SLEEP_RECORD_SIZE <= stream.length; offset += VeepooConstants.SLEEP_RECORD_SIZE) {
-                parseNormalSleepRecord(stream, offset, dayIndex);
+                VeepooSleepParser.parseNormalRecord(stream, offset, dayIndex, pendingListCollector);
             }
         }
         advanceSleepDay(dayIndex, stream.length > 0);
@@ -1259,10 +1315,10 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
         }
         LOG.warn("Sleep read stalled for {} ms; finishing the day with partial data", idle);
         if (preciseSleepCapable) {
-            parsePrecisionSleepStream(stream, dayIndex);
+            VeepooSleepParser.parsePrecisionStream(stream, dayIndex, pendingListCollector);
         } else {
             for (int offset = 0; offset + VeepooConstants.SLEEP_RECORD_SIZE <= stream.length; offset += VeepooConstants.SLEEP_RECORD_SIZE) {
-                parseNormalSleepRecord(stream, offset, dayIndex);
+                VeepooSleepParser.parseNormalRecord(stream, offset, dayIndex, pendingListCollector);
             }
         }
         advanceSleepDay(dayIndex, stream.length > 0);
@@ -1359,8 +1415,8 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
             dfDayFrames.clear();
             int dayIndex = originDayIndex;
             LOG.info("Origin3 day {} complete ({} frames)", dayIndex, frames.size());
-            boolean hadData = parseOrigin3Day(frames, dayIndex);
-            mergeOriginHeartRateIntoSleep();
+            boolean hadData = VeepooOrigin3Parser.parseDay(frames, dayIndex, originProtocolVersion, bloodGlucoseTag, pendingListCollector);
+            VeepooOrigin3Parser.mergeHeartRateIntoSleep(pendingOriginSamples, pendingSleepSamples);
             persistPendingOriginDay();
             afterOriginDayComplete(dayIndex, hadData);
             return;
@@ -1400,9 +1456,9 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
             hadData = false;
         } else {
             LOG.warn("Origin3 read stalled for {} ms; finishing the day with partial data", idle);
-            hadData = parseOrigin3Day(frames, dayIndex);
+            hadData = VeepooOrigin3Parser.parseDay(frames, dayIndex, originProtocolVersion, bloodGlucoseTag, pendingListCollector);
         }
-        mergeOriginHeartRateIntoSleep();
+        VeepooOrigin3Parser.mergeHeartRateIntoSleep(pendingOriginSamples, pendingSleepSamples);
         persistPendingOriginDay();
         afterOriginDayComplete(dayIndex, hadData);
     }
@@ -1731,761 +1787,6 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
         return calendar.getTime();
     }
 
-    /**
-     * Reassembles the per-block payload streams of one Origin3 day and parses each TLV stream.
-     * Header fields: [4..5]=LE total blocks, [6]=packets per block, [10]=valid payload bytes,
-     * [11..12]=LE CRC-16 of the block payload, [13]=single-packet length j (read once from the
-     * first block header on v5; v3 uses 20).
-     */
-    private boolean parseOrigin3Day(List<byte[]> frames, int dayIndex) {
-        ByteArrayOutputStream stream = new ByteArrayOutputStream();
-        boolean inBlock = false;
-        int packetLen = -1; // single-packet length j: read from the first block header, reused for the rest of the day
-        int validBytes = -1;
-        int checksum = -1;
-        int records = 0;
-
-        for (byte[] frame : frames) {
-            if ((frame[3] & 0xFF) == 0) {
-                records += flushOrigin3Block(stream, validBytes, checksum, dayIndex);
-                inBlock = true;
-                if (packetLen < 0) {
-                    packetLen = originProtocolVersion == VeepooConstants.ORIGIN_PROTOCOL_VERSION_DF
-                            ? frame[13] & 0xFF : 20;
-                    if (packetLen < 5) {
-                        packetLen = 20;
-                    }
-                }
-                validBytes = frame[10] & 0xFF;
-                checksum = (frame[11] & 0xFF) | ((frame[12] & 0xFF) << 8);
-                continue;
-            }
-            if (!inBlock) {
-                LOG.debug("Dropping Origin3 payload frame before any block header (day {})", dayIndex);
-                continue;
-            }
-            int copy = Math.min(packetLen - 4, frame.length - 4);
-            stream.write(frame, 4, copy);
-        }
-        records += flushOrigin3Block(stream, validBytes, checksum, dayIndex);
-        return records > 0;
-    }
-
-    private int flushOrigin3Block(ByteArrayOutputStream stream, int validBytes, int checksum, int dayIndex) {
-        byte[] payload = stream.toByteArray();
-        stream.reset();
-        if (payload.length == 0) {
-            return 0;
-        }
-        if (validBytes >= 0 && validBytes < payload.length) {
-            payload = Arrays.copyOf(payload, validBytes);
-        }
-        if (checksum >= 0 && vpCrc16(payload) != checksum) {
-            LOG.warn("Origin3 block for day {} failed its CRC-16 check; dropping", dayIndex);
-            return 0;
-        }
-        return parseOrigin3TlvStream(payload, dayIndex);
-    }
-
-    /**
-     * Parses one Origin3 block stream. Each 0xB1 tag starts a new 5-minute record (hour [2],
-     * minute [3]); fields accumulate until the next 0xB1 or the 0xC0 terminator. B2 (SportFiveMinuteData):
-     * [0..1]=steps BE16, [2..3]=sport BE16, [4..5]=distance meters BE16, [6..7]=kcal tenths BE16,
-     * [8]=pose, [9]=wear. B4 carries the PPG heart-rate array, B5 the ECG one (B4 wins for the
-     * record when both are present). The all-day vitals tags are handled per tag and queued for
-     * batch persistence: 0xB6 breath rate (1 byte/minute), 0xB8 blood pressure (systolic,
-     * diastolic), 0xB9 SpO2 (up to five 1-byte percentages, one per minute) plus the trailing
-     * apnea count / hypoxia time / cardiac load groups (aggregated onto the activity record),
-     * 0xBE glucose (LE16,
-     * 0.01 mmol/L steps), 0xBF MET (1 byte, /10; log-only), 0xC1 pressure/wear (log-only) and
-     * 0xC2 lipids (TCHO/TAG/HDL/LDL as LE16 in 0.01 mmol/L steps + uric acid in mg/dL).
-     */
-    private int parseOrigin3TlvStream(byte[] payload, int dayIndex) {
-        Calendar base = Calendar.getInstance();
-        base.add(Calendar.DAY_OF_MONTH, -dayIndex);
-
-        boolean haveRecord = false;
-        int hour = -1;
-        int minute = -1;
-        int steps = 0;
-        int distanceMeters = 0;
-        int kcalTenths = 0;
-        int ppgHeartRate = ActivitySample.NOT_MEASURED;
-        int ecgHeartRate = ActivitySample.NOT_MEASURED;
-        int ppgHrRecords = 0;
-        int ecgHrRecords = 0;
-        int hrvRecords = 0;
-        int hrvSamplesAdded = 0;
-        // Aggregates of the 0xB9 apnea/hypoxia/cardiac-load groups (null until the tag is seen).
-        Integer apneaCount = null;
-        Integer hypoxiaMinutes = null;
-        Integer hypoxiaTimeSum = null;
-        Integer cardiacLoadMinutes = null;
-        int recordsAdded = 0;
-
-        int pos = 0;
-        while (pos + 2 <= payload.length) {
-            int tag = payload[pos] & 0xFF;
-            if (tag == 0xC0) {
-                break;
-            }
-            int length = payload[pos + 1] & 0xFF;
-            if (pos + 2 + length > payload.length) {
-                LOG.debug("Origin3 stream for day {} truncated at tag 0x{}", dayIndex, Integer.toHexString(tag));
-                break;
-            }
-            byte[] body = Arrays.copyOfRange(payload, pos + 2, pos + 2 + length);
-
-            if (tag == 0xB1) {
-                if (flushOrigin3Record(base, dayIndex, haveRecord, hour, minute, steps, distanceMeters, kcalTenths,
-                        ppgHeartRate, ecgHeartRate, apneaCount, hypoxiaMinutes, hypoxiaTimeSum, cardiacLoadMinutes)) {
-                    recordsAdded++;
-                }
-                if (body.length == 4 && ((body[0] & 0xFF) | (body[1] & 0xFF)) != 0) {
-                    haveRecord = true;
-                    hour = body[2] & 0xFF;
-                    minute = body[3] & 0xFF;
-                } else {
-                    haveRecord = false;
-                }
-                steps = 0;
-                distanceMeters = 0;
-                kcalTenths = 0;
-                ppgHeartRate = ActivitySample.NOT_MEASURED;
-                ecgHeartRate = ActivitySample.NOT_MEASURED;
-                apneaCount = null;
-                hypoxiaMinutes = null;
-                hypoxiaTimeSum = null;
-                cardiacLoadMinutes = null;
-            } else if (haveRecord && tag == 0xB2 && body.length >= 10) {
-                steps = ((body[0] & 0xFF) << 8) | (body[1] & 0xFF);
-                distanceMeters = ((body[4] & 0xFF) << 8) | (body[5] & 0xFF);
-                kcalTenths = ((body[6] & 0xFF) << 8) | (body[7] & 0xFF);
-            } else if (haveRecord && tag == 0xB4) {
-                int average = averageValidHeartRate(body);
-                if (average > 0) {
-                    ppgHeartRate = average;
-                    ppgHrRecords++;
-                }
-            } else if (haveRecord && tag == 0xB5) {
-                int average = averageValidHeartRate(body);
-                if (average > 0) {
-                    ecgHeartRate = average;
-                    ecgHrRecords++;
-                }
-            } else if (haveRecord && tag == 0xB7) {
-                LOG.debug("Origin3 day {} HRV tag at {}:{} len={} body={}",
-                        dayIndex, hour, minute, body.length, hexBytes(body));
-                if (hour <= 23 && minute <= 59 && body.length >= 51) {
-                    Calendar stamp = (Calendar) base.clone();
-                    stamp.set(Calendar.HOUR_OF_DAY, hour);
-                    stamp.set(Calendar.MINUTE, minute);
-                    stamp.set(Calendar.SECOND, 0);
-                    stamp.set(Calendar.MILLISECOND, 0);
-                    if (stamp.getTimeInMillis() <= System.currentTimeMillis() + 60_000L) {
-                        hrvRecords++;
-                        hrvSamplesAdded += parseHrvFiveMinuteRecord(stamp, body, dayIndex);
-                    }
-                }
-            } else if (haveRecord && tag == 0xB6 && hour <= 23 && minute <= 59) {
-                // Breath rate: one byte per minute (breaths/min).
-                Calendar stamp = origin3RecordStamp(base, hour, minute);
-                for (int m = 0; stamp != null && m < body.length && m < 5; m++) {
-                    int breaths = body[m] & 0xFF;
-                    if (breaths >= 5 && breaths <= 100) {
-                        GenericRespiratoryRateSample sample = new GenericRespiratoryRateSample();
-                        sample.setTimestamp(stamp.getTimeInMillis() + m * 60_000L);
-                        sample.setRespiratoryRate(breaths);
-                        pendingOriginBreathSamples.add(sample);
-                    }
-                }
-            } else if (haveRecord && tag == 0xB8 && hour <= 23 && minute <= 59 && body.length >= 2) {
-                // Blood pressure: systolic then diastolic, one reading per record.
-                int systolic = body[0] & 0xFF;
-                int diastolic = body[1] & 0xFF;
-                Calendar stamp = origin3RecordStamp(base, hour, minute);
-                if (stamp != null && systolic >= 50 && systolic <= 250
-                        && diastolic >= 30 && diastolic <= 150) {
-                    GenericBloodPressureSample sample = new GenericBloodPressureSample();
-                    sample.setTimestamp(stamp.getTimeInMillis());
-                    sample.setBpSystolic(systolic);
-                    sample.setBpDiastolic(diastolic);
-                    sample.setMeanArterialPressure((systolic + 2 * diastolic) / 3);
-                    pendingOriginBpSamples.add(sample);
-                } else if (stamp != null) {
-                    LOG.debug("Ignoring implausible Origin3 BP at {}:{}: {}/{}", hour, minute, systolic, diastolic);
-                }
-            } else if (haveRecord && tag == 0xB9 && hour <= 23 && minute <= 59) {
-                // SpO2: up to five 1-byte percentages, one per minute.
-                Calendar stamp = origin3RecordStamp(base, hour, minute);
-                for (int m = 0; stamp != null && m < body.length && m < 5; m++) {
-                    int spo2 = body[m] & 0xFF;
-                    if (spo2 > 0 && spo2 <= 100) {
-                        GenericSpo2Sample sample = new GenericSpo2Sample();
-                        sample.setTimestamp(stamp.getTimeInMillis() + m * 60_000L);
-                        sample.setSpo2(spo2);
-                        pendingOriginSpo2Samples.add(sample);
-                    }
-                }
-                // Apnea count [5..9], hypoxia time [15..19] and cardiac load [20..24]: five 1-byte
-                // values per group, one per minute. Aggregated like the vendor app: apnea events are
-                // summed; a hypoxia-time or cardiac-load byte is counted only when plausible.
-                if (body.length > 5) {
-                    int recordApnea = 0;
-                    int recordHypoxiaMinutes = 0;
-                    int recordHypoxiaTimeSum = 0;
-                    int recordCardiacLoadMinutes = 0;
-                    for (int m = 0; m < 5; m++) {
-                        if (body.length > 5 + m) {
-                            int apnea = body[5 + m] & 0xFF;
-                            if (apnea > 0) {
-                                recordApnea += apnea;
-                            }
-                        }
-                        if (body.length > 15 + m) {
-                            int hypoxia = body[15 + m] & 0xFF;
-                            if (hypoxia >= 1 && hypoxia <= 60) {
-                                recordHypoxiaMinutes++;
-                                recordHypoxiaTimeSum += hypoxia;
-                            }
-                        }
-                        if (body.length > 20 + m) {
-                            int cardiacLoad = body[20 + m] & 0xFF;
-                            if (cardiacLoad >= 1 && cardiacLoad <= 100) {
-                                recordCardiacLoadMinutes++;
-                            }
-                        }
-                    }
-                    apneaCount = recordApnea;
-                    hypoxiaMinutes = recordHypoxiaMinutes;
-                    hypoxiaTimeSum = recordHypoxiaTimeSum;
-                    cardiacLoadMinutes = recordCardiacLoadMinutes;
-                    if (recordApnea == 0 && recordHypoxiaMinutes == 0 && recordCardiacLoadMinutes == 0) {
-                        LOG.debug("Origin3 day {} 0xB9 at {}:{}: apnea/hypoxia/cardiac groups present ({} bytes) but all zero",
-                                dayIndex, hour, minute, body.length);
-                    }
-                }
-            } else if (haveRecord && tag == 0xBE && hour <= 23 && minute <= 59 && body.length >= 2) {
-                // Blood glucose: LE16 in 0.01 mmol/L steps (the vendor app stores value/100 as mmol/L).
-                int raw = ((body[1] & 0xFF) << 8) | (body[0] & 0xFF);
-                if (bloodGlucoseTag == 5) {
-                    // Tag-5 encoding packs the risk level into the top three bits.
-                    raw &= 0x1FFF;
-                }
-                Calendar stamp = origin3RecordStamp(base, hour, minute);
-                if (stamp != null && raw > 0) {
-                    GlucoseSample sample = new GlucoseSample();
-                    sample.setTimestamp(stamp.getTimeInMillis());
-                    sample.setValueMgDl(raw * 0.18); // GB stores mg/dL; the wire value is 0.01 mmol/L
-                    pendingOriginGlucoseSamples.add(sample);
-                }
-            } else if (haveRecord && tag == 0xBF && hour <= 23 && minute <= 59 && body.length >= 1) {
-                // MET (metabolic equivalent): one byte, value = byte/10. VeepooActivitySample has no
-                // MET field, so the value is logged only.
-                LOG.debug("Origin3 day {} MET at {}:{}: {}", dayIndex, hour, minute, (body[0] & 0xFF) / 10.0);
-            } else if (haveRecord && tag == 0xC1 && hour <= 23 && minute <= 59 && body.length >= 1) {
-                // Per-record stress ("pressure") index, one byte per five-minute record; the vendor
-                // stores this byte and charts it as the all-day stress series.
-                int stress = body[0] & 0xFF;
-                Calendar stamp = origin3RecordStamp(base, hour, minute);
-                if (stamp != null && stress <= 100) {
-                    GenericStressSample sample = new GenericStressSample();
-                    sample.setTimestamp(stamp.getTimeInMillis());
-                    sample.setStress(stress);
-                    pendingStressSamples.add(sample);
-                } else if (stamp != null) {
-                    LOG.debug("Ignoring implausible Origin3 stress at {}:{}: {}", hour, minute, stress);
-                }
-            } else if (haveRecord && tag == 0xC2 && hour <= 23 && minute <= 59 && body.length >= 10) {
-                // Lipids: TCHO/TAG/HDL/LDL as LE16 in 0.01 mmol/L steps plus uric acid as LE16 mg/dL.
-                int tcho = ((body[1] & 0xFF) << 8) | (body[0] & 0xFF);
-                int trig = ((body[3] & 0xFF) << 8) | (body[2] & 0xFF);
-                int hdl = ((body[5] & 0xFF) << 8) | (body[4] & 0xFF);
-                int ldl = ((body[7] & 0xFF) << 8) | (body[6] & 0xFF);
-                int uricAcid = ((body[9] & 0xFF) << 8) | (body[8] & 0xFF);
-                Calendar stamp = origin3RecordStamp(base, hour, minute);
-                if (stamp != null && tcho > 0 && trig > 0 && hdl > 0 && ldl > 0 && uricAcid > 0) {
-                    GenericBloodLipidSample sample = new GenericBloodLipidSample();
-                    sample.setTimestamp(stamp.getTimeInMillis());
-                    sample.setTotalCholesterol(tcho / 100.0f);
-                    sample.setTriglyceride(trig / 100.0f);
-                    sample.setHdl(hdl / 100.0f);
-                    sample.setLdl(ldl / 100.0f);
-                    sample.setUricAcid(uricAcid / 10.0f);
-                    pendingOriginLipidSamples.add(sample);
-                    LOG.debug("Origin3 day {} lipids at {}:{}: tcho={} trig={} hdl={} ldl={} uricAcid={}",
-                            dayIndex, hour, minute, tcho / 100.0f, trig / 100.0f, hdl / 100.0f,
-                            ldl / 100.0f, uricAcid / 10.0f);
-                } else if (stamp != null) {
-                    LOG.debug("Ignoring empty Origin3 lipid record at {}:{}: tcho={} trig={} hdl={} ldl={} uricAcid={}",
-                            dayIndex, hour, minute, tcho, trig, hdl, ldl, uricAcid);
-                }
-            } else if (haveRecord && tag == 0xC3 && hour <= 23 && minute <= 59 && body.length >= 4) {
-                // Wrist skin temperature: LE16 base and measured values, each in tenths of a
-                // degree; the vendor drops the record when either value is outside 120..480
-                // (12.0..48.0 C). The on-demand 0x87 measurement stays TYPE_BODY.
-                int baseTenths = ((body[1] & 0xFF) << 8) | (body[0] & 0xFF);
-                int measuredTenths = ((body[3] & 0xFF) << 8) | (body[2] & 0xFF);
-                Calendar stamp = origin3RecordStamp(base, hour, minute);
-                if (stamp != null && baseTenths >= 120 && baseTenths <= 480
-                        && measuredTenths >= 120 && measuredTenths <= 480) {
-                    GenericTemperatureSample sample = new GenericTemperatureSample();
-                    sample.setTimestamp(stamp.getTimeInMillis());
-                    sample.setTemperature(measuredTenths / 10.0f);
-                    sample.setTemperatureType(TemperatureSample.TYPE_SKIN);
-                    sample.setTemperatureLocation(TemperatureSample.LOCATION_WRIST);
-                    pendingOriginTemperatureSamples.add(sample);
-                }
-            }
-            pos += 2 + length;
-        }
-        if (flushOrigin3Record(base, dayIndex, haveRecord, hour, minute, steps, distanceMeters, kcalTenths,
-                ppgHeartRate, ecgHeartRate, apneaCount, hypoxiaMinutes, hypoxiaTimeSum, cardiacLoadMinutes)) {
-            recordsAdded++;
-        }
-        LOG.debug("Origin3 stream for day {}: {} five-minute records", dayIndex, recordsAdded);
-        LOG.info("Origin3 day {}: heart rate in {} PPG / {} ECG of {} five-minute records; HRV tags {} ({} minute samples)",
-                dayIndex, ppgHrRecords, ecgHrRecords, recordsAdded, hrvRecords, hrvSamplesAdded);
-        return recordsAdded;
-    }
-
-    /**
-     * Record start time for hour/minute within {@code base}, or null when the record lies in the
-     * future (the band clock can run ahead of the phone).
-     */
-    private static Calendar origin3RecordStamp(Calendar base, int hour, int minute) {
-        Calendar stamp = (Calendar) base.clone();
-        stamp.set(Calendar.HOUR_OF_DAY, hour);
-        stamp.set(Calendar.MINUTE, minute);
-        stamp.set(Calendar.SECOND, 0);
-        stamp.set(Calendar.MILLISECOND, 0);
-        if (stamp.getTimeInMillis() > System.currentTimeMillis() + 60_000L) {
-            return null;
-        }
-        return stamp;
-    }
-
-    private boolean flushOrigin3Record(Calendar base, int dayIndex, boolean valid, int hour, int minute,
-                                       int steps, int distanceMeters, int kcalTenths,
-                                       int ppgHeartRate, int ecgHeartRate,
-                                       Integer apneaCount, Integer hypoxiaMinutes,
-                                       Integer hypoxiaTimeSum, Integer cardiacLoadMinutes) {
-        if (!valid || hour > 23 || minute > 59) {
-            return false;
-        }
-        Calendar stamp = (Calendar) base.clone();
-        stamp.set(Calendar.HOUR_OF_DAY, hour);
-        stamp.set(Calendar.MINUTE, minute);
-        stamp.set(Calendar.SECOND, 0);
-        stamp.set(Calendar.MILLISECOND, 0);
-        if (stamp.getTimeInMillis() > System.currentTimeMillis() + 60_000L) {
-            LOG.debug("Skipping Origin3 record for day {} with a future timestamp ({})", dayIndex, stamp);
-            return false;
-        }
-        // Prefer the PPG (0xB4) average when both it and the ECG (0xB5) array were present.
-        int heartRate = ppgHeartRate != ActivitySample.NOT_MEASURED ? ppgHeartRate : ecgHeartRate;
-        if (ppgHeartRate != ActivitySample.NOT_MEASURED && ecgHeartRate != ActivitySample.NOT_MEASURED) {
-            LOG.debug("Origin3 day {} record at {}:{}: PPG HR {} preferred over ECG HR {}",
-                    dayIndex, hour, minute, ppgHeartRate, ecgHeartRate);
-        }
-        VeepooActivitySample sample = new VeepooActivitySample();
-        sample.setTimestamp((int) (stamp.getTimeInMillis() / 1000L));
-        sample.setRawKind(VeepooConstants.RAW_KIND_ACTIVITY);
-        sample.setSteps(steps);
-        sample.setHeartRate(heartRate);
-        sample.setCaloriesBurnt(kcalTenths * 100);
-        sample.setDistanceMeters(distanceMeters);
-        sample.setDataSource(DATA_SOURCE_ACTIVITY_SUMMARY);
-        sample.setApneaCount(apneaCount);
-        sample.setHypoxiaMinutes(hypoxiaMinutes);
-        sample.setHypoxiaTimeSum(hypoxiaTimeSum);
-        sample.setCardiacLoadMinutes(cardiacLoadMinutes);
-        pendingOriginSamples.add(sample);
-        return true;
-    }
-
-    /**
-     * Back-fills per-minute heart rate for the pending sleep rows from the Origin3 five-minute
-     * records covering them: the 0xE0 sleep stream carries no heart rate of its own, but the band
-     * stores PPG/ECG averages in the activity stream. Runs after each Origin3 day parse, while
-     * both lists are still in memory (sleep rows persist last, so without this merge they would
-     * replace the overlapping activity rows and drop their heart rate).
-     */
-    private void mergeOriginHeartRateIntoSleep() {
-        if (pendingOriginSamples.isEmpty() || pendingSleepSamples.isEmpty()) {
-            return;
-        }
-        Map<Integer, Integer> heartRateBySlot = new HashMap<>();
-        for (VeepooActivitySample sample : pendingOriginSamples) {
-            int heartRate = sample.getHeartRate();
-            if (heartRate >= 30 && heartRate <= 200) {
-                heartRateBySlot.put((sample.getTimestamp() / 300) * 300, heartRate);
-            }
-        }
-        if (heartRateBySlot.isEmpty()) {
-            return;
-        }
-        int filled = 0;
-        for (VeepooActivitySample sleep : pendingSleepSamples) {
-            if (sleep.getHeartRate() != ActivitySample.NOT_MEASURED) {
-                continue;
-            }
-            Integer heartRate = heartRateBySlot.get((sleep.getTimestamp() / 300) * 300);
-            if (heartRate != null) {
-                sleep.setHeartRate(heartRate);
-                filled++;
-            }
-        }
-        if (filled > 0) {
-            LOG.info("Back-filled heart rate into {} sleep minutes from Origin3 records", filled);
-        }
-    }
-
-    /**
-     * Parses one Origin3 0xB7 five-minute HRV record: body[0] is unused on this firmware (always
-     * 0) and bytes [1..50] hold 50 RR-interval samples in centiseconds, ten per minute. The
-     * per-minute HRV value in milliseconds is the average absolute difference of consecutive valid
-     * RR samples (centiseconds × 10). A minute with fewer than two valid samples is skipped.
-     */
-    private int parseHrvFiveMinuteRecord(Calendar stamp, byte[] body, int dayIndex) {
-        int added = 0;
-        for (int m = 0; m < 5; m++) {
-            int sumAbsDiff = 0;
-            int diffs = 0;
-            int prevRr = -1;
-            for (int i = m * 10; i < m * 10 + 10; i++) {
-                int rr = body[i + 1] & 0xFF;
-                if (rr >= 30 && rr <= 210) {
-                    if (prevRr != -1) {
-                        sumAbsDiff += Math.abs(prevRr - rr);
-                        diffs++;
-                    }
-                    prevRr = rr;
-                }
-            }
-            int value = diffs > 0 ? sumAbsDiff * 10 / diffs : 0;
-            if (value <= 0 || value > 600) {
-                continue;
-            }
-            GenericHrvValueSample sample = new GenericHrvValueSample();
-            sample.setTimestamp(stamp.getTimeInMillis() + m * 60_000L);
-            sample.setValue(value);
-            pendingHrvSamples.add(sample);
-            added++;
-        }
-        return added;
-    }
-
-    /** Averages the heart-rate bytes inside the plausible 30..200 range; 0 when none qualify. */
-    private static int averageValidHeartRate(byte[] body) {
-        int sum = 0;
-        int count = 0;
-        for (byte value : body) {
-            int rate = value & 0xFF;
-            if (rate >= 30 && rate <= 200) {
-                sum += rate;
-                count++;
-            }
-        }
-        return count > 0 ? sum / count : 0;
-    }
-
-    /** VeePoo's proprietary CRC-16 (AlarmCrcUtil): init 0xFFFF, table-driven; verifies Origin3 block payloads. */
-    private static final int[] VP_CRC16_TABLE = {
-            0, 49345, 49537, 320, 49921, 960, 640, 49729,
-            50689, 1728, 1920, 51009, 1280, 50625, 50305, 1088,
-            52225, 3264, 3456, 52545, 3840, 53185, 52865, 3648,
-            2560, 51905, 52097, 2880, 51457, 2496, 2176, 51265,
-            55297, 6336, 6528, 55617, 6912, 56257, 55937, 6720,
-            7680, 57025, 57217, 8000, 56577, 7616, 7296, 56385,
-            5120, 54465, 54657, 5440, 55041, 6080, 5760, 54849,
-            53761, 4800, 4992, 54081, 4352, 53697, 53377, 4160,
-            61441, 12480, 12672, 61761, 13056, 62401, 62081, 12864,
-            13824, 63169, 63361, 14144, 62721, 13760, 13440, 62529,
-            15360, 64705, 64897, 15680, 65281, 16320, 16000, 65089,
-            64001, 15040, 15232, 64321, 14592, 63937, 63617, 14400,
-            10240, 59585, 59777, 10560, 60161, 11200, 10880, 59969,
-            60929, 11968, 12160, 61249, 11520, 60865, 60545, 11328,
-            58369, 9408, 9600, 58689, 9984, 59329, 59009, 9792,
-            8704, 58049, 58241, 9024, 57601, 8640, 8320, 57409,
-            40961, 24768, 24960, 41281, 25344, 41921, 41601, 25152,
-            26112, 42689, 42881, 26432, 42241, 26048, 25728, 42049,
-            27648, 44225, 44417, 27968, 44801, 28608, 28288, 44609,
-            43521, 27328, 27520, 43841, 26880, 43457, 43137, 26688,
-            30720, 47297, 47489, 31040, 47873, 31680, 31360, 47681,
-            48641, 32448, 32640, 48961, 32000, 48577, 48257, 31808,
-            46081, 29888, 30080, 46401, 30464, 47041, 46721, 30272,
-            29184, 45761, 45953, 29504, 45313, 29120, 28800, 45121,
-            20480, 37057, 37249, 20800, 37633, 21440, 21120, 37441,
-            38401, 22208, 22400, 38721, 21760, 38337, 38017, 21568,
-            39937, 23744, 23936, 40257, 24320, 40897, 40577, 24128,
-            23040, 39617, 39809, 23360, 39169, 22976, 22656, 38977,
-            34817, 18624, 18816, 35137, 19200, 35777, 35457, 19008,
-            19968, 36545, 36737, 20288, 36097, 19904, 19584, 35905,
-            17408, 33985, 34177, 17728, 34561, 18368, 18048, 34369,
-            33281, 17088, 17280, 33601, 16640, 33217, 32897, 16448
-    };
-
-    private static int vpCrc16(byte[] data) {
-        int crc = 0xFFFF;
-        for (byte value : data) {
-            crc = (((crc >> 8) & 0xFF) ^ VP_CRC16_TABLE[(crc & 0xFF) ^ (value & 0xFF)]) & 0xFFFF;
-        }
-        return crc;
-    }
-
-    /**
-     * Parses one 96-byte normal sleep record and emits per-minute activity samples.
-     * Stages: bitmap bit 0 = deep, 1 = light; window spans are marked '2' (REM).
-     */
-    private void parseNormalSleepRecord(byte[] stream, int offset, int dayIndex) {
-        byte[] rec = new byte[VeepooConstants.SLEEP_RECORD_SIZE];
-        System.arraycopy(stream, offset, rec, 0, VeepooConstants.SLEEP_RECORD_SIZE);
-
-        int startMonth = rec[1] & 0xFF;
-        int startDay = rec[2] & 0xFF;
-        int startHour = rec[3] & 0xFF;
-        int startMinute = rec[4] & 0xFF;
-        int endMonth = rec[5] & 0xFF;
-        int endDay = rec[6] & 0xFF;
-        int endHour = rec[7] & 0xFF;
-        int endMinute = rec[8] & 0xFF;
-        int quality = rec[11] & 0xFF;
-        int totalSlots = rec[43] & 0xFF;
-
-        if (quality == 255 || quality < 1 || quality > 5) {
-            LOG.debug("Discarding sleep record for day {} (quality {})", dayIndex, quality);
-            return;
-        }
-        if (totalSlots > 248) {
-            LOG.warn("Discarding sleep record for day {} (invalid total slots {})", dayIndex, totalSlots);
-            return;
-        }
-        if (!isValidDatePart(startMonth, startDay, startHour, startMinute) || !isValidDatePart(endMonth, endDay, endHour, endMinute)) {
-            LOG.warn("Discarding sleep record for day {} (invalid date parts)", dayIndex);
-            return;
-        }
-
-        // Stage bitmap: slot k uses bit (7 - k%8) of byte 12 + k/8.
-        char[] stages = new char[totalSlots];
-        for (int slot = 0; slot < totalSlots; slot++) {
-            int bit = (rec[12 + slot / 8] >>> (7 - slot % 8)) & 1;
-            stages[slot] = bit == 0 ? '0' : '1';
-        }
-
-        // Window override: if deep time is non-zero, mark REM spans where light time covers them.
-        int windowCount = rec[55] & 0xFF;
-        int deepSlots = rec[9] & 0xFF;
-        int lightSlots = rec[10] & 0xFF;
-        if (deepSlots != 0 && windowCount > 0) {
-            if (windowCount > 10) {
-                windowCount = 10;
-            }
-            for (int w = 0; w < windowCount; w++) {
-                int windowStart = rec[45 + w] & 0xFF;
-                int windowEnd = rec[57 + w] & 0xFF;
-                int span = windowEnd - windowStart;
-                if (span > 0 && lightSlots >= span) {
-                    for (int slot = windowStart; slot < Math.min(windowStart + span, totalSlots); slot++) {
-                        stages[slot] = '2';
-                    }
-                }
-            }
-        }
-
-        Calendar start = anchorSleepDate(dayIndex, startMonth, startDay, startHour, startMinute);
-        Calendar end = anchorSleepDate(dayIndex, endMonth, endDay, endHour, endMinute);
-        if (end.getTimeInMillis() <= start.getTimeInMillis()) {
-            // Crossed a year boundary that anchoring could not resolve; use the tracked duration.
-            end.setTimeInMillis(start.getTimeInMillis() + totalSlots * 5L * 60_000L);
-        }
-        long endCap = start.getTimeInMillis() + 24L * MILLIS_PER_DAY;
-        if (end.getTimeInMillis() > endCap) {
-            LOG.warn("Sleep record for day {} spans more than a day; clamping", dayIndex);
-            end.setTimeInMillis(endCap);
-        }
-
-        int totalMinutes = (int) ((end.getTimeInMillis() - start.getTimeInMillis()) / 60_000L);
-        long startEpochSeconds = start.getTimeInMillis() / 1000L;
-
-        for (int minuteOffset = 0; minuteOffset < totalMinutes; minuteOffset++) {
-            int slot = minuteOffset / 5;
-            int rawKind;
-            if (slot >= totalSlots) {
-                rawKind = VeepooConstants.RAW_KIND_AWAKE_SLEEP;
-            } else {
-                switch (stages[slot]) {
-                    case '0':
-                        rawKind = VeepooConstants.RAW_KIND_DEEP_SLEEP;
-                        break;
-                    case '1':
-                        rawKind = VeepooConstants.RAW_KIND_LIGHT_SLEEP;
-                        break;
-                    case '2':
-                        rawKind = VeepooConstants.RAW_KIND_REM_SLEEP;
-                        break;
-                    default:
-                        rawKind = VeepooConstants.RAW_KIND_AWAKE_SLEEP;
-                }
-            }
-            VeepooActivitySample sample = new VeepooActivitySample();
-            sample.setTimestamp((int) (startEpochSeconds + minuteOffset * 60L));
-            sample.setRawKind(rawKind);
-            sample.setSteps(0);
-            sample.setHeartRate(ActivitySample.NOT_MEASURED);
-            sample.setCaloriesBurnt(0);
-            sample.setDistanceMeters(0);
-            sample.setDataSource(DATA_SOURCE_SLEEP_SUMMARY);
-            pendingSleepSamples.add(sample);
-        }
-        VeepooSleepSummarySample summary = new VeepooSleepSummarySample();
-        summary.setTimestamp(start.getTimeInMillis());
-        summary.setDurationMin(totalMinutes);
-        summary.setQuality(quality);
-        summary.setWakeCount(rec[55] & 0xFF);
-        pendingSleepSummaries.add(summary);
-        LOG.info("Parsed sleep record for day {}: {} minutes ({} deep slots, {} light slots, quality {})",
-                dayIndex, totalMinutes, deepSlots, lightSlots, quality);
-    }
-
-    /**
-     * Parses the precise sleep stream used by preciseSleep-capable bands: an A1 marker followed by
-     * a LE16 record length, then tagged blocks. A3 is the main block (dates and durations), A5 is
-     * the per-minute stage curve (BE16 words with the stage in the top three bits).
-     */
-    private void parsePrecisionSleepStream(byte[] stream, int dayIndex) {
-        int pos = 0;
-        while (pos + 3 <= stream.length) {
-            int marker = -1;
-            for (int i = pos; i + 3 <= stream.length; i++) {
-                if ((stream[i] & 0xFF) == 0xA1) {
-                    marker = i;
-                    break;
-                }
-            }
-            if (marker < 0) {
-                break;
-            }
-            int recordLength = le16(stream, marker + 1);
-            int recordStart = marker + 3;
-            int recordEnd = Math.min(recordStart + Math.max(0, recordLength - 3), stream.length);
-            parsePrecisionSleepRecord(stream, recordStart, recordEnd, dayIndex);
-            pos = recordEnd;
-        }
-    }
-
-    private void parsePrecisionSleepRecord(byte[] stream, int recordStart, int recordEnd, int dayIndex) {
-        if (recordEnd - recordStart < 40) {
-            LOG.warn("Precise sleep record for day {} is too short ({} bytes)", dayIndex, recordEnd - recordStart);
-            return;
-        }
-
-        byte[] a3 = null;
-        int curveStart = -1;
-        int curveLen = 0;
-        int pos = recordStart;
-        while (pos + 2 <= recordEnd) {
-            int tag = stream[pos] & 0xFF;
-            int payloadStart;
-            int payloadLen;
-            if (tag == 0xA5) {
-                payloadStart = pos + 3;
-                payloadLen = le16(stream, pos + 1);
-            } else {
-                payloadStart = pos + 2;
-                payloadLen = stream[pos + 1] & 0xFF;
-            }
-            if (payloadStart + payloadLen > recordEnd) {
-                LOG.debug("Precise sleep tag 0x{} at record offset {} declares more bytes than remain; stopping the walk",
-                        hexByte(tag), pos - recordStart);
-                break;
-            }
-            if (tag == 0xA3 && a3 == null) {
-                a3 = Arrays.copyOfRange(stream, payloadStart, payloadStart + payloadLen);
-            } else if (tag == 0xA5 && curveStart < 0) {
-                curveStart = payloadStart;
-                curveLen = payloadLen;
-            }
-            pos = payloadStart + payloadLen;
-        }
-        if (a3 == null || curveStart < 0) {
-            LOG.warn("Precise sleep record for day {} is missing the A3 block or the stage curve", dayIndex);
-            return;
-        }
-
-        if (a3.length < 27) {
-            LOG.warn("Discarding precise sleep record for day {} (A3 block too short: {} bytes)", dayIndex, a3.length);
-            return;
-        }
-        int startMonth = a3[0] & 0xFF;
-        int startDay = a3[1] & 0xFF;
-        int startHour = a3[2] & 0xFF;
-        int startMinute = a3[3] & 0xFF;
-        if (!isValidDatePart(startMonth, startDay, startHour, startMinute)) {
-            LOG.warn("Discarding precise sleep record for day {} (invalid start date parts)", dayIndex);
-            return;
-        }
-        int deepSleepTime = le16(a3, 19);
-        int lightSleepTime = le16(a3, 21);
-        int allSleepTime = le16(a3, 25);
-        int accurateType = a3.length >= 36 ? a3[35] & 0xFF : 1;
-
-        // Type 0 (scientific sleep off) and type 1 both carry plain BE16 stage words.
-        if (accurateType != 0 && accurateType != 1) {
-            LOG.warn("Precise sleep record for day {} uses unsupported accuracy type {}; skipping", dayIndex, accurateType);
-            return;
-        }
-        int wordCount = curveLen / 2;
-        if (wordCount < 30 || allSleepTime < 30 || allSleepTime > 24 * 60) {
-            LOG.warn("Discarding precise sleep record for day {} (curve words {}, total minutes {})", dayIndex, wordCount, allSleepTime);
-            return;
-        }
-
-        Calendar start = anchorSleepDate(dayIndex, startMonth, startDay, startHour, startMinute);
-        long startEpochSeconds = start.getTimeInMillis() / 1000L;
-        int minutes = Math.min(wordCount, allSleepTime);
-        for (int minuteOffset = 0; minuteOffset < minutes; minuteOffset++) {
-            int word = ((stream[curveStart + minuteOffset * 2] & 0xFF) << 8) | (stream[curveStart + minuteOffset * 2 + 1] & 0xFF);
-            int stage = (word & 0xE000) >> 13;
-            int rawKind;
-            switch (stage) {
-                case 0:
-                    rawKind = VeepooConstants.RAW_KIND_DEEP_SLEEP;
-                    break;
-                case 1:
-                    rawKind = VeepooConstants.RAW_KIND_LIGHT_SLEEP;
-                    break;
-                case 2:
-                    rawKind = VeepooConstants.RAW_KIND_REM_SLEEP;
-                    break;
-                default:
-                    rawKind = VeepooConstants.RAW_KIND_AWAKE_SLEEP;
-            }
-            VeepooActivitySample sample = new VeepooActivitySample();
-            sample.setTimestamp((int) (startEpochSeconds + minuteOffset * 60L));
-            sample.setRawKind(rawKind);
-            sample.setSteps(0);
-            sample.setHeartRate(ActivitySample.NOT_MEASURED);
-            sample.setCaloriesBurnt(0);
-            sample.setDistanceMeters(0);
-            sample.setDataSource(DATA_SOURCE_SLEEP_SUMMARY);
-            pendingSleepSamples.add(sample);
-        }
-        int rawQuality = a3[15] & 0xFF;
-        VeepooSleepSummarySample summary = new VeepooSleepSummarySample();
-        summary.setTimestamp(start.getTimeInMillis());
-        summary.setDurationMin(allSleepTime);
-        summary.setQuality(rawQuality >= 1 && rawQuality <= 5 ? rawQuality : null);
-        summary.setWakeCount(a3[16] & 0xFF);
-        summary.setScoreGetUp(a3[9] & 0xFF);
-        summary.setScoreDeep(a3[10] & 0xFF);
-        summary.setScoreEfficiency(a3[11] & 0xFF);
-        summary.setScoreFallAsleep(a3[12] & 0xFF);
-        summary.setScoreTime(a3[13] & 0xFF);
-        pendingSleepSummaries.add(summary);
-        LOG.info("Parsed precise sleep record for day {}: {} minutes ({} deep, {} light)", dayIndex, minutes, deepSleepTime, lightSleepTime);
-    }
-
     static int le16(byte[] buf, int offset) {
         return (buf[offset] & 0xFF) | ((buf[offset + 1] & 0xFF) << 8);
     }
@@ -2501,30 +1802,14 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
                 | ((buf[offset + 3] & 0xFFL) << 24);
     }
 
-    /**
-     * Anchors a month/day/hour/minute tuple to an actual date, assuming the current year and
-     * rolling back one year when the candidate ends up in the future (December/January boundary).
-     */
-    private Calendar anchorSleepDate(int dayIndex, int month, int day, int hour, int minute) {
-        Calendar reference = Calendar.getInstance();
-        reference.add(Calendar.DAY_OF_MONTH, -dayIndex);
-        Calendar candidate = Calendar.getInstance();
-        candidate.clear();
-        candidate.set(reference.get(Calendar.YEAR), month - 1, day, hour, minute);
-        if (candidate.getTimeInMillis() > reference.getTimeInMillis() + MILLIS_PER_DAY) {
-            candidate.add(Calendar.YEAR, -1);
-        }
-        return candidate;
-    }
-
-    private static boolean isValidDatePart(int month, int day, int hour, int minute) {
+    static boolean isValidDatePart(int month, int day, int hour, int minute) {
         return month >= 1 && month <= 12
                 && day >= 1 && day <= 31
                 && hour >= 0 && hour <= 23
                 && minute >= 0 && minute <= 59;
     }
 
-    private static String hexByte(int value) {
+    static String hexByte(int value) {
         return String.format("%02x", value & 0xFF);
     }
 
