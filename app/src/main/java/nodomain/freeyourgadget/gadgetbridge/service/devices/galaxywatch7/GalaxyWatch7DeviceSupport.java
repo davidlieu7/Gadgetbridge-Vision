@@ -417,40 +417,25 @@ public class GalaxyWatch7DeviceSupport extends AbstractBTBRDeviceSupport {
     // Reflect a watch-reported protogensettings boolean back into the device prefs so the GB
     // settings UI shows the real current state. Only trust the watch's own node's values.
     private void reflectIncomingSetting(final byte[] message) {
-        final String path = WearDataLayerProtocol.parseDataItemPath(message);
-        if (path == null) {
+        final String subPath = WearDataLayerProtocol.parseWatchSettingSubPath(message);
+        if (subPath == null) {
             return;
         }
-        final int idx = path.indexOf("/protogensettings/");
-        if (idx < 0) {
-            return;
-        }
-        final String node = watchNodeId;
-        if (node == null || !path.contains("/" + node)) {
-            return; // only reflect the watch's own current state
-        }
-        String rest = path.substring(idx + "/protogensettings/".length());
-        final int lastSlash = rest.lastIndexOf('/');
-        if (lastSlash < 0) {
-            return;
-        }
-        final String groupKey = rest.substring(0, lastSlash); // drop trailing "/<node>"
-        final String prefKey = BOOLEAN_SETTINGS_BY_PATH.get(groupKey);
+        final String prefKey = BOOLEAN_SETTINGS_BY_PATH.get(subPath);
         if (prefKey == null) {
-            return;
+            return; // not a boolean setting we expose
         }
-        final Long sentAt = recentlySentSetting.get(groupKey);
+        final Long sentAt = recentlySentSetting.get(subPath);
         if (sentAt != null && System.currentTimeMillis() - sentAt < SETTING_WRITE_SETTLE_MS) {
-            return; // we just wrote this; don't let the watch's old streamed value revert it
+            return; // we just wrote this; don't let the watch's echo revert the UI
         }
-        final Boolean value = WearDataLayerProtocol.parseProtogenBool(
-                WearDataLayerProtocol.parseDataItemValue(message));
+        final Boolean value = WearDataLayerProtocol.parseDataMapBoolean(message, "booleanIsChecked");
         if (value == null) {
             return;
         }
         final SharedPreferences prefs = GBApplication.getDeviceSpecificSharedPrefs(getDevice().getAddress());
         if (prefs != null && prefs.getBoolean(prefKey, false) != value) {
-            LOG.info("Galaxy Watch7: reflecting {} = {} from watch", groupKey, value);
+            LOG.info("Galaxy Watch7: reflecting {} = {} from watch", subPath, value);
             prefs.edit().putBoolean(prefKey, value).apply();
         }
     }

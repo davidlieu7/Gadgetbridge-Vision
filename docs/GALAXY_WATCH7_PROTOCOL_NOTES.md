@@ -2266,3 +2266,21 @@ Implemented `WearDataLayerProtocol.parseBatteryState` (returns {level, status}) 
 reports one battery (default getBatteryCount=1), so it shows in the GB UI. Builds
 clean; live-verified against dumpsys (level 100 / full) - end-to-end UI check
 pending the phone's USB ADB coming back.
+
+---
+
+## 31. Fix battery display + reflect settings state into UI (2026-09-18/19)
+
+Two user-reported issues fixed:
+- Battery was not shown because the battery build had never actually installed (the
+  earlier install hung when the phone's USB ADB dropped). Reinstalled; battery now
+  reports (`battery 100% state BATTERY_CHARGING_FULL`), field 1 = level confirmed
+  again (0x61 = 97 off charger).
+- Settings switches all showed OFF and didn't reflect the watch. reflectIncomingSetting
+  was still written for the old protogensettings scheme; rewrote it for the actual
+  w_module_sec_watch_setting scheme: parse the incoming DataItem's sub-path and its
+  DataMap `booleanIsChecked` value (added WearDataLayerProtocol.parseWatchSettingSubPath,
+  parseDataMapBoolean + ProtoReader.findAllMessages for repeated DataMap entries) and
+  mirror it into the device pref. Verified live: many settings reflected true from the
+  watch (touch_bezel, always_on_display, wake_on_*, system sounds/vibration, ...), so
+  the switches now show the real current state.

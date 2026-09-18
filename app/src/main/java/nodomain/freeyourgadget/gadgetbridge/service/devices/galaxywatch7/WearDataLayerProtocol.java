@@ -359,6 +359,53 @@ public final class WearDataLayerProtocol {
         return new int[]{level.intValue(), status == null ? -1 : status.intValue()};
     }
 
+    /**
+     * If the message is a `w_module_sec_watch_setting` DataItem, returns its sub-path (the part
+     * after `/w_module_sec_watch_setting/`), else null.
+     */
+    public static String parseWatchSettingSubPath(final byte[] message) {
+        final String path = parseDataItemPath(message);
+        if (path == null) {
+            return null;
+        }
+        final String marker = "/w_module_sec_watch_setting/";
+        final int idx = path.indexOf(marker);
+        return idx < 0 ? null : path.substring(idx + marker.length());
+    }
+
+    /**
+     * Reads a boolean DataMap entry (e.g. "booleanIsChecked") from a DataItem's value. DataMap
+     * wire format: repeated entries at field 1, each {f1=key, f2=typedValue}; a bool typedValue is
+     * {f1=8, f2={f8=0|1}}. Returns null if the key is absent.
+     */
+    public static Boolean parseDataMapBoolean(final byte[] message, final String key) {
+        final byte[] dataMap = parseDataItemValue(message);
+        if (dataMap == null) {
+            return null;
+        }
+        try {
+            for (final byte[] entry : new ProtoReader(dataMap).findAllMessages(1)) {
+                final ProtoReader er = new ProtoReader(entry);
+                if (!key.equals(er.findString(1))) {
+                    continue;
+                }
+                final byte[] typedValue = new ProtoReader(entry).findMessage(2);
+                if (typedValue == null) {
+                    return null;
+                }
+                final byte[] container = new ProtoReader(typedValue).findMessage(2);
+                if (container == null) {
+                    return null;
+                }
+                final Long b = new ProtoReader(container).findVarint(8);
+                return b == null ? null : (b != 0);
+            }
+        } catch (final RuntimeException e) {
+            return null;
+        }
+        return null;
+    }
+
     private static byte[] extractDataItem(final byte[] message) {
         final byte[] envelope = stripLengthPrefix(message);
         if (envelope == null) {
@@ -688,6 +735,36 @@ public final class WearDataLayerProtocol {
         byte[] findMessage(final int fieldNumber) {
             final byte[] bytes = findLenField(fieldNumber);
             return bytes;
+        }
+
+        /** Returns the bytes of every length-delimited field with the given number (repeated). */
+        java.util.List<byte[]> findAllMessages(final int fieldNumber) {
+            final java.util.List<byte[]> out = new java.util.ArrayList<>();
+            pos = 0;
+            while (pos < end) {
+                final long tag = readRawVarint();
+                final int field = (int) (tag >>> 3);
+                final int wireType = (int) (tag & 0x7);
+                if (wireType == 2) {
+                    final int len = (int) readRawVarint();
+                    if (len < 0 || pos + len > end) {
+                        break;
+                    }
+                    if (field == fieldNumber) {
+                        out.add(java.util.Arrays.copyOfRange(buf, pos, pos + len));
+                    }
+                    pos += len;
+                } else if (wireType == 0) {
+                    readRawVarint();
+                } else if (wireType == 1) {
+                    pos += 8;
+                } else if (wireType == 5) {
+                    pos += 4;
+                } else {
+                    break;
+                }
+            }
+            return out;
         }
 
         /** Returns the first length-delimited field with the given number decoded as UTF-8, or null. */
