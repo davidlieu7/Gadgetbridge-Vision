@@ -437,7 +437,7 @@ class VeepooLiveWorkoutModule {
             }
         }
 
-        LOG.info("Live workout: state {} ({} s, {} m, HR {}, {} kcal, pace {}, speed {}){}",
+        LOG.debug("Live workout: state {} ({} s, {} m, HR {}, {} kcal, pace {}, speed {}){}",
                 runState, duration, distance, heartRate, calories, pace, speed, gnss ? ", GNSS" : "");
         if (precheckDecision == -1) {
             LOG.warn("The band already has an active workout; not starting a new one");

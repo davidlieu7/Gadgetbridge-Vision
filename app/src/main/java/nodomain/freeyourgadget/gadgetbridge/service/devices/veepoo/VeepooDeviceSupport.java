@@ -304,7 +304,7 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
             builder.write(getCharacteristic(VeepooConstants.UUID_CHARACTERISTIC_F008_CMD),
                     new byte[]{VeepooConstants.OP_STATUS_POLL, 0x00});
             builder.queue();
-            LOG.info("Status poll sent (0xD8)");
+            LOG.debug("Status poll sent (0xD8)");
         } catch (Exception e) {
             LOG.debug("Status poll skipped: {}", e.getMessage());
         }
@@ -626,7 +626,7 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
      * midnight; we turn consecutive polls into per-poll deltas for the live activity view.
      */
      private void handleStatusFrame(byte[] data) {
-        LOG.info("D8 status frame received: len={} hex={}", data.length, GB.hexdump(data));
+        LOG.debug("D8 status frame received: len={} hex={}", data.length, GB.hexdump(data));
         if (data.length < 14) {
             LOG.warn("D8 status frame too short ({}), ignoring", data.length);
             return;
@@ -636,7 +636,7 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
         int day = (int) (System.currentTimeMillis() / 86_400_000L);
         if (day != lastStatusDay || lastStatusSteps < 0) {
             // First poll after screen open, reconnect, or midnight rollover: baseline only.
-            LOG.info("D8 status: steps={} (baseline)", steps);
+            LOG.debug("D8 status: steps={} (baseline)", steps);
             lastStatusDay = day;
             lastStatusSteps = steps;
             return;
@@ -645,10 +645,10 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
         lastStatusSteps = steps;
         if (delta <= 0 || delta > 1000) {
             // Counter moved backwards (band reset, manual clear) or an implausible jump.
-            LOG.info("D8 status: steps={} delta={} (dropped)", steps, delta);
+            LOG.debug("D8 status: steps={} delta={} (dropped)", steps, delta);
             return;
         }
-        LOG.info("D8 status: steps={} delta={}", steps, delta);
+        LOG.debug("D8 status: steps={} delta={}", steps, delta);
         VeepooActivitySample sample = new VeepooActivitySample();
         sample.setTimestamp((int) (System.currentTimeMillis() / 1000L));
         sample.setSteps((int) delta);
