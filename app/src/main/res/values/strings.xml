@@ -5631,4 +5631,40 @@
     <string name="cardo_control_volume">Volume</string>
     <string name="cardo_card_voice_prompts">Voice Prompts</string>
     <string name="cardo_control_enable_voice_prompts">Enable Voice Prompts</string>
+
+    <!-- Galaxy Watch7 settings -->
+    <string name="prefs_gw7_cat_display">Display</string>
+    <string name="prefs_gw7_cat_adv">Gestures &amp; buttons</string>
+    <string name="prefs_gw7_cat_general">General</string>
+    <string name="prefs_gw7_cat_bedtime">Bedtime</string>
+    <string name="prefs_gw7_cat_sound">System sounds &amp; vibration</string>
+    <string name="prefs_gw7_display_always_on_display">Always On Display</string>
+    <string name="prefs_gw7_display_auto_low_brightness">Auto low brightness</string>
+    <string name="prefs_gw7_display_bold_font">Bold font</string>
+    <string name="prefs_gw7_display_show_charging_info">Show charging info</string>
+    <string name="prefs_gw7_display_touch_sensitivity">Touch sensitivity (gloves)</string>
+    <string name="prefs_gw7_display_wake_on_touch_screen">Wake on touch</string>
+    <string name="prefs_gw7_display_wake_on_turning_bezel">Wake on bezel turn</string>
+    <string name="prefs_gw7_display_wake_on_wrist_raised">Wake on wrist raise</string>
+    <string name="prefs_gw7_advanced_action_button_siren_enabled">Action button: siren</string>
+    <string name="prefs_gw7_advanced_gestures_dismiss_alerts_and_reject_calls">Gesture: dismiss alerts / reject calls</string>
+    <string name="prefs_gw7_advanced_gestures_quick_action">Gesture: quick action (double pinch)</string>
+    <string name="prefs_gw7_advanced_gestures_quick_action_watchface_second_action_enabled">Quick action: second action</string>
+    <string name="prefs_gw7_advanced_gestures_raise_to_talk_enabled">Raise to talk</string>
+    <string name="prefs_gw7_advanced_labs_quicklaunch_enabled">Quick launch (labs)</string>
+    <string name="prefs_gw7_advanced_media_control_auto_launch_media_controls">Auto-launch media controls</string>
+    <string name="prefs_gw7_advanced_media_control_show_ongoing_icon">Media: show ongoing icon</string>
+    <string name="prefs_gw7_general_touch_bezel">Touch bezel</string>
+    <string name="prefs_gw7_general_touch_bezel_feedback">Touch bezel feedback</string>
+    <string name="prefs_gw7_bedtime_turn_on_scheduled">Bedtime mode: scheduled</string>
+    <string name="prefs_gw7_sound_settings_system_sounds_charging_sound">Sound: charging</string>
+    <string name="prefs_gw7_sound_settings_system_sounds_dialing_keypad_tone">Sound: dialing keypad</string>
+    <string name="prefs_gw7_sound_settings_system_sounds_hourly_chime">Sound: hourly chime</string>
+    <string name="prefs_gw7_sound_settings_system_sounds_samsung_keyboard">Sound: Samsung keyboard</string>
+    <string name="prefs_gw7_sound_settings_system_sounds_ticking_sound">Sound: ticking</string>
+    <string name="prefs_gw7_sound_settings_system_sounds_touch_sound">Sound: touch</string>
+    <string name="prefs_gw7_sound_settings_system_sounds_unlock_sound">Sound: unlock</string>
+    <string name="prefs_gw7_sound_settings_system_vibration_charging">Vibration: charging</string>
+    <string name="prefs_gw7_sound_settings_system_vibration_dialing_keypad">Vibration: dialing keypad</string>
+    <string name="prefs_gw7_sound_settings_system_vibration_samsung_keyboard">Vibration: Samsung keyboard</string>
 </resources>
