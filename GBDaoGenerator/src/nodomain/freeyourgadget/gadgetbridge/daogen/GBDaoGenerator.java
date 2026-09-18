@@ -110,7 +110,7 @@ public class GBDaoGenerator {
             outputDir.mkdirs();
         }
 
-        final Schema schema = new Schema(142, MAIN_PACKAGE + ".entities");
+        final Schema schema = new Schema(143, MAIN_PACKAGE + ".entities");
 
         final List<Entity> sampleProvidersToGenerate = new LinkedList<>();
         final List<Entity> batterySampleProvidersToGenerate = new LinkedList<>();
@@ -300,6 +300,7 @@ public class GBDaoGenerator {
         sampleProvidersToGenerate.add(addGenericTrainingLoadAcuteSample(schema, user, device));
         sampleProvidersToGenerate.add(addGenericTrainingLoadChronicSample(schema, user, device));
         sampleProvidersToGenerate.add(addGenericWeightSample(schema, user, device));
+        sampleProvidersToGenerate.add(addGenericImpedanceSample(schema, user, device));
         sampleProvidersToGenerate.add(addGlucoseSample(schema, user, device));
         addGenericMetricsSample(schema, user, device);
         sampleProvidersToGenerate.add(addGenericSleepScoreSample(schema, user, device));
@@ -2602,6 +2603,22 @@ public class GBDaoGenerator {
         sample.addFloatProperty(SAMPLE_WEIGHT_KG).notNull().codeBeforeGetter(OVERRIDE);
         // Raw bio-impedance in Ohms, for scales that report it (see MiScaleWeightSample).
         sample.addIntProperty(SAMPLE_IMPEDANCE_OHM).codeBeforeGetter(OVERRIDE);
+        return sample;
+    }
+
+    private static Entity addGenericImpedanceSample(Schema schema, Entity user, Entity device) {
+        // One raw bio-impedance reading. A scale can report several at the same instant, one per
+        // body section and frequency, so both are part of the key alongside time and device.
+        Entity sample = addEntity(schema, "GenericImpedanceSample");
+        addCommonTimeSampleProperties("AbstractTimeSample", sample, user, device);
+        // Body section the reading was taken across, numbered as the device numbers it; 0 for
+        // scales that only measure the whole body.
+        sample.addIntProperty("bodySectionIdx").notNull().primaryKey();
+        // Measurement frequency in Hz, or -1 when the device does not say which it used. In Hz
+        // rather than kHz because scales use fractional kHz: 6.25 kHz is 6250 Hz exactly.
+        sample.addIntProperty("frequencyHz").notNull().primaryKey();
+        // Raw bio-impedance in Ohms, as reported by the device.
+        sample.addFloatProperty(SAMPLE_IMPEDANCE_OHM).notNull();
         return sample;
     }
 
