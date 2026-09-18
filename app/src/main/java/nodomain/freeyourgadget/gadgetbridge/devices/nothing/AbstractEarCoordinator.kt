@@ -1,4 +1,4 @@
-/*  Copyright (C) 2024 José Rebelo
+/*  Copyright (C) 2024 José Rebelo, Jackson Attwood
 
     This file is part of Gadgetbridge.
 
@@ -27,6 +27,8 @@ import nodomain.freeyourgadget.gadgetbridge.devices.DeviceCoordinator
 import nodomain.freeyourgadget.gadgetbridge.devices.nothing.prefs.NothingAudioMode
 import nodomain.freeyourgadget.gadgetbridge.devices.nothing.prefs.NothingEqualizer
 import nodomain.freeyourgadget.gadgetbridge.devices.nothing.prefs.NothingTapAction
+import nodomain.freeyourgadget.gadgetbridge.devices.nothing.prefs.NothingAudioCodec
+import nodomain.freeyourgadget.gadgetbridge.devices.nothing.prefs.NothingAutoTransparencyMode
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice
 import nodomain.freeyourgadget.gadgetbridge.model.BatteryConfig
 import nodomain.freeyourgadget.gadgetbridge.service.DeviceSupport
@@ -125,6 +127,23 @@ abstract class AbstractEarCoordinator : AbstractBLClassicDeviceCoordinator() {
                         summary = R.string.nothing_prefs_spatial_audio_summary,
                         icon = R.drawable.ic_surround,
                         defaultValue = false,
+                    )
+                }
+                if (supportsAutoTransparency()) {
+                    switchSetting(
+                        key = "pref_nothing_auto_transparency",
+                        title = R.string.nothing_prefs_auto_transparency_title,
+                        summary = R.string.nothing_prefs_auto_transparency_summary,
+                        icon = R.drawable.ic_hearing,
+                        defaultValue = true,
+                    )
+                }
+                if (supportsAudioCodec()) {
+                    enumList<NothingAudioCodec>(
+                        key = "pref_nothing_audio_codec",
+                        title = R.string.nothing_prefs_codec_title, // Define in strings.xml
+                        icon = R.drawable.ic_equalizer,
+                        defaultValue = NothingAudioCodec.AAC,
                     )
                 }
             }
@@ -231,6 +250,14 @@ abstract class AbstractEarCoordinator : AbstractBLClassicDeviceCoordinator() {
 
 
     open fun supportsSpatialAudio(): Boolean {
+        return false
+    }
+
+    open fun supportsAutoTransparency(): Boolean {
+        return false
+    }
+
+    open fun supportsAudioCodec(): Boolean {
         return false
     }
 

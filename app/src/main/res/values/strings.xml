@@ -3438,6 +3438,7 @@
     <string name="prefs_autoheartrate_interval">Frequency of measurements</string>
     <string name="devicetype_nothingear1" translatable="false">Nothing Ear (1)</string>
     <string name="devicetype_nothingear2" translatable="false">Nothing Ear (2)</string>
+    <string name="devicetype_nothingear3" translatable="false">Nothing Ear (3)</string>
     <string name="devicetype_nothing_ear_a" translatable="false">Nothing Ear (a)</string>
     <string name="devicetype_nothingearstick" translatable="false">Nothing Ear (Stick)</string>
     <string name="devicetype_nothing_cmf_buds_2" translatable="false">CMF Buds 2</string>
@@ -5605,4 +5606,9 @@
     <string name="gpx_include_navigation_straight">Include \'Continue straight\' instructions</string>
     <string name="gpx_roundabout_exit">Exit %1$d</string>
     <string name="pref_title_connect_to_this_device_when_another_device_connects">Connect to this device when another device connects</string>
+    <string name="nothing_prefs_auto_transparency_title">Auto Transparency</string>
+    <string name="nothing_prefs_auto_transparency_summary">Turn ON Transparency mode whenever you are on a phone call.</string>
+    <string name="nothing_prefs_codec_title">High-quality audio</string>
+    <string name="prefs_codec_aac">AAC</string>
+    <string name="prefs_codec_ldac">LDAC</string>
 </resources>

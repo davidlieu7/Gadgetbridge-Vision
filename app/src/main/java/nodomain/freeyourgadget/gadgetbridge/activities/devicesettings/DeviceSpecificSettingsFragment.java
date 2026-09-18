@@ -40,7 +40,6 @@ import static nodomain.freeyourgadget.gadgetbridge.devices.moyoung.MoyoungConsta
 import static nodomain.freeyourgadget.gadgetbridge.util.GBPrefs.DEVICE_CONNECT_BY_TRIGGER;
 
 import android.Manifest;
-import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothManager;
 import android.content.BroadcastReceiver;
@@ -906,6 +905,8 @@ public class DeviceSpecificSettingsFragment extends AbstractPreferenceFragment i
         addPreferenceHandlerFor(PREF_NOTHING_EAR1_ULTRA_BASS_ENABLED);
         addPreferenceHandlerFor(PREF_NOTHING_EAR1_ULTRA_BASS_LEVEL);
         addPreferenceHandlerFor(PREF_NOTHING_EAR1_SPATIAL_AUDIO);
+        addPreferenceHandlerFor(PREF_NOTHING_AUTO_TRANSPARENCY);
+        addPreferenceHandlerFor(PREF_NOTHING_AUDIO_CODEC);
 
         addPreferenceHandlerFor(PREF_HUAWEI_FREEBUDS_INEAR);
         addPreferenceHandlerFor(PREF_HUAWEI_FREEBUDS_AUDIOMODE);

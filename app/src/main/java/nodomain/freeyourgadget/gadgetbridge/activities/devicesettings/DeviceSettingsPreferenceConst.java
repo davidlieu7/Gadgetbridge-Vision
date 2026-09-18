@@ -404,6 +404,8 @@ public class DeviceSettingsPreferenceConst {
     public static final String PREF_HEADPHONES_EQUALIZER = "pref_headphones_equalizer";
     public static final String PREF_HEADPHONES_LOW_LATENCY = "pref_headphones_low_latency";
     public static final String PREF_NOTHING_EAR1_SPATIAL_AUDIO = "pref_nothing_spatial_audio";
+    public static final String PREF_NOTHING_AUTO_TRANSPARENCY = "pref_nothing_auto_transparency";
+    public static final String PREF_NOTHING_AUDIO_CODEC = "pref_nothing_audio_codec";
 
     public static final String PREF_HUAWEI_FREEBUDS_INEAR = "pref_freebuds_inear_detection";
     public static final String PREF_HUAWEI_FREEBUDS_AUDIOMODE = "pref_freebuds_audiomode";

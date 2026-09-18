@@ -486,6 +486,7 @@ import nodomain.freeyourgadget.gadgetbridge.devices.nothing.CmfBuds2aCoordinator
 import nodomain.freeyourgadget.gadgetbridge.devices.nothing.CmfBudsPro2Coordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.nothing.Ear1Coordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.nothing.Ear2Coordinator;
+import nodomain.freeyourgadget.gadgetbridge.devices.nothing.Ear3Coordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.nothing.EarACoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.nothing.EarStickCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.nut.NutCoordinator;
@@ -997,6 +998,7 @@ public enum DeviceType {
     EVEN_REALITIES_G_1(G1DeviceCoordinator.class),
     NOTHING_EAR1(Ear1Coordinator.class),
     NOTHING_EAR2(Ear2Coordinator.class),
+    NOTHING_EAR3(Ear3Coordinator.class),
     NOTHING_EAR_A(EarACoordinator.class),
     NOTHING_EAR_STICK(EarStickCoordinator.class),
     NOTHING_CMF_BUDS_2(CmfBuds2Coordinator.class),

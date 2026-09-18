@@ -1,4 +1,4 @@
-/*  Copyright (C) 2021-2026 Arjan Schrijver, Daniele Gobbetti, Petr Vaněk
+/*  Copyright (C) 2021-2026 Arjan Schrijver, Daniele Gobbetti, Petr Vaněk, Jackson Attwood
 
     This file is part of Gadgetbridge.
 
@@ -41,6 +41,8 @@ import nodomain.freeyourgadget.gadgetbridge.devices.nothing.AbstractEarCoordinat
 import nodomain.freeyourgadget.gadgetbridge.devices.nothing.prefs.NothingEqualizer;
 import nodomain.freeyourgadget.gadgetbridge.devices.nothing.prefs.NothingAudioMode;
 import nodomain.freeyourgadget.gadgetbridge.devices.nothing.prefs.NothingTapAction;
+import nodomain.freeyourgadget.gadgetbridge.devices.nothing.prefs.NothingAudioCodec;
+import nodomain.freeyourgadget.gadgetbridge.devices.nothing.prefs.NothingAutoTransparencyMode;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
 import nodomain.freeyourgadget.gadgetbridge.model.BatteryState;
 import nodomain.freeyourgadget.gadgetbridge.service.AbstractHeadphoneBTBRDeviceSupport;
@@ -63,6 +65,12 @@ public class Ear1Support extends AbstractHeadphoneBTBRDeviceSupport {
         addSupportedService(UUID_DEVICE_CTRL);
     }
 
+    //@Override
+    public nodomain.freeyourgadget.gadgetbridge.model.DeviceType getDeviceType() {
+        // Ensure this matches whatever enum you used in DeviceType.java
+        return nodomain.freeyourgadget.gadgetbridge.model.DeviceType.NOTHING_EAR3;
+    }
+
     @Override
     public void onTestNewFunction(@Nullable Bundle options) {
         //getDeviceIOThread().write(((NothingProtocol) getDeviceProtocol()).encodeBatteryStatusReq());
@@ -75,6 +83,7 @@ public class Ear1Support extends AbstractHeadphoneBTBRDeviceSupport {
 
     @Override
     protected TransactionBuilder initializeDevice(final TransactionBuilder builder) {
+
         nothingProtocol = new NothingProtocol(getCoordinator().incrementCounter());
 
         sendCommand(builder, nothingProtocol.encodeFirmwareVersionReq());
@@ -96,6 +105,10 @@ public class Ear1Support extends AbstractHeadphoneBTBRDeviceSupport {
         if (getCoordinator().supportsSpatialAudio()) {
             sendCommand(builder, nothingProtocol.encodeSpatialAudioReq());
         }
+        if (getCoordinator().supportsAutoTransparency()) {
+            sendCommand(builder, nothingProtocol.encodeAutoTransparencyReq());
+        }
+
 
         return builder;
     }
@@ -114,7 +127,6 @@ public class Ear1Support extends AbstractHeadphoneBTBRDeviceSupport {
         sendCommand(builder, payload);
         builder.queue();
     }
-
 
     @Override
     public void onSocketRead(byte[] data) {
@@ -171,6 +183,18 @@ public class Ear1Support extends AbstractHeadphoneBTBRDeviceSupport {
                         )
                 );
                 break;
+            case DeviceSettingsPreferenceConst.PREF_NOTHING_AUTO_TRANSPARENCY:
+                sendCommand(
+                        "set auto transparency",
+                        nothingProtocol.encodeAutoTransparency(prefs)
+                );
+                break;
+            case "pref_nothing_audio_codec":
+                sendCommand(
+                        "set audio codec",
+                        nothingProtocol.encodeAudioCodec(prefs)
+                );
+                break;
             case NothingBudsPreferences.PREF_CMF_BUDS_TOUCH__LEFT__TAP_2:
             case NothingBudsPreferences.PREF_CMF_BUDS_TOUCH__LEFT__TAP_3:
             case NothingBudsPreferences.PREF_CMF_BUDS_TOUCH__LEFT__TAP_1_HOLD:
@@ -224,6 +248,7 @@ public class Ear1Support extends AbstractHeadphoneBTBRDeviceSupport {
         private static final short equalizer_status = (short) 0xc050;
         private static final short ultra_bass_status = (short) 0xc04e;
         private static final short spatial_audio_status = (short) 0xc04f;
+        private static final short auto_transparency_status = (short) 0xc060;
 
         private static final short unk_maybe_ack = (short) 0xf002;
         private static final short unk_close_case = (short) 0xe002; //sent twice when the case is closed with earphones in
@@ -236,10 +261,12 @@ public class Ear1Support extends AbstractHeadphoneBTBRDeviceSupport {
         private static final short low_latency = (short) 0xf040;
         private static final short equalizer = (short) 0xf01d;
         private static final short ultra_bass = (short) 0xf051;
-        private static final short spatial_audio = (short) 0xf052;
-
+        private static final short spatial_audio = (short) 0x0052;
+        private static final short auto_transparency = (short) 0xf060;
         private final boolean incrementCounter;
         private int messageCounter = 0x00;
+
+        private static final short audio_codec = (short) 0xf01c;
 
         private final HashMap<Byte, GBDeviceEventBatteryInfo> batteries;
         private static final byte battery_earphone_left = 0x02;
@@ -408,6 +435,8 @@ public class Ear1Support extends AbstractHeadphoneBTBRDeviceSupport {
             return evt;
         }
 
+
+
         private GBDeviceEventUpdatePreferences handleAudioModeStatus(byte[] payload) {
             final GBDeviceEventUpdatePreferences preferencesEvent = new GBDeviceEventUpdatePreferences();
 
@@ -569,6 +598,22 @@ public class Ear1Support extends AbstractHeadphoneBTBRDeviceSupport {
             final byte rawLevel = (byte) (clampedLevel * 2);
 
             return encodeMessage((short) 0x120, ultra_bass, new byte[]{(byte) (enabled ? 0x01 : 0x00), rawLevel});
+        }
+
+        public byte[] encodeAutoTransparencyReq() {
+            return encodeMessage((short) 0x120, auto_transparency, new byte[0]);
+        }
+
+        public byte[] encodeAutoTransparency(final SharedPreferences prefs) {
+            boolean enabled = prefs.getBoolean(DeviceSettingsPreferenceConst.PREF_NOTHING_AUTO_TRANSPARENCY, false);
+            byte stateByte = (byte) (enabled ? 0x01 : 0x00);
+            return encodeMessage((short) 0x120, auto_transparency, new byte[]{stateByte});
+        }
+
+        public byte[] encodeAudioCodec(final SharedPreferences prefs) {
+            NothingAudioCodec codec = NothingAudioCodec.fromPreferences(prefs, "pref_nothing_audio_codec");
+            byte code = (byte) (codec != null ? codec.getCode() : 0x02);
+            return encodeMessage((short) 0x120, audio_codec, new byte[]{code});
         }
 
         public byte[] encodeFindDevice(boolean start) {
