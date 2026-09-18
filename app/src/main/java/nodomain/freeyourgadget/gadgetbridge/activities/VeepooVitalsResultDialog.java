@@ -123,8 +123,19 @@ public class VeepooVitalsResultDialog extends Dialog {
                 }
                 break;
             case TYPE_TEMPERATURE:
-                if (result instanceof TemperatureSample) {
-                    heart_rate_widget_hr_value.setText(String.format("%.1f °C", ((TemperatureSample) result).getTemperature()));
+                if (result instanceof VeepooDeviceSupport.VeepooTemperatureMeasurementResult) {
+                    final VeepooDeviceSupport.VeepooTemperatureMeasurementResult temp =
+                            (VeepooDeviceSupport.VeepooTemperatureMeasurementResult) result;
+                    if (vitals_result_rows != null) {
+                        vitals_result_rows.removeAllViews();
+                        addVitalsRow(R.string.veepoo_temp_body, String.format("%.1f °C", temp.bodyCelsius));
+                        if (temp.skinCelsius != null) {
+                            addVitalsRow(R.string.veepoo_temp_skin, String.format("%.1f °C", temp.skinCelsius));
+                        }
+                    }
+                } else if (result instanceof TemperatureSample && vitals_result_rows != null) {
+                    addVitalsRow(R.string.veepoo_temp_body,
+                            String.format("%.1f °C", ((TemperatureSample) result).getTemperature()));
                 }
                 break;
             case TYPE_STRESS:
@@ -294,7 +305,7 @@ public class VeepooVitalsResultDialog extends Dialog {
                 heart_rate_widget_hr_title.setText(R.string.heart_rate);
         }
 
-        if (type == TYPE_BODY_COMPOSITION || type == TYPE_BLOOD_LIPID || type == TYPE_ECG) {
+        if (type == TYPE_BODY_COMPOSITION || type == TYPE_BLOOD_LIPID || type == TYPE_ECG || type == TYPE_TEMPERATURE) {
             final View widgetsRow = (View) heart_rate_hr.getParent();
             widgetsRow.setVisibility(View.GONE);
             final View list = LayoutInflater.from(getContext())

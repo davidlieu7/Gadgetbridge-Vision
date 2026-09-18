@@ -2506,6 +2506,8 @@
     <string name="veepoo_spo2_no_reading">No blood oxygen reading (timed out)</string>
     <string name="veepoo_temp_ok">Body temperature: %1$.1f °C</string>
     <string name="veepoo_temp_no_reading">No temperature reading (timed out)</string>
+    <string name="veepoo_temp_body">Body temperature</string>
+    <string name="veepoo_temp_skin">Skin temperature</string>
     <string name="veepoo_stress_ok">Stress level: %1$d</string>
     <string name="veepoo_stress_no_reading">No stress reading (timed out)</string>
     <string name="veepoo_action_measure_blood_pressure">Blood pressure</string>

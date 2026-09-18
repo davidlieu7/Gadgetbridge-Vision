@@ -5365,7 +5365,7 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
         Float body = plausibleTemperature(data[5], data[6]);
         if (progress >= 100 && body != null) {
             LOG.info("Autonomous temperature push: {} C", body);
-            saveTemperatureSample(body);
+            saveTemperatureSample(body, TemperatureSample.TYPE_BODY);
         } else {
             LOG.debug("Ignoring autonomous temperature push: progress={} body={}", progress, body);
         }
@@ -5390,6 +5390,18 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
         return null;
     }
 
+    /** Result of an on-demand temperature measurement: the estimated body and the raw skin (base) readings. */
+    public static final class VeepooTemperatureMeasurementResult implements Serializable {
+        private static final long serialVersionUID = 1L;
+        public final float bodyCelsius;
+        public final Float skinCelsius;
+
+        public VeepooTemperatureMeasurementResult(float bodyCelsius, Float skinCelsius) {
+            this.bodyCelsius = bodyCelsius;
+            this.skinCelsius = skinCelsius;
+        }
+    }
+
     /** Completes the temperature read: stops the stream, then stores or reports the result. */
     private void finishTemperatureDetect(Float body, Float base, int failure) {
         synchronized (this) {
@@ -5403,21 +5415,20 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
         sendStopVitalFrame(VeepooConstants.OP_TEMP_REALTIME,
                 VeepooConstants.TEMP_DETECT_START, VeepooConstants.TEMP_DETECT_STOP);
         if (body != null) {
-            GenericTemperatureSample sample = saveTemperatureSample(body);
-            if (sample != null) {
-                notifyVitalSample(sample);
-                GB.toast(getContext(), getContext().getString(R.string.veepoo_temp_ok, body), Toast.LENGTH_SHORT, GB.INFO);
+            final GenericTemperatureSample bodySample = saveTemperatureSample(body, TemperatureSample.TYPE_BODY);
+            final GenericTemperatureSample skinSample = base == null ? null : saveTemperatureSample(base, TemperatureSample.TYPE_SKIN);
+            if (bodySample == null || (base != null && skinSample == null)) {
+                LOG.warn("Temperature measurement completed but sample persistence failed");
             }
-            if (base != null) {
-                LOG.info("Base (skin) temperature: {} C", base);
-            }
+            notifyVitalSample(new VeepooTemperatureMeasurementResult(body, base));
+            GB.toast(getContext(), getContext().getString(R.string.veepoo_temp_ok, body), Toast.LENGTH_SHORT, GB.INFO);
         } else {
             toastVitalFailure(R.string.veepoo_temp_no_reading, failure);
         }
     }
 
-    /** Stores a body-temperature sample; returns the saved sample, or null on failure. */
-    private GenericTemperatureSample saveTemperatureSample(float celsius) {
+    /** Stores a temperature sample of the given type (TYPE_BODY or TYPE_SKIN); returns it, or null on failure. */
+    private GenericTemperatureSample saveTemperatureSample(float celsius, int temperatureType) {
         try (DBHandler dbHandler = GBApplication.acquireDB()) {
             DaoSession session = dbHandler.getDaoSession();
             Long userId = DBHelper.getUser(session).getId();
@@ -5426,7 +5437,7 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
             GenericTemperatureSample sample = new GenericTemperatureSample();
             sample.setTimestamp(System.currentTimeMillis());
             sample.setTemperature(celsius);
-            sample.setTemperatureType(TemperatureSample.TYPE_BODY);
+            sample.setTemperatureType(temperatureType);
             sample.setTemperatureLocation(TemperatureSample.LOCATION_WRIST);
             sample.setUserId(userId);
             sample.setDeviceId(deviceId);
