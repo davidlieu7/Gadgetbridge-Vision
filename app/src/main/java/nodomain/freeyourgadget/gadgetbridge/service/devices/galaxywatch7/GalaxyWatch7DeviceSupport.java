@@ -209,15 +209,15 @@ public class GalaxyWatch7DeviceSupport extends AbstractBTBRDeviceSupport {
     // relays the DataItem; the watch applies settings written under this node.
     private static final String SETTINGS_NODE = "efb3c185";
 
-    // Boolean protogensettings, confirmed on the wire (§23): GB preference key -> the
-    // "<group>/<key>" written at wear://<node>/protogensettings/<group>/<key>/<node>.
+    // Boolean settings mapped to the Samsung w_module_sec_watch_setting sub-path the watch's
+    // StDataLayerListenerService actually applies (research notes §28), decoded from
+    // StDataLayerDisplayManager. Written under the connection node (localNodeId) with a
+    // {booleanIsChecked, from:"mobile"} DataMap.
     private static final java.util.Map<String, String> BOOLEAN_SETTINGS = new java.util.HashMap<>();
     static {
         BOOLEAN_SETTINGS.put("pref_galaxywatch7_always_on_display", "display/always_on_display");
-        BOOLEAN_SETTINGS.put("pref_galaxywatch7_tilt_to_wake", "display/tilt_to_wake");
-        BOOLEAN_SETTINGS.put("pref_galaxywatch7_touch_to_wake", "display/touch_to_wake");
-        BOOLEAN_SETTINGS.put("pref_galaxywatch7_show_unread_dot", "unread_dot/show_unread_dot");
-        BOOLEAN_SETTINGS.put("pref_galaxywatch7_use_mode_ringer", "modes/use_mode_ringer");
+        BOOLEAN_SETTINGS.put("pref_galaxywatch7_tilt_to_wake", "display/wake_on_wrist_raised");
+        BOOLEAN_SETTINGS.put("pref_galaxywatch7_touch_to_wake", "display/wake_on_touch_screen");
     }
     // Reverse map: the protogensettings "<group>/<key>" -> GB preference key, to reflect the
     // watch's reported values back into the device prefs so the UI shows the real state.
@@ -241,18 +241,20 @@ public class GalaxyWatch7DeviceSupport extends AbstractBTBRDeviceSupport {
         }
         final SharedPreferences prefs = GBApplication.getDeviceSpecificSharedPrefs(getDevice().getAddress());
         final boolean enabled = prefs != null && prefs.getBoolean(config, false);
-        final long seq = settingsSeq.incrementAndGet();
-        LOG.info("Galaxy Watch7: sending {} = {} (seq {}, {} known nodes)", groupKey, enabled, seq, nodeCounters.size());
-        recentlySentSetting.put(groupKey, System.currentTimeMillis());
-        final TransactionBuilder builder = createTransactionBuilder("send " + config);
-        // Assert ownership of the phone-side nodes (incl. the settings node) with a fuller peer-sync
-        // right before the write, mirroring the stock client, in case the watch's settings applier
-        // only applies writes from a node it sees us represent (research notes §26).
-        if (watchNodeId != null && !nodeCounters.isEmpty()) {
-            builder.write(WearDataLayerProtocol.buildSeqAck(nodeCounters, watchNodeId));
+        final String node = localNodeId;
+        if (node == null) {
+            LOG.warn("Galaxy Watch7: cannot send {} - own node id not known yet", config);
+            return;
         }
-        builder.write(WearDataLayerProtocol.buildProtogenBooleanSettingPut(
-                SETTINGS_SOURCE_PACKAGE, SETTINGS_SOURCE_SIGNATURE, SETTINGS_NODE, groupKey, enabled, seq));
+        final long seq = settingsSeq.incrementAndGet();
+        LOG.info("Galaxy Watch7: sending w_module {} = {} under node {} (seq {})", groupKey, enabled, node, seq);
+        recentlySentSetting.put(groupKey, System.currentTimeMillis());
+        // The watch's StDataLayerListenerService applies w_module_sec_watch_setting DataItems whose
+        // host node is a connected peer (our connection node) and whose "from" != "watch" (§28).
+        final byte[] write = WearDataLayerProtocol.buildWatchSettingBooleanPut(
+                SETTINGS_SOURCE_PACKAGE, SETTINGS_SOURCE_SIGNATURE, node, groupKey, enabled, seq);
+        final TransactionBuilder builder = createTransactionBuilder("send " + config);
+        builder.write(write);
         builder.queue();
     }
 
@@ -353,9 +355,8 @@ public class GalaxyWatch7DeviceSupport extends AbstractBTBRDeviceSupport {
         final int slash = path.indexOf('/', "wear://".length());
         final String node = slash < 0 ? path.substring("wear://".length()) : path.substring("wear://".length(), slash);
         nodeCounters.merge(node, seq, Math::max);
-        if (node.equals(SETTINGS_NODE)) {
-            settingsSeq.getAndUpdate(cur -> Math.max(cur, seq));
-        }
+        // Keep our outgoing seq above every node's current seq so writes are never seen as stale.
+        settingsSeq.getAndUpdate(cur -> Math.max(cur, seq));
     }
 
     // Reflect a watch-reported protogensettings boolean back into the device prefs so the GB

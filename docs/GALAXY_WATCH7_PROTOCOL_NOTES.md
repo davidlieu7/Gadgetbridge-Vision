@@ -2171,3 +2171,43 @@ Solid and durable: GB establishes and holds the Data Layer connection as the sol
 companion without the Samsung app, decodes the full incoming DataItem stream
 (settings, apps, battery, ...), and delivers correctly-framed writes that reach the
 watch. Only the watch-side application of setting writes is unresolved.
+
+---
+
+## 28. SETTINGS WRITE SOLVED — w_module_sec_watch_setting via StDataLayerListenerService (2026-09-18)
+
+Decompiled the watch's settings applier (pulled SecClockworkSettings.apk +
+ClockworkWcsExt.apk over a stable watch ADB) and read
+`StDataLayerListenerService.onDataChanged`. It is the component that APPLIES
+settings, and it processes the **Samsung `w_module_sec_watch_setting/*`** scheme —
+NOT `protogensettings/*` (that was the wrong scheme; protogensettings reached the
+watch's Data Layer but nothing applied it). Requirements decoded from the service
++ `StDataLayerDisplayManager`:
+
+1. Path `wear://<node>/w_module_sec_watch_setting/<sub>` where `<node>` is a
+   CONNECTED peer node — i.e. our connection node `e1b1cd8b` (the service's
+   `isValidNodeId` checks the DataItem host against the connected peer / peer list).
+   Writing under efb3c185 or any non-connected node fails this check.
+2. DataMap `{ "booleanIsChecked": <bool>, "from": "mobile" }`. The service SKIPS any
+   item whose `from` is null or `"watch"` (`StNewPhoneConstants.Sender.WATCH`); a
+   phone write must use `"mobile"` (`Sender.MOBILE`).
+3. Wear DataMap TypedValue wire format: entry = {f1=key, f2=typedValue};
+   typedValue = {f1=typeTag, f2=container}; bool → typeTag 8, container {f8=0|1};
+   string → typeTag 2, container {f2=string}.
+
+Confirmed sub-paths (StDataLayerDisplayManager):
+- always_on_display: `display/always_on_display`
+- touch to wake:     `display/wake_on_touch_screen`
+- tilt to wake:      `display/wake_on_wrist_raised`
+- turning bezel:     `display/wake_on_turning_bezel`
+- others: show_charging_info, bold_font, touch_sensitivity, ...
+
+Verified live: GB wrote `wear://e1b1cd8b/w_module_sec_watch_setting/display/
+wake_on_touch_screen = false` and the watch applied it —
+`StDataLayerListener: isValidNodeId:true ... from : mobile ... handleSyncData :
+really ...` and the behaviour changed on the watch. Implemented as
+`WearDataLayerProtocol.buildWatchSettingBooleanPut` + wired in onSendConfiguration
+(node = connection node, seq kept above the global max from the incoming stream).
+
+Read + connection + settings write now all work as a standalone companion (Samsung
+app disabled). protogensettings write path is retained in code but unused.

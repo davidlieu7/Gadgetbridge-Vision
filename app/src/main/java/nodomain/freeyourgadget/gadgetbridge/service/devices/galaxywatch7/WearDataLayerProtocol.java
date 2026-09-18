@@ -206,6 +206,71 @@ public final class WearDataLayerProtocol {
         return buildProtogenSettingPut(sourcePackage, signatureHex, ownNodeId, groupAndKey, typed, seq);
     }
 
+    /**
+     * Builds a DataItem PUT for a Samsung `w_module_sec_watch_setting` boolean setting - the scheme
+     * the watch's StDataLayerListenerService actually applies (research notes §28). Requirements
+     * decoded from that service + StDataLayerDisplayManager:
+     *   - path wear://<node>/w_module_sec_watch_setting/<sub> where <node> is a CONNECTED peer node
+     *     (our connection node, so the watch's isValidNodeId check passes),
+     *   - DataMap { "booleanIsChecked": bool, "from": "mobile" } - "from" must not be "watch" or
+     *     the service skips it.
+     *
+     * @param ownNodeId our connection node id (must be a peer node the watch sees connected)
+     * @param subPath   e.g. "display/always_on_display", "display/wake_on_touch_screen"
+     */
+    public static byte[] buildWatchSettingBooleanPut(final String sourcePackage, final String signatureHex,
+                                                     final String ownNodeId, final String subPath,
+                                                     final boolean value, final long seq) {
+        final ProtoWriter dataMap = new ProtoWriter();
+        dataMapEntry(dataMap, "booleanIsChecked", dataMapBool(value));
+        dataMapEntry(dataMap, "from", dataMapString("mobile"));
+
+        final String path = "wear://" + ownNodeId + "/w_module_sec_watch_setting/" + subPath;
+        final long now = System.currentTimeMillis();
+
+        final ProtoWriter dataItem = new ProtoWriter();
+        dataItem.writeString(DATAITEM_SOURCE_PACKAGE, sourcePackage);
+        dataItem.writeString(DATAITEM_PATH, path);
+        dataItem.writeMessage(DATAITEM_PAYLOAD, dataMap.toByteArray());
+        dataItem.writeVarint(DATAITEM_SEQ, seq);
+        dataItem.writeVarint(DATAITEM_DELETE_FLAG, 0);
+        dataItem.writeString(DATAITEM_DEST_NODE_ID, ownNodeId);
+        dataItem.writeString(DATAITEM_SIGNATURE, signatureHex);
+        dataItem.writeVarint(DATAITEM_TIMESTAMP, now);
+
+        final ProtoWriter payload = new ProtoWriter();
+        payload.writeMessage(PAYLOAD_DATA_ITEM, dataItem.toByteArray());
+        return frame(wrapEnvelope(payload.toByteArray(), true));
+    }
+
+    // Wear DataMap "TypedValue": field1 = type tag, field2 = a container whose inner field number
+    // is the type tag (bool = field 8, string = field 2). A DataMap is repeated entries at field 1,
+    // each { field1 = key, field2 = typed value }.
+    private static void dataMapEntry(final ProtoWriter dataMap, final String key, final byte[] typedValue) {
+        final ProtoWriter entry = new ProtoWriter();
+        entry.writeString(1, key);
+        entry.writeMessage(2, typedValue);
+        dataMap.writeMessage(1, entry.toByteArray());
+    }
+
+    private static byte[] dataMapBool(final boolean value) {
+        final ProtoWriter container = new ProtoWriter();
+        container.writeVarint(8, value ? 1 : 0);
+        final ProtoWriter tv = new ProtoWriter();
+        tv.writeVarint(1, 8);
+        tv.writeMessage(2, container.toByteArray());
+        return tv.toByteArray();
+    }
+
+    private static byte[] dataMapString(final String s) {
+        final ProtoWriter container = new ProtoWriter();
+        container.writeString(2, s);
+        final ProtoWriter tv = new ProtoWriter();
+        tv.writeVarint(1, 2);
+        tv.writeMessage(2, container.toByteArray());
+        return tv.toByteArray();
+    }
+
     private static byte[] buildProtogenSettingPut(final String sourcePackage, final String signatureHex,
                                                   final String ownNodeId, final String groupAndKey,
                                                   final ProtoWriter typedValue, final long seq) {
