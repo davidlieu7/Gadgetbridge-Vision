@@ -820,13 +820,78 @@ public final class WearDataLayerProtocol {
                 final String valHex = value == null ? "-" : toHex(value, 40);
                 return "DataItem path=" + path + " val=" + valHex;
             }
-            if (new ProtoReader(payload).findMessage(PAYLOAD_MESSAGE_EVENT) != null) {
-                return "MessageEvent";
+            final byte[] messageEvent = new ProtoReader(payload).findMessage(PAYLOAD_MESSAGE_EVENT);
+            if (messageEvent != null) {
+                return "MessageEvent " + describeMessageEvent(messageEvent);
             }
             return "payload(other, " + payload.length + "B)";
         } catch (final RuntimeException e) {
             return "undecodable (" + envelope.length + "B)";
         }
+    }
+
+    // Walks a MessageEvent submessage and prints each field as {num=…}: length-delimited fields
+    // are shown as text when they look printable (path / JSON payload) else as a hex preview, and
+    // varints as their value. Used to reverse the MessageApi wire layout (path vs data field #s).
+    private static String describeMessageEvent(final byte[] messageEvent) {
+        final StringBuilder sb = new StringBuilder();
+        int pos = 0;
+        final int end = messageEvent.length;
+        try {
+            while (pos < end) {
+                long tag = 0;
+                int shift = 0;
+                while (pos < end) {
+                    final byte b = messageEvent[pos++];
+                    tag |= (long) (b & 0x7f) << shift;
+                    if ((b & 0x80) == 0) break;
+                    shift += 7;
+                }
+                final int field = (int) (tag >>> 3);
+                final int wire = (int) (tag & 0x7);
+                if (wire == 2) {
+                    int len = 0; shift = 0;
+                    while (pos < end) {
+                        final byte b = messageEvent[pos++];
+                        len |= (b & 0x7f) << shift;
+                        if ((b & 0x80) == 0) break;
+                        shift += 7;
+                    }
+                    if (len < 0 || pos + len > end) break;
+                    final byte[] v = java.util.Arrays.copyOfRange(messageEvent, pos, pos + len);
+                    pos += len;
+                    sb.append(" {").append(field).append("=").append(isPrintable(v)
+                            ? "\"" + new String(v, StandardCharsets.UTF_8) + "\"" : "hex:" + toHex(v, 60)).append("}");
+                } else if (wire == 0) {
+                    long val = 0; shift = 0;
+                    while (pos < end) {
+                        final byte b = messageEvent[pos++];
+                        val |= (long) (b & 0x7f) << shift;
+                        if ((b & 0x80) == 0) break;
+                        shift += 7;
+                    }
+                    sb.append(" {").append(field).append("#=").append(val).append("}");
+                } else if (wire == 1) {
+                    pos += 8;
+                } else if (wire == 5) {
+                    pos += 4;
+                } else {
+                    break;
+                }
+            }
+        } catch (final RuntimeException e) {
+            sb.append(" <decode-error>");
+        }
+        return sb.toString().trim();
+    }
+
+    private static boolean isPrintable(final byte[] b) {
+        if (b.length == 0) return false;
+        for (final byte x : b) {
+            final int c = x & 0xff;
+            if (c < 0x09 || (c > 0x0d && c < 0x20) || c > 0x7e) return false;
+        }
+        return true;
     }
 
     private static String toHex(final byte[] b, final int max) {
