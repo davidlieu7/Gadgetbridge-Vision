@@ -2514,3 +2514,33 @@ Status: mechanism identified + MessageEvent transport decoded/logged; full media
 NOT implemented. Recommend a focused stock-app capture session before implementing, or
 pivoting to a smaller MessageApi win first (find-my-watch, calls, weather) now that the
 MessageEvent layout is understood.
+
+## 37. Incoming calls — display-only alert WORKING (via the notification bridge)
+
+Implemented `onSetCallState` for the Galaxy Watch7. On this watch a phone call rings via
+the SAME Wear notification-stream bridge as normal notifications (§34), not (for our
+purposes) via Samsung's dedicated w_callservice/w_apps_incallui channel — so we push a
+**call-category notification** when the phone rings and delete it when the call ends.
+
+- CALL_INCOMING -> `buildNotificationPut(..., category="call")` under
+  packageName `com.android.server.telecom`, appName "Telefon", title=caller
+  name/number, body=R.string.incoming_call, a fixed id (0x0CA11) so it stays one card.
+- CALL_END / ACCEPT / REJECT / START -> `buildNotificationDelete` for that id.
+- Added a `category` field to the notification DataMap (string). The watch reads it and
+  maps "call" to its internal CATEGORY_CALL.
+
+Verified live via GB Debug -> Telefonanrufe -> Send CallSpec (stock GB debug tooling that
+calls onSetCallState directly, no real call needed): INCOMING showed "Mr. Plow /
+Eingehender Anruf" as a call card on the watch (WearServices logged
+`packageName=com.android.server.telecom, category=call, category=3 (CATEGORY_CALL),
+appName=Telefon, color=0xFF2196F3`), and END removed it (`Dashboard onItemRangeRemoved`).
+Only skipped the ring with "Not alerting: Device is off-body" (watch on charger).
+
+**Scope / limits:** this is a display-only incoming-call ALERT (caller + "Incoming
+call"), a call-category notification card - NOT the native full-screen ringing UI with
+Answer/Decline. Answering/rejecting FROM the watch needs either wearable notification
+actions (delivered as binary Wear Assets, like icons - not done) or Samsung's
+w_callservice/w_apps_incallui RPC (no capture: the committed stock capture contains only
+call *settings*, no live call). A real phone call reaches this same onSetCallState entry
+point via GB's telephony receiver, so it works for real calls too, not just the debug
+trigger.

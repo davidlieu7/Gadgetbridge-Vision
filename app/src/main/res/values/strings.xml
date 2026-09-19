@@ -278,6 +278,7 @@
     <string name="pref_summary_notification_wake_on_open">Wake and unlock the Android device when the gadget sends a OPEN response back. Needs to be in a trusted state.</string>
     <string name="pref_summary_receive_calls_watch">Perform and receive calls directly on the watch</string>
     <string name="phone_calls">Phone calls</string>
+    <string name="incoming_call">Incoming call</string>
     <string name="bluetooth_calls">Bluetooth calls</string>
     <string name="bluetooth_calls_pairing">Bluetooth calls pairing</string>
     <string name="bluetooth_calls_settings">Bluetooth calls settings</string>

@@ -397,11 +397,67 @@ public class GalaxyWatch7DeviceSupport extends AbstractBTBRDeviceSupport {
         final byte[] write = WearDataLayerProtocol.buildNotificationPut(
                 SETTINGS_SOURCE_PACKAGE, SETTINGS_SOURCE_SIGNATURE, node, pkg, spec.getId(), tag,
                 appName, title, text, appName, postTime, postTime,
-                NOTIFICATION_DEFAULT_COLOR, spec.getFlags(), seq);
+                NOTIFICATION_DEFAULT_COLOR, spec.getFlags(), spec.getCategory(), seq);
         sentNotifications.put(spec.getId(), new String[]{pkg, tag});
         final TransactionBuilder builder = createTransactionBuilder("notify " + spec.getId());
         builder.write(write);
         builder.queue();
+    }
+
+    // Incoming-call display. The watch shows phone calls via the same Wear notification-stream
+    // bridge as normal notifications (§34): we push a call-category notification when the phone
+    // rings and delete it when the call ends/answers. A fixed id keeps it a single, updatable card.
+    // Answering/rejecting FROM the watch (via Samsung's w_callservice / w_apps_incallui channel) is
+    // a separate, not-yet-reversed protocol - for now this is a display-only incoming-call alert.
+    private static final int CALL_NOTIFICATION_ID = 0x0CA11; // stable id for the call card
+    private static final String CALL_PACKAGE = "com.android.server.telecom";
+
+    @Override
+    public void onSetCallState(final nodomain.freeyourgadget.gadgetbridge.model.CallSpec callSpec) {
+        final String node = localNodeId;
+        if (node == null) {
+            return;
+        }
+        final String tag = "null_tag";
+        switch (callSpec.getCommand()) {
+            case nodomain.freeyourgadget.gadgetbridge.model.CallSpec.CALL_INCOMING: {
+                final String caller = callSpec.getName() != null && !callSpec.getName().isEmpty()
+                        ? callSpec.getName()
+                        : (callSpec.getNumber() != null ? callSpec.getNumber() : "?");
+                final long seq = ownDataVersion.incrementAndGet();
+                final long now = System.currentTimeMillis();
+                LOG.info("Galaxy Watch7: incoming call from \"{}\" (seq {})", caller, seq);
+                final byte[] write = WearDataLayerProtocol.buildNotificationPut(
+                        SETTINGS_SOURCE_PACKAGE, SETTINGS_SOURCE_SIGNATURE, node, CALL_PACKAGE,
+                        CALL_NOTIFICATION_ID, tag, "Telefon", caller,
+                        getContext().getString(nodomain.freeyourgadget.gadgetbridge.R.string.incoming_call),
+                        null, now, now, NOTIFICATION_DEFAULT_COLOR, 0, "call", seq);
+                sentNotifications.put(CALL_NOTIFICATION_ID, new String[]{CALL_PACKAGE, tag});
+                final TransactionBuilder builder = createTransactionBuilder("call incoming");
+                builder.write(write);
+                builder.queue();
+                break;
+            }
+            case nodomain.freeyourgadget.gadgetbridge.model.CallSpec.CALL_ACCEPT:
+            case nodomain.freeyourgadget.gadgetbridge.model.CallSpec.CALL_REJECT:
+            case nodomain.freeyourgadget.gadgetbridge.model.CallSpec.CALL_START:
+            case nodomain.freeyourgadget.gadgetbridge.model.CallSpec.CALL_END: {
+                if (sentNotifications.remove(CALL_NOTIFICATION_ID) == null) {
+                    return; // no active call card to clear
+                }
+                final long seq = ownDataVersion.incrementAndGet();
+                LOG.info("Galaxy Watch7: clearing incoming-call card (seq {})", seq);
+                final byte[] write = WearDataLayerProtocol.buildNotificationDelete(
+                        SETTINGS_SOURCE_PACKAGE, SETTINGS_SOURCE_SIGNATURE, node, CALL_PACKAGE,
+                        CALL_NOTIFICATION_ID, tag, seq);
+                final TransactionBuilder builder = createTransactionBuilder("call end");
+                builder.write(write);
+                builder.queue();
+                break;
+            }
+            default:
+                break;
+        }
     }
 
     @Override

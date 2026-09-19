@@ -269,6 +269,7 @@ public final class WearDataLayerProtocol {
      * @param whenMs      the notification's {@code when} timestamp in epoch millis
      * @param color       the notification accent color as an ARGB value
      * @param flags       the raw Android {@code Notification.flags} bitmask
+     * @param category    the Android notification category (e.g. {@code "call"}), or {@code null}
      * @param seq         our per-node data version (must exceed the watch's counter for our node)
      */
     public static byte[] buildNotificationPut(final String sourcePackage, final String signatureHex,
@@ -276,7 +277,7 @@ public final class WearDataLayerProtocol {
                                               final int notifId, final String tag, final String appName,
                                               final String title, final String text, final String subText,
                                               final long postTime, final long whenMs, final long color,
-                                              final int flags, final long seq) {
+                                              final int flags, final String category, final long seq) {
         final ProtoWriter dataMap = new ProtoWriter();
         dataMapEntry(dataMap, "app_name", dataMapString(nz(appName)));
         dataMapEntry(dataMap, "title_raw", dataMapString(nz(title)));
@@ -293,6 +294,9 @@ public final class WearDataLayerProtocol {
         // color is read as an Integer (int32 ARGB) by the watch's DataMap reader, not int64.
         dataMapEntry(dataMap, "color", dataMapInt((int) color));
         dataMapEntry(dataMap, "notification_flags", dataMapInt(flags));
+        if (category != null) {
+            dataMapEntry(dataMap, "category", dataMapString(category));
+        }
         dataMapEntry(dataMap, "notification_style", dataMapInt(1));
         dataMapEntry(dataMap, "defaults", dataMapInt(2));
         dataMapEntry(dataMap, "group_alert_behavior", dataMapInt(0));

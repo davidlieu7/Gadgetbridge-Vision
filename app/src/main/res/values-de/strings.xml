@@ -3651,6 +3651,7 @@
     <string name="same_image_already_on_device">dasselbe Bild ist bereits auf dem Gerät</string>
     <string name="sending_image">Bild wird gesendet</string>
     <string name="phone_calls">Telefonanrufe</string>
+    <string name="incoming_call">Eingehender Anruf</string>
     <string name="busy_task_busy">Beschäftigt …</string>
     <string name="busy_task_configuring">Konfigurieren</string>
     <string name="busy_task_downloading">Herunterladen</string>
