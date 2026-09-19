@@ -3120,7 +3120,7 @@ public class HuaweiSupportProvider {
                         if (fileRequest.getData().length == 0) {
                             LOG.debug("GPS file empty");
                             // Indoor / empty GPS: still auto-export FIT (track from HuaweiActivityTrackProvider).
-                            autoExportWorkout(fileRequest.getDatabaseId(), null);
+                            autoExportWorkout(fileRequest.getDatabaseId());
                             syncState.stopWorkoutGpsDownload();
                             return;
                         }
@@ -3157,38 +3157,12 @@ public class HuaweiSupportProvider {
                         if (points.length == 0) {
                             LOG.debug("No GPS points returned");
                             // Indoor / empty GPS: still auto-export FIT (track from HuaweiActivityTrackProvider).
-                            autoExportWorkout(databaseId, null);
+                            autoExportWorkout(databaseId);
                             syncState.stopWorkoutGpsDownload();
                             return;
                         }
 
-                        ActivityTrack track = new ActivityTrack();
-
-                        track.setName("Workout " + fileRequest.getWorkoutId());
-                        track.setBaseTime(DateTimeUtils.parseTimeStamp(points[0].timestamp));
-
-                        try (DBHandler db = GBApplication.acquireDB()) {
-                            track.setUser(DBHelper.getUser(db.getDaoSession()));
-                            track.setDevice(DBHelper.getDevice(gbDevice, db.getDaoSession()));
-                        } catch (Exception e) {
-                            LOG.error("Cannot acquire DB, set user, or set device for Activity track, continuing anyway");
-                        }
-
-                        for (HuaweiGpsParser.GpsPoint point : points) {
-                            GPSCoordinate coordinate;
-                            if (point.altitudeSupported)
-                                coordinate = new GPSCoordinate(point.longitude, point.latitude, point.altitude);
-                            else
-                                coordinate = new GPSCoordinate(point.longitude, point.latitude);
-
-                            ActivityPoint activityPoint = new ActivityPoint();
-                            activityPoint.setTime(DateTimeUtils.parseTimeStamp(point.timestamp));
-                            activityPoint.setLocation(coordinate);
-
-                            track.addTrackPoint(activityPoint);
-                        }
-
-                        autoExportWorkout(databaseId, track);
+                        autoExportWorkout(databaseId);
 
                         LOG.debug("Completed workout GPS parsing and inserting");
                         syncState.stopWorkoutGpsDownload();
@@ -3205,8 +3179,8 @@ public class HuaweiSupportProvider {
         ), true);
     }
 
-    /** Auto-export after workout sync; builds the track from samples when {@code gpsTrack} is null. */
-    private void autoExportWorkout(@Nullable final Long workoutId, @Nullable final ActivityTrack gpsTrack) {
+    /** Auto-export after workout sync. */
+    private void autoExportWorkout(@Nullable final Long workoutId) {
         if (workoutId == null) {
             LOG.warn("Cannot auto-export workout: missing workout id");
             return;
@@ -3219,10 +3193,7 @@ public class HuaweiSupportProvider {
             return;
         }
 
-        ActivityTrack exportTrack = gpsTrack;
-        if (exportTrack == null) {
-            exportTrack = new HuaweiActivityTrackProvider(getDevice()).getActivityTrack(summary);
-        }
+        final ActivityTrack exportTrack = new HuaweiActivityTrackProvider(getDevice()).getActivityTrack(summary);
 
         if (exportTrack != null && exportTrack.getAllPoints().stream().anyMatch(p -> p.getLocation() != null)) {
             // GPX needs at least one GPS-valid point; FIT can be emitted regardless.
