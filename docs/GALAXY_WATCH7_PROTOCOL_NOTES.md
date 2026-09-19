@@ -2696,3 +2696,57 @@ session. Findings:
 
 Conclusion: media NOW-PLAYING (push) works without a capture; media CONTROL (watch->phone
 transport) + the "connected" handshake need a stock-app capture. Added to the capture list.
+
+## 42. Media control — CAPTURED (stock app): adaptive_media_bridging RPC
+
+Capture session with the STOCK Galaxy Wearable + watch7plugin as companion (watch factory-
+reset + re-paired; btsnoop + logcat). Real media played on the phone (Firefox), driven on
+the watch's Samsung media controller (`com.samsung.android.mediacontroller/.view.control.
+MediaControlActivity`), which — unlike our GB JSON attempt (§41) — showed the track and a
+working Pause button, and controlled the phone.
+
+**Key finding: media CONTROL rides the `adaptive_media_bridging` RPC, NOT the
+`w_apps_media_controller` JSON channel.** The JSON channel (§40/§41) is a secondary/display
+path; the actual session + transport use Google's Wear media library (obfuscated tags
+`S3.b` / `W3.h` / `MediaLinkService`, in the wcs.extension/media process). Captured:
+
+  watch -> phone (command):  S3.b: Sent "pause" command (requestToken=<uuid>) to phone NodeId(e1b1cd8b)
+                             S3.b: Sent "play" command  (requestToken=<uuid>) ...
+  phone -> watch (state):    MessageEvent path /adaptive_media_bridging/rpc/media_update
+                             W3.h: Received update: MediaUpdate {
+                                 activeSubscriptionRequestToken=<uuid>,
+                                 lastCommandRequestToken=<uuid of the command it answers>,
+                                 stateLost=false,
+                                 sessionStates=[{ id=<uuid>, pkg=org.mozilla.firefox,
+                                                  playWhenReady=true|false, title=... }] }
+  watch -> phone (subscribe/poll): /adaptive_media_bridging/rpc/watch_request (protobuf;
+                             also carries the commands). Args seen earlier: a request-id +
+                             method ("OA") + params (§36).
+
+So it is a subscribe + command + update model over `/adaptive_media_bridging/rpc/*`
+(MessageEvents, protobuf payloads). Commands are strings ("play","pause", presumably
+"next"/"previous"/seek/volume) carried with a per-command requestToken; the phone answers
+with a `media_update` MediaUpdate echoing lastCommandRequestToken and the new sessionStates
+(playWhenReady = playing/paused, title, pkg, session id).
+
+Raw evidence in the repo:
+- `docs/captures/media_session/btsnoop_media_control.log.gz` — full HCI btsnoop of the
+  session (contains the raw `/adaptive_media_bridging/rpc/watch_request` + `/media_update`
+  protobuf frames on RFCOMM channel 7; deframe with the 4-byte length prefix + envelope
+  from §3, then decode the MessageEvent payload field 7).
+- `docs/captures/media_session/watch_media_rpc.txt` — the decoded S3.b/W3.h/MediaLink log
+  lines (command + MediaUpdate semantics above).
+- `docs/captures/media_session/logcat_media_filtered.txt` — filtered phone logcat.
+
+**To implement in GB:** extend our MessageEvent transport (buildMessageEvent, §41) to speak
+`/adaptive_media_bridging/rpc/*`: answer `watch_request` (advertise a media session +
+metadata/playbackstate from onSetMusicInfo/State) and, on a command, map the command string
+to `GBDeviceEventMusicControl` and reply `media_update` echoing the requestToken. Decode the
+exact protobuf field numbers for MediaUpdate/command from the btsnoop frames. This replaces
+the JSON-channel control attempt (§41), which the watch never treated as "connected".
+
+**NOT captured this session (need a future stock session):** call answer/reject
+(`w_callservice` — no way to place a real incoming call, the notification-simulator call
+template is not bridged), notification icons/action-buttons (test app not in the stock
+notification allow-list), weather, alarms, find-my-watch/phone (UI nav didn't land). Media
+was the priority and is done.
