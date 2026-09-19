@@ -2787,3 +2787,31 @@ Raw evidence in the repo:
 native incoming-call UI; handle the watch's `/w_apps_incallui/*` MessageEvents to receive
 answer/reject/mute and turn them into GBDeviceEventCallControl; delete the DataItem on call
 end. This upgrades our display-only call alert (§37) to a real answer/reject-capable call.
+
+## 44. Notification icons + action buttons — CAPTURED (stock app)
+
+Same stock session. A real notification (the xinesoft test app, WhatsApp-style, color
+0xff075e54, groupKey=test, actions=2) bridged to the watch once it arrived with the phone
+screen OFF (the stock bridge, like ours, only forwards when the phone is not in use).
+Confirms/extends §5g:
+- `NotificationSender: Putting notification data item /bridger/stream_item:<node>:<pkg>:<id>
+  :<tag>:<sbnKey>` where sbnKey = `<userId>|<pkg>|<id>|<tag>|<uid>` (the `|` is URL-encoded
+  `~7C`). NOTE the stock path has a 6th segment (the SBN key); our GB impl used only 5 and
+  still rendered — the 6th is the stock convention, worth matching for exact dismiss parity.
+- `DataClientWriter: Writing data map ... (urgent=true)` then the DataItem lands as
+  `DataItemRef{ uri=.../bridger/stream_item:..., dataSz=1479, numAssets=3 }` — i.e. the
+  notification DataMap (~1479B) plus **3 binary Assets** = the small icon / large icon /
+  app icon, referenced by digest (not inline). `actions=2` in the source notification =
+  wearable action buttons.
+- Dismiss on phone: `NotifDismissalHandler: ... dismissed on phone, deleting data item` +
+  `DataClientWriter: Deleting data items ... DeleteRequest(EXACT)` (matches our §40 delete).
+
+Raw evidence: `docs/captures/notification_session/btsnoop_notification.log.gz` (the DataMap
++ the 3 Asset blobs + the wearable_actions encoding on RFCOMM ch 7) +
+`logcat_notification_flow.txt`.
+
+**To implement in GB:** attach icons as Wear **Assets** (small/large/app icon) referenced
+by digest in the stream_item DataMap (fields `icon` etc. from §5g), and encode
+`wearable_actions` for action buttons / quick-reply. Decode the exact Asset attachment +
+wearable_actions wire format from the btsnoop. This adds icons + reply to our working
+text-only notifications (§34).
