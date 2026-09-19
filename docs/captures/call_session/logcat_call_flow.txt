@@ -1,0 +1,121 @@
+09-19 23:55:02.153  4110  4110 I GW_SCallUI_v0.5: CallVolumeInfoChangedBroadcastReceiver - onReceive - ACTION_VOLUME_CHANGED
+09-19 23:55:02.153  4110  4110 I GW_SCallUI_v0.5: CallVolumeInfoChangedBroadcastReceiver - startVolumeViewTimer
+09-19 23:55:02.153  4110  4110 I GW_SCallUI_v0.5: CallVolumeInfoChangedBroadcastReceiver - onReceive - ACTION_VOLUME_CHANGED
+09-19 23:55:02.153  4110  4110 I GW_SCallUI_v0.5: CallVolumeInfoChangedBroadcastReceiver - onReceive - ACTION_VOLUME_CHANGED
+09-19 23:55:02.225  1158  2364 D audio_hw_con: add_client accept client connect 72, total connect 1
+09-19 23:55:02.654  4110  7903 I GW_SCallUI_v0.5: CallVolumeInfoChangedBroadcastReceiver - executeVolumeChangedInfoDataTask
+09-19 23:55:02.655  4110  7903 E GW_SCallUI_v0.5: InCallUiUtils - getInCallUiVersion() failed
+09-19 23:55:02.655  4110  7903 D GW_SCallUI_v0.5: CallVolumeInfoDataTask@65271490 - execute - InCallUiVersion: 
+09-19 23:55:02.661  4110  7903 D GW_SCallUI_v0.5: CallVolumeInfoDataTask - getVolDataCapableNodes - nodes size: 4
+09-19 23:55:02.661  4110  7903 D GW_SCallUI_v0.5: CallVolumeInfoDataTask - sendVolumeInfoChangedMessage - 1
+09-19 23:55:02.662  4110  7903 D GW_SCallUI_v0.5: CallVolumeInfoDataTask - sendVolumeDataChangedMessage
+09-19 23:55:02.666  4110  7903 D GW_SCallUI_v0.5: CallVolumeInfoDataTask - sendMessage - {"data":{"currentvolume":4,"maxvolume":15,"minvolume":1},"deviceId":"temp","inCallUiVersion":"","msgId":"control_volume_data","msgType":3}
+09-19 23:55:02.668  4110  4110 D GW_SCallUI_v0.5: CallVolumeInfoDataTask - sendMessage - success
+09-19 23:55:02.754  4110  7882 D ListenerDispatcher: onMessageReceived: 0 listeners - /w_apps_incallui/primary_caller_info with paths: 60b4a64a/w_apps_incallui/primary_caller_info and */w_apps_incallui/primary_caller_info
+09-19 23:55:02.756  4110  4110 D GW_SCallUI_v0.5: InCallUiWearableListenerService - onCreate
+09-19 23:55:02.759  4110  7904 D GW_SCallUI_v0.5: InCallUiWearableListenerService - onMessageReceived: /w_apps_incallui/primary_caller_info
+09-19 23:55:03.321  4110  4110 I GW_SCallUI_v0.5: CallVolumeInfoChangedBroadcastReceiver - onReceive - ACTION_VOLUME_CHANGED
+09-19 23:55:03.321  4110  4110 I GW_SCallUI_v0.5: CallVolumeInfoChangedBroadcastReceiver - startVolumeViewTimer
+09-19 23:55:03.322  4110  4110 I GW_SCallUI_v0.5: CallVolumeInfoChangedBroadcastReceiver - onReceive - ACTION_VOLUME_CHANGED
+09-19 23:55:03.824  4110  7909 I GW_SCallUI_v0.5: CallVolumeInfoChangedBroadcastReceiver - executeVolumeChangedInfoDataTask
+09-19 23:55:03.824  4110  7909 E GW_SCallUI_v0.5: InCallUiUtils - getInCallUiVersion() failed
+09-19 23:55:03.824  4110  7909 D GW_SCallUI_v0.5: CallVolumeInfoDataTask@49619139 - execute - InCallUiVersion: 
+09-19 23:55:03.833  4110  7909 D GW_SCallUI_v0.5: CallVolumeInfoDataTask - getVolDataCapableNodes - nodes size: 4
+09-19 23:55:03.834  4110  7909 D GW_SCallUI_v0.5: CallVolumeInfoDataTask - sendVolumeInfoChangedMessage - 1
+09-19 23:55:03.834  4110  7909 D GW_SCallUI_v0.5: CallVolumeInfoDataTask - sendVolumeDataChangedMessage
+09-19 23:55:03.837  4110  7909 D GW_SCallUI_v0.5: CallVolumeInfoDataTask - sendMessage - {"data":{"currentvolume":1,"maxvolume":15,"minvolume":1},"deviceId":"temp","inCallUiVersion":"","msgId":"control_volume_data","msgType":3}
+09-19 23:55:03.842  4110  4110 D GW_SCallUI_v0.5: CallVolumeInfoDataTask - sendMessage - success
+09-19 23:55:03.868  4110  4110 I GW_SCallUI_v0.5: CallVolumeInfoChangedBroadcastReceiver - onReceive - ACTION_VOLUME_CHANGED
+09-19 23:55:03.868  4110  4110 I GW_SCallUI_v0.5: CallVolumeInfoChangedBroadcastReceiver - startVolumeViewTimer
+09-19 23:55:03.869  4110  4110 I GW_SCallUI_v0.5: CallVolumeInfoChangedBroadcastReceiver - onReceive - ACTION_VOLUME_CHANGED
+09-19 23:55:04.261  4110  4110 D GW_SCallUI_v0.5: InCallUiWearableListenerService - onDestroy
+09-19 23:55:04.369  4110  7910 I GW_SCallUI_v0.5: CallVolumeInfoChangedBroadcastReceiver - executeVolumeChangedInfoDataTask
+09-19 23:55:04.369  4110  7910 E GW_SCallUI_v0.5: InCallUiUtils - getInCallUiVersion() failed
+09-19 23:55:04.369  4110  7910 D GW_SCallUI_v0.5: CallVolumeInfoDataTask@194503995 - execute - InCallUiVersion: 
+09-19 23:55:04.375  4110  7910 D GW_SCallUI_v0.5: CallVolumeInfoDataTask - getVolDataCapableNodes - nodes size: 4
+09-19 23:55:04.375  4110  7910 D GW_SCallUI_v0.5: CallVolumeInfoDataTask - sendVolumeInfoChangedMessage - 1
+09-19 23:55:04.375  4110  7910 D GW_SCallUI_v0.5: CallVolumeInfoDataTask - sendVolumeDataChangedMessage
+09-19 23:55:04.377  4110  7910 D GW_SCallUI_v0.5: CallVolumeInfoDataTask - sendMessage - {"data":{"currentvolume":1,"maxvolume":15,"minvolume":1},"deviceId":"temp","inCallUiVersion":"","msgId":"control_volume_data","msgType":3}
+09-19 23:55:04.379  4110  4110 D GW_SCallUI_v0.5: CallVolumeInfoDataTask - sendMessage - success
+09-19 23:55:04.747  4110  4110 D GW_SCallUI_v0.5: InCallUiWearableListenerService - onCreate
+09-19 23:55:04.749  4110  7913 D ListenerDispatcher: onMessageReceived: 0 listeners - /w_apps_incallui/primary_caller_info with paths: 60b4a64a/w_apps_incallui/primary_caller_info and */w_apps_incallui/primary_caller_info
+09-19 23:55:04.750  4110  7914 D GW_SCallUI_v0.5: InCallUiWearableListenerService - onMessageReceived: /w_apps_incallui/primary_caller_info
+09-19 23:55:04.927  4110  4110 I GW_SCallUI_v0.5: CallVolumeInfoChangedBroadcastReceiver - onReceive - ACTION_VOLUME_CHANGED
+09-19 23:55:04.927  4110  4110 I GW_SCallUI_v0.5: CallVolumeInfoChangedBroadcastReceiver - startVolumeViewTimer
+09-19 23:55:04.928  4110  4110 I GW_SCallUI_v0.5: CallVolumeInfoChangedBroadcastReceiver - onReceive - ACTION_VOLUME_CHANGED
+09-19 23:55:05.430  4110  7915 I GW_SCallUI_v0.5: CallVolumeInfoChangedBroadcastReceiver - executeVolumeChangedInfoDataTask
+09-19 23:55:05.430  4110  7915 E GW_SCallUI_v0.5: InCallUiUtils - getInCallUiVersion() failed
+09-19 23:55:05.430  4110  7915 D GW_SCallUI_v0.5: CallVolumeInfoDataTask@230373127 - execute - InCallUiVersion: 
+09-19 23:55:05.440  4110  7915 D GW_SCallUI_v0.5: CallVolumeInfoDataTask - getVolDataCapableNodes - nodes size: 4
+09-19 23:55:05.440  4110  7915 D GW_SCallUI_v0.5: CallVolumeInfoDataTask - sendVolumeInfoChangedMessage - 1
+09-19 23:55:05.440  4110  7915 D GW_SCallUI_v0.5: CallVolumeInfoDataTask - sendVolumeDataChangedMessage
+09-19 23:55:05.444  4110  7915 D GW_SCallUI_v0.5: CallVolumeInfoDataTask - sendMessage - {"data":{"currentvolume":3,"maxvolume":15,"minvolume":1},"deviceId":"temp","inCallUiVersion":"","msgId":"control_volume_data","msgType":3}
+09-19 23:55:05.448  4110  4110 D GW_SCallUI_v0.5: CallVolumeInfoDataTask - sendMessage - success
+09-19 23:55:06.256  4110  4110 D GW_SCallUI_v0.5: InCallUiWearableListenerService - onDestroy
+09-19 23:55:08.909  4110  4110 I WPCS/CallServicePhoneStateListener@241127_1: onCallStateChanged - state: 0, canReadPhoneState: true, canReadCallLog: true
+09-19 23:55:08.910  4110  4110 I WPCS/CallServiceUtils: getPhoneId for multi sim, exception: java.lang.NoSuchMethodException: android.telephony.SubscriptionManager.getPhoneId [int]
+09-19 23:55:08.910  4110  4110 I WPCS/CallServiceUtils: getSubIdOld for multi sim, exception: java.lang.NoSuchMethodException: android.telephony.TelephonyManager.getSubId []
+09-19 23:55:08.911  4110  4110 I WPCS/CallServiceAudioManager: returnToOriginalRingerMode, originalRingerMode: -1
+09-19 23:55:08.911  4110  4110 D WPCS/CallServiceAudioManager: clearCommandMute
+09-19 23:55:08.912  4110  4110 I WPCS/CallServiceDataItemGenerator200213337: deleteDataItems, DataItem: PutDataRequest[dataSz=0, numAssets=0, uri=wear:/w_callservice/mute, syncDeadline=0]
+09-19 23:55:08.912  4110  4110 I WPCS/CallServiceCallManager: onCallStateChanged - state: IDLE(0), phoneId: -1, subId: -1, multiSimConfig: dsds, label: , icon: null
+09-19 23:55:08.912  4110  4110 D WPCS/CallServiceCallManager: sendCallInfo: {call_number=<Empty>, acceptable=true, is_rtt_call=false, is_video_call=false, sub_id=-1, call_component_name=, call_state=0, call_id=0, is_vo_wifi_call=false, phone_id=-1}
+09-19 23:55:08.912  4110  4110 I WPCS/CallServiceDataItemGenerator20578303: putDataItem, Generating DataItem: PutDataRequest[dataSz=244, numAssets=0, uri=wear:/c_callservice/info, syncDeadline=0]
+09-19 23:55:08.913  4110  4110 I GW_SCallUI_v0.5: CallVolumeInfoChangedBroadcastReceiver - CustomTelephonyCallback, onCallStateChanged - state: 0
+09-19 23:55:08.913  4110  4110 I GW_SCallUI_v0.5: CallVolumeInfoChangedBroadcastReceiver - unregisterReceiver
+09-19 23:55:08.919  4110  4110 I WPCS/CallServiceDataItemGenerator200213337: deleteDataItems onSuccess, 0
+09-19 23:55:08.922  4110  4110 I WPCS/CallServiceDataItemGenerator20578303: putDataItem onSuccess, DataItem saved: DataItemParcelable[@6037c15,dataSz=244, numAssets=0, uri=wear://e1b1cd8b/c_callservice/info]
+09-19 23:55:08.946  3855  3855 I PlatformContrRepo: Rejecting sessions from packages: 
+09-19 23:55:08.946  3855  3855 I PlatformContrRepo: Accepting sessions from packages: 
+09-19 23:55:14.868  4110  4110 I WPCS/CallServicePhoneStateListener@241127_1: onCallStateChanged - state: 1, canReadPhoneState: true, canReadCallLog: true
+09-19 23:55:14.869  4110  4110 I WPCS/CallServiceUtils: getPhoneId for multi sim, exception: java.lang.NoSuchMethodException: android.telephony.SubscriptionManager.getPhoneId [int]
+09-19 23:55:14.870  4110  4110 I WPCS/CallServiceUtils: getSubIdOld for multi sim, exception: java.lang.NoSuchMethodException: android.telephony.TelephonyManager.getSubId []
+09-19 23:55:14.870  4110  4110 I WPCS/CallServiceCallManager: onCallStateChanged - state: RINGING(1), phoneId: -1, subId: -1, multiSimConfig: dsds, label: , icon: null
+09-19 23:55:14.871  4110  4110 D WPCS/CallServiceCallManager: sendCallInfo: {call_number=<Empty>, acceptable=true, is_rtt_call=false, is_video_call=false, sub_id=-1, call_component_name=, call_state=1, call_id=0, is_vo_wifi_call=false, phone_id=-1}
+09-19 23:55:14.871  4110  7962 I WPCS/CallServiceNotificationSettingManager: getAppEnableNodesMap - virtualName : Incoming_call
+09-19 23:55:14.871  4110  4110 I WPCS/CallServiceDataItemGenerator254407386: putDataItem, Generating DataItem: PutDataRequest[dataSz=244, numAssets=0, uri=wear:/c_callservice/info, syncDeadline=0]
+09-19 23:55:14.872  4110  4110 I GW_SCallUI_v0.5: CallVolumeInfoChangedBroadcastReceiver - CustomTelephonyCallback, onCallStateChanged - state: 1
+09-19 23:55:14.872  4110  4110 I GW_SCallUI_v0.5: CallVolumeInfoChangedBroadcastReceiver - registerReceiver
+09-19 23:55:14.874  4110  7962 E WPCS/CallServiceNotificationSettingManager: isIncomingCallNotificationEnable, isIncomingCallNotificationEnable: true
+09-19 23:55:14.874  4110  7962 D WPCS/CallServiceNotificationSettingManager: getAppEnableNodesMap, size: 1
+09-19 23:55:14.877  4110  4110 I WPCS/CallServiceDataItemGenerator254407386: putDataItem onSuccess, DataItem saved: DataItemParcelable[@276f401,dataSz=244, numAssets=0, uri=wear://e1b1cd8b/c_callservice/info]
+09-19 23:55:14.878  4110  7962 I WPCS/CallServiceNotificationSettingManager: insertReceivedNotificationHistory - userId: 0, currentSystemTime: 1789854914871, [N:R] [60b4a64a:true:] virtualName: Incoming_call
+09-19 23:55:14.933  3855  3855 I PlatformContrRepo: Rejecting sessions from packages: 
+09-19 23:55:14.933  3855  3855 I PlatformContrRepo: Accepting sessions from packages: com.android.server.telecom
+09-19 23:55:14.934  3855  3855 I PlatformContrRepo: Rejecting sessions from packages: 
+09-19 23:55:14.934  3855  3855 I PlatformContrRepo: Accepting sessions from packages: com.android.server.telecom
+09-19 23:55:15.230  4110  7963 D ListenerDispatcher: onMessageReceived: 0 listeners - /w_apps_incallui/primary_caller_info with paths: 60b4a64a/w_apps_incallui/primary_caller_info and */w_apps_incallui/primary_caller_info
+09-19 23:55:15.231  4110  4110 D GW_SCallUI_v0.5: InCallUiWearableListenerService - onCreate
+09-19 23:55:15.234  4110  7978 D GW_SCallUI_v0.5: InCallUiWearableListenerService - onMessageReceived: /w_apps_incallui/primary_caller_info
+09-19 23:55:15.404  4110  4110 I GW_SCallUI_v0.5: CallVolumeInfoChangedBroadcastReceiver - onReceive - ACTION_VOLUME_CHANGED
+09-19 23:55:15.404  4110  4110 I GW_SCallUI_v0.5: CallVolumeInfoChangedBroadcastReceiver - startVolumeViewTimer
+09-19 23:55:15.906  4110  7991 I GW_SCallUI_v0.5: CallVolumeInfoChangedBroadcastReceiver - executeVolumeChangedInfoDataTask
+09-19 23:55:15.906  4110  7991 E GW_SCallUI_v0.5: InCallUiUtils - getInCallUiVersion() failed
+09-19 23:55:15.906  4110  7991 D GW_SCallUI_v0.5: CallVolumeInfoDataTask@18785582 - execute - InCallUiVersion: 
+09-19 23:55:15.911  4110  7991 D GW_SCallUI_v0.5: CallVolumeInfoDataTask - getVolDataCapableNodes - nodes size: 4
+09-19 23:55:15.912  4110  7991 D GW_SCallUI_v0.5: CallVolumeInfoDataTask - sendVolumeInfoChangedMessage - 1
+09-19 23:55:15.912  4110  7991 D GW_SCallUI_v0.5: CallVolumeInfoDataTask - sendVolumeDataChangedMessage
+09-19 23:55:15.914  4110  7991 D GW_SCallUI_v0.5: CallVolumeInfoDataTask - sendMessage - {"data":{"currentvolume":3,"maxvolume":15,"minvolume":1},"deviceId":"temp","inCallUiVersion":"","msgId":"control_volume_data","msgType":3}
+09-19 23:55:15.917  4110  4110 D GW_SCallUI_v0.5: CallVolumeInfoDataTask - sendMessage - success
+09-19 23:55:15.962  4110  7963 D ListenerDispatcher: onMessageReceived: 0 listeners - /w_apps_incallui/primary_caller_info with paths: 60b4a64a/w_apps_incallui/primary_caller_info and */w_apps_incallui/primary_caller_info
+09-19 23:55:15.962  4110  7978 D GW_SCallUI_v0.5: InCallUiWearableListenerService - onMessageReceived: /w_apps_incallui/primary_caller_info
+09-19 23:55:17.471  4110  4110 D GW_SCallUI_v0.5: InCallUiWearableListenerService - onDestroy
+09-19 23:55:18.697  4110  4110 I WPCS/CallServicePhoneStateListener@241127_1: onCallStateChanged - state: 0, canReadPhoneState: true, canReadCallLog: true
+09-19 23:55:18.698  4110  4110 I WPCS/CallServiceUtils: getPhoneId for multi sim, exception: java.lang.NoSuchMethodException: android.telephony.SubscriptionManager.getPhoneId [int]
+09-19 23:55:18.700  4110  4110 I WPCS/CallServiceUtils: getSubIdOld for multi sim, exception: java.lang.NoSuchMethodException: android.telephony.TelephonyManager.getSubId []
+09-19 23:55:18.705  4110  4110 I WPCS/CallServiceAudioManager: returnToOriginalRingerMode, originalRingerMode: -1
+09-19 23:55:18.707  4110  4110 D WPCS/CallServiceAudioManager: clearCommandMute
+09-19 23:55:18.710  4110  4110 I WPCS/CallServiceDataItemGenerator9988168: deleteDataItems, DataItem: PutDataRequest[dataSz=0, numAssets=0, uri=wear:/w_callservice/mute, syncDeadline=0]
+09-19 23:55:18.711  4110  4110 I WPCS/CallServiceCallManager: onCallStateChanged - state: IDLE(0), phoneId: -1, subId: -1, multiSimConfig: dsds, label: , icon: null
+09-19 23:55:18.712  4110  4110 D WPCS/CallServiceCallManager: sendCallInfo: {call_number=<Empty>, acceptable=true, is_rtt_call=false, is_video_call=false, sub_id=-1, call_component_name=, call_state=0, call_id=0, is_vo_wifi_call=false, phone_id=-1}
+09-19 23:55:18.714  4110  4110 I WPCS/CallServiceDataItemGenerator176341703: putDataItem, Generating DataItem: PutDataRequest[dataSz=244, numAssets=0, uri=wear:/c_callservice/info, syncDeadline=0]
+09-19 23:55:18.714  4110  4110 I GW_SCallUI_v0.5: CallVolumeInfoChangedBroadcastReceiver - CustomTelephonyCallback, onCallStateChanged - state: 0
+09-19 23:55:18.715  4110  4110 I GW_SCallUI_v0.5: CallVolumeInfoChangedBroadcastReceiver - unregisterReceiver
+09-19 23:55:18.716  4110  4110 I WPCS/CallServiceDataItemGenerator9988168: deleteDataItems onSuccess, 0
+09-19 23:55:18.727  3855  3855 I PlatformContrRepo: Rejecting sessions from packages: 
+09-19 23:55:18.727  3855  3855 I PlatformContrRepo: Accepting sessions from packages: 
+09-19 23:55:18.730  4110  4110 I WPCS/CallServiceDataItemGenerator176341703: putDataItem onSuccess, DataItem saved: DataItemParcelable[@1c1f860,dataSz=244, numAssets=0, uri=wear://e1b1cd8b/c_callservice/info]
+09-19 23:55:18.874  4110  8001 D ListenerDispatcher: onMessageReceived: 0 listeners - /w_apps_incallui/primary_caller_info with paths: 60b4a64a/w_apps_incallui/primary_caller_info and */w_apps_incallui/primary_caller_info
+09-19 23:55:18.877  4110  4110 D GW_SCallUI_v0.5: InCallUiWearableListenerService - onCreate
+09-19 23:55:18.882  4110  8008 D GW_SCallUI_v0.5: InCallUiWearableListenerService - onMessageReceived: /w_apps_incallui/primary_caller_info
+09-19 23:55:20.383  4110  4110 D GW_SCallUI_v0.5: InCallUiWearableListenerService - onDestroy
