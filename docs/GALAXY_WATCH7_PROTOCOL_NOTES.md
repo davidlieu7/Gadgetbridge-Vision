@@ -2673,3 +2673,26 @@ Still open (follow-ups, not blockers to the data layer which is proven):
 - Reverse transport commands (watch button -> phone): scaffolding + a msgId->event map are
   in place, but the exact command msgIds are only observable once the controller is bound to
   our session and its buttons are pressed - confirm and extend `mediaCommandToEvent` then.
+
+### §41 addendum — media control (reverse) is blocked on the "connected" handshake
+
+Drove the watch's Samsung media controller live
+(`com.samsung.android.mediacontroller/.view.control.MediaControlActivity`) with our pushed
+session. Findings:
+- Now-playing DATA is accepted (watch registers "The Track Name", title/artist/album/
+  duration) — confirmed again.
+- BUT the controller shows "Nicht verbunden" / a Play (resume) button and loops
+  `RemoteMediaControlBackend: force get media meta and playback` (re-requesting
+  `mediametadata`/`playbackstate` with msgType "0", empty appId ~every 30-60s). It never
+  reaches a "connected", controllable state.
+- Pressing a transport button (Weiter/Next) does NOT send a command to the phone — it only
+  triggers another state-refresh request. So the JSON channel as we drive it is
+  display/state only; transport CONTROL needs the missing handshake.
+- Added a responder for the watch's mediametadata/playbackstate/volume requests, but it
+  does not break the "force get" loop — something else marks a session "connected" that we
+  don't send yet (candidates: a proactive `media_app`/connect message from the phone that
+  we should send FIRST, and/or control really flows over the `adaptive_media_bridging`
+  protobuf RPC — §36). This is the thing to capture from the stock app.
+
+Conclusion: media NOW-PLAYING (push) works without a capture; media CONTROL (watch->phone
+transport) + the "connected" handshake need a stock-app capture. Added to the capture list.

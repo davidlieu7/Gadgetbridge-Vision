@@ -669,14 +669,38 @@ public class GalaxyWatch7DeviceSupport extends AbstractBTBRDeviceSupport {
         final String msgId = path.substring(MEDIA_PATH_PREFIX.length());
         final String json = WearDataLayerProtocol.parseMessageEventData(message);
         LOG.info("Galaxy Watch7: media <- {} {}", msgId, json);
-        if ("request_data".equals(msgId)) {
-            // The watch is asking for our current state; reply with what we can.
-            sendVolume();
-            if (lastMusicSpec != null) {
-                sendMediaMetadata(lastMusicSpec);
-            }
-            if (lastMusicStateSpec != null) {
-                sendPlaybackState(lastMusicStateSpec);
+
+        // Distinguish the watch's REQUESTS (msgType "0" with an empty appId, e.g. "force get media
+        // meta and playback") from ACKs (msgType "0" echoing our own appId). Reply to requests with
+        // our current state so the session stays live/controllable.
+        String msgType = "";
+        String appId = "";
+        try {
+            final JSONObject o = new JSONObject(json != null ? json : "{}");
+            msgType = o.optString("msgType", "");
+            final JSONObject d = o.optJSONObject("data");
+            appId = d != null ? d.optString("appId", "") : "";
+        } catch (final JSONException ignored) {
+        }
+        final boolean isRequest = "request_data".equals(msgId) || ("0".equals(msgType) && appId.isEmpty());
+        if (isRequest) {
+            switch (msgId) {
+                case "request_data":
+                    sendVolume();
+                    if (lastMusicSpec != null) sendMediaMetadata(lastMusicSpec);
+                    if (lastMusicStateSpec != null) sendPlaybackState(lastMusicStateSpec);
+                    break;
+                case "mediametadata":
+                    if (lastMusicSpec != null) sendMediaMetadata(lastMusicSpec);
+                    break;
+                case "playbackstate":
+                    if (lastMusicStateSpec != null) sendPlaybackState(lastMusicStateSpec);
+                    break;
+                case "volume":
+                    sendVolume();
+                    break;
+                default:
+                    break;
             }
             return;
         }
