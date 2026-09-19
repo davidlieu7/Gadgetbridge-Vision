@@ -1,0 +1,7 @@
+09-20 00:41:32.715 15299 15655 E [GW_FMW_CS]: [SamsungFindUtil] getSamsungFindAppVersion: problem occurs android.content.pm.PackageManager$NameNotFoundException: com.samsung.android.app.find
+09-20 00:41:32.716 15484 15484 I [GW_FMW_CS]: [FmwJumpUtil] calculateJumpingDestination: sFindVersion [null]
+09-20 00:41:32.716 15484 15484 I [GW_FMW_CS]: [FmwJumpUtil] calculateJumpingDestination: is kids watch ? false
+09-20 00:41:32.716 15299 15655 I [GW_FMW_CS]: [STFManager] isPossibleToJumpIntoStfApp: ##:##:##:##:08:07, false [1000000010]
+09-20 00:41:32.717 15484 15484 I [GW_FMW_CS]: [FmwJumpUtil] calculateJumpingDestination: isSTFPossible [false]
+09-20 00:41:32.717 15484 15484 I [GW_FMW_CS]: [FmwJumpUtil] calculateJumpingDestination: isWatchConnected [true]
+09-20 00:41:32.717 15484 15484 I [HOME]_SettingItemUseCase: items[FIND_MY_WATCH.id].fmwJumpingDestination unchanged: com.samsung.android.waterplugin.maininfo.data.model.FmwJumpingDestination$ToDefault***@ac8d55

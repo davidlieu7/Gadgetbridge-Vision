@@ -2815,3 +2815,20 @@ by digest in the stream_item DataMap (fields `icon` etc. from §5g), and encode
 `wearable_actions` for action buttons / quick-reply. Decode the exact Asset attachment +
 wearable_actions wire format from the btsnoop. This adds icons + reply to our working
 text-only notifications (§34).
+
+## 45. Find My Watch — CAPTURED (simple JSON, immediately implementable)
+
+Triggered "Uhr finden" from Galaxy Wearable; the watch rang. Plain JSON MessageEvents on
+path `/w_apps_find_my_watch` (companion service tag `[GW_FMW_CS]`):
+
+  phone -> watch (ring):  {"msg_id":"fmw-startalert-req"}
+  watch -> phone (ack):   {"msg_id":"fmw-startalert-rsp","result":true}
+  phone -> watch (stop):  {"msg_id":"fmw-stopalert-req"}
+  watch -> phone (ack):   {"msg_id":"fmw-stopalert-rsp","result":true}
+
+No protobuf — this is directly implementable over our MessageEvent transport
+(`buildMessageEvent`, §41): send a MessageEvent to the watch node, path
+`/w_apps_find_my_watch`, data = the JSON above. This lets GB implement Find Device for the
+GW7 (coordinator `supportsFindDevice` currently returns false). Find-my-PHONE (watch->phone)
+is presumably the mirror on `/w_apps_find_my_phone` with `fmp-*` msg_ids — to confirm by
+triggering it on the watch.
