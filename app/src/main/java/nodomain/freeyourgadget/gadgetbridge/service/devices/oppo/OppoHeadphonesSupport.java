@@ -17,8 +17,6 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 package nodomain.freeyourgadget.gadgetbridge.service.devices.oppo;
 
-import org.apache.commons.lang3.ArrayUtils;
-
 import android.os.Handler;
 
 import androidx.annotation.NonNull;
@@ -55,11 +53,12 @@ import nodomain.freeyourgadget.gadgetbridge.service.devices.oppo.commands.MiscCo
 import nodomain.freeyourgadget.gadgetbridge.service.devices.oppo.commands.AncConfigType;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.oppo.commands.AncConfigValue;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.oppo.commands.SubscriptionType;
+import nodomain.freeyourgadget.gadgetbridge.service.devices.oppo.modules.FirmwareVersionModule;
 import nodomain.freeyourgadget.gadgetbridge.devices.oppo.OppoHeadphonesCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.oppo.OppoHeadphonesPreferences;
+import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEvent;
 import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEventBatteryInfo;
 import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEventUpdatePreferences;
-import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEventVersionInfo;
 
 public class OppoHeadphonesSupport extends AbstractHeadphoneBTBRDeviceSupport {
     private static final Logger LOG = LoggerFactory.getLogger(OppoHeadphonesSupport.class);
@@ -99,7 +98,7 @@ public class OppoHeadphonesSupport extends AbstractHeadphoneBTBRDeviceSupport {
         ancConfigReq();
         touchConfigReq();
         subscriptionSet();
-        firmwareVersionReq();
+        queueCommand(getFwVersionModule().encodeReq());
 
         builder.setDeviceState(GBDevice.State.INITIALIZED);
         return builder;
@@ -238,7 +237,8 @@ public class OppoHeadphonesSupport extends AbstractHeadphoneBTBRDeviceSupport {
                     break;
                 }
 
-                parseFirmwareVersion(payload);
+                final GBDeviceEvent event = getFwVersionModule().decodeRet(payload);
+                evaluateGBDeviceEvent(event);
             }
             case TOUCH_CONFIG_RET -> {
                 final int zero = buf.get();
@@ -406,74 +406,6 @@ public class OppoHeadphonesSupport extends AbstractHeadphoneBTBRDeviceSupport {
                 break;
             }
         }
-    }
-
-    private void firmwareVersionReq() {
-        queueCommand(OppoCommand.FIRMWARE_REQ, new byte[0]);
-    }
-
-    private void parseFirmwareVersion(final byte[] payload) {
-        final String fwString;
-        if (payload[payload.length - 1] == 0) {
-            fwString = new String(ArrayUtils.subarray(payload, 2, payload.length - 1)).strip();
-        } else {
-            fwString = new String(ArrayUtils.subarray(payload, 2, payload.length)).strip();
-        }
-        final String[] parts = fwString.split(",");
-        if (parts.length % 3 != 0) {
-            LOG.warn("Fw parts length {} from '{}' is not divisible by 3", parts.length, fwString);
-
-            // We need to persist something, otherwise Gb misbehaves
-            final GBDeviceEventVersionInfo eventVersionInfo = new GBDeviceEventVersionInfo();
-            eventVersionInfo.fwVersion = fwString;
-            eventVersionInfo.hwVersion = getContext().getString(R.string.n_a);
-            evaluateGBDeviceEvent(eventVersionInfo);
-            return;
-        }
-        final String[] fwVersionParts = new String[3];
-        for (int i = 0; i < parts.length; i += 3) {
-            final String versionPart = parts[i];
-            final String versionType = parts[i + 1];
-            final String version = parts[i + 2];
-            if (!"2".equals(versionType)) {
-                continue; // not fw
-            }
-
-            switch (versionPart) {
-                case "1":
-                    fwVersionParts[0] = version;
-                    break;
-                case "2":
-                    fwVersionParts[1] = version;
-                    break;
-                case "3":
-                    fwVersionParts[2] = version;
-                    break;
-                default:
-                    LOG.warn("Unknown firmware version part {}", versionPart);
-            }
-        }
-
-        final List<String> nonNullParts = new ArrayList<>(fwVersionParts.length);
-        for (int i = 0; i < fwVersionParts.length; i++) {
-            if (fwVersionParts[i] == null) {
-                continue;
-            }
-            nonNullParts.add(fwVersionParts[i]);
-            if (fwVersionParts[i].contains(".")) {
-                // Realme devices have the version already with the dots, repeated multiple
-                // times
-                break;
-            }
-        }
-        final String fwVersion = String.join(".", nonNullParts);
-
-        final GBDeviceEventVersionInfo eventVersionInfo = new GBDeviceEventVersionInfo();
-        eventVersionInfo.fwVersion = fwVersion;
-        eventVersionInfo.hwVersion = getContext().getString(R.string.n_a);
-        evaluateGBDeviceEvent(eventVersionInfo);
-
-        LOG.debug("Got fw version: {}", fwVersion);
     }
 
     private void touchConfigSet(final String config) {
@@ -806,6 +738,10 @@ public class OppoHeadphonesSupport extends AbstractHeadphoneBTBRDeviceSupport {
         buf.putShort((short) payload.length);
         buf.put(payload);
         return buf.array();
+    }
+
+    protected FirmwareVersionModule getFwVersionModule() {
+        return new FirmwareVersionModule(getContext());
     }
 
     @Override
