@@ -297,10 +297,16 @@ public class GalaxyWatch7DeviceSupport extends AbstractBTBRDeviceSupport {
         }
     }
 
-    // Highest DataItem sequence number seen for the settings node (efb3c185). The watch ignores a
-    // DataItem whose seq is not greater than the node's current seq (treats it as stale), so our
-    // writes must use a seq above what the watch already has. Seeded from the incoming stream.
+    // Highest DataItem sequence seen from the WATCH's nodes (used only to observe the peer, not for
+    // our own writes - the watch tracks each node's data version separately).
     private final java.util.concurrent.atomic.AtomicLong settingsSeq = new java.util.concurrent.atomic.AtomicLong(0);
+
+    // Version counter for DataItems WE host (under our node). The watch tracks our node's data
+    // version separately and IGNORES a DataItem whose seq is not greater than the counter it already
+    // holds for our node. That counter is not the watch's own node seq (what settingsSeq tracks) - it
+    // is reported per node in the watch's peer-sync, so we seed this from parsePeerSyncNodeCounter for
+    // our node id and increment above it. Without this, writes look stale and are silently dropped.
+    private final java.util.concurrent.atomic.AtomicLong ownDataVersion = new java.util.concurrent.atomic.AtomicLong(0);
 
     @Override
     public void onSendConfiguration(final String config) {
@@ -318,7 +324,7 @@ public class GalaxyWatch7DeviceSupport extends AbstractBTBRDeviceSupport {
             LOG.warn("Galaxy Watch7: cannot send {} - own node id not known yet", config);
             return;
         }
-        final long seq = settingsSeq.incrementAndGet();
+        final long seq = ownDataVersion.incrementAndGet();
         // The watch's StDataLayerListenerService applies w_module_sec_watch_setting DataItems whose
         // host node is a connected peer (our connection node) and whose "from" != "watch" (§28).
         final byte[] write;
@@ -414,6 +420,7 @@ public class GalaxyWatch7DeviceSupport extends AbstractBTBRDeviceSupport {
         LOG.info("Galaxy Watch7 <<< {}", WearDataLayerProtocol.describeMessage(message));
 
         trackSettingsSeq(message);
+        seedOwnDataVersion(message);
         reflectIncomingSetting(message);
         reflectBattery(message);
 
@@ -497,6 +504,21 @@ public class GalaxyWatch7DeviceSupport extends AbstractBTBRDeviceSupport {
         nodeCounters.merge(node, seq, Math::max);
         // Keep our outgoing seq above every node's current seq so writes are never seen as stale.
         settingsSeq.getAndUpdate(cur -> Math.max(cur, seq));
+    }
+
+    // The watch's peer-sync reports, per node, the data version it currently holds. For our own node
+    // it is the bar our pushed DataItems must clear: the watch ignores a write whose seq is not above
+    // it. Raise ownDataVersion to at least that counter so the next incrementAndGet lands above it.
+    private void seedOwnDataVersion(final byte[] message) {
+        if (localNodeId == null) {
+            return;
+        }
+        final Long counter = WearDataLayerProtocol.parsePeerSyncNodeCounter(message, localNodeId);
+        if (counter != null) {
+            final long updated = ownDataVersion.getAndUpdate(cur -> Math.max(cur, counter));
+            LOG.info("Galaxy Watch7: watch holds our node {} at data version {} (own seq base now {})",
+                    localNodeId, counter, Math.max(updated, counter));
+        }
     }
 
     // Reflect a watch-reported protogensettings boolean back into the device prefs so the GB

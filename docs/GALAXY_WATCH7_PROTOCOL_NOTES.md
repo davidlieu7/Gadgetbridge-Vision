@@ -2327,3 +2327,37 @@ Still follow-up (need dynamic list population from the watch's */list DataItems,
 GB's static preference XML can't express well): ringtone/notification selected_name,
 screen_time_out/selected_item, and the package pickers (double_press, press_and_hold,
 recents_key, quicklaunch launch_package, action_button, digital_assistant, status_indicator).
+
+---
+
+## 33. Settings WRITE fixed for good: per-node data-version seqId (2026-09-19)
+
+The settings-write/apply path had regressed (writes reached the watch byte-correct,
+node fully registered - `setConnectedNodeId(e1b1cd8b)`, `isValidNodeId` capable - yet
+nothing applied and the watch's GMS logged no dataChanged). Root cause: the DataItem
+seq (Wear per-node data version) was seeded from the WATCH's own node counter
+(`settingsSeq`, ~35133), but the watch tracks OUR node's version separately and
+ignores any DataItem we host whose seq is not greater than the counter it already
+holds for our node. The watch reports that counter in its peer-sync, per node:
+
+  peer-sync node-ref: {f1 = nodeId, f2 = counter}
+  ...12 0e 0a08 6531623163643862 10 879a02  -> {e1b1cd8b, 36103}
+
+So our writes at seq 1 and 35134 were both <= 36103 and silently dropped. ("Worked
+before" was timing luck: right after a connect/enrollment the watch's counter for our
+node was low enough that settingsSeq exceeded it.)
+
+Fix: added `parsePeerSyncNodeCounter(message, nodeId)` and `seedOwnDataVersion` - a
+dedicated `ownDataVersion` counter seeded to the watch's advertised counter for our
+node and incremented per write (36104, 36105, ...). Verified live end-to-end, watch
+actually applying each type:
+- bool  system_vibration/dialing_keypad: `settings get system dialing_keypad_vibrate`
+  1 -> 0; watch logged isValidNodeId:true, onDataChanged from:mobile, handleSyncData,
+  StDataLayerSystemVibrationManager enable:false.
+- string sound_mode = "sound": watch ringer mode VIBRATE -> NORMAL; SoundModeManager
+  sound mode: 2.
+- int    vibration_intensity = 0 (Leicht): `setting_vibration_intensity` 3 -> 1;
+  StDataLayerVibrationIntensityManager setVibrationIntensity:1.
+
+Settings write (all types) + reflection + battery are now confirmed working with GB as
+the sole companion.

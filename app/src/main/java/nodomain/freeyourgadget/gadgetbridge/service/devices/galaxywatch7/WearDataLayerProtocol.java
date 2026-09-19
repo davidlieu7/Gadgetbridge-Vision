@@ -413,6 +413,38 @@ public final class WearDataLayerProtocol {
     }
 
     /**
+     * If the message is a peer-sync (SeqAck), returns the data-version counter the watch reports for
+     * the given node id, else null. The watch will ignore a DataItem we host under our node unless
+     * its seq is greater than this counter (it is the watch's record of our node's data version), so
+     * our writes must start above it. Peer-sync: field8 payload with repeated node-refs at field 2,
+     * each {f1 = nodeId, f2 = counter}.
+     */
+    public static Long parsePeerSyncNodeCounter(final byte[] message, final String nodeId) {
+        final byte[] envelope = stripLengthPrefix(message);
+        if (envelope == null) {
+            return null;
+        }
+        try {
+            final byte[] payload = new ProtoReader(envelope).findMessage(FIELD_ENVELOPE_PAYLOAD);
+            if (payload == null) {
+                return null;
+            }
+            final byte[] seqAck = new ProtoReader(payload).findMessage(PAYLOAD_SEQ_ACK);
+            if (seqAck == null) {
+                return null;
+            }
+            for (final byte[] ref : new ProtoReader(seqAck).findAllMessages(SEQACK_NODE_REF)) {
+                if (nodeId.equals(new ProtoReader(ref).findString(NODE_REF_ID))) {
+                    return new ProtoReader(ref).findVarint(NODE_REF_COUNTER);
+                }
+            }
+        } catch (final RuntimeException e) {
+            return null;
+        }
+        return null;
+    }
+
+    /**
      * Reads a boolean DataMap entry (e.g. "booleanIsChecked") from a DataItem's value. DataMap
      * wire format: repeated entries at field 1, each {f1=key, f2=typedValue}; a bool typedValue is
      * {f1=8, f2={f8=0|1}}. Returns null if the key is absent.
