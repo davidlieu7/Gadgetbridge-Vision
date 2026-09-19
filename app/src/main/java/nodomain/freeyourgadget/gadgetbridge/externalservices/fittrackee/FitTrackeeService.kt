@@ -154,7 +154,8 @@ object FitTrackeeService : WorkoutUploadTarget {
             ActivityKind.MOUNTAIN_BIKE, ActivityKind.CYCLING_DOWNHILL -> 4
 
             ActivityKind.RUNNING, ActivityKind.OUTDOOR_RUNNING, ActivityKind.INDOOR_RUNNING,
-            ActivityKind.STREET_RUNNING, ActivityKind.TRACK_RUN, ActivityKind.ULTRA_RUN -> 5
+            ActivityKind.STREET_RUNNING, ActivityKind.TRACK_RUN, ActivityKind.INDOOR_TRACK_RUNNING,
+            ActivityKind.ULTRA_RUN, ActivityKind.TREADMILL, ActivityKind.VIRTUAL_RUN -> 5
 
             ActivityKind.WALKING, ActivityKind.OUTDOOR_WALKING, ActivityKind.INDOOR_WALKING,
             ActivityKind.RACE_WALKING -> 6
