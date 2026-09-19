@@ -2431,3 +2431,46 @@ push path. Use GB's own Debug screen -> Benachrichtigungen -> **Send Notificatio
 filters). For the real NotificationListener path, note GB defaults filter notifications
 when the phone screen is on (`notifications_generic_whenscreenon`) and low-priority ones
 (`notifications_ignore_low_priority`).
+
+## 35. Navigation display — INVESTIGATION (CoMaps/turn-by-turn on the watch)
+
+Question: can GB push turn-by-turn navigation (GB already ingests CoMaps via
+CoMapsNavigationReceiver -> NavigationInfoSpec -> onSetNavigationInfo) to the
+Galaxy Watch7? Investigated live (no implementation yet).
+
+Finding: **navigation on this watch is exclusively Google Maps' domain.** The only
+navigation-related channels the watch advertises are Google Maps Wear-app
+capabilities, all under `com.google.android.apps.maps` (+ Google's signing cert
+`38918a453d07199354f8b19af05ec6562ced5788`):
+  - `.../wearable_navigation`
+  - `.../improved_tethered_nav_communication`   (tethered = phone navigates, watch mirrors)
+  - `.../send_eta_changes`
+com.google.android.apps.maps IS installed on the watch (v25.14, but currently
+stopped). There is NO generic system "navigation" DataItem/MessageApi path a
+companion can write (the only other "tethered" capability is Samsung's
+`wcs_tethered_two_way_sync`, which is settings/data sync, not nav). Google Maps is
+NOT installed on the phone.
+
+Consequence: GB cannot make the watch render a native nav card just by emitting a
+NavigationInfoSpec-shaped DataItem. Two possible routes:
+
+1. **Impersonate phone-side Google Maps** and speak Maps' tethered-nav protocol to
+   the watch's Maps Wear app (author DataItems/MessageEvents under
+   com.google.android.apps.maps + Google's cert, same authoring trick as settings).
+   Native nav UI, but: the message format is a closed, versioned Google protocol we
+   don't have — needs a captured real Maps nav session (hard right now: GB occupies
+   the connection, so it'd require temporarily restoring stock GMS Maps nav while
+   sniffing) or decompiling Maps. It would also display CoMaps data inside Google
+   Maps' UI. High effort; questionable value.
+
+2. **Notification-card approach (pragmatic):** reuse the working
+   `/bridger/stream_item` notification transport (§34) to push a single, self-updating
+   card ("Links auf Hauptstraße · 200 m"), refreshed each turn by re-PUTting the same
+   stream id. Low effort (transport proven). Caveats: it's a plain notification, not a
+   nav UI; must avoid the ongoing-notification filter (the bridge drops FLAG_ONGOING
+   items - §5f) and re-alerting on every turn (use only_alert_once + same id).
+
+Recommendation: native Maps-style nav is a large RE project for little payoff on
+CoMaps data; the notification-card route is the realistic way to get turn-by-turn
+onto the GW7 with what we already have, accepting it won't look like Google's nav.
+Not implemented pending a decision.
