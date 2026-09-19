@@ -71,7 +71,14 @@ data class UploadCapabilities(
     val metadata: Set<RemoteOp>,
 
     /** Its header photo. */
-    val media: Set<RemoteOp>
+    val media: Set<RemoteOp>,
+
+    /**
+     * Whether the service refuses a workout that went nowhere, whatever it is written as. A
+     * service that maps what it is given wants a route even in a format that can be written
+     * without one, and answers a file that has none with an error rather than a bare workout.
+     */
+    val requiresRoute: Boolean = false
 ) {
     /**
      * Format to export [summary] in, or null when the service can take no form of this workout.
@@ -80,8 +87,13 @@ data class UploadCapabilities(
      * a re-sync is triggered by the exported file's fingerprint and no column records which format
      * was sent, so a choice that could differ between two runs would re-upload on every sync.
      */
-    fun formatFor(summary: BaseActivitySummary): WorkoutPayloadFormat? =
-        formats.firstOrNull { !it.needsTrack || WorkoutUploader.summaryHasTrack(summary) }
+    fun formatFor(summary: BaseActivitySummary): WorkoutPayloadFormat? {
+        val hasTrack = WorkoutUploader.summaryHasTrack(summary)
+        if (requiresRoute && !hasTrack) {
+            return null
+        }
+        return formats.firstOrNull { !it.needsTrack || hasTrack }
+    }
 
     /** Whether this service can take [summary] at all. */
     fun appliesTo(summary: BaseActivitySummary): Boolean = formatFor(summary) != null

@@ -46,7 +46,7 @@ public class UploadCapabilitiesTest extends TestBase {
     private static final Set<RemoteOp> NOTHING = Collections.emptySet();
 
     private UploadCapabilities capabilities(final WorkoutPayloadFormat... formats) {
-        return new UploadCapabilities(Arrays.asList(formats), NOTHING, NOTHING, NOTHING);
+        return new UploadCapabilities(Arrays.asList(formats), NOTHING, NOTHING, NOTHING, false);
     }
 
     private UploadCapabilities withMedia(final RemoteOp... ops) {
@@ -54,7 +54,8 @@ public class UploadCapabilitiesTest extends TestBase {
                 Collections.singletonList(WorkoutPayloadFormat.FIT),
                 NOTHING,
                 NOTHING,
-                ops.length == 0 ? NOTHING : EnumSet.copyOf(Arrays.asList(ops))
+                ops.length == 0 ? NOTHING : EnumSet.copyOf(Arrays.asList(ops)),
+                false
         );
     }
 
@@ -135,10 +136,20 @@ public class UploadCapabilitiesTest extends TestBase {
     public void testMetadataIsEditableOnlyWhenItCanBeUpdatedInPlace() {
         assertTrue(new UploadCapabilities(
                 Collections.singletonList(WorkoutPayloadFormat.FIT),
-                NOTHING, EnumSet.of(RemoteOp.UPDATE), NOTHING).getEditableMetadata());
+                NOTHING, EnumSet.of(RemoteOp.UPDATE), NOTHING, false).getEditableMetadata());
         assertFalse(new UploadCapabilities(
                 Collections.singletonList(WorkoutPayloadFormat.FIT),
-                NOTHING, EnumSet.of(RemoteOp.CREATE), NOTHING).getEditableMetadata());
+                NOTHING, EnumSet.of(RemoteOp.CREATE), NOTHING, false).getEditableMetadata());
+    }
+
+    @Test
+    public void testAServiceThatMapsWhatItIsGivenTakesNothingWithoutARoute() throws Exception {
+        final UploadCapabilities routeOnly = new UploadCapabilities(
+                Arrays.asList(WorkoutPayloadFormat.FIT, WorkoutPayloadFormat.GPX),
+                NOTHING, NOTHING, NOTHING, true);
+        assertNull(routeOnly.formatFor(summary(false)));
+        assertFalse(routeOnly.appliesTo(summary(false)));
+        assertEquals(WorkoutPayloadFormat.FIT, routeOnly.formatFor(summary(true)));
     }
 
     @Test

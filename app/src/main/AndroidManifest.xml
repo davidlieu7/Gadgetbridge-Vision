@@ -1250,9 +1250,14 @@
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
 
-                <!-- Where a service's login sends the browser back; the host names the service -->
+                <!-- Where a service's login sends the browser back; the host names the service.
+                     Some services only accept a redirect under a short scheme, so "app" is
+                     claimed alongside our own. -->
                 <data
                     android:scheme="${appAuthRedirectScheme}"
+                    android:pathPrefix="/oauth/callback" />
+                <data
+                    android:scheme="app"
                     android:pathPrefix="/oauth/callback" />
             </intent-filter>
         </activity>

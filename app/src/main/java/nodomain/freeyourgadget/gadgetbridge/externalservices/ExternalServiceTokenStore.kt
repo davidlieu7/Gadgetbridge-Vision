@@ -154,8 +154,9 @@ abstract class ExternalServiceTokenStore(context: Context, private val fileName:
         fun getInt(name: String, defValue: Int): Int = read(name)?.toIntOrNull() ?: defValue
 
         /**
-         * Encrypts and writes every value [block] puts, in one edit. When the Keystore refuses to
-         * encrypt, nothing is written and the store keeps its previous contents.
+         * Encrypts and writes every value [block] puts, and drops every entry it removes, in one
+         * edit. When the Keystore refuses to encrypt, nothing is written and the store keeps its
+         * previous contents.
          */
         fun edit(block: Editor.() -> Unit) {
             val editor = Editor().apply(block)
@@ -167,6 +168,7 @@ abstract class ExternalServiceTokenStore(context: Context, private val fileName:
                 return
             }
             storage.edit {
+                editor.removed.forEach { remove(it) }
                 encrypted.forEach { (name, value) -> putString(name, value) }
             }
         }
@@ -174,13 +176,20 @@ abstract class ExternalServiceTokenStore(context: Context, private val fileName:
 
     protected class Editor {
         internal val values = LinkedHashMap<String, String>()
+        internal val removed = LinkedHashSet<String>()
 
         fun putString(name: String, value: String) {
+            removed.remove(name)
             values[name] = value
         }
 
         fun putInt(name: String, value: Int) {
-            values[name] = value.toString()
+            putString(name, value.toString())
+        }
+
+        fun remove(name: String) {
+            values.remove(name)
+            removed.add(name)
         }
     }
 

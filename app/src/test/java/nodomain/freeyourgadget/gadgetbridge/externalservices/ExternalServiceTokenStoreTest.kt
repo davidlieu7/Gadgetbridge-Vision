@@ -78,6 +78,19 @@ class ExternalServiceTokenStoreTest : TestBase() {
     }
 
     @Test
+    fun removedEntryReadsAsAbsent() {
+        val store = object : ApiTokenStore(context, FILE) {
+            override fun secretKey() = key
+            fun dropToken() = preferences.edit { remove("api_token") }
+        }
+        store.saveToken("wanderer_key_abc")
+        store.dropToken()
+
+        assertNull(store.getApiToken())
+        assertTrue(stored().all.isEmpty())
+    }
+
+    @Test
     fun storedValuesHoldNoPlaintext() {
         oauthStore().saveTokens("access-secret", "refresh-secret", 900, 900)
 

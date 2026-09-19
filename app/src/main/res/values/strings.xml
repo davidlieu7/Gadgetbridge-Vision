@@ -5924,6 +5924,9 @@
     <string name="pref_category_ridehub" translatable="false">RideHub</string>
     <string name="pref_category_dreeve" translatable="false">Dreeve</string>
     <string name="dreeve_error_uploads_disabled">This Dreeve server imports activities from Strava and does not accept uploaded files</string>
+    <string name="pref_category_fittrackee" translatable="false">FitTrackee</string>
+    <string name="fittrackee_setup_hint">Create an application in your FitTrackee profile, under Apps, with the redirect URL app://fittrackee/oauth/callback and the scopes workouts:read, workouts:write and profile:read.</string>
+    <string name="fittrackee_login_failed">FitTrackee did not complete the login</string>
     <string name="select_at_least_option">Please select at least %1$d option</string>
 
     <!-- Auto-upload to online fitness trackers -->
