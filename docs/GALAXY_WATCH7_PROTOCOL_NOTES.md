@@ -2565,3 +2565,6 @@ extension logcat, both directions). NOT now — keep the working GB connection m
 
 MessageApi/MessageEvent transport layout is already decoded (§36), so once captured,
 implementing the sends is straightforward.
+
+**Step-by-step runbook for doing these captures (written to be followed with no prior
+context): `docs/GALAXY_WATCH7_CAPTURE_RUNBOOK.md`.**
