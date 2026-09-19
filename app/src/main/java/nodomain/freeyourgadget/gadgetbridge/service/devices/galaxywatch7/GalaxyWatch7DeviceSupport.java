@@ -21,6 +21,8 @@ import android.bluetooth.BluetoothServerSocket;
 import android.bluetooth.BluetoothSocket;
 import android.content.SharedPreferences;
 
+import org.json.JSONException;
+import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -32,7 +34,10 @@ import java.util.UUID;
 
 import nodomain.freeyourgadget.gadgetbridge.GBApplication;
 import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEventBatteryInfo;
+import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEventMusicControl;
 import nodomain.freeyourgadget.gadgetbridge.model.BatteryState;
+import nodomain.freeyourgadget.gadgetbridge.model.MusicSpec;
+import nodomain.freeyourgadget.gadgetbridge.model.MusicStateSpec;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
 import nodomain.freeyourgadget.gadgetbridge.service.btbr.AbstractBTBRDeviceSupport;
 import nodomain.freeyourgadget.gadgetbridge.service.btbr.TransactionBuilder;
@@ -537,6 +542,174 @@ public class GalaxyWatch7DeviceSupport extends AbstractBTBRDeviceSupport {
         builder.queue();
     }
 
+    // ---- Media control (MessageApi JSON channel /w_apps_media_controller/*, research notes §36/§40) ----
+    // The watch drives media over MessageApi JSON (not only the adaptive_media_bridging RPC): it
+    // asks the phone for state via request_data and shows what the phone pushes as mediametadata /
+    // playbackstate / volume. We author these under the Samsung wcs.extension identity, same trick
+    // as settings.
+    private static final String MEDIA_SOURCE_PACKAGE = "com.samsung.android.wcs.extension";
+    private static final String MEDIA_SOURCE_SIGNATURE = "9ca5170f381919dfe0446fcdab18b19a143b3163";
+    private static final String MEDIA_PATH_PREFIX = "/w_apps_media_controller/";
+    private final java.util.concurrent.atomic.AtomicLong messageSeq = new java.util.concurrent.atomic.AtomicLong(1);
+    private volatile MusicSpec lastMusicSpec;
+    private volatile MusicStateSpec lastMusicStateSpec;
+    private volatile int lastPhoneVolume = 7; // 0-15 scale the watch uses
+
+    @Override
+    public void onSetMusicInfo(final MusicSpec musicSpec) {
+        lastMusicSpec = musicSpec;
+        sendMediaMetadata(musicSpec);
+    }
+
+    @Override
+    public void onSetMusicState(final MusicStateSpec stateSpec) {
+        lastMusicStateSpec = stateSpec;
+        sendPlaybackState(stateSpec);
+    }
+
+    @Override
+    public void onSetPhoneVolume(final float volume) {
+        lastPhoneVolume = Math.round(volume / 100f * 15f); // GB gives 0-100%, watch wants 0-15
+        sendVolume();
+    }
+
+    private void sendMediaMetadata(final MusicSpec spec) {
+        if (spec == null) {
+            return;
+        }
+        try {
+            final JSONObject data = new JSONObject();
+            data.put("appId", "nodomain.freeyourgadget.gadgetbridge");
+            data.put("appTitle", "Gadgetbridge");
+            data.put("mediaId", "");
+            data.put("title", spec.getTrack() != null ? spec.getTrack() : "");
+            data.put("artist", spec.getArtist() != null ? spec.getArtist() : "");
+            data.put("album", spec.getAlbum() != null ? spec.getAlbum() : "");
+            data.put("duration", spec.getDuration() > 0 ? (long) spec.getDuration() * 1000 : 0);
+            data.put("albumArt", "");
+            sendMediaMessage("mediametadata", data);
+        } catch (final JSONException e) {
+            LOG.warn("Galaxy Watch7: media metadata json", e);
+        }
+    }
+
+    private void sendPlaybackState(final MusicStateSpec state) {
+        if (state == null) {
+            return;
+        }
+        // GB state 0=playing/1=paused/2=stopped -> Android PlaybackState 3=playing/2=paused/1=stopped.
+        final int androidState = state.getState() == MusicStateSpec.STATE_PLAYING ? 3
+                : state.getState() == MusicStateSpec.STATE_PAUSED ? 2 : 1;
+        try {
+            final JSONObject data = new JSONObject();
+            data.put("appId", "nodomain.freeyourgadget.gadgetbridge");
+            data.put("appTitle", "Gadgetbridge");
+            data.put("state", androidState);
+            data.put("position", state.getPosition() > 0 ? (long) state.getPosition() * 1000 : 0);
+            data.put("speed", 1);
+            sendMediaMessage("playbackstate", data);
+        } catch (final JSONException e) {
+            LOG.warn("Galaxy Watch7: playback state json", e);
+        }
+    }
+
+    private void sendVolume() {
+        try {
+            final JSONObject data = new JSONObject();
+            data.put("appId", "");
+            data.put("playbackType", "1");
+            data.put("volume", String.valueOf(lastPhoneVolume));
+            data.put("maxVolume", "15");
+            data.put("warningVolume", "10");
+            data.put("headsetConnected", "0");
+            data.put("btOutput", "0");
+            data.put("dndModeOn", "0");
+            data.put("muteAllSoundsOn", "0");
+            sendMediaMessage("volume", data);
+        } catch (final JSONException e) {
+            LOG.warn("Galaxy Watch7: volume json", e);
+        }
+    }
+
+    private void sendMediaMessage(final String msgId, final JSONObject data) {
+        final String node = localNodeId;
+        final String watch = watchNodeId;
+        if (node == null || watch == null) {
+            return;
+        }
+        try {
+            final JSONObject env = new JSONObject();
+            env.put("msgId", msgId);
+            env.put("msgType", "4"); // 4 = data push from the phone
+            env.put("deviceId", node);
+            env.put("data", data);
+            final byte[] write = WearDataLayerProtocol.buildMessageEvent(
+                    MEDIA_SOURCE_PACKAGE, MEDIA_SOURCE_SIGNATURE, node, watch,
+                    messageSeq.getAndIncrement(), MEDIA_PATH_PREFIX + msgId,
+                    env.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            LOG.info("Galaxy Watch7: media -> {} {}", msgId, data);
+            final TransactionBuilder builder = createTransactionBuilder("media " + msgId);
+            builder.write(write);
+            builder.queue();
+        } catch (final JSONException e) {
+            LOG.warn("Galaxy Watch7: media envelope json", e);
+        }
+    }
+
+    // Handle an incoming media MessageEvent from the watch: answer its request_data, and turn its
+    // transport button presses into Gadgetbridge music-control events.
+    private void handleMediaMessage(final byte[] message) {
+        final String path = WearDataLayerProtocol.parseMessageEventPath(message);
+        if (path == null || !path.startsWith(MEDIA_PATH_PREFIX)) {
+            return;
+        }
+        final String msgId = path.substring(MEDIA_PATH_PREFIX.length());
+        final String json = WearDataLayerProtocol.parseMessageEventData(message);
+        LOG.info("Galaxy Watch7: media <- {} {}", msgId, json);
+        if ("request_data".equals(msgId)) {
+            // The watch is asking for our current state; reply with what we can.
+            sendVolume();
+            if (lastMusicSpec != null) {
+                sendMediaMetadata(lastMusicSpec);
+            }
+            if (lastMusicStateSpec != null) {
+                sendPlaybackState(lastMusicStateSpec);
+            }
+            return;
+        }
+        final GBDeviceEventMusicControl.Event event = mediaCommandToEvent(msgId, json);
+        if (event != null) {
+            LOG.info("Galaxy Watch7: media command {} -> {}", msgId, event);
+            final GBDeviceEventMusicControl evt = new GBDeviceEventMusicControl();
+            evt.event = event;
+            evaluateGBDeviceEvent(evt);
+        }
+    }
+
+    // Map a watch media MessageApi msgId (+ its JSON) to a Gadgetbridge music-control event. The
+    // exact command msgIds are confirmed live once the watch controls active media; this covers the
+    // common ones and is easy to extend.
+    private GBDeviceEventMusicControl.Event mediaCommandToEvent(final String msgId, final String json) {
+        switch (msgId) {
+            case "play":
+                return GBDeviceEventMusicControl.Event.PLAY;
+            case "pause":
+                return GBDeviceEventMusicControl.Event.PAUSE;
+            case "playpause":
+            case "play_pause":
+                return GBDeviceEventMusicControl.Event.PLAYPAUSE;
+            case "next":
+            case "skip_to_next":
+                return GBDeviceEventMusicControl.Event.NEXT;
+            case "previous":
+            case "prev":
+            case "skip_to_previous":
+                return GBDeviceEventMusicControl.Event.PREVIOUS;
+            default:
+                return null;
+        }
+    }
+
     private static int parseIntPref(final String s, final int fallback) {
         try {
             return Integer.parseInt(s.trim());
@@ -592,6 +765,7 @@ public class GalaxyWatch7DeviceSupport extends AbstractBTBRDeviceSupport {
         reflectIncomingSetting(message);
         reflectBattery(message);
         reflectNotificationDismissal(message);
+        handleMediaMessage(message);
 
         final String parsed = WearDataLayerProtocol.parseWatchNodeId(message);
         if (parsed == null) {

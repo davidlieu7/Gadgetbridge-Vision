@@ -2643,3 +2643,33 @@ the §5b format) - not only the `adaptive_media_bridging` protobuf RPC (§36). I
 `request_data` for [volume, audio_output, oneui_version] and empty
 mediametadata/playbackstate when nothing is playing. This suggests media control MAY be
 implementable via the known JSON format without a full capture - worth revisiting.
+
+## 41. Media control — now-playing WORKING via the legacy JSON channel (no capture)
+
+Confirmed the media hunch from §40: the watch drives media over MessageApi JSON on
+`/w_apps_media_controller/*` (the §5b format), so no stock-app capture was needed.
+
+Added a MessageEvent SENDER (`WearDataLayerProtocol.buildMessageEvent`, field layout §36)
+plus parsers (`parseMessageEventPath`/`parseMessageEventData`). GalaxyWatch7DeviceSupport:
+- `onSetMusicInfo` -> `mediametadata` JSON, `onSetMusicState` -> `playbackstate`,
+  `onSetPhoneVolume` -> `volume`; envelope `{msgId, msgType:"4", deviceId:<ourNode>, data:{…}}`
+  authored under `com.samsung.android.wcs.extension` + its cert, sent to the watch node.
+- Answers the watch's `request_data` (volume + last metadata/state).
+- `handleMediaMessage` maps incoming transport msgIds to GBDeviceEventMusicControl.
+
+Verified live (GB Debug -> Musik -> Send MusicSpec/MusicStateSpec): the watch's
+MediaController received and PARSED our JSON, registered the remote session
+(`IMediaControlBackend isPositionIncreased: new: REMOTE:nodomain.freeyourgadget.
+gadgetbridge:The Track Name:120000`), sent `media_app{appId:…gadgetbridge}`, and ACKed our
+messages (`RemoteMediaControlBackend sendMessage … "playbackstate","msgType":"0"`). GB also
+answered the watch's `request_data([volume,audio_output,oneui_version])`. state map: GB
+0/1/2 -> Android PlaybackState 3/2/1; duration/position sent in ms.
+
+Still open (follow-ups, not blockers to the data layer which is proven):
+- Making the watch's media CONTROLLER UI visibly display it: UmoActivity (the output
+  switcher) shows "Keine Wiedergabe"; the phone-media card is a separate surface that may
+  need `advanced/media_control/auto_launch_media_controls` on and/or continuous position
+  updates to be treated as the live session. Not yet visually confirmed on screen.
+- Reverse transport commands (watch button -> phone): scaffolding + a msgId->event map are
+  in place, but the exact command msgIds are only observable once the controller is bound to
+  our session and its buttons are pressed - confirm and extend `mediaCommandToEvent` then.

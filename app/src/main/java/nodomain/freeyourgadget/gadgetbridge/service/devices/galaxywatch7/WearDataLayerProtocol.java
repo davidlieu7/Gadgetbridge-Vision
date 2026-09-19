@@ -355,6 +355,75 @@ public final class WearDataLayerProtocol {
         return s == null ? "" : s;
     }
 
+    // MessageApi MessageEvent field layout (payload field 10), decoded live (research notes §36):
+    //   {1=seq counter}{2=srcPackage}{3=signingCertDigest}{4=targetNodeId}{5=0}
+    //   {6=path}{7=data bytes/JSON}{8=srcNodeId}{10=4}{13=1}
+    private static final int ME_SEQ = 1;
+    private static final int ME_SRC_PACKAGE = 2;
+    private static final int ME_SIGNATURE = 3;
+    private static final int ME_TARGET_NODE = 4;
+    private static final int ME_FLAG5 = 5;
+    private static final int ME_PATH = 6;
+    private static final int ME_DATA = 7;
+    private static final int ME_SRC_NODE = 8;
+    private static final int ME_FLAG10 = 10;
+    private static final int ME_FLAG13 = 13;
+
+    /**
+     * Builds a MessageApi MessageEvent (one-shot RPC-style message, e.g. the media-controller
+     * JSON messages). Unlike a DataItem this is not stored/versioned, so {@code seq} is just a
+     * per-connection message counter, not the per-node data version.
+     *
+     * @param targetNodeId the watch's node id (the message's destination)
+     * @param ownNodeId    our node id (the source)
+     * @param path         MessageApi path, e.g. {@code "/w_apps_media_controller/mediametadata"}
+     * @param data         the payload bytes (for the Samsung channels, a UTF-8 JSON string)
+     */
+    public static byte[] buildMessageEvent(final String sourcePackage, final String signatureHex,
+                                           final String ownNodeId, final String targetNodeId,
+                                           final long seq, final String path, final byte[] data) {
+        final ProtoWriter me = new ProtoWriter();
+        me.writeVarint(ME_SEQ, seq);
+        me.writeString(ME_SRC_PACKAGE, sourcePackage);
+        me.writeString(ME_SIGNATURE, signatureHex);
+        me.writeString(ME_TARGET_NODE, targetNodeId);
+        me.writeVarint(ME_FLAG5, 0);
+        me.writeString(ME_PATH, path);
+        me.writeMessage(ME_DATA, data);
+        me.writeString(ME_SRC_NODE, ownNodeId);
+        me.writeVarint(ME_FLAG10, 4);
+        me.writeVarint(ME_FLAG13, 1);
+
+        final ProtoWriter payload = new ProtoWriter();
+        payload.writeMessage(PAYLOAD_MESSAGE_EVENT, me.toByteArray());
+        return frame(wrapEnvelope(payload.toByteArray(), true));
+    }
+
+    private static byte[] extractMessageEvent(final byte[] message) {
+        final byte[] envelope = stripLengthPrefix(message);
+        if (envelope == null) {
+            return null;
+        }
+        try {
+            final byte[] payload = new ProtoReader(envelope).findMessage(FIELD_ENVELOPE_PAYLOAD);
+            return payload == null ? null : new ProtoReader(payload).findMessage(PAYLOAD_MESSAGE_EVENT);
+        } catch (final RuntimeException e) {
+            return null;
+        }
+    }
+
+    /** If the message is a MessageEvent, returns its path (field 6), else null. */
+    public static String parseMessageEventPath(final byte[] message) {
+        final byte[] me = extractMessageEvent(message);
+        return me == null ? null : new ProtoReader(me).findString(ME_PATH);
+    }
+
+    /** If the message is a MessageEvent, returns its data (field 7) as a UTF-8 string, else null. */
+    public static String parseMessageEventData(final byte[] message) {
+        final byte[] me = extractMessageEvent(message);
+        return me == null ? null : new ProtoReader(me).findString(ME_DATA);
+    }
+
     private static byte[] buildWatchSettingPut(final String sourcePackage, final String signatureHex,
                                                final String ownNodeId, final String subPath,
                                                final String valueKey, final byte[] typedValue, final long seq) {
