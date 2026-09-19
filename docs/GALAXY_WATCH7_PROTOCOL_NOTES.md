@@ -2544,3 +2544,24 @@ w_callservice/w_apps_incallui RPC (no capture: the committed stock capture conta
 call *settings*, no live call). A real phone call reaches this same onSetCallState entry
 point via GB's telephony receiver, so it works for real calls too, not just the debug
 trigger.
+
+## 38. TODO — captures still needed (future stock-app session)
+
+Some features are blocked on capturing the STOCK companion's wire format (the side that
+speaks the private protocol is Samsung's app, which GB replaced — so we can't observe
+these while GB is the companion). To be done in ONE deliberate session with the stock
+Galaxy Wearable / watch7plugin as companion again (btsnoop + com.samsung.android.wcs.
+extension logcat, both directions). NOT now — keep the working GB connection meanwhile.
+
+1. **Media control** (§36): real MediaSession playing + watch media controller open +
+   press play/pause/next/prev/volume. Need `/adaptive_media_bridging/rpc/*`
+   request+response protobuf both ways. (Legacy JSON media path is NOT used by this OS.)
+2. **Call answer/decline from the watch** (§37): a real incoming call (the notification-
+   simulator app can also generate one), answer/reject on the watch, capture
+   `w_callservice` / `w_apps_incallui`. (Display-only incoming-call alert already works.)
+3. (Nice-to-have) **Notification icons + action buttons**: captured as separate binary
+   Wear **Assets** by digest (§5g) — capture a notification-with-actions to learn the
+   Asset framing.
+
+MessageApi/MessageEvent transport layout is already decoded (§36), so once captured,
+implementing the sends is straightforward.
