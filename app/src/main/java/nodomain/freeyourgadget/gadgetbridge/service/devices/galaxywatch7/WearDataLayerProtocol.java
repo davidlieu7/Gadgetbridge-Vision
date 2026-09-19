@@ -248,6 +248,109 @@ public final class WearDataLayerProtocol {
                 valueKey, dataMapString(value), seq);
     }
 
+    /**
+     * Builds a DataItem PUT that pushes a phone notification onto the watch's notification stream,
+     * in the Wear "notification stream" convention the Watch7 notification bridge renders (research
+     * notes §5f/§5g): a DataItem at
+     * {@code wear://<node>/bridger/stream_item:<node>:<pkg>:<id>:<tag>} whose DataMap carries the
+     * title/text/app-name/meta fields captured from the stock app. Icons and action buttons (which
+     * the stock app delivers as separate binary Wear Assets referenced by digest) are omitted - the
+     * watch renders a text notification without them.
+     *
+     * @param ownNodeId   our connection node id (the DataItem host; also embedded in the stream key)
+     * @param packageName the posting app's package (stream key + used for grouping on the watch)
+     * @param notifId     the notification id (stream key)
+     * @param tag         the notification tag, or {@code null} (encoded as "null_tag")
+     * @param appName     the posting app's display label (shown as the notification's source)
+     * @param title       notification title
+     * @param text        notification body text
+     * @param subText     optional sub-text (app-provided), or {@code null} to omit
+     * @param postTime    post time in epoch millis (post_time_millis)
+     * @param whenMs      the notification's {@code when} timestamp in epoch millis
+     * @param color       the notification accent color as an ARGB value
+     * @param flags       the raw Android {@code Notification.flags} bitmask
+     * @param seq         our per-node data version (must exceed the watch's counter for our node)
+     */
+    public static byte[] buildNotificationPut(final String sourcePackage, final String signatureHex,
+                                              final String ownNodeId, final String packageName,
+                                              final int notifId, final String tag, final String appName,
+                                              final String title, final String text, final String subText,
+                                              final long postTime, final long whenMs, final long color,
+                                              final int flags, final long seq) {
+        final ProtoWriter dataMap = new ProtoWriter();
+        dataMapEntry(dataMap, "app_name", dataMapString(nz(appName)));
+        dataMapEntry(dataMap, "title_raw", dataMapString(nz(title)));
+        dataMapEntry(dataMap, "title_html", dataMapString(nz(title)));
+        dataMapEntry(dataMap, "text_raw", dataMapString(nz(text)));
+        dataMapEntry(dataMap, "text_html", dataMapString(nz(text)));
+        if (subText != null) {
+            dataMapEntry(dataMap, "sub_text_raw", dataMapString(subText));
+            dataMapEntry(dataMap, "sub_text_html", dataMapString(subText));
+        }
+        dataMapEntry(dataMap, "post_time_millis", dataMapLong(postTime));
+        dataMapEntry(dataMap, "when", dataMapLong(whenMs));
+        dataMapEntry(dataMap, "show_when", dataMapBool(true));
+        // color is read as an Integer (int32 ARGB) by the watch's DataMap reader, not int64.
+        dataMapEntry(dataMap, "color", dataMapInt((int) color));
+        dataMapEntry(dataMap, "notification_flags", dataMapInt(flags));
+        dataMapEntry(dataMap, "notification_style", dataMapInt(1));
+        dataMapEntry(dataMap, "defaults", dataMapInt(2));
+        dataMapEntry(dataMap, "group_alert_behavior", dataMapInt(0));
+        dataMapEntry(dataMap, "has_content_intent", dataMapBool(false));
+        dataMapEntry(dataMap, "is_emergency", dataMapBool(false));
+        dataMapEntry(dataMap, "is_group_summary", dataMapBool(false));
+        dataMapEntry(dataMap, "is_work_profile", dataMapBool(false));
+        dataMapEntry(dataMap, "only_alert_once", dataMapBool(false));
+        dataMapEntry(dataMap, "user_id", dataMapInt(0));
+        // supplemental_data / supplemental_assets are Asset-typed on the watch (icon/picture
+        // blobs); we attach no Wear Assets, so they are omitted (sending an int errors on parse).
+
+        return buildStreamItemDataItem(sourcePackage, signatureHex, ownNodeId, packageName, notifId,
+                tag, dataMap.toByteArray(), 0, seq);
+    }
+
+    /**
+     * Builds the DataItem DELETE that mirrors dismissing a notification (research notes §5g): the
+     * same {@code /bridger/stream_item:...} path with the DataItem delete flag (field 6) set to 1
+     * and no payload. Dismissing on the phone removes it from the watch's notification list.
+     */
+    public static byte[] buildNotificationDelete(final String sourcePackage, final String signatureHex,
+                                                 final String ownNodeId, final String packageName,
+                                                 final int notifId, final String tag, final long seq) {
+        return buildStreamItemDataItem(sourcePackage, signatureHex, ownNodeId, packageName, notifId,
+                tag, new byte[0], 1, seq);
+    }
+
+    private static byte[] buildStreamItemDataItem(final String sourcePackage, final String signatureHex,
+                                                  final String ownNodeId, final String packageName,
+                                                  final int notifId, final String tag, final byte[] dataMap,
+                                                  final int deleteFlag, final long seq) {
+        final String streamTag = tag == null ? "null_tag" : tag;
+        final String path = "wear://" + ownNodeId + "/bridger/stream_item:" + ownNodeId + ":"
+                + packageName + ":" + notifId + ":" + streamTag;
+        final long now = System.currentTimeMillis();
+
+        final ProtoWriter dataItem = new ProtoWriter();
+        dataItem.writeString(DATAITEM_SOURCE_PACKAGE, sourcePackage);
+        dataItem.writeString(DATAITEM_PATH, path);
+        if (deleteFlag == 0) {
+            dataItem.writeMessage(DATAITEM_PAYLOAD, dataMap);
+        }
+        dataItem.writeVarint(DATAITEM_SEQ, seq);
+        dataItem.writeVarint(DATAITEM_DELETE_FLAG, deleteFlag);
+        dataItem.writeString(DATAITEM_DEST_NODE_ID, ownNodeId);
+        dataItem.writeString(DATAITEM_SIGNATURE, signatureHex);
+        dataItem.writeVarint(DATAITEM_TIMESTAMP, now);
+
+        final ProtoWriter payload = new ProtoWriter();
+        payload.writeMessage(PAYLOAD_DATA_ITEM, dataItem.toByteArray());
+        return frame(wrapEnvelope(payload.toByteArray(), true));
+    }
+
+    private static String nz(final String s) {
+        return s == null ? "" : s;
+    }
+
     private static byte[] buildWatchSettingPut(final String sourcePackage, final String signatureHex,
                                                final String ownNodeId, final String subPath,
                                                final String valueKey, final byte[] typedValue, final long seq) {
@@ -306,6 +409,17 @@ public final class WearDataLayerProtocol {
         container.writeVarint(6, value);
         final ProtoWriter tv = new ProtoWriter();
         tv.writeVarint(1, 6);
+        tv.writeMessage(2, container.toByteArray());
+        return tv.toByteArray();
+    }
+
+    // long-valued DataMap entry (typeTag 5, container inner field 5, varint) - used for the
+    // notification time/color fields that the stock app encodes as int64 (research notes §5g).
+    private static byte[] dataMapLong(final long value) {
+        final ProtoWriter container = new ProtoWriter();
+        container.writeVarint(5, value);
+        final ProtoWriter tv = new ProtoWriter();
+        tv.writeVarint(1, 5);
         tv.writeMessage(2, container.toByteArray());
         return tv.toByteArray();
     }

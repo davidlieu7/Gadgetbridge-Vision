@@ -2361,3 +2361,73 @@ actually applying each type:
 
 Settings write (all types) + reflection + battery are now confirmed working with GB as
 the sole companion.
+
+## 34. NOTIFICATION PUSH — WORKING end-to-end (GB as sole companion)
+
+Implemented phone->watch notification forwarding using the Wear notification-stream
+DataItem convention captured in §5f/§5g. Confirmed live on the real watch (no Galaxy
+Wearable / watch7plugin): two GB test notifications rendered in the watch's own
+notification panel ("Title" / "Notification body", correct time + Gadgetbridge-blue
+accent).
+
+Path (DataItem hosted under OUR node, same transport/seqId rule as settings §33):
+
+  wear://<ownNode>/bridger/stream_item:<ownNode>:<packageName>:<notifId>:<tag>
+
+- `<ownNode>` = our connection node (e1b1cd8b). The stream key repeats it as the
+  originating node; `<tag>` is "null_tag" when the notification has no tag.
+- PUT = DataItem with delete flag (field 6) = 0 and the DataMap payload; DELETE
+  (dismissal) = same path, field 6 = 1, no payload.
+- seq MUST exceed the watch's per-node counter for our node -> reuse the same
+  `ownDataVersion` counter as settings (one per-node data version covers all our
+  DataItems, settings and notifications alike; the watch bumped it 36106 -> 36107 ->
+  36108 as it accepted each write, proving persistence).
+
+DataMap fields we send (generic §3 DataMap encoding; the two field-type gotchas below
+were found by decoding the watch's own `[DataMap]` cast warnings live):
+  app_name (string), title_raw/title_html (string), text_raw/text_html (string),
+  sub_text_raw/sub_text_html (string), post_time_millis (int64), when (int64),
+  show_when (bool), color (INT32 ARGB), notification_flags (int32),
+  notification_style=1, defaults=2, group_alert_behavior=0, has_content_intent=false,
+  is_emergency=false, is_group_summary=false, is_work_profile=false,
+  only_alert_once=false, user_id=0.
+
+Field-type corrections vs the §5g capture guess (watch's DataMap reader is strict):
+- `color` is read as **Integer (int32)**, NOT int64 — sending a Long makes the reader
+  log "Key color expected Integer but value was a java.lang.Long" and default to 0.
+  Encoded as int32 ARGB, it came through as -14575885 == 0xFF2196F3 (GB blue).
+- `supplemental_data` / `supplemental_assets` are **Asset-typed** (icon/picture blobs),
+  not ints — sending an int errors ("expected Asset but value was a java.lang.Integer")
+  and they are simply omitted (we attach no Wear Assets, so no icon/large-icon/app-icon;
+  the watch renders text-only, which is fine).
+
+Watch-side flow confirmed (WearServices / SysUI logcat): `onDataChanged` for our
+stream_item uri -> `WatchBridgedItemsController.buildBridgedNotificationForDataItem`
+(clean, no cast warnings after the fixes) -> `Posting new remote notification`
+(appName=Gadgetbridge, isOngoing=false, hasGroupSummary=false, color=0xFF2196F3) ->
+`StreamTimeline STREAM_POST` -> SysUI `WNotiVspPanel addElement`. It only skipped the
+buzz/heads-up with "Not alerting: Device is off-body" because the watch was on the
+charger; on-wrist it would alert.
+
+Assets (icons, big-picture, action buttons) still TODO: the stock app attaches them as
+separate binary Wear Assets referenced by digest (§5g, numAssets=3) — a later step.
+Dismissal DELETE is implemented (`buildNotificationDelete`, delete flag=1) and is a
+trivial variant of the proven PUT transport, but a phone->watch dismissal round-trip
+was not separately live-tested this session.
+
+### GB-side wiring
+- `WearDataLayerProtocol.buildNotificationPut/buildNotificationDelete` +
+  `buildStreamItemDataItem` + `dataMapLong` helper.
+- `GalaxyWatch7DeviceSupport.onNotification` (maps NotificationSpec ->
+  title/body/sourceName/sourceAppId/flags/when, seq from `ownDataVersion`) and
+  `onDeleteNotification` (rebuilds the path from a `sentNotifications` id->{pkg,tag}
+  map). Reuses the settings source package + signature.
+
+### Test harness note (for future sessions)
+The `com.xinesoft.notifications` tester marks EVERY notification `FLAG_GROUP_SUMMARY`
+(flags=536), which GB drops ("no wearable action present"), so it can't exercise the
+push path. Use GB's own Debug screen -> Benachrichtigungen -> **Send NotificationSpec**
+(calls DeviceService.onNotification directly, bypassing the NotificationListener
+filters). For the real NotificationListener path, note GB defaults filter notifications
+when the phone screen is on (`notifications_generic_whenscreenon`) and low-priority ones
+(`notifications_ignore_low_priority`).

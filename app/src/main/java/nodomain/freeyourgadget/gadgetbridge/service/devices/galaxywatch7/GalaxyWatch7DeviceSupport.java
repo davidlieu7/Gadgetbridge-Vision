@@ -39,13 +39,12 @@ import nodomain.freeyourgadget.gadgetbridge.service.btbr.TransactionBuilder;
 import nodomain.freeyourgadget.gadgetbridge.util.GB;
 
 /**
- * Phase 1 proof-of-concept device support for the Samsung Galaxy Watch7: establishes the RFCOMM
- * Data Layer connection (see {@link WearDataLayerProtocol}) and sends the initial node handshake.
- * <p/>
- * Deliberately minimal for now — it proves out the transport/pairing/handshake layer of the
- * reverse-engineered protocol against a real device. Feature support (notifications, settings,
- * media control, ...) is intentionally not wired up yet; see the project's research notes for the
- * full protocol writeup and the planned next steps.
+ * Device support for the Samsung Galaxy Watch7 over the reverse-engineered Wear OS "Data Layer"
+ * RFCOMM transport (see {@link WearDataLayerProtocol}). Establishes the node handshake/peer-sync,
+ * then drives the features wired up so far as the watch's sole companion (no Galaxy Wearable /
+ * watch7plugin needed): battery reporting, reading + writing watch settings, and forwarding phone
+ * notifications to the watch's notification stream. See the project's research notes for the full
+ * protocol writeup and the remaining planned features (media control, quick replies, ...).
  */
 public class GalaxyWatch7DeviceSupport extends AbstractBTBRDeviceSupport {
     private static final Logger LOG = LoggerFactory.getLogger(GalaxyWatch7DeviceSupport.class);
@@ -365,6 +364,58 @@ public class GalaxyWatch7DeviceSupport extends AbstractBTBRDeviceSupport {
         }
         recentlySentSetting.put(subPath, System.currentTimeMillis());
         final TransactionBuilder builder = createTransactionBuilder("send " + config);
+        builder.write(write);
+        builder.queue();
+    }
+
+    // Notifications we've pushed (id -> {packageName, tag}), so a later dismissal can rebuild the
+    // exact /bridger/stream_item: path to DELETE (onDeleteNotification only gives us the id).
+    private final java.util.Map<Integer, String[]> sentNotifications = new java.util.concurrent.ConcurrentHashMap<>();
+    // Fallback accent color for notifications that don't carry one (Gadgetbridge blue).
+    private static final long NOTIFICATION_DEFAULT_COLOR = 0xff2196f3L;
+
+    @Override
+    public void onNotification(final nodomain.freeyourgadget.gadgetbridge.model.NotificationSpec spec) {
+        final String node = localNodeId;
+        if (node == null) {
+            LOG.warn("Galaxy Watch7: cannot push notification - own node id not known yet");
+            return;
+        }
+        final String pkg = spec.getSourceAppId() != null
+                ? spec.getSourceAppId() : "nodomain.freeyourgadget.gadgetbridge";
+        final String appName = spec.getSourceName() != null ? spec.getSourceName() : pkg;
+        String title = spec.getTitle();
+        if (title == null || title.isEmpty()) {
+            title = spec.getSender() != null ? spec.getSender() : appName;
+        }
+        final String text = spec.getBody() != null ? spec.getBody() : "";
+        final String tag = "null_tag";
+        final long postTime = spec.getWhen() > 0 ? spec.getWhen() : System.currentTimeMillis();
+        final long seq = ownDataVersion.incrementAndGet();
+        LOG.info("Galaxy Watch7: pushing notification id={} pkg={} title=\"{}\" (seq {})",
+                spec.getId(), pkg, title, seq);
+        final byte[] write = WearDataLayerProtocol.buildNotificationPut(
+                SETTINGS_SOURCE_PACKAGE, SETTINGS_SOURCE_SIGNATURE, node, pkg, spec.getId(), tag,
+                appName, title, text, appName, postTime, postTime,
+                NOTIFICATION_DEFAULT_COLOR, spec.getFlags(), seq);
+        sentNotifications.put(spec.getId(), new String[]{pkg, tag});
+        final TransactionBuilder builder = createTransactionBuilder("notify " + spec.getId());
+        builder.write(write);
+        builder.queue();
+    }
+
+    @Override
+    public void onDeleteNotification(final int id) {
+        final String node = localNodeId;
+        final String[] info = sentNotifications.remove(id);
+        if (node == null || info == null) {
+            return; // never sent it (or not connected) - nothing to delete on the watch
+        }
+        final long seq = ownDataVersion.incrementAndGet();
+        LOG.info("Galaxy Watch7: deleting notification id={} pkg={} (seq {})", id, info[0], seq);
+        final byte[] write = WearDataLayerProtocol.buildNotificationDelete(
+                SETTINGS_SOURCE_PACKAGE, SETTINGS_SOURCE_SIGNATURE, node, info[0], id, info[1], seq);
+        final TransactionBuilder builder = createTransactionBuilder("del-notify " + id);
         builder.write(write);
         builder.queue();
     }
