@@ -2624,3 +2624,22 @@ The other advanced pickers are deliberately NOT wired:
   different path with a not-yet-confirmed DataMap key, and the list is `arrayPackageIdList`
   of raw package ids. Needs a capture of the stock app changing one to confirm the write
   key + label source. Added to the deferred capture list.
+
+## 40. Notification dismissal from the watch — WORKING (watch->phone)
+
+When a bridged notification is dismissed ON the watch, the watch mirrors the DataItem
+delete back to the phone: `DataItem path=wear://<ourNode>/bridger/stream_item:<node>:<pkg>
+:<id>:<tag>` with no payload (delete). GB now parses that
+(`parseNotificationStreamDeleteId` - note the path arrives percent-encoded, `%3A` for ':')
+and, if the id is one we still consider active, fires
+`GBDeviceEventNotificationControl{event=DISMISS, handle=id}` so the phone notification is
+dismissed too. Removing the id first also prevents reacting to the echo of our own delete
+(no loop). Verified live: dismissing the card on the watch logged
+"notification <id> dismissed on watch, dismissing on phone".
+
+Incidental find while testing: the watch ALSO drives media over the legacy JSON channel
+`/w_apps_media_controller/{request_data,mediametadata,playbackstate}` (MessageApi JSON,
+the §5b format) - not only the `adaptive_media_bridging` protobuf RPC (§36). It sends
+`request_data` for [volume, audio_output, oneui_version] and empty
+mediametadata/playbackstate when nothing is playing. This suggests media control MAY be
+implementable via the known JSON format without a full capture - worth revisiting.

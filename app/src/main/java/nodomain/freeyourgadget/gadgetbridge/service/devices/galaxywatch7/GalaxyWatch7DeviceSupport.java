@@ -582,6 +582,7 @@ public class GalaxyWatch7DeviceSupport extends AbstractBTBRDeviceSupport {
         seedOwnDataVersion(message);
         reflectIncomingSetting(message);
         reflectBattery(message);
+        reflectNotificationDismissal(message);
 
         final String parsed = WearDataLayerProtocol.parseWatchNodeId(message);
         if (parsed == null) {
@@ -622,6 +623,22 @@ public class GalaxyWatch7DeviceSupport extends AbstractBTBRDeviceSupport {
     // node id -> highest DataItem seq we've seen for it, learned from the incoming stream. Used to
     // build a fuller peer-sync (like the stock client) that declares all nodes with their counters.
     private final java.util.concurrent.ConcurrentHashMap<String, Long> nodeCounters = new java.util.concurrent.ConcurrentHashMap<>();
+
+    // When a notification is dismissed on the watch, the watch mirrors the DataItem delete back to
+    // us; dismiss it on the phone too so the two stay in sync. Only act on ids we still consider
+    // active (also avoids reacting to the echo of our own delete, which already removed the id).
+    private void reflectNotificationDismissal(final byte[] message) {
+        final Integer id = WearDataLayerProtocol.parseNotificationStreamDeleteId(message);
+        if (id == null || sentNotifications.remove(id) == null) {
+            return;
+        }
+        LOG.info("Galaxy Watch7: notification {} dismissed on watch, dismissing on phone", id);
+        final nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEventNotificationControl evt =
+                new nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEventNotificationControl();
+        evt.handle = id;
+        evt.event = nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEventNotificationControl.Event.DISMISS;
+        evaluateGBDeviceEvent(evt);
+    }
 
     private int lastBatteryLevel = -1;
     // Timestamp (field 7 of the batterystate value) of the newest reading we've accepted. The watch

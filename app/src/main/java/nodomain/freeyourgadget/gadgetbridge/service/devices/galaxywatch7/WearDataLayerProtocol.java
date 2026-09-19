@@ -525,6 +525,45 @@ public final class WearDataLayerProtocol {
     }
 
     /**
+     * If the message is a DELETE of one of our {@code /bridger/stream_item:...} notification
+     * DataItems (i.e. a notification was dismissed on the watch, mirrored back to us), returns the
+     * notification id embedded in the stream key, else null. A delete has the DataItem delete flag
+     * (field 6) set or carries no payload. The path may be percent-encoded ({@code %3A} for ':').
+     */
+    public static Integer parseNotificationStreamDeleteId(final byte[] message) {
+        final byte[] dataItem = extractDataItem(message);
+        if (dataItem == null) {
+            return null;
+        }
+        try {
+            final String path = new ProtoReader(dataItem).findString(DATAITEM_PATH);
+            if (path == null || !path.contains("/bridger/stream_item")) {
+                return null;
+            }
+            final Long deleteFlag = new ProtoReader(dataItem).findVarint(DATAITEM_DELETE_FLAG);
+            final byte[] payload = new ProtoReader(dataItem).findMessage(DATAITEM_PAYLOAD);
+            final boolean isDelete = (deleteFlag != null && deleteFlag != 0) || payload == null;
+            if (!isDelete) {
+                return null;
+            }
+            // key = "stream_item:<node>:<pkg>:<id>:<tag>" (colons possibly encoded as %3A)
+            final int marker = path.indexOf("stream_item");
+            String key = path.substring(marker).replace("%3A", ":");
+            final int colon = key.indexOf(':');
+            if (colon < 0) {
+                return null;
+            }
+            final String[] parts = key.substring(colon + 1).split(":");
+            if (parts.length < 3) {
+                return null;
+            }
+            return Integer.parseInt(parts[2]); // <node>:<pkg>:<id>:<tag> -> index 2 = id
+        } catch (final RuntimeException e) {
+            return null;
+        }
+    }
+
+    /**
      * If the message is a `w_module_sec_watch_setting` DataItem, returns its sub-path (the part
      * after `/w_module_sec_watch_setting/`), else null.
      */
