@@ -31,7 +31,7 @@ class RideHubSetupBottomSheet : AbstractApiTokenSetupBottomSheet(
      * before the prefix existed.
      */
     override fun validate(apiToken: String): String? =
-        if (apiToken.isEmpty()) getString(R.string.wanderer_setup_missing_information) else null
+        if (apiToken.isEmpty()) getString(R.string.service_setup_missing_information) else null
 
     override fun checkToken(apiToken: String): Pair<Boolean, String?> =
         RideHubApiClient(RideHubTokenManager(requireContext())).checkToken(apiToken)

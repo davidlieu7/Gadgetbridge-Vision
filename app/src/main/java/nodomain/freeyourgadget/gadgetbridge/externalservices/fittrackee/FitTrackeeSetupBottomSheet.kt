@@ -26,6 +26,7 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.Button
 import android.widget.EditText
+import android.widget.TextView
 import android.widget.Toast
 import androidx.core.content.edit
 import androidx.core.net.toUri
@@ -55,7 +56,7 @@ class FitTrackeeSetupBottomSheet : BottomSheetDialogFragment() {
         override fun onReceive(context: Context, intent: Intent) {
             val success = intent.getBooleanExtra("success", false)
             if (!success) {
-                GB.toast(getString(R.string.fittrackee_login_failed), Toast.LENGTH_LONG, GB.ERROR)
+                GB.toast(getString(R.string.service_login_failed), Toast.LENGTH_LONG, GB.ERROR)
                 return
             }
             parentFragmentManager.setFragmentResult(
@@ -75,6 +76,8 @@ class FitTrackeeSetupBottomSheet : BottomSheetDialogFragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
+        view.findViewById<TextView>(R.id.title)?.text =
+            getString(R.string.service_setup_title, getString(FitTrackeeService.nameRes))
         serverInput = view.findViewById(R.id.fittrackee_server_name)
         clientIdInput = view.findViewById(R.id.fittrackee_client_id)
         clientSecretInput = view.findViewById(R.id.fittrackee_client_secret)
@@ -98,7 +101,7 @@ class FitTrackeeSetupBottomSheet : BottomSheetDialogFragment() {
         val clientId = clientIdInput.text.toString().trim()
         val clientSecret = clientSecretInput.text.toString().trim()
         if (server.isEmpty() || clientId.isEmpty() || clientSecret.isEmpty()) {
-            GB.toast(getString(R.string.wanderer_setup_missing_information), Toast.LENGTH_SHORT, GB.WARN)
+            GB.toast(getString(R.string.service_setup_missing_information), Toast.LENGTH_SHORT, GB.WARN)
             return
         }
 
@@ -117,7 +120,7 @@ class FitTrackeeSetupBottomSheet : BottomSheetDialogFragment() {
             startActivity(Intent(Intent.ACTION_VIEW, url.toUri()))
         } catch (e: Exception) {
             LOG.error("Could not open the browser for the FitTrackee login", e)
-            GB.toast(getString(R.string.endurain_failed_to_open_browser), Toast.LENGTH_LONG, GB.ERROR)
+            GB.toast(getString(R.string.service_failed_to_open_browser, e.localizedMessage), Toast.LENGTH_LONG, GB.ERROR)
         }
     }
 

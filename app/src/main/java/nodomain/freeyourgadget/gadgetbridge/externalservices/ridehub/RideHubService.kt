@@ -36,7 +36,7 @@ import java.io.File
  */
 object RideHubService : WorkoutUploadTarget {
     override val id = "ridehub"
-    override val nameRes = R.string.pref_category_ridehub
+    override val nameRes = R.string.service_name_ridehub
     override val authStyle = AuthStyle.API_TOKEN
 
     /** Hosted at one address, so there is no instance for the user to name. */

@@ -28,10 +28,10 @@ class DreeveSetupBottomSheet : AbstractApiTokenSetupBottomSheet(
 
     override fun validate(apiToken: String): String? = when {
         serverName.isEmpty() || apiToken.isEmpty() ->
-            getString(R.string.wanderer_setup_missing_information)
+            getString(R.string.service_setup_missing_information)
 
         !apiToken.startsWith(DreeveTokenManager.TOKEN_PREFIX) ->
-            getString(R.string.dreeve_setup_api_token_error)
+            getString(R.string.service_setup_api_token_prefix_error, DreeveTokenManager.TOKEN_PREFIX)
 
         else -> null
     }

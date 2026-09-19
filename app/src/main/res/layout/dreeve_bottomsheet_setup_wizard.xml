@@ -10,14 +10,13 @@
         android:id="@+id/title"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="Dreeve setup"
         android:textAppearance="?attr/textAppearanceHeadlineSmall" />
 
     <com.google.android.material.textfield.TextInputLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginBottom="12dp"
-        android:hint="Server hostname"
+        android:hint="@string/service_setup_server_hostname"
         app:placeholderText="https://dreeve.example.com">
 
         <com.google.android.material.textfield.TextInputEditText
@@ -31,7 +30,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginBottom="24dp"
-        android:hint="API token">
+        android:hint="@string/service_setup_api_token">
 
         <com.google.android.material.textfield.TextInputEditText
             android:id="@+id/dreeve_api_token"

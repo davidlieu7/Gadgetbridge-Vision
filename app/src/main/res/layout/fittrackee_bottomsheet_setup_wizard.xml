@@ -10,7 +10,6 @@
         android:id="@+id/title"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:text="FitTrackee setup"
         android:textAppearance="?attr/textAppearanceHeadlineSmall" />
 
     <TextView
@@ -24,7 +23,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginBottom="12dp"
-        android:hint="Server hostname"
+        android:hint="@string/service_setup_server_hostname"
         app:placeholderText="https://fittrackee.example.com">
 
         <com.google.android.material.textfield.TextInputEditText
@@ -38,7 +37,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginBottom="12dp"
-        android:hint="Client ID">
+        android:hint="@string/service_setup_client_id">
 
         <com.google.android.material.textfield.TextInputEditText
             android:id="@+id/fittrackee_client_id"
@@ -51,7 +50,7 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginBottom="24dp"
-        android:hint="Client secret">
+        android:hint="@string/service_setup_client_secret">
 
         <com.google.android.material.textfield.TextInputEditText
             android:id="@+id/fittrackee_client_secret"

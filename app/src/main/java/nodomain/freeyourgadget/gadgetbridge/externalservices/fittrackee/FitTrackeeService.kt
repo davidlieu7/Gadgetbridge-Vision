@@ -44,7 +44,7 @@ import java.io.File
  */
 object FitTrackeeService : WorkoutUploadTarget {
     override val id = "fittrackee"
-    override val nameRes = R.string.pref_category_fittrackee
+    override val nameRes = R.string.service_name_fittrackee
     override val authStyle = AuthStyle.LOGIN
 
     override val service = WorkoutUploadStore.SERVICE_FITTRACKEE

@@ -31,7 +31,7 @@ import java.io.File
 
 object DreeveService : WorkoutUploadTarget {
     override val id = "dreeve"
-    override val nameRes = R.string.pref_category_dreeve
+    override val nameRes = R.string.service_name_dreeve
     override val authStyle = AuthStyle.API_TOKEN
 
     override val service = WorkoutUploadStore.SERVICE_DREEVE
