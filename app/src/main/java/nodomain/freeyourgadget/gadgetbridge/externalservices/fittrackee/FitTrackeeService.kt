@@ -81,6 +81,9 @@ object FitTrackeeService : WorkoutUploadTarget {
         ExternalServiceTokenRefreshWorker.schedule(context, this)
     }
 
+    override fun credentialsExpired(context: Context): Boolean =
+        FitTrackeeTokenManager(context).isAccessTokenExpired()
+
     override fun refreshCredentials(context: Context): Boolean {
         val server = serverUrl() ?: return false
         return FitTrackeeApiClient(server, FitTrackeeTokenManager(context)).refreshTokens()
