@@ -4504,6 +4504,7 @@
     <string name="prefs_gw7_sound_notification_vibration">Benachrichtigungsvibration</string>
     <string name="prefs_gw7_sound_ringtone">Klingelton</string>
     <string name="prefs_gw7_sound_ringtone_vibration">Klingelton-Vibration</string>
+    <string name="prefs_gw7_advanced_press_and_hold">Home-Taste gedrückt halten</string>
     <string name="prefs_gw7_sound_volume_media">Lautstärke: Medien</string>
     <string name="prefs_gw7_sound_volume_ringtone">Lautstärke: Klingelton</string>
     <string name="prefs_gw7_sound_volume_notifications">Lautstärke: Benachrichtigungen</string>

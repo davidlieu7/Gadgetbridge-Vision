@@ -309,6 +309,13 @@ public class GalaxyWatch7DeviceSupport extends AbstractBTBRDeviceSupport {
         addValueSetting(new SettingSpec("pref_galaxywatch7_sound_notification_vibration", "sound_settings/notification_vibration", "intSelectedItem", SettingType.LIST_DYNAMIC));
         addValueSetting(new SettingSpec("pref_galaxywatch7_sound_ringtone", "sound_settings/ringtone", "intSelectedItem", SettingType.LIST_DYNAMIC, "sound_settings/ringtone/name/list"));
         addValueSetting(new SettingSpec("pref_galaxywatch7_sound_ringtone_vibration", "sound_settings/ringtone_vibration", "intSelectedItem", SettingType.LIST_DYNAMIC));
+        // Buttons & gestures: press_and_hold selects by index (arrayItemList + selected_item), same
+        // proven mechanism as above, and its options are clean localized labels. The other pickers
+        // are omitted on purpose: action_button/status_indicator list raw component names / internal
+        // tokens ("com.samsung.../...Service", "show"/"hide2") the watch doesn't localize inline, and
+        // double_press/digital_assistant/quicklaunch select by a string (selected_package/
+        // selected_name/launch_package) with a not-yet-confirmed write key. Deferred (see docs/§).
+        addValueSetting(new SettingSpec("pref_galaxywatch7_advanced_press_and_hold", "advanced/press_and_hold", "intSelectedItem", SettingType.LIST_DYNAMIC));
     }
 
     private static void addValueSetting(final SettingSpec spec) {

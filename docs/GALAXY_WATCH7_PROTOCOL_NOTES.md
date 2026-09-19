@@ -2605,3 +2605,22 @@ watch apply it (`StDataLayerScreenTimeout getScreenTimeoutValueByIndex: 60, inde
 notification-sound list populated with the real 11 names (Stumm/Beep/Chirp/…). The
 ringtone list didn't always arrive this session; the ListPreference stays disabled
 gracefully until the watch pushes it.
+
+### §39 addendum — Buttons & gestures pickers
+
+Also wired `advanced/press_and_hold` (long-press Home key) as a LIST_DYNAMIC: options came
+through as clean localized labels (Digitaler Assistent / Bixby / Ausschalten-Menü) and a
+write applied live (selected_item=1 -> watch resolved to Bixby and echoed selected_name
+`com.samsung.android.bixby.agent/...WinkService`; restored to 0 afterwards).
+
+The other advanced pickers are deliberately NOT wired:
+- `action_button`, `status_indicator`: their `arrayItemList` entries are raw component
+  names / internal tokens the watch does NOT localize inline
+  (`com.samsung.android.watch.stopwatch/...StopwatchActionButtonService`, `show`/`hide2`) -
+  would need resolving component->app-label (the installed_apps DataItem carries names) and
+  a token->string map. Poor UX without that, so omitted.
+- `double_press` (selected_package), `digital_assistant` (selected_name),
+  `labs/quicklaunch` (launch_package): selection is a STRING, not an int index, written to a
+  different path with a not-yet-confirmed DataMap key, and the list is `arrayPackageIdList`
+  of raw package ids. Needs a capture of the stock app changing one to confirm the write
+  key + label source. Added to the deferred capture list.

@@ -23,6 +23,7 @@
         <SwitchPreferenceCompat android:defaultValue="false" android:key="pref_galaxywatch7_advanced_labs_quicklaunch_enabled" android:title="@string/prefs_gw7_advanced_labs_quicklaunch_enabled" />
         <SwitchPreferenceCompat android:defaultValue="false" android:key="pref_galaxywatch7_advanced_media_control_auto_launch_media_controls" android:title="@string/prefs_gw7_advanced_media_control_auto_launch_media_controls" />
         <SwitchPreferenceCompat android:defaultValue="false" android:key="pref_galaxywatch7_advanced_media_control_show_ongoing_icon" android:title="@string/prefs_gw7_advanced_media_control_show_ongoing_icon" />
+        <ListPreference android:key="pref_galaxywatch7_advanced_press_and_hold" android:title="@string/prefs_gw7_advanced_press_and_hold" app:useSimpleSummaryProvider="true" />
     </PreferenceCategory>
     <PreferenceCategory android:title="@string/prefs_gw7_cat_general">
         <SwitchPreferenceCompat android:defaultValue="false" android:key="pref_galaxywatch7_general_touch_bezel" android:title="@string/prefs_gw7_general_touch_bezel" />

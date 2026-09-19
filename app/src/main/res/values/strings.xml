@@ -5677,6 +5677,7 @@
     <string name="prefs_gw7_sound_notification_vibration">Notification vibration</string>
     <string name="prefs_gw7_sound_ringtone">Ringtone</string>
     <string name="prefs_gw7_sound_ringtone_vibration">Ringtone vibration</string>
+    <string name="prefs_gw7_advanced_press_and_hold">Press and hold Home key</string>
     <string name="prefs_gw7_sound_volume_media">Volume: media</string>
     <string name="prefs_gw7_sound_volume_ringtone">Volume: ringtone</string>
     <string name="prefs_gw7_sound_volume_notifications">Volume: notifications</string>
