@@ -168,30 +168,35 @@ object WorkoutUploader {
         val id = summary.id ?: return SyncOutcome.NotApplicable
         val sourceHash = WorkoutUploadStore.sourceHashOf(summary)
         val row = WorkoutUploadStore.rowsForSummaries(listOf(id))[id]?.get(target.service)
-        if (row == null || row.status != WorkoutUploadStore.STATUS_SUCCESS) {
-            return uploadNew(context, gbDevice, provider, target, summary, sourceHash, summaryData)
-        }
-        val remoteId = row.remoteActivityId
-        if (verifyRemote && remoteId != null) {
-            when (target.lookupRemote(context, remoteId)) {
-                RemoteLookup.GONE -> {
-                    LOG.info("Service {} no longer holds activity {} of summary {}, uploading it again",
-                        target.service, remoteId, id)
-                    // Dropped first so that a failed upload leaves a failed first attempt, which the
-                    // background worker picks up again, rather than a row naming an activity that
-                    // no longer exists.
-                    WorkoutUploadStore.delete(id, target.service)
-                    return uploadNew(context, gbDevice, provider, target, summary, sourceHash, summaryData)
-                }
+        return when (syncActionFor(row, sourceHash)) {
+            SyncAction.UPLOAD ->
+                uploadNew(context, gbDevice, provider, target, summary, sourceHash, summaryData)
 
-                RemoteLookup.FAILED -> return SyncOutcome.Failed(null)
-                RemoteLookup.PRESENT, null -> Unit
-            }
+            SyncAction.ALREADY_IN_STEP -> SyncOutcome.AlreadyInStep
+
+            SyncAction.RESYNC -> resyncWorkout(
+                context, gbDevice, provider, target, summary, row!!, sourceHash, summaryData
+            )
         }
-        if (row.sourceHash == sourceHash && row.lastError == null) {
-            return SyncOutcome.AlreadyInStep
-        }
-        return resyncWorkout(context, gbDevice, provider, target, summary, row, sourceHash, summaryData)
+    }
+
+    /** What sending a workout to a service amounts to, given what that service already holds. */
+    enum class SyncAction { UPLOAD, RESYNC, ALREADY_IN_STEP }
+
+    /**
+     * What to do about [row], the service's last word on this workout, now that the workout
+     * fingerprints as [sourceHash].
+     *
+     * A service holds the activity only once an upload has succeeded, so anything else means
+     * starting over: never uploaded, or an upload that failed. A row that succeeded is left alone
+     * when the workout has not changed since and nothing was left outstanding, which is what stops
+     * asking twice from leaving a second activity behind.
+     */
+    @JvmStatic
+    fun syncActionFor(row: WorkoutUpload?, sourceHash: String): SyncAction = when {
+        row == null || row.status != WorkoutUploadStore.STATUS_SUCCESS -> SyncAction.UPLOAD
+        row.sourceHash == sourceHash && row.lastError == null -> SyncAction.ALREADY_IN_STEP
+        else -> SyncAction.RESYNC
     }
 
     /** Uploads [summary] to [target] for the first time. Blocking: call from an IO context. */
@@ -249,7 +254,16 @@ object WorkoutUploader {
         summaryData: ActivitySummaryData? = null
     ): SyncOutcome {
         val id = summary.id ?: return SyncOutcome.NotApplicable
-        var remoteId = row.remoteActivityId ?: return SyncOutcome.NotApplicable
+        // A service can take a workout without naming what it became, and then there is nothing to
+        // point a later change at. Recording the current fingerprint says so once, instead of
+        // leaving the workout looking unfinished and bringing every later sync back to it.
+        var remoteId = row.remoteActivityId ?: run {
+            WorkoutUploadStore.recordSuccess(
+                id, target.service, null, row.photoHash, row.photoMediaId,
+                sourceHash, row.payloadHash, row.hadTrack
+            )
+            return SyncOutcome.AlreadyInStep
+        }
         var photoHash = row.photoHash
         var photoMediaId = row.photoMediaId
         var payloadHash = row.payloadHash
