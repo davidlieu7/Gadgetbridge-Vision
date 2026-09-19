@@ -245,6 +245,13 @@ public class GalaxyWatch7DeviceSupport extends AbstractBTBRDeviceSupport {
         BOOLEAN_SETTINGS.put("pref_galaxywatch7_sound_settings_system_vibration_charging", "sound_settings/system_vibration/charging");
         BOOLEAN_SETTINGS.put("pref_galaxywatch7_sound_settings_system_vibration_dialing_keypad", "sound_settings/system_vibration/dialing_keypad");
         BOOLEAN_SETTINGS.put("pref_galaxywatch7_sound_settings_system_vibration_samsung_keyboard", "sound_settings/system_vibration/samsung_keyboard");
+        // Additional toggles from the settings catalog (§5h). Any whose path the watch does not
+        // actually publish simply never reflects/applies; harmless.
+        BOOLEAN_SETTINGS.put("pref_galaxywatch7_advanced_bixby_enabled", "advanced/bixby/enabled");
+        BOOLEAN_SETTINGS.put("pref_galaxywatch7_display_outdoor_mode", "display/outdoor_mode");
+        BOOLEAN_SETTINGS.put("pref_galaxywatch7_sound_vibration_feedback", "sound_settings/vibration_feedback");
+        BOOLEAN_SETTINGS.put("pref_galaxywatch7_sound_vibration_with_sound", "sound_settings/vibration_with_sound");
+        BOOLEAN_SETTINGS.put("pref_galaxywatch7_phone_dnd_sync", "phone/dnd/sync_do_not_disturb/enabled");
     }
 
     // Non-boolean settings: a slider (INT) or a list. Each maps a GB preference key to the watch
@@ -301,6 +308,8 @@ public class GalaxyWatch7DeviceSupport extends AbstractBTBRDeviceSupport {
         addValueSetting(new SettingSpec("pref_galaxywatch7_sound_volume_notifications", "sound_settings/volume/notifications", "intLevel", SettingType.INT));
         addValueSetting(new SettingSpec("pref_galaxywatch7_sound_volume_ringtone", "sound_settings/volume/ringtone", "intLevel", SettingType.INT));
         addValueSetting(new SettingSpec("pref_galaxywatch7_sound_volume_system", "sound_settings/volume/system", "intLevel", SettingType.INT));
+        addValueSetting(new SettingSpec("pref_galaxywatch7_sound_volume_accessibility", "sound_settings/volume/accessibility", "intLevel", SettingType.INT));
+        addValueSetting(new SettingSpec("pref_galaxywatch7_sound_volume_bixby", "sound_settings/volume/bixby", "intLevel", SettingType.INT));
         addValueSetting(new SettingSpec("pref_galaxywatch7_sound_mode", "sound_settings/sound_mode", "stringMode", SettingType.STRING));
         addValueSetting(new SettingSpec("pref_galaxywatch7_sound_vibration_intensity", "sound_settings/vibration_intensity", "intSelectedItem", SettingType.INT_LIST));
         // Dynamic lists (options pushed by the watch).

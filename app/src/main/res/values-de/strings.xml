@@ -4505,6 +4505,13 @@
     <string name="prefs_gw7_sound_ringtone">Klingelton</string>
     <string name="prefs_gw7_sound_ringtone_vibration">Klingelton-Vibration</string>
     <string name="prefs_gw7_advanced_press_and_hold">Home-Taste gedrückt halten</string>
+    <string name="prefs_gw7_advanced_bixby_enabled">Bixby aktiviert</string>
+    <string name="prefs_gw7_display_outdoor_mode">Outdoor-Modus</string>
+    <string name="prefs_gw7_sound_vibration_feedback">Vibrations-Feedback</string>
+    <string name="prefs_gw7_sound_vibration_with_sound">Mit Ton vibrieren</string>
+    <string name="prefs_gw7_phone_dnd_sync">Nicht stören mit Telefon synchronisieren</string>
+    <string name="prefs_gw7_sound_volume_accessibility">Lautstärke: Bedienungshilfen</string>
+    <string name="prefs_gw7_sound_volume_bixby">Lautstärke: Bixby</string>
     <string name="prefs_gw7_sound_volume_media">Lautstärke: Medien</string>
     <string name="prefs_gw7_sound_volume_ringtone">Lautstärke: Klingelton</string>
     <string name="prefs_gw7_sound_volume_notifications">Lautstärke: Benachrichtigungen</string>

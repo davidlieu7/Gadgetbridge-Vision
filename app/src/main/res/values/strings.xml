@@ -5678,6 +5678,13 @@
     <string name="prefs_gw7_sound_ringtone">Ringtone</string>
     <string name="prefs_gw7_sound_ringtone_vibration">Ringtone vibration</string>
     <string name="prefs_gw7_advanced_press_and_hold">Press and hold Home key</string>
+    <string name="prefs_gw7_advanced_bixby_enabled">Bixby enabled</string>
+    <string name="prefs_gw7_display_outdoor_mode">Outdoor mode</string>
+    <string name="prefs_gw7_sound_vibration_feedback">Vibration feedback</string>
+    <string name="prefs_gw7_sound_vibration_with_sound">Vibrate with sound</string>
+    <string name="prefs_gw7_phone_dnd_sync">Sync Do Not Disturb with phone</string>
+    <string name="prefs_gw7_sound_volume_accessibility">Volume: Accessibility</string>
+    <string name="prefs_gw7_sound_volume_bixby">Volume: Bixby</string>
     <string name="prefs_gw7_sound_volume_media">Volume: media</string>
     <string name="prefs_gw7_sound_volume_ringtone">Volume: ringtone</string>
     <string name="prefs_gw7_sound_volume_notifications">Volume: notifications</string>
