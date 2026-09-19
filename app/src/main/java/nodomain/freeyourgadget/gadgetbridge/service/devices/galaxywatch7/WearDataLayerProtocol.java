@@ -625,6 +625,41 @@ public final class WearDataLayerProtocol {
         return container == null ? null : new ProtoReader(container).findString(2);
     }
 
+    /**
+     * Reads an array DataMap entry (e.g. "arrayItemList" in a {@code .../list} setting) from a
+     * DataItem's value, as a list of display labels in index order. The array typedValue is
+     * {f1=10, f2={f10=element (repeated)}}; each element is itself a Wear TypedValue
+     * ({f1=typeTag, f2=container}), NOT a bare string - so string options are {typeTag 2, {f2=str}}
+     * and numeric options (e.g. screen-timeout seconds) are {typeTag 6, {f6=int}}. We render strings
+     * as-is and numbers as their decimal value. Some string entries are {@code "value::label"};
+     * callers may split on "::". Returns {@code null} if the key is absent.
+     */
+    public static java.util.List<String> parseDataMapStringArray(final byte[] message, final String key) {
+        final byte[] container = findDataMapContainer(message, key);
+        if (container == null) {
+            return null;
+        }
+        final java.util.List<String> out = new java.util.ArrayList<>();
+        for (final byte[] element : new ProtoReader(container).findAllMessages(10)) {
+            final byte[] inner = new ProtoReader(element).findMessage(2);
+            String label = null;
+            if (inner != null) {
+                label = new ProtoReader(inner).findString(2); // string option (typeTag 2)
+                if (label == null) {
+                    Long n = new ProtoReader(inner).findVarint(6); // int option (typeTag 6)
+                    if (n == null) {
+                        n = new ProtoReader(inner).findVarint(5); // long option (typeTag 5)
+                    }
+                    if (n != null) {
+                        label = String.valueOf(n);
+                    }
+                }
+            }
+            out.add(label != null ? label : "");
+        }
+        return out;
+    }
+
     /** Finds the typedValue container (typedValue.f2) for the given DataMap key, or null. */
     private static byte[] findDataMapContainer(final byte[] message, final String key) {
         final byte[] dataMap = parseDataItemValue(message);

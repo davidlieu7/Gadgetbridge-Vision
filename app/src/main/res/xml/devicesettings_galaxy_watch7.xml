@@ -4,6 +4,7 @@
     <PreferenceCategory android:title="@string/prefs_gw7_cat_display">
         <SeekBarPreference android:defaultValue="128" android:key="pref_galaxywatch7_display_brightness" android:max="254" app:min="0" app:showSeekBarValue="true" android:title="@string/prefs_gw7_display_brightness" />
         <SeekBarPreference android:defaultValue="2" android:key="pref_galaxywatch7_display_font_size" android:max="5" app:min="0" app:showSeekBarValue="true" android:title="@string/prefs_gw7_display_font_size" />
+        <ListPreference android:key="pref_galaxywatch7_display_screen_timeout" android:title="@string/prefs_gw7_display_screen_timeout" app:useSimpleSummaryProvider="true" />
         <SwitchPreferenceCompat android:defaultValue="false" android:key="pref_galaxywatch7_display_always_on_display" android:title="@string/prefs_gw7_display_always_on_display" />
         <SwitchPreferenceCompat android:defaultValue="false" android:key="pref_galaxywatch7_display_auto_low_brightness" android:title="@string/prefs_gw7_display_auto_low_brightness" />
         <SwitchPreferenceCompat android:defaultValue="false" android:key="pref_galaxywatch7_display_bold_font" android:title="@string/prefs_gw7_display_bold_font" />
@@ -33,6 +34,10 @@
     <PreferenceCategory android:title="@string/prefs_gw7_cat_sound">
         <ListPreference android:defaultValue="sound" android:key="pref_galaxywatch7_sound_mode" android:entries="@array/prefs_gw7_sound_mode_names" android:entryValues="@array/prefs_gw7_sound_mode_values" android:title="@string/prefs_gw7_sound_mode" app:useSimpleSummaryProvider="true" />
         <ListPreference android:defaultValue="0" android:key="pref_galaxywatch7_sound_vibration_intensity" android:entries="@array/prefs_gw7_vibration_intensity_names" android:entryValues="@array/prefs_gw7_vibration_intensity_values" android:title="@string/prefs_gw7_sound_vibration_intensity" app:useSimpleSummaryProvider="true" />
+        <ListPreference android:key="pref_galaxywatch7_sound_notification_sound" android:title="@string/prefs_gw7_sound_notification_sound" app:useSimpleSummaryProvider="true" />
+        <ListPreference android:key="pref_galaxywatch7_sound_notification_vibration" android:title="@string/prefs_gw7_sound_notification_vibration" app:useSimpleSummaryProvider="true" />
+        <ListPreference android:key="pref_galaxywatch7_sound_ringtone" android:title="@string/prefs_gw7_sound_ringtone" app:useSimpleSummaryProvider="true" />
+        <ListPreference android:key="pref_galaxywatch7_sound_ringtone_vibration" android:title="@string/prefs_gw7_sound_ringtone_vibration" app:useSimpleSummaryProvider="true" />
         <SeekBarPreference android:defaultValue="7" android:key="pref_galaxywatch7_sound_volume_media" android:max="15" app:min="0" app:showSeekBarValue="true" android:title="@string/prefs_gw7_sound_volume_media" />
         <SeekBarPreference android:defaultValue="7" android:key="pref_galaxywatch7_sound_volume_ringtone" android:max="15" app:min="0" app:showSeekBarValue="true" android:title="@string/prefs_gw7_sound_volume_ringtone" />
         <SeekBarPreference android:defaultValue="7" android:key="pref_galaxywatch7_sound_volume_notifications" android:max="15" app:min="0" app:showSeekBarValue="true" android:title="@string/prefs_gw7_sound_volume_notifications" />

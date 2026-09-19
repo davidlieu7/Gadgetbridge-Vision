@@ -18,6 +18,7 @@ package nodomain.freeyourgadget.gadgetbridge.devices.galaxywatch7;
 
 import android.os.Parcel;
 
+import androidx.preference.ListPreference;
 import androidx.preference.Preference;
 
 import java.util.Collections;
@@ -25,6 +26,7 @@ import java.util.Set;
 
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSpecificSettingsCustomizer;
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSpecificSettingsHandler;
+import nodomain.freeyourgadget.gadgetbridge.service.devices.galaxywatch7.GalaxyWatch7DeviceSupport;
 import nodomain.freeyourgadget.gadgetbridge.util.Prefs;
 
 /**
@@ -72,6 +74,12 @@ public class GalaxyWatch7SettingsCustomizer implements DeviceSpecificSettingsCus
             "pref_galaxywatch7_sound_volume_system",
             "pref_galaxywatch7_sound_mode",
             "pref_galaxywatch7_sound_vibration_intensity",
+            // Dynamic lists (options pushed by the watch).
+            "pref_galaxywatch7_display_screen_timeout",
+            "pref_galaxywatch7_sound_notification_sound",
+            "pref_galaxywatch7_sound_notification_vibration",
+            "pref_galaxywatch7_sound_ringtone",
+            "pref_galaxywatch7_sound_ringtone_vibration",
     };
 
     @Override
@@ -82,6 +90,28 @@ public class GalaxyWatch7SettingsCustomizer implements DeviceSpecificSettingsCus
     public void customizeSettings(final DeviceSpecificSettingsHandler handler, final Prefs prefs, final String rootKey) {
         for (final String prefKey : SENT_PREFERENCES) {
             handler.addPreferenceHandlerFor(prefKey);
+        }
+        // Populate the dynamic ListPreferences from the option labels the watch last pushed
+        // (cached in the device prefs by GalaxyWatch7DeviceSupport). Entry values are the index
+        // strings the watch expects back as "selected_item".
+        for (final String prefKey : GalaxyWatch7DeviceSupport.dynamicListPrefKeys()) {
+            final ListPreference lp = handler.findPreference(prefKey);
+            if (lp == null) {
+                continue;
+            }
+            final String cached = prefs.getString(prefKey + GalaxyWatch7DeviceSupport.DYNLIST_ENTRIES_SUFFIX, "");
+            if (cached == null || cached.isEmpty()) {
+                lp.setEnabled(false); // no options received from the watch yet
+                continue;
+            }
+            final String[] entries = cached.split("\n");
+            final CharSequence[] entryValues = new CharSequence[entries.length];
+            for (int i = 0; i < entries.length; i++) {
+                entryValues[i] = String.valueOf(i);
+            }
+            lp.setEntries(entries);
+            lp.setEntryValues(entryValues);
+            lp.setEnabled(true);
         }
     }
 

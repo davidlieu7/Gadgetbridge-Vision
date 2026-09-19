@@ -254,24 +254,46 @@ public class GalaxyWatch7DeviceSupport extends AbstractBTBRDeviceSupport {
     // values are numeric strings written as an int index (e.g. vibration_intensity "intSelectedItem").
     // Only settings whose watch-side handleSyncData actually applies the incoming value are wired -
     // font_style and securitysetting/wrist_detection are echo-only on the watch and omitted on purpose.
-    enum SettingType { INT, STRING, INT_LIST }
+    // LIST_DYNAMIC = a ListPreference whose options are NOT fixed but pushed by the watch as a
+    // "<base>/list" DataItem (DataMap key "arrayItemList", a string array of labels in index order);
+    // the selection is a "<base>/selected_item" int (key "intSelectedItem"). We cache the labels and
+    // populate the ListPreference at runtime (see GalaxyWatch7SettingsCustomizer), reflect the
+    // selected index, and write "<base>/selected_item" on change.
+    enum SettingType { INT, STRING, INT_LIST, LIST_DYNAMIC }
 
     static final class SettingSpec {
         final String prefKey;
         final String subPath;
         final String valueKey;
         final SettingType type;
+        // For LIST_DYNAMIC: the sub-path of the option-list DataItem (usually subPath + "/list", but
+        // e.g. ringtone's list lives at "sound_settings/ringtone/name/list"). Null otherwise.
+        final String listPath;
 
         SettingSpec(final String prefKey, final String subPath, final String valueKey, final SettingType type) {
+            this(prefKey, subPath, valueKey, type, type == SettingType.LIST_DYNAMIC ? subPath + "/list" : null);
+        }
+
+        SettingSpec(final String prefKey, final String subPath, final String valueKey,
+                    final SettingType type, final String listPath) {
             this.prefKey = prefKey;
             this.subPath = subPath;
             this.valueKey = valueKey;
             this.type = type;
+            this.listPath = listPath;
         }
     }
 
+    // Suffix on the device pref under which we cache a LIST_DYNAMIC setting's option labels
+    // (newline-joined), so the settings screen can populate the ListPreference from the last values
+    // the watch pushed. Public so the settings customizer reads the same key.
+    public static final String DYNLIST_ENTRIES_SUFFIX = "_gw7_entries";
+
     private static final java.util.Map<String, SettingSpec> VALUE_SETTINGS = new java.util.LinkedHashMap<>();
     private static final java.util.Map<String, SettingSpec> VALUE_SETTINGS_BY_PATH = new java.util.HashMap<>();
+    // LIST_DYNAMIC only: option-list sub-path ("<base>/list") -> spec, to catch the list DataItem.
+    private static final java.util.Map<String, SettingSpec> VALUE_SETTINGS_BY_LIST_PATH = new java.util.HashMap<>();
+    static final java.util.List<SettingSpec> DYNAMIC_LIST_SETTINGS = new java.util.ArrayList<>();
     static {
         addValueSetting(new SettingSpec("pref_galaxywatch7_display_brightness", "display/brightness", "intLevel", SettingType.INT));
         addValueSetting(new SettingSpec("pref_galaxywatch7_display_font_size", "display/font_size", "intLevel", SettingType.INT));
@@ -281,11 +303,31 @@ public class GalaxyWatch7DeviceSupport extends AbstractBTBRDeviceSupport {
         addValueSetting(new SettingSpec("pref_galaxywatch7_sound_volume_system", "sound_settings/volume/system", "intLevel", SettingType.INT));
         addValueSetting(new SettingSpec("pref_galaxywatch7_sound_mode", "sound_settings/sound_mode", "stringMode", SettingType.STRING));
         addValueSetting(new SettingSpec("pref_galaxywatch7_sound_vibration_intensity", "sound_settings/vibration_intensity", "intSelectedItem", SettingType.INT_LIST));
+        // Dynamic lists (options pushed by the watch).
+        addValueSetting(new SettingSpec("pref_galaxywatch7_display_screen_timeout", "display/screen_time_out", "intSelectedItem", SettingType.LIST_DYNAMIC));
+        addValueSetting(new SettingSpec("pref_galaxywatch7_sound_notification_sound", "sound_settings/notification_sound", "intSelectedItem", SettingType.LIST_DYNAMIC));
+        addValueSetting(new SettingSpec("pref_galaxywatch7_sound_notification_vibration", "sound_settings/notification_vibration", "intSelectedItem", SettingType.LIST_DYNAMIC));
+        addValueSetting(new SettingSpec("pref_galaxywatch7_sound_ringtone", "sound_settings/ringtone", "intSelectedItem", SettingType.LIST_DYNAMIC, "sound_settings/ringtone/name/list"));
+        addValueSetting(new SettingSpec("pref_galaxywatch7_sound_ringtone_vibration", "sound_settings/ringtone_vibration", "intSelectedItem", SettingType.LIST_DYNAMIC));
     }
 
     private static void addValueSetting(final SettingSpec spec) {
         VALUE_SETTINGS.put(spec.prefKey, spec);
         VALUE_SETTINGS_BY_PATH.put(spec.subPath, spec);
+        if (spec.type == SettingType.LIST_DYNAMIC) {
+            VALUE_SETTINGS_BY_LIST_PATH.put(spec.listPath, spec);
+            DYNAMIC_LIST_SETTINGS.add(spec);
+        }
+    }
+
+    /** GB preference keys of the dynamic-list settings (options pushed by the watch). For the
+     *  settings customizer, which lives in a different package. */
+    public static String[] dynamicListPrefKeys() {
+        final String[] keys = new String[DYNAMIC_LIST_SETTINGS.size()];
+        for (int i = 0; i < keys.length; i++) {
+            keys[i] = DYNAMIC_LIST_SETTINGS.get(i).prefKey;
+        }
+        return keys;
     }
     // Reverse map: the protogensettings "<group>/<key>" -> GB preference key, to reflect the
     // watch's reported values back into the device prefs so the UI shows the real state.
@@ -335,7 +377,9 @@ public class GalaxyWatch7DeviceSupport extends AbstractBTBRDeviceSupport {
             write = WearDataLayerProtocol.buildWatchSettingBooleanPut(
                     SETTINGS_SOURCE_PACKAGE, SETTINGS_SOURCE_SIGNATURE, node, subPath, enabled, seq);
         } else {
-            subPath = valueSpec.subPath;
+            // A dynamic list is written to "<base>/selected_item"; everything else writes its subPath.
+            subPath = valueSpec.type == SettingType.LIST_DYNAMIC
+                    ? valueSpec.subPath + "/selected_item" : valueSpec.subPath;
             switch (valueSpec.type) {
                 case STRING: {
                     final String value = prefs.getString(config, "");
@@ -344,7 +388,8 @@ public class GalaxyWatch7DeviceSupport extends AbstractBTBRDeviceSupport {
                             SETTINGS_SOURCE_PACKAGE, SETTINGS_SOURCE_SIGNATURE, node, subPath, valueSpec.valueKey, value, seq);
                     break;
                 }
-                case INT_LIST: {
+                case INT_LIST:
+                case LIST_DYNAMIC: {
                     // ListPreference stores the index as a numeric string; the watch reads an int.
                     final int value = parseIntPref(prefs.getString(config, "0"), 0);
                     LOG.info("Galaxy Watch7: sending w_module {} = {} under node {} (seq {})", subPath, value, node, seq);
@@ -669,6 +714,39 @@ public class GalaxyWatch7DeviceSupport extends AbstractBTBRDeviceSupport {
                 prefs.edit().putBoolean(booleanPrefKey, value).apply();
             }
             return;
+        }
+
+        // Dynamic list: the watch pushes the option set as "<base>/list" - cache the labels so the
+        // settings screen can populate the ListPreference from the last values the watch reported.
+        final SettingSpec listSpec = VALUE_SETTINGS_BY_LIST_PATH.get(subPath);
+        if (listSpec != null) {
+            final java.util.List<String> labels = WearDataLayerProtocol.parseDataMapStringArray(message, "arrayItemList");
+            if (labels != null && !labels.isEmpty()) {
+                final StringBuilder sb = new StringBuilder();
+                for (final String l : labels) {
+                    final int sep = l.indexOf("::"); // some entries are "value::label"
+                    sb.append(sep >= 0 ? l.substring(sep + 2) : l).append('\n');
+                }
+                final String joined = sb.toString();
+                if (!joined.equals(prefs.getString(listSpec.prefKey + DYNLIST_ENTRIES_SUFFIX, null))) {
+                    LOG.info("Galaxy Watch7: cached {} options for {}", labels.size(), listSpec.subPath);
+                    prefs.edit().putString(listSpec.prefKey + DYNLIST_ENTRIES_SUFFIX, joined).apply();
+                }
+            }
+            return;
+        }
+        // Dynamic list selection: "<base>/selected_item" -> store the chosen index as the pref value.
+        if (subPath.endsWith("/selected_item")) {
+            final String base = subPath.substring(0, subPath.length() - "/selected_item".length());
+            final SettingSpec selSpec = VALUE_SETTINGS_BY_PATH.get(base);
+            if (selSpec != null && selSpec.type == SettingType.LIST_DYNAMIC) {
+                final Integer value = WearDataLayerProtocol.parseDataMapInt(message, "intSelectedItem");
+                if (value != null && !String.valueOf(value).equals(prefs.getString(selSpec.prefKey, null))) {
+                    LOG.info("Galaxy Watch7: reflecting {} = {} from watch", subPath, value);
+                    prefs.edit().putString(selSpec.prefKey, String.valueOf(value)).apply();
+                }
+                return;
+            }
         }
 
         final SettingSpec spec = VALUE_SETTINGS_BY_PATH.get(subPath);

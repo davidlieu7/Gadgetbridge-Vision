@@ -2568,3 +2568,40 @@ implementing the sends is straightforward.
 
 **Step-by-step runbook for doing these captures (written to be followed with no prior
 context): `docs/GALAXY_WATCH7_CAPTURE_RUNBOOK.md`.**
+
+## 39. Dynamic list settings — WORKING (options pushed by the watch)
+
+Finished the settings feature by wiring the "dynamic" lists whose options are not a fixed
+enum but pushed by the watch as a `<base>/list` DataItem. Verified live end-to-end.
+
+Wire format (decoded from the raw bytes): a `<base>/list` DataMap carries key
+`arrayItemList` whose value is an ARRAY typedValue `{f1=10, f2={f10=element (repeated)}}`.
+Each element is ITSELF a Wear TypedValue, NOT a bare string:
+- string option: `{f1=2, f2={f2="<label>"}}` (e.g. notification sounds "Stumm", "Beep", …)
+- int option:    `{f1=6, f2={f6=<n>}}`      (e.g. screen-timeout seconds 15/30/60)
+`parseDataMapStringArray` decodes each element accordingly (string as-is, number as its
+decimal). Some string entries are `"value::label"` (split on "::"). The current selection
+is a separate `<base>/selected_item` int (key `intSelectedItem`); the label list and the
+selection index arrive as separate DataItems.
+
+GB wiring:
+- New `SettingType.LIST_DYNAMIC` (+ optional `listPath` on SettingSpec, since ringtone's
+  list is at `sound_settings/ringtone/name/list` while its selection is at
+  `sound_settings/ringtone/selected_item`).
+- On receive: cache the decoded labels in the device pref `<prefKey>_gw7_entries`
+  (newline-joined) and reflect `selected_item` into `<prefKey>` (index as string).
+- `GalaxyWatch7SettingsCustomizer.customizeSettings` populates each ListPreference at
+  runtime from the cached labels (entryValues = "0".."n-1"); disabled until the watch has
+  pushed its options.
+- On change: write `<base>/selected_item` with `intSelectedItem` = chosen index.
+
+Wired (all LIST_DYNAMIC): `display/screen_time_out`, `sound_settings/notification_sound`,
+`sound_settings/notification_vibration`, `sound_settings/ringtone` (list at
+`.../ringtone/name/list`), `sound_settings/ringtone_vibration`.
+
+Verified live: the screen-timeout list populated with 15/30/60 and selecting 60 made the
+watch apply it (`StDataLayerScreenTimeout getScreenTimeoutValueByIndex: 60, index: 2` ->
+`setScreenTimeout:60000` -> PowerManager `mScreenOffTimeoutSetting: 60000`). The
+notification-sound list populated with the real 11 names (Stumm/Beep/Chirp/…). The
+ringtone list didn't always arrive this session; the ListPreference stays disabled
+gracefully until the watch pushes it.

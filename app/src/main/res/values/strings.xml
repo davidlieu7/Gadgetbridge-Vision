@@ -5672,6 +5672,11 @@
     <string name="prefs_gw7_display_font_size">Font size</string>
     <string name="prefs_gw7_sound_mode">Sound mode</string>
     <string name="prefs_gw7_sound_vibration_intensity">Vibration intensity</string>
+    <string name="prefs_gw7_display_screen_timeout">Screen timeout</string>
+    <string name="prefs_gw7_sound_notification_sound">Notification sound</string>
+    <string name="prefs_gw7_sound_notification_vibration">Notification vibration</string>
+    <string name="prefs_gw7_sound_ringtone">Ringtone</string>
+    <string name="prefs_gw7_sound_ringtone_vibration">Ringtone vibration</string>
     <string name="prefs_gw7_sound_volume_media">Volume: media</string>
     <string name="prefs_gw7_sound_volume_ringtone">Volume: ringtone</string>
     <string name="prefs_gw7_sound_volume_notifications">Volume: notifications</string>

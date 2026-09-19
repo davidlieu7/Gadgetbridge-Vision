@@ -4499,6 +4499,11 @@
     <string name="prefs_gw7_display_font_size">Schriftgröße</string>
     <string name="prefs_gw7_sound_mode">Tonmodus</string>
     <string name="prefs_gw7_sound_vibration_intensity">Vibrationsstärke</string>
+    <string name="prefs_gw7_display_screen_timeout">Bildschirm-Timeout</string>
+    <string name="prefs_gw7_sound_notification_sound">Benachrichtigungston</string>
+    <string name="prefs_gw7_sound_notification_vibration">Benachrichtigungsvibration</string>
+    <string name="prefs_gw7_sound_ringtone">Klingelton</string>
+    <string name="prefs_gw7_sound_ringtone_vibration">Klingelton-Vibration</string>
     <string name="prefs_gw7_sound_volume_media">Lautstärke: Medien</string>
     <string name="prefs_gw7_sound_volume_ringtone">Lautstärke: Klingelton</string>
     <string name="prefs_gw7_sound_volume_notifications">Lautstärke: Benachrichtigungen</string>
