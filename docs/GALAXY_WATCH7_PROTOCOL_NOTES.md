@@ -2474,3 +2474,43 @@ Recommendation: native Maps-style nav is a large RE project for little payoff on
 CoMaps data; the notification-card route is the realistic way to get turn-by-turn
 onto the GW7 with what we already have, accepting it won't look like Google's nav.
 Not implemented pending a decision.
+
+## 36. Media control — INVESTIGATION (mechanism identified, bigger than expected)
+
+Started implementing media control (GB has onSetMusicInfo/onSetMusicState + music
+control device events; watch advertises w_media_control / samsung_media_controls /
+third_party_media_controls / adaptive_media_bridging / volume_data).
+
+MessageApi/MessageEvent wire layout decoded (envelope payload field 10):
+  {1=seq varint}{2=srcPackage}{3=signingCertDigest}{4=targetNodeId}{5=0}
+  {6=path string}{7=data bytes (often JSON)}{8=srcNodeId}{10=4}{13=1}
+(added `describeMessageEvent` logging — commit 32bb2ba12). This is reusable for ALL
+MessageApi features (media, calls, find, weather).
+
+**Key finding — media on this OS uses `/adaptive_media_bridging/rpc/*`, NOT the legacy
+JSON.** Right after connect the watch (com.samsung.android.wcs.extension) proactively
+sends `/adaptive_media_bridging/rpc/watch_request` with a nested protobuf RPC payload,
+e.g. (field 7):
+  12 76 {0a24 "<uuid request id>"  124a {0a02 "OA"  1225 {0801 2801 3a1b ...}}}
+i.e. a request-id + method + args RPC envelope. The legacy JSON media msgIds
+catalogued in §5b (`mediametadata`/`playbackstate`/`volume`) were NOT seen from this
+watch this session — this OS/companion version appears to have moved media to the
+adaptive_media_bridging protobuf RPC.
+
+**Why this is a big task (not a quick win):**
+- The media protocol is a bidirectional custom protobuf RPC (session list + metadata +
+  playback state + transport commands + volume), not a handful of one-shot JSON pushes.
+- Both directions are gated on it: the watch's media controller shows nothing (and thus
+  sends no transport commands) until the phone answers `watch_request` with the current
+  media session via the same RPC — so there is no cheap "commands only" half.
+- We cannot easily capture the phone→watch response format now: the side that knows the
+  RPC is the stock companion (watch7plugin/wcs.extension), which is no longer the
+  companion (GB replaced it). A faithful capture needs a dedicated session with the
+  STOCK app as companion + real media playing, sniffing btsnoop + wcs.extension logcat
+  both ways (and/or decompiling ClockworkWcsExt.apk, pulled earlier as
+  apks_watch/wcs_extension.apk).
+
+Status: mechanism identified + MessageEvent transport decoded/logged; full media RPC
+NOT implemented. Recommend a focused stock-app capture session before implementing, or
+pivoting to a smaller MessageApi win first (find-my-watch, calls, weather) now that the
+MessageEvent layout is understood.
