@@ -48,6 +48,12 @@ class ShokzSupport : AbstractHeadphoneBTBRDeviceSupport(LOG, MAX_MTU) {
 
     private var lastMultipointDevices: List<MultipointDevice> = emptyList()
 
+    // The device only reports its battery level once, right after we request it on connect - there
+    // is no notification for battery changes. Keep polling periodically so the UI doesn't get stuck
+    // showing a stale level.
+    private val batteryPollHandler = Handler(Looper.getMainLooper())
+    private val batteryPollRunnable = Runnable { queueCommand(ShokzCommand.BATTERY_GET) }
+
     init {
         addSupportedService(UUID_SERVICE_SHOKZ)
     }
@@ -99,6 +105,7 @@ class ShokzSupport : AbstractHeadphoneBTBRDeviceSupport(LOG, MAX_MTU) {
     override fun dispose() {
         synchronized(ConnectionMonitor) {
             timeoutHandler.removeCallbacksAndMessages(null)
+            batteryPollHandler.removeCallbacksAndMessages(null)
             LocalBroadcastManager.getInstance(context).unregisterReceiver(multipointBroadcastReceiver)
             super.dispose()
         }
@@ -195,6 +202,9 @@ class ShokzSupport : AbstractHeadphoneBTBRDeviceSupport(LOG, MAX_MTU) {
             DeviceSettingsPreferenceConst.PREF_MEDIA_PLAYBACK_MODE -> setMediaPlaybackMode()
             DeviceSettingsPreferenceConst.PREF_SHOKZ_CONTROLS_LONG_PRESS_MULTI_FUNCTION,
             DeviceSettingsPreferenceConst.PREF_SHOKZ_CONTROLS_SIMULTANEOUS_VOLUME_UP_DOWN -> setControls()
+
+            DeviceSettingsPreferenceConst.PREF_BATTERY_POLLING_ENABLE,
+            DeviceSettingsPreferenceConst.PREF_BATTERY_POLLING_INTERVAL -> rearmBatteryPollTimer()
 
             else -> super.onSendConfiguration(config)
         }
@@ -442,6 +452,8 @@ class ShokzSupport : AbstractHeadphoneBTBRDeviceSupport(LOG, MAX_MTU) {
                 val batteryInfoEvent = GBDeviceEventBatteryInfo()
                 batteryInfoEvent.level = batteryPercentage
                 evaluateGBDeviceEvent(batteryInfoEvent)
+
+                rearmBatteryPollTimer()
             }
 
             ShokzCommand.EQUALIZER_RET, ShokzCommand.EQUALIZER_ACK -> {
@@ -745,6 +757,16 @@ class ShokzSupport : AbstractHeadphoneBTBRDeviceSupport(LOG, MAX_MTU) {
 
         if (pendingMessage == null) {
             sendNextCommand()
+        }
+    }
+
+    private fun rearmBatteryPollTimer() {
+        batteryPollHandler.removeCallbacks(batteryPollRunnable)
+        if (devicePrefs.getBatteryPollingEnabled()) {
+            batteryPollHandler.postDelayed(
+                batteryPollRunnable,
+                devicePrefs.getBatteryPollingIntervalMinutes() * 60 * 1000L
+            )
         }
     }
 
