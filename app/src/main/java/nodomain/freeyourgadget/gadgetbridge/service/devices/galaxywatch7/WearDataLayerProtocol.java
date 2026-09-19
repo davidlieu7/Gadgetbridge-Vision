@@ -491,11 +491,18 @@ public final class WearDataLayerProtocol {
 
     /**
      * If the message is the watch's `batterystate/data/batterystate` DataItem, returns
-     * {@code {level, status}} where level is 0-100 (proto field 1, verified against dumpsys) and
-     * status is the AOSP BatteryManager status (field 5: 2=charging, 3=discharging, 5=full);
-     * status is -1 if absent. Returns {@code null} for other messages.
+     * {@code {level, status, timestampMs}} where level is 0-100 (proto field 1, verified against
+     * dumpsys), status is the AOSP BatteryManager status (field 5: 2=charging, 3=discharging,
+     * 5=full; -1 if absent), and timestampMs is the reading's own epoch-millis timestamp (field 7;
+     * -1 if absent). Returns {@code null} for other messages.
+     * <p/>
+     * The timestamp matters because the watch keeps DataItems from more than one node identity (a
+     * stale one left over from an earlier enrolment plus the current one). Both publish a
+     * batterystate; the stale one carries an old value and an old timestamp. Callers must prefer the
+     * newest reading by timestamp rather than whichever arrives last on the wire, or a days-old
+     * cached level silently overwrites the live one.
      */
-    public static int[] parseBatteryState(final byte[] message) {
+    public static long[] parseBatteryState(final byte[] message) {
         final String path = parseDataItemPath(message);
         if (path == null || !path.contains("/batterystate/data/batterystate")) {
             return null;
@@ -509,7 +516,8 @@ public final class WearDataLayerProtocol {
             return null;
         }
         final Long status = new ProtoReader(value).findVarint(5);
-        return new int[]{level.intValue(), status == null ? -1 : status.intValue()};
+        final Long timestamp = new ProtoReader(value).findVarint(7);
+        return new long[]{level, status == null ? -1 : status, timestamp == null ? -1 : timestamp};
     }
 
     /**

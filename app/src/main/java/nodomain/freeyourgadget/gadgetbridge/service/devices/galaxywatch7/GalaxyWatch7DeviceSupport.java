@@ -516,17 +516,34 @@ public class GalaxyWatch7DeviceSupport extends AbstractBTBRDeviceSupport {
     private final java.util.concurrent.ConcurrentHashMap<String, Long> nodeCounters = new java.util.concurrent.ConcurrentHashMap<>();
 
     private int lastBatteryLevel = -1;
+    // Timestamp (field 7 of the batterystate value) of the newest reading we've accepted. The watch
+    // keeps a stale batterystate under an old node id alongside the live one; both arrive on connect,
+    // so we must take the newest by timestamp, not whichever lands last (else the stale, days-old
+    // level overwrites the correct one - the "battery stuck at 97%" bug).
+    private long lastBatteryTimestamp = -1;
 
     // Report the watch's battery level/state to Gadgetbridge from its batterystate DataItem.
     private void reflectBattery(final byte[] message) {
-        final int[] bs = WearDataLayerProtocol.parseBatteryState(message);
-        if (bs == null || bs[0] == lastBatteryLevel) {
+        final long[] bs = WearDataLayerProtocol.parseBatteryState(message);
+        if (bs == null) {
             return;
         }
-        lastBatteryLevel = bs[0];
+        final int level = (int) bs[0];
+        final long timestamp = bs[2];
+        // Ignore a reading older than the newest one we've taken (a stale node's cached value).
+        if (timestamp >= 0 && lastBatteryTimestamp >= 0 && timestamp < lastBatteryTimestamp) {
+            return;
+        }
+        if (level == lastBatteryLevel && timestamp <= lastBatteryTimestamp) {
+            return;
+        }
+        lastBatteryLevel = level;
+        if (timestamp >= 0) {
+            lastBatteryTimestamp = timestamp;
+        }
         final GBDeviceEventBatteryInfo info = new GBDeviceEventBatteryInfo();
-        info.level = bs[0];
-        switch (bs[1]) {
+        info.level = level;
+        switch ((int) bs[1]) {
             case 5: // BATTERY_STATUS_FULL
                 info.state = BatteryState.BATTERY_CHARGING_FULL;
                 break;
@@ -534,7 +551,7 @@ public class GalaxyWatch7DeviceSupport extends AbstractBTBRDeviceSupport {
                 info.state = BatteryState.BATTERY_CHARGING;
                 break;
             default:
-                info.state = bs[0] <= 15 ? BatteryState.BATTERY_LOW : BatteryState.BATTERY_NORMAL;
+                info.state = level <= 15 ? BatteryState.BATTERY_LOW : BatteryState.BATTERY_NORMAL;
                 break;
         }
         LOG.info("Galaxy Watch7: battery {}% state {}", info.level, info.state);
