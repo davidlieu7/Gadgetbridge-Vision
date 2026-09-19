@@ -180,6 +180,17 @@ object WorkoutUploader {
         }
     }
 
+    /**
+     * An access token that lasts minutes is expired far more often than not by the time a workout
+     * is sent, so it is renewed before talking to [target] rather than spending a request to find
+     * out. A renewal that fails is left for the request itself to report.
+     */
+    private fun renewExpiredCredentials(context: Context, target: WorkoutUploadTarget) {
+        if (target.credentialsExpired(context) && !target.refreshCredentials(context)) {
+            LOG.warn("Could not renew the credentials of service {}", target.service)
+        }
+    }
+
     /** What sending a workout to a service amounts to, given what that service already holds. */
     enum class SyncAction { UPLOAD, RESYNC, ALREADY_IN_STEP }
 
@@ -212,6 +223,7 @@ object WorkoutUploader {
         val id = summary.id ?: return SyncOutcome.NotApplicable
         val payload = buildPayload(context, gbDevice, provider, target, summary, summaryData)
             ?: return SyncOutcome.NotApplicable
+        renewExpiredCredentials(context, target)
         val result = target.upload(context, summary, payload)
         if (!result.success) {
             LOG.warn("Upload of summary {} to service {} failed: {}", id, target.service, result.reason)
@@ -264,6 +276,7 @@ object WorkoutUploader {
             )
             return SyncOutcome.AlreadyInStep
         }
+        renewExpiredCredentials(context, target)
         var photoHash = row.photoHash
         var photoMediaId = row.photoMediaId
         var payloadHash = row.payloadHash

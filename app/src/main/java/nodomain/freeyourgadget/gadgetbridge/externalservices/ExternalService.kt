@@ -130,6 +130,13 @@ interface ExternalService {
     fun refreshCredentials(context: Context): Boolean = true
 
     /**
+     * Whether the stored credentials have run out and [refreshCredentials] has to go first. A
+     * service whose access token is short-lived says so here, so a call is not spent finding out
+     * with a 401. Answers false for a service whose credentials do not expire.
+     */
+    fun credentialsExpired(context: Context): Boolean = false
+
+    /**
      * Handles the link the browser comes back on after a login, whose host is this service's [id].
      * What the rest of it carries is the service's own business.
      */
