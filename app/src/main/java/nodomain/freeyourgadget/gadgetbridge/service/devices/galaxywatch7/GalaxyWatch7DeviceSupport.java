@@ -607,6 +607,9 @@ public class GalaxyWatch7DeviceSupport extends AbstractBTBRDeviceSupport {
             data.put("state", androidState);
             data.put("position", state.getPosition() > 0 ? (long) state.getPosition() * 1000 : 0);
             data.put("speed", 1);
+            // Android PlaybackState action bitmask so the watch knows the session is controllable
+            // and shows transport buttons: STOP|PAUSE|PLAY|SKIP_NEXT|SKIP_PREV|PLAY_PAUSE = 1|2|4|32|16|512.
+            data.put("actions", 1 | 2 | 4 | 16 | 32 | 512);
             sendMediaMessage("playbackstate", data);
         } catch (final JSONException e) {
             LOG.warn("Galaxy Watch7: playback state json", e);
