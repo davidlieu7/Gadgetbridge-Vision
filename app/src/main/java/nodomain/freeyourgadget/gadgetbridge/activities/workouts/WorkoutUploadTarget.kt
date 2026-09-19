@@ -105,6 +105,21 @@ data class UploadCapabilities(
     val canLookUp: Boolean get() = RemoteOp.READ in activity
 
     /**
+     * Whether the service reads an activity's name and type out of the file it was given, which is
+     * what a service offering no way to edit them afterwards does. A rename then only reaches it
+     * by sending the file again, so the name belongs in what is compared against what it holds.
+     */
+    val metadataComesFromFile: Boolean get() = metadata.isEmpty()
+
+    /**
+     * Whether pushing a changed track costs the activity its identity, because the service offers
+     * no way to write a new track onto the one it holds. What the user loses is the address of the
+     * activity and anything the service hangs off it, which is why they are asked first.
+     */
+    val trackChangeIsDestructive: Boolean
+        get() = RemoteOp.UPDATE !in activity && RemoteOp.REPLACE in activity
+
+    /**
      * Whether the service can bring its copy of the header photo in line, which depends on which
      * way it changed: a service that takes a photo on upload and offers nothing afterwards can
      * neither replace nor remove one.
@@ -151,6 +166,13 @@ interface WorkoutUploadTarget : ExternalService {
 
     /** What this service accepts, and what it can still change once it holds an activity. */
     val capabilities: UploadCapabilities
+
+    /**
+     * Whether the service refuses to touch an activity that was edited on its own side, so a
+     * change made here cannot overwrite one made there. Only a service that has a way of telling
+     * can promise it, and the settings screen says so where it holds.
+     */
+    val keepsRemoteEdits: Boolean get() = false
 
     /**
      * Notification id used to report a failure. Derived from [service], which is unique and never

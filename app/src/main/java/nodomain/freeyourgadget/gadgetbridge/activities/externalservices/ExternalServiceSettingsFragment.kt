@@ -27,6 +27,7 @@ import kotlinx.coroutines.withContext
 import nodomain.freeyourgadget.gadgetbridge.R
 import nodomain.freeyourgadget.gadgetbridge.activities.AbstractPreferenceFragment
 import nodomain.freeyourgadget.gadgetbridge.activities.workouts.WorkoutUploadTarget
+import nodomain.freeyourgadget.gadgetbridge.activities.workouts.canChange
 import nodomain.freeyourgadget.gadgetbridge.externalservices.ExternalService
 import nodomain.freeyourgadget.gadgetbridge.externalservices.ExternalServiceRegistry
 import nodomain.freeyourgadget.gadgetbridge.externalservices.externalServiceLoginResultKey
@@ -86,12 +87,10 @@ class ExternalServiceSettingsFragment : AbstractPreferenceFragment() {
 
     /** Only a service that takes workouts has anything to upload automatically. */
     private fun addAutoUploadPreference(name: String) {
-        if (service !is WorkoutUploadTarget) {
-            return
-        }
+        val target = service as? WorkoutUploadTarget ?: return
         preferenceScreen.addPreference(
             SwitchPreferenceCompat(preferenceScreen.context).apply {
-                key = service.autoUploadPrefKey
+                key = target.autoUploadPrefKey
                 setDefaultValue(false)
                 layoutResource = R.layout.preference_checkbox
                 setIcon(R.drawable.ic_file_upload)
@@ -99,6 +98,41 @@ class ExternalServiceSettingsFragment : AbstractPreferenceFragment() {
                 summary = getString(R.string.pref_service_auto_upload_summary, name)
             }
         )
+        addSyncUpdatesPreference(target, name)
+    }
+
+    /**
+     * Whether changes made after a workout went up are sent on. Offered by any service that can
+     * change an activity it holds, and left out by one that cannot, which has nothing to decide.
+     *
+     * A service that can only replace the activity says so and starts off, since replacing costs
+     * the activity its address; one that writes onto the activity it holds starts on.
+     */
+    private fun addSyncUpdatesPreference(target: WorkoutUploadTarget, name: String) {
+        if (!target.capabilities.activity.canChange()) {
+            return
+        }
+        val destructive = target.capabilities.trackChangeIsDestructive
+        val preference = SwitchPreferenceCompat(preferenceScreen.context).apply {
+            key = target.syncUpdatesPrefKey
+            setDefaultValue(!destructive)
+            layoutResource = R.layout.preference_checkbox
+            setIcon(if (destructive) R.drawable.ic_warning else R.drawable.ic_sync)
+            title = getString(R.string.pref_service_sync_updates_title, name)
+            summary = listOfNotNull(
+                if (destructive) {
+                    getString(R.string.pref_service_sync_updates_destructive_summary, name)
+                } else {
+                    getString(R.string.pref_service_sync_updates_summary, name)
+                },
+                if (target.keepsRemoteEdits) {
+                    getString(R.string.pref_service_sync_updates_remote_edits_kept, name)
+                } else {
+                    null
+                }
+            ).joinToString(" ")
+        }
+        preferenceScreen.addPreference(preference)
     }
 
     private fun logOut() {
@@ -120,8 +154,10 @@ class ExternalServiceSettingsFragment : AbstractPreferenceFragment() {
         findPreference<Preference>(KEY_STATUS)?.summary = service.statusSummary(context)
         findPreference<Preference>(KEY_LOG_IN)?.isVisible = !configured
         findPreference<Preference>(KEY_LOG_OUT)?.isVisible = configured
-        // Auto-upload only makes sense once the service is set up.
+        // What to send, and when, only makes sense once the service is set up. Sending later
+        // changes is not tied to auto-upload: it decides what a manual upload does too.
         findPreference<Preference>(service.autoUploadPrefKey)?.isEnabled = configured
+        findPreference<Preference>(service.syncUpdatesPrefKey)?.isEnabled = configured
     }
 
     companion object {

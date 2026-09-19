@@ -28,7 +28,9 @@ import nodomain.freeyourgadget.gadgetbridge.activities.workouts.WorkoutPayloadFo
 import nodomain.freeyourgadget.gadgetbridge.activities.workouts.WorkoutUploadStore
 import nodomain.freeyourgadget.gadgetbridge.activities.workouts.WorkoutUploadTarget
 import nodomain.freeyourgadget.gadgetbridge.activities.workouts.WorkoutUploader
+import nodomain.freeyourgadget.gadgetbridge.activities.workouts.TrackUpdateResult
 import nodomain.freeyourgadget.gadgetbridge.entities.BaseActivitySummary
+import nodomain.freeyourgadget.gadgetbridge.entities.WorkoutUpload
 import nodomain.freeyourgadget.gadgetbridge.externalservices.AuthStyle
 import nodomain.freeyourgadget.gadgetbridge.externalservices.ExternalServiceTokenRefreshWorker
 import nodomain.freeyourgadget.gadgetbridge.model.ActivityKind
@@ -124,6 +126,34 @@ object FitTrackeeService : WorkoutUploadTarget {
             updateMetadata(context, result.remoteActivityId, summary)
         }
         return result
+    }
+
+    /**
+     * FitTrackee has no endpoint that writes a new file onto a workout it already holds, so a
+     * changed track means deleting the workout and uploading it again, which gives it a new id.
+     * The engine asks the user before calling this; see [WorkoutUploader.mayPushTrackUpdate].
+     */
+    override fun updateTrack(
+        context: Context,
+        remoteActivityId: String,
+        payload: File,
+        summary: BaseActivitySummary,
+        row: WorkoutUpload
+    ): TrackUpdateResult {
+        val server = serverUrl() ?: return TrackUpdateResult.Failed
+        val apiClient = FitTrackeeApiClient(server, FitTrackeeTokenManager(context))
+        if (!apiClient.deleteWorkout(remoteActivityId)) {
+            LOG.warn("Could not delete FitTrackee workout {}, leaving it as it was", remoteActivityId)
+            return TrackUpdateResult.Failed
+        }
+        val result = upload(context, summary, payload)
+        val newId = result.remoteActivityId
+        if (!result.success || newId == null) {
+            // The workout is already gone, so it has no online copy until the next sync retries.
+            LOG.error("Re-upload of summary {} failed after its workout was deleted", summary.id)
+            return TrackUpdateResult.Failed
+        }
+        return TrackUpdateResult.Recreated(newId, null)
     }
 
     override fun updateMetadata(

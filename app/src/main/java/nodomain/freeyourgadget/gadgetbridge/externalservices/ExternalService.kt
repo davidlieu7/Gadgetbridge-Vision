@@ -72,6 +72,13 @@ interface ExternalService {
     val autoUploadPrefKey: String
         get() = "${id}_auto_upload_enabled"
 
+    /**
+     * Preference holding whether changes made to a workout after it was uploaded are sent on to
+     * this service. Only meaningful for a service that can change an activity it already holds.
+     */
+    val syncUpdatesPrefKey: String
+        get() = "${id}_sync_updates"
+
     /** Address of the user's instance, or null when they have not given one. */
     fun serverUrl(): String? =
         serverPrefKey?.let { GBApplication.getPrefs().preferences.getString(it, null) }

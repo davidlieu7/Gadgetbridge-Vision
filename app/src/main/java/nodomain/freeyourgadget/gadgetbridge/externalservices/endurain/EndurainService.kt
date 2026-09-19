@@ -21,8 +21,6 @@ import android.content.Intent
 import android.net.Uri
 import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import androidx.fragment.app.Fragment
-import androidx.preference.PreferenceFragmentCompat
-import androidx.preference.SwitchPreferenceCompat
 import nodomain.freeyourgadget.gadgetbridge.GBApplication
 import nodomain.freeyourgadget.gadgetbridge.R
 import nodomain.freeyourgadget.gadgetbridge.activities.workouts.RemoteOp
@@ -40,7 +38,6 @@ import nodomain.freeyourgadget.gadgetbridge.externalservices.ExternalServiceCall
 import nodomain.freeyourgadget.gadgetbridge.externalservices.ExternalServiceTokenRefreshWorker
 import nodomain.freeyourgadget.gadgetbridge.model.ActivityKind
 import nodomain.freeyourgadget.gadgetbridge.util.DateTimeUtils
-import nodomain.freeyourgadget.gadgetbridge.util.GBPrefs
 import org.slf4j.LoggerFactory
 import java.io.File
 
@@ -109,33 +106,14 @@ object EndurainService : WorkoutUploadTarget {
         }
     }
 
-    /**
-     * Re-creating an activity to push a changed track destroys one the user may have been looking
-     * at, so it is offered as a choice rather than done silently. See [updateTrack].
-     */
-    override fun onSettingsScreenCreated(fragment: PreferenceFragmentCompat) {
-        val screen = fragment.preferenceScreen
-        val replaceOnTrackChange = SwitchPreferenceCompat(screen.context).apply {
-            key = GBPrefs.ENDURAIN_REPLACE_ON_TRACK_CHANGE
-            setDefaultValue(false)
-            layoutResource = R.layout.preference_checkbox
-            setIcon(R.drawable.ic_warning)
-            setTitle(R.string.pref_endurain_replace_on_track_change_title)
-            setSummary(R.string.pref_endurain_replace_on_track_change_summary)
-        }
-        screen.addPreference(replaceOnTrackChange)
-        // Set once it is in the hierarchy: a dependency named on a preference that is not yet
-        // attached is resolved against an empty one, and throws.
-        replaceOnTrackChange.dependency = autoUploadPrefKey
-    }
-
     /** The refresh token expires, so it is renewed on a schedule rather than at the next upload. */
     override fun scheduleBackgroundWork(context: Context) {
         ExternalServiceTokenRefreshWorker.schedule(context, this)
     }
 
-    override fun credentialsExpired(context: Context): Boolean =
-        EndurainTokenManager(context).isAccessTokenExpired()
+    // recreateActivity compares the remote activity against what was uploaded and gives up when
+    // it no longer matches.
+    override val keepsRemoteEdits = true
 
     override fun refreshCredentials(context: Context): Boolean {
         val server = serverUrl() ?: return false
@@ -256,18 +234,6 @@ object EndurainService : WorkoutUploadTarget {
         summary: BaseActivitySummary,
         row: WorkoutUpload
     ): TrackUpdateResult {
-        val trackAdded = row.hadTrack != true && WorkoutUploader.summaryHasTrack(summary)
-        val allowed = trackAdded || GBApplication.getPrefs()
-            .getBoolean(GBPrefs.ENDURAIN_REPLACE_ON_TRACK_CHANGE, false)
-        if (!allowed) {
-            return TrackUpdateResult.Refused(
-                context.getString(
-                    R.string.workout_upload_status_track_change_declined,
-                    context.getString(nameRes)
-                )
-            )
-        }
-
         val (result, refusal) = recreateActivity(context, summary, remoteActivityId, payload)
         if (result?.remoteActivityId != null) {
             return TrackUpdateResult.Recreated(result.remoteActivityId, result.photoMediaId)

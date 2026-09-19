@@ -5936,6 +5936,7 @@
     <string name="workout_upload_status_uploaded">Uploaded</string>
     <string name="workout_upload_status_partial">Partly uploaded</string>
     <string name="workout_upload_status_pending">Waiting for upload</string>
+    <string name="workout_upload_status_changed">Uploaded, but the workout changed since</string>
     <string name="workout_upload_status_failed">Upload failed</string>
     <string name="workout_upload_status_not_uploaded">Not uploaded</string>
     <string name="workout_upload_status_no_track">Not uploaded, the workout has no GPS track</string>
@@ -5945,8 +5946,6 @@
     <string name="workout_upload_toast_already_uploaded">%1$s already has this workout</string>
     <string name="workout_upload_toast_updated">Updated the activity on %1$s</string>
     <string name="workout_upload_toast_no_payload">Could not build the file to upload to %1$s</string>
-    <string name="pref_endurain_replace_on_track_change_title">Replace workouts when the track changes</string>
-    <string name="pref_endurain_replace_on_track_change_summary">Changing the track of an uploaded workout means deleting the activity and uploading it again, so it gets a new address. Activities you edited on Endurain are left untouched.</string>
 
     <!-- Workout summary section headers -->
     <string name="goals">Goals</string>
@@ -6320,4 +6319,8 @@
     <string name="service_setup_upload_token">Upload token</string>
     <string name="service_setup_client_id">Client ID</string>
     <string name="service_setup_client_secret">Client secret</string>
+    <string name="pref_service_sync_updates_title">Send later changes to %1$s</string>
+    <string name="pref_service_sync_updates_summary">A workout you rename, or attach a route or a photo to, is sent on to %1$s</string>
+    <string name="pref_service_sync_updates_destructive_summary">Changing the track of an uploaded workout means deleting the activity on %1$s and uploading it again, so it gets a new address.</string>
+    <string name="pref_service_sync_updates_remote_edits_kept">Activities you edited on %1$s are left untouched.</string>
 </resources>

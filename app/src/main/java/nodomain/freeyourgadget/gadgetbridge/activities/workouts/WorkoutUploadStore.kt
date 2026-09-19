@@ -244,6 +244,33 @@ object WorkoutUploadStore {
     }
 
     /**
+     * Fingerprint of what the remote activity was built from: the recorded track and the figures
+     * the exported file carries. The name and the type are left out, so renaming a workout does
+     * not read as a new track and cost the activity its address on a service that can only replace
+     * one. [withMetadata] puts them back in, for a service that reads them out of the file and
+     * offers no other way to change them; see [UploadCapabilities.metadataComesFromFile].
+     */
+    @JvmOverloads
+    fun trackHashOf(
+        summary: BaseActivitySummary,
+        withMetadata: Boolean = false,
+        storedSummaryData: String? = null
+    ): String {
+        val parts = listOf(
+            BuildConfig.VERSION_CODE.toString(),
+            fileStamp(summary.gpxTrack),
+            fileStamp(summary.rawDetailsPath),
+            storedSummaryData ?: storedSummaryDataOf(summary),
+            summary.endTime.time.toString()
+        ) + if (withMetadata) {
+            listOf(summary.name ?: "", summary.activityKind.toString())
+        } else {
+            emptyList()
+        }
+        return sha256Hex(parts.joinToString("\u0000").toByteArray())
+    }
+
+    /**
      * The stored `summaryData` of [summary], which is not always the one the entity carries:
      * opening a workout re-parses its raw details and replaces the field in memory, so an entity
      * that has been through the detail screen holds a richer value than the row it came from.

@@ -203,6 +203,46 @@ public class WorkoutUploadStoreTest extends TestBase {
     }
 
     @Test
+    public void testTrackHashIgnoresTheNameAndTheKind() {
+        final BaseActivitySummary summary = newSummary();
+        final String base = WorkoutUploadStore.INSTANCE.trackHashOf(summary);
+
+        summary.setName("Evening run");
+        assertEquals("renaming a workout must not read as a new track",
+                base, WorkoutUploadStore.INSTANCE.trackHashOf(summary));
+
+        summary.setActivityKind(ActivityKind.CYCLING.getCode());
+        assertEquals("changing the activity kind must not read as a new track",
+                base, WorkoutUploadStore.INSTANCE.trackHashOf(summary));
+    }
+
+    @Test
+    public void testTrackHashCarriesTheNameWhenTheFileDoes() {
+        final BaseActivitySummary summary = newSummary();
+        final String base = WorkoutUploadStore.INSTANCE.trackHashOf(summary, true);
+
+        summary.setName("Evening run");
+        assertNotEquals("a service that reads the name out of the file must be sent it again",
+                base, WorkoutUploadStore.INSTANCE.trackHashOf(summary, true));
+    }
+
+    @Test
+    public void testTrackHashFollowsTheTrack() throws Exception {
+        final BaseActivitySummary summary = newSummary();
+        final String base = WorkoutUploadStore.INSTANCE.trackHashOf(summary);
+
+        final File gpx = writeTempFile("track", "<gpx/>");
+        summary.setGpxTrack(gpx.getAbsolutePath());
+        final String withTrack = WorkoutUploadStore.INSTANCE.trackHashOf(summary);
+        assertNotEquals("an attached gpx track must be detected", base, withTrack);
+
+        final File raw = writeTempFile("raw", "fit bytes");
+        summary.setRawDetailsPath(raw.getAbsolutePath());
+        assertNotEquals("a repointed rawDetailsPath must be detected",
+                withTrack, WorkoutUploadStore.INSTANCE.trackHashOf(summary));
+    }
+
+    @Test
     public void testSourceHashChangesWithEverySignalItWatches() throws Exception {
         final BaseActivitySummary summary = newSummary();
         final String base = WorkoutUploadStore.INSTANCE.sourceHashOf(summary);

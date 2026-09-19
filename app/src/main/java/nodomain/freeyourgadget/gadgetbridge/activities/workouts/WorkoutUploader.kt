@@ -17,6 +17,7 @@
 package nodomain.freeyourgadget.gadgetbridge.activities.workouts
 
 import android.content.Context
+import nodomain.freeyourgadget.gadgetbridge.GBApplication
 import nodomain.freeyourgadget.gadgetbridge.R
 import nodomain.freeyourgadget.gadgetbridge.entities.BaseActivitySummary
 import nodomain.freeyourgadget.gadgetbridge.entities.WorkoutUpload
@@ -215,6 +216,35 @@ object WorkoutUploader {
     enum class SyncAction { UPLOAD, RESYNC, ALREADY_IN_STEP }
 
     /**
+     * Whether the track [target] holds may be brought in line with [summary].
+     *
+     * A service that writes the new track onto the activity it holds loses nothing by it, so the
+     * user is opted in. One that can only replace the activity gives it a new address and drops
+     * whatever the service hung off the old one, so that is opted out of and asked for.
+     *
+     * Either way it goes ahead unasked when it is purely additive: the activity went up without a
+     * track and now has one, which is the case of a workout from a watch that records none with a
+     * route attached afterwards.
+     */
+    @JvmStatic
+    fun mayPushTrackUpdate(
+        target: WorkoutUploadTarget,
+        summary: BaseActivitySummary,
+        row: WorkoutUpload
+    ): Boolean {
+        val capabilities = target.capabilities
+        if (!capabilities.activity.canChange()) {
+            return false
+        }
+        val trackAdded = row.hadTrack != true && summaryHasTrack(summary)
+        if (trackAdded) {
+            return true
+        }
+        return GBApplication.getPrefs()
+            .getBoolean(target.syncUpdatesPrefKey, !capabilities.trackChangeIsDestructive)
+    }
+
+    /**
      * What to do about [row], the service's last word on this workout, now that the workout
      * fingerprints as [sourceHash].
      *
@@ -261,7 +291,11 @@ object WorkoutUploader {
             if (photoLanded) WorkoutUploadStore.photoHashOf(summary.headerPhoto) else null,
             result.photoMediaId,
             if (photoLanded) sourceHash else null,
-            WorkoutUploadStore.fileHashOf(payload),
+            WorkoutUploadStore.trackHashOf(
+                summary,
+                target.capabilities.metadataComesFromFile &&
+                        !target.capabilities.trackChangeIsDestructive
+            ),
             summaryHasTrack(summary)
         )
         return SyncOutcome.Uploaded
@@ -309,22 +343,37 @@ object WorkoutUploader {
         // The track goes first: a service that can only update one by re-creating the activity
         // gives back a new activity id, and the photo and metadata belong on the replacement.
         var recreated = false
-        // A service with no way to change a track is not asked to build a payload it cannot use.
-        val payload = if (target.capabilities.activity.canChange()) {
+        // A service that takes the name out of the file has to be sent the file again to hear
+        // about a rename, unless sending it would cost the activity its address.
+        val fingerprintCarriesName = target.capabilities.metadataComesFromFile &&
+                !target.capabilities.trackChangeIsDestructive
+        val newTrackHash = WorkoutUploadStore.trackHashOf(summary, fingerprintCarriesName)
+        // A service with no way to change a track is not asked to build a payload it cannot use,
+        // and neither is a workout whose track is the one the service already holds.
+        val trackChanged =
+            target.capabilities.activity.canChange() && newTrackHash != row.payloadHash
+        val mayPushTrack = trackChanged && mayPushTrackUpdate(target, summary, row)
+        val payload = if (mayPushTrack) {
             buildPayload(context, gbDevice, provider, target, summary, summaryData)
         } else {
             null
         }
-        val newPayloadHash = payload?.let { WorkoutUploadStore.fileHashOf(it) }
-        if (payload != null && newPayloadHash != row.payloadHash) {
+        if (trackChanged && !mayPushTrack) {
+            // The only way this service can take the new track destroys the activity, and the user
+            // has not agreed to that. Saying so once is better than asking again on every sync.
+            refusal = context.getString(
+                R.string.workout_upload_status_track_change_declined,
+                context.getString(target.nameRes)
+            )
+        } else if (payload != null) {
             when (val update = target.updateTrack(context, remoteId, payload, summary, row)) {
                 is TrackUpdateResult.Updated -> {
-                    payloadHash = newPayloadHash
+                    payloadHash = newTrackHash
                     hadTrack = summaryHasTrack(summary)
                 }
 
                 is TrackUpdateResult.Recreated -> {
-                    payloadHash = newPayloadHash
+                    payloadHash = newTrackHash
                     hadTrack = summaryHasTrack(summary)
                     remoteId = update.remoteActivityId
                     recreated = true

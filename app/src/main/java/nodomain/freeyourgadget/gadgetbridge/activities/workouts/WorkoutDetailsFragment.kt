@@ -366,6 +366,7 @@ class WorkoutDetailsFragment : Fragment(), MenuProvider {
                             notifyWorkoutChanged()
                             updateActionBarTitle()
                             workoutViewModel.refreshWorkout(workoutId)
+                            scheduleUploadSync()
                         }
                     })
                 }
@@ -606,8 +607,10 @@ class WorkoutDetailsFragment : Fragment(), MenuProvider {
                     row?.status == WorkoutUploadStore.STATUS_SUCCESS && row.sourceHash == sourceHash ->
                         context.getString(R.string.workout_upload_status_uploaded)
 
+                    // The service holds it, but not as it now stands. Saying so is what tells a
+                    // user who uploads by hand that this one is worth sending again.
                     row?.status == WorkoutUploadStore.STATUS_SUCCESS ->
-                        context.getString(R.string.workout_upload_status_pending)
+                        context.getString(R.string.workout_upload_status_changed)
 
                     !target.capabilities.appliesTo(summary) ->
                         context.getString(R.string.workout_upload_status_no_track)
