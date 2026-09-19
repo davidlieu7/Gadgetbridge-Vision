@@ -247,6 +247,47 @@ public class GalaxyWatch7DeviceSupport extends AbstractBTBRDeviceSupport {
         BOOLEAN_SETTINGS.put("pref_galaxywatch7_sound_settings_system_vibration_dialing_keypad", "sound_settings/system_vibration/dialing_keypad");
         BOOLEAN_SETTINGS.put("pref_galaxywatch7_sound_settings_system_vibration_samsung_keyboard", "sound_settings/system_vibration/samsung_keyboard");
     }
+
+    // Non-boolean settings: a slider (INT) or a list. Each maps a GB preference key to the watch
+    // sub-path, the DataMap value key the watch's manager reads, and how the pref stores the value.
+    // INT = SeekBarPreference storing an int (key "intLevel"); STRING = ListPreference storing the
+    // watch's string value (e.g. sound_mode "stringMode"); INT_LIST = ListPreference whose entry
+    // values are numeric strings written as an int index (e.g. vibration_intensity "intSelectedItem").
+    // Only settings whose watch-side handleSyncData actually applies the incoming value are wired -
+    // font_style and securitysetting/wrist_detection are echo-only on the watch and omitted on purpose.
+    enum SettingType { INT, STRING, INT_LIST }
+
+    static final class SettingSpec {
+        final String prefKey;
+        final String subPath;
+        final String valueKey;
+        final SettingType type;
+
+        SettingSpec(final String prefKey, final String subPath, final String valueKey, final SettingType type) {
+            this.prefKey = prefKey;
+            this.subPath = subPath;
+            this.valueKey = valueKey;
+            this.type = type;
+        }
+    }
+
+    private static final java.util.Map<String, SettingSpec> VALUE_SETTINGS = new java.util.LinkedHashMap<>();
+    private static final java.util.Map<String, SettingSpec> VALUE_SETTINGS_BY_PATH = new java.util.HashMap<>();
+    static {
+        addValueSetting(new SettingSpec("pref_galaxywatch7_display_brightness", "display/brightness", "intLevel", SettingType.INT));
+        addValueSetting(new SettingSpec("pref_galaxywatch7_display_font_size", "display/font_size", "intLevel", SettingType.INT));
+        addValueSetting(new SettingSpec("pref_galaxywatch7_sound_volume_media", "sound_settings/volume/media", "intLevel", SettingType.INT));
+        addValueSetting(new SettingSpec("pref_galaxywatch7_sound_volume_notifications", "sound_settings/volume/notifications", "intLevel", SettingType.INT));
+        addValueSetting(new SettingSpec("pref_galaxywatch7_sound_volume_ringtone", "sound_settings/volume/ringtone", "intLevel", SettingType.INT));
+        addValueSetting(new SettingSpec("pref_galaxywatch7_sound_volume_system", "sound_settings/volume/system", "intLevel", SettingType.INT));
+        addValueSetting(new SettingSpec("pref_galaxywatch7_sound_mode", "sound_settings/sound_mode", "stringMode", SettingType.STRING));
+        addValueSetting(new SettingSpec("pref_galaxywatch7_sound_vibration_intensity", "sound_settings/vibration_intensity", "intSelectedItem", SettingType.INT_LIST));
+    }
+
+    private static void addValueSetting(final SettingSpec spec) {
+        VALUE_SETTINGS.put(spec.prefKey, spec);
+        VALUE_SETTINGS_BY_PATH.put(spec.subPath, spec);
+    }
     // Reverse map: the protogensettings "<group>/<key>" -> GB preference key, to reflect the
     // watch's reported values back into the device prefs so the UI shows the real state.
     private static final java.util.Map<String, String> BOOLEAN_SETTINGS_BY_PATH = new java.util.HashMap<>();
@@ -263,27 +304,71 @@ public class GalaxyWatch7DeviceSupport extends AbstractBTBRDeviceSupport {
 
     @Override
     public void onSendConfiguration(final String config) {
-        final String groupKey = BOOLEAN_SETTINGS.get(config);
-        if (groupKey == null) {
+        final String booleanSubPath = BOOLEAN_SETTINGS.get(config);
+        final SettingSpec valueSpec = VALUE_SETTINGS.get(config);
+        if (booleanSubPath == null && valueSpec == null) {
             return;
         }
         final SharedPreferences prefs = GBApplication.getDeviceSpecificSharedPrefs(getDevice().getAddress());
-        final boolean enabled = prefs != null && prefs.getBoolean(config, false);
+        if (prefs == null) {
+            return;
+        }
         final String node = localNodeId;
         if (node == null) {
             LOG.warn("Galaxy Watch7: cannot send {} - own node id not known yet", config);
             return;
         }
         final long seq = settingsSeq.incrementAndGet();
-        LOG.info("Galaxy Watch7: sending w_module {} = {} under node {} (seq {})", groupKey, enabled, node, seq);
-        recentlySentSetting.put(groupKey, System.currentTimeMillis());
         // The watch's StDataLayerListenerService applies w_module_sec_watch_setting DataItems whose
         // host node is a connected peer (our connection node) and whose "from" != "watch" (§28).
-        final byte[] write = WearDataLayerProtocol.buildWatchSettingBooleanPut(
-                SETTINGS_SOURCE_PACKAGE, SETTINGS_SOURCE_SIGNATURE, node, groupKey, enabled, seq);
+        final byte[] write;
+        final String subPath;
+        if (booleanSubPath != null) {
+            subPath = booleanSubPath;
+            final boolean enabled = prefs.getBoolean(config, false);
+            LOG.info("Galaxy Watch7: sending w_module {} = {} under node {} (seq {})", subPath, enabled, node, seq);
+            write = WearDataLayerProtocol.buildWatchSettingBooleanPut(
+                    SETTINGS_SOURCE_PACKAGE, SETTINGS_SOURCE_SIGNATURE, node, subPath, enabled, seq);
+        } else {
+            subPath = valueSpec.subPath;
+            switch (valueSpec.type) {
+                case STRING: {
+                    final String value = prefs.getString(config, "");
+                    LOG.info("Galaxy Watch7: sending w_module {} = \"{}\" under node {} (seq {})", subPath, value, node, seq);
+                    write = WearDataLayerProtocol.buildWatchSettingStringPut(
+                            SETTINGS_SOURCE_PACKAGE, SETTINGS_SOURCE_SIGNATURE, node, subPath, valueSpec.valueKey, value, seq);
+                    break;
+                }
+                case INT_LIST: {
+                    // ListPreference stores the index as a numeric string; the watch reads an int.
+                    final int value = parseIntPref(prefs.getString(config, "0"), 0);
+                    LOG.info("Galaxy Watch7: sending w_module {} = {} under node {} (seq {})", subPath, value, node, seq);
+                    write = WearDataLayerProtocol.buildWatchSettingIntPut(
+                            SETTINGS_SOURCE_PACKAGE, SETTINGS_SOURCE_SIGNATURE, node, subPath, valueSpec.valueKey, value, seq);
+                    break;
+                }
+                case INT:
+                default: {
+                    final int value = prefs.getInt(config, 0);
+                    LOG.info("Galaxy Watch7: sending w_module {} = {} under node {} (seq {})", subPath, value, node, seq);
+                    write = WearDataLayerProtocol.buildWatchSettingIntPut(
+                            SETTINGS_SOURCE_PACKAGE, SETTINGS_SOURCE_SIGNATURE, node, subPath, valueSpec.valueKey, value, seq);
+                    break;
+                }
+            }
+        }
+        recentlySentSetting.put(subPath, System.currentTimeMillis());
         final TransactionBuilder builder = createTransactionBuilder("send " + config);
         builder.write(write);
         builder.queue();
+    }
+
+    private static int parseIntPref(final String s, final int fallback) {
+        try {
+            return Integer.parseInt(s.trim());
+        } catch (final NumberFormatException e) {
+            return fallback;
+        }
     }
 
     // group/key -> time we last sent it, so the watch's still-streaming old value does not revert
@@ -421,22 +506,58 @@ public class GalaxyWatch7DeviceSupport extends AbstractBTBRDeviceSupport {
         if (subPath == null) {
             return;
         }
-        final String prefKey = BOOLEAN_SETTINGS_BY_PATH.get(subPath);
-        if (prefKey == null) {
-            return; // not a boolean setting we expose
-        }
         final Long sentAt = recentlySentSetting.get(subPath);
         if (sentAt != null && System.currentTimeMillis() - sentAt < SETTING_WRITE_SETTLE_MS) {
             return; // we just wrote this; don't let the watch's echo revert the UI
         }
-        final Boolean value = WearDataLayerProtocol.parseDataMapBoolean(message, "booleanIsChecked");
-        if (value == null) {
+        final SharedPreferences prefs = GBApplication.getDeviceSpecificSharedPrefs(getDevice().getAddress());
+        if (prefs == null) {
             return;
         }
-        final SharedPreferences prefs = GBApplication.getDeviceSpecificSharedPrefs(getDevice().getAddress());
-        if (prefs != null && prefs.getBoolean(prefKey, false) != value) {
-            LOG.info("Galaxy Watch7: reflecting {} = {} from watch", subPath, value);
-            prefs.edit().putBoolean(prefKey, value).apply();
+
+        final String booleanPrefKey = BOOLEAN_SETTINGS_BY_PATH.get(subPath);
+        if (booleanPrefKey != null) {
+            final Boolean value = WearDataLayerProtocol.parseDataMapBoolean(message, "booleanIsChecked");
+            if (value != null && prefs.getBoolean(booleanPrefKey, false) != value) {
+                LOG.info("Galaxy Watch7: reflecting {} = {} from watch", subPath, value);
+                prefs.edit().putBoolean(booleanPrefKey, value).apply();
+            }
+            return;
+        }
+
+        final SettingSpec spec = VALUE_SETTINGS_BY_PATH.get(subPath);
+        if (spec == null) {
+            return; // not a setting we expose
+        }
+        switch (spec.type) {
+            case STRING: {
+                final String value = WearDataLayerProtocol.parseDataMapString(message, spec.valueKey);
+                if (value != null && !value.equals(prefs.getString(spec.prefKey, null))) {
+                    LOG.info("Galaxy Watch7: reflecting {} = \"{}\" from watch", subPath, value);
+                    prefs.edit().putString(spec.prefKey, value).apply();
+                }
+                break;
+            }
+            case INT_LIST: {
+                final Integer value = WearDataLayerProtocol.parseDataMapInt(message, spec.valueKey);
+                if (value != null) {
+                    final String asString = String.valueOf(value);
+                    if (!asString.equals(prefs.getString(spec.prefKey, null))) {
+                        LOG.info("Galaxy Watch7: reflecting {} = {} from watch", subPath, value);
+                        prefs.edit().putString(spec.prefKey, asString).apply();
+                    }
+                }
+                break;
+            }
+            case INT:
+            default: {
+                final Integer value = WearDataLayerProtocol.parseDataMapInt(message, spec.valueKey);
+                if (value != null && prefs.getInt(spec.prefKey, Integer.MIN_VALUE) != value) {
+                    LOG.info("Galaxy Watch7: reflecting {} = {} from watch", subPath, value);
+                    prefs.edit().putInt(spec.prefKey, value).apply();
+                }
+                break;
+            }
         }
     }
 

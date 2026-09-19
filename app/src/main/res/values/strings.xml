@@ -5667,4 +5667,30 @@
     <string name="prefs_gw7_sound_settings_system_vibration_charging">Vibration: charging</string>
     <string name="prefs_gw7_sound_settings_system_vibration_dialing_keypad">Vibration: dialing keypad</string>
     <string name="prefs_gw7_sound_settings_system_vibration_samsung_keyboard">Vibration: Samsung keyboard</string>
+    <string name="prefs_gw7_display_brightness">Brightness</string>
+    <string name="prefs_gw7_display_font_size">Font size</string>
+    <string name="prefs_gw7_sound_mode">Sound mode</string>
+    <string name="prefs_gw7_sound_vibration_intensity">Vibration intensity</string>
+    <string name="prefs_gw7_sound_volume_media">Volume: media</string>
+    <string name="prefs_gw7_sound_volume_ringtone">Volume: ringtone</string>
+    <string name="prefs_gw7_sound_volume_notifications">Volume: notifications</string>
+    <string name="prefs_gw7_sound_volume_system">Volume: system</string>
+    <string-array name="prefs_gw7_sound_mode_names">
+        <item>Sound</item>
+        <item>Vibrate</item>
+        <item>Mute</item>
+    </string-array>
+    <string-array name="prefs_gw7_sound_mode_values">
+        <item>sound</item>
+        <item>vibrate</item>
+        <item>mute</item>
+    </string-array>
+    <string-array name="prefs_gw7_vibration_intensity_names">
+        <item>Light</item>
+        <item>Strong</item>
+    </string-array>
+    <string-array name="prefs_gw7_vibration_intensity_values">
+        <item>0</item>
+        <item>1</item>
+    </string-array>
 </resources>

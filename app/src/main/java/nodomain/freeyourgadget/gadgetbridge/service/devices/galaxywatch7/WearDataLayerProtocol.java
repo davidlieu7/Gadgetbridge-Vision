@@ -221,8 +221,38 @@ public final class WearDataLayerProtocol {
     public static byte[] buildWatchSettingBooleanPut(final String sourcePackage, final String signatureHex,
                                                      final String ownNodeId, final String subPath,
                                                      final boolean value, final long seq) {
+        return buildWatchSettingPut(sourcePackage, signatureHex, ownNodeId, subPath,
+                "booleanIsChecked", dataMapBool(value), seq);
+    }
+
+    /**
+     * Writes an int-valued watch setting (e.g. brightness, font size, volume). {@code valueKey} is
+     * the setting-specific DataMap key the watch's manager reads - "intLevel" for brightness/font
+     * size/volume, "intSelectedItem" for list-index settings like vibration intensity.
+     */
+    public static byte[] buildWatchSettingIntPut(final String sourcePackage, final String signatureHex,
+                                                 final String ownNodeId, final String subPath,
+                                                 final String valueKey, final int value, final long seq) {
+        return buildWatchSettingPut(sourcePackage, signatureHex, ownNodeId, subPath,
+                valueKey, dataMapInt(value), seq);
+    }
+
+    /**
+     * Writes a string-valued watch setting (e.g. sound_mode "stringMode"). {@code valueKey} is the
+     * setting-specific DataMap key the watch's manager reads.
+     */
+    public static byte[] buildWatchSettingStringPut(final String sourcePackage, final String signatureHex,
+                                                    final String ownNodeId, final String subPath,
+                                                    final String valueKey, final String value, final long seq) {
+        return buildWatchSettingPut(sourcePackage, signatureHex, ownNodeId, subPath,
+                valueKey, dataMapString(value), seq);
+    }
+
+    private static byte[] buildWatchSettingPut(final String sourcePackage, final String signatureHex,
+                                               final String ownNodeId, final String subPath,
+                                               final String valueKey, final byte[] typedValue, final long seq) {
         final ProtoWriter dataMap = new ProtoWriter();
-        dataMapEntry(dataMap, "booleanIsChecked", dataMapBool(value));
+        dataMapEntry(dataMap, valueKey, typedValue);
         dataMapEntry(dataMap, "from", dataMapString("mobile"));
 
         final String path = "wear://" + ownNodeId + "/w_module_sec_watch_setting/" + subPath;
@@ -267,6 +297,15 @@ public final class WearDataLayerProtocol {
         container.writeString(2, s);
         final ProtoWriter tv = new ProtoWriter();
         tv.writeVarint(1, 2);
+        tv.writeMessage(2, container.toByteArray());
+        return tv.toByteArray();
+    }
+
+    private static byte[] dataMapInt(final int value) {
+        final ProtoWriter container = new ProtoWriter();
+        container.writeVarint(6, value);
+        final ProtoWriter tv = new ProtoWriter();
+        tv.writeVarint(1, 6);
         tv.writeMessage(2, container.toByteArray());
         return tv.toByteArray();
     }
@@ -399,6 +438,48 @@ public final class WearDataLayerProtocol {
                 }
                 final Long b = new ProtoReader(container).findVarint(8);
                 return b == null ? null : (b != 0);
+            }
+        } catch (final RuntimeException e) {
+            return null;
+        }
+        return null;
+    }
+
+    /**
+     * Reads an int DataMap entry (e.g. "intLevel", "intSelectedItem") from a DataItem's value. An
+     * int typedValue is {f1=6, f2={f6=varint}}. Returns null if the key is absent.
+     */
+    public static Integer parseDataMapInt(final byte[] message, final String key) {
+        final byte[] container = findDataMapContainer(message, key);
+        if (container == null) {
+            return null;
+        }
+        final Long v = new ProtoReader(container).findVarint(6);
+        return v == null ? null : v.intValue();
+    }
+
+    /**
+     * Reads a string DataMap entry (e.g. "stringMode") from a DataItem's value. A string typedValue
+     * is {f1=2, f2={f2=string}}. Returns null if the key is absent.
+     */
+    public static String parseDataMapString(final byte[] message, final String key) {
+        final byte[] container = findDataMapContainer(message, key);
+        return container == null ? null : new ProtoReader(container).findString(2);
+    }
+
+    /** Finds the typedValue container (typedValue.f2) for the given DataMap key, or null. */
+    private static byte[] findDataMapContainer(final byte[] message, final String key) {
+        final byte[] dataMap = parseDataItemValue(message);
+        if (dataMap == null) {
+            return null;
+        }
+        try {
+            for (final byte[] entry : new ProtoReader(dataMap).findAllMessages(1)) {
+                if (!key.equals(new ProtoReader(entry).findString(1))) {
+                    continue;
+                }
+                final byte[] typedValue = new ProtoReader(entry).findMessage(2);
+                return typedValue == null ? null : new ProtoReader(typedValue).findMessage(2);
             }
         } catch (final RuntimeException e) {
             return null;

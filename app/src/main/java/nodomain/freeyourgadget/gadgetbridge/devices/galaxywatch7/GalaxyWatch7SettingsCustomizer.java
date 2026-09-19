@@ -63,6 +63,15 @@ public class GalaxyWatch7SettingsCustomizer implements DeviceSpecificSettingsCus
             "pref_galaxywatch7_sound_settings_system_vibration_charging",
             "pref_galaxywatch7_sound_settings_system_vibration_dialing_keypad",
             "pref_galaxywatch7_sound_settings_system_vibration_samsung_keyboard",
+            // Sliders and lists (int/string values).
+            "pref_galaxywatch7_display_brightness",
+            "pref_galaxywatch7_display_font_size",
+            "pref_galaxywatch7_sound_volume_media",
+            "pref_galaxywatch7_sound_volume_notifications",
+            "pref_galaxywatch7_sound_volume_ringtone",
+            "pref_galaxywatch7_sound_volume_system",
+            "pref_galaxywatch7_sound_mode",
+            "pref_galaxywatch7_sound_vibration_intensity",
     };
 
     @Override

@@ -4494,4 +4494,21 @@
     <string name="prefs_gw7_sound_settings_system_vibration_charging">Vibration: Laden</string>
     <string name="prefs_gw7_sound_settings_system_vibration_dialing_keypad">Vibration: Wähltastatur</string>
     <string name="prefs_gw7_sound_settings_system_vibration_samsung_keyboard">Vibration: Samsung-Tastatur</string>
+    <string name="prefs_gw7_display_brightness">Helligkeit</string>
+    <string name="prefs_gw7_display_font_size">Schriftgröße</string>
+    <string name="prefs_gw7_sound_mode">Tonmodus</string>
+    <string name="prefs_gw7_sound_vibration_intensity">Vibrationsstärke</string>
+    <string name="prefs_gw7_sound_volume_media">Lautstärke: Medien</string>
+    <string name="prefs_gw7_sound_volume_ringtone">Lautstärke: Klingelton</string>
+    <string name="prefs_gw7_sound_volume_notifications">Lautstärke: Benachrichtigungen</string>
+    <string name="prefs_gw7_sound_volume_system">Lautstärke: System</string>
+    <string-array name="prefs_gw7_sound_mode_names">
+        <item>Ton</item>
+        <item>Vibrieren</item>
+        <item>Stumm</item>
+    </string-array>
+    <string-array name="prefs_gw7_vibration_intensity_names">
+        <item>Leicht</item>
+        <item>Stark</item>
+    </string-array>
 </resources>

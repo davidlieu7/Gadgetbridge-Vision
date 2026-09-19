@@ -2284,3 +2284,46 @@ Two user-reported issues fixed:
   mirror it into the device pref. Verified live: many settings reflected true from the
   watch (touch_bezel, always_on_display, wake_on_*, system sounds/vibration, ...), so
   the switches now show the real current state.
+
+---
+
+## 32. Numeric + string settings wired (2026-09-19)
+
+Decoded the DataMap TypedValue wire format for the remaining value types by capturing
+the watch's own full settings sync (reconnect triggers peer-sync field1=-1 "send all").
+Each DataMap entry is {f1=key, f2=typedValue}; typedValue={f1=typeTag, f2=container}
+where the container's inner field number equals the typeTag:
+- bool  -> typeTag 8, container {f8 = 0|1}   (already known)
+- string-> typeTag 2, container {f2 = string}
+- int   -> typeTag 6, container {f6 = varint}
+- long  -> typeTag 5, container {f5 = varint}  (used by the "time" entry)
+- array -> typeTag 10, container repeated {f10 = nested typedValue}  (read-only lists)
+
+Added buildWatchSettingIntPut / buildWatchSettingStringPut (+ dataMapInt) and
+parseDataMapInt / parseDataMapString to WearDataLayerProtocol. The value key differs
+per setting: brightness/font_size/volumes use "intLevel"; vibration_intensity and the
+*/selected_item list settings use "intSelectedItem"; sound_mode uses "stringMode".
+
+Wired (verified against each manager's handleSyncData actually applying the value):
+- Sliders (SeekBarPreference, int "intLevel"): display/brightness (0-254, max from
+  brightness_max_level=254), display/font_size (0-5, max from font_size_max=5),
+  sound_settings/volume/{media,notifications,ringtone,system} (0-15).
+- List (string "stringMode"): sound_settings/sound_mode = mute|vibrate|sound.
+- List (int index "intSelectedItem"): sound_settings/vibration_intensity = 0 Light / 1 Strong.
+
+Live-verified reflection end-to-end after reconnect: font_size=2, sound_mode="vibrate",
+volume/media=7, vibration_intensity=1, brightness=48 - all decoded values matched the
+raw capture and populated the UI (the sound_mode dialog pre-selected the real value).
+The sound_mode write fired correctly (`sending w_module sound_settings/sound_mode =
+"sound" under node e1b1cd8b`); direct watch-side confirmation was pending the watch's
+wireless ADB (dropped at the time). Write format is the watch's own serialization on
+the proven boolean transport path.
+
+Deliberately NOT wired (watch-side handleSyncData is empty -> writes are ignored):
+- display/font_style/selected_item (echo-only)
+- securitysetting/wrist_detection (echo-only; also inverted key booleanIsDisabled)
+
+Still follow-up (need dynamic list population from the watch's */list DataItems, which
+GB's static preference XML can't express well): ringtone/notification selected_name,
+screen_time_out/selected_item, and the package pickers (double_press, press_and_hold,
+recents_key, quicklaunch launch_package, action_button, digital_assistant, status_indicator).
