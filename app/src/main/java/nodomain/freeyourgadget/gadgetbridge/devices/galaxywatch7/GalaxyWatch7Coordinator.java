@@ -55,9 +55,9 @@ public class GalaxyWatch7Coordinator extends AbstractBLClassicDeviceCoordinator 
 
     @Override
     public boolean supportsFindDevice(@NonNull final GBDevice device) {
-        // "Find My Watch" appears to use the same Data Layer message mechanism as everything
-        // else here, but isn't wired up yet.
-        return false;
+        // Find My Watch: a plain-JSON MessageEvent on /w_apps_find_my_watch (research notes §45),
+        // wired up in GalaxyWatch7DeviceSupport.onFindDevice.
+        return true;
     }
 
     @NonNull

@@ -549,6 +549,10 @@ public class GalaxyWatch7DeviceSupport extends AbstractBTBRDeviceSupport {
     // as settings.
     private static final String MEDIA_SOURCE_PACKAGE = "com.samsung.android.wcs.extension";
     private static final String MEDIA_SOURCE_SIGNATURE = "9ca5170f381919dfe0446fcdab18b19a143b3163";
+    // Find My Watch is registered on the watch under the watch7plugin package (same Samsung signing
+    // cert as wcs.extension). Wear routes MessageEvents to the listener matching (package, signature),
+    // so /w_apps_find_my_watch must be authored under THIS package or the watch never receives it.
+    private static final String FMW_SOURCE_PACKAGE = "com.samsung.wearable.watch7plugin";
     private static final String MEDIA_PATH_PREFIX = "/w_apps_media_controller/";
     private final java.util.concurrent.atomic.AtomicLong messageSeq = new java.util.concurrent.atomic.AtomicLong(1);
     private volatile MusicSpec lastMusicSpec;
@@ -735,6 +739,29 @@ public class GalaxyWatch7DeviceSupport extends AbstractBTBRDeviceSupport {
             default:
                 return null;
         }
+    }
+
+    // Find My Watch: ring/stop the watch via a plain-JSON MessageEvent on /w_apps_find_my_watch.
+    // Payload and transport verified against the stock com.samsung.wearable.watch7plugin
+    // (FMWStartAlertReq/FMWStopAlertReq + FMWMessageSender: bare {"msg_id":...} on DATA_TRANSFER_PATH,
+    // no connection_type, no handshake). Authored under the watch7plugin identity so the watch's
+    // find_my_watch listener actually receives it (research notes §45).
+    @Override
+    public void onFindDevice(final boolean start) {
+        final String node = localNodeId;
+        final String watch = watchNodeId;
+        if (node == null || watch == null) {
+            return;
+        }
+        final String json = start ? "{\"msg_id\":\"fmw-startalert-req\"}" : "{\"msg_id\":\"fmw-stopalert-req\"}";
+        LOG.info("Galaxy Watch7: find device start={} -> /w_apps_find_my_watch {}", start, json);
+        final byte[] write = WearDataLayerProtocol.buildMessageEvent(
+                FMW_SOURCE_PACKAGE, MEDIA_SOURCE_SIGNATURE, node, watch,
+                messageSeq.getAndIncrement(), "/w_apps_find_my_watch",
+                json.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        final TransactionBuilder builder = createTransactionBuilder("find device " + start);
+        builder.write(write);
+        builder.queue();
     }
 
     private static int parseIntPref(final String s, final int fallback) {
