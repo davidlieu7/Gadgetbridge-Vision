@@ -173,28 +173,41 @@ class WandererApiClient(
     }
 
     /**
-     * Whether the trail [trailId] still exists: true or false, or null when the request failed.
-     * Blocking. Wanderer answers 404 both for a deleted trail and for one this account cannot
-     * see, which for a trail it uploaded itself means the same thing.
+     * Writes [fields] onto the trail without sending a track. The same form endpoint takes the
+     * fields on their own, and leaves everything it is not given alone.
+     *
+     * [callback] fires with (success, reason); reason is null on success.
      */
-    fun trailExists(trailId: String): Boolean? {
-        return try {
-            val response = InternetUtils.doStringRequestWithStatus(
-                uri = "$baseUrl/api/v1/trail/$trailId".toUri(),
-                requestHeaders = buildHeaders()
-            )
-            when (response.statusCode) {
-                in 200..299 -> true
-                404 -> false
-                else -> {
-                    LOG.warn("Looking up trail {} failed (status {})", trailId, response.statusCode)
-                    null
+    fun updateTrailFields(
+        trailId: String,
+        fields: Map<String, String>,
+        callback: (Boolean, String?) -> Unit
+    ) {
+        Thread {
+            try {
+                InternetUtils.sendMultipartForm(
+                    uri = "$baseUrl/api/v1/trail/form/$trailId".toUri(),
+                    formFields = mapOf("id" to trailId) + fields,
+                    requestHeaders = buildHeaders()
+                ) { success, statusCode, responseText, reason ->
+                    if (success && statusCode != null && statusCode in 200..299) {
+                        LOG.info("Updated Wanderer trail {}", trailId)
+                        callback(true, null)
+                    } else {
+                        val message = try {
+                            if (responseText != null) JSONObject(responseText).getString("message") else null
+                        } catch (e: Exception) {
+                            null
+                        } ?: reason ?: statusCode?.let { "HTTP $it" }
+                        LOG.error("Updating trail {} failed: {}", trailId, message)
+                        callback(false, message)
+                    }
                 }
+            } catch (e: Exception) {
+                LOG.error("Trail update error", e)
+                callback(false, e.localizedMessage)
             }
-        } catch (e: Exception) {
-            LOG.error("Error looking up trail {}", trailId, e)
-            null
-        }
+        }.start()
     }
 
     /**

@@ -48,9 +48,10 @@ object WandererService : WorkoutUploadTarget {
         formats = listOf(WorkoutPayloadFormat.GPX),
         // trail/form/{id} writes the new track onto the existing trail, so its id and whatever the
         // user did to it survive.
-        activity = setOf(RemoteOp.CREATE, RemoteOp.UPDATE, RemoteOp.READ),
-        // It infers a trail's name and type from the uploaded file.
-        metadata = emptySet(),
+        activity = setOf(RemoteOp.CREATE, RemoteOp.UPDATE),
+        // trail/form/{id} also takes the fields beside the file, so a name can be written on
+        // its own without sending the track again.
+        metadata = setOf(RemoteOp.UPDATE),
         media = emptySet()
     )
 
@@ -96,6 +97,27 @@ object WandererService : WorkoutUploadTarget {
                 }
             }
         }
+    }
+
+    override fun updateMetadata(
+        context: Context,
+        remoteActivityId: String,
+        summary: BaseActivitySummary
+    ): Boolean {
+        val server = serverUrl() ?: return false
+        val updated = ExternalServiceCalls.await<Boolean>(WorkoutUploader.DEFAULT_UPLOAD_TIMEOUT_SECONDS) { done ->
+            WandererApiClient(server, WandererTokenManager(context))
+                .updateTrailFields(
+                    remoteActivityId,
+                    mapOf("name" to WorkoutUploader.nameFor(context, summary))
+                ) { ok, reason ->
+                    if (!ok) {
+                        LOG.warn("Wanderer metadata update failed for trail {}: {}", remoteActivityId, reason)
+                    }
+                    done(ok)
+                }
+        }
+        return updated == true
     }
 
     override fun updateTrack(

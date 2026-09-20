@@ -287,6 +287,63 @@ class InternetUtils {
         }
 
         /**
+         * Sends [formFields] as multipart/form-data with no file part, for an endpoint that takes
+         * a form upload but is being asked to change only the fields beside the file. Same
+         * callback contract as [uploadBinaryFile].
+         */
+        @JvmOverloads
+        fun sendMultipartForm(
+            uri: Uri,
+            formFields: Map<String, String>,
+            requestHeaders: Map<String, String> = emptyMap(),
+            method: String = "POST",
+            allowInsecure: Boolean = false,
+            onComplete: (success: Boolean, statusCode: Int?, response: String?, reason: String?) -> Unit
+        ) {
+            var success = false
+            var statusCode: Int? = null
+            var responseText: String? = null
+            var reason: String? = null
+
+            try {
+                val boundary = "----GadgetbridgeFormBoundary${System.currentTimeMillis()}"
+                val body = buildMultipartBody(null, null, null, boundary, "file", formFields)
+                val headers = requestHeaders.toMutableMap()
+                headers["Content-Type"] = "multipart/form-data; boundary=$boundary"
+
+                val response = if (GBApplication.hasDirectInternetAccess()) {
+                    directBinaryRequest(
+                        uri = uri,
+                        method = method,
+                        requestHeaders = headers,
+                        body = body,
+                        allowInsecure = allowInsecure
+                    )
+                } else {
+                    InternetHelperSingleton.send(
+                        uri,
+                        HttpRequest.Method.valueOf(method),
+                        headers,
+                        body,
+                        allowInsecure
+                    )
+                }
+
+                statusCode = response?.statusCode
+                responseText = response?.data?.bufferedReader()?.use { it.readText() }
+                success = response != null
+                if (!success) {
+                    reason = networkFailureReason(null)
+                }
+            } catch (e: Exception) {
+                LOG.error("Posting a form to $uri failed: ", e)
+                reason = networkFailureReason(e)
+            }
+
+            onComplete(success, statusCode, responseText, reason)
+        }
+
+        /**
          * Localized, user-facing reason for a failed request to an online tracker (Endurain,
          * Wanderer, …) when there was no usable response. Distinguishes "no internet access at
          * all" (no permission / internet helper unavailable / offline) from "server unreachable".
@@ -347,14 +404,13 @@ class InternetUtils {
         }
 
         private fun buildMultipartBody(
-            file: File,
-            fileName: String,
-            mimeType: String,
+            file: File?,
+            fileName: String?,
+            mimeType: String?,
             boundary: String,
             fileFieldName: String,
             formFields: Map<String, String>
         ): ByteArray {
-            val fileBytes = file.readBytes()
             val output = ByteArrayOutputStream()
 
             for ((name, value) in formFields) {
@@ -366,13 +422,16 @@ class InternetUtils {
                 output.write(part.toByteArray(Charsets.UTF_8))
             }
 
-            val header = "--$boundary\r\n" +
-                "Content-Disposition: form-data; name=\"$fileFieldName\"; filename=\"$fileName\"\r\n" +
-                "Content-Type: $mimeType\r\n" +
-                "\r\n"
-            output.write(header.toByteArray(Charsets.UTF_8))
-            output.write(fileBytes)
-            output.write("\r\n--$boundary--\r\n".toByteArray(Charsets.US_ASCII))
+            if (file != null) {
+                val header = "--$boundary\r\n" +
+                    "Content-Disposition: form-data; name=\"$fileFieldName\"; filename=\"$fileName\"\r\n" +
+                    "Content-Type: $mimeType\r\n" +
+                    "\r\n"
+                output.write(header.toByteArray(Charsets.UTF_8))
+                output.write(file.readBytes())
+                output.write("\r\n".toByteArray(Charsets.US_ASCII))
+            }
+            output.write("--$boundary--\r\n".toByteArray(Charsets.US_ASCII))
 
             return output.toByteArray()
         }
