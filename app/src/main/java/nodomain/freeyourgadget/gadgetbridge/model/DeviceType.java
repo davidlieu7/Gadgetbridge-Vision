@@ -526,6 +526,7 @@ import nodomain.freeyourgadget.gadgetbridge.devices.roidmi.RoidmiF8Coordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.sbm_67.SanitasSBM67Coordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.sbm_67.SilverCrestSBM67Coordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.scannable.ScannableDeviceCoordinator;
+import nodomain.freeyourgadget.gadgetbridge.devices.sennheiser.SennheiserMomentumInEarWirelessCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.shokz.ShokzOpenRunPro2Coordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.shokz.ShokzOpenSwimProCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.sinilink.SinilinkCoordinator;
@@ -1197,6 +1198,7 @@ public enum DeviceType {
     EARFUN_AIR_S(EarFunAirSCoordinator.class),
     EARFUN_AIR_PRO_4(EarFunAirPro4Coordinator.class),
     EARFUN_FREE_PRO_3(EarFunFreePro3Coordinator.class),
+    SENNHEISER_MOMENTUM_IN_EAR_WIRELESS(SennheiserMomentumInEarWirelessCoordinator.class),
     SCANNABLE(ScannableDeviceCoordinator.class),
     CYCLING_SENSOR(CyclingSensorCoordinator.class),
     BLE_GATT_CLIENT(BleGattClientCoordinator.class),

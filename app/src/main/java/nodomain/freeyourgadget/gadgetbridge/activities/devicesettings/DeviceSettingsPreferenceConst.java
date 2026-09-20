@@ -584,6 +584,11 @@ public class DeviceSettingsPreferenceConst {
     public static final String PREF_HAYLOU_S35_ANC_MULTIPOINT = "pref_haylou_s35_anc_multipoint";
     public static final String PREF_HAYLOU_S35_ANC_EQ_PRESET = "pref_haylou_s35_anc_eq_preset";
 
+    public static final String PREF_SENNHEISER_MOMENTUM_LED = "pref_sennheiser_momentum_led";
+    public static final String PREF_SENNHEISER_MOMENTUM_VOICE_PROMPTS = "pref_sennheiser_momentum_voice_prompts";
+    public static final String PREF_SENNHEISER_MOMENTUM_VOICE_ANSWER = "pref_sennheiser_momentum_voice_answer";
+    public static final String PREF_SENNHEISER_MOMENTUM_SWAP_VOLUME_BUTTONS = "pref_sennheiser_momentum_swap_volume_buttons";
+
     public static final String PREF_SONY_AMBIENT_SOUND_CONTROL_BUTTON_MODE = "pref_sony_ambient_sound_control_button_mode";
     public static final String PREF_SONY_FOCUS_VOICE = "pref_sony_focus_voice";
     public static final String PREF_SONY_AMBIENT_SOUND_LEVEL = "pref_sony_ambient_sound_level";

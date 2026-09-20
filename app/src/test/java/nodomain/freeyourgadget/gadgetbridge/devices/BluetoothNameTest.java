@@ -70,6 +70,8 @@ public class BluetoothNameTest extends TestBase {
             put("WF-C710N", DeviceType.SONY_WF_C710N);
             put("John's WF-C710N", DeviceType.SONY_WF_C710N);
             put("LE_WF-C710N", null);
+            put("MOMENTUM M2 IEBT", DeviceType.SENNHEISER_MOMENTUM_IN_EAR_WIRELESS);
+            put("MOMENTUM M2 AEBT", null); // the over-ear MOMENTUM Wireless, not tested
             put("Polar H10 96C0B12D", DeviceType.POLARH10);
             put("Forerunner 165 Music", DeviceType.GARMIN_FORERUNNER_165_MUSIC);
             put("Forerunner 170", DeviceType.GARMIN_FORERUNNER_170); // #6276
