@@ -56,9 +56,9 @@ class DeviceSettingsRefreshHandle(
 /**
  * Converts a list of [DeviceSetting] nodes into androidx [Preference] objects and adds them to
  * a parent [PreferenceGroup]. Returns a [DeviceSettingsRefreshHandle] that re-evaluates all
- * [DeviceSetting.visibleWhen] predicates and repopulates all dynamic [ListSetting.entriesProvider]
- * when invoked. Call [DeviceSettingsRefreshHandle.cleanup] when the fragment stops to unregister
- * any SharedPreferences listeners.
+ * [DeviceSetting.visibleWhen] and screen [ScreenSetting.enabled] predicates, and repopulates all dynamic
+ * [ListSetting.entriesProvider] when invoked. Call [DeviceSettingsRefreshHandle.cleanup] when the
+ * fragment stops to unregister any SharedPreferences listeners.
  *
  * [CategorySetting] nodes are automatically hidden when all of their member preferences (those
  * between this category and the next one or an [XmlScreenSetting]) are invisible.
@@ -73,6 +73,7 @@ object DeviceSettingRenderer {
         handler: SettingsRenderHost,
     ): DeviceSettingsRefreshHandle {
         val visibilityPairs = mutableListOf<Pair<Preference, (Prefs) -> Boolean>>()
+        val enabledPairs = mutableListOf<Pair<Preference, (Prefs) -> Boolean>>()
         val dynamicEntryPairs = mutableListOf<Pair<ListPreference, (Prefs) -> List<ListEntry>>>()
         val dynamicMultiEntryPairs = mutableListOf<Pair<MultiSelectListPreference, (Prefs) -> List<ListEntry>>>()
         val categoryMemberPairs = mutableListOf<Pair<PreferenceCategory, MutableList<Preference>>>()
@@ -86,6 +87,7 @@ object DeviceSettingRenderer {
             val livePrefs = Prefs(sp)
             val context = handler.context
             visibilityPairs.forEach { (pref, predicate) -> pref.isVisible = predicate(livePrefs) }
+            enabledPairs.forEach { (pref, predicate) -> pref.isEnabled = predicate(livePrefs) }
             dynamicEntryPairs.forEach { (pref, provider) ->
                 applyEntries(pref, provider(livePrefs), context)
             }
@@ -109,6 +111,7 @@ object DeviceSettingRenderer {
             prefs,
             handler,
             visibilityPairs,
+            enabledPairs,
             dynamicEntryPairs,
             dynamicMultiEntryPairs,
             categoryMemberPairs,
@@ -120,6 +123,7 @@ object DeviceSettingRenderer {
 
         // Initial visibility passes - individual predicates first, then category membership
         visibilityPairs.forEach { (pref, predicate) -> pref.isVisible = predicate(prefs) }
+        enabledPairs.forEach { (pref, predicate) -> pref.isEnabled = predicate(prefs) }
         categoryMemberPairs.forEach { (cat, members) ->
             cat.isVisible = members.isNotEmpty() && members.any { it.isVisible }
         }
@@ -168,6 +172,7 @@ object DeviceSettingRenderer {
         prefs: Prefs,
         handler: SettingsRenderHost,
         visibilityPairs: MutableList<Pair<Preference, (Prefs) -> Boolean>>,
+        enabledPairs: MutableList<Pair<Preference, (Prefs) -> Boolean>>,
         dynamicEntryPairs: MutableList<Pair<ListPreference, (Prefs) -> List<ListEntry>>>,
         dynamicMultiEntryPairs: MutableList<Pair<MultiSelectListPreference, (Prefs) -> List<ListEntry>>>,
         categoryMemberPairs: MutableList<Pair<PreferenceCategory, MutableList<Preference>>>,
@@ -196,6 +201,7 @@ object DeviceSettingRenderer {
                         prefs,
                         handler,
                         visibilityPairs,
+                        enabledPairs,
                         dynamicEntryPairs,
                         dynamicMultiEntryPairs,
                         categoryMemberPairs,
@@ -220,6 +226,10 @@ object DeviceSettingRenderer {
                     screen.setTitle(setting.title)
                     if (setting.summary != 0) screen.setSummary(setting.summary)
                     if (setting.icon != 0) screen.setIcon(setting.icon)
+                    if (setting.enabled != null) {
+                        val enabled = setting.enabled
+                        enabledPairs.add(screen to enabled)
+                    }
                     // Must be added to parent before rendering children so that dependencies can be resolved
                     parent.addPreference(screen)
                     renderItems(
@@ -228,6 +238,7 @@ object DeviceSettingRenderer {
                         prefs,
                         handler,
                         visibilityPairs,
+                        enabledPairs,
                         dynamicEntryPairs,
                         dynamicMultiEntryPairs,
                         categoryMemberPairs,

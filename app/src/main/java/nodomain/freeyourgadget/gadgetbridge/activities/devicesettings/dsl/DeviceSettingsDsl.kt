@@ -48,6 +48,7 @@ class DeviceSettingsScope {
         @DrawableRes icon: Int = 0,
         connectedOnly: Boolean = false,
         visibleWhen: ((Prefs) -> Boolean)? = null,
+        enabled: ((Prefs) -> Boolean)? = null,
         block: DeviceSettingsScope.() -> Unit,
     ) {
         items.add(
@@ -58,6 +59,7 @@ class DeviceSettingsScope {
                 icon = icon,
                 connectedOnly = connectedOnly,
                 visibleWhen = visibleWhen,
+                enabled = enabled,
                 children = DeviceSettingsScope().apply(block).build(),
             )
         )
