@@ -2930,7 +2930,7 @@ typeTag 13 -> "0"/"1"/"2"), the DataItem's field 8 binds each key to a digest
 (`{1=key, 2={4=digest}, 3=4}`, digest = base64url(SHA-1(bytes)), 27 chars), and the blob bytes
 travel separately in a framing we have not decoded yet.
 
-## 47. Notification icons — Wear Asset transfer DECODED (not yet implemented)
+## 47. Notification icons — Wear Asset transfer IMPLEMENTED but disabled (blocked)
 
 Decoded from the same §44 capture. Assets travel on the *same* RFCOMM channel with the
 *same* 4-byte length prefix + envelope framing as everything else — they were only invisible
@@ -2971,7 +2971,36 @@ padding), bind it to a key in the DataItem's field 8, and point the DataMap entr
 key's index with typeTag 13. `supplemental_data` uses the same mechanism (it is Asset-typed,
 which is why §34 had to omit it).
 
-Not implemented yet — this section is the spec for doing so.
+### Implemented (commit cdbbe3556), but disabled pending one more bug
+
+The encoding above is implemented in GB (`WearDataLayerProtocol.buildAssetChunks`/
+`assetDigest`, wired into `buildNotificationPut`'s optional icon parameter), gated off by
+`APP_ICON_MODE = 0` in `GalaxyWatch7DeviceSupport` (an unconditional early return, so it is a
+true no-op while disabled).
+
+**A real bug was found and fixed along the way**: an asset chunk's envelope must carry **no
+field 5** (unlike DataItem/peer-sync envelopes, which always have `field 5 = 3` - see the
+envelope layout in §3). Sending it made the watch silently drop the asset **and the
+notification that referenced it**. This was found by bisecting live: a notification with no
+icon at all delivered fine; the same notification with the icon asset sent-but-unreferenced
+was *also* dropped - proving the asset message itself was the problem, not the DataItem's
+reference to it. Fixing the envelope (no field 5 on asset chunks) resolved that failure mode.
+
+**Still blocked after that fix**: a correctly-framed, correctly-referenced asset still never
+renders on the watch. The leading hypothesis going in was a missing handshake on **payload
+field 16** (a paired request/response seen ~330x each direction in the capture) - **this was
+chased down and ruled out**: checked across the *full* capture (664 field-16 messages, not
+just the small sample first inspected), only 49 even mention a `w_apps_*` path, and the rest
+cover entirely unrelated channels (`/c_voicerecorder/get_vr_watch_info`,
+`/c_voicerecorder/connection_change`, etc.) - field16 is a generic per-MessageEvent-path
+announcement wrapper, not an asset-transfer handshake. The small sample checked first just
+happened to correlate by coincidence.
+
+The real blocker remains **unidentified**. Next steps for a future session: a fresh
+stock-app capture with btsnoop spanning the *complete* asset lifecycle (the current one has
+a gap partway through), or further live bisection against the reference capture (e.g. does
+the watch expect a per-chunk ack before accepting the next chunk; does establishing the
+session require an intervening exchange we are not reproducing).
 
 ## 48. Battery level poll — DECODED and IMPLEMENTED: stf_battery_req/rsp on /w_stf
 
