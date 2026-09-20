@@ -1,20 +1,15 @@
 package nodomain.freeyourgadget.gadgetbridge.service.devices.soundcore.q30;
 
-import static nodomain.freeyourgadget.gadgetbridge.util.GB.hexdump;
-
 import android.content.SharedPreferences;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.List;
 
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsPreferenceConst;
 import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEvent;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
-import nodomain.freeyourgadget.gadgetbridge.service.devices.soundcore.SoundcorePacket;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.soundcore.protocol.impl.v1.SoundcoreProtocolImplV1;
 import nodomain.freeyourgadget.gadgetbridge.util.Prefs;
 
@@ -23,48 +18,50 @@ public class SoundcoreQ30Protocol extends SoundcoreProtocolImplV1 {
     private static final Logger LOG = LoggerFactory.getLogger(SoundcoreQ30Protocol.class);
 
     private static final short CMD_SET_EQUALIZER = (short) 0x8102;
+    private static final int BATTERY_MULTIPLIER = 20;
 
     protected SoundcoreQ30Protocol(GBDevice device) {
         super(device);
     }
 
     @Override
-    public GBDeviceEvent[] decodeResponse(byte[] responseData) {
-        SoundcorePacket packet = decodePacket(responseData);
-
-        if (packet == null)
-            return null;
-
-        List<GBDeviceEvent> devEvts = new ArrayList<>();
-        short cmd = packet.getCommand();
-        byte[] payload = packet.getPayload();
-
-        if (cmd == CMD_GET_DEVICE_INFO) {
-            int battery = payload[0] * 20; // only 20% steps available here
-            devEvts.add(buildBatteryInfo(0, battery));
-
-            byte[] eq_data = Arrays.copyOfRange(payload, 2, 12);
-            decodeEqualizer(eq_data);
-
-            // a lot of zeros is in range 12 - 34
-
-            byte[] anc_data = Arrays.copyOfRange(payload, 35, 39);
-            decodeAudioMode(anc_data);
-
-            String firmware1 = readString(payload, 39, 5);
-            String firmware2 = "";
-            String serialNumber = readString(payload, 44, 16);
-            devEvts.add(buildVersionInfo(firmware1, firmware2, serialNumber));
-
-        } else if (cmd == CMD_NOTIFY_AUDIO_MODE) {
-            decodeAudioMode(payload);
-        } else if (cmd == CMD_SET_AUDIO_MODE) {
-            // Acknowledgement for changed Ambient Mode
-            // empty payload
-        } else {
-            LOG.debug("Unknown incoming message - command: " + cmd + ", dump: " + hexdump(responseData));
+    protected GBDeviceEvent[] decodeDeviceInfo(final byte[] payload) {
+        if (payload.length < 60) {
+            LOG.warn("CMD_GET_DEVICE_INFO payload too short: {} bytes", payload.length);
+            return new GBDeviceEvent[0];
         }
-        return devEvts.toArray(new GBDeviceEvent[devEvts.size()]);
+
+        decodeEqualizer(Arrays.copyOfRange(payload, 2, 12));
+        decodeAudioMode(Arrays.copyOfRange(payload, 35, 39));
+
+        final String firmware1 = readString(payload, 39, 5);
+        final String serialNumber = readString(payload, 44, 16);
+        return new GBDeviceEvent[]{
+                handleBatteryInfo(payload[0], 0, BATTERY_MULTIPLIER)[0],
+                buildVersionInfo(firmware1, "", serialNumber)
+        };
+    }
+
+    @Override
+    protected GBDeviceEvent[] decodeAudioMode(final byte[] payload) {
+        decodeAudioModePayload(payload);
+        return new GBDeviceEvent[0];
+    }
+
+    /** Q30 reports its single battery in CMD_GET_DEVICE_INFO, not the earbud/case notification layout. */
+    @Override
+    protected GBDeviceEvent[] decodeBatteryInfo(final byte[] payload) {
+        return new GBDeviceEvent[0];
+    }
+
+    @Override
+    protected GBDeviceEvent[] decodeCommand(final short command, final byte[] payload) {
+        if (command == CMD_SET_EQUALIZER) {
+            decodeEqualizer(payload);
+            return new GBDeviceEvent[0];
+        }
+        LOG.debug("Unknown incoming message - command: {} ({} bytes)", command, payload.length);
+        return new GBDeviceEvent[0];
     }
 
 
@@ -127,7 +124,11 @@ public class SoundcoreQ30Protocol extends SoundcoreProtocolImplV1 {
     /**
      * Gets triggered when the button on the device is pressed or transparency toggled with the right palm.
      */
-    private void decodeAudioMode(byte[] payload) {
+    private void decodeAudioModePayload(byte[] payload) {
+        if (payload.length < 2) {
+            LOG.warn("Audio mode payload too short: {} bytes", payload.length);
+            return;
+        }
         SharedPreferences prefs = getDevicePrefs().getPreferences();
         SharedPreferences.Editor editor = prefs.edit();
         String ambient_sound_mode = decodeAmbientSoundMode(payload[0]);
@@ -168,6 +169,10 @@ public class SoundcoreQ30Protocol extends SoundcoreProtocolImplV1 {
     }
 
     private void decodeEqualizer(byte[] payload) {
+        if (payload.length < 10) {
+            LOG.warn("Equalizer payload too short: {} bytes", payload.length);
+            return;
+        }
         // payload[0] und payload[1] immer 0xfe ?
         int band1 = Byte.toUnsignedInt(payload[2]);
         int band2 = Byte.toUnsignedInt(payload[3]);
@@ -181,6 +186,6 @@ public class SoundcoreQ30Protocol extends SoundcoreProtocolImplV1 {
 
 
     byte[] encodeMysteryDataRequest2() {
-        return encodeRequest(CMD_GET_UNKNOWN_DATA_0105);
+        return encodeRequest(CMD_GET_EXTENDED_INFO);
     }
 }
