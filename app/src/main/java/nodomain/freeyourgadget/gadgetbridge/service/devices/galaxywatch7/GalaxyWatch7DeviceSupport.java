@@ -182,6 +182,7 @@ public class GalaxyWatch7DeviceSupport extends AbstractBTBRDeviceSupport {
         }
 
         LOG.info("Galaxy Watch7: Data Layer channel connected, sending node handshake as {}", localNodeId);
+        stopBatteryPolling();
 
         final String localName = "Gadgetbridge";
         if (watchConnectionId == null) {
@@ -201,8 +202,45 @@ public class GalaxyWatch7DeviceSupport extends AbstractBTBRDeviceSupport {
             peerSyncSent = true;
         }
         builder.setDeviceState(GBDevice.State.INITIALIZED);
+        // The watch only reliably pushes its battery level on connect and on its own schedule (it
+        // sent us 100/96/95% unprompted in the reference capture, but nothing while sitting on the
+        // charger for hours) - poll it explicitly so a full charge is reflected promptly. Delay the
+        // first request slightly so it does not race the handshake/peer-sync above.
+        builder.run(() -> batteryPollHandler.postDelayed(batteryPollRunnable, 5000));
 
         return builder;
+    }
+
+    // The watch's battery level otherwise only updates on connect (its batterystate DataItem) or on
+    // its own unpredictable schedule (a /w_stf stf_battery_rsp push - research notes §48), so a full
+    // charge could sit unreflected in GB for hours. Poll it explicitly on the same schedule GB uses
+    // for other devices (DeviceSettingsPreferenceConst battery-polling prefs), mirroring the pattern
+    // other DeviceSupport implementations use (e.g. OVTouch26DeviceSupport).
+    private final android.os.Handler batteryPollHandler = new android.os.Handler(android.os.Looper.getMainLooper());
+    private final Runnable batteryPollRunnable = this::pollBattery;
+
+    private void pollBattery() {
+        final String node = localNodeId;
+        final String watch = watchNodeId;
+        final nodomain.freeyourgadget.gadgetbridge.util.preferences.DevicePrefs devicePrefs =
+                GBApplication.getDevicePrefs(getDevice());
+        if (node != null && watch != null && devicePrefs.getBatteryPollingEnabled()) {
+            LOG.debug("Galaxy Watch7: requesting battery level (stf_battery_req)");
+            final byte[] write = WearDataLayerProtocol.buildStfBatteryRequest(
+                    SETTINGS_SOURCE_PACKAGE, SETTINGS_SOURCE_SIGNATURE, node, watch,
+                    messageSeq.getAndIncrement(), getDevice().getAddress());
+            final TransactionBuilder builder = createTransactionBuilder("poll battery");
+            builder.write(write);
+            builder.queue();
+        }
+        // Reschedule regardless (also when currently disabled) so re-enabling the setting takes
+        // effect on the next tick instead of requiring a reconnect.
+        final int intervalMinutes = Math.max(1, devicePrefs.getBatteryPollingIntervalMinutes());
+        batteryPollHandler.postDelayed(batteryPollRunnable, intervalMinutes * 60_000L);
+    }
+
+    private void stopBatteryPolling() {
+        batteryPollHandler.removeCallbacks(batteryPollRunnable);
     }
 
     // The watch validates a setting DataItem's source package + signing-cert digest against its
@@ -811,6 +849,12 @@ public class GalaxyWatch7DeviceSupport extends AbstractBTBRDeviceSupport {
     private static final int MAX_FRAME_LEN = 1 << 20;
 
     @Override
+    public void dispose() {
+        stopBatteryPolling();
+        super.dispose();
+    }
+
+    @Override
     public void onSocketRead(final byte[] data) {
         synchronized (incomingLock) {
             byte[] merged = new byte[incoming.length + data.length];
@@ -845,6 +889,7 @@ public class GalaxyWatch7DeviceSupport extends AbstractBTBRDeviceSupport {
         seedOwnDataVersion(message);
         reflectIncomingSetting(message);
         reflectBattery(message);
+        reflectStfBattery(message);
         reflectNotificationDismissal(message);
         handleBridgedAction(message);
         handleMediaMessage(message);
@@ -951,6 +996,25 @@ public class GalaxyWatch7DeviceSupport extends AbstractBTBRDeviceSupport {
     // so we must take the newest by timestamp, not whichever lands last (else the stale, days-old
     // level overwrites the correct one - the "battery stuck at 97%" bug).
     private long lastBatteryTimestamp = -1;
+
+    // The watch also pushes its level as JSON on /w_stf when it changes (research notes §48). The
+    // batterystate DataItem below only reliably arrives on connect, so without this the level sat
+    // stale for hours (e.g. still showing the pre-charge value while the watch was already full).
+    private void reflectStfBattery(final byte[] message) {
+        final Integer level = WearDataLayerProtocol.parseStfBatteryLevel(message);
+        if (level == null || level == lastBatteryLevel) {
+            return;
+        }
+        lastBatteryLevel = level;
+        // This is a live push, so it supersedes any DataItem timestamp we have seen so far.
+        lastBatteryTimestamp = System.currentTimeMillis();
+        final GBDeviceEventBatteryInfo info = new GBDeviceEventBatteryInfo();
+        info.level = level;
+        // The push carries no charging flag; keep it to the level-derived states.
+        info.state = level <= 15 ? BatteryState.BATTERY_LOW : BatteryState.BATTERY_NORMAL;
+        LOG.info("Galaxy Watch7: battery {}% (from /w_stf push)", level);
+        handleGBDeviceEvent(info);
+    }
 
     // Report the watch's battery level/state to Gadgetbridge from its batterystate DataItem.
     private void reflectBattery(final byte[] message) {

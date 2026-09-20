@@ -472,6 +472,53 @@ public final class WearDataLayerProtocol {
         return me == null ? null : new ProtoReader(me).findMessage(ME_DATA);
     }
 
+    // Besides the batterystate DataItem, the watch pushes its charge level as a plain-JSON
+    // MessageEvent on /w_stf whenever it changes (research notes §48):
+    //   {"msg_id":"stf_battery_rsp","deviceId":"<mac>","result":true,"data":"{\"batteryLevel\":95}"}
+    // Ignoring these is why the level could sit stale for hours while the watch charged.
+    private static final String STF_PATH = "/w_stf";
+    private static final java.util.regex.Pattern STF_BATTERY_LEVEL =
+            java.util.regex.Pattern.compile("batteryLevel\\\\?\"\\s*:\\s*(\\d{1,3})");
+
+    /**
+     * Builds the {@code stf_battery_req} MessageEvent that asks the watch to report its charge level
+     * on {@code /w_stf} (decoded from the stock {@code STFMessageData}/{@code STFDataLayerUtil}:
+     * {"msg_id":"stf_battery_req","deviceId":"<mac>"}, no other fields, no handshake).
+     */
+    public static byte[] buildStfBatteryRequest(final String sourcePackage, final String signatureHex,
+                                                final String ownNodeId, final String targetNodeId,
+                                                final long seq, final String deviceMac) {
+        final String json = "{\"msg_id\":\"stf_battery_req\",\"deviceId\":\"" + deviceMac + "\"}";
+        return buildMessageEvent(sourcePackage, signatureHex, ownNodeId, targetNodeId, seq, STF_PATH,
+                json.getBytes(java.nio.charset.StandardCharsets.UTF_8));
+    }
+
+    /** The battery percentage from a {@code /w_stf} {@code stf_battery_rsp} push, or null. */
+    public static Integer parseStfBatteryLevel(final byte[] message) {
+        final byte[] me = extractMessageEvent(message);
+        if (me == null) {
+            return null;
+        }
+        final ProtoReader reader = new ProtoReader(me);
+        if (!STF_PATH.equals(reader.findString(ME_PATH))) {
+            return null;
+        }
+        final String json = reader.findString(ME_DATA);
+        if (json == null || !json.contains("stf_battery_rsp")) {
+            return null;
+        }
+        final java.util.regex.Matcher m = STF_BATTERY_LEVEL.matcher(json);
+        if (!m.find()) {
+            return null;
+        }
+        try {
+            final int level = Integer.parseInt(m.group(1));
+            return level >= 0 && level <= 100 ? level : null;
+        } catch (final NumberFormatException e) {
+            return null;
+        }
+    }
+
     // ---- Incoming bridged-action handling (watch -> phone quick reply / action tap), research §46 ----
     // The watch invokes a notification action by sending a MessageEvent on /bridger/rpc whose data is
     // a DataMap { rpc_command:"bridged_action", intent_id:<the action's intent_id>,
