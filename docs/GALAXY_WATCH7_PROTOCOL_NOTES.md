@@ -2972,3 +2972,162 @@ key's index with typeTag 13. `supplemental_data` uses the same mechanism (it is 
 which is why §34 had to omit it).
 
 Not implemented yet — this section is the spec for doing so.
+
+## 48. Battery level poll — DECODED and IMPLEMENTED: stf_battery_req/rsp on /w_stf
+
+The `batterystate` DataItem (§ earlier) only reliably arrives on connect and otherwise
+updates on the watch's own unpredictable schedule - it could sit stale for hours (observed:
+still showing a pre-charge level while the watch had long since reached 100%). The stock
+Samsung "Find My" companion (`com.samsung.android.companionapps.stfinder`) actively polls it
+instead, over a tiny JSON MessageEvent channel, decoded from its `STFMessageData`/
+`STFDataLayerUtil` classes:
+
+```
+path: /w_stf   (STFDataLayerUtil.PATH_PREFIX_PHONE)
+
+phone -> watch (request): {"msg_id":"stf_battery_req","deviceId":"<mac>"}
+watch -> phone (response): {"msg_id":"stf_battery_rsp","deviceId":"<mac>","result":true,
+                             "data":"{\"batteryLevel\":<0-100>}"}
+```
+
+No handshake, no other fields. `deviceId` is the watch's own Bluetooth MAC (as GB already
+has it from `GBDevice.getAddress()`). Implemented in GB: request sent shortly after connect
+and on the same battery-polling schedule/prefs GB already uses for other devices
+(`DevicePrefs.getBatteryPollingEnabled/IntervalMinutes`, default 15 min). Verified live: the
+watch replied with a `stf_battery_rsp` carrying the current level. See
+[[gw7-battery-stale-node]].
+
+## 49. Media control — DECODED and IMPLEMENTED: adaptive_media_bridging RPC
+
+§42 identified the channel (`/adaptive_media_bridging/rpc/*`, a Google Wear media-library
+RPC, NOT the `w_apps_media_controller` JSON channel §40/§41 uses for the display-only path)
+but left the protobuf field numbers undecoded. Decoded from
+`docs/captures/media_session/btsnoop_media_control.log.gz` this session and **verified
+byte-for-byte**: a Python encoder reproduces 4 real captured `media_update` messages
+(the empty/idle ack, a paused reply, a playing reply, and a reply carrying a live playback
+position) exactly, byte for byte, confirming every field below.
+
+### Watch -> phone: `/adaptive_media_bridging/rpc/watch_request`
+
+One path, two message shapes (the MessageEvent's data, field 7, holds a `WatchRequest`):
+
+```
+WatchRequest {
+  1 = CommandRequest {            // a transport-button press
+    1 = MediaCommand {
+      1 = sessionId (string)      // echoes a SessionState.id we previously sent
+      2 = Command { 1 = CommandCode { 1 = code (varint) } }
+    }
+    2 = requestToken (string, uuid)
+  }
+  2 = MethodRequest {              // subscribe / capability query ("OA" seen after connect,
+    1 = activeSubscriptionRequestToken (string, uuid)     // "external" seen later)
+    2 = { 1 = method name ("OA"/"external"), 2/3/4 = capability negotiation - the WATCH
+          describing what IT supports; not needed to reply, only to detect the request }
+  }
+}
+```
+
+Only two command codes were exercised live: **0 = PAUSE, 1 = PLAY** (verified: each
+`CommandRequest.requestToken` byte-for-byte matches the token logged in `S3.b: Sent "pause"/
+"play" command (requestToken=...)` in `watch_media_rpc.txt`, and the code correlates exactly
+with which one). Next/previous/seek were not pressed in this capture - unknown codes, but
+likely small sequential ints in the same enum given a capability list `{2,3,4}` appears
+elsewhere in the handshake (see raw evidence).
+
+### Phone -> watch: `/adaptive_media_bridging/rpc/media_update`
+
+```
+MediaUpdate {
+  1 = activeSubscriptionRequestToken (string) - echo of the watch's current subscribe token
+  2 = { 1 = SessionState {
+    1 = id (string)              // stable per playback session, arbitrary
+    2 = pkg (string)              // the "owning" package, e.g. "org.mozilla.firefox";
+                                   //   GB can use its own applicationId here
+    3 = { 1 = <32 raw bytes> }    // SKIPPED in our v1 (see below) - looks like a raw
+                                   //   SHA-256 of the album art, not base64url like §47's
+                                   //   notification-asset digest
+    4 = appLabel (string)         // e.g. "Firefox" - the app's display name
+    5 = assetKey (string)         // SKIPPED - app-icon asset key (art transport undecoded,
+                                   //   inline bytes in a top-level field 3, NOT the chunked
+                                   //   §47 mechanism - different from notification assets)
+    6 = assetKey (string)         // SKIPPED - a second, different asset key (unclear which
+                                   //   icon this is vs field 5)
+    7 = { 1:0, 2:15, 3:6, 4:0 }    // constant across every sample; sent as-is, meaning unknown
+                                   //   (possibly an available-commands bitmask)
+    8 = playWhenReady (bool)      // *** CONFIRMED the play/pause flag *** - toggled true/
+                                   //   false exactly in step with the PLAY/PAUSE command
+                                   //   whose token this reply's field 5 (below) echoes
+    9 = playbackState (varint)    // constant 3 across all samples (idle/paused/playing) -
+                                   //   plausibly ExoPlayer's Player.STATE_READY
+    10 = { 1 = Timestamp{1=sec,2=nanos} (position; empty submessage when unknown/zero),
+           2 = Timestamp{1=sec,2=nanos} (wall-clock the update was generated at) }
+    11 = speed (fixed32 float, IEEE-754) - always 1.0 (0x3f800000) in this capture
+    12 = 0 (varint, constant; unknown - possibly a repeat/shuffle mode)
+    13 = Metadata { 1=title, 2=artist, 4=artist again (album? - always equal to 2 here),
+                     6=assetKey (SKIPPED, track-specific art key) }
+    14 = { 1 = { 2:0, 3 = <same Metadata as field 13> } }   // a "queue item" duplicate of
+                                                              //   the same title/artist
+    15 = "" (string, constant empty)
+    16 = { 1:1, 2:0, 3:0, 4:0, 5:0, 6:0, 7:0, 8:0, 9:1, 10:1 }   // constant; unknown
+    17 = 0, 18 = 0 (varints, constant)
+  } }
+  5 = lastCommandRequestToken (string) - ONLY present when this update answers a command;
+      omitted for a subscribe-triggered or spontaneous push. *** CONFIRMED *** by exact
+      byte match against the token in each captured PLAY/PAUSE command.
+}
+```
+
+The idle/no-session ack is just `{1 = token}` with field 2 present but **empty**
+(`field2 = msg(1, "")` conceptually - zero bytes), no field 5.
+
+### Implementation notes / what GB's v1 does
+
+- **Album art is skipped entirely** (SessionState fields 3/5/6/13.6 and the top-level
+  attached-asset field 3 all omitted) - the art transport here is a different, undecoded
+  mechanism from §47's notification-icon chunking (inline bytes in one message, up to
+  ~10KB seen, keyed by a raw 32-byte hash rather than a base64url digest). Omitting it is
+  expected to be safe (every other field's presence/absence was verified against real
+  captured bytes; only the art trio's necessity is unverified) and is the main thing to
+  confirm/extend in a follow-up.
+- `playbackState` (field 9) is always sent as `3`; `speed` (field 11) always `1.0`;
+  fields 7/12/15/16/17/18 are sent as the exact constants observed, since their semantics
+  are unknown and copying known-good values is safer than guessing.
+- A stable per-connection session id/token pair is invented locally (GB is not told one by
+  the watch) and reused for all pushes during that connection.
+- Commands 0/1 map to `GBDeviceEventMusicControl.PAUSE`/`PLAY`; other command codes are
+  logged and ignored pending a capture that presses next/previous/seek.
+
+### A second, simpler control path: `remote_control` on the JSON channel
+
+Live testing (2026-09-21, Galaxy Watch7, `com.samsung.android.mediacontroller`'s "select
+device -> Phone" screen, the common/default watch media-control UI) found that **this
+specific screen's transport buttons do not use the RPC channel at all** - they send a
+standard Android `KeyEvent` code on the existing JSON `w_apps_media_controller` channel
+(§40/§41, already implemented for metadata/playbackstate/volume):
+
+```
+path: /w_apps_media_controller/remote_control
+{"msgId":"remote_control","msgType":"1","deviceId":"<watchNode>",
+ "data":{"appId":"","extra":"","keyCode":"126"}}
+```
+
+`keyCode` is a stringified `android.view.KeyEvent` constant: confirmed live `126` =
+`KEYCODE_MEDIA_PLAY`; by the same numbering `127`=PAUSE, `85`=PLAY_PAUSE, `79`=HEADSETHOOK,
+`87`=NEXT, `88`=PREVIOUS, `89`=REWIND, `90`=FAST_FORWARD (not all individually confirmed
+live, but standard/stable Android constants). The screen's "back" button is plain UI
+navigation, not a transport command - it just re-triggers a `mediametadata`/`playbackstate`
+request (already handled).
+
+Implemented in GB: `handleMediaMessage` maps `remote_control`'s `keyCode` to
+`GBDeviceEventMusicControl`. **Verified live end-to-end**: pressing the watch's Play button
+produced `Galaxy Watch7: media remote_control -> PLAY` and dispatched the event.
+
+Both control paths are implemented; which one an interaction actually uses depends on which
+watch-side media UI/entry point the user is in. The RPC path is byte-verified against a
+historical capture (see the older §42 wording, `S3.b: Sent "play"/"pause" command`); the
+`remote_control` path is the one confirmed working live just now.
+
+Raw evidence in the repo: `docs/captures/media_session/btsnoop_media_control.log.gz`,
+`watch_media_rpc.txt` (the human-readable `S3.b`/`W3.h` log lines used to correlate request
+tokens), `logcat_media_filtered.txt`.

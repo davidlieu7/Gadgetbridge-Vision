@@ -185,6 +185,10 @@ public class GalaxyWatch7DeviceSupport extends AbstractBTBRDeviceSupport {
         // Asset transfers do not survive a reconnect, so re-send each app icon on the new connection.
         sentAppIcons.clear();
         stopBatteryPolling();
+        // The watch re-subscribes with a fresh token on every connection; forget the old one so we
+        // don't push media_update to a subscription the watch no longer holds.
+        mediaSubscribeToken = null;
+        mediaSessionId = null;
 
         final String localName = "Gadgetbridge";
         if (watchConnectionId == null) {
@@ -682,12 +686,14 @@ public class GalaxyWatch7DeviceSupport extends AbstractBTBRDeviceSupport {
     public void onSetMusicInfo(final MusicSpec musicSpec) {
         lastMusicSpec = musicSpec;
         sendMediaMetadata(musicSpec);
+        pushMediaRpcUpdate(null);
     }
 
     @Override
     public void onSetMusicState(final MusicStateSpec stateSpec) {
         lastMusicStateSpec = stateSpec;
         sendPlaybackState(stateSpec);
+        pushMediaRpcUpdate(null);
     }
 
     @Override
@@ -827,12 +833,59 @@ public class GalaxyWatch7DeviceSupport extends AbstractBTBRDeviceSupport {
             }
             return;
         }
+        // The watch's "select device -> Telefon" remote-control screen (Samsung's
+        // com.samsung.android.mediacontroller MediaControlActivity, confirmed live) sends transport
+        // presses as a standard Android KeyEvent code here, not a play/pause msgId string:
+        // {"msgId":"remote_control","msgType":"1","deviceId":"...","data":{"appId":"","extra":"",
+        // "keyCode":"126"}}. 126 = KEYCODE_MEDIA_PLAY, confirmed by watching the raw tap live.
+        if ("remote_control".equals(msgId)) {
+            final GBDeviceEventMusicControl.Event event = keyCodeToEvent(json);
+            if (event != null) {
+                LOG.info("Galaxy Watch7: media remote_control -> {}", event);
+                final GBDeviceEventMusicControl evt = new GBDeviceEventMusicControl();
+                evt.event = event;
+                evaluateGBDeviceEvent(evt);
+            } else {
+                LOG.warn("Galaxy Watch7: media remote_control with unmapped keyCode: {}", json);
+            }
+            return;
+        }
         final GBDeviceEventMusicControl.Event event = mediaCommandToEvent(msgId, json);
         if (event != null) {
             LOG.info("Galaxy Watch7: media command {} -> {}", msgId, event);
             final GBDeviceEventMusicControl evt = new GBDeviceEventMusicControl();
             evt.event = event;
             evaluateGBDeviceEvent(evt);
+        }
+    }
+
+    // Standard android.view.KeyEvent media key codes, as sent in remote_control's data.keyCode.
+    private GBDeviceEventMusicControl.Event keyCodeToEvent(final String json) {
+        try {
+            final JSONObject o = new JSONObject(json != null ? json : "{}");
+            final JSONObject d = o.optJSONObject("data");
+            final String keyCode = d != null ? d.optString("keyCode", "") : "";
+            switch (keyCode) {
+                case "79": // KEYCODE_HEADSETHOOK
+                case "85": // KEYCODE_MEDIA_PLAY_PAUSE
+                    return GBDeviceEventMusicControl.Event.PLAYPAUSE;
+                case "126": // KEYCODE_MEDIA_PLAY
+                    return GBDeviceEventMusicControl.Event.PLAY;
+                case "127": // KEYCODE_MEDIA_PAUSE
+                    return GBDeviceEventMusicControl.Event.PAUSE;
+                case "87": // KEYCODE_MEDIA_NEXT
+                    return GBDeviceEventMusicControl.Event.NEXT;
+                case "88": // KEYCODE_MEDIA_PREVIOUS
+                    return GBDeviceEventMusicControl.Event.PREVIOUS;
+                case "90": // KEYCODE_MEDIA_FAST_FORWARD
+                    return GBDeviceEventMusicControl.Event.FORWARD;
+                case "89": // KEYCODE_MEDIA_REWIND
+                    return GBDeviceEventMusicControl.Event.REWIND;
+                default:
+                    return null;
+            }
+        } catch (final JSONException e) {
+            return null;
         }
     }
 
@@ -858,6 +911,79 @@ public class GalaxyWatch7DeviceSupport extends AbstractBTBRDeviceSupport {
             default:
                 return null;
         }
+    }
+
+    // ---- Media control: /adaptive_media_bridging/rpc/* RPC (research notes §49) ----
+    // This is the channel the watch's actual transport buttons use (play/pause/skip); the JSON
+    // channel above is display-only. Message shapes verified byte-for-byte against the capture.
+    // A session id is invented locally (the watch never tells us one) and kept for one connection;
+    // the subscribe token is whatever the watch's last /adaptive_media_bridging "OA"/"external"
+    // request carried, echoed on every reply so the watch treats them as answers to its query.
+    private volatile String mediaSessionId;
+    private volatile String mediaSubscribeToken;
+
+    private void handleMediaRpcMessage(final byte[] message) {
+        final WearDataLayerProtocol.MediaWatchCommand cmd = WearDataLayerProtocol.parseMediaWatchCommand(message);
+        if (cmd != null) {
+            LOG.info("Galaxy Watch7: media command code={} session={} token={}",
+                    cmd.code, cmd.sessionId, cmd.requestToken);
+            final GBDeviceEventMusicControl.Event event = cmd.code == 0
+                    ? GBDeviceEventMusicControl.Event.PAUSE
+                    : cmd.code == 1 ? GBDeviceEventMusicControl.Event.PLAY : null;
+            if (event != null) {
+                final GBDeviceEventMusicControl evt = new GBDeviceEventMusicControl();
+                evt.event = event;
+                evaluateGBDeviceEvent(evt);
+            } else {
+                LOG.warn("Galaxy Watch7: unknown media command code {}", cmd.code);
+            }
+            // Reply promptly with our best-known state (optimistically reflecting the just-received
+            // command) so the watch's UI doesn't wait for the real onSetMusicState callback.
+            pushMediaRpcUpdate(cmd.requestToken, cmd.code == 1);
+            return;
+        }
+        final String token = WearDataLayerProtocol.parseMediaWatchSubscribeToken(message);
+        if (token != null) {
+            LOG.info("Galaxy Watch7: media subscribe token={}", token);
+            mediaSubscribeToken = token;
+            pushMediaRpcUpdate(null);
+        }
+    }
+
+    private void pushMediaRpcUpdate(final String lastCommandToken) {
+        pushMediaRpcUpdate(lastCommandToken, lastMusicStateSpec != null
+                && lastMusicStateSpec.getState() == MusicStateSpec.STATE_PLAYING);
+    }
+
+    private void pushMediaRpcUpdate(final String lastCommandToken, final boolean playWhenReady) {
+        final String node = localNodeId;
+        final String watch = watchNodeId;
+        final String token = mediaSubscribeToken;
+        if (node == null || watch == null || token == null) {
+            return; // the watch hasn't subscribed on this channel (yet) - nothing to push to
+        }
+        final byte[] write;
+        if (lastMusicSpec == null) {
+            write = WearDataLayerProtocol.buildMediaUpdateIdle(
+                    MEDIA_SOURCE_PACKAGE, MEDIA_SOURCE_SIGNATURE, node, watch,
+                    messageSeq.getAndIncrement(), token);
+        } else {
+            if (mediaSessionId == null) {
+                mediaSessionId = java.util.UUID.randomUUID().toString();
+            }
+            final Long positionMs = lastMusicStateSpec != null && lastMusicStateSpec.getPosition() >= 0
+                    ? (long) lastMusicStateSpec.getPosition() * 1000 : null;
+            write = WearDataLayerProtocol.buildMediaUpdate(
+                    MEDIA_SOURCE_PACKAGE, MEDIA_SOURCE_SIGNATURE, node, watch,
+                    messageSeq.getAndIncrement(), token, lastCommandToken, mediaSessionId,
+                    "nodomain.freeyourgadget.gadgetbridge", "Gadgetbridge", playWhenReady,
+                    lastMusicSpec.getTrack(), lastMusicSpec.getArtist(), positionMs);
+        }
+        LOG.info("Galaxy Watch7: media_update -> playWhenReady={} lastCommandToken={}",
+                playWhenReady, lastCommandToken);
+        final TransactionBuilder builder = createTransactionBuilder("media_update");
+        builder.write(write);
+        builder.queue();
     }
 
     // Find My Watch: ring/stop the watch via a plain-JSON MessageEvent on /w_apps_find_my_watch.
@@ -947,6 +1073,7 @@ public class GalaxyWatch7DeviceSupport extends AbstractBTBRDeviceSupport {
         reflectNotificationDismissal(message);
         handleBridgedAction(message);
         handleMediaMessage(message);
+        handleMediaRpcMessage(message);
 
         final String parsed = WearDataLayerProtocol.parseWatchNodeId(message);
         if (parsed == null) {

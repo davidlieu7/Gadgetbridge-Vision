@@ -581,6 +581,231 @@ public final class WearDataLayerProtocol {
         }
     }
 
+    // ---- Media control: /adaptive_media_bridging/rpc/* RPC (research notes §49) ----
+    // The actual transport-control channel (play/pause/skip button presses) rides this Google
+    // Wear media-library RPC, not the w_apps_media_controller JSON channel (§40/§41, display-only).
+    // Both message shapes below were verified byte-for-byte against the reference capture with a
+    // standalone encoder before being ported here.
+    public static final String MEDIA_RPC_PATH_PREFIX = "/adaptive_media_bridging/rpc/";
+    public static final String MEDIA_WATCH_REQUEST_PATH = MEDIA_RPC_PATH_PREFIX + "watch_request";
+    public static final String MEDIA_UPDATE_PATH = MEDIA_RPC_PATH_PREFIX + "media_update";
+
+    // WatchRequest.field1 = CommandRequest (a transport-button press).
+    private static final int WR_COMMAND = 1;
+    private static final int CMDREQ_MEDIA_COMMAND = 1;
+    private static final int CMDREQ_TOKEN = 2;
+    private static final int MEDIACMD_SESSION_ID = 1;
+    private static final int MEDIACMD_COMMAND = 2;
+    private static final int COMMAND_CODE_WRAPPER = 1;
+    private static final int CODE_VALUE = 1;
+    // WatchRequest.field2 = MethodRequest (subscribe / capability query, e.g. method "OA").
+    private static final int WR_METHOD = 2;
+    private static final int METHODREQ_TOKEN = 1;
+
+    /** A watch transport-button press decoded from a {@code watch_request} MessageEvent. */
+    public static final class MediaWatchCommand {
+        public final String sessionId;
+        public final int code; // 0 = PAUSE, 1 = PLAY (only codes confirmed live so far)
+        public final String requestToken;
+
+        MediaWatchCommand(final String sessionId, final int code, final String requestToken) {
+            this.sessionId = sessionId;
+            this.code = code;
+            this.requestToken = requestToken;
+        }
+    }
+
+    /** If the message is a {@code watch_request} carrying a command, returns it, else null. */
+    public static MediaWatchCommand parseMediaWatchCommand(final byte[] message) {
+        final byte[] me = extractMessageEvent(message);
+        if (me == null) {
+            return null;
+        }
+        final ProtoReader meReader = new ProtoReader(me);
+        if (!MEDIA_WATCH_REQUEST_PATH.equals(meReader.findString(ME_PATH))) {
+            return null;
+        }
+        final byte[] data = meReader.findMessage(ME_DATA);
+        final byte[] commandRequest = data == null ? null : new ProtoReader(data).findMessage(WR_COMMAND);
+        if (commandRequest == null) {
+            return null;
+        }
+        final ProtoReader cr = new ProtoReader(commandRequest);
+        final byte[] mediaCommand = cr.findMessage(CMDREQ_MEDIA_COMMAND);
+        final String token = cr.findString(CMDREQ_TOKEN);
+        if (mediaCommand == null || token == null) {
+            return null;
+        }
+        final ProtoReader mc = new ProtoReader(mediaCommand);
+        final String sessionId = mc.findString(MEDIACMD_SESSION_ID);
+        final byte[] command = mc.findMessage(MEDIACMD_COMMAND);
+        final byte[] codeWrapper = command == null ? null : new ProtoReader(command).findMessage(COMMAND_CODE_WRAPPER);
+        final Long code = codeWrapper == null ? null : new ProtoReader(codeWrapper).findVarint(CODE_VALUE);
+        if (sessionId == null || code == null) {
+            return null;
+        }
+        return new MediaWatchCommand(sessionId, code.intValue(), token);
+    }
+
+    /**
+     * If the message is a {@code watch_request} subscribe/capability query (not a command), returns
+     * the watch's {@code activeSubscriptionRequestToken}, else null. Reply with a {@link
+     * #buildMediaUpdate} using this as the token.
+     */
+    public static String parseMediaWatchSubscribeToken(final byte[] message) {
+        final byte[] me = extractMessageEvent(message);
+        if (me == null) {
+            return null;
+        }
+        final ProtoReader meReader = new ProtoReader(me);
+        if (!MEDIA_WATCH_REQUEST_PATH.equals(meReader.findString(ME_PATH))) {
+            return null;
+        }
+        final byte[] data = meReader.findMessage(ME_DATA);
+        if (data == null) {
+            return null;
+        }
+        final ProtoReader dr = new ProtoReader(data);
+        if (dr.findMessage(WR_COMMAND) != null) {
+            return null; // it's a command, not a subscribe/method request
+        }
+        final byte[] methodRequest = dr.findMessage(WR_METHOD);
+        return methodRequest == null ? null : new ProtoReader(methodRequest).findString(METHODREQ_TOKEN);
+    }
+
+    // MediaUpdate (phone -> watch), field numbers per research notes §49.
+    private static final int MU_TOKEN = 1;
+    private static final int MU_SESSION_WRAP = 2;
+    private static final int MU_LAST_COMMAND_TOKEN = 5;
+    private static final int SS_ID = 1;
+    private static final int SS_PKG = 2;
+    private static final int SS_APP_LABEL = 4;
+    private static final int SS_CAPS = 7;
+    private static final int SS_PLAY_WHEN_READY = 8;
+    private static final int SS_PLAYBACK_STATE = 9;
+    private static final int SS_TIMESTAMPS = 10;
+    private static final int SS_SPEED = 11;
+    private static final int SS_UNKNOWN12 = 12;
+    private static final int SS_METADATA = 13;
+    private static final int SS_QUEUE = 14;
+    private static final int SS_UNKNOWN15 = 15;
+    private static final int SS_UNKNOWN16 = 16;
+    private static final int SS_UNKNOWN17 = 17;
+    private static final int SS_UNKNOWN18 = 18;
+    private static final int MD_TITLE = 1;
+    private static final int MD_ARTIST = 2;
+    private static final int MD_ALBUM = 4;
+
+    /**
+     * Builds the empty/idle {@code media_update} (no active session) that acks a subscribe request
+     * when Gadgetbridge has no current track.
+     */
+    public static byte[] buildMediaUpdateIdle(final String sourcePackage, final String signatureHex,
+                                              final String ownNodeId, final String targetNodeId,
+                                              final long seq, final String activeToken) {
+        final ProtoWriter mu = new ProtoWriter();
+        mu.writeString(MU_TOKEN, nz(activeToken));
+        mu.writeMessage(MU_SESSION_WRAP, new byte[0]);
+        return buildMessageEvent(sourcePackage, signatureHex, ownNodeId, targetNodeId, seq,
+                MEDIA_UPDATE_PATH, mu.toByteArray());
+    }
+
+    /**
+     * Builds a {@code media_update} reporting the current track/playback state (research notes §49).
+     * Album art is intentionally omitted (undecoded transport, see docs) - the watch shows title,
+     * artist and transport controls without it.
+     *
+     * @param activeToken     the watch's current {@code activeSubscriptionRequestToken} to echo
+     * @param lastCommandToken the token of the command this update answers, or {@code null} for a
+     *                        spontaneous/subscribe-triggered push
+     * @param sessionId       a stable id for this playback session (GB invents one per connection)
+     * @param pkg             the package this session is attributed to (GB's own applicationId)
+     * @param appLabel        the app's display name (e.g. "Gadgetbridge")
+     * @param playWhenReady   true while playing, false while paused
+     * @param title           track title
+     * @param artist          track artist
+     * @param positionMs      current playback position, or {@code null} if unknown
+     */
+    public static byte[] buildMediaUpdate(final String sourcePackage, final String signatureHex,
+                                          final String ownNodeId, final String targetNodeId,
+                                          final long seq, final String activeToken,
+                                          final String lastCommandToken, final String sessionId,
+                                          final String pkg, final String appLabel,
+                                          final boolean playWhenReady, final String title,
+                                          final String artist, final Long positionMs) {
+        final long nowMs = System.currentTimeMillis();
+
+        final ProtoWriter metadata = new ProtoWriter();
+        metadata.writeString(MD_TITLE, nz(title));
+        metadata.writeString(MD_ARTIST, nz(artist));
+        metadata.writeString(MD_ALBUM, nz(artist));
+
+        final ProtoWriter queueItem = new ProtoWriter();
+        queueItem.writeVarint(2, 0);
+        queueItem.writeMessage(3, metadata.toByteArray());
+        final ProtoWriter queue = new ProtoWriter();
+        queue.writeMessage(1, queueItem.toByteArray());
+
+        final ProtoWriter timestamps = new ProtoWriter();
+        final ProtoWriter position = new ProtoWriter();
+        if (positionMs != null) {
+            position.writeVarint(1, positionMs / 1000);
+            position.writeVarint(2, (positionMs % 1000) * 1_000_000);
+        }
+        timestamps.writeMessage(1, position.toByteArray());
+        final ProtoWriter wallClock = new ProtoWriter();
+        wallClock.writeVarint(1, nowMs / 1000);
+        wallClock.writeVarint(2, (nowMs % 1000) * 1_000_000);
+        timestamps.writeMessage(2, wallClock.toByteArray());
+
+        final ProtoWriter caps = new ProtoWriter();
+        caps.writeVarint(1, 0);
+        caps.writeVarint(2, 15);
+        caps.writeVarint(3, 6);
+        caps.writeVarint(4, 0);
+
+        final ProtoWriter unknown16 = new ProtoWriter();
+        unknown16.writeVarint(1, 1);
+        unknown16.writeVarint(2, 0);
+        unknown16.writeVarint(3, 0);
+        unknown16.writeVarint(4, 0);
+        unknown16.writeVarint(5, 0);
+        unknown16.writeVarint(6, 0);
+        unknown16.writeVarint(7, 0);
+        unknown16.writeVarint(8, 0);
+        unknown16.writeVarint(9, 1);
+        unknown16.writeVarint(10, 1);
+
+        final ProtoWriter sessionState = new ProtoWriter();
+        sessionState.writeString(SS_ID, sessionId);
+        sessionState.writeString(SS_PKG, pkg);
+        sessionState.writeString(SS_APP_LABEL, nz(appLabel));
+        sessionState.writeMessage(SS_CAPS, caps.toByteArray());
+        sessionState.writeVarint(SS_PLAY_WHEN_READY, playWhenReady ? 1 : 0);
+        sessionState.writeVarint(SS_PLAYBACK_STATE, 3); // constant in every captured sample
+        sessionState.writeMessage(SS_TIMESTAMPS, timestamps.toByteArray());
+        sessionState.writeFixed32(SS_SPEED, Float.floatToIntBits(1.0f));
+        sessionState.writeVarint(SS_UNKNOWN12, 0);
+        sessionState.writeMessage(SS_METADATA, metadata.toByteArray());
+        sessionState.writeMessage(SS_QUEUE, queue.toByteArray());
+        sessionState.writeString(SS_UNKNOWN15, "");
+        sessionState.writeMessage(SS_UNKNOWN16, unknown16.toByteArray());
+        sessionState.writeVarint(SS_UNKNOWN17, 0);
+        sessionState.writeVarint(SS_UNKNOWN18, 0);
+
+        final ProtoWriter sessionWrap = new ProtoWriter();
+        sessionWrap.writeMessage(1, sessionState.toByteArray());
+
+        final ProtoWriter mu = new ProtoWriter();
+        mu.writeString(MU_TOKEN, nz(activeToken));
+        mu.writeMessage(MU_SESSION_WRAP, sessionWrap.toByteArray());
+        if (lastCommandToken != null) {
+            mu.writeString(MU_LAST_COMMAND_TOKEN, lastCommandToken);
+        }
+        return buildMessageEvent(sourcePackage, signatureHex, ownNodeId, targetNodeId, seq,
+                MEDIA_UPDATE_PATH, mu.toByteArray());
+    }
+
     // ---- Incoming bridged-action handling (watch -> phone quick reply / action tap), research §46 ----
     // The watch invokes a notification action by sending a MessageEvent on /bridger/rpc whose data is
     // a DataMap { rpc_command:"bridged_action", intent_id:<the action's intent_id>,
