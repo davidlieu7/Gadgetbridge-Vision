@@ -206,7 +206,7 @@ public class OppoHeadphonesSupport extends AbstractHeadphoneBTBRDeviceSupport {
         }
     }
 
-    private void handleCommand(OppoCommand command, byte[] payload) {
+    protected void handleCommand(OppoCommand command, byte[] payload) {
         final ByteBuffer buf = ByteBuffer.wrap(payload);
         switch (command) {
             case SUBSCRIPTION_ACK, TOUCH_CONFIG_ACK, MISC_CONFIG_ACK, ANC_CONFIG_ACK, FIND_DEVICE_ACK -> {
