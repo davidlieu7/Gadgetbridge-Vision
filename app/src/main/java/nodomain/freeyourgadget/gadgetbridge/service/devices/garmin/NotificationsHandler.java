@@ -80,6 +80,7 @@ public class NotificationsHandler implements MessageHandler {
             final NotificationSpec callNotificationSpec = new NotificationSpec(id);
             callNotificationSpec.setPhoneNumber(callSpec.getNumber());
             callNotificationSpec.setSourceAppId(callSpec.getSourceAppId());
+            callNotificationSpec.setKey(callSpec.getKey());
             callNotificationSpec.setTitle(caller);
             callNotificationSpec.setType(NotificationType.GENERIC_PHONE);
             callNotificationSpec.setBody(caller);
@@ -201,6 +202,7 @@ public class NotificationsHandler implements MessageHandler {
         switch (message.getNotificationAction()) {
             case REPLY_INCOMING_CALL:
                 deviceEvtCallControl.event = GBDeviceEventCallControl.Event.REJECT;
+                deviceEvtCallControl.callKey = notificationSpec.getKey();
                 message.addGbDeviceEvent(deviceEvtCallControl);
             case REPLY_MESSAGES:
                 deviceEvtNotificationControl.event = GBDeviceEventNotificationControl.Event.REPLY;
@@ -214,10 +216,12 @@ public class NotificationsHandler implements MessageHandler {
                 break;
             case ACCEPT_INCOMING_CALL:
                 deviceEvtCallControl.event = GBDeviceEventCallControl.Event.ACCEPT;
+                deviceEvtCallControl.callKey = notificationSpec.getKey();
                 message.addGbDeviceEvent(deviceEvtCallControl);
                 break;
             case REJECT_INCOMING_CALL:
                 deviceEvtCallControl.event = GBDeviceEventCallControl.Event.REJECT;
+                deviceEvtCallControl.callKey = notificationSpec.getKey();
                 message.addGbDeviceEvent(deviceEvtCallControl);
                 break;
             case DISMISS_NOTIFICATION:

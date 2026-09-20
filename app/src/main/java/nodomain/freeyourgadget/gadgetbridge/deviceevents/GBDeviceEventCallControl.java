@@ -21,10 +21,12 @@ import android.content.Context;
 import android.content.Intent;
 
 import androidx.annotation.NonNull;
+import androidx.localbroadcastmanager.content.LocalBroadcastManager;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import nodomain.freeyourgadget.gadgetbridge.externalevents.NotificationListener;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
 import nodomain.freeyourgadget.gadgetbridge.service.receivers.GBCallControlReceiver;
 
@@ -32,6 +34,7 @@ public class GBDeviceEventCallControl extends GBDeviceEvent {
     private static final Logger LOG = LoggerFactory.getLogger(GBDeviceEventCallControl.class);
 
     public Event event = Event.UNKNOWN;
+    public String callKey;
 
     public GBDeviceEventCallControl() {
     }
@@ -48,6 +51,15 @@ public class GBDeviceEventCallControl extends GBDeviceEvent {
             final Intent broadcastIntent = new Intent("nodomain.freeyourgadget.gadgetbridge.MUTE_CALL");
             broadcastIntent.setPackage(context.getPackageName());
             context.sendBroadcast(broadcastIntent);
+            return;
+        }
+        if (callKey != null && (event == Event.ACCEPT || event == Event.REJECT)) {
+            final String action = event == Event.ACCEPT
+                    ? NotificationListener.ACTION_VOIP_CALL_ACCEPT
+                    : NotificationListener.ACTION_VOIP_CALL_REJECT;
+            final Intent voipIntent = new Intent(action);
+            voipIntent.putExtra(NotificationListener.EXTRA_VOIP_CALL_KEY, callKey);
+            LocalBroadcastManager.getInstance(context).sendBroadcast(voipIntent);
             return;
         }
         final Intent callIntent = new Intent(GBCallControlReceiver.ACTION_CALLCONTROL);

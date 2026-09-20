@@ -118,10 +118,16 @@ public class NotificationListener extends NotificationListenerService {
             = "nodomain.freeyourgadget.gadgetbridge.notificationlistener.action.mute";
     public static final String ACTION_REPLY
             = "nodomain.freeyourgadget.gadgetbridge.notificationlistener.action.reply";
+    public static final String ACTION_VOIP_CALL_ACCEPT
+            = "nodomain.freeyourgadget.gadgetbridge.notificationlistener.action.voip_call_accept";
+    public static final String ACTION_VOIP_CALL_REJECT
+            = "nodomain.freeyourgadget.gadgetbridge.notificationlistener.action.voip_call_reject";
+    public static final String EXTRA_VOIP_CALL_KEY = "voip_call_key";
 
     private final LimitedQueue<Integer, NotificationAction> mActionLookup = new LimitedQueue<>(128);
     private final LimitedQueue<Integer, String> mPackageLookup = new LimitedQueue<>(64);
     private final LimitedQueue<Integer, Long> mNotificationHandleLookup = new LimitedQueue<>(128);
+    private final LimitedQueue<String, VoipCallActions> mVoipCallActions = new LimitedQueue<>(32);
     private long lastPictureNotificationTime = 0;
 
     private final HashMap<String, Long> notificationBurstPrevention = new HashMap<>();
@@ -145,6 +151,10 @@ public class NotificationListener extends NotificationListenerService {
     private static final Set<String> NOTI_USE_TITLE_APPS = new HashSet<>() {{
         add("com.whatsapp");
         add("org.thoughtcrime.securesms");
+        add("org.telegram.messenger");
+        add("org.telegram.messenger.beta");
+        add("org.telegram.messenger.web");
+        add("org.telegram.plus");
     }};
 
     public static final ArrayList<String> notificationStack = new ArrayList<>();
@@ -162,6 +172,8 @@ public class NotificationListener extends NotificationListenerService {
     private File notificationPictureCacheDirectory;
 
     private long activeCallPostTime;
+    private String activeCallNumber;
+    private String activeCallKey;
     private int mLastCallCommand = CallSpec.CALL_UNDEFINED;
 
     private final Handler mHandler = new Handler();
@@ -293,6 +305,31 @@ public class NotificationListener extends NotificationListenerService {
                         LOG.warn("Received ACTION_REPLY for handle {}, but cannot find the corresponding wearableAction", handle);
                     }
                     break;
+                case ACTION_VOIP_CALL_ACCEPT:
+                case ACTION_VOIP_CALL_REJECT: {
+                    final String callKey = intent.getStringExtra(EXTRA_VOIP_CALL_KEY);
+                    final VoipCallActions callActions = callKey == null ? null : mVoipCallActions.lookup(callKey);
+                    if (callActions == null) {
+                        LOG.warn("Received VoIP call action for unknown key {}", callKey);
+                        break;
+                    }
+
+                    final PendingIntent callAction = ACTION_VOIP_CALL_ACCEPT.equals(action)
+                            ? callActions.accept
+                            : callActions.reject;
+                    if (callAction == null) {
+                        LOG.warn("VoIP call action is not available for key {}", callKey);
+                        break;
+                    }
+
+                    try {
+                        callAction.send();
+                        mVoipCallActions.remove(callKey);
+                    } catch (final PendingIntent.CanceledException e) {
+                        LOG.warn("Failed to perform VoIP call action for {}", callKey, e);
+                    }
+                    break;
+                }
             }
         }
     };
@@ -321,6 +358,8 @@ public class NotificationListener extends NotificationListenerService {
         filterLocal.addAction(ACTION_DISMISS_ALL);
         filterLocal.addAction(ACTION_MUTE);
         filterLocal.addAction(ACTION_REPLY);
+        filterLocal.addAction(ACTION_VOIP_CALL_ACCEPT);
+        filterLocal.addAction(ACTION_VOIP_CALL_REJECT);
         //noinspection deprecation
         LocalBroadcastManager.getInstance(this).registerReceiver(mReceiver, filterLocal);
 
@@ -340,6 +379,7 @@ public class NotificationListener extends NotificationListenerService {
         unregisterReceiver(mExportedReceiver);
         notificationStack.clear();
         notificationsActive.clear();
+        mVoipCallActions.clear();
         cleanUpNotificationPictureProvider();
         super.onDestroy();
     }
@@ -759,38 +799,12 @@ public class NotificationListener extends NotificationListenerService {
             notificationBurstPrevention.put(burstPreventionKey, curTime);
         }
 
-        // figure out sender
-        String number = null;
-        String notiTitle = null;
-        String notiText = null;
         String appName = NotificationUtils.getApplicationLabel(this, app);
-        if (noti.extras.containsKey(Notification.EXTRA_PEOPLE)) {
-            String[] people = noti.extras.getStringArray(Notification.EXTRA_PEOPLE);
-            if (people != null && people.length > 0 && people[0] != null) {
-                number = people[0];
-            }
-        } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && noti.extras.containsKey(Notification.EXTRA_PEOPLE_LIST)) {
-            List<Person> people = noti.extras.getParcelableArrayList(Notification.EXTRA_PEOPLE_LIST);
-            if (people != null && !people.isEmpty()) {
-                Person firstPerson = people.get(0);
-                if (firstPerson != null && firstPerson.getName() != null) {
-                    number = firstPerson.getName().toString();
-                }
-            }
-        }
-        if (noti.extras.containsKey(Notification.EXTRA_TEXT)) {
-            notiText = noti.extras.getString(Notification.EXTRA_TEXT);
-        }
-        if (noti.extras.containsKey(Notification.EXTRA_TITLE)) {
-            notiTitle = noti.extras.getString(Notification.EXTRA_TITLE);
-        }
-        if (number == null) {
-            number = NOTI_USE_TITLE_APPS.contains(app) ? notiTitle : notiText;
-        }
-        if (number == null) {
-            number = appName != null ? appName : app;
-        }
+        final String number = getVoipCaller(noti, app, appName);
         activeCallPostTime = sbn.getPostTime();
+        activeCallNumber = number;
+        activeCallKey = sbn.getKey();
+        saveVoipCallActions(sbn);
         CallSpec callSpec = new CallSpec();
         callSpec.setNumber(number);
         callSpec.setSourceAppId(app);
@@ -809,6 +823,58 @@ public class NotificationListener extends NotificationListenerService {
         callSpec.setCommand(callStarted ? CallSpec.CALL_START : CallSpec.CALL_INCOMING);
         mLastCallCommand = callSpec.getCommand();
         GBApplication.deviceService().onSetCallState(callSpec);
+    }
+
+    @SuppressWarnings("deprecation")
+    static String getVoipCaller(final Notification notification, final String app, final String appName) {
+        final Bundle extras = notification.extras;
+        String number = null;
+
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S && extras.containsKey(Notification.EXTRA_CALL_PERSON)) {
+            final Person callPerson = extras.getParcelable(Notification.EXTRA_CALL_PERSON);
+            if (callPerson != null && callPerson.getName() != null) {
+                number = callPerson.getName().toString();
+            }
+        }
+        if (number == null && extras.containsKey(Notification.EXTRA_PEOPLE)) {
+            final String[] people = extras.getStringArray(Notification.EXTRA_PEOPLE);
+            if (people != null && people.length > 0 && people[0] != null) {
+                number = people[0];
+            }
+        } else if (number == null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q && extras.containsKey(Notification.EXTRA_PEOPLE_LIST)) {
+            final List<Person> people = extras.getParcelableArrayList(Notification.EXTRA_PEOPLE_LIST);
+            if (people != null && !people.isEmpty()) {
+                final Person firstPerson = people.get(0);
+                if (firstPerson != null && firstPerson.getName() != null) {
+                    number = firstPerson.getName().toString();
+                }
+            }
+        }
+
+        final String notiText = extras.getString(Notification.EXTRA_TEXT);
+        final String notiTitle = extras.getString(Notification.EXTRA_TITLE);
+        if (number == null) {
+            number = NOTI_USE_TITLE_APPS.contains(app) ? notiTitle : notiText;
+        }
+        if (number == null) {
+            number = appName != null ? appName : app;
+        }
+        return number;
+    }
+
+    private void saveVoipCallActions(final StatusBarNotification sbn) {
+        final Notification.Action[] actions = sbn.getNotification().actions;
+        mVoipCallActions.remove(sbn.getKey());
+        if (actions == null || actions.length < 2) {
+            return;
+        }
+
+        // Notification.CallStyle orders incoming-call actions as decline, answer.
+        final PendingIntent reject = actions[0].actionIntent;
+        final PendingIntent accept = actions[1].actionIntent;
+        if (reject != null || accept != null) {
+            mVoipCallActions.add(sbn.getKey(), new VoipCallActions(accept, reject));
+        }
     }
 
     boolean shouldContinueAfterFilter(String body, @NonNull List<String> wordsList, @NonNull NotificationFilter notificationFilter) {
@@ -1064,6 +1130,8 @@ public class NotificationListener extends NotificationListenerService {
     public void onNotificationRemoved(StatusBarNotification sbn) {
         logNotification(sbn, false);
 
+        mVoipCallActions.remove(sbn.getKey());
+
         notificationStack.remove(sbn.getPackageName());
 
         if (isServiceNotRunningAndShouldIgnoreNotifications()) return;
@@ -1096,6 +1164,10 @@ public class NotificationListener extends NotificationListenerService {
                 && activeCallPostTime == sbn.getPostTime()) {
             activeCallPostTime = 0;
             CallSpec callSpec = new CallSpec();
+            callSpec.setNumber(activeCallNumber);
+            callSpec.setKey(activeCallKey);
+            activeCallNumber = null;
+            activeCallKey = null;
             callSpec.setCommand(CallSpec.CALL_END);
             mLastCallCommand = callSpec.getCommand();
             GBApplication.deviceService().onSetCallState(callSpec);
@@ -1425,6 +1497,16 @@ public class NotificationListener extends NotificationListenerService {
         @Nullable
         public RemoteInput getRemoteInput() {
             return remoteInput;
+        }
+    }
+
+    private static class VoipCallActions {
+        private final PendingIntent accept;
+        private final PendingIntent reject;
+
+        private VoipCallActions(final PendingIntent accept, final PendingIntent reject) {
+            this.accept = accept;
+            this.reject = reject;
         }
     }
 

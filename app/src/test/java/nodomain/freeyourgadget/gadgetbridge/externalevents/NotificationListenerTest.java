@@ -207,4 +207,16 @@ public class NotificationListenerTest extends TestBase {
         assertEquals(android.R.drawable.ic_dialog_alert, spec.getIconId());
         assertEquals("com.example.source", spec.getIconPackageId());
     }
+
+    @Test
+    public void getVoipCaller_usesTelegramTitleBeforeGenericText() {
+        final Notification notification = new Notification();
+        notification.extras.putString(Notification.EXTRA_TITLE, "Alice");
+        notification.extras.putString(Notification.EXTRA_TEXT, "Incoming call");
+
+        assertEquals(
+                "Alice",
+                NotificationListener.getVoipCaller(notification, "org.telegram.messenger", "Telegram")
+        );
+    }
 }
