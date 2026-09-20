@@ -20,6 +20,8 @@ public class BluetoothNameTest extends TestBase {
             put("AAWireless-xUkL1YH0", DeviceType.AAWIRELESS);
             put("AAWireless-12345abc", DeviceType.AAWIRELESS);
             put("AndroidAuto-AAW12345abc", DeviceType.AAWIRELESS);
+            put("1MORE SonoFlow", DeviceType.ONEMORE_SONOFLOW); // #6803
+            put("1MORE SonoFlow SE", DeviceType.ONEMORE_SONOFLOW_SE); // #6803
             put("Active 2 NFC (Round)", DeviceType.AMAZFITACTIVE2NFC);
             put("Amazfit Band 7", DeviceType.AMAZFITBAND7); // #2945
             put("Amazfit GTR 3 Pro", DeviceType.AMAZFITGTR3PRO); // #2442
