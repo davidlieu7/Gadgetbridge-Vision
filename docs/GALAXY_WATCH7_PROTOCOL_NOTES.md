@@ -2832,3 +2832,100 @@ No protobuf — this is directly implementable over our MessageEvent transport
 GW7 (coordinator `supportsFindDevice` currently returns false). Find-my-PHONE (watch->phone)
 is presumably the mirror on `/w_apps_find_my_phone` with `fmp-*` msg_ids — to confirm by
 triggering it on the watch.
+
+## 46. Notification action buttons + quick reply — DECODED and IMPLEMENTED
+
+Decoded from `docs/captures/notification_session/btsnoop_notification.log.gz` (the same stock
+session as §44 — the reply *was* performed during that recording) and implemented in GB.
+Verified live: the watch renders the reply field, the typed text reaches GB, and the watch
+reports success.
+
+### Composite DataMap value types
+
+§3 covered the scalar types. The composite ones, all following the same
+`{f1=typeTag, f2=container}` shape where the container's inner field number equals the typeTag:
+
+```
+typeTag 2  string      container {f2 = string}
+typeTag 5  int64       container {f5 = varint}
+typeTag 6  int32       container {f6 = varint}
+typeTag 8  bool        container {f8 = varint}
+typeTag 9  DataMap     container = the nested map's ENTRIES, repeated at field 9
+typeTag 10 array/list  container = repeated field 10, each a full TypedValue
+typeTag 11 String[]    container = repeated field 11 (stock sends choices_html empty)
+typeTag 13 Asset ref   container {f13 = asset key index, varint}
+```
+
+The typeTag-9 shape is the easy one to get wrong: a nested DataMap does **not** embed a
+serialized field-1-entry DataMap; its entries are inlined at **field 9** of the container.
+(A top-level DataMap keeps its entries at field 1.)
+
+### Action arrays: `actions` vs `wearable_actions`
+
+The stock app puts the notification's own `Notification.actions` under **`actions`** and only
+`WearableExtender` actions under `wearable_actions`. The captured, working reply came through
+**`actions`** — `wearable_actions` was present but empty. So populate `actions`; send
+`wearable_actions` as an empty array alongside it, as stock does.
+
+Each array element is a typeTag-9 DataMap (keys serialize alphabetically):
+
+```
+action_inline           bool
+allow_generated_replies bool
+intent_id               string   echoed back verbatim when the action is invoked
+remote_content_intent   bool
+remote_inputs           array of typeTag-9 maps:
+                          allowFreeFormInput bool
+                          choices_html       String[] (empty)
+                          label_html         string
+                          return_key         string   tags the reply text on the way back
+title_html              string   the button label
+```
+
+GB encodes the notification action's own handle as `intent_id`, so the reply maps straight
+back to a `GBDeviceEventNotificationControl` REPLY without a side table.
+
+### Return path: watch -> phone on `/bridger/rpc`
+
+A MessageEvent whose data is a DataMap:
+
+```
+action_index            int32
+...RpcWithCallback.invocation_id  string   echo it in the ack
+intent_id               string   the invoked action's intent_id
+is_wearable_action      bool     false when it came from `actions`
+remote_input_results    DataMap { <return_key>: DataMap { string_result: <text> } }
+                                 (or char_sequence_html for html)
+remote_stream_item_id   string   the /bridger/stream_item path it belongs to
+rpc_command             string   "bridged_action"
+```
+
+### Ack: phone -> watch on `/bridger/result`
+
+Authored under `com.samsung.wearable.watch7plugin` (the notification identity), data:
+
+```
+...RpcWithCallback.invocation_id  string  echoed
+...RpcWithCallback.result         DataMap { ...message_id: int32 1,
+                                            ...successful: bool }
+```
+
+**MessageEvent field 10 must be 2 on this path** (not the 4 we use elsewhere — see §41). With
+4 the watch receives the reply and the phone dispatches it correctly, but the watch still
+shows the reply as failed. This was the last bug; the rest of our ack was already byte-identical
+to stock.
+
+### Testing note
+
+`com.xinesoft.notifications` (the simulator used for the captures) is usable for protocol
+testing but has two traps: it flags every notification `FLAG_GROUP_SUMMARY`, which GB drops
+unless the app is in `NotificationListener.GROUP_SUMMARY_WHITELIST` (temporarily whitelist it
+to test), and its reply action is a **startActivity** PendingIntent, so the actual delivery is
+refused by Android with `BackgroundActivityLaunchViolation`. It therefore exercises the whole
+wire protocol but never the final hand-off; a real messaging app (broadcast/service
+PendingIntent) is needed to verify that last step.
+
+Icons are still open: the DataMap references an asset key (`app_icon`/`icon`/`large_icon` =
+typeTag 13 -> "0"/"1"/"2"), the DataItem's field 8 binds each key to a digest
+(`{1=key, 2={4=digest}, 3=4}`, digest = base64url(SHA-1(bytes)), 27 chars), and the blob bytes
+travel separately in a framing we have not decoded yet.

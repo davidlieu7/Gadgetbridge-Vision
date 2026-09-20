@@ -278,6 +278,22 @@ public final class WearDataLayerProtocol {
                                               final String title, final String text, final String subText,
                                               final long postTime, final long whenMs, final long color,
                                               final int flags, final String category, final long seq) {
+        return buildNotificationPut(sourcePackage, signatureHex, ownNodeId, packageName, notifId, tag,
+                appName, title, text, subText, postTime, whenMs, color, flags, category, seq, null);
+    }
+
+    /**
+     * As above, plus a {@code wearable_actions} array (each element from {@link #buildWearableAction})
+     * so the watch renders action buttons / a quick-reply field. Pass {@code null} or an empty list
+     * for a plain notification.
+     */
+    public static byte[] buildNotificationPut(final String sourcePackage, final String signatureHex,
+                                              final String ownNodeId, final String packageName,
+                                              final int notifId, final String tag, final String appName,
+                                              final String title, final String text, final String subText,
+                                              final long postTime, final long whenMs, final long color,
+                                              final int flags, final String category, final long seq,
+                                              final java.util.List<byte[]> wearableActions) {
         final ProtoWriter dataMap = new ProtoWriter();
         dataMapEntry(dataMap, "app_name", dataMapString(nz(appName)));
         dataMapEntry(dataMap, "title_raw", dataMapString(nz(title)));
@@ -308,6 +324,18 @@ public final class WearDataLayerProtocol {
         dataMapEntry(dataMap, "user_id", dataMapInt(0));
         // supplemental_data / supplemental_assets are Asset-typed on the watch (icon/picture
         // blobs); we attach no Wear Assets, so they are omitted (sending an int errors on parse).
+        // Action buttons: an array (typeTag 10) of action DataMaps (typeTag 9). The stock app puts the
+        // notification's own actions under "actions" and only WearableExtender ones under
+        // "wearable_actions" - the captured, working reply came through "actions", so that is what we
+        // populate; "wearable_actions" is sent empty alongside it, exactly as stock does (§46).
+        if (wearableActions != null && !wearableActions.isEmpty()) {
+            final java.util.List<byte[]> elements = new java.util.ArrayList<>(wearableActions.size());
+            for (final byte[] action : wearableActions) {
+                elements.add(dataMapNested(action));
+            }
+            dataMapEntry(dataMap, "actions", dataMapArray(elements));
+            dataMapEntry(dataMap, "wearable_actions", dataMapArray(java.util.Collections.emptyList()));
+        }
 
         return buildStreamItemDataItem(sourcePackage, signatureHex, ownNodeId, packageName, notifId,
                 tag, dataMap.toByteArray(), 0, seq);
@@ -382,6 +410,20 @@ public final class WearDataLayerProtocol {
     public static byte[] buildMessageEvent(final String sourcePackage, final String signatureHex,
                                            final String ownNodeId, final String targetNodeId,
                                            final long seq, final String path, final byte[] data) {
+        return buildMessageEvent(sourcePackage, signatureHex, ownNodeId, targetNodeId, seq, path,
+                data, ME_FLAG10_DEFAULT);
+    }
+
+    // Field 10 appears to classify the message; the stock companion uses 4 for the app channels we
+    // mirror but 2 for the /bridger/result RPC callback, so that path overrides it (research §46).
+    private static final int ME_FLAG10_DEFAULT = 4;
+    private static final int ME_FLAG10_RPC_RESULT = 2;
+
+    /** As above, with an explicit field-10 classifier (see {@link #ME_FLAG10_RPC_RESULT}). */
+    public static byte[] buildMessageEvent(final String sourcePackage, final String signatureHex,
+                                           final String ownNodeId, final String targetNodeId,
+                                           final long seq, final String path, final byte[] data,
+                                           final int flag10) {
         final ProtoWriter me = new ProtoWriter();
         me.writeVarint(ME_SEQ, seq);
         me.writeString(ME_SRC_PACKAGE, sourcePackage);
@@ -391,7 +433,7 @@ public final class WearDataLayerProtocol {
         me.writeString(ME_PATH, path);
         me.writeMessage(ME_DATA, data);
         me.writeString(ME_SRC_NODE, ownNodeId);
-        me.writeVarint(ME_FLAG10, 4);
+        me.writeVarint(ME_FLAG10, flag10);
         me.writeVarint(ME_FLAG13, 1);
 
         final ProtoWriter payload = new ProtoWriter();
@@ -424,6 +466,150 @@ public final class WearDataLayerProtocol {
         return me == null ? null : new ProtoReader(me).findString(ME_DATA);
     }
 
+    /** If the message is a MessageEvent, returns its data (field 7) raw bytes, else null. */
+    public static byte[] parseMessageEventDataBytes(final byte[] message) {
+        final byte[] me = extractMessageEvent(message);
+        return me == null ? null : new ProtoReader(me).findMessage(ME_DATA);
+    }
+
+    // ---- Incoming bridged-action handling (watch -> phone quick reply / action tap), research §46 ----
+    // The watch invokes a notification action by sending a MessageEvent on /bridger/rpc whose data is
+    // a DataMap { rpc_command:"bridged_action", intent_id:<the action's intent_id>,
+    // remote_input_results:{ <return_key>:{ string_result:<reply text> } }, ...invocation_id }.
+    public static final String BRIDGER_RPC_PATH = "/bridger/rpc";
+    public static final String BRIDGER_RESULT_PATH = "/bridger/result";
+    private static final String RPC_INVOCATION_ID =
+            "com.google.android.clockwork.actions.RpcWithCallback.invocation_id";
+
+    /** Parsed /bridger/rpc bridged action: the invoked action's intent_id, optional reply, invocation id. */
+    public static final class BridgedAction {
+        public final String intentId;
+        public final String reply;       // null when it was a plain action tap (no remote input)
+        public final String invocationId; // echoed back in the /bridger/result ack (may be empty)
+
+        BridgedAction(final String intentId, final String reply, final String invocationId) {
+            this.intentId = intentId;
+            this.reply = reply;
+            this.invocationId = invocationId;
+        }
+    }
+
+    /**
+     * If the message is a {@code /bridger/rpc} {@code bridged_action} MessageEvent, returns the parsed
+     * action (intent_id + optional reply text), else {@code null}.
+     */
+    public static BridgedAction parseBridgedAction(final byte[] message) {
+        final byte[] me = extractMessageEvent(message);
+        if (me == null) {
+            return null;
+        }
+        final ProtoReader meReader = new ProtoReader(me);
+        if (!BRIDGER_RPC_PATH.equals(meReader.findString(ME_PATH))) {
+            return null;
+        }
+        final byte[] data = meReader.findMessage(ME_DATA);
+        if (data == null) {
+            return null;
+        }
+        try {
+            if (!"bridged_action".equals(getMapString(data, "rpc_command"))) {
+                return null;
+            }
+            final String intentId = getMapString(data, "intent_id");
+            if (intentId == null) {
+                return null;
+            }
+            String invocationId = getMapString(data, RPC_INVOCATION_ID);
+            if (invocationId == null) {
+                invocationId = "";
+            }
+            return new BridgedAction(intentId, parseFirstRemoteInputResult(data), invocationId);
+        } catch (final RuntimeException e) {
+            return null;
+        }
+    }
+
+    // remote_input_results is a nested DataMap keyed by each RemoteInput's return_key; each value is
+    // itself a nested DataMap holding string_result (plain) or char_sequence_html. Return the first.
+    private static String parseFirstRemoteInputResult(final byte[] dataMap) {
+        final byte[] results = findContainerInMap(dataMap, "remote_input_results");
+        if (results == null) {
+            return null;
+        }
+        for (final byte[] entry : new ProtoReader(results).findAllMessages(NESTED_MAP_ENTRY_FIELD)) {
+            final byte[] typedValue = new ProtoReader(entry).findMessage(2);
+            final byte[] sub = typedValue == null ? null : new ProtoReader(typedValue).findMessage(2);
+            if (sub == null) {
+                continue;
+            }
+            final String plain = getNestedString(sub, "string_result");
+            if (plain != null) {
+                return plain;
+            }
+            final String html = getNestedString(sub, "char_sequence_html");
+            if (html != null) {
+                return android.text.Html.fromHtml(html, android.text.Html.FROM_HTML_MODE_LEGACY).toString();
+            }
+        }
+        return null;
+    }
+
+    // Reads a string entry out of a nested DataMap's container (its entries live at field 9).
+    private static String getNestedString(final byte[] container, final String key) {
+        for (final byte[] entry : new ProtoReader(container).findAllMessages(NESTED_MAP_ENTRY_FIELD)) {
+            if (!key.equals(new ProtoReader(entry).findString(1))) {
+                continue;
+            }
+            final byte[] typedValue = new ProtoReader(entry).findMessage(2);
+            final byte[] valueContainer = typedValue == null ? null
+                    : new ProtoReader(typedValue).findMessage(2);
+            return valueContainer == null ? null : new ProtoReader(valueContainer).findString(2);
+        }
+        return null;
+    }
+
+    /**
+     * Builds the {@code /bridger/result} ack MessageEvent the phone returns after handling a bridged
+     * action, echoing the invocation id and reporting success (mirrors the stock companion).
+     */
+    public static byte[] buildBridgedActionResult(final String sourcePackage, final String signatureHex,
+                                                  final String ownNodeId, final String targetNodeId,
+                                                  final long seq, final String invocationId,
+                                                  final boolean success) {
+        final ProtoWriter result = new ProtoWriter();
+        nestedMapEntry(result, "com.google.android.clockwork.actions.RpcWithCallback.message_id",
+                dataMapInt(1));
+        nestedMapEntry(result, "com.google.android.clockwork.actions.RpcWithCallback.successful",
+                dataMapBool(success));
+        final ProtoWriter ack = new ProtoWriter();
+        dataMapEntry(ack, RPC_INVOCATION_ID, dataMapString(nz(invocationId)));
+        dataMapEntry(ack, "com.google.android.clockwork.actions.RpcWithCallback.result",
+                dataMapNested(result.toByteArray()));
+        return buildMessageEvent(sourcePackage, signatureHex, ownNodeId, targetNodeId, seq,
+                BRIDGER_RESULT_PATH, ack.toByteArray(), ME_FLAG10_RPC_RESULT);
+    }
+
+    // Reads a string DataMap value ({f1=2, f2={f2=str}}) directly from raw DataMap bytes, or null.
+    private static String getMapString(final byte[] dataMap, final String key) {
+        final byte[] container = findContainerInMap(dataMap, key);
+        return container == null ? null : new ProtoReader(container).findString(2);
+    }
+
+    // Finds the typedValue container (typedValue.f2) for a key within raw DataMap bytes, or null.
+    private static byte[] findContainerInMap(final byte[] dataMap, final String key) {
+        if (dataMap == null) {
+            return null;
+        }
+        for (final byte[] entry : new ProtoReader(dataMap).findAllMessages(1)) {
+            if (!key.equals(new ProtoReader(entry).findString(1))) {
+                continue;
+            }
+            final byte[] typedValue = new ProtoReader(entry).findMessage(2);
+            return typedValue == null ? null : new ProtoReader(typedValue).findMessage(2);
+        }
+        return null;
+    }
+
     private static byte[] buildWatchSettingPut(final String sourcePackage, final String signatureHex,
                                                final String ownNodeId, final String subPath,
                                                final String valueKey, final byte[] typedValue, final long seq) {
@@ -453,10 +639,26 @@ public final class WearDataLayerProtocol {
     // is the type tag (bool = field 8, string = field 2). A DataMap is repeated entries at field 1,
     // each { field1 = key, field2 = typed value }.
     private static void dataMapEntry(final ProtoWriter dataMap, final String key, final byte[] typedValue) {
+        dataMapEntryAt(dataMap, DATAMAP_ENTRY_FIELD, key, typedValue);
+    }
+
+    // A top-level DataMap carries its entries at field 1; a nested DataMap *value* carries them at
+    // field 9 inside the typed value's container (see dataMapNested) - verified against the stock
+    // capture's populated notification "actions" array (research notes §46).
+    private static final int DATAMAP_ENTRY_FIELD = 1;
+    private static final int NESTED_MAP_ENTRY_FIELD = 9;
+
+    private static void dataMapEntryAt(final ProtoWriter dataMap, final int entryField,
+                                       final String key, final byte[] typedValue) {
         final ProtoWriter entry = new ProtoWriter();
         entry.writeString(1, key);
         entry.writeMessage(2, typedValue);
-        dataMap.writeMessage(1, entry.toByteArray());
+        dataMap.writeMessage(entryField, entry.toByteArray());
+    }
+
+    /** Adds an entry to a nested DataMap value's container (entries live at field 9 there). */
+    private static void nestedMapEntry(final ProtoWriter container, final String key, final byte[] typedValue) {
+        dataMapEntryAt(container, NESTED_MAP_ENTRY_FIELD, key, typedValue);
     }
 
     private static byte[] dataMapBool(final boolean value) {
@@ -495,6 +697,79 @@ public final class WearDataLayerProtocol {
         tv.writeVarint(1, 5);
         tv.writeMessage(2, container.toByteArray());
         return tv.toByteArray();
+    }
+
+    // Composite DataMap value types, following the same {f1=typeTag, f2=container} pattern where the
+    // container's inner field number equals the typeTag (research notes §46, decoded from the stock
+    // capture's populated notification "actions" array):
+    //   typeTag 9  = embedded DataMap  (container = the map's entries, repeated at field 9)
+    //   typeTag 10 = array/list        (container = repeated field 10, each a full TypedValue)
+    //   typeTag 11 = String[]          (container = repeated field 11; stock sends it empty)
+    //   typeTag 13 = Wear Asset ref    (container inner field 13 = the attached-asset index, varint)
+
+    /**
+     * A nested-DataMap DataMap value (typeTag 9). {@code entries} must already hold the map's entries
+     * written at field 9 (use {@link #nestedMapEntry}).
+     */
+    private static byte[] dataMapNested(final byte[] entries) {
+        final ProtoWriter tv = new ProtoWriter();
+        tv.writeVarint(1, 9);
+        tv.writeMessage(2, entries);
+        return tv.toByteArray();
+    }
+
+    /** An empty String[] DataMap value (typeTag 11), as the stock app sends for {@code choices_html}. */
+    private static byte[] dataMapEmptyStringArray() {
+        final ProtoWriter tv = new ProtoWriter();
+        tv.writeVarint(1, 11);
+        tv.writeMessage(2, new byte[0]);
+        return tv.toByteArray();
+    }
+
+    /** An array DataMap value (typeTag 10) whose elements are the given already-typed values. */
+    private static byte[] dataMapArray(final java.util.List<byte[]> elementTypedValues) {
+        final ProtoWriter container = new ProtoWriter();
+        for (final byte[] el : elementTypedValues) {
+            container.writeMessage(10, el);
+        }
+        final ProtoWriter tv = new ProtoWriter();
+        tv.writeVarint(1, 10);
+        tv.writeMessage(2, container.toByteArray());
+        return tv.toByteArray();
+    }
+
+    /**
+     * Builds one wearable-action DataMap for the {@code wearable_actions} array of a notification
+     * (research notes §46; shape verified against the stock com.google.android.gms.internal.
+     * wear_companion action serializer). Each action carries a display {@code title_html}, an
+     * {@code intent_id} the watch echoes back when the action is invoked, and - for a reply action -
+     * a single {@code remote_inputs} entry that makes the watch offer a free-form text field.
+     *
+     * @param titleHtml the action button label
+     * @param intentId  an id the watch returns verbatim on invocation (we encode the GB action handle)
+     * @param isReply   true to attach a free-form text remote input (quick reply)
+     * @param returnKey the RemoteInput result key the watch tags the reply text with
+     */
+    public static byte[] buildWearableAction(final String titleHtml, final String intentId,
+                                             final boolean isReply, final String returnKey) {
+        // Field set and order mirror the stock capture exactly (keys are serialized alphabetically).
+        final ProtoWriter action = new ProtoWriter();
+        nestedMapEntry(action, "action_inline", dataMapBool(false));
+        nestedMapEntry(action, "allow_generated_replies", dataMapBool(isReply));
+        nestedMapEntry(action, "intent_id", dataMapString(nz(intentId)));
+        nestedMapEntry(action, "remote_content_intent", dataMapBool(false));
+        final java.util.List<byte[]> remoteInputs = new java.util.ArrayList<>();
+        if (isReply) {
+            final ProtoWriter ri = new ProtoWriter();
+            nestedMapEntry(ri, "allowFreeFormInput", dataMapBool(true));
+            nestedMapEntry(ri, "choices_html", dataMapEmptyStringArray());
+            nestedMapEntry(ri, "label_html", dataMapString(nz(titleHtml)));
+            nestedMapEntry(ri, "return_key", dataMapString(nz(returnKey)));
+            remoteInputs.add(dataMapNested(ri.toByteArray()));
+        }
+        nestedMapEntry(action, "remote_inputs", dataMapArray(remoteInputs));
+        nestedMapEntry(action, "title_html", dataMapString(nz(titleHtml)));
+        return action.toByteArray();
     }
 
     private static byte[] buildProtogenSettingPut(final String sourcePackage, final String signatureHex,

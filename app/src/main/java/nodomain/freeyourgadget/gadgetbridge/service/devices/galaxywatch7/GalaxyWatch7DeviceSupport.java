@@ -196,7 +196,7 @@ public class GalaxyWatch7DeviceSupport extends AbstractBTBRDeviceSupport {
         // reply-driven queue path - the watch drops us ~40ms in, likely before a queued peer-sync
         // arrives. onSocketRead still covers the first-ever connect (no cached watch id yet).
         if (watchNodeId != null) {
-            LOG.info("Galaxy Watch7: sending peer-sync eagerly for watch node {}", watchNodeId);
+            builder.run(() -> LOG.info("Galaxy Watch7: sending peer-sync eagerly for watch node {}", watchNodeId));
             builder.write(WearDataLayerProtocol.buildSeqAck(localNodeId, watchNodeId));
             peerSyncSent = true;
         }
@@ -458,16 +458,43 @@ public class GalaxyWatch7DeviceSupport extends AbstractBTBRDeviceSupport {
         final String tag = "null_tag";
         final long postTime = spec.getWhen() > 0 ? spec.getWhen() : System.currentTimeMillis();
         final long seq = ownDataVersion.incrementAndGet();
-        LOG.info("Galaxy Watch7: pushing notification id={} pkg={} title=\"{}\" (seq {})",
-                spec.getId(), pkg, title, seq);
+        final java.util.List<byte[]> wearableActions = buildWearableActions(spec);
+        LOG.info("Galaxy Watch7: pushing notification id={} pkg={} title=\"{}\" replyActions={} (seq {})",
+                spec.getId(), pkg, title, wearableActions.size(), seq);
         final byte[] write = WearDataLayerProtocol.buildNotificationPut(
                 SETTINGS_SOURCE_PACKAGE, SETTINGS_SOURCE_SIGNATURE, node, pkg, spec.getId(), tag,
                 appName, title, text, appName, postTime, postTime,
-                NOTIFICATION_DEFAULT_COLOR, spec.getFlags(), spec.getCategory(), seq);
+                NOTIFICATION_DEFAULT_COLOR, spec.getFlags(), spec.getCategory(), seq, wearableActions);
         sentNotifications.put(spec.getId(), new String[]{pkg, tag});
         final TransactionBuilder builder = createTransactionBuilder("notify " + spec.getId());
         builder.write(write);
         builder.queue();
+    }
+
+    // Quick-reply: encode each of a notification's reply actions as a wearable_action the watch shows
+    // as a text-reply field. The action's GB handle is carried as the wearable action's intent_id, so
+    // the reply the watch sends back on /bridger/rpc maps straight to a REPLY on that handle (§46).
+    private static final String REPLY_RETURN_KEY = "gb_reply";
+    // Handles we sent as reply actions - a bridged reply is only honoured for one of these.
+    private final java.util.Set<Long> sentReplyHandles =
+            java.util.Collections.newSetFromMap(new java.util.concurrent.ConcurrentHashMap<>());
+
+    private java.util.List<byte[]> buildWearableActions(final nodomain.freeyourgadget.gadgetbridge.model.NotificationSpec spec) {
+        final java.util.List<byte[]> out = new java.util.ArrayList<>();
+        if (spec.getAttachedActions() == null) {
+            return out;
+        }
+        for (final nodomain.freeyourgadget.gadgetbridge.model.NotificationSpec.Action action : spec.getAttachedActions()) {
+            if (action == null || !action.isReply()) {
+                continue;
+            }
+            final String title = action.getTitle() != null && !action.getTitle().isEmpty()
+                    ? action.getTitle() : "Reply";
+            sentReplyHandles.add(action.getHandle());
+            out.add(WearDataLayerProtocol.buildWearableAction(
+                    title, String.valueOf(action.getHandle()), true, REPLY_RETURN_KEY));
+        }
+        return out;
     }
 
     // Incoming-call display. The watch shows phone calls via the same Wear notification-stream
@@ -819,6 +846,7 @@ public class GalaxyWatch7DeviceSupport extends AbstractBTBRDeviceSupport {
         reflectIncomingSetting(message);
         reflectBattery(message);
         reflectNotificationDismissal(message);
+        handleBridgedAction(message);
         handleMediaMessage(message);
 
         final String parsed = WearDataLayerProtocol.parseWatchNodeId(message);
@@ -864,6 +892,46 @@ public class GalaxyWatch7DeviceSupport extends AbstractBTBRDeviceSupport {
     // When a notification is dismissed on the watch, the watch mirrors the DataItem delete back to
     // us; dismiss it on the phone too so the two stay in sync. Only act on ids we still consider
     // active (also avoids reacting to the echo of our own delete, which already removed the id).
+    // Quick reply from the watch: the watch invokes a reply action by sending a /bridger/rpc
+    // bridged_action MessageEvent carrying the action's intent_id (our GB handle) and the typed text.
+    // Turn it into a GBDeviceEventNotificationControl REPLY on that handle and ack on /bridger/result.
+    private void handleBridgedAction(final byte[] message) {
+        final WearDataLayerProtocol.BridgedAction action = WearDataLayerProtocol.parseBridgedAction(message);
+        if (action == null) {
+            return;
+        }
+        long handle;
+        try {
+            handle = Long.parseLong(action.intentId);
+        } catch (final NumberFormatException e) {
+            LOG.warn("Galaxy Watch7: bridged action with non-numeric intent_id {}", action.intentId);
+            return;
+        }
+        if (action.reply != null && sentReplyHandles.contains(handle)) {
+            LOG.info("Galaxy Watch7: quick reply on handle {} : \"{}\"", handle, action.reply);
+            final nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEventNotificationControl evt =
+                    new nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEventNotificationControl();
+            evt.handle = handle;
+            evt.reply = action.reply;
+            evt.event = nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEventNotificationControl.Event.REPLY;
+            evaluateGBDeviceEvent(evt);
+        } else {
+            LOG.info("Galaxy Watch7: bridged action on handle {} (reply={}, known={}) - not dispatched",
+                    handle, action.reply != null, sentReplyHandles.contains(handle));
+        }
+
+        final String watch = watchNodeId;
+        final String node = localNodeId;
+        if (watch != null && node != null) {
+            final byte[] ack = WearDataLayerProtocol.buildBridgedActionResult(
+                    SETTINGS_SOURCE_PACKAGE, SETTINGS_SOURCE_SIGNATURE, node, watch,
+                    messageSeq.getAndIncrement(), action.invocationId, true);
+            final TransactionBuilder builder = createTransactionBuilder("bridged action ack");
+            builder.write(ack);
+            builder.queue();
+        }
+    }
+
     private void reflectNotificationDismissal(final byte[] message) {
         final Integer id = WearDataLayerProtocol.parseNotificationStreamDeleteId(message);
         if (id == null || sentNotifications.remove(id) == null) {
