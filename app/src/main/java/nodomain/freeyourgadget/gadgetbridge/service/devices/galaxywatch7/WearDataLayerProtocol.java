@@ -75,6 +75,29 @@ public final class WearDataLayerProtocol {
     private static final int ASSET_DIGEST = 4;
     /** Chunk size the stock companion uses for asset transfers. */
     private static final int ASSET_CHUNK_SIZE = 12215;
+    // Asset grant (research notes §50): a separate envelope, sent before an asset's chunks, that
+    // authorizes the given app identities to use the asset by digest. Without this, the watch
+    // silently ignores the asset (and any notification referencing it) - this was the actual
+    // missing piece behind §47's "still blocked" note.
+    //   payload field 4 = { 4 = { 1 = assetDigest, 3 = repeated{ 1 = { 1=package, 2=sig } } },
+    //                       13 = 1 (constant) }
+    // Envelope field 5 (flagC) = 5 for this payload kind - neither the DataItem/peer-sync value
+    // (3) nor the plain-asset-chunk absence.
+    private static final int PAYLOAD_ASSET_GRANT = 4;
+    private static final int GRANT_IDENTITIES = 4;
+    private static final int GRANT_DIGEST = 1;
+    private static final int GRANT_IDENTITY_LIST = 3;
+    private static final int GRANT_IDENTITY_ENTRY = 1;
+    private static final int IDENTITY_PACKAGE = 1;
+    private static final int IDENTITY_SIGNATURE = 2;
+    private static final int GRANT_FLAG13 = 13;
+    private static final int GRANT_ENVELOPE_FLAG5 = 5;
+    // The two identities the stock app grants every asset to; granting to both (rather than just
+    // whichever package authored the notification) matched the capture and is the safe default.
+    private static final String[][] GRANT_IDENTITIES_STOCK = {
+            {"com.samsung.wearable.watch7plugin", "9ca5170f381919dfe0446fcdab18b19a143b3163"},
+            {"com.samsung.android.wcs.extension", "9ca5170f381919dfe0446fcdab18b19a143b3163"},
+    };
 
     // Peer-sync (payload field 8) structure, decoded from the reference capture:
     //   field 1 = varint counter (the highest sequence this node has seen from the peer it is
@@ -1066,10 +1089,59 @@ public final class WearDataLayerProtocol {
         }
     }
 
+    /** The framed asset-grant envelope plus the transfer id it establishes (research notes §50). */
+    public static final class AssetGrant {
+        public final byte[] frame;
+        public final String transferId;
+
+        AssetGrant(final byte[] frame, final String transferId) {
+            this.frame = frame;
+            this.transferId = transferId;
+        }
+    }
+
+    /**
+     * Builds the asset-grant message that MUST be sent before an asset's chunks, authorizing the
+     * watch's own identities to use it (research notes §50). Without this the watch silently
+     * ignores the asset - and any notification referencing it - even though the chunks themselves
+     * are correctly framed. Byte-verified against 3 real captured grants.
+     *
+     * <p>The grant also determines the transfer id: the watch computes it the same way we do (the
+     * envelope integrity digest of the grant's own payload bytes), so {@link #buildAssetChunks}
+     * must be called with the {@link AssetGrant#transferId} this method returns, not an
+     * independently chosen id.
+     *
+     * <p>The grant's wire format carries no source package, signature, or node ids of its own - the
+     * captured grant is just the payload plus the standard envelope trailer (unlike DataItem/
+     * MessageEvent, which embed that identity inside the payload itself).
+     *
+     * @param assetDigest the asset's digest, from {@link #assetDigest}
+     */
+    public static AssetGrant buildAssetGrant(final String assetDigest) {
+        final ProtoWriter identities = new ProtoWriter();
+        for (final String[] identity : GRANT_IDENTITIES_STOCK) {
+            final ProtoWriter entry = new ProtoWriter();
+            entry.writeString(IDENTITY_PACKAGE, identity[0]);
+            entry.writeString(IDENTITY_SIGNATURE, identity[1]);
+            identities.writeMessage(GRANT_IDENTITY_ENTRY, entry.toByteArray());
+        }
+        final ProtoWriter grantee = new ProtoWriter();
+        grantee.writeString(GRANT_DIGEST, assetDigest);
+        grantee.writeMessage(GRANT_IDENTITY_LIST, identities.toByteArray());
+
+        final ProtoWriter payload = new ProtoWriter();
+        payload.writeMessage(GRANT_IDENTITIES, grantee.toByteArray());
+        payload.writeVarint(GRANT_FLAG13, 1);
+        final byte[] payloadBytes = payload.toByteArray();
+        final String transferId = payloadDigest(payloadBytes);
+        return new AssetGrant(frame(wrapEnvelope(payloadBytes, GRANT_ENVELOPE_FLAG5)), transferId);
+    }
+
     /**
      * Splits an asset into the framed chunk messages that carry it to the watch (research notes §47).
      * Every chunk repeats the same transfer id; only the final one carries the digest and the
-     * last-chunk flag. Send these before the DataItem that references the asset.
+     * last-chunk flag. Send {@link #buildAssetGrant} first, then these, using the transfer id it
+     * returned - not an independently chosen one.
      *
      * @param asset      the encoded bytes (the stock app sends PNG and WEBP)
      * @param transferId an id shared by this asset's chunks; the digest is what the DataItem binds
@@ -1537,6 +1609,12 @@ public final class WearDataLayerProtocol {
     }
 
     private static byte[] wrapEnvelope(final byte[] payload, final boolean withFlagC) {
+        return wrapEnvelope(payload, withFlagC ? 3 : 0);
+    }
+
+    // flagC = 0 means "omit field 5 entirely" (asset chunks, NodeInfo); observed values are
+    // 3 (DataItem/peer-sync) and 5 (the asset-grant payload below, research notes §50).
+    private static byte[] wrapEnvelope(final byte[] payload, final int flagC) {
         final ProtoWriter envelope = new ProtoWriter();
         envelope.writeMessage(FIELD_ENVELOPE_PAYLOAD, payload);
         // Field 2 is NOT a random request id (as first assumed) - it is a message-integrity
@@ -1547,8 +1625,8 @@ public final class WearDataLayerProtocol {
         envelope.writeString(FIELD_ENVELOPE_REQUEST_ID, payloadDigest(payload));
         envelope.writeVarint(FIELD_ENVELOPE_FLAG_A, 1);
         envelope.writeVarint(FIELD_ENVELOPE_FLAG_B, 1);
-        if (withFlagC) {
-            envelope.writeVarint(FIELD_ENVELOPE_FLAG_C, 3);
+        if (flagC != 0) {
+            envelope.writeVarint(FIELD_ENVELOPE_FLAG_C, flagC);
         }
         return envelope.toByteArray();
     }

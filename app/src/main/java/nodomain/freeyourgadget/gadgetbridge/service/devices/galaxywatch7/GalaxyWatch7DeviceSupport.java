@@ -524,7 +524,7 @@ public class GalaxyWatch7DeviceSupport extends AbstractBTBRDeviceSupport {
     // package's icon is transferred once per connection.
     private static final int APP_ICON_MAX_PX = 96;
     // BISECT: 0 = no icon at all, 1 = transfer the asset but do not reference it, 2 = full.
-    private static final int APP_ICON_MODE = 0;
+    private static final int APP_ICON_MODE = 2;
     private final java.util.Map<String, String> sentAppIcons = new java.util.concurrent.ConcurrentHashMap<>();
 
     private String ensureAppIconAsset(final String pkg, final TransactionBuilder builder) {
@@ -553,7 +553,14 @@ public class GalaxyWatch7DeviceSupport extends AbstractBTBRDeviceSupport {
             final byte[] png = out.toByteArray();
 
             final String digest = WearDataLayerProtocol.assetDigest(png);
-            final java.util.List<byte[]> chunks = WearDataLayerProtocol.buildAssetChunks(png, digest);
+            // The grant MUST precede the chunks (research notes §50): without it the watch silently
+            // drops the asset (and any notification referencing it) even though the chunks are
+            // correctly framed - this was the actual "still blocked" cause behind §47. The grant
+            // also determines the transfer id; the chunks must use the one it returns, not the
+            // asset's own digest (that was this method's other bug - masked by APP_ICON_MODE=0).
+            final WearDataLayerProtocol.AssetGrant grant = WearDataLayerProtocol.buildAssetGrant(digest);
+            builder.write(grant.frame);
+            final java.util.List<byte[]> chunks = WearDataLayerProtocol.buildAssetChunks(png, grant.transferId);
             for (final byte[] chunk : chunks) {
                 builder.write(chunk);
             }

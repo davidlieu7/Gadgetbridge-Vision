@@ -3160,3 +3160,67 @@ historical capture (see the older §42 wording, `S3.b: Sent "play"/"pause" comma
 Raw evidence in the repo: `docs/captures/media_session/btsnoop_media_control.log.gz`,
 `watch_media_rpc.txt` (the human-readable `S3.b`/`W3.h` log lines used to correlate request
 tokens), `logcat_media_filtered.txt`.
+
+## 50. Notification icons — the actual blocker: a per-asset grant message
+
+§47 documented the asset chunk format and implemented it, but a referenced, correctly-framed
+asset still never rendered. A fresh, gapless stock capture (2026-09-21, a NEW enrollment -
+the notification simulator app was granted watch notification access + the watch was
+confirmed on-body, both required for the stock bridge to even attempt delivery) finally
+caught the missing piece: **every asset is preceded by a small "grant" envelope that
+authorizes specific app identities to use it, by digest.** Without it, the watch accepts
+and stores the asset bytes but never releases them for use - exactly matching the earlier
+finding that a sent-but-unreferenced asset also caused the referencing notification to be
+dropped (the watch was correctly refusing to serve an unauthorized asset, not failing to
+parse it).
+
+### The grant — envelope payload field 4
+
+A normal envelope (frame + digest + flags), but with **field 5 (flagC) = 5** - a third
+value alongside the already-known 3 (DataItem/peer-sync) and "absent" (plain asset chunks,
+NodeInfo). Payload field 4:
+
+```
+4 = { 1 = assetDigest (the same base64url(SHA-1(asset)) §47 already computes)
+      3 = repeated { 1 = { 1 = package name, 2 = signing-cert digest hex } }   (grantees)
+    }
+13 = 1   (constant)
+```
+
+The captured grant authorizes exactly two identities, both Samsung's, same signing cert:
+`com.samsung.wearable.watch7plugin` and `com.samsung.android.wcs.extension`. Granting to
+both (rather than just whichever package will end up authoring the referencing DataItem)
+matched the capture and is what GB now does unconditionally.
+
+**The asset's transfer id is derived from the grant, not chosen independently**: it equals
+`base64url(SHA-1(the grant's own payload bytes))` - the exact same "envelope integrity
+digest" function used for the outer envelope's own field 2 in every message (§22), just
+applied to the grant payload and reused as the transfer id for the *following* asset chunks
+(§47's `field 1`). This was verified two ways: the encoder reproduces all 3 captured grants
+in the session byte-for-byte (233 bytes each, digest+identities varying, everything else
+constant), and independently, `base64url(SHA-1(grant_payload))` computed from each grant
+equals the transfer id used by that asset's chunks.
+
+### Full sequence, timed from the fresh capture
+
+```
+t=+0.000  phone->watch  AssetGrant   (digest of icon "0", ~19ms build+send)
+t=+0.000  phone->watch  Asset chunks (icon "0", 8429B wire, one chunk)
+t=+0.756  phone->watch  AssetGrant   (digest of icon "1")
+t=+0.756  phone->watch  Asset chunks (icon "1", 1739B wire)
+t=+0.766  phone->watch  AssetGrant   (digest of icon "2"/supplemental)
+t=+0.766  phone->watch  Asset chunks (icon "2", 85B wire)
+t=+0.766  phone->watch  DataItem     (the /bridger/stream_item notification, referencing all 3)
+```
+
+No watch->phone traffic appears between any of these - the ~756ms gap between icon "0" and
+icon "1" is just normal per-asset build/encode/write latency on the stock phone, not a
+required round-trip; nothing needs to be awaited between grant, chunks, and the next asset's
+grant. Implemented in GB (`WearDataLayerProtocol.buildAssetGrant`, called before
+`buildAssetChunks` in `GalaxyWatch7DeviceSupport.ensureAppIconAsset`) and re-enabled
+(`APP_ICON_MODE = 2`) - not yet re-verified live (this session's stock-capture window was
+still open when this was implemented; verify on the next GB connection).
+
+Raw evidence: `docs/captures/notification_icon_session/` (fresh capture: gapless framing,
+all 3 assets digest-verified, the notification bridged and was interactively repliable on
+the watch during capture).
