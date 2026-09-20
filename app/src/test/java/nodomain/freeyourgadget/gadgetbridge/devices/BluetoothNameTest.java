@@ -243,6 +243,7 @@ public class BluetoothNameTest extends TestBase {
             put("M6-4711", DeviceType.FITPRO);
             put("M4-4711", DeviceType.FITPRO);
             put("YBW-05", DeviceType.FITPRO); // #6069
+            put("SERIES 11", DeviceType.FITPRO); // #6479
             put("C20", DeviceType.C20); // #4070
             put("C 20", DeviceType.C20); // #5495
             put("C20_Pro", DeviceType.C20PRO); // #6763
