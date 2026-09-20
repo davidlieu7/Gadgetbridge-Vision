@@ -20,6 +20,7 @@ package nodomain.freeyourgadget.gadgetbridge.service;
 
 import android.bluetooth.BluetoothAdapter;
 import android.content.Context;
+import android.hardware.usb.UsbAccessory;
 import android.location.Location;
 import android.net.Uri;
 import android.os.Bundle;
@@ -46,6 +47,7 @@ import nodomain.freeyourgadget.gadgetbridge.model.Contact;
 import nodomain.freeyourgadget.gadgetbridge.model.MusicSpec;
 import nodomain.freeyourgadget.gadgetbridge.model.MusicStateSpec;
 import nodomain.freeyourgadget.gadgetbridge.model.NavigationInfoSpec;
+import nodomain.freeyourgadget.gadgetbridge.model.NavigationRouteSpec;
 import nodomain.freeyourgadget.gadgetbridge.model.NotificationSpec;
 import nodomain.freeyourgadget.gadgetbridge.model.Reminder;
 import nodomain.freeyourgadget.gadgetbridge.model.WorldClock;
@@ -74,8 +76,17 @@ public class ServiceDeviceSupport implements DeviceSupport {
     }
 
     @Override
-    public void setContext(GBDevice gbDevice, BluetoothAdapter btAdapter, Context context) {
+    public void setContext(@NonNull final GBDevice gbDevice,
+                           @NonNull final BluetoothAdapter btAdapter,
+                           @NonNull final Context context) {
         delegate.setContext(gbDevice, btAdapter, context);
+    }
+
+    @Override
+    public void setContext(@NonNull final GBDevice gbDevice,
+                           @NonNull final UsbAccessory usbAccessory,
+                           @NonNull final Context context) {
+        delegate.setContext(gbDevice, usbAccessory, context);
     }
 
     @Override
@@ -126,11 +137,6 @@ public class ServiceDeviceSupport implements DeviceSupport {
     @Override
     public GBDevice getDevice() {
         return delegate.getDevice();
-    }
-
-    @Override
-    public BluetoothAdapter getBluetoothAdapter() {
-        return delegate.getBluetoothAdapter();
     }
 
     @Override
@@ -255,6 +261,15 @@ public class ServiceDeviceSupport implements DeviceSupport {
     }
 
     @Override
+    public void onSetNavigationRoute(NavigationRouteSpec navigationRouteSpec) {
+        if (checkBusy("set navigation route")) {
+            return;
+        }
+        delegate.onSetNavigationRoute(navigationRouteSpec);
+    }
+
+
+    @Override
     public void onInstallApp(Uri uri, @NonNull final Bundle options) {
         if (checkBusy("install app")) {
             return;
@@ -335,11 +350,19 @@ public class ServiceDeviceSupport implements DeviceSupport {
     }
 
     @Override
-    public void onReset(int flags) {
-        if (checkBusy("reset")) {
+    public void onReboot() {
+        if (checkBusy("reboot")) {
             return;
         }
-        delegate.onReset(flags);
+        delegate.onReboot();
+    }
+
+    @Override
+    public void onFactoryReset() {
+        if (checkBusy("factory reset")) {
+            return;
+        }
+        delegate.onFactoryReset();
     }
 
     @Override

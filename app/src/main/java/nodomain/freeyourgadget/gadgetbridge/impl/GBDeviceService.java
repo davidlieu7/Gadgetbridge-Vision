@@ -33,12 +33,14 @@ import android.provider.ContactsContract;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.core.content.ContextCompat;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.UUID;
+import java.util.concurrent.Executor;
 
 import nodomain.freeyourgadget.gadgetbridge.GBApplication;
 import nodomain.freeyourgadget.gadgetbridge.R;
@@ -54,6 +56,7 @@ import nodomain.freeyourgadget.gadgetbridge.model.DeviceService;
 import nodomain.freeyourgadget.gadgetbridge.model.MusicSpec;
 import nodomain.freeyourgadget.gadgetbridge.model.MusicStateSpec;
 import nodomain.freeyourgadget.gadgetbridge.model.NavigationInfoSpec;
+import nodomain.freeyourgadget.gadgetbridge.model.NavigationRouteSpec;
 import nodomain.freeyourgadget.gadgetbridge.model.NotificationSpec;
 import nodomain.freeyourgadget.gadgetbridge.model.Reminder;
 import nodomain.freeyourgadget.gadgetbridge.model.WorldClock;
@@ -69,22 +72,10 @@ public class GBDeviceService implements DeviceService {
     protected final Context mContext;
     private final GBDevice mDevice;
     private final Class<? extends Service> mServiceClass;
-    public static final String[] transliterationExtras = new String[]{
-            EXTRA_NOTIFICATION_SENDER,
-            EXTRA_NOTIFICATION_SUBJECT,
-            EXTRA_NOTIFICATION_TITLE,
-            EXTRA_NOTIFICATION_BODY,
-            EXTRA_NOTIFICATION_SOURCENAME,
-            EXTRA_CALL_DISPLAYNAME,
-            EXTRA_CALL_SOURCENAME,
-            EXTRA_MUSIC_ARTIST,
-            EXTRA_MUSIC_ALBUM,
-            EXTRA_MUSIC_TRACK,
-            EXTRA_CALENDAREVENT_TITLE,
-            EXTRA_CALENDAREVENT_DESCRIPTION,
-            EXTRA_CALENDAREVENT_LOCATION,
-            EXTRA_CALENDAREVENT_CALNAME,
-    };
+    private final Executor mainExecutor = ContextCompat.getMainExecutor(GBApplication.getContext());
+
+    private final ConflatingDispatcher<NavigationInfoSpec> navigationDispatcher =
+            new ConflatingDispatcher<>(mainExecutor, this::forwardNavigationInfo);
     private static final Logger LOG = LoggerFactory.getLogger(GBDeviceService.class);
 
     public GBDeviceService(@NonNull Context context) {
@@ -113,14 +104,6 @@ public class GBDeviceService implements DeviceService {
     }
 
     protected void invokeService(@NonNull Intent intent) {
-
-        if (RtlUtils.rtlSupport()) {
-            for (String extra : transliterationExtras) {
-                if (intent.hasExtra(extra)) {
-                    intent.putExtra(extra, RtlUtils.fixRtl(intent.getStringExtra(extra)));
-                }
-            }
-        }
 
         if (mDevice != null) {
             intent.putExtra(GBDevice.EXTRA_DEVICE, mDevice);
@@ -173,25 +156,18 @@ public class GBDeviceService implements DeviceService {
         boolean hideMessageDetails = messagePrivacyMode.equals(GBApplication.getContext().getString(R.string.p_message_privacy_mode_complete));
         boolean hideMessageBodyOnly = messagePrivacyMode.equals(GBApplication.getContext().getString(R.string.p_message_privacy_mode_bodyonly));
 
+        NotificationSpec privacyCleared = notificationSpec.copyOf();
+
+        privacyCleared = privacyCleared.withSender(coalesce(privacyCleared.getSender(), getContactDisplayNameByNumber(privacyCleared.getPhoneNumber())));
+
+        if (hideMessageDetails) {
+            privacyCleared = privacyCleared.withMessageDetailsCleared();
+        } else if (hideMessageBodyOnly) {
+            privacyCleared = privacyCleared.withMessageBodyCleared();
+        }
+
         Intent intent = createIntent().setAction(ACTION_NOTIFICATION)
-                .putExtra(EXTRA_NOTIFICATION_FLAGS, notificationSpec.flags)
-                .putExtra(EXTRA_NOTIFICATION_PHONENUMBER, hideMessageDetails ? null : notificationSpec.phoneNumber)
-                .putExtra(EXTRA_NOTIFICATION_SENDER, hideMessageDetails ? null : coalesce(notificationSpec.sender, getContactDisplayNameByNumber(notificationSpec.phoneNumber)))
-                .putExtra(EXTRA_NOTIFICATION_SUBJECT, hideMessageDetails ? null : notificationSpec.subject)
-                .putExtra(EXTRA_NOTIFICATION_TITLE, hideMessageDetails ? null : notificationSpec.title)
-                .putExtra(EXTRA_NOTIFICATION_BODY, hideMessageDetails || hideMessageBodyOnly ? null : notificationSpec.body)
-                .putExtra(EXTRA_NOTIFICATION_ID, notificationSpec.getId())
-                .putExtra(EXTRA_NOTIFICATION_KEY, notificationSpec.key)
-                .putExtra(EXTRA_NOTIFICATION_TYPE, notificationSpec.type)
-                .putExtra(EXTRA_NOTIFICATION_ACTIONS, notificationSpec.attachedActions)
-                .putExtra(EXTRA_NOTIFICATION_SOURCENAME, notificationSpec.sourceName)
-                .putExtra(EXTRA_NOTIFICATION_SOURCEAPPID, notificationSpec.sourceAppId)
-                .putExtra(EXTRA_NOTIFICATION_ICONID, notificationSpec.iconId)
-                .putExtra(EXTRA_NOTIFICATION_ICONPACKAGEID, notificationSpec.iconPackageId)
-                .putExtra(NOTIFICATION_PICTURE_PATH, notificationSpec.picturePath)
-                .putExtra(EXTRA_NOTIFICATION_DNDSUPPRESSED, notificationSpec.dndSuppressed)
-                .putExtra(EXTRA_NOTIFICATION_CHANNEL_ID, notificationSpec.channelId)
-                .putExtra(EXTRA_NOTIFICATION_CATEGORY, notificationSpec.category);
+                .putExtra(EXTRA_NOTIFICATION_SPEC, privacyCleared.withRtlFix());
         invokeService(intent);
     }
 
@@ -221,49 +197,36 @@ public class GBDeviceService implements DeviceService {
         Context context = GBApplication.getContext();
         String currentPrivacyMode = GBApplication.getPrefs().getString("pref_call_privacy_mode", GBApplication.getContext().getString(R.string.p_call_privacy_mode_off));
         if (currentPrivacyMode.equals(context.getString(R.string.p_call_privacy_mode_name))) {
-            callSpec.name = callSpec.number;
+            callSpec.setName(callSpec.getNumber());
         } else if (currentPrivacyMode.equals(context.getString(R.string.p_call_privacy_mode_complete))) {
-            callSpec.number = null;
-            callSpec.name = null;
+            callSpec.setNumber(null);
+            callSpec.setName(null);
         } else if (currentPrivacyMode.equals(context.getString(R.string.p_call_privacy_mode_number))) {
-            callSpec.name = coalesce(callSpec.name, getContactDisplayNameByNumber(callSpec.number));
-            if (callSpec.name != null && !callSpec.name.equals(callSpec.number)) {
-                callSpec.number = null;
+            callSpec.setName(coalesce(callSpec.getName(), getContactDisplayNameByNumber(callSpec.getNumber())));
+            if (callSpec.getName() != null && !callSpec.getName().equals(callSpec.getNumber())) {
+                callSpec.setNumber(null);
             }
         } else {
-            callSpec.name = coalesce(callSpec.name, getContactDisplayNameByNumber(callSpec.number));
+            callSpec.setName(coalesce(callSpec.getName(), getContactDisplayNameByNumber(callSpec.getNumber())));
         }
 
         Intent intent = createIntent().setAction(ACTION_CALLSTATE)
-                .putExtra(EXTRA_CALL_PHONENUMBER, callSpec.number)
-                .putExtra(EXTRA_CALL_DISPLAYNAME, callSpec.name)
-                .putExtra(EXTRA_CALL_SOURCENAME, callSpec.sourceName)
-                .putExtra(EXTRA_CALL_SOURCEAPPID, callSpec.sourceAppId)
-                .putExtra(EXTRA_CALL_KEY, callSpec.key)
-                .putExtra(EXTRA_CALL_CHANNELID, callSpec.channelId)
-                .putExtra(EXTRA_CALL_CATEGORY, callSpec.category)
-                .putExtra(EXTRA_CALL_ISVOIP, callSpec.isVoip)
-                .putExtra(EXTRA_CALL_COMMAND, callSpec.command)
-                .putExtra(EXTRA_CALL_DNDSUPPRESSED, callSpec.dndSuppressed);
+                .putExtra(EXTRA_CALL_SPEC, callSpec.withRtlFix());
+
         invokeService(intent);
     }
 
     @Override
     public void onSetCannedMessages(@NonNull CannedMessagesSpec cannedMessagesSpec) {
         Intent intent = createIntent().setAction(ACTION_SETCANNEDMESSAGES)
-                .putExtra(EXTRA_CANNEDMESSAGES_TYPE, cannedMessagesSpec.type)
-                .putExtra(EXTRA_CANNEDMESSAGES, cannedMessagesSpec.cannedMessages);
+                .putExtra(EXTRA_CANNEDMESSAGES_SPEC, cannedMessagesSpec);
         invokeService(intent);
     }
 
     @Override
     public void onSetMusicState(@NonNull MusicStateSpec stateSpec) {
         Intent intent = createIntent().setAction(ACTION_SETMUSICSTATE)
-                .putExtra(EXTRA_MUSIC_REPEAT, stateSpec.repeat)
-                .putExtra(EXTRA_MUSIC_RATE, stateSpec.playRate)
-                .putExtra(EXTRA_MUSIC_STATE, stateSpec.state)
-                .putExtra(EXTRA_MUSIC_SHUFFLE, stateSpec.shuffle)
-                .putExtra(EXTRA_MUSIC_POSITION, stateSpec.position);
+                .putExtra(EXTRA_MUSIC_STATE_SPEC, stateSpec);
         invokeService(intent);
     }
 
@@ -311,24 +274,36 @@ public class GBDeviceService implements DeviceService {
 
     @Override
     public void onSetMusicInfo(@NonNull MusicSpec musicSpec) {
+        final MusicSpec withRtlFix = musicSpec.withRtlFix();
         Intent intent = createIntent().setAction(ACTION_SETMUSICINFO)
-                .putExtra(EXTRA_MUSIC_ARTIST, musicSpec.artist)
-                .putExtra(EXTRA_MUSIC_ALBUM, musicSpec.album)
-                .putExtra(EXTRA_MUSIC_TRACK, musicSpec.track)
-                .putExtra(EXTRA_MUSIC_DURATION, musicSpec.duration)
-                .putExtra(EXTRA_MUSIC_TRACKCOUNT, musicSpec.trackCount)
-                .putExtra(EXTRA_MUSIC_TRACKNR, musicSpec.trackNr);
+                .putExtra(EXTRA_MUSIC_SPEC, withRtlFix);
         invokeService(intent);
     }
 
     @Override
     public void onSetNavigationInfo(@NonNull NavigationInfoSpec navigationInfoSpec) {
+        navigationDispatcher.offer(navigationInfoSpec);
+    }
+
+    @Override
+    public void onSetNavigationRoute(@NonNull NavigationRouteSpec navigationRouteSpec) {
+        Intent intent = createIntent().setAction(ACTION_SETNAVIGATIONROUTE)
+                .putExtra(EXTRA_NAVIGATION_ROUTE_SPEC, navigationRouteSpec);
+        invokeService(intent);
+    }
+
+    private void forwardNavigationInfo(NavigationInfoSpec navigationInfoSpec) {
         Intent intent = createIntent().setAction(ACTION_SETNAVIGATIONINFO)
-                .putExtra(EXTRA_NAVIGATION_INSTRUCTION, navigationInfoSpec.instruction)
-                .putExtra(EXTRA_NAVIGATION_NEXT_ACTION, navigationInfoSpec.nextAction)
-                .putExtra(EXTRA_NAVIGATION_DISTANCE_TO_TURN, navigationInfoSpec.distanceToTurn)
-                .putExtra(EXTRA_NAVIGATION_ETA, navigationInfoSpec.ETA)
-                .putExtra(EXTRA_NAVIGATION_COMPLETION_PERCENT, navigationInfoSpec.completionPercent);
+                .putExtra(EXTRA_NAVIGATION_INSTRUCTION, navigationInfoSpec.getInstruction())
+                .putExtra(EXTRA_NAVIGATION_NEXT_ACTION, navigationInfoSpec.getNextAction())
+                .putExtra(EXTRA_NAVIGATION_DISTANCE_TO_TURN, navigationInfoSpec.getDistanceToTurn())
+                .putExtra(EXTRA_NAVIGATION_DISTANCE_TO_TARGET, navigationInfoSpec.getDistanceToTarget())
+                .putExtra(EXTRA_NAVIGATION_COMPLETION_PERCENT, navigationInfoSpec.getCompletionPercent());
+        if(navigationInfoSpec.getTotalTimeToDestination() != null) {
+            intent.putExtra(EXTRA_NAVIGATION_TIME_TO_DESTINATION, navigationInfoSpec.getTotalTimeToDestination());
+        } else {
+            intent.putExtra(EXTRA_NAVIGATION_ETA, navigationInfoSpec.getETA());
+        }
         invokeService(intent);
     }
 
@@ -412,9 +387,14 @@ public class GBDeviceService implements DeviceService {
     }
 
     @Override
-    public void onReset(int flags) {
-        Intent intent = createIntent().setAction(ACTION_RESET)
-                .putExtra(EXTRA_RESET_FLAGS, flags);
+    public void onReboot() {
+        Intent intent = createIntent().setAction(ACTION_REBOOT);
+        invokeService(intent);
+    }
+
+    @Override
+    public void onFactoryReset() {
+        Intent intent = createIntent().setAction(ACTION_FACTORY_RESET);
         invokeService(intent);
     }
 
@@ -481,22 +461,10 @@ public class GBDeviceService implements DeviceService {
 
     @Override
     public void onAddCalendarEvent(@NonNull CalendarEventSpec calendarEventSpec) {
+        final CalendarEventSpec withRtlFix = calendarEventSpec.withRtlFix();
+
         Intent intent = createIntent().setAction(ACTION_ADD_CALENDAREVENT)
-                .putExtra(EXTRA_CALENDAREVENT_ID, calendarEventSpec.id)
-                .putExtra(EXTRA_CALENDAREVENT_EVENT_ID, calendarEventSpec.eventId)
-                .putExtra(EXTRA_CALENDAREVENT_TYPE, calendarEventSpec.type)
-                .putExtra(EXTRA_CALENDAREVENT_TIMESTAMP, calendarEventSpec.timestamp)
-                .putExtra(EXTRA_CALENDAREVENT_DURATION, calendarEventSpec.durationInSeconds)
-                .putExtra(EXTRA_CALENDAREVENT_ALLDAY, calendarEventSpec.allDay)
-                .putExtra(EXTRA_CALENDAREVENT_REMINDERS, calendarEventSpec.reminders)
-                .putExtra(EXTRA_CALENDAREVENT_TITLE, calendarEventSpec.title)
-                .putExtra(EXTRA_CALENDAREVENT_DESCRIPTION, calendarEventSpec.description)
-                .putExtra(EXTRA_CALENDAREVENT_CALNAME, calendarEventSpec.calName)
-                .putExtra(EXTRA_CALENDAREVENT_CALENDAR_COLOR, calendarEventSpec.calendarColor)
-                .putExtra(EXTRA_CALENDAREVENT_COLOR, calendarEventSpec.color)
-                .putExtra(EXTRA_CALENDAREVENT_LOCATION, calendarEventSpec.location)
-                .putExtra(EXTRA_CALENDAREVENT_STATUS, calendarEventSpec.location)
-                .putExtra(EXTRA_CALENDAREVENT_ATTENDING_STATUS, calendarEventSpec.location);
+                .putExtra(EXTRA_CALENDAREVENT_SPEC, withRtlFix);
         invokeService(intent);
     }
 

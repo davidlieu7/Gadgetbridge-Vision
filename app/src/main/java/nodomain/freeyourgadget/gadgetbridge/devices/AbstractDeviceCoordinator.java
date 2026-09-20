@@ -35,6 +35,7 @@ import android.widget.Toast;
 import androidx.annotation.DrawableRes;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.annotation.StringRes;
 
 import org.apache.commons.lang3.ArrayUtils;
 import org.slf4j.Logger;
@@ -94,6 +95,7 @@ import nodomain.freeyourgadget.gadgetbridge.model.Alarm;
 import nodomain.freeyourgadget.gadgetbridge.model.BatteryConfig;
 import nodomain.freeyourgadget.gadgetbridge.model.BloodPressureSample;
 import nodomain.freeyourgadget.gadgetbridge.model.BodyEnergySample;
+import nodomain.freeyourgadget.gadgetbridge.model.SolarChargeSample;
 import nodomain.freeyourgadget.gadgetbridge.model.DeviceType;
 import nodomain.freeyourgadget.gadgetbridge.model.GpxActivityTrackProvider;
 import nodomain.freeyourgadget.gadgetbridge.model.HeartRateSample;
@@ -117,6 +119,7 @@ import nodomain.freeyourgadget.gadgetbridge.util.GB;
 import nodomain.freeyourgadget.gadgetbridge.util.GBPrefs;
 import nodomain.freeyourgadget.gadgetbridge.util.Prefs;
 import nodomain.freeyourgadget.gadgetbridge.util.preferences.DevicePrefs;
+import nodomain.freeyourgadget.gadgetbridge.widgets.DeviceWidgetsProvider;
 
 public abstract class AbstractDeviceCoordinator implements DeviceCoordinator {
     private static final Logger LOG = LoggerFactory.getLogger(AbstractDeviceCoordinator.class);
@@ -336,6 +339,12 @@ public abstract class AbstractDeviceCoordinator implements DeviceCoordinator {
     @Override
     @Nullable
     public TimeSampleProvider<? extends BodyEnergySample> getBodyEnergySampleProvider(final GBDevice device, final DaoSession session) {
+        return null;
+    }
+
+    @Override
+    @Nullable
+    public TimeSampleProvider<? extends SolarChargeSample> getSolarChargeSampleProvider(final GBDevice device, final DaoSession session) {
         return null;
     }
 
@@ -738,6 +747,26 @@ public abstract class AbstractDeviceCoordinator implements DeviceCoordinator {
     }
 
     @Override
+    public boolean supportsTrainingLoadChronic(@NonNull GBDevice device) {
+        return supportsTrainingLoad(device);
+    }
+
+    @Override
+    public boolean supportsRacePrediction(@NonNull GBDevice device) {
+        return false;
+    }
+
+    @Override
+    public boolean supportsTrainingReadiness(@NonNull GBDevice device) {
+        return false;
+    }
+
+    @Override
+    public boolean supportsSolarCharging(@NonNull GBDevice device) {
+        return false;
+    }
+
+    @Override
     public boolean supportsCharts(@NonNull GBDevice device) {
         // All the default charts (see DefaultChartsProvider)
         return supportsActivityTracking(device) ||
@@ -758,7 +787,10 @@ public abstract class AbstractDeviceCoordinator implements DeviceCoordinator {
                 supportsActiveCalories(device) ||
                 supportsCyclingData(device) ||
                 supportsRespiratoryRate(device) ||
-                supportsBloodPressureMeasurement(device);
+                supportsBloodPressureMeasurement(device) ||
+                supportsRacePrediction(device) ||
+                supportsTrainingReadiness(device) ||
+                supportsSolarCharging(device);
     }
 
     @Override
@@ -784,6 +816,11 @@ public abstract class AbstractDeviceCoordinator implements DeviceCoordinator {
     @Override
     public DeviceChartsProvider getChartsProvider() {
         return DefaultChartsProvider.INSTANCE;
+    }
+
+    @Override
+    public DeviceWidgetsProvider getWidgetsProvider() {
+        return DeviceWidgetsProvider.DEFAULT;
     }
 
     @Override
@@ -1040,6 +1077,7 @@ public abstract class AbstractDeviceCoordinator implements DeviceCoordinator {
         if (connectionType.usesBluetoothClassic() || connectionType.usesBluetoothLE()) {
             settings = ArrayUtils.insert(0, settings, R.xml.devicesettings_reconnect_periodic);
             settings = ArrayUtils.insert(0, settings, R.xml.devicesettings_device_connect_back);
+            settings = ArrayUtils.insert(0, settings, R.xml.devicesettings_device_connect_by_trigger);
             if (supportsConnectionPriority()) {
                 settings = ArrayUtils.add(settings, R.xml.devicesettings_connection_priority_low_power);
             }
@@ -1246,6 +1284,18 @@ public abstract class AbstractDeviceCoordinator implements DeviceCoordinator {
     @Nullable
     public String getAuthHelp() {
         return "https://gadgetbridge.org/basics/pairing/#authentication-key";
+    }
+
+    @Override
+    @Nullable
+    public String getSecondaryAuthKeyPref() {
+        return null;
+    }
+
+    @Override
+    @StringRes
+    public int getSecondaryAuthKeyHint() {
+        return 0;
     }
 
     @Override

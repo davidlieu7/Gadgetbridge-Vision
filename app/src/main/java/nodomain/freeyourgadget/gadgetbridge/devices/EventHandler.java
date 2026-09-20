@@ -39,6 +39,7 @@ import nodomain.freeyourgadget.gadgetbridge.model.Contact;
 import nodomain.freeyourgadget.gadgetbridge.model.MusicSpec;
 import nodomain.freeyourgadget.gadgetbridge.model.MusicStateSpec;
 import nodomain.freeyourgadget.gadgetbridge.model.NavigationInfoSpec;
+import nodomain.freeyourgadget.gadgetbridge.model.NavigationRouteSpec;
 import nodomain.freeyourgadget.gadgetbridge.model.NotificationSpec;
 import nodomain.freeyourgadget.gadgetbridge.model.Reminder;
 import nodomain.freeyourgadget.gadgetbridge.model.WorldClock;
@@ -84,6 +85,8 @@ public interface EventHandler {
 
     void onSetNavigationInfo(@NonNull NavigationInfoSpec navigationInfoSpec);
 
+    void onSetNavigationRoute(@NonNull NavigationRouteSpec navigationRouteSpec);
+
     void onEnableRealtimeSteps(boolean enable);
 
     void onInstallApp(Uri uri, @NonNull Bundle options);
@@ -106,7 +109,9 @@ public interface EventHandler {
 
     void onFetchRecordedData(int dataTypes);
 
-    void onReset(int flags);
+    void onReboot();
+
+    void onFactoryReset();
 
     void onHeartRateTest();
 
@@ -156,7 +161,7 @@ public interface EventHandler {
 
     void onPowerOff();
 
-    void onSetGpsLocation(Location location);
+    void onSetGpsLocation(@NonNull Location location);
 
     void onSleepAsAndroidAction(String action, Bundle extras);
 

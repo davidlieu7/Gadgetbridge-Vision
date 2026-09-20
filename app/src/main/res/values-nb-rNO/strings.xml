@@ -654,7 +654,7 @@
     <string name="pref_display_add_device_fab_off">Synlig bare hvis ingen enhet er lagt til</string>
     <plurals name="widget_alarm_target_hours">
         <item quantity="one">%1$d:%2$02d time</item>
-        <item quantity="other"/>
+        <item quantity="other">%1$d:%2$02d timer</item>
     </plurals>
     <string name="activity_error_no_app_for_gpx">For å vise aktivitetsspor, installer en app som kan håndtere GPX-filer.</string>
     <string name="preferences_makibes_hr3_settings">Makibes HR3 innstillinger</string>
@@ -3370,7 +3370,6 @@
     <string name="pref_sleepasandroid_feat_movement">Akselerometer</string>
     <string name="pref_sleepasandroid_feat_heartrate">Hjerteslag</string>
     <string name="pref_sleepasandroid_feat_oximetry">Oksimetri</string>
-    <string name="pref_sleepasandroid_feat_spo2">SPO2</string>
     <string name="pref_title_huawei_account">Huawei-konto</string>
     <string name="pref_summary_huawei_account">Huawei-konto brukt i paringsprosessen. Å sette den tillater paring uten fabrikktilbakestilling.</string>
     <string name="watchface_resolution_doesnt_match">Urvisoppløsning matcher ikke enhetsskjerm. Urvis er %1$s enhetsskjerm er %2$s</string>
@@ -4166,4 +4165,48 @@
     <string name="casio_interval_timer_add">Legg til timer</string>
     <string name="casio_interval_timer_empty">Ingen intervalltimere ennå. Trykk på + for å legge til en.</string>
     <string name="casio_interval_timer_limit_reached">aksgrense på 50 timere er nådd</string>
+    <string name="appmanager_app_store">App store</string>
+    <string name="refresh">Oppdater</string>
+    <string name="pref_title_notifications_ignore_other_users">Ignorer andre brukerprofiler</string>
+    <string name="pref_summary_notifications_ignore_other_users">Ikke send varsler fra andre brukerprofiler til klokken</string>
+    <string name="casio_interval_timer_active">Aktiv på klokken</string>
+    <string name="casio_interval_timer_skip">Hopp over</string>
+    <string name="casio_interval_timer_total">Totalt: %1$s × %2$d = %3$s</string>
+    <string name="pref_export_directory">Eksporter katalog</string>
+    <string name="soundcore_equalizer_preset_podcast">Podcast</string>
+    <string name="soundcore_equalizer_preset_dance">Dance</string>
+    <string name="soundcore_equalizer_band7_freq">6.4 kHz</string>
+    <string name="soundcore_equalizer_band1_freq">100 Hz</string>
+    <string name="soundcore_3d_surround_title">3D Surround Sound</string>
+    <string name="soundcore_equalizer_band6_freq">3.2 kHz</string>
+    <string name="soundcore_equalizer_band8_freq">12.8 kHz</string>
+    <string name="qhybrid_button_function_stopwatch">Stoppeklokke</string>
+    <string name="endurain_setup_login_type_local">Lokal</string>
+    <string name="endurain_setup_mfa_code">MFA-kode</string>
+    <string name="endurain_setup_next">Neste</string>
+    <string name="warning_network_required_title">Nettverk kreves</string>
+    <string name="endurain_verify_mfa">Verifiser MFA</string>
+    <string name="endurain_no_sso_providers_available">Ingen SSO-tilbydere tilgjengelig</string>
+    <string name="electrical_current">Nåværende</string>
+    <string name="pref_title_general_prefs_key_sort_by_last_connected_ts">Sorter etter siste tilkoblingsdato</string>
+    <string name="pref_summary_general_prefs_key_sort_by_last_connected_ts">Sorter frakoblede enheter etter når de sist var tilkoblet, i stedet for alfabetisk</string>
+    <string name="url_development">Utvikling</string>
+    <string name="casio_interval_timer_slot">Trinn %1$d</string>
+    <string name="pref_title_xiaomi_device_id">Enhets-ID</string>
+    <string name="stamina">Utholdenhet</string>
+    <string name="add_contact">Legg til kontakt</string>
+    <string name="add_world_clock">Legg til verdensklokke</string>
+    <string name="upload_music">Last opp musikk</string>
+    <string name="blood_pressure_export_date">Dato</string>
+    <string name="workout_throws_count">Kast</string>
+    <string name="nothing_equalizer_rock">Rock</string>
+    <string name="nothing_equalizer_pop">Pop</string>
+    <string name="nothing_equalizer_enhance_vocals">Forbedre vokal</string>
+    <string name="nothing_equalizer_classical">Klassisk</string>
+    <string name="nothing_equalizer_custom">Egendefinert</string>
+    <string name="knots">kn</string>
+    <string name="unit_inch">tom</string>
+    <string name="unit_ampere">A</string>
+    <string name="unit_ampere_hour">Ah</string>
+    <string name="unit_kilojoule">kJ</string>
 </resources>

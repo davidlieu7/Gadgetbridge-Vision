@@ -93,6 +93,7 @@ import nodomain.freeyourgadget.gadgetbridge.devices.huawei.packets.Notifications
 import nodomain.freeyourgadget.gadgetbridge.devices.huawei.packets.Weather;
 import nodomain.freeyourgadget.gadgetbridge.devices.huawei.ui.HuaweiStressCalibrationFragment;
 import nodomain.freeyourgadget.gadgetbridge.devices.miband.MiBandConst;
+import nodomain.freeyourgadget.gadgetbridge.entities.BaseActivitySummary;
 import nodomain.freeyourgadget.gadgetbridge.entities.HuaweiActivitySample;
 import nodomain.freeyourgadget.gadgetbridge.entities.HuaweiEcgDataSample;
 import nodomain.freeyourgadget.gadgetbridge.entities.HuaweiEcgDataSampleDao;
@@ -138,6 +139,7 @@ import nodomain.freeyourgadget.gadgetbridge.service.devices.huawei.datasync.Huaw
 import nodomain.freeyourgadget.gadgetbridge.service.devices.huawei.datasync.HuaweiDataSyncArterialStiffnessDetection;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.huawei.datasync.HuaweiDataSyncSleepApnea;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.huawei.p2p.HuaweiP2PAppIcon;
+import nodomain.freeyourgadget.gadgetbridge.service.devices.huawei.p2p.HuaweiP2PBatteryService;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.huawei.p2p.HuaweiP2PCalendarService;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.huawei.p2p.HuaweiP2PCannedRepliesService;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.huawei.p2p.HuaweiP2PContactsService;
@@ -236,7 +238,6 @@ import nodomain.freeyourgadget.gadgetbridge.service.devices.huawei.requests.GetN
 import nodomain.freeyourgadget.gadgetbridge.service.devices.huawei.requests.SetWorkModeRequest;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.huawei.utils.HuaweiGPSTrackConverter;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.huawei.utils.HuaweiRouteTrack;
-import nodomain.freeyourgadget.gadgetbridge.service.serial.GBDeviceProtocol;
 import nodomain.freeyourgadget.gadgetbridge.util.DateTimeUtils;
 import nodomain.freeyourgadget.gadgetbridge.util.GB;
 import nodomain.freeyourgadget.gadgetbridge.util.MediaManager;
@@ -1166,6 +1167,11 @@ public class HuaweiSupportProvider {
                             HuaweiP2PFitnessData p2PFitnessData = new HuaweiP2PFitnessData(huaweiP2PManager);
                             p2PFitnessData.register();
                         }
+
+                        if (HuaweiP2PBatteryService.getRegisteredInstance(huaweiP2PManager) == null) {
+                            HuaweiP2PBatteryService batteryService = new HuaweiP2PBatteryService(huaweiP2PManager);
+                            batteryService.register();
+                        }
                     }
                 }
             });
@@ -1284,7 +1290,7 @@ public class HuaweiSupportProvider {
     public void onSocketRead(byte[] data, int channel) {
         if (channel != ResponseManager.MAIN_CHANNEL)
             LOG.debug("Dual channel: received {} bytes on aux socket (channel {}): {}",
-                    data.length, channel, GB.hexdump(data));
+                    data.length, channel, GB.lazyHexdump(data));
         responseManager.handleData(data, channel);
     }
 
@@ -1837,12 +1843,10 @@ public class HuaweiSupportProvider {
         });
     }
 
-    public void onReset(int flags) {
+    public void onFactoryReset() {
         try {
-            if (flags == GBDeviceProtocol.RESET_FLAGS_FACTORY_RESET) {
-                SendFactoryResetRequest sendFactoryResetReq = new SendFactoryResetRequest(this);
-                sendFactoryResetReq.doPerform();
-            }
+            SendFactoryResetRequest sendFactoryResetReq = new SendFactoryResetRequest(this);
+            sendFactoryResetReq.doPerform();
         } catch (IOException e) {
             GB.toast(context, "Factory resetting Huawei device failed", Toast.LENGTH_SHORT, GB.ERROR, e);
             LOG.error("Factory resetting Huawei device failed", e);
@@ -1932,7 +1936,7 @@ public class HuaweiSupportProvider {
     }
 
     public void onSetCallState(CallSpec callSpec) {
-        if (callSpec.command == CallSpec.CALL_INCOMING || (callSpec.command == CallSpec.CALL_OUTGOING && getDeviceState().supportsOutgoingCall())) {
+        if (callSpec.getCommand() == CallSpec.CALL_INCOMING || (callSpec.getCommand() == CallSpec.CALL_OUTGOING && getDeviceState().supportsOutgoingCall())) {
             SendNotificationRequest sendNotificationReq = new SendNotificationRequest(this);
             try {
                 sendNotificationReq.buildNotificationTLVFromCallSpec(callSpec);
@@ -1941,8 +1945,8 @@ public class HuaweiSupportProvider {
                 LOG.error("Failed to send start call notification", e);
             }
         } else if (
-                callSpec.command == CallSpec.CALL_ACCEPT ||
-                        callSpec.command == CallSpec.CALL_START) {
+                callSpec.getCommand() == CallSpec.CALL_ACCEPT ||
+                        callSpec.getCommand() == CallSpec.CALL_START) {
             byte type = getDeviceState().supportsNotificationsStartCall() ? Notifications.NotificationType.startCall : Notifications.NotificationType.stopNotification;
             StopNotificationRequest stopNotificationRequest = new StopNotificationRequest(this, type);
             try {
@@ -1951,8 +1955,8 @@ public class HuaweiSupportProvider {
                 LOG.error("Failed to send stop call notification", e);
             }
         } else if (
-                callSpec.command == CallSpec.CALL_REJECT ||
-                        callSpec.command == CallSpec.CALL_END
+                callSpec.getCommand() == CallSpec.CALL_REJECT ||
+                        callSpec.getCommand() == CallSpec.CALL_END
         ) {
             StopNotificationRequest stopNotificationRequest = new StopNotificationRequest(this, Notifications.NotificationType.stopNotification);
             try {
@@ -3115,6 +3119,8 @@ public class HuaweiSupportProvider {
 
                         if (fileRequest.getData().length == 0) {
                             LOG.debug("GPS file empty");
+                            // Indoor / empty GPS: still auto-export FIT (track from HuaweiActivityTrackProvider).
+                            autoExportWorkout(fileRequest.getDatabaseId());
                             syncState.stopWorkoutGpsDownload();
                             return;
                         }
@@ -3150,40 +3156,13 @@ public class HuaweiSupportProvider {
 
                         if (points.length == 0) {
                             LOG.debug("No GPS points returned");
+                            // Indoor / empty GPS: still auto-export FIT (track from HuaweiActivityTrackProvider).
+                            autoExportWorkout(databaseId);
                             syncState.stopWorkoutGpsDownload();
                             return;
                         }
 
-                        ActivityTrack track = new ActivityTrack();
-
-                        track.setName("Workout " + fileRequest.getWorkoutId());
-                        track.setBaseTime(DateTimeUtils.parseTimeStamp(points[0].timestamp));
-
-                        try (DBHandler db = GBApplication.acquireDB()) {
-                            track.setUser(DBHelper.getUser(db.getDaoSession()));
-                            track.setDevice(DBHelper.getDevice(gbDevice, db.getDaoSession()));
-                        } catch (Exception e) {
-                            LOG.error("Cannot acquire DB, set user, or set device for Activity track, continuing anyway");
-                        }
-
-                        for (HuaweiGpsParser.GpsPoint point : points) {
-                            GPSCoordinate coordinate;
-                            if (point.altitudeSupported)
-                                coordinate = new GPSCoordinate(point.longitude, point.latitude, point.altitude);
-                            else
-                                coordinate = new GPSCoordinate(point.longitude, point.latitude);
-
-                            ActivityPoint activityPoint = new ActivityPoint();
-                            activityPoint.setTime(DateTimeUtils.parseTimeStamp(point.timestamp));
-                            activityPoint.setLocation(coordinate);
-
-                            track.addTrackPoint(activityPoint);
-                        }
-
-                        AutoGpxExporter.doExport(getContext(), getDevice(), null, track);
-                        AutoFitExporter.doExport(getContext(), getDevice(), null, track);
-
-                        new HuaweiWorkoutGbParser(getDevice(), getContext()).parseWorkout(databaseId);
+                        autoExportWorkout(databaseId);
 
                         LOG.debug("Completed workout GPS parsing and inserting");
                         syncState.stopWorkoutGpsDownload();
@@ -3198,6 +3177,29 @@ public class HuaweiSupportProvider {
                     }
                 }
         ), true);
+    }
+
+    /** Auto-export after workout sync. */
+    private void autoExportWorkout(@Nullable final Long workoutId) {
+        if (workoutId == null) {
+            LOG.warn("Cannot auto-export workout: missing workout id");
+            return;
+        }
+
+        final BaseActivitySummary summary = new HuaweiWorkoutGbParser(getDevice(), getContext())
+                .parseWorkout(workoutId);
+        if (summary == null) {
+            LOG.warn("Cannot auto-export workout {}: summary not found", workoutId);
+            return;
+        }
+
+        final ActivityTrack exportTrack = new HuaweiActivityTrackProvider(getDevice()).getActivityTrack(summary);
+
+        if (exportTrack != null && exportTrack.getAllPoints().stream().anyMatch(p -> p.getLocation() != null)) {
+            // GPX needs at least one GPS-valid point; FIT can be emitted regardless.
+            AutoGpxExporter.doExport(getContext(), getDevice(), summary, exportTrack);
+        }
+        AutoFitExporter.doExport(getContext(), getDevice(), summary, exportTrack);
     }
 
     /**
@@ -3225,12 +3227,12 @@ public class HuaweiSupportProvider {
     }
 
     public void onSetCannedMessages(final CannedMessagesSpec cannedMessagesSpec) {
-        if (cannedMessagesSpec.type != CannedMessagesSpec.TYPE_GENERIC) {
-            LOG.warn("Got unsupported canned messages type: {}", cannedMessagesSpec.type);
+        if (cannedMessagesSpec.getType() != CannedMessagesSpec.TYPE_GENERIC) {
+            LOG.warn("Got unsupported canned messages type: {}", cannedMessagesSpec.getType());
             return;
         }
 
-        if (cannedMessagesSpec.cannedMessages.length == 0) {
+        if (cannedMessagesSpec.getCannedMessages().length == 0) {
             GB.toast(context, HuaweiSupportProvider.this.getContext().getString(R.string.canned_replies_not_empty), Toast.LENGTH_SHORT, GB.WARN);
             LOG.warn(HuaweiSupportProvider.this.getContext().getString(R.string.canned_replies_not_empty));
         }
@@ -3240,7 +3242,7 @@ public class HuaweiSupportProvider {
             LOG.warn("P2P canned replies service is not registered");
             return;
         }
-        cannedRepliesService.sendReplies(cannedMessagesSpec.cannedMessages);
+        cannedRepliesService.sendReplies(cannedMessagesSpec.getCannedMessages());
     }
 
     public void onFindDevice(boolean start) {
@@ -3257,7 +3259,7 @@ public class HuaweiSupportProvider {
         LOG.info("navigation: {}", navigationInfoSpec);
         HuaweiP2PDirection nav = HuaweiP2PDirection.getRegisteredInstance(huaweiP2PManager);
         if (nav != null) {
-            nav.updateInstruction(navigationInfoSpec.distanceToTurn, HuaweiP2PDirection.actionToIconId(navigationInfoSpec.nextAction), navigationInfoSpec.instruction);
+            nav.updateInstruction(navigationInfoSpec.getDistanceToTurn(), HuaweiP2PDirection.actionToIconId(navigationInfoSpec.getNextAction()), navigationInfoSpec.getInstruction());
         }
     }
 
