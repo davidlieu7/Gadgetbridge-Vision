@@ -3218,8 +3218,9 @@ icon "1" is just normal per-asset build/encode/write latency on the stock phone,
 required round-trip; nothing needs to be awaited between grant, chunks, and the next asset's
 grant. Implemented in GB (`WearDataLayerProtocol.buildAssetGrant`, called before
 `buildAssetChunks` in `GalaxyWatch7DeviceSupport.ensureAppIconAsset`) and re-enabled
-(`APP_ICON_MODE = 2`) - not yet re-verified live (this session's stock-capture window was
-still open when this was implemented; verify on the next GB connection).
+(`APP_ICON_MODE = 2`) - **verified live 2026-09-21 back on GB**: a notification pushed with
+an icon now arrives on the watch with `hasAppIcon=true` (previously the whole notification
+was silently dropped whenever an icon was attached).
 
 Raw evidence: `docs/captures/notification_icon_session/` (fresh capture: gapless framing,
 all 3 assets digest-verified, the notification bridged and was interactively repliable on
