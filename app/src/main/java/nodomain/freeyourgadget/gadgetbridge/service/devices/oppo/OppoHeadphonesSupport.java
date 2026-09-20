@@ -749,11 +749,17 @@ public class OppoHeadphonesSupport extends AbstractHeadphoneBTBRDeviceSupport {
         queueCommand(OppoCommand.FIND_DEVICE_REQ, new byte[] { (byte) (start ? 0x01 : 0x00) });
     }
 
-    private void queueCommand(OppoCommand command, byte[] payload) {
-        messageQueue.add(new OppoMessage(command, payload));
+    private void queueCommand(final OppoCommand command, final byte[] payload) {
+        queueCommand(new OppoMessage(command, payload));
+    }
 
-        if (pendingMessage == null) {
-            sendNextCommand();
+    private void queueCommand(final OppoMessage message) {
+        if (message != null) {
+            messageQueue.add(message);
+
+            if (pendingMessage == null) {
+                sendNextCommand();
+            }
         }
     }
 
