@@ -65,6 +65,16 @@ public final class WearDataLayerProtocol {
     private static final int PAYLOAD_SEQ_ACK = 8;
     private static final int PAYLOAD_DATA_ITEM = 9;
     private static final int PAYLOAD_MESSAGE_EVENT = 10;
+    // Wear Asset transfer (icons and other binary blobs), research notes §47:
+    //   {1 = transfer id, 2 = last-chunk flag, 3 = chunk bytes,
+    //    4 = base64url(SHA-1(whole asset)) - final chunk only}
+    private static final int PAYLOAD_ASSET = 12;
+    private static final int ASSET_TRANSFER_ID = 1;
+    private static final int ASSET_LAST_CHUNK = 2;
+    private static final int ASSET_BYTES = 3;
+    private static final int ASSET_DIGEST = 4;
+    /** Chunk size the stock companion uses for asset transfers. */
+    private static final int ASSET_CHUNK_SIZE = 12215;
 
     // Peer-sync (payload field 8) structure, decoded from the reference capture:
     //   field 1 = varint counter (the highest sequence this node has seen from the peer it is
@@ -104,6 +114,13 @@ public final class WearDataLayerProtocol {
     private static final int DATAITEM_SEQ = 5;
     private static final int DATAITEM_DELETE_FLAG = 6;
     private static final int DATAITEM_DEST_NODE_ID = 7;
+    // Binds an attached asset to a key the DataMap references by index (research notes §47):
+    //   repeated { 1 = key ("0", "1", ...), 2 = { 4 = assetDigest }, 3 = 4 }
+    private static final int DATAITEM_ASSETS = 8;
+    private static final int ASSET_BINDING_KEY = 1;
+    private static final int ASSET_BINDING_REF = 2;
+    private static final int ASSET_BINDING_DIGEST = 4;
+    private static final int ASSET_BINDING_KIND = 3;
     // The source app's signing-certificate SHA digest (hex) and a write timestamp; the watch
     // checks the source package + signature against its trusted_packages before applying.
     private static final int DATAITEM_SIGNATURE = 9;
@@ -294,6 +311,23 @@ public final class WearDataLayerProtocol {
                                               final long postTime, final long whenMs, final long color,
                                               final int flags, final String category, final long seq,
                                               final java.util.List<byte[]> wearableActions) {
+        return buildNotificationPut(sourcePackage, signatureHex, ownNodeId, packageName, notifId, tag,
+                appName, title, text, subText, postTime, whenMs, color, flags, category, seq,
+                wearableActions, null);
+    }
+
+    /**
+     * As above, plus the app icon. {@code appIconDigest} must be the {@link #assetDigest} of an asset
+     * whose chunks ({@link #buildAssetChunks}) were already sent, or {@code null} for no icon.
+     */
+    public static byte[] buildNotificationPut(final String sourcePackage, final String signatureHex,
+                                              final String ownNodeId, final String packageName,
+                                              final int notifId, final String tag, final String appName,
+                                              final String title, final String text, final String subText,
+                                              final long postTime, final long whenMs, final long color,
+                                              final int flags, final String category, final long seq,
+                                              final java.util.List<byte[]> wearableActions,
+                                              final String appIconDigest) {
         final ProtoWriter dataMap = new ProtoWriter();
         dataMapEntry(dataMap, "app_name", dataMapString(nz(appName)));
         dataMapEntry(dataMap, "title_raw", dataMapString(nz(title)));
@@ -336,9 +370,16 @@ public final class WearDataLayerProtocol {
             dataMapEntry(dataMap, "actions", dataMapArray(elements));
             dataMapEntry(dataMap, "wearable_actions", dataMapArray(java.util.Collections.emptyList()));
         }
+        // The icon itself travels as a separate Wear Asset; the DataMap only points at the key the
+        // DataItem binds below (index 0 here, since the app icon is our only attachment) - §47.
+        final java.util.List<String> assetDigests = new java.util.ArrayList<>();
+        if (appIconDigest != null) {
+            dataMapEntry(dataMap, "app_icon", dataMapAssetRef(assetDigests.size()));
+            assetDigests.add(appIconDigest);
+        }
 
         return buildStreamItemDataItem(sourcePackage, signatureHex, ownNodeId, packageName, notifId,
-                tag, dataMap.toByteArray(), 0, seq);
+                tag, dataMap.toByteArray(), 0, seq, assetDigests);
     }
 
     /**
@@ -357,6 +398,16 @@ public final class WearDataLayerProtocol {
                                                   final String ownNodeId, final String packageName,
                                                   final int notifId, final String tag, final byte[] dataMap,
                                                   final int deleteFlag, final long seq) {
+        return buildStreamItemDataItem(sourcePackage, signatureHex, ownNodeId, packageName, notifId,
+                tag, dataMap, deleteFlag, seq, null);
+    }
+
+    /** As above, binding {@code assetDigests} (in index order) to the keys "0", "1", ... (field 8). */
+    private static byte[] buildStreamItemDataItem(final String sourcePackage, final String signatureHex,
+                                                  final String ownNodeId, final String packageName,
+                                                  final int notifId, final String tag, final byte[] dataMap,
+                                                  final int deleteFlag, final long seq,
+                                                  final java.util.List<String> assetDigests) {
         final String streamTag = tag == null ? "null_tag" : tag;
         final String path = "wear://" + ownNodeId + "/bridger/stream_item:" + ownNodeId + ":"
                 + packageName + ":" + notifId + ":" + streamTag;
@@ -371,6 +422,17 @@ public final class WearDataLayerProtocol {
         dataItem.writeVarint(DATAITEM_SEQ, seq);
         dataItem.writeVarint(DATAITEM_DELETE_FLAG, deleteFlag);
         dataItem.writeString(DATAITEM_DEST_NODE_ID, ownNodeId);
+        if (assetDigests != null) {
+            for (int i = 0; i < assetDigests.size(); i++) {
+                final ProtoWriter ref = new ProtoWriter();
+                ref.writeString(ASSET_BINDING_DIGEST, assetDigests.get(i));
+                final ProtoWriter binding = new ProtoWriter();
+                binding.writeString(ASSET_BINDING_KEY, String.valueOf(i));
+                binding.writeMessage(ASSET_BINDING_REF, ref.toByteArray());
+                binding.writeVarint(ASSET_BINDING_KIND, 4);
+                dataItem.writeMessage(DATAITEM_ASSETS, binding.toByteArray());
+            }
+        }
         dataItem.writeString(DATAITEM_SIGNATURE, signatureHex);
         dataItem.writeVarint(DATAITEM_TIMESTAMP, now);
 
@@ -762,6 +824,65 @@ public final class WearDataLayerProtocol {
         final ProtoWriter tv = new ProtoWriter();
         tv.writeVarint(1, 9);
         tv.writeMessage(2, entries);
+        return tv.toByteArray();
+    }
+
+    /**
+     * The identifier a DataItem uses to bind an attached asset: base64url of the SHA-1 of the whole
+     * asset, unpadded (27 chars) - research notes §47.
+     */
+    public static String assetDigest(final byte[] asset) {
+        try {
+            final byte[] sha1 = java.security.MessageDigest.getInstance("SHA-1").digest(asset);
+            return android.util.Base64.encodeToString(sha1,
+                    android.util.Base64.URL_SAFE | android.util.Base64.NO_PADDING | android.util.Base64.NO_WRAP);
+        } catch (final java.security.NoSuchAlgorithmException e) {
+            throw new IllegalStateException("SHA-1 unavailable", e);
+        }
+    }
+
+    /**
+     * Splits an asset into the framed chunk messages that carry it to the watch (research notes §47).
+     * Every chunk repeats the same transfer id; only the final one carries the digest and the
+     * last-chunk flag. Send these before the DataItem that references the asset.
+     *
+     * @param asset      the encoded bytes (the stock app sends PNG and WEBP)
+     * @param transferId an id shared by this asset's chunks; the digest is what the DataItem binds
+     */
+    public static java.util.List<byte[]> buildAssetChunks(final byte[] asset, final String transferId) {
+        final String digest = assetDigest(asset);
+        final java.util.List<byte[]> out = new java.util.ArrayList<>();
+        int offset = 0;
+        do {
+            final int len = Math.min(ASSET_CHUNK_SIZE, asset.length - offset);
+            final boolean last = offset + len >= asset.length;
+
+            final ProtoWriter chunk = new ProtoWriter();
+            chunk.writeString(ASSET_TRANSFER_ID, transferId);
+            chunk.writeVarint(ASSET_LAST_CHUNK, last ? 1 : 0);
+            chunk.writeMessage(ASSET_BYTES, java.util.Arrays.copyOfRange(asset, offset, offset + len));
+            if (last) {
+                chunk.writeString(ASSET_DIGEST, digest);
+            }
+
+            final ProtoWriter payload = new ProtoWriter();
+            payload.writeMessage(PAYLOAD_ASSET, chunk.toByteArray());
+            // Asset envelopes carry no field 5, unlike DataItem/peer-sync ones (735 of them in the
+            // reference capture have {3=1, 4=1} and no field 5); sending it makes the watch ignore
+            // the asset, and with it the notification that references it.
+            out.add(frame(wrapEnvelope(payload.toByteArray(), false)));
+            offset += len;
+        } while (offset < asset.length);
+        return out;
+    }
+
+    /** An Asset-reference DataMap value (typeTag 13): the index of a key bound in DataItem field 8. */
+    private static byte[] dataMapAssetRef(final int index) {
+        final ProtoWriter container = new ProtoWriter();
+        container.writeVarint(13, index);
+        final ProtoWriter tv = new ProtoWriter();
+        tv.writeVarint(1, 13);
+        tv.writeMessage(2, container.toByteArray());
         return tv.toByteArray();
     }
 

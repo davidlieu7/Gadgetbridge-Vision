@@ -182,6 +182,8 @@ public class GalaxyWatch7DeviceSupport extends AbstractBTBRDeviceSupport {
         }
 
         LOG.info("Galaxy Watch7: Data Layer channel connected, sending node handshake as {}", localNodeId);
+        // Asset transfers do not survive a reconnect, so re-send each app icon on the new connection.
+        sentAppIcons.clear();
         stopBatteryPolling();
 
         final String localName = "Gadgetbridge";
@@ -497,16 +499,68 @@ public class GalaxyWatch7DeviceSupport extends AbstractBTBRDeviceSupport {
         final long postTime = spec.getWhen() > 0 ? spec.getWhen() : System.currentTimeMillis();
         final long seq = ownDataVersion.incrementAndGet();
         final java.util.List<byte[]> wearableActions = buildWearableActions(spec);
-        LOG.info("Galaxy Watch7: pushing notification id={} pkg={} title=\"{}\" replyActions={} (seq {})",
-                spec.getId(), pkg, title, wearableActions.size(), seq);
+        final TransactionBuilder builder = createTransactionBuilder("notify " + spec.getId());
+        // The icon's bytes must reach the watch before the DataItem that references them; both go
+        // into the same transaction so they stay in order.
+        final String iconDigest = ensureAppIconAsset(pkg, builder);
+        LOG.info("Galaxy Watch7: pushing notification id={} pkg={} title=\"{}\" replyActions={} icon={} (seq {})",
+                spec.getId(), pkg, title, wearableActions.size(), iconDigest != null, seq);
         final byte[] write = WearDataLayerProtocol.buildNotificationPut(
                 SETTINGS_SOURCE_PACKAGE, SETTINGS_SOURCE_SIGNATURE, node, pkg, spec.getId(), tag,
                 appName, title, text, appName, postTime, postTime,
-                NOTIFICATION_DEFAULT_COLOR, spec.getFlags(), spec.getCategory(), seq, wearableActions);
+                NOTIFICATION_DEFAULT_COLOR, spec.getFlags(), spec.getCategory(), seq, wearableActions,
+                iconDigest);
         sentNotifications.put(spec.getId(), new String[]{pkg, tag});
-        final TransactionBuilder builder = createTransactionBuilder("notify " + spec.getId());
         builder.write(write);
         builder.queue();
+    }
+
+    // App icons are pushed as Wear Assets (research notes §47): the bytes travel in their own chunked
+    // messages and the notification DataItem only binds their digest. The watch keeps them, so each
+    // package's icon is transferred once per connection.
+    private static final int APP_ICON_MAX_PX = 96;
+    // BISECT: 0 = no icon at all, 1 = transfer the asset but do not reference it, 2 = full.
+    private static final int APP_ICON_MODE = 0;
+    private final java.util.Map<String, String> sentAppIcons = new java.util.concurrent.ConcurrentHashMap<>();
+
+    private String ensureAppIconAsset(final String pkg, final TransactionBuilder builder) {
+        if (APP_ICON_MODE == 0) {
+            return null;
+        }
+        final String cached = sentAppIcons.get(pkg);
+        if (cached != null) {
+            return cached;
+        }
+        try {
+            final android.graphics.drawable.Drawable drawable =
+                    nodomain.freeyourgadget.gadgetbridge.util.NotificationUtils.getAppIcon(getContext(), pkg);
+            if (drawable == null) {
+                return null;
+            }
+            android.graphics.Bitmap bitmap =
+                    nodomain.freeyourgadget.gadgetbridge.util.BitmapUtil.convertDrawableToBitmap(drawable);
+            if (bitmap == null) {
+                return null;
+            }
+            bitmap = nodomain.freeyourgadget.gadgetbridge.util.BitmapUtil.scaleWithMax(
+                    bitmap, APP_ICON_MAX_PX, APP_ICON_MAX_PX);
+            final java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
+            bitmap.compress(android.graphics.Bitmap.CompressFormat.PNG, 100, out);
+            final byte[] png = out.toByteArray();
+
+            final String digest = WearDataLayerProtocol.assetDigest(png);
+            final java.util.List<byte[]> chunks = WearDataLayerProtocol.buildAssetChunks(png, digest);
+            for (final byte[] chunk : chunks) {
+                builder.write(chunk);
+            }
+            LOG.info("Galaxy Watch7: transferring app icon for {} ({} bytes, {} chunk(s), digest {})",
+                    pkg, png.length, chunks.size(), digest);
+            sentAppIcons.put(pkg, digest);
+            return APP_ICON_MODE >= 2 ? digest : null;
+        } catch (final Exception e) {
+            LOG.warn("Galaxy Watch7: could not build app icon asset for {}", pkg, e);
+            return null;
+        }
     }
 
     // Quick-reply: encode each of a notification's reply actions as a wearable_action the watch shows
