@@ -2929,3 +2929,46 @@ Icons are still open: the DataMap references an asset key (`app_icon`/`icon`/`la
 typeTag 13 -> "0"/"1"/"2"), the DataItem's field 8 binds each key to a digest
 (`{1=key, 2={4=digest}, 3=4}`, digest = base64url(SHA-1(bytes)), 27 chars), and the blob bytes
 travel separately in a framing we have not decoded yet.
+
+## 47. Notification icons — Wear Asset transfer DECODED (not yet implemented)
+
+Decoded from the same §44 capture. Assets travel on the *same* RFCOMM channel with the
+*same* 4-byte length prefix + envelope framing as everything else — they were only invisible
+before because they live under a payload field we had not seen (**field 12**) and because a
+gap in the capture desynced a naive sequential framer. A resyncing framer recovers them.
+
+### Asset chunk record — envelope payload field 12
+
+```
+1 = transfer id   (27-char base64url, opaque; NOT the value the DataItem binds)
+2 = last-chunk flag (0 = more chunks follow, 1 = final chunk)
+3 = chunk bytes   (full chunks are 12215 B; the first chunk starts with the PNG/RIFF magic)
+4 = base64url(SHA-1(complete asset bytes)), present on the FINAL chunk only
+```
+
+An asset is the concatenation of all chunks sharing a transfer id, in order, ending at the
+chunk with flag 1. Verified across the capture: field 4 equals base64url(SHA-1(concatenation))
+for 7/7 single-chunk assets and 92/113 multi-chunk ones (the 21 failures are exactly the
+groups a capture gap tore apart, not a protocol variation). Payloads seen are PNG and WEBP.
+
+### How a notification references an icon
+
+Three links, and the DataItem binds the **SHA-1** (field 4), not the transfer id (field 1):
+
+```
+DataMap:          app_icon / icon / large_icon = typeTag 13, container {13 = <index varint>}
+                  (the index selects the key below: 0, 1, 2)
+
+DataItem field 8: repeated { 1 = key string "0"/"1"/"2",
+                             2 = { 4 = base64url(SHA-1(asset)) },
+                             3 = 4 }
+
+payload field 12: the chunked asset record above, carrying that same SHA-1 in field 4
+```
+
+So to attach an icon: send the asset chunks, compute base64url(SHA-1(bytes)) (27 chars, no
+padding), bind it to a key in the DataItem's field 8, and point the DataMap entry at that
+key's index with typeTag 13. `supplemental_data` uses the same mechanism (it is Asset-typed,
+which is why §34 had to omit it).
+
+Not implemented yet — this section is the spec for doing so.
