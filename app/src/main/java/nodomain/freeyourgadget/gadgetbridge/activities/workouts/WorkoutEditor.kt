@@ -75,7 +75,9 @@ class WorkoutEditor(private val context: Context, resultCaller: ActivityResultCa
 
         builder.setSingleChoiceItems(kindListing, 0) { dialog: DialogInterface?, which: Int ->
             val selectedKind = kinds[which]
-            workout.summary.activityKind = selectedKind.code
+            workout.summary.setOverrideActivityKind(false)
+            workout.summary.setActivityKind(selectedKind.code)
+            workout.summary.setOverrideActivityKind(true)
             workout.summary.update()
             callback.onWorkoutUpdated()
             dialog!!.dismiss()
