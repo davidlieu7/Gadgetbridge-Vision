@@ -24,6 +24,10 @@ public abstract class SoundcoreProtocolImplV1 extends AbstractSoundcoreProtocol 
     public static final short CMD_SET_FIND_DEVICE = (short) 0x8910;
     public static final short CMD_ENABLE_PAIRING_MODE = (short) 0x850b;
 
+    public static final short CMD_SET_3D_SURROUND = (short) 0x8602;
+    public static final short CMD_SET_BATTERY_LOW_TONE = (short) 0x8210;
+    public static final short CMD_SESSION_INIT = (short) 0x8105;
+
     protected SoundcoreProtocolImplV1(final GBDevice device) {
         super(device);
     }

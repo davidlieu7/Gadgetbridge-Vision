@@ -23,20 +23,6 @@ public class SoundcoreA30iProtocol extends SoundcoreProtocolImplV1 {
 
     private static final Logger LOG = LoggerFactory.getLogger(SoundcoreA30iProtocol.class);
 
-    // Receive Commands (LITTLE_ENDIAN)
-    private static final short CMD_GET_DEVICE_INFO = (short) 0x0101;
-    private static final short CMD_GET_MORE_DEVICE_INFO = (short) 0x0105;
-    private static final short CMD_NOTIFY_BATTERY_INFO = (short) 0x0301;
-
-    // Send Commands (LITTLE_ENDIAN)
-    private static final short CMD_SET_AUDIO_MODE = (short) 0x8106;
-    private static final short CMD_SET_3D_SURROUND = (short) 0x8602;
-    private static final short CMD_SET_TOUCH_TONE = (short) 0x8301;
-    private static final short CMD_SET_BATTERY_LOW_TONE = (short) 0x8210;
-    private static final short CMD_SET_AUTO_POWER_OFF = (short) 0x8601;
-    private static final short CMD_SESSION_INIT = (short) 0x8105;
-
-    // Constants
     private static final int battery_earphone_left = 0;
     private static final int battery_earphone_right = 1;
     private static final String OFF = "off";
@@ -77,11 +63,11 @@ public class SoundcoreA30iProtocol extends SoundcoreProtocolImplV1 {
 
             //-------------------------------------------------------------------------
             // Active Noise Cancelling [63 to 70 (7 bytes)]
-            String ACN_mode = getACNmode(payload[64], payload[67]);
+            String ANC_mode = getANCmode(payload[64], payload[67]);
             String ambient_mode = getAmbientMode(payload[70]);
             int noiseCancellingLevel = getNoiseCancellingLevel(payload[65]);
             boolean wind_noise_reduction = payload[68] == 0x01;
-            turn_ACN_settings_on_off(ACN_mode);
+            turn_ANC_settings_on_off(ANC_mode);
             //-------------------------------------------------------------------------
             boolean touchTone = payload[72] == 0x01;
             boolean surround3d = payload[74] == 0x01;
@@ -91,7 +77,7 @@ public class SoundcoreA30iProtocol extends SoundcoreProtocolImplV1 {
             final int autoPowerDuration = autoPowerEnabled ? (payload[76] & 0xFF) + 1 : 0;
 
             getDevicePrefs().getPreferences().edit()
-                    .putString(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_ANC_MODE, ACN_mode)
+                    .putString(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_ANC_MODE, ANC_mode)
                     .putString(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_AMBIENT_SOUND_CONTROL, ambient_mode)
                     .putInt(DeviceSettingsPreferenceConst.PREF_SONY_AMBIENT_SOUND_LEVEL, noiseCancellingLevel)
                     .putBoolean(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_WIND_NOISE_REDUCTION, wind_noise_reduction)
@@ -118,53 +104,53 @@ public class SoundcoreA30iProtocol extends SoundcoreProtocolImplV1 {
     }
 
     /**
-     * It greys out some ACN settings on the UI, depending on the
-     * selected ACN_mode.
+     * It greys out some ANC settings on the UI, depending on the
+     * selected ANC_mode.
      * The (de)activation is useful because some settings do not make
      * sense in all modes.
      */
-    private void turn_ACN_settings_on_off(String ACN_mode){
+    private void turn_ANC_settings_on_off(String ANC_mode){
         boolean ambient_mode;
-        boolean ACN_sound_level;
+        boolean ANC_sound_level;
         boolean wind_noise_reduction;
-        switch (ACN_mode) {
+        switch (ANC_mode) {
             case OFF -> {
                 ambient_mode = true;
-                ACN_sound_level = true;
+                ANC_sound_level = true;
                 wind_noise_reduction = true;
             }
             case TRANSPARENCY, ADAPTIVE_ANC -> {
                 ambient_mode = true;
-                ACN_sound_level = true;
+                ANC_sound_level = true;
                 wind_noise_reduction = false;
             }
             case NOISE_CANCELLING -> {
                 ambient_mode = true;
-                ACN_sound_level = false;
+                ANC_sound_level = false;
                 wind_noise_reduction = false;
             }
             case AMBIENT_SOUND -> {
                 ambient_mode = false;
-                ACN_sound_level = true;
+                ANC_sound_level = true;
                 wind_noise_reduction = false;
             }
             default -> {
                 // Unknown state (should never happen), but if so, allow the user to select
                 // all options so they can make the best out of it.
                 ambient_mode = false;
-                ACN_sound_level = false;
+                ANC_sound_level = false;
                 wind_noise_reduction = false;
             }
         }
         getDevicePrefs().getPreferences().edit()
                 .putBoolean(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_A30I_DISABLE_OPTION_AMBIENT_MODE, ambient_mode)
-                .putBoolean(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_A30I_DISABLE_OPTION_AMBIENT_SOUND_LEVEL, ACN_sound_level)
+                .putBoolean(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_A30I_DISABLE_OPTION_AMBIENT_SOUND_LEVEL, ANC_sound_level)
                 .putBoolean(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_A30I_DISABLE_OPTION_WIND_NOISE_REDUCTION, wind_noise_reduction)
                 .apply();
     }
 
     /**
-     * It returns the current ACN level.
+     * It returns the current ANC level.
      */
     private int getNoiseCancellingLevel(byte noise_level){
         return switch (noise_level) {
@@ -190,11 +176,11 @@ public class SoundcoreA30iProtocol extends SoundcoreProtocolImplV1 {
     }
 
     /**
-     * It returns the current ACN Mode.
+     * It returns the current ANC Mode.
      */
-    private String getACNmode(byte ACN_select, byte ACN_mode){
-        return switch (ACN_select) {
-            case 0x00 -> switch (ACN_mode) {
+    private String getANCmode(byte ANC_select, byte ANC_mode){
+        return switch (ANC_select) {
+            case 0x00 -> switch (ANC_mode) {
                 case 0x00 -> NOISE_CANCELLING;
                 case 0x01 -> ADAPTIVE_ANC;
                 case 0x02 -> AMBIENT_SOUND;
@@ -263,17 +249,17 @@ public class SoundcoreA30iProtocol extends SoundcoreProtocolImplV1 {
 
             case DeviceSettingsPreferenceConst.PREF_SOUNDCORE_ANC_MODE, DeviceSettingsPreferenceConst.PREF_SOUNDCORE_AMBIENT_SOUND_CONTROL,
                  DeviceSettingsPreferenceConst.PREF_SONY_AMBIENT_SOUND_LEVEL, DeviceSettingsPreferenceConst.PREF_SOUNDCORE_WIND_NOISE_REDUCTION:
-                // It sets the ACN mode. It always sends the same command (with different values),
-                // independent of which part of the ACN setting was changed.
-                String ACN_mode = prefs.getString(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_ANC_MODE, OFF);
+                // It sets the ANC mode. It always sends the same command (with different values),
+                // independent of which part of the ANC setting was changed.
+                String ANC_mode = prefs.getString(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_ANC_MODE, OFF);
                 String ambient_mode = prefs.getString(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_AMBIENT_SOUND_CONTROL, TRANSPORT);
                 int noiseCancellingLevel = prefs.getInt(DeviceSettingsPreferenceConst.PREF_SONY_AMBIENT_SOUND_LEVEL, 0);
                 boolean wind_noise_reduction = prefs.getBoolean(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_WIND_NOISE_REDUCTION, false);
 
-                turn_ACN_settings_on_off(ACN_mode);
-                byte[] ACN_result = build_ACN_mode_value(ACN_mode, ambient_mode, noiseCancellingLevel, wind_noise_reduction);
-                if(ACN_result != null) {
-                    return ACN_result;
+                turn_ANC_settings_on_off(ANC_mode);
+                byte[] ANC_result = build_ANC_mode_value(ANC_mode, ambient_mode, noiseCancellingLevel, wind_noise_reduction);
+                if(ANC_result != null) {
+                    return ANC_result;
                 }else {
                     // An unsupported action was selected; do not send the result to the device.
                     return super.encodeSendConfiguration(config);
@@ -286,15 +272,15 @@ public class SoundcoreA30iProtocol extends SoundcoreProtocolImplV1 {
     }
 
     /**
-     * It builds the content for the ACN command.
+     * It builds the content for the ANC command.
      * It always needs all information, independent of the mode.
-     * @return The content for the ACN command; it returns null if an unknown value was requested.
+     * @return The content for the ANC command; it returns null if an unknown value was requested.
      */
-    private byte[] build_ACN_mode_value(String ACN_mode, String ambient_mode, int noiseCancellingLevel, boolean wind_noise_reduction){
+    private byte[] build_ANC_mode_value(String ANC_mode, String ambient_mode, int noiseCancellingLevel, boolean wind_noise_reduction){
         ByteBuffer buf = ByteBuffer.allocate(7);
-        byte mode; // ACN mode seems to be twice in the array.
+        byte mode; // ANC mode seems to be twice in the array.
 
-        switch (ACN_mode) {
+        switch (ANC_mode) {
             case OFF -> mode = 0x02;
             case TRANSPARENCY -> mode = 0x01;
             case NOISE_CANCELLING, ADAPTIVE_ANC, AMBIENT_SOUND -> mode = 0x00;
@@ -318,10 +304,10 @@ public class SoundcoreA30iProtocol extends SoundcoreProtocolImplV1 {
 
         buf.put(mode); // Probably a duplicated value cached from before.
 
-        switch (ACN_mode) {
+        switch (ANC_mode) {
             case ADAPTIVE_ANC -> buf.put((byte) 0x01);
             case AMBIENT_SOUND -> buf.put((byte) 0x02);
-            case NOISE_CANCELLING -> buf.put((byte) 0x00);
+            case NOISE_CANCELLING, OFF, TRANSPARENCY -> buf.put((byte) 0x00);
             default -> {
                 return null;
             }
@@ -385,6 +371,6 @@ public class SoundcoreA30iProtocol extends SoundcoreProtocolImplV1 {
     /** Request more device info during init; currently not used because
      * it is unclear which additional information are in the returned message. */
     public byte[] encodeSessionInitMoreInfoRequest() {
-        return encodeRequest(CMD_GET_MORE_DEVICE_INFO);
+        return encodeRequest(CMD_GET_UNKNOWN_DATA_0105);
     }
 }

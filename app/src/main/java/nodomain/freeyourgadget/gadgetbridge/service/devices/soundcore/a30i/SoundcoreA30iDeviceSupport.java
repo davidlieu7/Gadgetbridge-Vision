@@ -22,6 +22,8 @@ public class SoundcoreA30iDeviceSupport extends AbstractHeadphoneSerialDeviceSup
     @Override
     protected TransactionBuilder initializeDevice(TransactionBuilder builder) {
         // 1. Request device info (battery status, firmware version, serial number, device settings).
+        // Note: This command is sent two times by the official app, the response seems to be
+        // the same.
         builder.write(mDeviceProtocol.encodeDeviceInfoRequest());
 
         // For documentation: 2. Request more information from the device. Currently unknown what the
