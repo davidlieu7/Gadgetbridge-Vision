@@ -11,40 +11,26 @@
     </PreferenceCategory>
     <PreferenceCategory android:title="@string/prefs_gw7_cat_display">
         <SeekBarPreference android:defaultValue="128" android:key="pref_galaxywatch7_display_brightness" android:max="254" app:min="0" app:showSeekBarValue="true" android:title="@string/prefs_gw7_display_brightness" />
+        <SwitchPreferenceCompat android:defaultValue="false" android:key="pref_galaxywatch7_display_auto_low_brightness" android:title="@string/prefs_gw7_display_auto_low_brightness" />
         <SeekBarPreference android:defaultValue="2" android:key="pref_galaxywatch7_display_font_size" android:max="5" app:min="0" app:showSeekBarValue="true" android:title="@string/prefs_gw7_display_font_size" />
+        <SwitchPreferenceCompat android:defaultValue="false" android:key="pref_galaxywatch7_display_bold_font" android:title="@string/prefs_gw7_display_bold_font" />
         <ListPreference android:key="pref_galaxywatch7_display_screen_timeout" android:title="@string/prefs_gw7_display_screen_timeout" app:useSimpleSummaryProvider="true" />
         <SwitchPreferenceCompat android:defaultValue="false" android:key="pref_galaxywatch7_display_always_on_display" android:title="@string/prefs_gw7_display_always_on_display" />
-        <SwitchPreferenceCompat android:defaultValue="false" android:key="pref_galaxywatch7_display_auto_low_brightness" android:title="@string/prefs_gw7_display_auto_low_brightness" />
-        <SwitchPreferenceCompat android:defaultValue="false" android:key="pref_galaxywatch7_display_bold_font" android:title="@string/prefs_gw7_display_bold_font" />
-        <SwitchPreferenceCompat android:defaultValue="false" android:key="pref_galaxywatch7_display_show_charging_info" android:title="@string/prefs_gw7_display_show_charging_info" />
-        <SwitchPreferenceCompat android:defaultValue="false" android:key="pref_galaxywatch7_display_touch_sensitivity" android:title="@string/prefs_gw7_display_touch_sensitivity" />
+        <SwitchPreferenceCompat android:defaultValue="false" android:key="pref_galaxywatch7_display_wake_on_wrist_raised" android:title="@string/prefs_gw7_display_wake_on_wrist_raised" />
         <SwitchPreferenceCompat android:defaultValue="false" android:key="pref_galaxywatch7_display_wake_on_touch_screen" android:title="@string/prefs_gw7_display_wake_on_touch_screen" />
         <SwitchPreferenceCompat android:defaultValue="false" android:key="pref_galaxywatch7_display_wake_on_turning_bezel" android:title="@string/prefs_gw7_display_wake_on_turning_bezel" />
-        <SwitchPreferenceCompat android:defaultValue="false" android:key="pref_galaxywatch7_display_wake_on_wrist_raised" android:title="@string/prefs_gw7_display_wake_on_wrist_raised" />
+        <SwitchPreferenceCompat android:defaultValue="false" android:key="pref_galaxywatch7_display_touch_sensitivity" android:title="@string/prefs_gw7_display_touch_sensitivity" />
+        <SwitchPreferenceCompat android:defaultValue="false" android:key="pref_galaxywatch7_display_show_charging_info" android:title="@string/prefs_gw7_display_show_charging_info" />
         <SwitchPreferenceCompat android:defaultValue="false" android:key="pref_galaxywatch7_display_outdoor_mode" android:title="@string/prefs_gw7_display_outdoor_mode" />
     </PreferenceCategory>
-    <PreferenceCategory android:title="@string/prefs_gw7_cat_adv">
+    <PreferenceCategory android:title="@string/prefs_gw7_cat_buttons">
+        <ListPreference android:key="pref_galaxywatch7_advanced_press_and_hold" android:title="@string/prefs_gw7_advanced_press_and_hold" app:useSimpleSummaryProvider="true" />
+        <ListPreference android:key="pref_galaxywatch7_advanced_double_press" android:title="@string/prefs_gw7_advanced_double_press" app:useSimpleSummaryProvider="true" />
         <SwitchPreferenceCompat android:defaultValue="false" android:key="pref_galaxywatch7_advanced_action_button_siren_enabled" android:title="@string/prefs_gw7_advanced_action_button_siren_enabled" />
+        <SwitchPreferenceCompat android:defaultValue="false" android:key="pref_galaxywatch7_advanced_gestures_raise_to_talk_enabled" android:title="@string/prefs_gw7_advanced_gestures_raise_to_talk_enabled" />
         <SwitchPreferenceCompat android:defaultValue="false" android:key="pref_galaxywatch7_advanced_gestures_dismiss_alerts_and_reject_calls" android:title="@string/prefs_gw7_advanced_gestures_dismiss_alerts_and_reject_calls" />
         <SwitchPreferenceCompat android:defaultValue="false" android:key="pref_galaxywatch7_advanced_gestures_quick_action" android:title="@string/prefs_gw7_advanced_gestures_quick_action" />
         <SwitchPreferenceCompat android:defaultValue="false" android:key="pref_galaxywatch7_advanced_gestures_quick_action_watchface_second_action_enabled" android:title="@string/prefs_gw7_advanced_gestures_quick_action_watchface_second_action_enabled" />
-        <SwitchPreferenceCompat android:defaultValue="false" android:key="pref_galaxywatch7_advanced_gestures_raise_to_talk_enabled" android:title="@string/prefs_gw7_advanced_gestures_raise_to_talk_enabled" />
-        <SwitchPreferenceCompat android:defaultValue="false" android:key="pref_galaxywatch7_advanced_labs_quicklaunch_enabled" android:title="@string/prefs_gw7_advanced_labs_quicklaunch_enabled" />
-        <ListPreference android:defaultValue="fixed/open_exercise_list" android:key="pref_galaxywatch7_advanced_labs_quicklaunch_app" android:entries="@array/prefs_gw7_quicklaunch_app_names" android:entryValues="@array/prefs_gw7_quicklaunch_app_values" android:title="@string/prefs_gw7_advanced_labs_quicklaunch_app" app:useSimpleSummaryProvider="true" />
-        <ListPreference android:defaultValue="hide2" android:key="pref_galaxywatch7_advanced_status_indicator" android:entries="@array/prefs_gw7_status_indicator_names" android:entryValues="@array/prefs_gw7_status_indicator_values" android:title="@string/prefs_gw7_advanced_status_indicator" app:useSimpleSummaryProvider="true" />
-        <SwitchPreferenceCompat android:defaultValue="false" android:key="pref_galaxywatch7_advanced_media_control_auto_launch_media_controls" android:title="@string/prefs_gw7_advanced_media_control_auto_launch_media_controls" />
-        <SwitchPreferenceCompat android:defaultValue="false" android:key="pref_galaxywatch7_advanced_media_control_show_ongoing_icon" android:title="@string/prefs_gw7_advanced_media_control_show_ongoing_icon" />
-        <ListPreference android:key="pref_galaxywatch7_advanced_press_and_hold" android:title="@string/prefs_gw7_advanced_press_and_hold" app:useSimpleSummaryProvider="true" />
-        <ListPreference android:key="pref_galaxywatch7_advanced_double_press" android:title="@string/prefs_gw7_advanced_double_press" app:useSimpleSummaryProvider="true" />
-        <SwitchPreferenceCompat android:defaultValue="false" android:key="pref_galaxywatch7_advanced_bixby_enabled" android:title="@string/prefs_gw7_advanced_bixby_enabled" />
-    </PreferenceCategory>
-    <PreferenceCategory android:title="@string/prefs_gw7_cat_general">
-        <SwitchPreferenceCompat android:defaultValue="false" android:key="pref_galaxywatch7_general_touch_bezel" android:title="@string/prefs_gw7_general_touch_bezel" />
-        <SwitchPreferenceCompat android:defaultValue="false" android:key="pref_galaxywatch7_general_touch_bezel_feedback" android:title="@string/prefs_gw7_general_touch_bezel_feedback" />
-        <SwitchPreferenceCompat android:defaultValue="false" android:key="pref_galaxywatch7_phone_dnd_sync" android:title="@string/prefs_gw7_phone_dnd_sync" />
-    </PreferenceCategory>
-    <PreferenceCategory android:title="@string/prefs_gw7_cat_bedtime">
-        <SwitchPreferenceCompat android:defaultValue="false" android:key="pref_galaxywatch7_bedtime_turn_on_scheduled" android:title="@string/prefs_gw7_bedtime_turn_on_scheduled" />
     </PreferenceCategory>
     <PreferenceCategory android:title="@string/prefs_gw7_cat_sound">
         <ListPreference android:defaultValue="sound" android:key="pref_galaxywatch7_sound_mode" android:entries="@array/prefs_gw7_sound_mode_names" android:entryValues="@array/prefs_gw7_sound_mode_values" android:title="@string/prefs_gw7_sound_mode" app:useSimpleSummaryProvider="true" />
@@ -53,23 +39,43 @@
         <ListPreference android:key="pref_galaxywatch7_sound_notification_vibration" android:title="@string/prefs_gw7_sound_notification_vibration" app:useSimpleSummaryProvider="true" />
         <ListPreference android:key="pref_galaxywatch7_sound_ringtone" android:title="@string/prefs_gw7_sound_ringtone" app:useSimpleSummaryProvider="true" />
         <ListPreference android:key="pref_galaxywatch7_sound_ringtone_vibration" android:title="@string/prefs_gw7_sound_ringtone_vibration" app:useSimpleSummaryProvider="true" />
+        <SwitchPreferenceCompat android:defaultValue="false" android:key="pref_galaxywatch7_sound_vibration_feedback" android:title="@string/prefs_gw7_sound_vibration_feedback" />
+        <SwitchPreferenceCompat android:defaultValue="false" android:key="pref_galaxywatch7_sound_vibration_with_sound" android:title="@string/prefs_gw7_sound_vibration_with_sound" />
+    </PreferenceCategory>
+    <PreferenceCategory android:title="@string/prefs_gw7_cat_volume">
         <SeekBarPreference android:defaultValue="7" android:key="pref_galaxywatch7_sound_volume_media" android:max="15" app:min="0" app:showSeekBarValue="true" android:title="@string/prefs_gw7_sound_volume_media" />
         <SeekBarPreference android:defaultValue="7" android:key="pref_galaxywatch7_sound_volume_ringtone" android:max="15" app:min="0" app:showSeekBarValue="true" android:title="@string/prefs_gw7_sound_volume_ringtone" />
         <SeekBarPreference android:defaultValue="7" android:key="pref_galaxywatch7_sound_volume_notifications" android:max="15" app:min="0" app:showSeekBarValue="true" android:title="@string/prefs_gw7_sound_volume_notifications" />
         <SeekBarPreference android:defaultValue="7" android:key="pref_galaxywatch7_sound_volume_system" android:max="15" app:min="0" app:showSeekBarValue="true" android:title="@string/prefs_gw7_sound_volume_system" />
         <SeekBarPreference android:defaultValue="7" android:key="pref_galaxywatch7_sound_volume_accessibility" android:max="15" app:min="0" app:showSeekBarValue="true" android:title="@string/prefs_gw7_sound_volume_accessibility" />
         <SeekBarPreference android:defaultValue="7" android:key="pref_galaxywatch7_sound_volume_bixby" android:max="15" app:min="0" app:showSeekBarValue="true" android:title="@string/prefs_gw7_sound_volume_bixby" />
-        <SwitchPreferenceCompat android:defaultValue="false" android:key="pref_galaxywatch7_sound_vibration_feedback" android:title="@string/prefs_gw7_sound_vibration_feedback" />
-        <SwitchPreferenceCompat android:defaultValue="false" android:key="pref_galaxywatch7_sound_vibration_with_sound" android:title="@string/prefs_gw7_sound_vibration_with_sound" />
-        <SwitchPreferenceCompat android:defaultValue="false" android:key="pref_galaxywatch7_sound_settings_system_sounds_charging_sound" android:title="@string/prefs_gw7_sound_settings_system_sounds_charging_sound" />
-        <SwitchPreferenceCompat android:defaultValue="false" android:key="pref_galaxywatch7_sound_settings_system_sounds_dialing_keypad_tone" android:title="@string/prefs_gw7_sound_settings_system_sounds_dialing_keypad_tone" />
-        <SwitchPreferenceCompat android:defaultValue="false" android:key="pref_galaxywatch7_sound_settings_system_sounds_hourly_chime" android:title="@string/prefs_gw7_sound_settings_system_sounds_hourly_chime" />
-        <SwitchPreferenceCompat android:defaultValue="false" android:key="pref_galaxywatch7_sound_settings_system_sounds_samsung_keyboard" android:title="@string/prefs_gw7_sound_settings_system_sounds_samsung_keyboard" />
-        <SwitchPreferenceCompat android:defaultValue="false" android:key="pref_galaxywatch7_sound_settings_system_sounds_ticking_sound" android:title="@string/prefs_gw7_sound_settings_system_sounds_ticking_sound" />
+    </PreferenceCategory>
+    <PreferenceCategory android:title="@string/prefs_gw7_cat_system_sounds">
         <SwitchPreferenceCompat android:defaultValue="false" android:key="pref_galaxywatch7_sound_settings_system_sounds_touch_sound" android:title="@string/prefs_gw7_sound_settings_system_sounds_touch_sound" />
         <SwitchPreferenceCompat android:defaultValue="false" android:key="pref_galaxywatch7_sound_settings_system_sounds_unlock_sound" android:title="@string/prefs_gw7_sound_settings_system_sounds_unlock_sound" />
+        <SwitchPreferenceCompat android:defaultValue="false" android:key="pref_galaxywatch7_sound_settings_system_sounds_charging_sound" android:title="@string/prefs_gw7_sound_settings_system_sounds_charging_sound" />
+        <SwitchPreferenceCompat android:defaultValue="false" android:key="pref_galaxywatch7_sound_settings_system_sounds_hourly_chime" android:title="@string/prefs_gw7_sound_settings_system_sounds_hourly_chime" />
+        <SwitchPreferenceCompat android:defaultValue="false" android:key="pref_galaxywatch7_sound_settings_system_sounds_ticking_sound" android:title="@string/prefs_gw7_sound_settings_system_sounds_ticking_sound" />
+        <SwitchPreferenceCompat android:defaultValue="false" android:key="pref_galaxywatch7_sound_settings_system_sounds_dialing_keypad_tone" android:title="@string/prefs_gw7_sound_settings_system_sounds_dialing_keypad_tone" />
+        <SwitchPreferenceCompat android:defaultValue="false" android:key="pref_galaxywatch7_sound_settings_system_sounds_samsung_keyboard" android:title="@string/prefs_gw7_sound_settings_system_sounds_samsung_keyboard" />
         <SwitchPreferenceCompat android:defaultValue="false" android:key="pref_galaxywatch7_sound_settings_system_vibration_charging" android:title="@string/prefs_gw7_sound_settings_system_vibration_charging" />
         <SwitchPreferenceCompat android:defaultValue="false" android:key="pref_galaxywatch7_sound_settings_system_vibration_dialing_keypad" android:title="@string/prefs_gw7_sound_settings_system_vibration_dialing_keypad" />
         <SwitchPreferenceCompat android:defaultValue="false" android:key="pref_galaxywatch7_sound_settings_system_vibration_samsung_keyboard" android:title="@string/prefs_gw7_sound_settings_system_vibration_samsung_keyboard" />
+    </PreferenceCategory>
+    <PreferenceCategory android:title="@string/prefs_gw7_cat_media">
+        <SwitchPreferenceCompat android:defaultValue="false" android:key="pref_galaxywatch7_advanced_media_control_auto_launch_media_controls" android:title="@string/prefs_gw7_advanced_media_control_auto_launch_media_controls" />
+        <SwitchPreferenceCompat android:defaultValue="false" android:key="pref_galaxywatch7_advanced_media_control_show_ongoing_icon" android:title="@string/prefs_gw7_advanced_media_control_show_ongoing_icon" />
+    </PreferenceCategory>
+    <PreferenceCategory android:title="@string/prefs_gw7_cat_general">
+        <SwitchPreferenceCompat android:defaultValue="false" android:key="pref_galaxywatch7_general_touch_bezel" android:title="@string/prefs_gw7_general_touch_bezel" />
+        <SwitchPreferenceCompat android:defaultValue="false" android:key="pref_galaxywatch7_general_touch_bezel_feedback" android:title="@string/prefs_gw7_general_touch_bezel_feedback" />
+        <SwitchPreferenceCompat android:defaultValue="false" android:key="pref_galaxywatch7_phone_dnd_sync" android:title="@string/prefs_gw7_phone_dnd_sync" />
+        <SwitchPreferenceCompat android:defaultValue="false" android:key="pref_galaxywatch7_bedtime_turn_on_scheduled" android:title="@string/prefs_gw7_bedtime_turn_on_scheduled" />
+    </PreferenceCategory>
+    <PreferenceCategory android:title="@string/prefs_gw7_cat_labs">
+        <SwitchPreferenceCompat android:defaultValue="false" android:key="pref_galaxywatch7_advanced_labs_quicklaunch_enabled" android:title="@string/prefs_gw7_advanced_labs_quicklaunch_enabled" />
+        <ListPreference android:defaultValue="fixed/open_exercise_list" android:key="pref_galaxywatch7_advanced_labs_quicklaunch_app" android:entries="@array/prefs_gw7_quicklaunch_app_names" android:entryValues="@array/prefs_gw7_quicklaunch_app_values" android:title="@string/prefs_gw7_advanced_labs_quicklaunch_app" app:useSimpleSummaryProvider="true" />
+        <ListPreference android:defaultValue="hide2" android:key="pref_galaxywatch7_advanced_status_indicator" android:entries="@array/prefs_gw7_status_indicator_names" android:entryValues="@array/prefs_gw7_status_indicator_values" android:title="@string/prefs_gw7_advanced_status_indicator" app:useSimpleSummaryProvider="true" />
+        <SwitchPreferenceCompat android:defaultValue="false" android:key="pref_galaxywatch7_advanced_bixby_enabled" android:title="@string/prefs_gw7_advanced_bixby_enabled" />
     </PreferenceCategory>
 </androidx.preference.PreferenceScreen>
