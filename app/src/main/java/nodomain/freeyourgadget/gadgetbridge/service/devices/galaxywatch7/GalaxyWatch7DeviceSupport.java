@@ -323,7 +323,15 @@ public class GalaxyWatch7DeviceSupport extends AbstractBTBRDeviceSupport {
     // the selection is a "<base>/selected_item" int (key "intSelectedItem"). We cache the labels and
     // populate the ListPreference at runtime (see GalaxyWatch7SettingsCustomizer), reflect the
     // selected index, and write "<base>/selected_item" on change.
-    enum SettingType { INT, STRING, INT_LIST, LIST_DYNAMIC }
+    // STRING_LIST_DYNAMIC = a ListPreference whose options are package/feature ids pushed by the
+    // watch as TWO DataItems - "<base>/list" (DataMap key "arrayPackageIdList", real installed apps,
+    // value format "<package>/<activity>") and "<base>/feature_list" (DataMap key "arrayFeatureList",
+    // built-in non-app actions, self-referential "<id>/<id>"). The selection is written/read at
+    // "<base>/selected_package" (DataMap key "stringPackageId") as the chosen value string itself,
+    // not an index. Unlike LIST_DYNAMIC the watch does not push display labels for these - real app
+    // labels are resolved phone-side via PackageManager (see GalaxyWatch7SettingsCustomizer), and
+    // feature ids fall back to a title-cased rendering of the id.
+    enum SettingType { INT, STRING, INT_LIST, LIST_DYNAMIC, STRING_LIST_DYNAMIC }
 
     static final class SettingSpec {
         final String prefKey;
@@ -331,20 +339,31 @@ public class GalaxyWatch7DeviceSupport extends AbstractBTBRDeviceSupport {
         final String valueKey;
         final SettingType type;
         // For LIST_DYNAMIC: the sub-path of the option-list DataItem (usually subPath + "/list", but
-        // e.g. ringtone's list lives at "sound_settings/ringtone/name/list"). Null otherwise.
+        // e.g. ringtone's list lives at "sound_settings/ringtone/name/list"). For STRING_LIST_DYNAMIC,
+        // the sub-path of the package-list DataItem ("<base>/list"). Null otherwise.
         final String listPath;
+        // STRING_LIST_DYNAMIC only: the sub-path of the feature-list DataItem ("<base>/feature_list").
+        final String featureListPath;
 
         SettingSpec(final String prefKey, final String subPath, final String valueKey, final SettingType type) {
-            this(prefKey, subPath, valueKey, type, type == SettingType.LIST_DYNAMIC ? subPath + "/list" : null);
+            this(prefKey, subPath, valueKey, type,
+                    type == SettingType.LIST_DYNAMIC || type == SettingType.STRING_LIST_DYNAMIC ? subPath + "/list" : null);
         }
 
         SettingSpec(final String prefKey, final String subPath, final String valueKey,
                     final SettingType type, final String listPath) {
+            this(prefKey, subPath, valueKey, type, listPath,
+                    type == SettingType.STRING_LIST_DYNAMIC ? subPath + "/feature_list" : null);
+        }
+
+        SettingSpec(final String prefKey, final String subPath, final String valueKey,
+                    final SettingType type, final String listPath, final String featureListPath) {
             this.prefKey = prefKey;
             this.subPath = subPath;
             this.valueKey = valueKey;
             this.type = type;
             this.listPath = listPath;
+            this.featureListPath = featureListPath;
         }
     }
 
@@ -357,7 +376,11 @@ public class GalaxyWatch7DeviceSupport extends AbstractBTBRDeviceSupport {
     private static final java.util.Map<String, SettingSpec> VALUE_SETTINGS_BY_PATH = new java.util.HashMap<>();
     // LIST_DYNAMIC only: option-list sub-path ("<base>/list") -> spec, to catch the list DataItem.
     private static final java.util.Map<String, SettingSpec> VALUE_SETTINGS_BY_LIST_PATH = new java.util.HashMap<>();
+    // STRING_LIST_DYNAMIC only: "<base>/list" (packages) and "<base>/feature_list" (features) -> spec.
+    private static final java.util.Map<String, SettingSpec> VALUE_SETTINGS_BY_PKGLIST_PATH = new java.util.HashMap<>();
+    private static final java.util.Map<String, SettingSpec> VALUE_SETTINGS_BY_FEATURELIST_PATH = new java.util.HashMap<>();
     static final java.util.List<SettingSpec> DYNAMIC_LIST_SETTINGS = new java.util.ArrayList<>();
+    static final java.util.List<SettingSpec> STRING_DYNAMIC_LIST_SETTINGS = new java.util.ArrayList<>();
     static {
         addValueSetting(new SettingSpec("pref_galaxywatch7_display_brightness", "display/brightness", "intLevel", SettingType.INT));
         addValueSetting(new SettingSpec("pref_galaxywatch7_display_font_size", "display/font_size", "intLevel", SettingType.INT));
@@ -376,12 +399,17 @@ public class GalaxyWatch7DeviceSupport extends AbstractBTBRDeviceSupport {
         addValueSetting(new SettingSpec("pref_galaxywatch7_sound_ringtone", "sound_settings/ringtone", "intSelectedItem", SettingType.LIST_DYNAMIC, "sound_settings/ringtone/name/list"));
         addValueSetting(new SettingSpec("pref_galaxywatch7_sound_ringtone_vibration", "sound_settings/ringtone_vibration", "intSelectedItem", SettingType.LIST_DYNAMIC));
         // Buttons & gestures: press_and_hold selects by index (arrayItemList + selected_item), same
-        // proven mechanism as above, and its options are clean localized labels. The other pickers
-        // are omitted on purpose: action_button/status_indicator list raw component names / internal
-        // tokens ("com.samsung.../...Service", "show"/"hide2") the watch doesn't localize inline, and
-        // double_press/digital_assistant/quicklaunch select by a string (selected_package/
-        // selected_name/launch_package) with a not-yet-confirmed write key. Deferred (see docs/§).
+        // proven mechanism as above, and its options are clean localized labels. action_button/
+        // status_indicator are still omitted: they list raw component names / internal tokens
+        // ("com.samsung.../...Service", "show"/"hide2") the watch doesn't localize inline, and label
+        // resolution for those isn't confirmed yet. digital_assistant/quicklaunch are presumed to
+        // follow double_press's pattern but aren't individually wired until that's verified live.
         addValueSetting(new SettingSpec("pref_galaxywatch7_advanced_press_and_hold", "advanced/press_and_hold", "intSelectedItem", SettingType.LIST_DYNAMIC));
+        // double_press selects a package/feature id string, not an index (research notes/capture
+        // 2026-09-21): "advanced/double_press/selected_package" (DataMap key "stringPackageId"),
+        // options at "advanced/double_press/list" (arrayPackageIdList) + ".../feature_list"
+        // (arrayFeatureList). Reuses buildWatchSettingStringPut, same as sound_mode.
+        addValueSetting(new SettingSpec("pref_galaxywatch7_advanced_double_press", "advanced/double_press", "stringPackageId", SettingType.STRING_LIST_DYNAMIC));
     }
 
     private static void addValueSetting(final SettingSpec spec) {
@@ -390,6 +418,10 @@ public class GalaxyWatch7DeviceSupport extends AbstractBTBRDeviceSupport {
         if (spec.type == SettingType.LIST_DYNAMIC) {
             VALUE_SETTINGS_BY_LIST_PATH.put(spec.listPath, spec);
             DYNAMIC_LIST_SETTINGS.add(spec);
+        } else if (spec.type == SettingType.STRING_LIST_DYNAMIC) {
+            VALUE_SETTINGS_BY_PKGLIST_PATH.put(spec.listPath, spec);
+            VALUE_SETTINGS_BY_FEATURELIST_PATH.put(spec.featureListPath, spec);
+            STRING_DYNAMIC_LIST_SETTINGS.add(spec);
         }
     }
 
@@ -399,6 +431,16 @@ public class GalaxyWatch7DeviceSupport extends AbstractBTBRDeviceSupport {
         final String[] keys = new String[DYNAMIC_LIST_SETTINGS.size()];
         for (int i = 0; i < keys.length; i++) {
             keys[i] = DYNAMIC_LIST_SETTINGS.get(i).prefKey;
+        }
+        return keys;
+    }
+
+    /** Same as {@link #dynamicListPrefKeys()} but for STRING_LIST_DYNAMIC settings (options are
+     *  package/feature id strings, cached as "value\tlabel" pairs rather than plain labels). */
+    public static String[] stringDynamicListPrefKeys() {
+        final String[] keys = new String[STRING_DYNAMIC_LIST_SETTINGS.size()];
+        for (int i = 0; i < keys.length; i++) {
+            keys[i] = STRING_DYNAMIC_LIST_SETTINGS.get(i).prefKey;
         }
         return keys;
     }
@@ -450,11 +492,18 @@ public class GalaxyWatch7DeviceSupport extends AbstractBTBRDeviceSupport {
             write = WearDataLayerProtocol.buildWatchSettingBooleanPut(
                     SETTINGS_SOURCE_PACKAGE, SETTINGS_SOURCE_SIGNATURE, node, subPath, enabled, seq);
         } else {
-            // A dynamic list is written to "<base>/selected_item"; everything else writes its subPath.
-            subPath = valueSpec.type == SettingType.LIST_DYNAMIC
-                    ? valueSpec.subPath + "/selected_item" : valueSpec.subPath;
+            // A dynamic list is written to "<base>/selected_item" (index) or "<base>/selected_package"
+            // (STRING_LIST_DYNAMIC, a value string); everything else writes its subPath.
+            if (valueSpec.type == SettingType.LIST_DYNAMIC) {
+                subPath = valueSpec.subPath + "/selected_item";
+            } else if (valueSpec.type == SettingType.STRING_LIST_DYNAMIC) {
+                subPath = valueSpec.subPath + "/selected_package";
+            } else {
+                subPath = valueSpec.subPath;
+            }
             switch (valueSpec.type) {
-                case STRING: {
+                case STRING:
+                case STRING_LIST_DYNAMIC: {
                     final String value = prefs.getString(config, "");
                     LOG.info("Galaxy Watch7: sending w_module {} = \"{}\" under node {} (seq {})", subPath, value, node, seq);
                     write = WearDataLayerProtocol.buildWatchSettingStringPut(
@@ -1337,6 +1386,34 @@ public class GalaxyWatch7DeviceSupport extends AbstractBTBRDeviceSupport {
                 return;
             }
         }
+        // STRING_LIST_DYNAMIC: "<base>/list" (real apps) and "<base>/feature_list" (built-in actions)
+        // each contribute value/label pairs to the same cache; merge rather than overwrite so both
+        // sources survive regardless of which arrives first.
+        final SettingSpec pkgListSpec = VALUE_SETTINGS_BY_PKGLIST_PATH.get(subPath);
+        if (pkgListSpec != null) {
+            final java.util.List<String> values = WearDataLayerProtocol.parseDataMapStringArray(message, "arrayPackageIdList");
+            cacheStringListEntries(prefs, pkgListSpec, values, false);
+            return;
+        }
+        final SettingSpec featureListSpec = VALUE_SETTINGS_BY_FEATURELIST_PATH.get(subPath);
+        if (featureListSpec != null) {
+            final java.util.List<String> values = WearDataLayerProtocol.parseDataMapStringArray(message, "arrayFeatureList");
+            cacheStringListEntries(prefs, featureListSpec, values, true);
+            return;
+        }
+        // STRING_LIST_DYNAMIC selection: "<base>/selected_package" -> store the chosen value string.
+        if (subPath.endsWith("/selected_package")) {
+            final String base = subPath.substring(0, subPath.length() - "/selected_package".length());
+            final SettingSpec selSpec = VALUE_SETTINGS_BY_PATH.get(base);
+            if (selSpec != null && selSpec.type == SettingType.STRING_LIST_DYNAMIC) {
+                final String value = WearDataLayerProtocol.parseDataMapString(message, "stringPackageId");
+                if (value != null && !value.equals(prefs.getString(selSpec.prefKey, null))) {
+                    LOG.info("Galaxy Watch7: reflecting {} = \"{}\" from watch", subPath, value);
+                    prefs.edit().putString(selSpec.prefKey, value).apply();
+                }
+                return;
+            }
+        }
 
         final SettingSpec spec = VALUE_SETTINGS_BY_PATH.get(subPath);
         if (spec == null) {
@@ -1372,6 +1449,62 @@ public class GalaxyWatch7DeviceSupport extends AbstractBTBRDeviceSupport {
                 break;
             }
         }
+    }
+
+    // STRING_LIST_DYNAMIC option cache: "value\tlabel" pairs, one per line, merged across both the
+    // package-list and feature-list DataItems (whichever arrives, without clobbering the other).
+    // Package entries get an empty label here - GalaxyWatch7SettingsCustomizer resolves it via
+    // PackageManager at populate time, since only it has a Context. Feature entries get a best-effort
+    // label derived from the id (the watch does not push a label for these).
+    private void cacheStringListEntries(final SharedPreferences prefs, final SettingSpec spec,
+                                         final java.util.List<String> values, final boolean isFeature) {
+        if (values == null || values.isEmpty()) {
+            return;
+        }
+        final String cacheKey = spec.prefKey + DYNLIST_ENTRIES_SUFFIX;
+        final String existing = prefs.getString(cacheKey, "");
+        final java.util.LinkedHashMap<String, String> merged = new java.util.LinkedHashMap<>();
+        if (existing != null && !existing.isEmpty()) {
+            for (final String line : existing.split("\n")) {
+                final int tab = line.indexOf('\t');
+                if (tab > 0) {
+                    merged.put(line.substring(0, tab), line.substring(tab + 1));
+                }
+            }
+        }
+        for (final String value : values) {
+            if (value == null || value.isEmpty()) {
+                continue;
+            }
+            merged.put(value, isFeature ? titleCaseFeatureId(value) : "");
+        }
+        final StringBuilder sb = new StringBuilder();
+        for (final java.util.Map.Entry<String, String> e : merged.entrySet()) {
+            sb.append(e.getKey()).append('\t').append(e.getValue()).append('\n');
+        }
+        final String joined = sb.toString();
+        if (!joined.equals(existing)) {
+            LOG.info("Galaxy Watch7: cached {} {} options for {}", values.size(),
+                    isFeature ? "feature" : "package", spec.subPath);
+            prefs.edit().putString(cacheKey, joined).apply();
+        }
+    }
+
+    private static String titleCaseFeatureId(final String value) {
+        final int slash = value.indexOf('/');
+        final String id = slash > 0 ? value.substring(0, slash) : value;
+        final String[] words = id.split("_");
+        final StringBuilder sb = new StringBuilder();
+        for (final String w : words) {
+            if (w.isEmpty()) {
+                continue;
+            }
+            if (sb.length() > 0) {
+                sb.append(' ');
+            }
+            sb.append(Character.toUpperCase(w.charAt(0))).append(w.substring(1));
+        }
+        return sb.length() > 0 ? sb.toString() : id;
     }
 
     @Override

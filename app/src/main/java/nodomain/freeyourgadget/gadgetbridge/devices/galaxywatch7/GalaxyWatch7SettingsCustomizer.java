@@ -88,6 +88,7 @@ public class GalaxyWatch7SettingsCustomizer implements DeviceSpecificSettingsCus
             "pref_galaxywatch7_sound_ringtone",
             "pref_galaxywatch7_sound_ringtone_vibration",
             "pref_galaxywatch7_advanced_press_and_hold",
+            "pref_galaxywatch7_advanced_double_press",
     };
 
     @Override
@@ -120,6 +121,49 @@ public class GalaxyWatch7SettingsCustomizer implements DeviceSpecificSettingsCus
             lp.setEntries(entries);
             lp.setEntryValues(entryValues);
             lp.setEnabled(true);
+        }
+        // Same as above, but for STRING_LIST_DYNAMIC settings (double_press): entries are cached as
+        // "value\tlabel" pairs, entry values are the value strings themselves (not indices). A
+        // package entry's label is resolved here via PackageManager (the watch does not push app
+        // labels); a feature entry already carries a best-effort derived label from the device
+        // support layer, which doesn't have a Context to do this resolution itself.
+        for (final String prefKey : GalaxyWatch7DeviceSupport.stringDynamicListPrefKeys()) {
+            final ListPreference lp = handler.findPreference(prefKey);
+            if (lp == null) {
+                continue;
+            }
+            final String cached = prefs.getString(prefKey + GalaxyWatch7DeviceSupport.DYNLIST_ENTRIES_SUFFIX, "");
+            if (cached == null || cached.isEmpty()) {
+                lp.setEnabled(false); // no options received from the watch yet
+                continue;
+            }
+            final android.content.pm.PackageManager pm = lp.getContext().getPackageManager();
+            final String[] lines = cached.split("\n");
+            final java.util.List<CharSequence> entries = new java.util.ArrayList<>(lines.length);
+            final java.util.List<CharSequence> entryValues = new java.util.ArrayList<>(lines.length);
+            for (final String line : lines) {
+                final int tab = line.indexOf('\t');
+                if (tab < 0) {
+                    continue;
+                }
+                final String value = line.substring(0, tab);
+                String label = line.substring(tab + 1);
+                if (label.isEmpty()) {
+                    // Package entry: "<package>/<activity>" - resolve the app's own launcher label.
+                    final int slash = value.indexOf('/');
+                    final String pkg = slash > 0 ? value.substring(0, slash) : value;
+                    try {
+                        label = pm.getApplicationLabel(pm.getApplicationInfo(pkg, 0)).toString();
+                    } catch (final android.content.pm.PackageManager.NameNotFoundException e) {
+                        label = pkg; // not installed on the phone - show the raw package id
+                    }
+                }
+                entries.add(label);
+                entryValues.add(value);
+            }
+            lp.setEntries(entries.toArray(new CharSequence[0]));
+            lp.setEntryValues(entryValues.toArray(new CharSequence[0]));
+            lp.setEnabled(!entries.isEmpty());
         }
     }
 

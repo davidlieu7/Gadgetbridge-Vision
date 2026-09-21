@@ -5678,6 +5678,7 @@
     <string name="prefs_gw7_sound_ringtone">Ringtone</string>
     <string name="prefs_gw7_sound_ringtone_vibration">Ringtone vibration</string>
     <string name="prefs_gw7_advanced_press_and_hold">Press and hold Home key</string>
+    <string name="prefs_gw7_advanced_double_press">Double press Home key</string>
     <string name="prefs_gw7_advanced_bixby_enabled">Bixby enabled</string>
     <string name="prefs_gw7_display_outdoor_mode">Outdoor mode</string>
     <string name="prefs_gw7_sound_vibration_feedback">Vibration feedback</string>
