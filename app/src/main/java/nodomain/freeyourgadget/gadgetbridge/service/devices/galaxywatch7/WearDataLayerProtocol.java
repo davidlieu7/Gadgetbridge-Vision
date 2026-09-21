@@ -289,6 +289,50 @@ public final class WearDataLayerProtocol {
     }
 
     /**
+     * Publishes our side of the enrollment key exchange at
+     * {@code wear://<watchNodeId>/pairing/public_key} (research notes §51). Each side publishes only
+     * its own public key; nothing here is a secret we would have to obtain from Google. The stock
+     * capture shows the watch answering with its own key, and the {@code enrolled} flag following
+     * only once both keys are on the wire.
+     *
+     * @param encodedPublicKey X.509 SubjectPublicKeyInfo for an EC P-256 key ({@code
+     *                         PublicKey.getEncoded()} of a {@code secp256r1} pair; 91 bytes in the capture)
+     * @param registrationId   the stock app sends its FCM token here; GB has none, so {@code null}
+     *                         omits the entry. Whether the watch validates it is unverified (§51).
+     */
+    public static byte[] buildPairingPublicKeyPut(final String sourcePackage, final String signatureHex,
+                                                  final String ownNodeId, final String watchNodeId,
+                                                  final long androidId, final byte[] encodedPublicKey,
+                                                  final String registrationId, final long seq) {
+        final ProtoWriter dataMap = new ProtoWriter();
+        dataMapEntry(dataMap, "algorithm", dataMapString("EC"));
+        dataMapEntry(dataMap, "androidId", dataMapLong(androidId));
+        dataMapEntry(dataMap, "encodedPublicKey", dataMapBytes(encodedPublicKey));
+        if (registrationId != null) {
+            dataMapEntry(dataMap, "registrationId", dataMapString(registrationId));
+        }
+        return buildDataItemPut(sourcePackage, signatureHex, ownNodeId,
+                "wear://" + watchNodeId + "/pairing/public_key", dataMap.toByteArray(), seq);
+    }
+
+    /**
+     * Publishes the enrollment flag at {@code wear://<watchNodeId>/enrolled} (research notes §51) -
+     * the item the watch waits for to leave its on-device setup wizard. Sent phone-&gt;watch only,
+     * and in the stock capture only after both sides exchanged {@code pairing/public_key}.
+     *
+     * @param networkId the Wear "network" this watch is enrolled into. Whether the watch checks it
+     *                  against anything, or accepts any stable value, is unverified (§51).
+     */
+    public static byte[] buildEnrolledPut(final String sourcePackage, final String signatureHex,
+                                          final String ownNodeId, final String watchNodeId,
+                                          final String networkId, final long seq) {
+        final ProtoWriter dataMap = new ProtoWriter();
+        dataMapEntry(dataMap, "networkId", dataMapString(networkId));
+        return buildDataItemPut(sourcePackage, signatureHex, ownNodeId,
+                "wear://" + watchNodeId + "/enrolled", dataMap.toByteArray(), seq);
+    }
+
+    /**
      * Builds a DataItem PUT that pushes a phone notification onto the watch's notification stream,
      * in the Wear "notification stream" convention the Watch7 notification bridge renders (research
      * notes §5f/§5g): a DataItem at
@@ -974,18 +1018,29 @@ public final class WearDataLayerProtocol {
         dataMapEntry(dataMap, valueKey, typedValue);
         dataMapEntry(dataMap, "from", dataMapString("mobile"));
 
-        final String path = "wear://" + ownNodeId + "/w_module_sec_watch_setting/" + subPath;
-        final long now = System.currentTimeMillis();
+        return buildDataItemPut(sourcePackage, signatureHex, ownNodeId,
+                "wear://" + ownNodeId + "/w_module_sec_watch_setting/" + subPath,
+                dataMap.toByteArray(), seq);
+    }
 
+    /**
+     * Builds a plain DataItem PUT envelope for an already-encoded DataMap. {@code path} is the full
+     * {@code wear://<node>/...} URI - note the host is the node the item is *about*, which is not
+     * always our own (the enrollment items of §51 address the watch's node while still reporting us
+     * as the source in field 7).
+     */
+    private static byte[] buildDataItemPut(final String sourcePackage, final String signatureHex,
+                                           final String ownNodeId, final String path,
+                                           final byte[] dataMap, final long seq) {
         final ProtoWriter dataItem = new ProtoWriter();
         dataItem.writeString(DATAITEM_SOURCE_PACKAGE, sourcePackage);
         dataItem.writeString(DATAITEM_PATH, path);
-        dataItem.writeMessage(DATAITEM_PAYLOAD, dataMap.toByteArray());
+        dataItem.writeMessage(DATAITEM_PAYLOAD, dataMap);
         dataItem.writeVarint(DATAITEM_SEQ, seq);
         dataItem.writeVarint(DATAITEM_DELETE_FLAG, 0);
         dataItem.writeString(DATAITEM_DEST_NODE_ID, ownNodeId);
         dataItem.writeString(DATAITEM_SIGNATURE, signatureHex);
-        dataItem.writeVarint(DATAITEM_TIMESTAMP, now);
+        dataItem.writeVarint(DATAITEM_TIMESTAMP, System.currentTimeMillis());
 
         final ProtoWriter payload = new ProtoWriter();
         payload.writeMessage(PAYLOAD_DATA_ITEM, dataItem.toByteArray());
@@ -1041,6 +1096,17 @@ public final class WearDataLayerProtocol {
         container.writeVarint(6, value);
         final ProtoWriter tv = new ProtoWriter();
         tv.writeVarint(1, 6);
+        tv.writeMessage(2, container.toByteArray());
+        return tv.toByteArray();
+    }
+
+    // byte[]-valued DataMap entry (typeTag 1, container inner field 1) - used for the enrollment
+    // handshake's X.509-encoded EC public key (research notes §51).
+    private static byte[] dataMapBytes(final byte[] value) {
+        final ProtoWriter container = new ProtoWriter();
+        container.writeMessage(1, value);
+        final ProtoWriter tv = new ProtoWriter();
+        tv.writeVarint(1, 1);
         tv.writeMessage(2, container.toByteArray());
         return tv.toByteArray();
     }

@@ -3225,3 +3225,125 @@ was silently dropped whenever an icon was attached).
 Raw evidence: `docs/captures/notification_icon_session/` (fresh capture: gapless framing,
 all 3 assets digest-verified, the notification bridged and was interactively repliable on
 the watch during capture).
+
+## 51. Enrollment / OOBE — CAPTURED and DECODED (not yet implemented)
+
+Until now GB could only take over a watch that the **stock app had already enrolled**: pair
+via Galaxy Wearable once, then disable the Samsung apps and hand the Data Layer to GB
+(§the `gw7-restore-gb-after-reset` recipe). A watch that has never completed the stock OOBE,
+or whose enrollment was invalidated, stays in its on-device setup wizard ("check your phone
+to finish") forever, and **tears down every RFCOMM channel it is offered, roughly once a
+second** - GB's included. Observed failure signature: GB connects, the framing is correct,
+`NodeInfo` arrives, and ~20-70ms later the watch sends `RFC_PORT_EVENT_DISC` (remote-initiated;
+`port_rfc_closed ... reason=PORT_CLOSED`). This is *not* a competing-app problem: it
+reproduces with the Samsung apps `pm disable-user`'d **and** force-stopped, with GMS's
+`BLUETOOTH_CONNECT` revoked so `Wear_Transport` cannot run at all, and with GB itself the
+only process holding a socket.
+
+A full stock OOBE was captured on a factory-reset watch (2026-09-21, LineageOS test phone,
+btsnoop with the buffer raised via `persist.bluetooth.btsnoopsize`; 40047 frames / 209s).
+
+### Channel layout — scn 10 is *not* a security channel
+
+The session uses two RFCOMM channels, opened within 0.2s of each other:
+
+```
+scn 7   12.6 MB   Wear Data Layer  (the protobuf envelope protocol GB already speaks)
+scn 10   1.5 MB   Bluetooth network tethering
+```
+
+scn 10 is ~37% printable and looks encrypted, which initially suggested a proprietary
+Samsung crypto handshake. It is not: the plaintext fragments are
+`GET /generate_204 HTTP/1.1`, `Host: connectivitycheck.gstatic.com`,
+`com.android.networkstack.tethering`, and DNS-over-TLS markers. **scn 10 is just the watch
+routing its internet traffic through the phone**; the entropy is TLS. Nothing in the trust
+handshake lives there. A watch with working Wi-Fi does not need the phone for this at all,
+so GB does not have to implement a proxy to satisfy enrollment.
+
+### The enrollment message set (all on scn 7, all ordinary DataItems)
+
+Every one of these is the standard DataItem envelope GB already builds (payload field 9,
+envelope `flagC = 5:3`); only the authoring package, path and DataMap differ. **No value in
+any of them is a Google-held secret.**
+
+`wear://<node>/enrolled` — authored as `com.google.android.gms`, cert digest
+`38918a453d07199354f8b19af05ec6562ced5788`. Sent **phone -> watch only**; this is the flag
+the watch waits for.
+
+```
+9 = { 1 = "com.google.android.gms"
+      2 = "wear://<watchNode>/enrolled"
+      4 = { 1 = { 1 = "networkId", 2 = { 1 = 2(string), 2 = { 2 = "<19-digit decimal>" } } } }
+      5 = seqId, 6 = 0, 7 = "<phoneNode>",
+      9 = "38918a453d07199354f8b19af05ec6562ced5788", 10 = timestampMs }
+```
+
+`wear://<node>/pairing/public_key` — `com.google.android.gms`, exchanged **both ways**.
+The sender publishes only its *own* public key, so GB can generate a keypair and publish it:
+
+```
+4 = { "algorithm"        : 2(string) "EC"
+      "androidId"        : 5(long)   <id>
+      "encodedPublicKey" : 1(bytes)  91B X.509 SubjectPublicKeyInfo,
+                                     id-ecPublicKey + prime256v1, uncompressed point (0x04||X||Y)
+      "registrationId"   : 2(string) "<FCM token>" }
+```
+
+`wear://<node>/setup/oem_setup_info` — plain hardware metadata, no crypto. Authored by
+`com.samsung.android.wcs.extension` when the **watch** publishes it, and by
+`com.samsung.wearable.watch7plugin` when the **phone** mirrors it for other nodes:
+
+```
+has_oem_info: 8(bool) true      internal_name: 2(string) "fresh7blue"
+is_china_edition: 8(bool) false manufacturer_name: 2(string) "samsung"
+product_name: 2(string) "SM-L310"
+system_android_wear_version: 5(long) 4
+system_capabilities / wear_platform_versions: 10(array)
+```
+
+`wear://<node>/trusted_packages` — exchanged both ways; a list of
+`{package name, signing-cert digest}` pairs (e.g. `com.samsung.android.wear.shealth`,
+`com.sec.android.app.shealth`, `com.samsung.android.wcs.extension`). Same shape as the
+asset-grant grantee list of §50.
+
+DataMap value type tags seen here, consistent with §46: `1`=bytes, `2`=string, `5`=long,
+`8`=bool, `10`=array.
+
+### Timeline (t relative to capture start; connect at t=81.6s)
+
+```
+81.80  watch->phone  trusted_packages
+81.84  phone->watch  trusted_packages
+81.99  phone->watch  consents_per_watch
+82.39  watch->phone  setup/oem_setup_info      (watch publishes its own hardware info)
+82.62  phone->watch  setup/oem_setup_info      (phone mirrors it)
+84.66  phone->watch  pairing/public_key        (phone's EC P-256 key)
+102.88 watch->phone  pairing/public_key        (watch replies with its key, +18s)
+106.57 phone->watch  enrolled  {networkId}     (for this watch's node - the completion flag)
+```
+
+The ordering is the load-bearing part: **`enrolled` is published only after both sides have
+exchanged `pairing/public_key`.** The 18s gap before the watch's key is user interaction on
+the watch, not a protocol delay.
+
+The capture also contains three `enrolled` items for three different node ids - one for the
+current watch (`4228e44e`) and two stale ones from earlier pairings, which GMS still
+re-publishes. Only the current node's matters.
+
+### What is still unverified
+
+Whether the watch **cryptographically verifies** the authoring package's cert digest, or
+merely echoes it. §50 is evidence for the latter: GB already authors DataItems as
+`com.samsung.wearable.watch7plugin` / `com.samsung.android.wcs.extension` and issues asset
+grants naming those identities, and the watch honours them. If that holds for
+`com.google.android.gms` too, GB can complete enrollment on its own. If the watch does
+verify, enrollment stays gated on the stock app and the existing hand-over recipe remains
+the only route.
+
+Also unknown: whether `networkId` must be consistent across the session or may be
+freely chosen, and whether `registrationId` (an FCM token GB has no way to mint) is
+validated or merely stored.
+
+Raw evidence: local only, **not committed** - the capture carries personal identifiers (FCM
+registration token, `androidId`, the account's `networkId`). Kept in `captures/`, excluded
+via `.git/info/exclude`.

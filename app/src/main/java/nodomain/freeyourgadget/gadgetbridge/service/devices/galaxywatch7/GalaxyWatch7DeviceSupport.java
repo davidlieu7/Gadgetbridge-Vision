@@ -214,6 +214,9 @@ public class GalaxyWatch7DeviceSupport extends AbstractBTBRDeviceSupport {
             builder.run(() -> LOG.info("Galaxy Watch7: sending peer-sync eagerly for watch node {}", watchNodeId));
             builder.write(WearDataLayerProtocol.buildSeqAck(localNodeId, watchNodeId));
             peerSyncSent = true;
+            if (ENROLLMENT_ENABLED) {
+                sendEnrollment(builder, prefs);
+            }
         }
         builder.setDeviceState(GBDevice.State.INITIALIZED);
         // The watch only reliably pushes its battery level on connect and on its own schedule (it
@@ -223,6 +226,70 @@ public class GalaxyWatch7DeviceSupport extends AbstractBTBRDeviceSupport {
         builder.run(() -> batteryPollHandler.postDelayed(batteryPollRunnable, 5000));
 
         return builder;
+    }
+
+    // Enrollment (research notes §51). A watch that never completed the stock OOBE sits in its
+    // on-device setup wizard and drops every RFCOMM peer it is offered after ~40ms - GB included -
+    // until something publishes the "enrolled" DataItem for its node. The stock capture shows that
+    // item authored as GMS, and preceded by both sides publishing pairing/public_key. Nothing in
+    // the sequence is a Google-held secret, so GB can reproduce it; whether the watch verifies the
+    // authoring package's signature digest is the open question this code exists to answer.
+    private static final boolean ENROLLMENT_ENABLED = true;
+    private static final String GMS_SOURCE_PACKAGE = "com.google.android.gms";
+    private static final String GMS_SIGNATURE = "38918a453d07199354f8b19af05ec6562ced5788";
+    private static final String PREF_ENROLL_PUBLIC_KEY = "galaxywatch7_enroll_public_key";
+    private static final String PREF_ENROLL_ANDROID_ID = "galaxywatch7_enroll_android_id";
+    private static final String PREF_ENROLL_NETWORK_ID = "galaxywatch7_enroll_network_id";
+
+    private void sendEnrollment(final TransactionBuilder builder, final SharedPreferences prefs) {
+        final byte[] publicKey = enrollmentPublicKey(prefs);
+        if (publicKey == null) {
+            return;
+        }
+        final long androidId = stableLong(prefs, PREF_ENROLL_ANDROID_ID);
+        final String networkId = Long.toUnsignedString(stableLong(prefs, PREF_ENROLL_NETWORK_ID));
+        builder.run(() -> LOG.info("Galaxy Watch7: publishing enrollment for watch node {}", watchNodeId));
+        builder.write(WearDataLayerProtocol.buildPairingPublicKeyPut(
+                GMS_SOURCE_PACKAGE, GMS_SIGNATURE, localNodeId, watchNodeId,
+                androidId, publicKey, null, ownDataVersion.incrementAndGet()));
+        builder.write(WearDataLayerProtocol.buildEnrolledPut(
+                GMS_SOURCE_PACKAGE, GMS_SIGNATURE, localNodeId, watchNodeId,
+                networkId, ownDataVersion.incrementAndGet()));
+    }
+
+    // The published key must stay stable across reconnects, so the X.509 encoding is generated once
+    // and cached. Only the public half is kept: the capture shows no challenge/response that would
+    // require us to prove possession of the private key.
+    private byte[] enrollmentPublicKey(final SharedPreferences prefs) {
+        if (prefs == null) {
+            return null;
+        }
+        final String cached = prefs.getString(PREF_ENROLL_PUBLIC_KEY, null);
+        if (cached != null) {
+            return android.util.Base64.decode(cached, android.util.Base64.NO_WRAP);
+        }
+        final byte[] generated;
+        try {
+            final java.security.KeyPairGenerator gen = java.security.KeyPairGenerator.getInstance("EC");
+            gen.initialize(new java.security.spec.ECGenParameterSpec("secp256r1"));
+            generated = gen.generateKeyPair().getPublic().getEncoded();
+        } catch (final java.security.GeneralSecurityException e) {
+            LOG.warn("Galaxy Watch7: cannot generate enrollment key pair, skipping enrollment", e);
+            return null;
+        }
+        prefs.edit().putString(PREF_ENROLL_PUBLIC_KEY,
+                android.util.Base64.encodeToString(generated, android.util.Base64.NO_WRAP)).apply();
+        return generated;
+    }
+
+    private long stableLong(final SharedPreferences prefs, final String key) {
+        final long existing = prefs.getLong(key, 0L);
+        if (existing != 0L) {
+            return existing;
+        }
+        final long generated = new java.security.SecureRandom().nextLong();
+        prefs.edit().putLong(key, generated).apply();
+        return generated;
     }
 
     // The watch's battery level otherwise only updates on connect (its batterystate DataItem) or on
