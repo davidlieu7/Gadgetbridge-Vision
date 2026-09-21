@@ -89,6 +89,7 @@ public class GalaxyWatch7SettingsCustomizer implements DeviceSpecificSettingsCus
             "pref_galaxywatch7_sound_ringtone_vibration",
             "pref_galaxywatch7_advanced_press_and_hold",
             "pref_galaxywatch7_advanced_double_press",
+            "pref_galaxywatch7_advanced_labs_quicklaunch_app",
     };
 
     @Override

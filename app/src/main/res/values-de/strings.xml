@@ -4506,6 +4506,7 @@
     <string name="prefs_gw7_sound_ringtone_vibration">Klingelton-Vibration</string>
     <string name="prefs_gw7_advanced_press_and_hold">Home-Taste gedrückt halten</string>
     <string name="prefs_gw7_advanced_double_press">Home-Taste doppelt drücken</string>
+    <string name="prefs_gw7_advanced_labs_quicklaunch_app">Schnellstart-App</string>
     <string name="prefs_gw7_advanced_bixby_enabled">Bixby aktiviert</string>
     <string name="prefs_gw7_display_outdoor_mode">Outdoor-Modus</string>
     <string name="prefs_gw7_sound_vibration_feedback">Vibrations-Feedback</string>

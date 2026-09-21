@@ -410,6 +410,14 @@ public class GalaxyWatch7DeviceSupport extends AbstractBTBRDeviceSupport {
         // options at "advanced/double_press/list" (arrayPackageIdList) + ".../feature_list"
         // (arrayFeatureList). Reuses buildWatchSettingStringPut, same as sound_mode.
         addValueSetting(new SettingSpec("pref_galaxywatch7_advanced_double_press", "advanced/double_press", "stringPackageId", SettingType.STRING_LIST_DYNAMIC));
+        // Quicklaunch (the "knock-knock" gesture) selects by a DIFFERENT string convention than
+        // double_press - "advanced/labs/quicklaunch/launch_package" (DataMap key "stringLaunchApp",
+        // not "stringPackageId"), values like "fixed/open_exercise_list" (capture 2026-09-21). Unlike
+        // double_press the watch does not push an options list for this (no ".../list" DataItem seen
+        // in the capture), so this is a fixed ListPreference (like sound_mode) covering only the two
+        // values actually observed on the wire - not the full stock option set. The enable toggle is
+        // separate and already wired via BOOLEAN_SETTINGS ("labs/quicklaunch/enabled").
+        addValueSetting(new SettingSpec("pref_galaxywatch7_advanced_labs_quicklaunch_app", "advanced/labs/quicklaunch/launch_package", "stringLaunchApp", SettingType.STRING));
     }
 
     private static void addValueSetting(final SettingSpec spec) {
