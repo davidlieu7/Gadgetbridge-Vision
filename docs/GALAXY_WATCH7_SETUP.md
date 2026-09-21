@@ -98,8 +98,10 @@ not have to uninstall them, and disabling is easy to undo if you ever want the s
 **Connects, then drops after a second, over and over.** Something else is holding the channel.
 Check that both Samsung apps are disabled *and* not running (disabling does not kill a running
 process — force-stop them too). On some phones Google Play services keeps its own Wear
-connection alive; revoking its Bluetooth permission stops that, at the cost of other Play
-services Bluetooth features such as Fast Pair.
+connection alive. Stop it under Settings → Apps → Google Play services → Permissions → Nearby
+devices → Don't allow — no adb needed, it is an ordinary runtime permission. The cost is that
+other Play services Bluetooth features stop working too, Fast Pair and Find My Device among
+them; re-allowing it is a single toggle.
 
 **Still dropping, and the watch log says `Mismatched node`.** The node ID is wrong. It changes
 whenever the watch is re-enrolled, so if you reset the watch or paired it to another phone in
