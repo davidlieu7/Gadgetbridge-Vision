@@ -36,6 +36,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
@@ -89,12 +90,13 @@ public class GBDevice implements Parcelable {
     private String mModel;
     private State mState = State.NOT_CONNECTED;
 
-    // multiple battery support: at this point we support up to three batteries
-    private int[] mBatteryLevel = {BATTERY_UNKNOWN, BATTERY_UNKNOWN, BATTERY_UNKNOWN};
-    private float[] mBatteryVoltage = {BATTERY_UNKNOWN, BATTERY_UNKNOWN, BATTERY_UNKNOWN};
-    private BatteryState[] mBatteryState = {UNKNOWN, UNKNOWN, UNKNOWN};
-    private int[] mBatteryIcons = {BATTERY_ICON_DEFAULT, BATTERY_ICON_DEFAULT, BATTERY_ICON_DEFAULT};
-    private int[] mBatteryLabels = {BATTERY_LABEL_DEFAULT, BATTERY_LABEL_DEFAULT, BATTERY_LABEL_DEFAULT};
+    // multiple battery support: the arrays below grow on demand as higher indices are set,
+    // see #ensureBatteryCapacity(int)
+    private int[] mBatteryLevel = {BATTERY_UNKNOWN};
+    private float[] mBatteryVoltage = {BATTERY_UNKNOWN};
+    private BatteryState[] mBatteryState = {UNKNOWN};
+    private int[] mBatteryIcons = {BATTERY_ICON_DEFAULT};
+    private int[] mBatteryLabels = {BATTERY_LABEL_DEFAULT};
 
     private short mRssi = RSSI_UNKNOWN;
     private String mBusyTask;
@@ -417,12 +419,10 @@ public class GBDevice implements Parcelable {
     }
 
     private void unsetDynamicState() {
-        setBatteryLevel(BATTERY_UNKNOWN, 0);
-        setBatteryLevel(BATTERY_UNKNOWN, 1);
-        setBatteryLevel(BATTERY_UNKNOWN, 2);
-        setBatteryState(UNKNOWN, 0);
-        setBatteryState(UNKNOWN, 1);
-        setBatteryState(UNKNOWN, 2);
+        for (int i = 0; i < mBatteryLevel.length; i++) {
+            setBatteryLevel(BATTERY_UNKNOWN, i);
+            setBatteryState(UNKNOWN, i);
+        }
         setRssi(RSSI_UNKNOWN);
         resetExtraInfos();
         if (mBusyTask != null) {
@@ -557,26 +557,56 @@ public class GBDevice implements Parcelable {
         mExtraInfos = null;
     }
 
+    /// Grows all battery arrays together so they stay the same length, filling new slots with
+    /// their respective sentinel/default values. Called by every battery setter so any index can
+    /// be set without a fixed upper bound.
+    private void ensureBatteryCapacity(int batteryIndex) {
+        if (batteryIndex < mBatteryLevel.length) {
+            return;
+        }
+        final int newLength = batteryIndex + 1;
+        final int oldLength = mBatteryLevel.length;
+
+        mBatteryLevel = Arrays.copyOf(mBatteryLevel, newLength);
+        Arrays.fill(mBatteryLevel, oldLength, newLength, BATTERY_UNKNOWN);
+
+        mBatteryVoltage = Arrays.copyOf(mBatteryVoltage, newLength);
+        Arrays.fill(mBatteryVoltage, oldLength, newLength, BATTERY_UNKNOWN);
+
+        mBatteryState = Arrays.copyOf(mBatteryState, newLength);
+        Arrays.fill(mBatteryState, oldLength, newLength, UNKNOWN);
+
+        mBatteryIcons = Arrays.copyOf(mBatteryIcons, newLength);
+        Arrays.fill(mBatteryIcons, oldLength, newLength, BATTERY_ICON_DEFAULT);
+
+        mBatteryLabels = Arrays.copyOf(mBatteryLabels, newLength);
+        Arrays.fill(mBatteryLabels, oldLength, newLength, BATTERY_LABEL_DEFAULT);
+    }
+
     /// @return the battery level in range {@code 0} to {@code 100}, or {@link #BATTERY_UNKNOWN} if unknown
     /// @see #setBatteryLevel(int, int)
-    public int getBatteryLevel(@IntRange(from = 0, to = 2) int batteryIndex) {
+    public int getBatteryLevel(int batteryIndex) {
+        if (batteryIndex >= mBatteryLevel.length) {
+            return BATTERY_UNKNOWN;
+        }
         return mBatteryLevel[batteryIndex];
     }
 
     /// Set the battery level in range {@code 0} to {@code 100}, or {@link #BATTERY_UNKNOWN} if unknown
     /// @see #getBatteryLevel(int)
     public void setBatteryLevel(@IntRange(from = BATTERY_UNKNOWN, to = 100) int batteryLevel,
-                                @IntRange(from = 0, to = 2) int batteryIndex) {
+                                int batteryIndex) {
         if ((batteryLevel >= 0 && batteryLevel <= 100) || batteryLevel == BATTERY_UNKNOWN) {
+            ensureBatteryCapacity(batteryIndex);
             mBatteryLevel[batteryIndex] = batteryLevel;
         } else {
             LOG.error("Battery level must be within range 0-100: {}", batteryLevel);
         }
     }
     /// @param batteryVoltage Voltage greater than zero (unit: Volt), or {@link #BATTERY_UNKNOWN} if unknown
-    public void setBatteryVoltage(float batteryVoltage,
-                                  @IntRange(from = 0, to = 2) int batteryIndex) {
+    public void setBatteryVoltage(float batteryVoltage, int batteryIndex) {
         if (batteryVoltage >= 0 || batteryVoltage == BATTERY_UNKNOWN) {
+            ensureBatteryCapacity(batteryIndex);
             mBatteryVoltage[batteryIndex] = batteryVoltage;
         } else {
             LOG.error("Battery voltage must be > 0: {}", batteryVoltage);
@@ -586,32 +616,47 @@ public class GBDevice implements Parcelable {
     /// @return the battery voltage, or {@link #BATTERY_UNKNOWN} if unknown
     /// @see #setBatteryVoltage(float, int)
     public float getBatteryVoltage(int batteryIndex) {
+        if (batteryIndex >= mBatteryVoltage.length) {
+            return BATTERY_UNKNOWN;
+        }
         return mBatteryVoltage[batteryIndex];
     }
 
     public BatteryState getBatteryState(int batteryIndex) {
+        if (batteryIndex >= mBatteryState.length) {
+            return UNKNOWN;
+        }
         return mBatteryState[batteryIndex];
     }
 
     public void setBatteryState(BatteryState mBatteryState, int batteryIndex) {
+        ensureBatteryCapacity(batteryIndex);
         this.mBatteryState[batteryIndex] = mBatteryState;
     }
 
     @DrawableRes
     public int getBatteryIcon(int batteryIndex) {
+        if (batteryIndex >= mBatteryIcons.length) {
+            return BATTERY_ICON_DEFAULT;
+        }
         return mBatteryIcons[batteryIndex];
     }
 
     public void setBatteryIcon(@DrawableRes int icon, int batteryIndex) {
+        ensureBatteryCapacity(batteryIndex);
         mBatteryIcons[batteryIndex] = icon;
     }
 
     @StringRes
     public int getBatteryLabel(int batteryIndex) {
+        if (batteryIndex >= mBatteryLabels.length) {
+            return BATTERY_LABEL_DEFAULT;
+        }
         return mBatteryLabels[batteryIndex];
     }
 
     public void setBatteryLabel(@StringRes int label, int batteryIndex) {
+        ensureBatteryCapacity(batteryIndex);
         mBatteryLabels[batteryIndex] = label;
     }
 

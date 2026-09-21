@@ -46,6 +46,7 @@ import nodomain.freeyourgadget.gadgetbridge.capabilities.HeartRateCapability;
 import nodomain.freeyourgadget.gadgetbridge.capabilities.loyaltycards.BarcodeFormat;
 import nodomain.freeyourgadget.gadgetbridge.capabilities.password.PasswordCapabilityImpl;
 import nodomain.freeyourgadget.gadgetbridge.capabilities.widgets.WidgetManager;
+import nodomain.freeyourgadget.gadgetbridge.devices.cards.DeviceCardItem;
 import nodomain.freeyourgadget.gadgetbridge.entities.CyclingSample;
 import nodomain.freeyourgadget.gadgetbridge.entities.DaoSession;
 import nodomain.freeyourgadget.gadgetbridge.entities.Device;
@@ -1008,8 +1009,7 @@ public interface DeviceCoordinator {
     /**
      *
      * Multiple battery support: Indicates how many batteries the device has.
-     * 1 is default, 3 is maximum at the moment (as per UI layout)
-     * 0 will disable the battery from the UI
+     * 1 is default. 0 will disable the battery from the UI
      */
     int getBatteryCount(@NonNull final GBDevice device);
 
@@ -1118,7 +1118,20 @@ public interface DeviceCoordinator {
     @StringRes
     int getSecondaryAuthKeyHint();
 
+    /**
+     * @deprecated for new implementations, prefer adding an {@link nodomain.freeyourgadget.gadgetbridge.devices.cards.ActionCardItem}
+     * to {@link #getCardItems}.
+     */
+    @Deprecated
     List<DeviceCardAction> getCustomActions();
+
+    /**
+     * Returns the items (batteries, presets, status values, custom actions) to render in the
+     * device list card's icon row, in display order. Most coordinators do not need to override
+     * this -- the default implementation reconstructs the standard preset icon set from this
+     * coordinator's capabilities, and appends {@link #getCustomActions()}.
+     */
+    List<DeviceCardItem> getCardItems(@NonNull final GBDevice device);
 
     DeviceKind getDeviceKind(@NonNull final GBDevice device);
 

@@ -1,0 +1,424 @@
+package nodomain.freeyourgadget.gadgetbridge.devices.cards
+
+import android.app.Activity
+import android.content.Context
+import android.content.Intent
+import android.view.LayoutInflater
+import android.view.View
+import android.widget.Button
+import android.widget.NumberPicker
+import androidx.appcompat.app.AlertDialog
+import androidx.appcompat.app.AppCompatActivity
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
+import com.google.android.material.snackbar.Snackbar
+import com.jaredrummler.android.colorpicker.ColorPickerDialog
+import com.jaredrummler.android.colorpicker.ColorPickerDialogListener
+import nodomain.freeyourgadget.gadgetbridge.GBApplication
+import nodomain.freeyourgadget.gadgetbridge.R
+import nodomain.freeyourgadget.gadgetbridge.activities.ConfigureAlarms
+import nodomain.freeyourgadget.gadgetbridge.activities.ConfigureReminders
+import nodomain.freeyourgadget.gadgetbridge.activities.HeartRateDialog
+import nodomain.freeyourgadget.gadgetbridge.activities.VibrationActivity
+import nodomain.freeyourgadget.gadgetbridge.activities.charts.ActivityChartsActivity
+import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsActivity
+import nodomain.freeyourgadget.gadgetbridge.activities.workouts.WorkoutListActivity
+import nodomain.freeyourgadget.gadgetbridge.devices.DeviceCardAction
+import nodomain.freeyourgadget.gadgetbridge.devices.DeviceCoordinator
+import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice
+import nodomain.freeyourgadget.gadgetbridge.model.DeviceType
+import nodomain.freeyourgadget.gadgetbridge.model.RecordedDataTypes
+import java.util.Locale
+import kotlin.math.floor
+import kotlin.math.roundToInt
+import androidx.core.content.edit
+
+/**
+ * Builds the default list of [DeviceCardItem]s for a device, from a coordinator's capabilities.
+ */
+object DefaultDeviceCardItems {
+    @JvmStatic
+    fun build(coordinator: DeviceCoordinator, device: GBDevice): List<DeviceCardItem> {
+        val items = mutableListOf<DeviceCardItem>()
+
+        for (i in 0 until coordinator.getBatteryCount(device)) {
+            items.add(BatteryCardItem(i))
+        }
+
+        if (coordinator.getSupportedDeviceSpecificSettings(device) != null) {
+            items.add(ActionCardItem(settingsAction()))
+        }
+
+        if (device.isInitialized && device.getExtraInfo("fm_frequency") != null) {
+            items.add(fmFrequencyItem())
+        }
+
+        if (device.isInitialized && device.getExtraInfo("led_color") != null && coordinator.supportsLedColor(device)) {
+            items.add(ledColorItem(coordinator))
+        }
+
+        if (device.isInitialized && coordinator.supportsDataFetching(device)) {
+            items.add(ActionCardItem(fetchActivityAction(), busyIndicator = true))
+        }
+
+        if (device.isInitialized && coordinator.supportsScreenshots(device)) {
+            items.add(ActionCardItem(screenshotAction()))
+        }
+
+        if (device.isInitialized && coordinator.supportsAppsManagement(device)) {
+            coordinator.getAppsManagementActivity(device)?.let { activityClass ->
+                items.add(
+                    ActionCardItem(
+                        DeviceCardAction.forActivity(
+                            R.drawable.ic_action_manage_apps,
+                            R.string.title_activity_appmanager,
+                            activityClass
+                        )
+                    )
+                )
+            }
+        }
+
+        if (coordinator.getAlarmSlotCount(device) > 0) {
+            items.add(
+                ActionCardItem(
+                    DeviceCardAction.forActivity(
+                        R.drawable.ic_access_alarms,
+                        R.string.controlcenter_start_configure_alarms,
+                        ConfigureAlarms::class.java
+                    )
+                )
+            )
+        }
+
+        if (coordinator.getReminderSlotCount(device) > 0) {
+            items.add(
+                ActionCardItem(
+                    DeviceCardAction.forActivity(
+                        R.drawable.ic_device_set_reminders,
+                        R.string.controlcenter_start_configure_reminders,
+                        ConfigureReminders::class.java
+                    )
+                )
+            )
+        }
+
+        if (coordinator.supportsCharts(device)) {
+            items.add(
+                ActionCardItem(
+                    DeviceCardAction.forActivity(
+                        R.drawable.ic_activity_graphs,
+                        R.string.controlcenter_start_activitymonitor,
+                        ActivityChartsActivity::class.java
+                    )
+                )
+            )
+        }
+
+        if (coordinator.supportsRecordedActivities(device)) {
+            items.add(
+                ActionCardItem(
+                    DeviceCardAction.forActivity(
+                        R.drawable.ic_activity_tracks,
+                        R.string.controlcenter_start_activity_tracks,
+                        WorkoutListActivity::class.java
+                    )
+                )
+            )
+        }
+
+        if (device.isInitialized && coordinator.supportsFindDevice(device)) {
+            items.add(ActionCardItem(findDeviceAction()))
+        }
+
+        coordinator.calibrationActivity?.let { activityClass ->
+            if (device.isInitialized) {
+                items.add(
+                    ActionCardItem(
+                        DeviceCardAction.forActivity(
+                            R.drawable.ic_activity_unknown,
+                            R.string.controlcenter_calibrate_device,
+                            activityClass
+                        )
+                    )
+                )
+            }
+        }
+
+        if (device.isInitialized && coordinator.supportsRealtimeData(device)) {
+            items.add(HeartRateCardItem(coordinator.supportsLiveOnlyHeartRateDisplay(device), ::heartRateTestOnClick))
+        }
+
+        if (device.isInitialized && coordinator.supportsPowerOff(device)) {
+            items.add(ActionCardItem(powerOffAction()))
+        }
+
+        coordinator.customActions.filter { it.isVisible(device) }.forEach {
+            items.add(ActionCardItem(it))
+        }
+
+        return items
+    }
+
+    /**
+     * A View suitable to anchor a SnackBar to, without needing a reference to the RecyclerView's parent.
+     */
+    private fun snackBarAnchor(context: Context): View =
+        (context as Activity).window.decorView.findViewById(android.R.id.content)
+
+    private fun settingsAction(): DeviceCardAction = object : DeviceCardAction {
+        override fun getIcon(device: GBDevice) = R.drawable.ic_settings
+        override fun getDescription(device: GBDevice, context: Context): String =
+            context.getString(R.string.title_activity_device_specific_settings)
+
+        override fun onClick(device: GBDevice, context: Context) {
+            val intent = Intent(context, DeviceSettingsActivity::class.java)
+            intent.putExtra(GBDevice.EXTRA_DEVICE, device)
+            intent.putExtra(
+                DeviceSettingsActivity.MENU_ENTRY_POINT,
+                DeviceSettingsActivity.MENU_ENTRY_POINTS.DEVICE_SETTINGS
+            )
+            context.startActivity(intent)
+        }
+    }
+
+    private fun fetchActivityAction(): DeviceCardAction = object : DeviceCardAction {
+        override fun getIcon(device: GBDevice) = R.drawable.ic_refresh
+        override fun getDescription(device: GBDevice, context: Context): String =
+            context.getString(R.string.controlcenter_fetch_activity_data)
+
+        override fun onClick(device: GBDevice, context: Context) {
+            Snackbar.make(snackBarAnchor(context), R.string.busy_task_fetch_activity_data, Snackbar.LENGTH_SHORT).show()
+            GBApplication.deviceService(device).onFetchRecordedData(RecordedDataTypes.TYPE_SYNC)
+        }
+    }
+
+    private fun screenshotAction(): DeviceCardAction = object : DeviceCardAction {
+        override fun getIcon(device: GBDevice) = R.drawable.ic_screenshot
+        override fun getDescription(device: GBDevice, context: Context): String =
+            context.getString(R.string.controlcenter_take_screenshot)
+
+        override fun onClick(device: GBDevice, context: Context) {
+            Snackbar.make(
+                snackBarAnchor(context),
+                R.string.controlcenter_snackbar_requested_screenshot,
+                Snackbar.LENGTH_SHORT
+            ).show()
+            GBApplication.deviceService(device).onScreenshotReq()
+        }
+    }
+
+    private fun powerOffAction(): DeviceCardAction = object : DeviceCardAction {
+        override fun getIcon(device: GBDevice) = R.drawable.ic_power_settings_new
+        override fun getDescription(device: GBDevice, context: Context): String =
+            context.getString(R.string.controlcenter_power_off)
+
+        override fun onClick(device: GBDevice, context: Context) {
+            MaterialAlertDialogBuilder(context)
+                .setTitle(R.string.controlcenter_power_off_confirm_title)
+                .setMessage(R.string.controlcenter_power_off_confirm_description)
+                .setIcon(R.drawable.ic_power_settings_new)
+                .setPositiveButton(android.R.string.yes) { _, _ -> GBApplication.deviceService(device).onPowerOff() }
+                .setNegativeButton(android.R.string.no, null)
+                .show()
+        }
+    }
+
+    private fun findDeviceAction(): DeviceCardAction = object : DeviceCardAction {
+        override fun getIcon(device: GBDevice) = R.drawable.ic_action_find_lost_device
+        override fun getDescription(device: GBDevice, context: Context): String =
+            context.getString(R.string.controlcenter_find_device)
+
+        override fun onClick(device: GBDevice, context: Context) {
+            MaterialAlertDialogBuilder(context)
+                .setCancelable(true)
+                .setTitle(context.getString(R.string.controlcenter_find_device))
+                .setMessage(context.getString(R.string.find_lost_device_message, device.aliasOrName))
+                .setPositiveButton(R.string.ok) { _, _ ->
+                    if (device.type == DeviceType.VIBRATISSIMO) {
+                        val startIntent = Intent(context, VibrationActivity::class.java)
+                        startIntent.putExtra(GBDevice.EXTRA_DEVICE, device)
+                        context.startActivity(startIntent)
+                        return@setPositiveButton
+                    }
+                    GBApplication.deviceService(device).onFindDevice(true)
+                    Snackbar.make(
+                        snackBarAnchor(context),
+                        R.string.control_center_find_lost_device,
+                        Snackbar.LENGTH_INDEFINITE
+                    ).setAction(R.string.find_lost_device_you_found_it) {
+                        GBApplication.deviceService(device).onFindDevice(false)
+                    }.setCallback(object : Snackbar.Callback() {
+                        override fun onDismissed(snackbar: Snackbar, event: Int) {
+                            GBApplication.deviceService(device).onFindDevice(false)
+                            super.onDismissed(snackbar, event)
+                        }
+                    }).show()
+                }
+                .setNegativeButton(R.string.cancel, null)
+                .show()
+        }
+    }
+
+    private fun heartRateTestOnClick(device: GBDevice, context: Context) {
+        GBApplication.deviceService(device).onHeartRateTest()
+        HeartRateDialog(device, context).show()
+    }
+
+    private fun fmFrequencyItem(): StatusCardItem {
+        val freqMin = 87.5f
+        val freqMax = 108.0f
+        val freqMinInt = floor(freqMin.toDouble()).toInt()
+        val freqMaxInt = freqMax.roundToInt()
+
+        return StatusCardItem(
+            icon = R.drawable.ic_radio,
+            value = { device, _ ->
+                String.format(
+                    Locale.getDefault(),
+                    "%.1f",
+                    device.getExtraInfo("fm_frequency") as Float
+                )
+            },
+            description = { _, context -> context.getString(R.string.controlcenter_change_fm_frequency) },
+            onClick = { device, context ->
+                val builder = MaterialAlertDialogBuilder(context)
+                val inflater = LayoutInflater.from(context)
+                val pickerView = inflater.inflate(R.layout.dialog_frequency_picker, null)
+                builder.setTitle(R.string.preferences_fm_frequency)
+
+                val fmPresets = floatArrayOf(
+                    GBApplication.getDeviceSpecificSharedPrefs(device.address).getFloat("fm_preset0", 99f),
+                    GBApplication.getDeviceSpecificSharedPrefs(device.address).getFloat("fm_preset1", 100f),
+                    GBApplication.getDeviceSpecificSharedPrefs(device.address).getFloat("fm_preset2", 101f),
+                )
+
+                val decimalPicker = pickerView.findViewById<NumberPicker>(R.id.frequency_dec)
+                decimalPicker.minValue = freqMinInt
+                decimalPicker.maxValue = freqMaxInt
+
+                val fractionPicker = pickerView.findViewById<NumberPicker>(R.id.frequency_fraction)
+                fractionPicker.minValue = 0
+                fractionPicker.maxValue = 9
+
+                val pickerListener = NumberPicker.OnValueChangeListener { numberPicker, _, _ ->
+                    when (numberPicker.value) {
+                        freqMinInt -> {
+                            fractionPicker.minValue = 5
+                            fractionPicker.maxValue = 9
+                        }
+
+                        freqMaxInt -> {
+                            fractionPicker.minValue = 0
+                            fractionPicker.maxValue = 0
+                        }
+
+                        else -> {
+                            fractionPicker.minValue = 0
+                            fractionPicker.maxValue = 9
+                        }
+                    }
+                }
+                decimalPicker.setOnValueChangedListener(pickerListener)
+
+                val presetButtons = arrayOf<Button>(
+                    pickerView.findViewById(R.id.frequency_preset1),
+                    pickerView.findViewById(R.id.frequency_preset2),
+                    pickerView.findViewById(R.id.frequency_preset3),
+                )
+
+                val alert = arrayOfNulls<AlertDialog>(1)
+                for (index in presetButtons.indices) {
+                    presetButtons[index].text = fmPresets[index].toString()
+                    presetButtons[index].setOnClickListener {
+                        val frequency = fmPresets[index]
+                        device.setExtraInfo("fm_frequency", frequency)
+                        GBApplication.deviceService(device).onSetFmFrequency(frequency)
+                        device.sendDeviceUpdateIntent(context)
+                        alert[0]?.dismiss()
+                    }
+                    presetButtons[index].setOnLongClickListener {
+                        val frequency = decimalPicker.value + (0.1f * fractionPicker.value)
+                        fmPresets[index] = frequency
+                        presetButtons[index].text = frequency.toString()
+                        GBApplication.getDeviceSpecificSharedPrefs(device.address).edit {
+                            putFloat("fm_preset$index", frequency)
+                        }
+                        true
+                    }
+                }
+
+                val frequency = device.getExtraInfo("fm_frequency") as Float
+                val decimal = frequency.toInt()
+                val fraction = ((frequency - decimal) * 10).roundToInt()
+                decimalPicker.value = decimal
+                pickerListener.onValueChange(decimalPicker, decimalPicker.value, decimal)
+                fractionPicker.value = fraction
+
+                builder.setView(pickerView)
+                builder.setPositiveButton(context.resources.getString(android.R.string.ok)) { _, _ ->
+                    val selected = decimalPicker.value + (0.1f * fractionPicker.value)
+                    if (selected !in freqMin..freqMax) {
+                        MaterialAlertDialogBuilder(context)
+                            .setTitle(R.string.pref_invalid_frequency_title)
+                            .setMessage(R.string.pref_invalid_frequency_message)
+                            .setNeutralButton(android.R.string.ok, null)
+                            .show()
+                    } else {
+                        device.setExtraInfo("fm_frequency", selected)
+                        GBApplication.deviceService(device).onSetFmFrequency(selected)
+                        device.sendDeviceUpdateIntent(context)
+                    }
+                }
+                builder.setNegativeButton(context.resources.getString(R.string.cancel)) { dialog, _ -> dialog.cancel() }
+
+                alert[0] = builder.create()
+                alert[0]?.show()
+            },
+        )
+    }
+
+    private fun ledColorItem(coordinator: DeviceCoordinator): StatusCardItem = StatusCardItem(
+        icon = R.drawable.ic_led_color,
+        color = { device -> device.getExtraInfo("led_color") as? Int },
+        value = { _, _ -> null },
+        description = { _, context -> context.getString(R.string.controlcenter_change_led_color) },
+        onClick = { device, context ->
+            val builder = ColorPickerDialog.newBuilder()
+            builder.setDialogTitle(R.string.preferences_led_color)
+
+            val presets = coordinator.colorPresets
+            val currentColor = device.getExtraInfo("led_color") as Int
+            builder.setColor(currentColor)
+            builder.setShowAlphaSlider(false)
+            builder.setShowColorShades(false)
+            if (coordinator.supportsRgbLedColor(device)) {
+                builder.setAllowCustom(true)
+                if (presets.isEmpty()) {
+                    builder.setDialogType(ColorPickerDialog.TYPE_CUSTOM)
+                }
+            } else {
+                builder.setAllowCustom(false)
+            }
+
+            if (presets.isNotEmpty()) {
+                builder.setAllowPresets(true)
+                builder.setPresets(presets)
+            }
+
+            val dialog = builder.create()
+            dialog.setColorPickerDialogListener(object : ColorPickerDialogListener {
+                override fun onColorSelected(dialogId: Int, color: Int) {
+                    device.setExtraInfo("led_color", color)
+                    GBApplication.deviceService(device).onSetLedColor(color)
+                    // Trigger a refresh, to avoid mutating the Drawable directly
+                    device.sendDeviceUpdateIntent(context)
+                }
+
+                override fun onDialogDismissed(dialogId: Int) {
+                    // Nothing to do
+                }
+            })
+            dialog.show((context as AppCompatActivity).supportFragmentManager, "color-picker-dialog")
+        },
+    )
+}

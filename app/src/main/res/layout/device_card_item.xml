@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:card_view="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:id="@+id/card_item_root"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:layout_margin="3dp"
+    android:clickable="true"
+    android:focusable="true"
+    android:gravity="center_horizontal"
+    android:minWidth="36dp"
+    android:orientation="vertical">
+
+    <!-- ContentDescription is set dynamically -->
+    <ImageView
+        android:id="@+id/card_item_icon"
+        android:layout_width="40dp"
+        android:layout_height="40dp"
+        android:background="?android:attr/selectableItemBackground"
+        android:padding="3dp"
+        android:scaleType="fitXY"
+        card_view:srcCompat="@drawable/ic_device_unknown"
+        card_view:tint="@color/secondarytext"
+        tools:ignore="ContentDescription" />
+
+    <TextView
+        android:id="@+id/card_item_label"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_horizontal"
+        android:minWidth="36dp"
+        android:textColor="@color/secondarytext"
+        android:textStyle="bold"
+        android:visibility="gone"
+        tools:text="100%"
+        tools:visibility="visible" />
+
+    <ProgressBar
+        android:id="@+id/card_item_busy"
+        style="@android:style/Widget.ProgressBar.Horizontal"
+        android:layout_width="match_parent"
+        android:layout_height="3dp"
+        android:indeterminate="true"
+        android:visibility="gone"
+        tools:visibility="visible" />
+
+</LinearLayout>
