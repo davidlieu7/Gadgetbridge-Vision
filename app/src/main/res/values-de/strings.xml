@@ -4461,6 +4461,9 @@
     <string name="pref_log_level_trace_title">Detailliertes Logging</string>
     <string name="soundbrenner_category_tempo">Geschwindigkeit</string>
     <!-- Galaxy Watch7 settings -->
+    <string name="prefs_gw7_cat_pairing">Kopplung</string>
+    <string name="prefs_gw7_companion_node_id">Companion-Node-ID</string>
+    <string name="prefs_gw7_companion_node_id_summary">Die 8-stellige ID, die diese Uhr von ihrem gekoppelten Telefon erwartet. Ohne sie trennt die Uhr die Verbindung sofort. Wie man sie ausliest, steht auf der Galaxy-Watch7-Wikiseite.</string>
     <string name="prefs_gw7_cat_display">Display</string>
     <string name="prefs_gw7_cat_adv">Gesten &amp; Tasten</string>
     <string name="prefs_gw7_cat_general">Allgemein</string>

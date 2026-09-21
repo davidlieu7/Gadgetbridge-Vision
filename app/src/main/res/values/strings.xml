@@ -5634,6 +5634,9 @@
     <string name="cardo_control_enable_voice_prompts">Enable Voice Prompts</string>
 
     <!-- Galaxy Watch7 settings -->
+    <string name="prefs_gw7_cat_pairing">Pairing</string>
+    <string name="prefs_gw7_companion_node_id">Companion node ID</string>
+    <string name="prefs_gw7_companion_node_id_summary">The 8-character ID this watch expects from its paired phone. Without it the watch drops the connection immediately. See the Galaxy Watch7 wiki page on how to read it.</string>
     <string name="prefs_gw7_cat_display">Display</string>
     <string name="prefs_gw7_cat_adv">Gestures &amp; buttons</string>
     <string name="prefs_gw7_cat_general">General</string>

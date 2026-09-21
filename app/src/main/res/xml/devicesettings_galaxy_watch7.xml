@@ -1,6 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <androidx.preference.PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto">
+    <PreferenceCategory android:title="@string/prefs_gw7_cat_pairing">
+        <EditTextPreference
+            android:icon="@drawable/ic_vpn_key"
+            android:key="pref_galaxywatch7_companion_node_id"
+            android:maxLength="16"
+            android:summary="@string/prefs_gw7_companion_node_id_summary"
+            android:title="@string/prefs_gw7_companion_node_id" />
+    </PreferenceCategory>
     <PreferenceCategory android:title="@string/prefs_gw7_cat_display">
         <SeekBarPreference android:defaultValue="128" android:key="pref_galaxywatch7_display_brightness" android:max="254" app:min="0" app:showSeekBarValue="true" android:title="@string/prefs_gw7_display_brightness" />
         <SeekBarPreference android:defaultValue="2" android:key="pref_galaxywatch7_display_font_size" android:max="5" app:min="0" app:showSeekBarValue="true" android:title="@string/prefs_gw7_display_font_size" />

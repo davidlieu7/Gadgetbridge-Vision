@@ -3395,3 +3395,46 @@ So the watch *does* run a signature verifier over what we send, and is not satis
 yet the session survives and DataItems are acted upon. That is evidence against the digest
 being cryptographically enforced for the Data Layer path (§51's open question), though not
 proof: the message says nothing about which package it was checking.
+
+### §51 addendum 2 — the real gate: the watch pins the companion NODE ID
+
+Everything above was chasing the wrong thing. Moving the watch to a second phone (a Pixel 7,
+GrapheneOS) made it drop GB after every `NodeInfo`, with the Samsung apps disabled, GMS's
+Bluetooth permission revoked, and GB the only process on the channel. Watch-side logcat named
+the reason in one line:
+
+```
+Wear_Transport: ClientNodeId = 24473012 connectNodeId = ce92029e
+Wear_Transport: Mismatched node is attempting to connect:
+                clientNodeId is 24473012 and message nodeId is ce92029e
+```
+
+**The watch pins the Wear node id of the phone that enrolled it and rejects every peer that
+announces a different one.** Setting GB's node id to the expected value turns a flapping
+connection into a working one immediately: 897 DataItems, zero disconnects, zero reconnects,
+battery reported - on a phone where nothing had worked before.
+
+This also retroactively explains the earlier "success". `EXPERIMENT_IMPERSONATE_NODE_ID` was
+left set to `"e1b1cd8b"` despite its own comment claiming it was disabled - and that value is
+the *test phone's* GMS node id. GB was not being accepted on its own merits there; it was
+announcing the identity the watch already trusted. Enrollment (§51) was published on every
+connect and made no difference to acceptance. The constant is now permanently `null`: a
+captured id belongs to exactly one phone, so anywhere else it is simply a wrong answer that
+also masks whether anything else works.
+
+**The id cannot be discovered locally.** Checked and ruled out:
+
+- not derivable from `android_id` (compared on both phones, no relation in either half)
+- never logged by the phone before a session exists - it appears in phone-side logcat only
+  as the destination field of MessageEvents *after* GB is already connected as that node
+- not carried in the watch's `NodeInfo`, which is the only thing GB receives before being
+  dropped
+- the watch does publish it, 270 times in the capture, in a DataItem at
+  `wear://<watchNode>/peers` (DataMap key `ids`, an array alongside `isWatch` and
+  `cloudSyncNotif`) - but that is a DataItem, and the mismatch prevents any DataItem from
+  ever arriving. Chicken and egg.
+
+So it has to be supplied out of band, exactly like a pairing key. GB now exposes it as
+`pref_galaxywatch7_companion_node_id` ("Companion node ID", Pairing category); when set it
+overrides GB's own generated node id. Reading it off the watch needs adb but no root - see
+`docs/GALAXY_WATCH7_SETUP.md`.
