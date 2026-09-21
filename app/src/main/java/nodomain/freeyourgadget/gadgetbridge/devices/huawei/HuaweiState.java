@@ -502,10 +502,11 @@ public class HuaweiState {
         return supportsCommandForService(0x18, 0x02);
     }
 
-    public boolean supportsWheelchairMode(final GBDevice gbDevice) {
-        // Huawei does not advertise the wheelchair DataSync package as a capability. Until it
-        // does, keep the known supported model gate centralized with the other device state.
-        return gbDevice.getType() == DeviceType.HUAWEIBAND11PRO;
+    public boolean supportsWheelchairMode() {
+        if (supportsExpandCapability()) {
+            return supportsExpandCapability(276);
+        }
+        return false;
     }
 
     public boolean supportsGpsAndTimeToDevice() {

@@ -1031,7 +1031,7 @@ public class HuaweiSupportProvider {
             if (getDeviceState().supportsArterialStiffnessDetection()) {
                 huaweiDataSyncArterialStiffnessDetection = new HuaweiDataSyncArterialStiffnessDetection(HuaweiSupportProvider.this);
             }
-            if (getDeviceState().supportsWheelchairMode(getDevice())) {
+            if (getDeviceState().supportsWheelchairMode()) {
                 huaweiDataSyncWheelchairService = new HuaweiDataSyncWheelchairService(HuaweiSupportProvider.this);
                 huaweiDataSyncSyncDeviceService = new HuaweiDataSyncSyncDeviceService(HuaweiSupportProvider.this);
                 if (!huaweiDataSyncSyncDeviceService.requestConfigurationSync()) {
