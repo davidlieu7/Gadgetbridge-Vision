@@ -109,6 +109,7 @@ the meantime, read it again.
 the stock wizard again — Gadgetbridge cannot complete that step. Re-enable Galaxy Wearable, run
 the setup through, then come back to step 2.
 
-**Gadgetbridge shows connected but the watch says it is disconnected.** Known gap: Gadgetbridge
-does not yet announce phone-side capabilities, so Samsung's own status modules on the watch stay
-in "no companion" mode. Data syncing is unaffected.
+**The watch says it is disconnected.** Check whether Gadgetbridge is actually connected — the
+watch reports itself as companion-less exactly while nothing holds the session, including the
+moments right after Gadgetbridge restarts. If Gadgetbridge shows the watch as connected, the
+watch agrees.

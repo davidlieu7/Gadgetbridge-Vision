@@ -3362,7 +3362,18 @@ BATTERY_TILE_WatchDataLayerManager: Watch battery level : 100
 BATTERY_TILE_WatchDataLayerManager: Watch charging state : 1
 ```
 
-But the **Samsung companion layer still reports that no phone is present**:
+**Correction (2026-09-22):** the paragraph below was wrong, and is kept only because the
+capability observation in it still stands. The snapshot was taken moments after GB had been
+force-stopped and restarted, i.e. while it genuinely was not connected - so "no phone present"
+was simply true at that instant, not a structural gap. Re-checked deliberately across a
+disconnect/reconnect cycle with watch-side adb: while GB is connected the watch reports
+`CompanionConnectionMode: 1`. The watch does *not* consider itself companion-less when GB
+holds the session, and there is no evidence that a missing capability announcement affects the
+connection status it displays. What remains unverified is the narrower question of whether
+individual Samsung features that gate on a specific capability (the empty
+`CapabilityInfo{w_apps_music_transfer, []}` list) stay inactive.
+
+The original, mistaken observation:
 
 ```
 SecCompanionConnectionStatusModule: isBluetoothPhoneConnected: false
@@ -3376,14 +3387,10 @@ phone-side capability**, because GB never announces one. The stock phone does - 
 capture carries items of the form
 `wear://<node>/capabilities/<package>/<signature digest>/<capability name>` in both
 directions (e.g. `fast_pair_support` from GMS, `com.samsung.android.wcs.extension`'s set from
-the watch). Announcing capabilities is therefore a separate, still-missing piece from
-enrollment, and the likely reason the watch can display "disconnected" while GB shows
-"connected" and data is flowing.
-
-One alternative reading is not yet excluded: `isBluetoothPhoneConnected` may refer narrowly to
-the classic BT phone profile (HFP), which GB does not establish. Both readings fit the
-evidence; distinguishing them needs a capability announcement to actually be implemented and
-the flag re-checked.
+the watch). Announcing capabilities is therefore still a missing piece next to enrollment - but see the
+correction above: it is *not* the reason for any "disconnected" display, since the watch
+reports itself as connected whenever GB holds the session. What it may still gate are the
+individual Samsung features that look for a named capability.
 
 Also visible on every GB reconnect, several times:
 
