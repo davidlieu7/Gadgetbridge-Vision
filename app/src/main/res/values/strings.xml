@@ -2586,6 +2586,7 @@
     <string name="devicetype_coospo_h9z" translatable="false">Coospo H9Z</string>
     <string name="devicetype_solarflow">SolarFlow</string>
     <string name="devicetype_braun_bpw4500" translatable="false">Braun iCheck 7 BPW4500</string>
+    <string name="devicetype_ls2_4x">LS2-4X</string>
     <!-- Menus on the smart device -->
     <string name="menuitem_nothing">Nothing</string>
     <string name="menuitem_status">Status</string>
@@ -4076,6 +4077,7 @@
     <string name="devicetype_jabra_evolve2_55" translatable="false">Jabra Evolve2 55</string>
     <string name="devicetype_jabra_evolve2_65" translatable="false">Jabra Evolve2 65</string>
     <string name="devicetype_onemore_sonoflow" translatable="false">1MORE SonoFlow</string>
+    <string name="devicetype_onemore_sonoflow_se" translatable="false">1MORE SonoFlow SE</string>
     <string name="devicetype_sony_wena3" translatable="false">Sony Wena 3</string>
     <string name="devicetype_withings_steel_hr" translatable="false">Withings Steel HR</string>
     <string name="pref_button_action_disabled">Disabled</string>
@@ -5702,4 +5704,23 @@
     <string name="gpx_include_navigation_straight">Include \'Continue straight\' instructions</string>
     <string name="gpx_roundabout_exit">Exit %1$d</string>
     <string name="pref_title_connect_to_this_device_when_another_device_connects">Connect to this device when another device connects</string>
+
+    <!-- Strings related to Cardo Devices -->
+    <string name="title_activity_cardo_control">Cardo Control</string>
+    <string name="cardo_card_fm_radio">FM Radio</string>
+    <string name="cardo_control_enable_radio">Enable Radio</string>
+    <string name="cardo_control_fm_autotune">Auto tune stations to presets</string>
+    <string name="cardo_control_fm_confirm_autotune">Do you really want to proceed? Previously set stations will be overwritten.</string>
+    <string name="cardo_control_fm_preset_title">Tune Presets</string>
+    <string name="cardo_control_fm_preset_not_set">Empty Preset %1$d</string>
+    <string name="cardo_control_fm_frequency_title">Frequency</string>
+    <string name="cardo_control_fm_frequency_subtitle">%1$.1f MHz</string>
+    <string name="cardo_control_fm_scan_down">Scan DOWN</string>
+    <string name="cardo_control_fm_scan_up">Scan UP</string>
+    <string name="cardo_control_fm_scan_stop">Stop Scanning</string>
+    <string name="cardo_control_fm_seek_down">Seek DOWN</string>
+    <string name="cardo_control_fm_seek_up">Seek UP</string>
+    <string name="cardo_control_volume">Volume</string>
+    <string name="cardo_card_voice_prompts">Voice Prompts</string>
+    <string name="cardo_control_enable_voice_prompts">Enable Voice Prompts</string>
 </resources>

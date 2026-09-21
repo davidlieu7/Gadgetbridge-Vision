@@ -63,6 +63,7 @@ data class ScreenSetting(
     @StringRes val summary: Int = 0,
     @DrawableRes val icon: Int = 0,
     override val visibleWhen: ((Prefs) -> Boolean)? = null,
+    val enabled: ((Prefs) -> Boolean)? = null,
     override val connectedOnly: Boolean = true,
     override val children: List<DeviceSetting> = emptyList(),
 ) : GroupSetting()

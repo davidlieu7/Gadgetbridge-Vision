@@ -41,6 +41,7 @@ import nodomain.freeyourgadget.gadgetbridge.devices.binary_sensor.coordinator.Bi
 import nodomain.freeyourgadget.gadgetbridge.devices.bm2.Bm2Coordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.bm6.Bm6Coordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.braun.BraunBPW4500DeviceCoordinator;
+import nodomain.freeyourgadget.gadgetbridge.devices.cardo.Ls24xDeviceCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.casio.ecbs100.CasioECBS100DeviceCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.casio.gb6900.CasioGB6900DeviceCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.casio.gbd200.CasioGBD200DeviceCoordinator;
@@ -491,6 +492,7 @@ import nodomain.freeyourgadget.gadgetbridge.devices.nothing.EarStickCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.nut.NutCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.ollee.OlleeDeviceCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.onemoresonoflow.OneMoreSonoFlowCoordinator;
+import nodomain.freeyourgadget.gadgetbridge.devices.onemoresonoflow.OneMoreSonoFlowSECoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.onetouch.OneTouchCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.oppo.OppoEncoAir2Coordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.oppo.OppoEncoAirCoordinator;
@@ -1060,6 +1062,7 @@ public enum DeviceType {
     JABRA_EVOLVE2_55(JabraEvolve255Coordinator.class),
     JABRA_EVOLVE2_65(JabraEvolve265Coordinator.class),
     ONEMORE_SONOFLOW(OneMoreSonoFlowCoordinator.class),
+    ONEMORE_SONOFLOW_SE(OneMoreSonoFlowSECoordinator.class),
     HONORBAND3(HonorBand3Coordinator.class),
     HONORBAND4(HonorBand4Coordinator.class),
     HONORBAND5(HonorBand5Coordinator.class),
@@ -1228,6 +1231,7 @@ public enum DeviceType {
     UNA_WATCH(UnaDeviceCoordinator.class),
     ZEBLAZE_BEYOND_3_PRO(Beyond3ProCoordinator.class),
     QN_SCALE(QnScaleCoordinator.class),
+    CARDO_LS24X(Ls24xDeviceCoordinator.class),
     VEEPOO_KR96_PRO(VeepooKR96ProCoordinator.class),
     TEST(TestDeviceCoordinator.class);
 

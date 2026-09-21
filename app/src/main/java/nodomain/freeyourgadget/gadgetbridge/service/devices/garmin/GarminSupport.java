@@ -646,8 +646,9 @@ public class GarminSupport extends AbstractBTLESingleDeviceSupport implements IC
                 Smart.newBuilder().setInstalledAppsService(
                         GdiInstalledAppsService.InstalledAppsService.newBuilder().setDeleteAppRequest(
                                 GdiInstalledAppsService.InstalledAppsService.DeleteAppRequest.newBuilder()
-                                        .setStoreAppId(app.getStoreAppId())
+                                        .setNativeAppId(app.getNativeAppId())
                                         .setAppType(app.getType())
+                                        .setStoreAppId(app.getStoreAppId())
                         )
                 ).build());
     }
@@ -1508,7 +1509,7 @@ public class GarminSupport extends AbstractBTLESingleDeviceSupport implements IC
                                             ScreenDefinitionRequest.newBuilder()
                                                     .setScreenId(screenId)
                                                     .setUnk2(0)
-                                                    .setLanguage(localeString.length() == 5 ? localeString : "en_US")
+                                                    .setLocale(localeString.length() == 5 ? localeString : "en_US")
                                     )
                             ).build());
 

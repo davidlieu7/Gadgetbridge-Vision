@@ -1,5 +1,7 @@
 package nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.http;
 
+import androidx.annotation.NonNull;
+
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonNull;
@@ -162,6 +164,7 @@ public class GarminJson {
         }
     }
 
+    @NonNull
     public static JsonElement decode(final byte[] bytes) throws GarminJsonException {
         if (bytes.length < 4 + 4 + 1) {
             throw new GarminJsonException("Not enough bytes for GarminJson in " + GB.hexdump(bytes));
