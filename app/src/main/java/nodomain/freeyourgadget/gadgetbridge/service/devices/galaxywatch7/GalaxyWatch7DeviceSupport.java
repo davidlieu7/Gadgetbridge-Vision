@@ -418,6 +418,13 @@ public class GalaxyWatch7DeviceSupport extends AbstractBTBRDeviceSupport {
         // values actually observed on the wire - not the full stock option set. The enable toggle is
         // separate and already wired via BOOLEAN_SETTINGS ("labs/quicklaunch/enabled").
         addValueSetting(new SettingSpec("pref_galaxywatch7_advanced_labs_quicklaunch_app", "advanced/labs/quicklaunch/launch_package", "stringLaunchApp", SettingType.STRING));
+        // Status indicators (top-of-watchface charging/disconnected/mode icons): a string picker,
+        // NOT an int index despite the path ending in "/selected_item" - captured live 2026-09-21:
+        // "show" (Immer anzeigen) / "hide2" (Nach 2 Sekunden ausblenden), key "stringSelectedItem".
+        // action_button has no equivalent UI on this watch (Action Button is Ultra-only hardware;
+        // its catalog paths exist but nothing in the stock app's "Tasten und Gesten" screen exposes
+        // them), so it's not wired here.
+        addValueSetting(new SettingSpec("pref_galaxywatch7_advanced_status_indicator", "advanced/status_indicator/selected_item", "stringSelectedItem", SettingType.STRING));
     }
 
     private static void addValueSetting(final SettingSpec spec) {

@@ -5688,6 +5688,15 @@
         <item>fixed/open_exercise_list</item>
         <item>fixed/open_recent</item>
     </string-array>
+    <string name="prefs_gw7_advanced_status_indicator">Status indicators</string>
+    <string-array name="prefs_gw7_status_indicator_names">
+        <item>Always show</item>
+        <item>Hide after 2 seconds</item>
+    </string-array>
+    <string-array name="prefs_gw7_status_indicator_values">
+        <item>show</item>
+        <item>hide2</item>
+    </string-array>
     <string name="prefs_gw7_advanced_bixby_enabled">Bixby enabled</string>
     <string name="prefs_gw7_display_outdoor_mode">Outdoor mode</string>
     <string name="prefs_gw7_sound_vibration_feedback">Vibration feedback</string>

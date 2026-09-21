@@ -90,6 +90,7 @@ public class GalaxyWatch7SettingsCustomizer implements DeviceSpecificSettingsCus
             "pref_galaxywatch7_advanced_press_and_hold",
             "pref_galaxywatch7_advanced_double_press",
             "pref_galaxywatch7_advanced_labs_quicklaunch_app",
+            "pref_galaxywatch7_advanced_status_indicator",
     };
 
     @Override
