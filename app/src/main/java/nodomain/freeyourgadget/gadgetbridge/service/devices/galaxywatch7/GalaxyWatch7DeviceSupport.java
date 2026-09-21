@@ -159,6 +159,14 @@ public class GalaxyWatch7DeviceSupport extends AbstractBTBRDeviceSupport {
         synchronized (incomingLock) {
             incoming = new byte[0];
         }
+        // The dedup fields below live on this DeviceSupport instance, which can outlive a single
+        // enrollment (the app process, and with it this object, stays alive across a device
+        // removal + re-pair). Without resetting them here, a reconnect can silently swallow the
+        // first battery reading because it happens to match a value we reported in a PREVIOUS
+        // connection - even though GB's displayed value has since reset to unknown (new device
+        // row). Reset on every fresh connect so the first reading always gets through.
+        lastBatteryLevel = -1;
+        lastBatteryTimestamp = -1;
         final SharedPreferences prefs = GBApplication.getDeviceSpecificSharedPrefs(getDevice().getAddress());
         // EXPERIMENT (§16): impersonate the enrolled GMS companion node id. Trust looks node-id
         // based (no crypto challenge on the wire), so presenting the id the watch already trusts
