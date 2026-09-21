@@ -3347,3 +3347,51 @@ validated or merely stored.
 Raw evidence: local only, **not committed** - the capture carries personal identifiers (FCM
 registration token, `androidId`, the account's `networkId`). Kept in `captures/`, excluded
 via `.git/info/exclude`.
+
+### §51 addendum — what enrollment does *not* fix: the watch's companion status
+
+With adb enabled on the watch itself (Wireless debugging; `SM-L310`, Wear OS on Android 16),
+the same session can finally be observed from the watch's side. Doing that during a GB
+reconnect, with both Samsung companion apps uninstalled from the phone, splits the result in
+two.
+
+GB's Data Layer is unambiguously healthy - the watch's own modules act on our traffic:
+
+```
+BATTERY_TILE_WatchDataLayerManager: Watch battery level : 100
+BATTERY_TILE_WatchDataLayerManager: Watch charging state : 1
+```
+
+But the **Samsung companion layer still reports that no phone is present**:
+
+```
+SecCompanionConnectionStatusModule: isBluetoothPhoneConnected: false
+SecCompanionConnectionStatusModule: updated CompanionConnectionMode: 0
+_M_FTS_DataLayerListenerService:    disconnected with mobile
+_M_FTS_DataLayerListenerService:    onCapabilityChanged() : CapabilityInfo{w_apps_music_transfer, []}
+```
+
+The empty node list in that `CapabilityInfo` is the lead: **no connected node advertises any
+phone-side capability**, because GB never announces one. The stock phone does - the OOBE
+capture carries items of the form
+`wear://<node>/capabilities/<package>/<signature digest>/<capability name>` in both
+directions (e.g. `fast_pair_support` from GMS, `com.samsung.android.wcs.extension`'s set from
+the watch). Announcing capabilities is therefore a separate, still-missing piece from
+enrollment, and the likely reason the watch can display "disconnected" while GB shows
+"connected" and data is flowing.
+
+One alternative reading is not yet excluded: `isBluetoothPhoneConnected` may refer narrowly to
+the classic BT phone profile (HFP), which GB does not establish. Both readings fit the
+evidence; distinguishing them needs a capability announcement to actually be implemented and
+the flag re-checked.
+
+Also visible on every GB reconnect, several times:
+
+```
+GoogleSignatureVerifier: package info is not set correctly
+```
+
+So the watch *does* run a signature verifier over what we send, and is not satisfied with it -
+yet the session survives and DataItems are acted upon. That is evidence against the digest
+being cryptographically enforced for the Data Layer path (§51's open question), though not
+proof: the message says nothing about which package it was checking.
