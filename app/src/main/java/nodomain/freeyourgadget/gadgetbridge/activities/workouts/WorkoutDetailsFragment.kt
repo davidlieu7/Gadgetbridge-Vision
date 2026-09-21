@@ -347,7 +347,7 @@ class WorkoutDetailsFragment : Fragment(), MenuProvider {
                     workoutEditor.editWorkoutType(it, object : WorkoutEditor.Callback {
                         override fun onWorkoutUpdated() {
                             notifyWorkoutChanged()
-                            updateWorkoutHeader(workout.summary)
+                            workoutViewModel.refreshWorkout(workoutId)
                         }
                     })
                 }
