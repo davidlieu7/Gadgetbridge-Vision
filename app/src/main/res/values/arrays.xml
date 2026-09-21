@@ -4079,6 +4079,24 @@
         <item>7</item>
     </string-array>
 
+    <string-array name="redmi_buds_6_lite_button_function_names">
+        <item>@string/none</item>
+        <item>@string/pref_media_playpause</item>
+        <item>@string/pref_media_previous</item>
+        <item>@string/pref_media_next</item>
+        <item>@string/pref_media_volumeup</item>
+        <item>@string/pref_media_volumedown</item>
+    </string-array>
+
+    <string-array name="redmi_buds_6_lite_button_function_values">
+        <item>8</item>
+        <item>1</item>
+        <item>2</item>
+        <item>3</item>
+        <item>4</item>
+        <item>5</item>
+    </string-array>
+
     <string-array name="redmi_buds_8_active_single_button_function_names">
         <item>@string/none</item>
         <item>@string/pref_media_playpause</item>
