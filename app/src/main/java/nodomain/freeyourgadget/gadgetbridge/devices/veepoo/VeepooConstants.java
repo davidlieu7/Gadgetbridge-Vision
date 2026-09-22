@@ -179,6 +179,8 @@ public final class VeepooConstants {
     public static final String CONFIG_WORKOUT_START_PREFIX = "veepoo_workout_start_";
     /** Stop the running workout. */
     public static final String CONFIG_WORKOUT_STOP = "veepoo_workout_stop";
+    /** Record the route of a phone-initiated workout with the phone's GPS (the band has no GNSS). */
+    public static final String CONFIG_WORKOUT_PHONE_GPS = "veepoo_workout_phone_gps";
     /** Start a single-shot SpO2 (blood oxygen) measurement. */
     public static final String CONFIG_MEASURE_SPO2 = "veepoo_measure_spo2";
     /** Start a single-shot body-temperature measurement. */

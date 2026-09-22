@@ -31,6 +31,17 @@ private fun visibleWhenSupported(key: String): (Prefs) -> Boolean = { prefs ->
 
 fun veepooDeviceSettings(): DeviceSettingsSpec = deviceSettings {
     screen(
+        key = "veepoo_workout",
+        title = R.string.veepoo_settings_workout,
+        icon = R.drawable.ic_timer,
+    ) {
+        switchSetting(
+            key = VeepooConstants.CONFIG_WORKOUT_PHONE_GPS,
+            title = R.string.veepoo_workout_phone_gps_title,
+            summary = R.string.veepoo_workout_phone_gps_summary,
+        )
+    }
+    screen(
         key = "veepoo_auto_measure",
         title = R.string.veepoo_settings_auto_measure,
         icon = R.drawable.ic_health,

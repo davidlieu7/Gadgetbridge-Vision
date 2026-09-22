@@ -60,6 +60,7 @@ import nodomain.freeyourgadget.gadgetbridge.entities.VeepooEcgSampleDao;
 import nodomain.freeyourgadget.gadgetbridge.entities.VeepooSleepSummarySampleDao;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
 import nodomain.freeyourgadget.gadgetbridge.model.ActivitySample;
+import nodomain.freeyourgadget.gadgetbridge.model.ActivityTrackProvider;
 import nodomain.freeyourgadget.gadgetbridge.model.BloodPressureSample;
 import nodomain.freeyourgadget.gadgetbridge.model.HrvSummarySample;
 import nodomain.freeyourgadget.gadgetbridge.model.HrvValueSample;
@@ -82,6 +83,13 @@ public abstract class AbstractVeepooCoordinator extends AbstractBLEDeviceCoordin
         // Workout history (0xD4) sessions are persisted as BaseActivitySummary rows with an
         // optional GPX track, so the Health Connect workout syncer can export them.
         return true;
+    }
+
+    @Override
+    public ActivityTrackProvider getActivityTrackProvider(@NonNull final GBDevice device, @NonNull final Context context) {
+        // Rebuilds the per-minute HR/speed track from the 0xD4 per-minute records stored in the
+        // workout's summaryData, so Health Connect gets per-minute HeartRate/Speed samples.
+        return new VeepooActivityTrackProvider();
     }
 
     @Override

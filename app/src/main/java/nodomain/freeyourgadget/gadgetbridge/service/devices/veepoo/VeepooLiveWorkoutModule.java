@@ -16,7 +16,10 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>. */
 package nodomain.freeyourgadget.gadgetbridge.service.devices.veepoo;
 
+import android.location.Location;
 import android.widget.Toast;
+
+import androidx.annotation.Nullable;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -26,6 +29,7 @@ import java.nio.BufferUnderflowException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.ArrayList;
+import java.util.Date;
 import java.util.List;
 
 import nodomain.freeyourgadget.gadgetbridge.GBApplication;
@@ -35,6 +39,10 @@ import nodomain.freeyourgadget.gadgetbridge.database.DBHelper;
 import nodomain.freeyourgadget.gadgetbridge.devices.veepoo.VeepooConstants;
 import nodomain.freeyourgadget.gadgetbridge.entities.DaoSession;
 import nodomain.freeyourgadget.gadgetbridge.entities.GenericHeartRateSample;
+import nodomain.freeyourgadget.gadgetbridge.externalevents.gps.GBLocationProviderType;
+import nodomain.freeyourgadget.gadgetbridge.externalevents.gps.GBLocationService;
+import nodomain.freeyourgadget.gadgetbridge.model.ActivityPoint;
+import nodomain.freeyourgadget.gadgetbridge.model.GPSCoordinate;
 import nodomain.freeyourgadget.gadgetbridge.service.btle.TransactionBuilder;
 import nodomain.freeyourgadget.gadgetbridge.util.GB;
 
@@ -60,6 +68,14 @@ class VeepooLiveWorkoutModule {
     private final List<byte[]> liveReportChunks = new ArrayList<>();
     private int liveReportTotalChunks = 0;
     private boolean postStopFetchScheduled = false;
+
+    // Phone GPS track recording (the band has no GNSS of its own). The track is buffered while a
+    // phone-initiated workout runs and handed to saveSportSession once the session is fetched.
+    static final float MAX_GPS_SPEED_MPS = 30f; // ~108 km/h; a faster fix-to-fix jump is a glitch
+    private static final int PHONE_GPS_INTERVAL_MS = 5000;
+    private boolean phoneGpsRecording = false;
+    private final List<ActivityPoint> phoneGpsPoints = new ArrayList<>();
+    private long phoneGpsStartMs = 0L;
 
     /**
      * Starts a workout via 0xDA. First re-syncs time (A1+A5), opens the live control report
@@ -284,12 +300,16 @@ class VeepooLiveWorkoutModule {
                 GB.toast(support.getContext(), ok ? R.string.veepoo_workout_stopped : R.string.veepoo_workout_stop_failed,
                         Toast.LENGTH_SHORT, ok ? GB.INFO : GB.ERROR);
                 if (ok) {
+                    stopPhoneGps();
                     schedulePostStopFetch();
                 }
             } else {
                 LOG.info("Workout start command {}", ok ? "accepted" : "FAILED by the device");
                 GB.toast(support.getContext(), ok ? R.string.veepoo_workout_started : R.string.veepoo_workout_start_failed,
                         Toast.LENGTH_SHORT, ok ? GB.INFO : GB.ERROR);
+                if (ok) {
+                    startPhoneGps();
+                }
             }
             return;
         }
@@ -456,6 +476,7 @@ class VeepooLiveWorkoutModule {
             GB.toast(support.getContext(), R.string.veepoo_workout_none_active, Toast.LENGTH_SHORT, GB.INFO);
         }
         if (finished) {
+            stopPhoneGps();
             schedulePostStopFetch();
         }
         persistLiveHeartRate(heartRate);
@@ -482,8 +503,131 @@ class VeepooLiveWorkoutModule {
         }
     }
 
+    /**
+     * Starts the phone-side GPS capture when the "record workout with phone GPS" setting is on
+     * and the phone GPS provider is available. The band has no GNSS of its own, so the route is
+     * recorded on the phone and attached to the session once it is saved.
+     */
+    void startPhoneGps() {
+        if (!support.getDevicePrefs().getBoolean(VeepooConstants.CONFIG_WORKOUT_PHONE_GPS, false)) {
+            return;
+        }
+        if (!GBLocationService.isGpsSupportedAndEnabled()) {
+            LOG.warn("Phone GPS is enabled for the workout but the phone GPS provider is off");
+            GB.toast(support.getContext(), R.string.veepoo_workout_phone_gps_unavailable, Toast.LENGTH_SHORT, GB.WARN);
+            return;
+        }
+        synchronized (liveWorkoutLock) {
+            if (phoneGpsRecording) {
+                return;
+            }
+            phoneGpsPoints.clear();
+            phoneGpsStartMs = System.currentTimeMillis();
+            phoneGpsRecording = true;
+        }
+        try {
+            GBLocationService.start(support.getContext(), support.getDevice(), GBLocationProviderType.GPS, PHONE_GPS_INTERVAL_MS);
+            LOG.info("Started the phone GPS recording for the live workout");
+        } catch (Exception e) {
+            synchronized (liveWorkoutLock) {
+                phoneGpsRecording = false;
+            }
+            LOG.error("Error starting the phone GPS", e);
+        }
+    }
+
+    /** Stops the phone-side GPS capture; the buffered points stay pending for saveSportSession. */
+    void stopPhoneGps() {
+        boolean wasRecording;
+        synchronized (liveWorkoutLock) {
+            wasRecording = phoneGpsRecording;
+            phoneGpsRecording = false;
+        }
+        if (!wasRecording) {
+            return;
+        }
+        try {
+            GBLocationService.stop(support.getContext(), support.getDevice());
+            LOG.info("Stopped the phone GPS recording");
+        } catch (Exception e) {
+            LOG.error("Error stopping the phone GPS", e);
+        }
+    }
+
+    /**
+     * Appends a fix from the shared phone GPS service to the pending track. Fixes with no
+     * coordinates, duplicate/out-of-order timestamps and physically impossible jumps are dropped.
+     */
+    void addPhoneGpsPoint(@Nullable Location location) {
+        if (location == null) {
+            return;
+        }
+        synchronized (liveWorkoutLock) {
+            if (!phoneGpsRecording) {
+                return;
+            }
+            if (location.getLatitude() == 0 && location.getLongitude() == 0) {
+                return; // some providers emit a (0,0) sentinel when there is no fix
+            }
+            final long timeMs = location.getTime();
+            final ActivityPoint last = phoneGpsPoints.isEmpty() ? null : phoneGpsPoints.get(phoneGpsPoints.size() - 1);
+            if (last != null) {
+                if (timeMs <= last.getTime().getTime()) {
+                    return;
+                }
+                final GPSCoordinate lastLocation = last.getLocation();
+                if (lastLocation != null) {
+                    final double meters = GPSCoordinate.distanceHaversine(
+                            lastLocation, new GPSCoordinate(location.getLongitude(), location.getLatitude()));
+                    final double seconds = (timeMs - last.getTime().getTime()) / 1000.0;
+                    if (seconds > 0 && meters / seconds > MAX_GPS_SPEED_MPS) {
+                        LOG.debug("Dropping an implausible GPS jump of {} m in {} s", (int) meters, (long) seconds);
+                        return;
+                    }
+                }
+            }
+            final ActivityPoint point = new ActivityPoint(new Date(timeMs));
+            final double altitude = location.getAltitude();
+            if (Double.isFinite(altitude) && altitude > 0) {
+                point.setLocation(new GPSCoordinate(location.getLongitude(), location.getLatitude(), altitude));
+            } else {
+                point.setLocation(new GPSCoordinate(location.getLongitude(), location.getLatitude()));
+            }
+            phoneGpsPoints.add(point);
+        }
+    }
+
+    /** Returns the track buffered during the last finished workout, or null if no fix was recorded. */
+    @Nullable
+    PhoneGpsTrack consumePendingPhoneGpsTrack() {
+        synchronized (liveWorkoutLock) {
+            if (phoneGpsPoints.isEmpty()) {
+                return null;
+            }
+            final PhoneGpsTrack track = new PhoneGpsTrack(new ArrayList<>(phoneGpsPoints), phoneGpsStartMs);
+            phoneGpsPoints.clear();
+            phoneGpsStartMs = 0L;
+            return track;
+        }
+    }
+
+    /** The phone GPS fixes recorded during the last finished workout. */
+    static final class PhoneGpsTrack {
+        final List<ActivityPoint> points;
+        final long startMs;
+
+        PhoneGpsTrack(final List<ActivityPoint> points, final long startMs) {
+            this.points = points;
+            this.startMs = startMs;
+        }
+    }
+
     void dispose() {
         support.mainHandler.removeCallbacks(postStopFetchTask);
         support.mainHandler.removeCallbacks(workoutCommandTimeout);
+        stopPhoneGps();
+        synchronized (liveWorkoutLock) {
+            phoneGpsPoints.clear();
+        }
     }
 }

@@ -20,6 +20,7 @@ import android.bluetooth.BluetoothGatt;
 import android.bluetooth.BluetoothGattCharacteristic;
 import android.content.Intent;
 import android.content.SharedPreferences;
+import android.location.Location;
 import android.os.Handler;
 import android.os.Looper;
 import android.widget.Toast;
@@ -86,6 +87,7 @@ import nodomain.freeyourgadget.gadgetbridge.model.ActivityKind;
 import nodomain.freeyourgadget.gadgetbridge.model.ActivityPoint;
 import nodomain.freeyourgadget.gadgetbridge.model.ActivitySample;
 import nodomain.freeyourgadget.gadgetbridge.model.ActivitySummaryData;
+import nodomain.freeyourgadget.gadgetbridge.model.ActivitySummaryEntries;
 import nodomain.freeyourgadget.gadgetbridge.model.ActivityTrack;
 import nodomain.freeyourgadget.gadgetbridge.model.Alarm;
 import nodomain.freeyourgadget.gadgetbridge.model.BatteryState;
@@ -1630,9 +1632,18 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
         }
     }
 
+    /**
+     * The band clock is re-synced before a phone-initiated workout starts, so a matching pending
+     * phone GPS track started within this window belongs to the session.
+     */
+    private static final long PHONE_GPS_MATCH_TOLERANCE_MS = 5 * 60 * 1000L;
+
     /** Persists one parsed workout as a BaseActivitySummary; identical sessions are skipped. */
     private void saveSportSession(Date startTime, Date stopTime, int sportType, ActivitySummaryData summary,
                                   List<VeepooSportDayParser.GpxPoint> gpsPoints, int dayIndex) {
+        // Consume the pending phone GPS track even when the session is already stored, so a stale
+        // track can never attach to a later session.
+        final VeepooLiveWorkoutModule.PhoneGpsTrack phoneTrack = liveWorkoutModule.consumePendingPhoneGpsTrack();
         try (DBHandler dbHandler = GBApplication.acquireDB()) {
             DaoSession session = dbHandler.getDaoSession();
             User user = DBHelper.getUser(session);
@@ -1656,10 +1667,31 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
             workout.setEndTime(stopTime);
             workout.setDevice(device);
             workout.setUser(user);
-            if (gpsPoints.size() >= 2) {
+
+            List<ActivityPoint> trackPoints = toActivityPoints(gpsPoints);
+            if (trackPoints.size() < 2 && phoneTrack != null) {
+                // No band GPS: attach the route recorded with the phone, when it matches this session.
+                if (phoneTrack.points.size() >= 2
+                        && Math.abs(phoneTrack.startMs - startTime.getTime()) <= PHONE_GPS_MATCH_TOLERANCE_MS) {
+                    LOG.info("Workout day {}: attaching the phone GPS track ({} points)", dayIndex, phoneTrack.points.size());
+                    trackPoints = phoneTrack.points;
+                } else {
+                    LOG.info("Workout day {}: discarding a pending phone GPS track that does not match the session", dayIndex);
+                }
+            }
+            if (trackPoints.size() >= 2) {
                 try {
                     summary.setHasGps(true);
-                    workout.setGpxTrack(writeSportGpx(startTime, workout.getName(), device, user, gpsPoints));
+                    workout.setGpxTrack(writeSportGpx(startTime, workout.getName(), device, user, trackPoints));
+                    if (phoneTrack != null && trackPoints == phoneTrack.points) {
+                        // Without GNSS the band's distance is a step estimate; the recorded route
+                        // provides a real one for the summary and the Health Connect sync.
+                        final double gpsDistanceMeters = trackDistance(trackPoints);
+                        if (gpsDistanceMeters > 0) {
+                            summary.add(ActivitySummaryEntries.DISTANCE_METERS,
+                                    Math.round(gpsDistanceMeters), ActivitySummaryEntries.UNIT_METERS);
+                        }
+                    }
                 } catch (Exception e) {
                     LOG.warn("Workout day {}: GPX export failed, saving without track", dayIndex, e);
                 }
@@ -1674,7 +1706,7 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
     }
 
     /** Writes the collected GPS track points as a .gpx file in the export directory. */
-    private String writeSportGpx(Date startTime, String name, Device device, User user, List<VeepooSportDayParser.GpxPoint> gpsPoints) throws Exception {
+    private String writeSportGpx(Date startTime, String name, Device device, User user, List<ActivityPoint> trackPoints) throws Exception {
         File dir = getDevice().getDeviceCoordinator().getWritableExportDirectory(getDevice(), true);
         File gpxFile = new File(dir, "veepoo_sport_" + (startTime.getTime() / 1000L) + ".gpx");
         ActivityTrack track = new ActivityTrack();
@@ -1682,6 +1714,16 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
         track.setName(name);
         track.setDevice(device);
         track.setUser(user);
+        for (ActivityPoint activityPoint : trackPoints) {
+            track.addTrackPoint(activityPoint);
+        }
+        new GPXExporter().performExport(track, gpxFile, null);
+        return gpxFile.getAbsolutePath();
+    }
+
+    /** Converts the band-reported GPS layout points into track points. */
+    private static List<ActivityPoint> toActivityPoints(List<VeepooSportDayParser.GpxPoint> gpsPoints) {
+        final List<ActivityPoint> points = new ArrayList<>(gpsPoints.size());
         for (VeepooSportDayParser.GpxPoint point : gpsPoints) {
             ActivityPoint activityPoint = new ActivityPoint(new Date(point.timeMs));
             if (point.altitude > 0) {
@@ -1689,10 +1731,30 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
             } else {
                 activityPoint.setLocation(new GPSCoordinate(point.longitude / 1e6, point.latitude / 1e6));
             }
-            track.addTrackPoint(activityPoint);
+            points.add(activityPoint);
         }
-        new GPXExporter().performExport(track, gpxFile, null);
-        return gpxFile.getAbsolutePath();
+        return points;
+    }
+
+    /** Sums the great-circle distance between consecutive track points, skipping implausible jumps. */
+    static double trackDistance(List<ActivityPoint> points) {
+        double meters = 0;
+        ActivityPoint last = null;
+        for (ActivityPoint point : points) {
+            final GPSCoordinate location = point.getLocation();
+            if (location == null || point.getTime() == null) {
+                continue;
+            }
+            if (last != null) {
+                final double seconds = (point.getTime().getTime() - last.getTime().getTime()) / 1000.0;
+                final double distance = GPSCoordinate.distanceHaversine(last.getLocation(), location);
+                if (seconds > 0 && distance / seconds <= VeepooLiveWorkoutModule.MAX_GPS_SPEED_MPS) {
+                    meters += distance;
+                }
+            }
+            last = point;
+        }
+        return meters;
     }
 
     /** Maps the VeePoo ESportType value to the closest Gadgetbridge activity kind. */
@@ -2605,6 +2667,12 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
         } catch (IOException e) {
             LOG.error("Error setting time", e);
         }
+    }
+
+    /** Receives the phone GPS fixes while a phone-initiated workout records its route. */
+    @Override
+    public void onSetGpsLocation(Location location) {
+        liveWorkoutModule.addPhoneGpsPoint(location);
     }
 
     @Override
