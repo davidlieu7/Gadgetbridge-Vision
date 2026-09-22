@@ -803,6 +803,12 @@ public enum FitCodeGen {
         );
 
         for (final FitField primitive : nativeFITMessage.getFieldDefinitionPrimitives()) {
+            if ("STRING".equals(primitive.base) && primitive.stringLen <= 0 && primitive.arrayLen < 0) {
+                // Without a stringLen/arrayLen we can't encode the field, and it would silently
+                // default to 1 byte (only the null terminator). Don't generate the setter.
+                continue;
+            }
+
             final FieldClass fieldType = getFieldType(primitive);
             final String fieldTypeName = fieldType.getSimpleName();
 
