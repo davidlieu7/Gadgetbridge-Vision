@@ -92,6 +92,13 @@ public abstract class AbstractVeepooCoordinator extends AbstractBLEDeviceCoordin
     }
 
     @Override
+    public boolean supportsTotalCalories(@NonNull final GBDevice device) {
+        // The band reports a single per-slot kcal figure (the vendor app's "calories"), not a
+        // separate active/total split, so the same value feeds the TotalCaloriesBurnedRecord.
+        return true;
+    }
+
+    @Override
     public int getAlarmSlotCount(@NonNull final GBDevice device) {
         // Exposes the built-in "set alarms" card action (ConfigureAlarms); the 0xB9 module
         // enforces the firmware capability at send time and reads back the band's state.

@@ -651,6 +651,12 @@ class HealthConnectUtils {
                                 currentSliceStartTs, currentSliceEndTs, grantedPermissions, activityBasedSamples
                             ))
                         }
+                        if (gbDevice.deviceCoordinator.supportsTotalCalories(gbDevice)) {
+                            sliceStats.add(TotalCaloriesSyncer.sync(
+                                healthConnectClient, gbDevice, metadata, offset,
+                                currentSliceStartTs, currentSliceEndTs, grantedPermissions, activityBasedSamples
+                            ))
+                        }
                         if (gbDevice.deviceCoordinator.supportsActivityDistance(gbDevice)) {
                             sliceStats.add(DistanceSyncer.sync(
                                 healthConnectClient, gbDevice, metadata, offset,
@@ -691,6 +697,10 @@ class HealthConnectUtils {
                     currentSliceStartTs, currentSliceEndTs, grantedPermissions
                 ))
                 HealthConnectPermissionManager.HealthConnectDataType.BLOOD_GLUCOSE -> sliceStats.add(BloodGlucoseSyncer.sync(
+                    healthConnectClient, gbDevice, metadata, offset,
+                    currentSliceStartTs, currentSliceEndTs, grantedPermissions
+                ))
+                HealthConnectPermissionManager.HealthConnectDataType.BLOOD_PRESSURE -> sliceStats.add(BloodPressureSyncer.sync(
                     healthConnectClient, gbDevice, metadata, offset,
                     currentSliceStartTs, currentSliceEndTs, grantedPermissions
                 ))
@@ -833,6 +843,7 @@ class HealthConnectUtils {
                 HealthConnectPermissionManager.HealthConnectDataType.RESPIRATORY_RATE -> coordinator.getRespiratoryRateSampleProvider(device, db.daoSession)
                 HealthConnectPermissionManager.HealthConnectDataType.RESTING_HEART_RATE -> coordinator.getHeartRateRestingSampleProvider(device, db.daoSession)
                 HealthConnectPermissionManager.HealthConnectDataType.BLOOD_GLUCOSE -> GlucoseSampleProvider(device, db.daoSession)
+                HealthConnectPermissionManager.HealthConnectDataType.BLOOD_PRESSURE -> coordinator.getBloodPressureSampleProvider(device, db.daoSession)
                 HealthConnectPermissionManager.HealthConnectDataType.WEIGHT -> coordinator.getWeightSampleProvider(device, db.daoSession)
                 // For SpO2 and Temperature, there might be a specific provider or fallback to general sample provider
                 HealthConnectPermissionManager.HealthConnectDataType.SPO2 -> coordinator.getSpo2SampleProvider(device, db.daoSession) // Potentially add fallback if needed: ?: coordinator.getSampleProvider(device, db.daoSession)

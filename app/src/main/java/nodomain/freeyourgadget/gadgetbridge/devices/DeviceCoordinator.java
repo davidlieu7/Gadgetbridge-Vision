@@ -305,6 +305,17 @@ public interface DeviceCoordinator {
     boolean supportsSpeedzones(@NonNull final GBDevice device);
     boolean supportsCharts(@NonNull final GBDevice device);
     boolean supportsActiveCalories(@NonNull final GBDevice device);
+
+    /**
+     * Returns true if the device reports a total calories burned value (as opposed to only
+     * active calories). Devices with this capability expose their per-interval calorie value
+     * through {@link ActivitySample#getActiveCalories()}; the Health Connect syncer emits it as
+     * a TotalCaloriesBurnedRecord on top of any ActiveCaloriesBurnedRecord.
+     */
+    default boolean supportsTotalCalories(@NonNull final GBDevice device) {
+        return false;
+    }
+
     boolean supportsActivityDistance(@NonNull final GBDevice device);
     boolean supportsTrainingLoad(@NonNull final GBDevice device);
     boolean supportsTrainingLoadChronic(@NonNull final GBDevice device);
