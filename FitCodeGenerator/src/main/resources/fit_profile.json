@@ -966,24 +966,26 @@
       "name": "WORKOUT_STEP",
       "fields": [
         {"num":0,"name":"wkt_step_name","base":"STRING"},
-        {"num":1,"name":"duration_type","base":"ENUM"},
+        {"num":1,"name":"duration_type","base":"ENUM","type":"WktStepDuration"},
         {"num":2,"name":"duration_value","base":"UINT32"},
-        {"num":3,"name":"target_type","base":"ENUM"},
+        {"num":3,"name":"target_type","base":"ENUM","type":"WktStepTarget"},
         {"num":4,"name":"target_value","base":"UINT32"},
         {"num":5,"name":"custom_target_value_low","base":"UINT32"},
         {"num":6,"name":"custom_target_value_high","base":"UINT32"},
-        {"num":7,"name":"intensity","base":"ENUM"},
+        {"num":7,"name":"intensity","base":"ENUM","type":"Intensity"},
         {"num":8,"name":"notes","base":"STRING","stringLen":201},
-        {"num":9,"name":"equipment","base":"ENUM"},
+        {"num":9,"name":"equipment","base":"ENUM","type":"WorkoutEquipment"},
         {"num":10,"name":"exercise_category","base":"UINT16"},
         {"num":11,"name":"exercise_name","base":"UINT16"},
         {"num":12,"name":"exercise_weight","base":"UINT16","scale":100,"UOM":"KILOGRAM"},
-        {"num":13,"name":"weight_display_unit","base":"UINT16"},
+        {"num":13,"name":"weight_display_unit","base":"UINT16","type":"FitBaseUnit"},
         {"num":18,"name":"skip_last_recover","base":"ENUM"},
-        {"num":19,"name":"secondary_target_type","base":"ENUM"},
+        {"num":19,"name":"secondary_target_type","base":"ENUM","type":"WktStepTarget"},
         {"num":20,"name":"secondary_target_value","base":"UINT32"},
         {"num":21,"name":"secondary_custom_target_value_low","base":"UINT32"},
         {"num":22,"name":"secondary_custom_target_value_high","base":"UINT32"},
+        {"num":26,"name":"exercise_weight_percent","base":"UINT16"},
+        {"num":27,"name":"exercise_weight_type","base":"UINT8"},
         {"num":31,"name":"workout_index","base":"UINT16"},
         {"num":254,"name":"message_index","base":"UINT16"}
       ]
@@ -4182,7 +4184,34 @@
         {"num":30,"name":"CATEGORY_TRICEPS_EXTENSION","label":"R.string.exercise_category_triceps_extension"},
         {"num":31,"name":"CATEGORY_WARM_UP","label":"R.string.hrZoneWarmUp"},
         {"num":32,"name":"CATEGORY_RUN","label":"R.string.activity_type_running"},
+        {"num":33,"name":"CATEGORY_BIKE","label":"R.string.activity_type_biking"},
+        {"num":34,"name":"CATEGORY_CARDIO_SENSORS","label":"R.string.exercise_category_cardio_sensors"},
+        {"num":35,"name":"CATEGORY_MOVE","label":"R.string.exercise_category_move"},
+        {"num":36,"name":"CATEGORY_POSE","label":"R.string.exercise_category_pose"},
+        {"num":37,"name":"CATEGORY_BANDED_EXERCISES","label":"R.string.exercise_category_banded_exercises"},
+        {"num":38,"name":"CATEGORY_BATTLE_ROPE","label":"R.string.activity_type_battle_rope"},
+        {"num":39,"name":"CATEGORY_ELLIPTICAL","label":"R.string.activity_type_elliptical"},
+        {"num":40,"name":"CATEGORY_FLOOR_CLIMB","label":"R.string.activity_type_floor_climbing"},
+        {"num":41,"name":"CATEGORY_INDOOR_BIKE","label":"R.string.activity_type_indoor_cycling"},
+        {"num":42,"name":"CATEGORY_INDOOR_ROW","label":"R.string.exercise_category_indoor_row"},
+        {"num":43,"name":"CATEGORY_LADDER","label":"R.string.exercise_category_ladder"},
+        {"num":44,"name":"CATEGORY_SANDBAG","label":"R.string.exercise_category_sandbag"},
+        {"num":45,"name":"CATEGORY_SLED","label":"R.string.exercise_category_sled"},
+        {"num":46,"name":"CATEGORY_SLEDGE_HAMMER","label":"R.string.exercise_category_sledge_hammer"},
+        {"num":47,"name":"CATEGORY_STAIR_STEPPER","label":"R.string.activity_type_stair_stepper"},
+        {"num":49,"name":"CATEGORY_SUSPENSION","label":"R.string.exercise_category_suspension"},
+        {"num":50,"name":"CATEGORY_TIRE","label":"R.string.exercise_category_tire"},
+        {"num":52,"name":"CATEGORY_RUN_INDOOR","label":"R.string.activity_type_indoor_running"},
+        {"num":53,"name":"CATEGORY_BIKE_OUTDOOR","label":"R.string.activity_type_outdoor_cycling"},
         {"num":250,"name":"CATEGORY_UNKNOWN","label":"R.string.unknown"}
+      ]
+    },
+    {
+      "name": "FitBaseUnit",
+      "entries": [
+        {"num":0,"name":"OTHER"},
+        {"num":1,"name":"KILOGRAM"},
+        {"num":2,"name":"POUND"}
       ]
     },
     {
@@ -4215,6 +4244,18 @@
         {"num":2,"name":"LOW"},
         {"num":3,"name":"UNBALANCED"},
         {"num":4,"name":"BALANCED"}
+      ]
+    },
+    {
+      "name": "Intensity",
+      "entries": [
+        {"num":0,"name":"ACTIVE"},
+        {"num":1,"name":"REST"},
+        {"num":2,"name":"WARMUP"},
+        {"num":3,"name":"COOLDOWN"},
+        {"num":4,"name":"RECOVERY"},
+        {"num":5,"name":"INTERVAL"},
+        {"num":6,"name":"OTHER"}
       ]
     },
     {
@@ -4496,6 +4537,72 @@
         {"num":0,"name":"current"},
         {"num":1,"name":"hourly_forecast"},
         {"num":2,"name":"daily_forecast"}
+      ]
+    },
+    {
+      "name": "WktStepDuration",
+      "entries": [
+        {"num":0,"name":"TIME"},
+        {"num":1,"name":"DISTANCE"},
+        {"num":2,"name":"HR_LESS_THAN"},
+        {"num":3,"name":"HR_GREATER_THAN"},
+        {"num":4,"name":"CALORIES"},
+        {"num":5,"name":"OPEN"},
+        {"num":6,"name":"REPEAT_UNTIL_STEPS_CMPLT"},
+        {"num":7,"name":"REPEAT_UNTIL_TIME"},
+        {"num":8,"name":"REPEAT_UNTIL_DISTANCE"},
+        {"num":9,"name":"REPEAT_UNTIL_CALORIES"},
+        {"num":10,"name":"REPEAT_UNTIL_HR_LESS_THAN"},
+        {"num":11,"name":"REPEAT_UNTIL_HR_GREATER_THAN"},
+        {"num":12,"name":"REPEAT_UNTIL_POWER_LESS_THAN"},
+        {"num":13,"name":"REPEAT_UNTIL_POWER_GREATER_THAN"},
+        {"num":14,"name":"POWER_LESS_THAN"},
+        {"num":15,"name":"POWER_GREATER_THAN"},
+        {"num":16,"name":"TRAINING_PEAKS_TSS"},
+        {"num":17,"name":"REPEAT_UNTIL_POWER_LAST_LAP_LESS_THAN"},
+        {"num":18,"name":"REPEAT_UNTIL_MAX_POWER_LAST_LAP_LESS_THAN"},
+        {"num":19,"name":"POWER_3S_LESS_THAN"},
+        {"num":20,"name":"POWER_10S_LESS_THAN"},
+        {"num":21,"name":"POWER_30S_LESS_THAN"},
+        {"num":22,"name":"POWER_3S_GREATER_THAN"},
+        {"num":23,"name":"POWER_10S_GREATER_THAN"},
+        {"num":24,"name":"POWER_30S_GREATER_THAN"},
+        {"num":25,"name":"POWER_LAP_LESS_THAN"},
+        {"num":26,"name":"POWER_LAP_GREATER_THAN"},
+        {"num":27,"name":"REPEAT_UNTIL_TRAINING_PEAKS_TSS"},
+        {"num":28,"name":"REPETITION_TIME"},
+        {"num":29,"name":"REPS"},
+        {"num":31,"name":"TIME_ONLY"}
+      ]
+    },
+    {
+      "name": "WktStepTarget",
+      "entries": [
+        {"num":0,"name":"SPEED"},
+        {"num":1,"name":"HEART_RATE"},
+        {"num":2,"name":"OPEN"},
+        {"num":3,"name":"CADENCE"},
+        {"num":4,"name":"POWER"},
+        {"num":5,"name":"GRADE"},
+        {"num":6,"name":"RESISTANCE"},
+        {"num":7,"name":"POWER_3S"},
+        {"num":8,"name":"POWER_10S"},
+        {"num":9,"name":"POWER_30S"},
+        {"num":10,"name":"POWER_LAP"},
+        {"num":11,"name":"SWIM_STROKE"},
+        {"num":12,"name":"SPEED_LAP"},
+        {"num":13,"name":"HEART_RATE_LAP"}
+      ]
+    },
+    {
+      "name": "WorkoutEquipment",
+      "entries": [
+        {"num":0,"name":"NONE"},
+        {"num":1,"name":"SWIM_FINS"},
+        {"num":2,"name":"SWIM_KICKBOARD"},
+        {"num":3,"name":"SWIM_PADDLES"},
+        {"num":4,"name":"SWIM_PULL_BUOY"},
+        {"num":5,"name":"SWIM_SNORKEL"}
       ]
     }
   ],

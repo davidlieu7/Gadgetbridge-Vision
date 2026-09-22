@@ -3282,8 +3282,10 @@
     <string name="swim_style_butterfly">Butterfly</string>
     <string name="swim_style_drill">Drill</string>
     <string name="swim_style_mixed">Mixed</string>
+    <string name="exercise_category_banded_exercises">Banded exercises</string>
     <string name="exercise_category_bench_press">Bench press</string>
     <string name="exercise_category_calf_raise">Calf raise</string>
+    <string name="exercise_category_cardio_sensors">Cardio sensors</string>
     <string name="exercise_category_carry">Carry</string>
     <string name="exercise_category_chop">Chop</string>
     <string name="exercise_category_core">Core</string>
@@ -3293,16 +3295,25 @@
     <string name="exercise_category_hip_stability">Hip stability</string>
     <string name="exercise_category_hip_swing">Hip swing</string>
     <string name="exercise_category_hyperextension">Hyperextension</string>
+    <string name="exercise_category_indoor_row">Indoor row</string>
+    <string name="exercise_category_ladder">Ladder</string>
     <string name="exercise_category_lateral_raise">Lateral raise</string>
     <string name="exercise_category_leg_curl">Leg curl</string>
     <string name="exercise_category_leg_raise">Leg raise</string>
     <string name="exercise_category_lunge">Lunge</string>
+    <string name="exercise_category_move">Move</string>
     <string name="exercise_category_olympic_lift">Olympic lift</string>
     <string name="exercise_category_plyo">Plyo</string>
+    <string name="exercise_category_pose">Pose</string>
+    <string name="exercise_category_sandbag">Sandbag</string>
     <string name="exercise_category_shoulder_press">Shoulder press</string>
     <string name="exercise_category_shoulder_stability">Shoulder stability</string>
     <string name="exercise_category_shrug">Shrug</string>
+    <string name="exercise_category_sled">Sled</string>
+    <string name="exercise_category_sledge_hammer">Sledgehammer</string>
     <string name="exercise_category_squat">Squat</string>
+    <string name="exercise_category_suspension">Suspension</string>
+    <string name="exercise_category_tire">Tire</string>
     <string name="exercise_category_total_body">Total body</string>
     <string name="exercise_category_triceps_extension">Triceps extension</string>
 
