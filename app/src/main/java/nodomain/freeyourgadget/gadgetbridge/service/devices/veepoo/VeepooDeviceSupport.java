@@ -129,6 +129,10 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
     private int sleepDayIndex = 0;
     private int originDayIndex = 0;
     private int sportDayIndex = 0;
+    /** Highest day index requested in the current pass; -1 = full history (first sync). */
+    private int fetchEndDay = -1;
+    /** Local midnight when the current pass started; every date anchor derives from it. */
+    private long fetchAnchorTodayMs = 0L;
     private final ByteArrayOutputStream sleepDayPayload = new ByteArrayOutputStream();
     private long sleepLastChunkAt = 0;
     private final List<byte[]> dfDayFrames = new ArrayList<>();
@@ -1119,6 +1123,41 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
         }
     }
 
+    /**
+     * Captures the date anchor and day cap for a new pass. Day indices are relative to this
+     * phone date, so everything recorded since the last fully-synced date lives in days
+     * 0..(days elapsed); a missing last-sync date falls back to a full-history pass.
+     */
+    private void prepareFetchWindow() {
+        fetchAnchorTodayMs = midnightOf(System.currentTimeMillis());
+        long lastSyncMidnightMs = GBApplication.getDeviceSpecificSharedPrefs(getDevice().getAddress())
+                .getLong(VeepooConstants.PREF_LAST_SYNC_DATE, 0L);
+        fetchEndDay = computeFetchEndDay(lastSyncMidnightMs, fetchAnchorTodayMs);
+        LOG.info("Fetch window: days 0..{} (last sync {})",
+                fetchEndDay < 0 ? "full" : String.valueOf(fetchEndDay),
+                lastSyncMidnightMs > 0L ? new Date(lastSyncMidnightMs) : "never");
+    }
+
+    /** Normalizes an instant to the local midnight of its day. */
+    static long midnightOf(long ms) {
+        Calendar calendar = Calendar.getInstance();
+        calendar.setTimeInMillis(ms);
+        calendar.set(Calendar.HOUR_OF_DAY, 0);
+        calendar.set(Calendar.MINUTE, 0);
+        calendar.set(Calendar.SECOND, 0);
+        calendar.set(Calendar.MILLISECOND, 0);
+        return calendar.getTimeInMillis();
+    }
+
+    /** Days elapsed between two midnights; -1 requests a full-history pass. */
+    static int computeFetchEndDay(long lastSyncMidnightMs, long todayMidnightMs) {
+        if (lastSyncMidnightMs <= 0L) {
+            return -1;
+        }
+        long days = Math.round((todayMidnightMs - lastSyncMidnightMs) / (double) MILLIS_PER_DAY);
+        return days < 0 ? -1 : (int) Math.min(days, Integer.MAX_VALUE);
+    }
+
     @Override
     public void onFetchRecordedData(int dataTypes) {
         if ((dataTypes & RecordedDataTypes.TYPE_ACTIVITY) == 0) {
@@ -1137,7 +1176,7 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
         }
         getDevice().setBusyTask(R.string.busy_task_fetch_activity_data, getContext());
         getDevice().sendDeviceUpdateIntent(getContext());
-        LOG.info("Starting data fetch: {} days (sleep then activity)", watchDataDay);
+        prepareFetchWindow();
         requestSleepDay(0);
     }
 
@@ -1203,10 +1242,10 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
         sleepDayPayload.reset();
         LOG.info("Sleep day {} complete: {} payload bytes", dayIndex, stream.length);
         if (preciseSleepCapable) {
-            VeepooSleepParser.parsePrecisionStream(stream, dayIndex, pendingListCollector);
+            VeepooSleepParser.parsePrecisionStream(stream, dayIndex, fetchAnchorTodayMs, pendingListCollector);
         } else {
             for (int offset = 0; offset + VeepooConstants.SLEEP_RECORD_SIZE <= stream.length; offset += VeepooConstants.SLEEP_RECORD_SIZE) {
-                VeepooSleepParser.parseNormalRecord(stream, offset, dayIndex, pendingListCollector);
+                VeepooSleepParser.parseNormalRecord(stream, offset, dayIndex, fetchAnchorTodayMs, pendingListCollector);
             }
         }
         advanceSleepDay(dayIndex, stream.length > 0);
@@ -1227,17 +1266,16 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
      */
     private void advanceSleepDay(int dayIndex, boolean hadData) {
         int nextDay = dayIndex + 1;
-        int limit = sleepFetchLimit();
-        if (nextDay >= watchDataDay && !hadData) {
+        if (fetchEndDay < 0 && nextDay >= watchDataDay && !hadData) {
             if (dayIndex >= watchDataDay) {
                 LOG.info("Sleep probe: day {} empty, history ends at day {}", dayIndex, dayIndex);
             }
             enterOriginPhase();
             return;
         }
-        if (nextDay < limit) {
-            if (nextDay == watchDataDay) {
-                LOG.info("Sleep window full at {} day(s); probing up to day {}", watchDataDay, limit - 1);
+        if (nextDay < sleepEndExclusive()) {
+            if (fetchEndDay < 0 && nextDay == watchDataDay) {
+                LOG.info("Sleep window full at {} day(s); probing up to day {}", watchDataDay, sleepEndExclusive() - 1);
             }
             synchronized (syncLock) {
                 sleepDayIndex = nextDay;
@@ -1265,7 +1303,18 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
 
     /** 90 s for advertised days (mirrors the vendor app), 10 s for days beyond the window. */
     private long sleepWatchdogTimeout() {
-        return sleepDayIndex >= watchDataDay ? 10_000L : 90_000L;
+        return isSleepProbeDay(sleepDayIndex) ? 10_000L : 90_000L;
+    }
+
+    /** Exclusive day cap for this pass: the full limit, or the incremental end, whichever is smaller. */
+    private int sleepEndExclusive() {
+        int full = sleepFetchLimit();
+        return fetchEndDay < 0 ? full : Math.min(full, fetchEndDay + 1);
+    }
+
+    /** Probe days exist only on a full pass; an incremental pass simply stops at its cap. */
+    private boolean isSleepProbeDay(int dayIndex) {
+        return fetchEndDay < 0 && dayIndex >= watchDataDay;
     }
 
     private void scheduleSleepWatchdog() {
@@ -1289,17 +1338,17 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
         int dayIndex = sleepDayIndex;
         byte[] stream = sleepDayPayload.toByteArray();
         sleepDayPayload.reset();
-        if (dayIndex >= watchDataDay) {
+        if (isSleepProbeDay(dayIndex)) {
             LOG.info("Sleep probe: no response for day {}, history ends at day {}", dayIndex, dayIndex - 1);
             enterOriginPhase();
             return;
         }
         LOG.warn("Sleep read stalled for {} ms; finishing the day with partial data", idle);
         if (preciseSleepCapable) {
-            VeepooSleepParser.parsePrecisionStream(stream, dayIndex, pendingListCollector);
+            VeepooSleepParser.parsePrecisionStream(stream, dayIndex, fetchAnchorTodayMs, pendingListCollector);
         } else {
             for (int offset = 0; offset + VeepooConstants.SLEEP_RECORD_SIZE <= stream.length; offset += VeepooConstants.SLEEP_RECORD_SIZE) {
-                VeepooSleepParser.parseNormalRecord(stream, offset, dayIndex, pendingListCollector);
+                VeepooSleepParser.parseNormalRecord(stream, offset, dayIndex, fetchAnchorTodayMs, pendingListCollector);
             }
         }
         advanceSleepDay(dayIndex, stream.length > 0);
@@ -1336,6 +1385,7 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
         }
 
         Calendar calendar = Calendar.getInstance();
+        calendar.setTimeInMillis(fetchAnchorTodayMs);
         calendar.add(Calendar.DAY_OF_MONTH, -dayOffset);
         calendar.set(Calendar.HOUR_OF_DAY, hour);
         calendar.set(Calendar.MINUTE, minute);
@@ -1396,7 +1446,7 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
             dfDayFrames.clear();
             int dayIndex = originDayIndex;
             LOG.info("Origin3 day {} complete ({} frames)", dayIndex, frames.size());
-            boolean hadData = VeepooOrigin3Parser.parseDay(frames, dayIndex, originProtocolVersion, bloodGlucoseTag, pendingListCollector);
+            boolean hadData = VeepooOrigin3Parser.parseDay(frames, dayIndex, originProtocolVersion, bloodGlucoseTag, fetchAnchorTodayMs, pendingListCollector);
             VeepooOrigin3Parser.mergeHeartRateIntoSleep(pendingOriginSamples, pendingSleepSamples);
             persistPendingOriginDay();
             afterOriginDayComplete(dayIndex, hadData);
@@ -1407,7 +1457,19 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
 
     /** 90 s for advertised days (mirrors the vendor app), 10 s for days beyond the window. */
     private long dfWatchdogTimeout() {
-        return originDayIndex >= watchDataDay ? 10_000L : 90_000L;
+        return isOriginProbeDay(originDayIndex) ? 10_000L : 90_000L;
+    }
+
+    /** Exclusive day cap for this pass: the full limit, or the incremental end, whichever is smaller. */
+    private int originEndExclusive() {
+        boolean origin3 = originProtocolVersion == 3 || originProtocolVersion == 5;
+        int full = origin3 ? Math.max(watchDataDay, VeepooConstants.ORIGIN_FETCH_MAX_DAYS) : watchDataDay;
+        return fetchEndDay < 0 ? full : Math.min(full, fetchEndDay + 1);
+    }
+
+    /** Probe days exist only on a full Origin3 pass; an incremental pass simply stops at its cap. */
+    private boolean isOriginProbeDay(int dayIndex) {
+        return fetchEndDay < 0 && (originProtocolVersion == 3 || originProtocolVersion == 5) && dayIndex >= watchDataDay;
     }
 
     private void scheduleDfWatchdog() {
@@ -1432,12 +1494,12 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
         dfDayFrames.clear();
         int dayIndex = originDayIndex;
         boolean hadData;
-        if (dayIndex >= watchDataDay) {
+        if (isOriginProbeDay(dayIndex)) {
             LOG.info("Activity probe: no response for day {}, history ends at day {}", dayIndex, dayIndex - 1);
             hadData = false;
         } else {
             LOG.warn("Origin3 read stalled for {} ms; finishing the day with partial data", idle);
-            hadData = VeepooOrigin3Parser.parseDay(frames, dayIndex, originProtocolVersion, bloodGlucoseTag, pendingListCollector);
+            hadData = VeepooOrigin3Parser.parseDay(frames, dayIndex, originProtocolVersion, bloodGlucoseTag, fetchAnchorTodayMs, pendingListCollector);
         }
         VeepooOrigin3Parser.mergeHeartRateIntoSleep(pendingOriginSamples, pendingSleepSamples);
         persistPendingOriginDay();
@@ -1446,35 +1508,31 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
 
     /**
      * Advances the fetch after an activity day. Inside the advertised watchDataDay window every
-     * day is requested; beyond it (Origin3 only), days are probed until an empty day or
-     * ORIGIN_FETCH_MAX_DAYS. Then the workout history days follow if the device keeps them.
+     * day is requested; beyond it (Origin3 only, full passes), days are probed until an empty
+     * day or ORIGIN_FETCH_MAX_DAYS. Incremental passes (fetchEndDay >= 0) stop at the cap and
+     * never probe. Then the workout history days follow if the device keeps them.
      */
     private void afterOriginDayComplete(int dayIndex, boolean hadData) {
         int nextDay = dayIndex + 1;
-        if (nextDay < watchDataDay) {
-            synchronized (syncLock) {
-                originDayIndex = nextDay;
-            }
-            if (originProtocolVersion == 3 || originProtocolVersion == 5) {
-                requestOrigin3Day(nextDay);
-            } else {
-                requestOriginDay(nextDay);
-            }
-            return;
-        }
         boolean origin3 = originProtocolVersion == 3 || originProtocolVersion == 5;
-        int limit = origin3 ? Math.max(watchDataDay, VeepooConstants.ORIGIN_FETCH_MAX_DAYS) : watchDataDay;
-        if (origin3 && hadData && nextDay < limit) {
-            if (nextDay == watchDataDay) {
-                LOG.info("Activity window full at {} day(s); probing up to day {}", watchDataDay, limit - 1);
+        boolean probeRequest = fetchEndDay < 0 && origin3 && nextDay >= watchDataDay;
+        if (!probeRequest || hadData) {
+            if (nextDay < originEndExclusive()) {
+                if (probeRequest && nextDay == watchDataDay) {
+                    LOG.info("Activity window full at {} day(s); probing up to day {}", watchDataDay, originEndExclusive() - 1);
+                }
+                synchronized (syncLock) {
+                    originDayIndex = nextDay;
+                }
+                if (origin3) {
+                    requestOrigin3Day(nextDay);
+                } else {
+                    requestOriginDay(nextDay);
+                }
+                return;
             }
-            synchronized (syncLock) {
-                originDayIndex = nextDay;
-            }
-            requestOrigin3Day(nextDay);
-            return;
         }
-        if (origin3 && dayIndex >= watchDataDay && !hadData) {
+        if (probeRequest && !hadData) {
             LOG.info("Activity probe: day {} empty, history ends at day {}", dayIndex, dayIndex);
         }
         if (sportModelDay > 0) {
@@ -1539,8 +1597,7 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
      */
     private void advanceSportDay(int dayIndex, boolean hadSession) {
         int nextDay = dayIndex + 1;
-        int limit = sportFetchLimit();
-        if (nextDay >= sportModelDay && !hadSession) {
+        if (fetchEndDay < 0 && nextDay >= sportModelDay && !hadSession) {
             if (dayIndex >= sportModelDay) {
                 LOG.info("Workout probe: day {} empty, history ends at day {}", dayIndex, dayIndex);
             }
@@ -1550,9 +1607,9 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
             finishFetch();
             return;
         }
-        if (nextDay < limit) {
-            if (nextDay == sportModelDay) {
-                LOG.info("Workout window full at {} day(s); probing up to day {}", sportModelDay, limit - 1);
+        if (nextDay < sportEndExclusive()) {
+            if (fetchEndDay < 0 && nextDay == sportModelDay) {
+                LOG.info("Workout window full at {} day(s); probing up to day {}", sportModelDay, sportEndExclusive() - 1);
             }
             synchronized (syncLock) {
                 sportDayIndex = nextDay;
@@ -1580,7 +1637,18 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
 
     /** 90 s for advertised days (mirrors the vendor app), 10 s for days beyond the window. */
     private long sportWatchdogTimeout() {
-        return sportDayIndex >= sportModelDay ? 10_000L : 90_000L;
+        return isSportProbeDay(sportDayIndex) ? 10_000L : 90_000L;
+    }
+
+    /** Exclusive day cap for this pass: the full limit, or the incremental end, whichever is smaller. */
+    private int sportEndExclusive() {
+        int full = sportFetchLimit();
+        return fetchEndDay < 0 ? full : Math.min(full, fetchEndDay + 1);
+    }
+
+    /** Probe days exist only on a full pass; an incremental pass simply stops at its cap. */
+    private boolean isSportProbeDay(int dayIndex) {
+        return fetchEndDay < 0 && dayIndex >= sportModelDay;
     }
 
     private void runSportWatchdog() {
@@ -1595,7 +1663,7 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
             return;
         }
         mainHandler.removeCallbacks(sportWatchdog);
-        if (sportDayIndex >= sportModelDay) {
+        if (isSportProbeDay(sportDayIndex)) {
             LOG.info("Workout probe: no response for day {}, stopping the history fetch", sportDayIndex);
             sportDayFrames.clear();
             synchronized (syncLock) {
@@ -2093,6 +2161,7 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
             fetchPhase = FetchPhase.SPORT;
             sportDayIndex = 0;
         }
+        prepareFetchWindow();
         getDevice().setBusyTask(R.string.busy_task_fetch_activity_data, getContext());
         // The firmware only writes a stopped session into the day-0 history slot when a new
         // phone session is established (an A1 password-confirm frame), so re-send A1+A5 in
@@ -2574,6 +2643,11 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
             persistSamples(sleepBatch, true);
         }
         persistPendingSleepSummaries();
+        if (fetchAnchorTodayMs > 0L) {
+            GBApplication.getDeviceSpecificSharedPrefs(getDevice().getAddress()).edit()
+                    .putLong(VeepooConstants.PREF_LAST_SYNC_DATE, fetchAnchorTodayMs)
+                    .apply();
+        }
         getDevice().unsetBusyTask();
         getDevice().sendDeviceUpdateIntent(getContext());
         GB.signalActivityDataFinish(getDevice());

@@ -194,6 +194,13 @@ public final class VeepooConstants {
     /** Start a single-shot ECG measurement (waveform capture). */
     public static final String CONFIG_MEASURE_ECG = "veepoo_measure_ecg";
 
+    // ---- Internal sync state (not user settings) --------------------------
+    /**
+     * Midnight epoch millis of the last fully-synced phone date. Each fetch requests only the
+     * day indices 0..(days since this date); a missing value triggers a full-history pass.
+     */
+    public static final String PREF_LAST_SYNC_DATE = "veepoo_last_sync_date";
+
     // ---- Auto-measure (periodic vitals) settings, opcode 0xB3 -------------
     /** Opcode for reading/writing per-metric auto-measure settings. */
     public static final byte OP_AUTO_MEASURE = (byte) 0xB3;

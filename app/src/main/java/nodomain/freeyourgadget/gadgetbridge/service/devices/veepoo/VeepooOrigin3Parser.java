@@ -58,7 +58,7 @@ final class VeepooOrigin3Parser {
      * first block header on v5; v3 uses 20).
      */
     public static boolean parseDay(List<byte[]> frames, int dayIndex, int protocolVersion, int bloodGlucoseTag,
-                                   VeepooSampleCollector out) {
+                                   long todayMidnightMs, VeepooSampleCollector out) {
         ByteArrayOutputStream stream = new ByteArrayOutputStream();
         boolean inBlock = false;
         int packetLen = -1; // single-packet length j: read from the first block header, reused for the rest of the day
@@ -68,7 +68,7 @@ final class VeepooOrigin3Parser {
 
         for (byte[] frame : frames) {
             if ((frame[3] & 0xFF) == 0) {
-                records += flushOrigin3Block(stream, validBytes, checksum, dayIndex, bloodGlucoseTag, out);
+                records += flushOrigin3Block(stream, validBytes, checksum, dayIndex, bloodGlucoseTag, todayMidnightMs, out);
                 inBlock = true;
                 if (packetLen < 0) {
                     packetLen = protocolVersion == VeepooConstants.ORIGIN_PROTOCOL_VERSION_DF
@@ -88,12 +88,12 @@ final class VeepooOrigin3Parser {
             int copy = Math.min(packetLen - 4, frame.length - 4);
             stream.write(frame, 4, copy);
         }
-        records += flushOrigin3Block(stream, validBytes, checksum, dayIndex, bloodGlucoseTag, out);
+        records += flushOrigin3Block(stream, validBytes, checksum, dayIndex, bloodGlucoseTag, todayMidnightMs, out);
         return records > 0;
     }
 
     private static int flushOrigin3Block(ByteArrayOutputStream stream, int validBytes, int checksum, int dayIndex,
-                                         int bloodGlucoseTag, VeepooSampleCollector out) {
+                                         int bloodGlucoseTag, long todayMidnightMs, VeepooSampleCollector out) {
         byte[] payload = stream.toByteArray();
         stream.reset();
         if (payload.length == 0) {
@@ -106,7 +106,7 @@ final class VeepooOrigin3Parser {
             LOG.warn("Origin3 block for day {} failed its CRC-16 check; dropping", dayIndex);
             return 0;
         }
-        return parseOrigin3TlvStream(payload, dayIndex, bloodGlucoseTag, out);
+        return parseOrigin3TlvStream(payload, dayIndex, bloodGlucoseTag, todayMidnightMs, out);
     }
 
     /**
@@ -122,8 +122,9 @@ final class VeepooOrigin3Parser {
      * 0.01 mmol/L steps), 0xBF MET (1 byte, /10; log-only), 0xC1 pressure/wear (log-only) and
      * 0xC2 lipids (TCHO/TAG/HDL/LDL as LE16 in 0.01 mmol/L steps + uric acid in mg/dL).
      */
-    private static int parseOrigin3TlvStream(byte[] payload, int dayIndex, int bloodGlucoseTag, VeepooSampleCollector out) {
+    private static int parseOrigin3TlvStream(byte[] payload, int dayIndex, int bloodGlucoseTag, long todayMidnightMs, VeepooSampleCollector out) {
         Calendar base = Calendar.getInstance();
+        base.setTimeInMillis(todayMidnightMs);
         base.add(Calendar.DAY_OF_MONTH, -dayIndex);
 
         boolean haveRecord = false;

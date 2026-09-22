@@ -83,7 +83,7 @@ final class VeepooSleepParser {
      * Parses one 96-byte normal sleep record and emits per-minute activity samples.
      * Stages: bitmap bit 0 = deep, 1 = light; window spans are marked '2' (REM).
      */
-    public static void parseNormalRecord(byte[] stream, int offset, int dayIndex, VeepooSampleCollector out) {
+    public static void parseNormalRecord(byte[] stream, int offset, int dayIndex, long todayMidnightMs, VeepooSampleCollector out) {
         byte[] rec = new byte[VeepooConstants.SLEEP_RECORD_SIZE];
         System.arraycopy(stream, offset, rec, 0, VeepooConstants.SLEEP_RECORD_SIZE);
 
@@ -138,8 +138,8 @@ final class VeepooSleepParser {
             }
         }
 
-        Calendar start = anchorSleepDate(dayIndex, startMonth, startDay, startHour, startMinute);
-        Calendar end = anchorSleepDate(dayIndex, endMonth, endDay, endHour, endMinute);
+        Calendar start = anchorSleepDate(dayIndex, startMonth, startDay, startHour, startMinute, todayMidnightMs);
+        Calendar end = anchorSleepDate(dayIndex, endMonth, endDay, endHour, endMinute, todayMidnightMs);
         if (end.getTimeInMillis() <= start.getTimeInMillis()) {
             // Crossed a year boundary that anchoring could not resolve; use the tracked duration.
             end.setTimeInMillis(start.getTimeInMillis() + totalSlots * 5L * 60_000L);
@@ -198,7 +198,7 @@ final class VeepooSleepParser {
      * a LE16 record length, then tagged blocks. A3 is the main block (dates and durations), A5 is
      * the per-minute stage curve (BE16 words with the stage in the top three bits).
      */
-    public static void parsePrecisionStream(byte[] stream, int dayIndex, VeepooSampleCollector out) {
+    public static void parsePrecisionStream(byte[] stream, int dayIndex, long todayMidnightMs, VeepooSampleCollector out) {
         int pos = 0;
         while (pos + 3 <= stream.length) {
             int marker = -1;
@@ -214,12 +214,12 @@ final class VeepooSleepParser {
             int recordLength = VeepooDeviceSupport.le16(stream, marker + 1);
             int recordStart = marker + 3;
             int recordEnd = Math.min(recordStart + Math.max(0, recordLength - 3), stream.length);
-            parsePrecisionRecord(stream, recordStart, recordEnd, dayIndex, out);
+            parsePrecisionRecord(stream, recordStart, recordEnd, dayIndex, todayMidnightMs, out);
             pos = recordEnd;
         }
     }
 
-    private static void parsePrecisionRecord(byte[] stream, int recordStart, int recordEnd, int dayIndex, VeepooSampleCollector out) {
+    private static void parsePrecisionRecord(byte[] stream, int recordStart, int recordEnd, int dayIndex, long todayMidnightMs, VeepooSampleCollector out) {
         if (recordEnd - recordStart < 40) {
             LOG.warn("Precise sleep record for day {} is too short ({} bytes)", dayIndex, recordEnd - recordStart);
             return;
@@ -286,7 +286,7 @@ final class VeepooSleepParser {
             return;
         }
 
-        Calendar start = anchorSleepDate(dayIndex, startMonth, startDay, startHour, startMinute);
+        Calendar start = anchorSleepDate(dayIndex, startMonth, startDay, startHour, startMinute, todayMidnightMs);
         long startEpochSeconds = start.getTimeInMillis() / 1000L;
         int minutes = Math.min(wordCount, allSleepTime);
         for (int minuteOffset = 0; minuteOffset < minutes; minuteOffset++) {
@@ -332,11 +332,13 @@ final class VeepooSleepParser {
     }
 
     /**
-     * Anchors a month/day/hour/minute tuple to an actual date, assuming the current year and
-     * rolling back one year when the candidate ends up in the future (December/January boundary).
+     * Anchors a month/day/hour/minute tuple to an actual date, assuming the year of the fetch
+     * anchor (midnight of "today" when the pass started) and rolling back one year when the
+     * candidate ends up in the future (December/January boundary).
      */
-    private static Calendar anchorSleepDate(int dayIndex, int month, int day, int hour, int minute) {
+    private static Calendar anchorSleepDate(int dayIndex, int month, int day, int hour, int minute, long todayMidnightMs) {
         Calendar reference = Calendar.getInstance();
+        reference.setTimeInMillis(todayMidnightMs);
         reference.add(Calendar.DAY_OF_MONTH, -dayIndex);
         Calendar candidate = Calendar.getInstance();
         candidate.clear();
