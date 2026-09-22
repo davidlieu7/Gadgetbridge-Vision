@@ -692,6 +692,11 @@ public abstract class ZeppOsCoordinator extends HuamiCoordinator {
         return supportsDisplayItem(device, "map");
     }
 
+    @Override
+    public boolean supportsNavigation(@NonNull final GBDevice device) {
+        return hasDisplay();
+    }
+
     public boolean supportsMusicUpload(final GBDevice device) {
         return supportsDisplayItem(device, "music") && supportsBleFileTransfer(device, "music");
     }

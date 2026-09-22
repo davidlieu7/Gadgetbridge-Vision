@@ -86,7 +86,9 @@ import nodomain.freeyourgadget.gadgetbridge.model.CannedMessagesSpec;
 import nodomain.freeyourgadget.gadgetbridge.model.Contact;
 import nodomain.freeyourgadget.gadgetbridge.model.MusicSpec;
 import nodomain.freeyourgadget.gadgetbridge.model.MusicStateSpec;
+import nodomain.freeyourgadget.gadgetbridge.model.NavigationInfoSpec;
 import nodomain.freeyourgadget.gadgetbridge.model.NotificationSpec;
+import nodomain.freeyourgadget.gadgetbridge.model.NotificationType;
 import nodomain.freeyourgadget.gadgetbridge.model.Reminder;
 import nodomain.freeyourgadget.gadgetbridge.service.btle.BLETypeConversions;
 import nodomain.freeyourgadget.gadgetbridge.service.btle.GattCharacteristic;
@@ -148,6 +150,10 @@ import nodomain.freeyourgadget.gadgetbridge.util.RealtimeSamplesAggregator;
 public class ZeppOsSupport extends AbstractBluetoothDeviceSupport
         implements Huami2021Handler, HuamiFetcher.HuamiFetchSupport, ZeppOsFileTransferService.DownloadCallback {
     private static final Logger LOG = LoggerFactory.getLogger(ZeppOsSupport.class);
+
+    // Fixed notification slot for turn-by-turn cards so updates replace each other;
+    // a blank NavigationInfoSpec deletes this id (nav-end clear).
+    private static final int NAVIGATION_NOTIFICATION_ID = 0x4E415649;
 
     private final ZeppOsCommunicator communicator;
 
@@ -469,6 +475,51 @@ public class ZeppOsSupport extends AbstractBluetoothDeviceSupport
     @Override
     public void onDeleteNotification(final int id) {
         notificationService.deleteNotification(id);
+    }
+
+    @Override
+    public void onSetNavigationInfo(final NavigationInfoSpec navigationInfoSpec) {
+        if (!getDevicePrefs().getBoolean(DeviceSettingsPreferenceConst.PREF_SEND_APP_NOTIFICATIONS, true)) {
+            LOG.debug("App notifications disabled - ignoring navigation info");
+            return;
+        }
+
+        if (!getCoordinator().hasDisplay()) {
+            return;
+        }
+
+        final String instruction = navigationInfoSpec.getInstruction();
+        final String distanceToTurn = navigationInfoSpec.getDistanceToTurn();
+        final String eta = navigationInfoSpec.getETA();
+
+        // Blank spec clears the navigation card (see GoogleMapsNotificationHandler.handleRemove)
+        if ((instruction == null || instruction.isBlank())
+                && (distanceToTurn == null || distanceToTurn.isBlank())
+                && (eta == null || eta.isBlank())) {
+            LOG.info("Clearing Zepp OS navigation card");
+            notificationService.deleteNotification(NAVIGATION_NOTIFICATION_ID);
+            return;
+        }
+
+        final NotificationSpec notificationSpec = new NotificationSpec(NAVIGATION_NOTIFICATION_ID);
+        notificationSpec.setType(NotificationType.GENERIC_NAVIGATION);
+        notificationSpec.setSourceAppId("com.google.android.apps.maps");
+        notificationSpec.setSourceName("Navigation");
+        notificationSpec.setTitle(distanceToTurn != null && !distanceToTurn.isBlank() ? distanceToTurn : "Navigation");
+        final StringBuilder body = new StringBuilder();
+        if (instruction != null && !instruction.isBlank()) {
+            body.append(instruction);
+        }
+        if (eta != null && !eta.isBlank()) {
+            if (body.length() > 0) {
+                body.append("\n");
+            }
+            body.append("ETA ").append(eta);
+        }
+        notificationSpec.setBody(body.toString());
+
+        LOG.info("Sending Zepp OS navigation card: {}", navigationInfoSpec);
+        notificationService.sendNotification(notificationSpec);
     }
 
     @Override
