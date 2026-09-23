@@ -242,6 +242,12 @@ public class RedmiBudsProtocol extends GBDeviceProtocol {
         return new Message(MessageType.PHONE_REQUEST, Opcode.ANC, sequenceNumber++, new byte[]{0x02, 0x04, mode}).encode();
     }
 
+    @Override
+    public byte[] encodeFindDevice(final boolean start) {
+        return new Message(MessageType.PHONE_REQUEST, Opcode.SET_CONFIG, sequenceNumber++,
+                new byte[] { 0x04, 0x00, 0x09, start ? (byte) 0x01 : (byte) 0x00, (byte) 0x03 }).encode();
+    }
+
     public void decodeGetConfig(byte[] configPayload) {
         if (configPayload.length < 3) {
             return;

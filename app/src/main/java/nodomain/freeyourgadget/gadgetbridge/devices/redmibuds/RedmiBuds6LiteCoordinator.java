@@ -26,6 +26,7 @@ import nodomain.freeyourgadget.gadgetbridge.devices.redmibuds.prefs.RedmiBudsAmb
 import nodomain.freeyourgadget.gadgetbridge.devices.redmibuds.prefs.RedmiBudsAmbientSoundMode;
 import nodomain.freeyourgadget.gadgetbridge.devices.redmibuds.prefs.RedmiBudsGestureAction;
 import nodomain.freeyourgadget.gadgetbridge.devices.redmibuds.prefs.RedmiBudsLongGestureAction;
+import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
 
 public class RedmiBuds6LiteCoordinator extends AbstractRedmiBudsCoordinator {
     @Override
@@ -35,9 +36,12 @@ public class RedmiBuds6LiteCoordinator extends AbstractRedmiBudsCoordinator {
 
     @Override
     protected Pattern getSupportedDeviceName() {
-        // Matches the base name and any user-renamed variants, e.g. "Mahmoud's Redmi
-        // Buds 6 Lite"
         return Pattern.compile(".*Redmi Buds 6 Lite.*");
+    }
+
+    @Override
+    public boolean supportsFindDevice(@NonNull final GBDevice device) {
+        return true;
     }
 
     @NonNull
