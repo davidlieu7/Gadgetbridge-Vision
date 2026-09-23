@@ -18,6 +18,7 @@
 package nodomain.freeyourgadget.gadgetbridge.activities;
 
 
+import android.app.Activity;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
@@ -117,6 +118,13 @@ public abstract class AbstractGBActivity extends AppCompatActivity implements GB
                 activity.setTheme(R.style.GadgetbridgeTheme);
             }
         }
+
+        // Dynamic Color already ties tab/button/chip colors to the wallpaper palette, so the
+        // user's chosen accent preset only applies to the static Light/Dark themes above.
+        if (!GBApplication.areDynamicColorsEnabled() && activity instanceof Activity) {
+            ((Activity) activity).getTheme().applyStyle(GBApplication.getAccentColorOverlay(), true);
+        }
+
         activity.setLanguage(GBApplication.getLanguage(), false);
     }
 

@@ -18,6 +18,48 @@
 
     <color name="divider" type="color">#1f000000</color>
 
+    <!-- Pill-style tab bars: dark theme (bar + solid pill) -->
+    <color name="tab_text_off_dark" type="color">#CFCFCF</color>
+    <color name="subtab_pill_dark" type="color">#3A1512</color>
+    <color name="subtab_pill_on_dark" type="color">#FF6E5C</color>
+    <color name="subtab_text_off_dark" type="color">#BDBDBD</color>
+
+    <!-- Pill-style tab bars: light theme (tab_pill/tab_pill_on/text-off reuse existing brand colors) -->
+    <color name="tab_bar_bg_light" type="color">#FFFFFF</color>
+    <color name="tab_text_off_light" type="color">#4A4A4A</color>
+    <color name="subtab_text_off_light" type="color">#5A5A5A</color>
+    <color name="subtab_pill_light" type="color">#FBDBD5</color>
+
+    <!-- Date-step pill buttons: dark theme -->
+    <color name="datestep_row_bg_dark" type="color">#000000</color>
+    <color name="datestep_bg_dark" type="color">#1C1C1C</color>
+    <color name="datestep_icon_dark" type="color">#CFCFCF</color>
+    <color name="datestep_caption_dark" type="color">#9A9A9A</color>
+    <color name="datestep_primary_bg_dark" type="color">#E02F00</color>
+
+    <!-- Date-step pill buttons: light theme -->
+    <color name="datestep_row_bg_light" type="color">#EDEDED</color>
+    <color name="datestep_bg_light" type="color">#DCDCDC</color>
+    <color name="datestep_icon_light" type="color">#4A4A4A</color>
+    <color name="datestep_caption_light" type="color">#6E6E6E</color>
+
+    <!-- App-wide toolbar (3b, dark chrome regardless of theme - same rationale as the tab/date bars) -->
+    <color name="toolbar_bg" type="color">#1E1E1E</color>
+    <color name="toolbar_subtitle" type="color">#CCFFFFFF</color>
+
+    <!-- Static Light theme toolbar (and status bar behind it) -->
+    <color name="toolbar_bg_light" type="color">#FFFFFF</color>
+    <color name="toolbar_bg_amoled" type="color">#0F0F0F</color>
+    <color name="bar_shade_light" type="color">#1A000000</color>
+    <color name="bar_shade_dark" type="color">#59000000</color>
+    <color name="bar_shade_amoled_end" type="color">#000F0F0F</color>
+
+    <!-- Static Light theme screen background -->
+    <color name="window_background_light" type="color">#FAFAFA</color>
+
+    <!-- Static Dark theme screen background (the "black background" option overrides it with black) -->
+    <color name="window_background_dark" type="color">#121212</color>
+
     <color name="chart_heartrate" type="color">#ffab40</color>
     <color name="chart_heartrate_alternative" type="color">#8B0000</color>
     <color name="chart_heartrate_fill" type="color">#fadab1</color>
@@ -92,7 +134,19 @@
 
     <color name="value_line_color" type="color">#858585</color>
     <color name="row_separator_light" type="color">#ffe2e2e5</color>
-    <color name="row_separator_dark" type="color">#19808080</color>
+    <color name="row_separator_dark" type="color">#2C2C2C</color>
+
+    <color name="stat_tile_bg_light" type="color">#FFFFFF</color>
+    <color name="stat_tile_bg_dark" type="color">#1A1A1A</color>
+    <color name="stat_tile_border_light" type="color">#D8D4D0</color>
+    <color name="stat_tile_border_dark" type="color">#303030</color>
+    <color name="activity_icon_bg_light" type="color">#EBE7E3</color>
+    <color name="activity_icon_bg_dark" type="color">#262626</color>
+    <!-- Black (AMOLED) option: tiles and their border -->
+    <color name="stat_tile_bg_amoled" type="color">#080808</color>
+    <color name="stat_tile_border_amoled" type="color">#333333</color>
+    <color name="table_header_rule_light" type="color">#D8D4D0</color>
+    <color name="table_header_rule_dark" type="color">#3A3A3A</color>
     <color name="gauge_line_color" type="color">#19808080</color>
 
     <color name="hr_zone_warm_up_color" type="color">#92a4ad</color>
@@ -131,6 +185,10 @@
     <color name="chart_battery_temperature" type="color">#ff8f00</color>
 
     <attr name="row_separator" format="color" />
+    <attr name="stat_tile_bg" format="color" />
+    <attr name="stat_tile_border" format="color" />
+    <attr name="activity_icon_bg" format="color" />
+    <attr name="table_header_rule" format="color" />
     <color name="alternate_row_background_light">#FFEDEDED</color>
     <color name="alternate_row_background_dark">#545254</color>
 

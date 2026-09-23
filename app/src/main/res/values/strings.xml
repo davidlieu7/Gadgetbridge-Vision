@@ -262,6 +262,22 @@
     <string name="map_theme_biker">Biker</string>
     <string name="map_theme_indigo">Indigo</string>
     <string name="pref_theme_black_background">Use black background in Dark Theme</string>
+    <string name="pref_title_accent_color">Accent color</string>
+    <string name="pref_summary_accent_color">Color of buttons, tabs, and chips</string>
+    <string name="pref_accent_color_dynamic_disabled_summary">Not available while using Dynamic colors</string>
+    <string name="accent_color_red">Red</string>
+    <string name="accent_color_coral">Coral</string>
+    <string name="accent_color_orange">Orange</string>
+    <string name="accent_color_amber">Amber</string>
+    <string name="accent_color_lime">Lime</string>
+    <string name="accent_color_green">Green</string>
+    <string name="accent_color_teal">Teal</string>
+    <string name="accent_color_cyan">Cyan</string>
+    <string name="accent_color_blue">Blue</string>
+    <string name="accent_color_indigo">Indigo</string>
+    <string name="accent_color_violet">Violet</string>
+    <string name="accent_color_pink">Pink</string>
+    <string name="accent_color_white">White</string>
     <string name="pref_title_block_screenshot">Block screenshots</string>
     <string name="pref_summary_block_screenshots">Prevent screenshots and viewing on non-secure displays. Requires a GB restart to become fully effective.</string>
     <string name="pref_title_language">Language</string>
@@ -3261,6 +3277,14 @@
     <string name="no">No</string>
     <string name="activity_summaries_statistics">Statistics</string>
     <string name="activity_summaries_all_activities">All Activities</string>
+    <!-- Meta line under the workout list title: date range and number of activities -->
+    <!-- Short column header for heart rate in the workout tables (laps, intervals, sets) -->
+    <string name="table_header_hr">HR</string>
+    <string name="workout_list_meta">%1$s - %2$s • %3$s</string>
+    <plurals name="workout_list_activity_count">
+        <item quantity="one">%d activity</item>
+        <item quantity="other">%d activities</item>
+    </plurals>
     <string name="sports_activity_quick_filter_this_week">This week</string>
     <string name="sports_activity_quick_filter_last_week">Previous week</string>
     <string name="sports_activity_quick_filter_this_month">This month</string>
@@ -5626,4 +5650,13 @@
     <string name="cardo_control_volume">Volume</string>
     <string name="cardo_card_voice_prompts">Voice Prompts</string>
     <string name="cardo_control_enable_voice_prompts">Enable Voice Prompts</string>
+    <string name="datestep_letter_day">D</string>
+    <string name="datestep_letter_week">W</string>
+    <string name="datestep_letter_month">M</string>
+    <string name="datestep_prev_day">Previous day</string>
+    <string name="datestep_next_day">Next day</string>
+    <string name="datestep_prev_week">Previous week</string>
+    <string name="datestep_next_week">Next week</string>
+    <string name="datestep_prev_month">Previous month</string>
+    <string name="datestep_next_month">Next month</string>
 </resources>

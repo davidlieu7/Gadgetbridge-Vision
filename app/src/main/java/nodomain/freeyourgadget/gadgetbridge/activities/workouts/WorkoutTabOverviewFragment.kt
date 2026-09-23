@@ -20,6 +20,7 @@ import nodomain.freeyourgadget.gadgetbridge.R
 import nodomain.freeyourgadget.gadgetbridge.activities.workouts.WorkoutValueFormatter
 import nodomain.freeyourgadget.gadgetbridge.activities.workouts.entries.ActivitySummaryEntry
 import nodomain.freeyourgadget.gadgetbridge.activities.workouts.entries.ActivitySummaryGroup
+import nodomain.freeyourgadget.gadgetbridge.activities.workouts.entries.ActivitySummarySimpleEntry
 import nodomain.freeyourgadget.gadgetbridge.databinding.FragmentWorkoutTabOverviewBinding
 import nodomain.freeyourgadget.gadgetbridge.entities.BaseActivitySummary
 import nodomain.freeyourgadget.gadgetbridge.entities.Device
@@ -104,7 +105,7 @@ class WorkoutTabOverviewFragment : Fragment(), WorkoutTabScreenshotProvider {
         for ((groupKey, entries) in groups) {
             if (ActivitySummaryEntries.GROUP_ACTIVITY == groupKey) {
                 if (!entries.isEmpty()) {
-                    addGroupContent(entries)
+                    addActivityStatTiles(entries)
                 }
             }
         }
@@ -121,14 +122,10 @@ class WorkoutTabOverviewFragment : Fragment(), WorkoutTabScreenshotProvider {
     private fun updateGpsMap(workout: Workout) {
         if (!workoutHasGps(workout)) {
             binding.gpsFragmentHolder.visibility = View.GONE
-            // The details table draws its own top border - if we don't have a map, hide
-            // the separator.
-            binding.headerSeparator.visibility = View.GONE
             return
         }
 
         binding.gpsFragmentHolder.visibility = View.VISIBLE
-        binding.headerSeparator.visibility = View.VISIBLE
         gpsFragment?.setTrackData(workout.summary, getGBDevice(workout.summary.device))
     }
 
@@ -158,6 +155,17 @@ class WorkoutTabOverviewFragment : Fragment(), WorkoutTabScreenshotProvider {
             gridTableBuilder.addEntry(workoutValueFormatter.getStringResourceByName(key), entry)
         }
         binding.summaryDetails.addView(gridTableBuilder.build())
+    }
+
+    private fun addActivityStatTiles(entries: List<Pair<String, ActivitySummaryEntry>>) {
+        val stats = entries.mapNotNull { (key, entry) ->
+            (entry as? ActivitySummarySimpleEntry)?.takeIf { it.value != null }?.let {
+                StatTileData(workoutValueFormatter.formatTileValue(it.value, it.unit), workoutValueFormatter.getStringResourceByName(key))
+            }
+        }
+        if (stats.isNotEmpty()) {
+            addStatTileGrid(binding.summaryDetails, requireContext(), stats, horizontalMarginDp = 16)
+        }
     }
 
     private fun addGroupHeader(groupKey: String) {
@@ -190,6 +198,8 @@ class WorkoutTabOverviewFragment : Fragment(), WorkoutTabScreenshotProvider {
         }
     }
 
+    private fun String.keepTogether(): String = replace(' ', '\u00A0')
+
     private fun updateWorkoutHeader(summary: BaseActivitySummary) {
         val activityName = summary.name
         val startTime = summary.startTime
@@ -210,30 +220,27 @@ class WorkoutTabOverviewFragment : Fragment(), WorkoutTabScreenshotProvider {
                 visibility = if (StringUtils.isBlank(activityName)) View.GONE else View.VISIBLE
             }
 
-            // Date
-            binding.activitydate.apply {
-                val timeString = if (DateTimeUtils.isSameDay(startTime, endTime)) {
-                    val endTimeCal = Calendar.getInstance().apply { time = endTime }
-                    context.getString(
-                        R.string.date_placeholders__start_time__end_time,
-                        DateTimeUtils.formatDateTimeRelative(context, startTime),
-                        DateTimeUtils.formatTime(
-                            endTimeCal.get(Calendar.HOUR_OF_DAY),
-                            endTimeCal.get(Calendar.MINUTE)
-                        )
+            // Date range and duration share one line. Non-breaking spaces keep the time range and
+            // the duration in one piece, so at large font scales the line only wraps at the
+            // separator and never inside a time.
+            val dateString = if (DateTimeUtils.isSameDay(startTime, endTime)) {
+                val endTimeCal = Calendar.getInstance().apply { time = endTime }
+                requireContext().getString(
+                    R.string.date_placeholders__start_time__end_time,
+                    DateTimeUtils.formatDateTimeRelative(requireContext(), startTime),
+                    DateTimeUtils.formatTime(
+                        endTimeCal.get(Calendar.HOUR_OF_DAY),
+                        endTimeCal.get(Calendar.MINUTE)
                     )
-                } else {
-                    context.getString(
-                        R.string.date_placeholders__start_time__end_time,
-                        DateTimeUtils.formatDateTimeRelative(context, startTime),
-                        DateTimeUtils.formatDateTimeRelative(context, endTime)
-                    )
-                }
-                text = timeString
+                ).keepTogether()
+            } else {
+                requireContext().getString(
+                    R.string.date_placeholders__start_time__end_time,
+                    DateTimeUtils.formatDateTimeRelative(requireContext(), startTime),
+                    DateTimeUtils.formatDateTimeRelative(requireContext(), endTime)
+                )
             }
-
-            // Duration
-            binding.activityduration.text = durationHms
+            binding.activitymeta.text = "$dateString · ${durationHms.keepTogether()}"
 
             updateUploadStatusIcon(summary)
         }

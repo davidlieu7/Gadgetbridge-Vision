@@ -25,7 +25,9 @@ import nodomain.freeyourgadget.gadgetbridge.activities.charts.vico.ChartTheme
 import nodomain.freeyourgadget.gadgetbridge.activities.charts.vico.ChartUiState
 import nodomain.freeyourgadget.gadgetbridge.activities.charts.vico.GbLineChart
 import nodomain.freeyourgadget.gadgetbridge.activities.dashboard.GaugeDrawer
+import nodomain.freeyourgadget.gadgetbridge.activities.workouts.StatTileData
 import nodomain.freeyourgadget.gadgetbridge.activities.workouts.WorkoutValueFormatter
+import nodomain.freeyourgadget.gadgetbridge.activities.workouts.addStatTileGrid
 import nodomain.freeyourgadget.gadgetbridge.databinding.FragmentStepsBinding
 import nodomain.freeyourgadget.gadgetbridge.model.ActivityUser
 import java.text.NumberFormat
@@ -129,8 +131,12 @@ class StepsDailyFragment : AbstractVicoChartFragment<StepsDailyFragment.ScreenDa
             )
         )
 
-        binding.stepsCount.text = NumberFormat.getInstance().format(totals.steps)
-        binding.stepsDistance.text = WorkoutValueFormatter().formatValue(totals.distanceKm, "km")
+        binding.stepsStatsContainer.removeAllViews()
+        val stats = listOf(
+            StatTileData(NumberFormat.getInstance().format(totals.steps), getString(R.string.steps)),
+            StatTileData(WorkoutValueFormatter().formatValue(totals.distanceKm, "km"), getString(R.string.distance)),
+        )
+        addStatTileGrid(binding.stepsStatsContainer, requireContext(), stats, 0)
     }
 
     companion object {

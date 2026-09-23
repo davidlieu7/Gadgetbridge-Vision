@@ -12,6 +12,8 @@ import android.widget.ImageView;
 
 import androidx.annotation.ColorInt;
 
+import com.google.android.material.color.MaterialColors;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -242,7 +244,7 @@ public class GaugeDrawer {
         paint.setStyle(Paint.Style.STROKE);
         paint.setStrokeCap(Paint.Cap.BUTT);
         paint.setStrokeWidth(barWidth);
-        paint.setColor(context.getResources().getColor(R.color.gauge_line_color));
+        paint.setColor(MaterialColors.getColor(context, R.attr.gauge_track, context.getResources().getColor(R.color.gauge_line_color)));
         canvas.drawArc(
                 barMargin,
                 barMargin,
@@ -332,7 +334,7 @@ public class GaugeDrawer {
         paint.setStyle(Paint.Style.STROKE);
         paint.setStrokeCap(Paint.Cap.ROUND);
         paint.setStrokeWidth(barWidth);
-        paint.setColor(context.getResources().getColor(R.color.gauge_line_color));
+        paint.setColor(MaterialColors.getColor(context, R.attr.gauge_track, context.getResources().getColor(R.color.gauge_line_color)));
         canvas.drawArc(
                 barMargin,
                 barMargin,

@@ -19,6 +19,7 @@
         android:layout_width="wrap_content"
         android:layout_height="match_parent"
         android:layout_gravity="start"
+        android:background="?android:attr/windowBackground"
         android:fitsSystemWindows="true"
         app:headerLayout="@layout/main_drawer_header"
         app:menu="@menu/activity_main_drawer" />

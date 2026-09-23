@@ -50,7 +50,7 @@
                 android:scrollHorizontally="false"
                 android:text="@string/activity_filter_date_from"
                 android:textAllCaps="true"
-                android:textColor="@color/accent"
+                android:textColor="?attr/summary_tile_label"
                 android:textStyle="bold" />
 
             <TextView
@@ -94,7 +94,7 @@
                 android:scrollHorizontally="false"
                 android:text="@string/activity_detail_duration_label"
                 android:textAllCaps="true"
-                android:textColor="@color/accent"
+                android:textColor="?attr/summary_tile_label"
                 android:textStyle="bold" />
 
             <TextView
@@ -139,7 +139,7 @@
                 android:scrollHorizontally="false"
                 android:text="@string/activity_filter_date_to"
                 android:textAllCaps="true"
-                android:textColor="@color/accent"
+                android:textColor="?attr/summary_tile_label"
                 android:textStyle="bold" />
 
             <TextView
@@ -152,7 +152,7 @@
                 android:maxLines="1"
                 android:scrollHorizontally="false"
                 android:text="@string/lorem_ipsum"
-                android:textColor="@color/accent"
+                android:textColor="?attr/summary_tile_label"
                 android:textSize="12sp" />
         </LinearLayout>
 

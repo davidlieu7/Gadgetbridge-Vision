@@ -10,6 +10,7 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ImageView;
+import android.widget.LinearLayout;
 import android.widget.TextView;
 
 import androidx.annotation.ColorInt;
@@ -39,6 +40,8 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import nodomain.freeyourgadget.gadgetbridge.GBApplication;
 import nodomain.freeyourgadget.gadgetbridge.R;
+import nodomain.freeyourgadget.gadgetbridge.activities.workouts.StatTileData;
+import nodomain.freeyourgadget.gadgetbridge.activities.workouts.StatTileGridUtilKt;
 import nodomain.freeyourgadget.gadgetbridge.database.DBHandler;
 import nodomain.freeyourgadget.gadgetbridge.devices.DeviceCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.TimeSampleProvider;
@@ -51,8 +54,7 @@ public class BodyEnergyFragment extends AbstractChartFragment<BodyEnergyFragment
 
     private TextView mDateView;
     private ImageView bodyEnergyGauge;
-    private TextView bodyEnergyGained;
-    private TextView bodyEnergyLost;
+    private LinearLayout bodyEnergyStatsContainer;
     private LineChart bodyEnergyChart;
 
     protected int CHART_TEXT_COLOR;
@@ -75,8 +77,7 @@ public class BodyEnergyFragment extends AbstractChartFragment<BodyEnergyFragment
 
         mDateView = rootView.findViewById(R.id.body_energy_date_view);
         bodyEnergyGauge = rootView.findViewById(R.id.body_energy_gauge);
-        bodyEnergyGained = rootView.findViewById(R.id.body_energy_gained);
-        bodyEnergyLost = rootView.findViewById(R.id.body_energy_lost);
+        bodyEnergyStatsContainer = rootView.findViewById(R.id.body_energy_stats_container);
         bodyEnergyChart = rootView.findViewById(R.id.body_energy_chart);
         setupBodyEnergyLevelChart();
         refresh();
@@ -211,8 +212,11 @@ public class BodyEnergyFragment extends AbstractChartFragment<BodyEnergyFragment
                 newestValue,
                 100
         ));
-        bodyEnergyGained.setText(String.format("+ %s", gainedValue.intValue()));
-        bodyEnergyLost.setText(String.format("- %s", drainedValue));
+        final List<StatTileData> stats = new ArrayList<>();
+        stats.add(new StatTileData(String.format("+ %s", gainedValue.intValue()), getString(R.string.body_energy_gained)));
+        stats.add(new StatTileData(String.format("- %s", drainedValue), getString(R.string.body_energy_lost)));
+        bodyEnergyStatsContainer.removeAllViews();
+        StatTileGridUtilKt.addStatTileGrid(bodyEnergyStatsContainer, requireContext(), stats, 0);
     }
 
     @Override

@@ -25,17 +25,14 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
-import android.content.res.Resources;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.SystemClock;
-import android.util.TypedValue;
 import android.view.MenuItem;
 import android.view.MotionEvent;
 import android.view.View;
 import android.widget.Toast;
 
-import androidx.annotation.ColorInt;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.ActionBarDrawerToggle;
 import androidx.appcompat.app.AlertDialog;
@@ -55,6 +52,7 @@ import androidx.viewpager2.widget.ViewPager2;
 
 import com.google.android.material.appbar.MaterialToolbar;
 import com.google.android.material.bottomnavigation.BottomNavigationView;
+import com.google.android.material.color.MaterialColors;
 import com.google.android.material.navigation.NavigationView;
 
 import org.slf4j.Logger;
@@ -77,6 +75,7 @@ import nodomain.freeyourgadget.gadgetbridge.model.ActivitySample;
 import nodomain.freeyourgadget.gadgetbridge.model.DeviceService;
 import nodomain.freeyourgadget.gadgetbridge.model.RecordedDataTypes;
 import nodomain.freeyourgadget.gadgetbridge.util.AndroidUtils;
+import nodomain.freeyourgadget.gadgetbridge.util.BarShade;
 import nodomain.freeyourgadget.gadgetbridge.util.DeviceHelper;
 import nodomain.freeyourgadget.gadgetbridge.util.GB;
 import nodomain.freeyourgadget.gadgetbridge.util.GBChangeLog;
@@ -200,7 +199,7 @@ public class ControlCenterv2 extends AppCompatActivity
         NavigationView drawerNavigationView = findViewById(R.id.nav_view);
         drawerNavigationView.setNavigationItemSelectedListener(this);
 
-        View navigationHeaderView = drawerNavigationView.getHeaderView(0);
+        View navigationHeaderView = drawerNavigationView.getHeaderView(0).findViewById(R.id.drawer_header);
         final int headerPaddingLeft = navigationHeaderView.getPaddingLeft();
         final int headerPaddingRight = navigationHeaderView.getPaddingRight();
         final int headerPaddingBottom = navigationHeaderView.getPaddingBottom();
@@ -247,15 +246,18 @@ public class ControlCenterv2 extends AppCompatActivity
                 this, drawer, toolbar, R.string.controlcenter_navigation_drawer_open, R.string.controlcenter_navigation_drawer_close);
         drawer.setDrawerListener(toggle);
         toggle.syncState();
-        if (GBApplication.areDynamicColorsEnabled()) {
-            TypedValue typedValue = new TypedValue();
-            Resources.Theme theme = getTheme();
-            theme.resolveAttribute(com.google.android.material.R.attr.colorSurface, typedValue, true);
-            @ColorInt int toolbarBackground = typedValue.data;
-            toolbar.setBackgroundColor(toolbarBackground);
-        } else {
-            toolbar.setBackgroundColor(getResources().getColor(R.color.primarydark_light));
-            toolbar.setTitleTextColor(getResources().getColor(android.R.color.white));
+        // Every theme defines its own toolbar_bg (colorSurfaceContainer for Dynamic, black for AMOLED)
+        // Not TypedValue.data: the Dynamic surface colors are color state list resources (lStar),
+        // for which data is not a color. MaterialColors resolves those too.
+        toolbar.setBackgroundColor(MaterialColors.getColor(toolbar, R.attr.toolbar_bg));
+        // Same for the bottom bar; main_bar_bg follows toolbar_bg in every theme, so both bars match
+        navigationView.setBackgroundColor(MaterialColors.getColor(navigationView, R.attr.main_bar_bg));
+        findViewById(R.id.bottom_nav_shade).setVisibility(navigationView.getVisibility());
+        final View toolbarShade = findViewById(R.id.toolbar_shade);
+        final boolean dashboardDateRowShade = BarShade.continuesToolbar(this, R.attr.datestep_row_bg);
+        if (!GBApplication.areDynamicColorsEnabled()) {
+            // Dynamic Color already ties title/icon colors to colorOnSurface/colorControlNormal
+            toolbar.setTitleTextColor(GBApplication.getTextColor(this));
         }
 
         // Configure ViewPager2 with fragment adapter and default fragment
@@ -266,6 +268,7 @@ public class ControlCenterv2 extends AppCompatActivity
             viewPager.setCurrentItem(1, false);
             navigationView.getMenu().getItem(1).setChecked(true);
         }
+        toolbarShade.setVisibility(dashboardDateRowShade && viewPager.getCurrentItem() == 0 ? View.GONE : View.VISIBLE);
 
         // Sync ViewPager changes with BottomNavigationView
         viewPager.registerOnPageChangeCallback(new ViewPager2.OnPageChangeCallback() {
@@ -274,6 +277,7 @@ public class ControlCenterv2 extends AppCompatActivity
             @Override
             public void onPageSelected(int position) {
                 navigationView.getMenu().getItem(position).setChecked(true);
+                toolbarShade.setVisibility(dashboardDateRowShade && position == 0 ? View.GONE : View.VISIBLE);
 
                 // Ensure the menu provider is set to the current fragment
                 if (existingMenuProvider != null) {

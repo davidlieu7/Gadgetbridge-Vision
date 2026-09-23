@@ -22,6 +22,7 @@ import android.util.TypedValue;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.LinearLayout;
 import android.widget.TextView;
 
 import androidx.core.content.ContextCompat;
@@ -54,6 +55,8 @@ import java.util.Locale;
 
 import nodomain.freeyourgadget.gadgetbridge.GBApplication;
 import nodomain.freeyourgadget.gadgetbridge.R;
+import nodomain.freeyourgadget.gadgetbridge.activities.workouts.StatTileData;
+import nodomain.freeyourgadget.gadgetbridge.activities.workouts.StatTileGridUtilKt;
 import nodomain.freeyourgadget.gadgetbridge.database.DBHandler;
 import nodomain.freeyourgadget.gadgetbridge.devices.DeviceCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.TimeSampleProvider;
@@ -75,9 +78,7 @@ public class Spo2PeriodFragment extends AbstractChartFragment<Spo2PeriodFragment
     private int SPO2_AVG_COLOR;
 
     private TextView mDateView;
-    private TextView spo2Minimum;
-    private TextView spo2Maximum;
-    private TextView spo2Average;
+    private LinearLayout spo2StatsContainer;
     private CombinedChart spo2Chart;
     private int TOTAL_DAYS;
 
@@ -120,9 +121,7 @@ public class Spo2PeriodFragment extends AbstractChartFragment<Spo2PeriodFragment
         });
 
         mDateView = rootView.findViewById(R.id.date_view);
-        spo2Minimum = rootView.findViewById(R.id.spo2_minimum);
-        spo2Maximum = rootView.findViewById(R.id.spo2_maximum);
-        spo2Average = rootView.findViewById(R.id.spo2_average);
+        spo2StatsContainer = rootView.findViewById(R.id.spo2_period_stats_container);
         spo2Chart = rootView.findViewById(R.id.spo2_chart);
 
         setupChart();
@@ -212,9 +211,21 @@ public class Spo2PeriodFragment extends AbstractChartFragment<Spo2PeriodFragment
         final int minimum = minAccumulator.getCount() > 0 ? (int) Math.round(minAccumulator.getMin()) : DATA_INVALID;
         final int maximum = maxAccumulator.getCount() > 0 ? (int) Math.round(maxAccumulator.getMax()) : DATA_INVALID;
 
-        spo2Minimum.setText(minimum > 0 ? getString(R.string.battery_percentage_str, String.valueOf(minimum)) : emptyValue);
-        spo2Maximum.setText(maximum > 0 ? getString(R.string.battery_percentage_str, String.valueOf(maximum)) : emptyValue);
-        spo2Average.setText(average > 0 ? getString(R.string.battery_percentage_str, String.valueOf(average)) : emptyValue);
+        final List<StatTileData> stats = new ArrayList<>();
+        stats.add(new StatTileData(
+                minimum > 0 ? getString(R.string.battery_percentage_str, String.valueOf(minimum)) : emptyValue,
+                getString(R.string.hr_minimum)
+        ));
+        stats.add(new StatTileData(
+                maximum > 0 ? getString(R.string.battery_percentage_str, String.valueOf(maximum)) : emptyValue,
+                getString(R.string.hr_maximum)
+        ));
+        stats.add(new StatTileData(
+                average > 0 ? getString(R.string.battery_percentage_str, String.valueOf(average)) : emptyValue,
+                getString(R.string.hr_average)
+        ));
+        spo2StatsContainer.removeAllViews();
+        StatTileGridUtilKt.addStatTileGrid(spo2StatsContainer, requireContext(), stats, 0);
 
         final String fmt = TOTAL_DAYS == 7 ? "EEE" : "dd";
         SimpleDateFormat formatDay = new SimpleDateFormat(fmt, Locale.getDefault());

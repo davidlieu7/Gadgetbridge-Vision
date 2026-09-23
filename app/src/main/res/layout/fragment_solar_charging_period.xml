@@ -21,95 +21,15 @@
             android:textColor="?attr/textColorPrimary"
             />
 
-        <GridLayout
+        <LinearLayout
+            android:id="@+id/solar_charging_period_stats_container"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="15dp"
-            android:layout_marginBottom="15dp"
-            android:background="@color/gauge_line_color"
-            android:columnCount="2">
-
-            <LinearLayout
-                style="@style/GridTile"
-                android:layout_marginTop="2dp"
-                android:layout_marginEnd="1dp">
-
-                <TextView
-                    android:id="@+id/solar_charging_period_lux_hours_total"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="0.0K"
-                    android:textColor="?attr/textColorPrimary"
-                    android:textSize="20sp" />
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/solar_charging_lux_hours_total"
-                    android:textSize="12sp" />
-            </LinearLayout>
-
-            <LinearLayout
-                style="@style/GridTile"
-                android:layout_marginTop="2dp"
-                android:layout_marginStart="1dp">
-
-                <TextView
-                    android:id="@+id/solar_charging_period_battery_gain_total"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="+ 0 min"
-                    android:textColor="?attr/textColorPrimary"
-                    android:textSize="20sp" />
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/solar_charging_battery_gain_total"
-                    android:textSize="12sp" />
-            </LinearLayout>
-
-            <LinearLayout
-                style="@style/GridTile"
-                android:layout_marginTop="1dp"
-                android:layout_marginEnd="1dp">
-
-                <TextView
-                    android:id="@+id/solar_charging_period_lux_hours_avg"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="0.0K"
-                    android:textColor="?attr/textColorPrimary"
-                    android:textSize="20sp" />
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/solar_charging_lux_hours_avg"
-                    android:textSize="12sp" />
-            </LinearLayout>
-
-            <LinearLayout
-                style="@style/GridTile"
-                android:layout_marginTop="1dp"
-                android:layout_marginStart="1dp">
-
-                <TextView
-                    android:id="@+id/solar_charging_period_battery_gain_avg"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="+ 0 min"
-                    android:textColor="?attr/textColorPrimary"
-                    android:textSize="20sp" />
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/solar_charging_battery_gain_avg"
-                    android:textSize="12sp" />
-            </LinearLayout>
-
-        </GridLayout>
+            android:layout_marginBottom="@dimen/chart_section_spacing"
+            android:layout_marginStart="15dp"
+            android:layout_marginEnd="15dp"
+            android:orientation="vertical" />
 
         <LinearLayout
             android:layout_width="match_parent"
@@ -128,7 +48,7 @@
             android:layout_height="wrap_content"
             android:layout_marginStart="10dp"
             android:layout_marginEnd="10dp"
-            android:layout_marginTop="10dp"
+            android:layout_marginTop="@dimen/chart_section_spacing"
             app:singleSelection="true"
             app:selectionRequired="true" />
 

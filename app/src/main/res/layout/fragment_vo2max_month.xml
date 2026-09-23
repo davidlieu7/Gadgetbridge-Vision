@@ -15,11 +15,13 @@
             android:textSize="20sp"
             android:textColor="?attr/textColorPrimary"
             android:layout_marginTop="15dp"
-            android:layout_marginBottom="20dp"
             />
 
+        <!-- The cards' own 8dp vertical margins bring this to 15dp above and below the gauges -->
         <GridLayout
             android:id="@+id/tiles_grid_wrapper"
+            android:layout_marginBottom="7dp"
+            android:layout_marginTop="7dp"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:columnCount="2"

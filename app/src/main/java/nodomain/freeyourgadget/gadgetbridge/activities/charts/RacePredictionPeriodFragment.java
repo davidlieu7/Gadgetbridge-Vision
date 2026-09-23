@@ -16,18 +16,17 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 package nodomain.freeyourgadget.gadgetbridge.activities.charts;
 
-import android.content.res.ColorStateList;
 import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.LinearLayout;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.core.content.ContextCompat;
-import androidx.core.widget.TextViewCompat;
 
 import com.github.mikephil.charting.charts.Chart;
 import com.github.mikephil.charting.charts.LineChart;
@@ -42,6 +41,7 @@ import com.github.mikephil.charting.listener.ChartTouchListener;
 import com.github.mikephil.charting.listener.OnChartGestureListener;
 import com.google.android.material.chip.Chip;
 import com.google.android.material.chip.ChipGroup;
+import com.google.android.material.color.MaterialColors;
 
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -55,6 +55,8 @@ import java.util.Set;
 
 import nodomain.freeyourgadget.gadgetbridge.GBApplication;
 import nodomain.freeyourgadget.gadgetbridge.R;
+import nodomain.freeyourgadget.gadgetbridge.activities.workouts.StatTileData;
+import nodomain.freeyourgadget.gadgetbridge.activities.workouts.StatTileGridUtilKt;
 import nodomain.freeyourgadget.gadgetbridge.database.DBHandler;
 import nodomain.freeyourgadget.gadgetbridge.devices.GenericMetricSampleProvider;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
@@ -87,16 +89,7 @@ public class RacePredictionPeriodFragment extends AbstractChartFragment<RacePred
     private TextView dateView;
     private LineChart raceChart;
     private ChipGroup metricChipGroup;
-
-    private TextView tile5kValue;
-    private TextView tile10kValue;
-    private TextView tileHalfMarathonValue;
-    private TextView tileFullMarathonValue;
-
-    private TextView tile5kTrend;
-    private TextView tile10kTrend;
-    private TextView tileHalfMarathonTrend;
-    private TextView tileFullMarathonTrend;
+    private LinearLayout statsContainer;
 
     protected int CHART_TEXT_COLOR;
     protected int TEXT_COLOR;
@@ -133,7 +126,7 @@ public class RacePredictionPeriodFragment extends AbstractChartFragment<RacePred
         density = getResources().getDisplayMetrics().density;
         TEXT_COLOR = GBApplication.getTextColor(requireContext());
         CHART_TEXT_COLOR = GBApplication.getSecondaryTextColor(requireContext());
-        LINE_COLOR = getResources().getColor(R.color.accent);
+        LINE_COLOR = MaterialColors.getColor(requireContext(), R.attr.accent_color, getResources().getColor(R.color.accent));
     }
 
     @Override
@@ -147,15 +140,7 @@ public class RacePredictionPeriodFragment extends AbstractChartFragment<RacePred
         metricChipGroup = rootView.findViewById(R.id.race_prediction_chip_group);
 
         if (showTiles) {
-            tile5kValue = rootView.findViewById(R.id.race_prediction_5k_value);
-            tile10kValue = rootView.findViewById(R.id.race_prediction_10k_value);
-            tileHalfMarathonValue = rootView.findViewById(R.id.race_prediction_half_marathon_value);
-            tileFullMarathonValue = rootView.findViewById(R.id.race_prediction_full_marathon_value);
-
-            tile5kTrend = rootView.findViewById(R.id.race_prediction_5k_trend);
-            tile10kTrend = rootView.findViewById(R.id.race_prediction_10k_trend);
-            tileHalfMarathonTrend = rootView.findViewById(R.id.race_prediction_half_marathon_trend);
-            tileFullMarathonTrend = rootView.findViewById(R.id.race_prediction_full_marathon_trend);
+            statsContainer = rootView.findViewById(R.id.race_prediction_stats_container);
         }
 
         if (savedInstanceState != null) {
@@ -369,39 +354,29 @@ public class RacePredictionPeriodFragment extends AbstractChartFragment<RacePred
         if (latestValues == null) {
             return;
         }
-        tile5kValue.setText(formatTileValue(latestValues[0]));
-        tile10kValue.setText(formatTileValue(latestValues[1]));
-        tileHalfMarathonValue.setText(formatTileValue(latestValues[2]));
-        tileFullMarathonValue.setText(formatTileValue(latestValues[3]));
 
-        applyTrend(tile5kTrend, trendDeltas != null ? trendDeltas[0] : null);
-        applyTrend(tile10kTrend, trendDeltas != null ? trendDeltas[1] : null);
-        applyTrend(tileHalfMarathonTrend, trendDeltas != null ? trendDeltas[2] : null);
-        applyTrend(tileFullMarathonTrend, trendDeltas != null ? trendDeltas[3] : null);
-    }
-
-    private String formatTileValue(@Nullable final Double value) {
-        if (value == null) {
-            return getString(R.string.stats_empty_value);
+        final List<StatTileData> stats = new ArrayList<>();
+        for (int i = 0; i < METRICS_IN_CHIP_ORDER.length; i++) {
+            stats.add(buildStatTile(latestValues[i], trendDeltas != null ? trendDeltas[i] : null, METRICS_IN_CHIP_ORDER[i]));
         }
-        return formatSeconds(value);
+
+        statsContainer.removeAllViews();
+        StatTileGridUtilKt.addStatTileGrid(statsContainer, requireContext(), stats, 0);
     }
 
-    private void applyTrend(final TextView trendView, @Nullable final Double deltaSeconds) {
+    private StatTileData buildStatTile(@Nullable final Double value, @Nullable final Double deltaSeconds, final MetricSample.Metric metric) {
+        final String tileValue = value != null ? formatSeconds(value) : getString(R.string.stats_empty_value);
+        final String label = getString(metric.labelResId);
+
         if (deltaSeconds == null) {
-            trendView.setVisibility(View.GONE);
-            return;
+            return new StatTileData(tileValue, label);
         }
 
         final boolean faster = deltaSeconds < 0;
         final int iconRes = faster ? R.drawable.ic_caret_down_solid : R.drawable.ic_caret_up_solid;
         final int color = ContextCompat.getColor(requireContext(), faster ? R.color.body_energy_level_color : R.color.body_energy_lost_color);
 
-        trendView.setVisibility(View.VISIBLE);
-        trendView.setText(formatSeconds(Math.abs(deltaSeconds)));
-        trendView.setTextColor(color);
-        TextViewCompat.setCompoundDrawablesRelativeWithIntrinsicBounds(trendView, iconRes, 0, 0, 0);
-        TextViewCompat.setCompoundDrawableTintList(trendView, ColorStateList.valueOf(color));
+        return new StatTileData(tileValue, label, null, formatSeconds(Math.abs(deltaSeconds)), iconRes, color);
     }
 
     private LineDataSet createDataSet(final List<Entry> entries, final MetricSample.Metric metric) {

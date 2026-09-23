@@ -46,6 +46,7 @@ import nodomain.freeyourgadget.gadgetbridge.activities.dashboard.DashboardAdapte
 import nodomain.freeyourgadget.gadgetbridge.activities.dashboard.DashboardCalendarActivity
 import nodomain.freeyourgadget.gadgetbridge.activities.dashboard.DashboardViewModel
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice
+import nodomain.freeyourgadget.gadgetbridge.util.BarShade
 import nodomain.freeyourgadget.gadgetbridge.util.DateTimeUtils
 import nodomain.freeyourgadget.gadgetbridge.util.kotlin.getDevice
 import java.util.Calendar
@@ -97,6 +98,8 @@ class DashboardFragment : Fragment(), MenuProvider {
         textViewDate = view.findViewById(R.id.dashboard_date)
         recyclerView = view.findViewById(R.id.dashboard_recyclerview)
         arrowRight = view.findViewById(R.id.arrow_right)
+        view.findViewById<View>(R.id.dashboard_date_row_shade).visibility =
+            if (BarShade.continuesToolbar(requireContext(), R.attr.datestep_row_bg)) View.VISIBLE else View.GONE
 
         viewModel = ViewModelProvider(this)[DashboardViewModel::class.java]
         adapter = DashboardAdapter()

@@ -41,7 +41,7 @@
         android:gravity="center_horizontal|bottom"
         android:text="@string/discovery_note"
         android:textAppearance="?android:attr/textAppearanceSmall"
-        android:textColor="@color/secondarytext"
+        android:textColor="?attr/textColorSecondary"
         android:textStyle="bold" />
 
     <TextView
@@ -51,7 +51,7 @@
         android:layout_gravity="bottom|center_horizontal"
         android:text="@string/pairing_even_realities_g1_bottom_hint"
         android:textAppearance="?android:attr/textAppearanceSmall"
-        android:textColor="@color/secondarytext"
+        android:textColor="?attr/textColorSecondary"
         android:textIsSelectable="true" />
 
 </LinearLayout>

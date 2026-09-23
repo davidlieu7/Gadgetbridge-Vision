@@ -25,6 +25,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.AdapterView;
 import android.widget.ArrayAdapter;
+import android.widget.LinearLayout;
 import android.widget.Spinner;
 import android.widget.TextView;
 
@@ -46,8 +47,12 @@ import java.util.Date;
 import java.util.List;
 import java.util.Set;
 
+import com.google.android.material.color.MaterialColors;
+
 import nodomain.freeyourgadget.gadgetbridge.GBApplication;
 import nodomain.freeyourgadget.gadgetbridge.R;
+import nodomain.freeyourgadget.gadgetbridge.activities.workouts.StatTileData;
+import nodomain.freeyourgadget.gadgetbridge.activities.workouts.StatTileGridUtilKt;
 import nodomain.freeyourgadget.gadgetbridge.activities.workouts.WorkoutValueFormatter;
 import nodomain.freeyourgadget.gadgetbridge.activities.workouts.charts.DefaultWorkoutCharts;
 import nodomain.freeyourgadget.gadgetbridge.database.DBHandler;
@@ -64,10 +69,7 @@ public class GenericMetricChartFragment extends AbstractChartFragment<GenericMet
     private LineChart chart;
     private Spinner metricSpinner;
     private TextView timeSpanText;
-    private TextView averageText;
-    private TextView minimumText;
-    private TextView maximumText;
-    private TextView sampleCountText;
+    private LinearLayout statsContainer;
 
     private int chartTextColor;
     private int lineColor;
@@ -98,7 +100,7 @@ public class GenericMetricChartFragment extends AbstractChartFragment<GenericMet
         chartTextColor = GBApplication.getSecondaryTextColor(requireContext());
         textColor = GBApplication.getTextColor(requireContext());
         backgroundColor = GBApplication.getBackgroundColor(requireContext());
-        lineColor = getResources().getColor(R.color.accent);
+        lineColor = MaterialColors.getColor(requireContext(), R.attr.accent_color, getResources().getColor(R.color.accent));
         valueFormatter = new WorkoutValueFormatter();
     }
 
@@ -157,21 +159,31 @@ public class GenericMetricChartFragment extends AbstractChartFragment<GenericMet
 
         chart.setData(null); // workaround for https://github.com/PhilJay/MPAndroidChart/issues/2317
 
+        final String emptyValue = getString(R.string.stats_empty_value);
+        final String minimumValue;
+        final String maximumValue;
+        final String averageValue;
         if (chartsData.hasData()) {
             setYAxisRange(chartsData.yMin, chartsData.yMax);
             chart.setData(chartsData.lineData);
-            averageText.setText(formatMetricValue(chartsData.metric, chartsData.averageValue, false));
-            minimumText.setText(formatMetricValue(chartsData.metric, chartsData.yMin, false));
-            maximumText.setText(formatMetricValue(chartsData.metric, chartsData.yMax, false));
+            minimumValue = formatMetricValue(chartsData.metric, chartsData.yMin, false);
+            maximumValue = formatMetricValue(chartsData.metric, chartsData.yMax, false);
+            averageValue = formatMetricValue(chartsData.metric, chartsData.averageValue, false);
         } else {
             chart.getAxisLeft().setAxisMinimum(0f);
             chart.getAxisLeft().setAxisMaximum(1f);
-            averageText.setText(R.string.stats_empty_value);
-            minimumText.setText(R.string.stats_empty_value);
-            maximumText.setText(R.string.stats_empty_value);
+            minimumValue = emptyValue;
+            maximumValue = emptyValue;
+            averageValue = emptyValue;
         }
 
-        sampleCountText.setText(String.valueOf(chartsData.sampleCount));
+        final List<StatTileData> stats = new ArrayList<>();
+        stats.add(new StatTileData(minimumValue, getString(R.string.hr_minimum)));
+        stats.add(new StatTileData(maximumValue, getString(R.string.hr_maximum)));
+        stats.add(new StatTileData(averageValue, getString(R.string.hr_average)));
+        stats.add(new StatTileData(String.valueOf(chartsData.sampleCount), getString(R.string.generic_metric_samples)));
+        statsContainer.removeAllViews();
+        StatTileGridUtilKt.addStatTileGrid(statsContainer, requireContext(), stats, 0);
     }
 
     @Override
@@ -190,10 +202,7 @@ public class GenericMetricChartFragment extends AbstractChartFragment<GenericMet
         metricSpinner = rootView.findViewById(R.id.generic_metric_spinner);
         timeSpanText = rootView.findViewById(R.id.generic_metric_time_span_text);
         chart = rootView.findViewById(R.id.generic_metric_chart);
-        averageText = rootView.findViewById(R.id.generic_metric_average_value);
-        minimumText = rootView.findViewById(R.id.generic_metric_minimum_value);
-        maximumText = rootView.findViewById(R.id.generic_metric_maximum_value);
-        sampleCountText = rootView.findViewById(R.id.generic_metric_sample_count);
+        statsContainer = rootView.findViewById(R.id.generic_metric_stats_container);
 
         metrics = getAvailableMetrics(getChartsHost().getDevice());
         selectedMetric = getInitialMetric(savedInstanceState);

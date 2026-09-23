@@ -65,6 +65,7 @@ import nodomain.freeyourgadget.gadgetbridge.model.workout.Workout
 import nodomain.freeyourgadget.gadgetbridge.model.workout.WorkoutViewModel
 import nodomain.freeyourgadget.gadgetbridge.util.ActivitySummaryUtils
 import nodomain.freeyourgadget.gadgetbridge.util.AndroidUtils
+import nodomain.freeyourgadget.gadgetbridge.util.BarShade
 import nodomain.freeyourgadget.gadgetbridge.util.DateTimeUtils
 import nodomain.freeyourgadget.gadgetbridge.util.FileUtils
 import nodomain.freeyourgadget.gadgetbridge.util.GB
@@ -114,6 +115,9 @@ class WorkoutDetailsFragment : Fragment(), MenuProvider {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+
+        binding.tabRowShade.visibility =
+            if (BarShade.continuesToolbar(requireContext(), R.attr.tab_bar_bg)) View.VISIBLE else View.GONE
 
         // Attach workout tabs.
         val viewPager = binding.tabsViewPager
@@ -206,6 +210,7 @@ class WorkoutDetailsFragment : Fragment(), MenuProvider {
 
                 currentWorkout?.let { workout ->
                     workoutValueFormatter.setActivityKind(ActivityKind.fromCode(workout.summary.activityKind))
+                    updateActionBarTitle()
                     workoutViewModel.setWorkout(workout, workoutId)
                     tabsPagerAdapter.setLapsTab(hasLaps(workout))
 

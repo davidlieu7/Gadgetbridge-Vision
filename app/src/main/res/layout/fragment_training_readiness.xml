@@ -29,7 +29,10 @@
         <RelativeLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_margin="8dp">
+            android:layout_marginStart="8dp"
+            android:layout_marginEnd="8dp"
+            android:layout_marginTop="@dimen/chart_section_spacing"
+            android:layout_marginBottom="@dimen/chart_section_spacing">
 
             <ImageView
                 android:id="@+id/training_readiness_gauge_bar"
@@ -63,157 +66,16 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:gravity="center"
-            android:layout_marginTop="4dp"
             android:layout_marginBottom="15dp" />
 
-        <GridLayout
-            android:background="@color/gauge_line_color"
+        <LinearLayout
+            android:id="@+id/training_readiness_stats_container"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:columnCount="2"
-            android:layout_marginBottom="15dp">
-
-            <LinearLayout
-                style="@style/GridTile"
-                android:layout_marginEnd="1dp"
-                android:layout_marginTop="2dp">
-                <TextView
-                    android:id="@+id/training_readiness_hrv_value"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/stats_empty_value"
-                    android:textColor="?attr/textColorPrimary"
-                    android:textSize="20sp" />
-                <TextView
-                    android:id="@+id/training_readiness_hrv_indicator"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:textStyle="bold"
-                    android:textSize="12sp" />
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/pref_header_hrv_status"
-                    android:textSize="12sp" />
-            </LinearLayout>
-
-            <LinearLayout
-                style="@style/GridTile"
-                android:layout_marginStart="1dp"
-                android:layout_marginTop="2dp">
-                <TextView
-                    android:id="@+id/training_readiness_acute_load_value"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/stats_empty_value"
-                    android:textColor="?attr/textColorPrimary"
-                    android:textSize="20sp" />
-                <TextView
-                    android:id="@+id/training_readiness_acute_load_indicator"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:textStyle="bold"
-                    android:textSize="12sp" />
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/training_acute_load"
-                    android:textSize="12sp" />
-            </LinearLayout>
-
-            <LinearLayout
-                style="@style/GridTile"
-                android:layout_marginEnd="1dp">
-                <TextView
-                    android:id="@+id/training_readiness_sleep_score_value"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/stats_empty_value"
-                    android:textColor="?attr/textColorPrimary"
-                    android:textSize="20sp" />
-                <TextView
-                    android:id="@+id/training_readiness_sleep_score_indicator"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:textStyle="bold"
-                    android:textSize="12sp" />
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/menuitem_sleep"
-                    android:textSize="12sp" />
-            </LinearLayout>
-
-            <LinearLayout
-                style="@style/GridTile"
-                android:layout_marginStart="1dp">
-                <TextView
-                    android:id="@+id/training_readiness_recovery_value"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/stats_empty_value"
-                    android:textColor="?attr/textColorPrimary"
-                    android:textSize="20sp" />
-                <TextView
-                    android:id="@+id/training_readiness_recovery_indicator"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:textStyle="bold"
-                    android:textSize="12sp" />
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/recoveryTime"
-                    android:textSize="12sp" />
-            </LinearLayout>
-
-            <LinearLayout
-                style="@style/GridTile"
-                android:layout_marginEnd="1dp">
-                <TextView
-                    android:id="@+id/training_readiness_sleep_history_value"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/stats_empty_value"
-                    android:textColor="?attr/textColorPrimary"
-                    android:textSize="20sp" />
-                <TextView
-                    android:id="@+id/training_readiness_sleep_history_indicator"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:textStyle="bold"
-                    android:textSize="12sp" />
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/training_readiness_factor_sleep_3_nights"
-                    android:textSize="12sp" />
-            </LinearLayout>
-
-            <LinearLayout
-                style="@style/GridTile"
-                android:layout_marginStart="1dp">
-                <TextView
-                    android:id="@+id/training_readiness_stress_history_value"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/stats_empty_value"
-                    android:textColor="?attr/textColorPrimary"
-                    android:textSize="20sp" />
-                <TextView
-                    android:id="@+id/training_readiness_stress_history_indicator"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:textStyle="bold"
-                    android:textSize="12sp" />
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/training_readiness_factor_stress_3_days"
-                    android:textSize="12sp" />
-            </LinearLayout>
-
-        </GridLayout>
+            android:layout_marginBottom="15dp"
+            android:layout_marginStart="15dp"
+            android:layout_marginEnd="15dp"
+            android:orientation="vertical" />
 
     </LinearLayout>
 </ScrollView>

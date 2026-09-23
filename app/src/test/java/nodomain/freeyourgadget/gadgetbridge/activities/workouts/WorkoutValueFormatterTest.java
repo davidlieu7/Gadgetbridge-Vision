@@ -5,6 +5,7 @@ import static org.junit.Assert.assertEquals;
 import static nodomain.freeyourgadget.gadgetbridge.model.ActivitySummaryEntries.UNIT_CELSIUS;
 import static nodomain.freeyourgadget.gadgetbridge.model.ActivitySummaryEntries.UNIT_FAHRENHEIT;
 import static nodomain.freeyourgadget.gadgetbridge.model.ActivitySummaryEntries.UNIT_FOOT;
+import static nodomain.freeyourgadget.gadgetbridge.model.ActivitySummaryEntries.UNIT_JUMPS;
 import static nodomain.freeyourgadget.gadgetbridge.model.ActivitySummaryEntries.UNIT_KILOMETERS;
 import static nodomain.freeyourgadget.gadgetbridge.model.ActivitySummaryEntries.UNIT_KMPH;
 import static nodomain.freeyourgadget.gadgetbridge.model.ActivitySummaryEntries.UNIT_KNOTS;
@@ -12,10 +13,15 @@ import static nodomain.freeyourgadget.gadgetbridge.model.ActivitySummaryEntries.
 import static nodomain.freeyourgadget.gadgetbridge.model.ActivitySummaryEntries.UNIT_MILE;
 import static nodomain.freeyourgadget.gadgetbridge.model.ActivitySummaryEntries.UNIT_METERS_PER_SECOND;
 import static nodomain.freeyourgadget.gadgetbridge.model.ActivitySummaryEntries.UNIT_MM;
+import static nodomain.freeyourgadget.gadgetbridge.model.ActivitySummaryEntries.UNIT_REPS;
+import static nodomain.freeyourgadget.gadgetbridge.model.ActivitySummaryEntries.UNIT_REVS;
 import static nodomain.freeyourgadget.gadgetbridge.model.ActivitySummaryEntries.UNIT_SECONDS_PER_100_METERS;
 import static nodomain.freeyourgadget.gadgetbridge.model.ActivitySummaryEntries.UNIT_SECONDS_PER_500_METERS;
 import static nodomain.freeyourgadget.gadgetbridge.model.ActivitySummaryEntries.UNIT_SECONDS_PER_KM;
 import static nodomain.freeyourgadget.gadgetbridge.model.ActivitySummaryEntries.UNIT_SECONDS_PER_M;
+import static nodomain.freeyourgadget.gadgetbridge.model.ActivitySummaryEntries.UNIT_SPM;
+import static nodomain.freeyourgadget.gadgetbridge.model.ActivitySummaryEntries.UNIT_STEPS;
+import static nodomain.freeyourgadget.gadgetbridge.model.ActivitySummaryEntries.UNIT_STROKES;
 
 import org.junit.After;
 import org.junit.Before;
@@ -120,6 +126,24 @@ public class WorkoutValueFormatterTest extends TestBase {
         assertEquals("68 ℉", fahrenheit.formatValue(20, UNIT_CELSIUS, true));
         assertEquals("20 ℃", metric(68, UNIT_FAHRENHEIT));
         assertEquals("68 ℉", fahrenheit.formatValue(68, UNIT_FAHRENHEIT, true));
+    }
+
+    @Test
+    public void tileValuesSkipTheUnitForCounts() {
+        assertEquals("8432", metric.formatTileValue(8432, UNIT_STEPS));
+        assertEquals("1208", metric.formatTileValue(1208, UNIT_STROKES));
+        assertEquals("30", metric.formatTileValue(30, UNIT_JUMPS));
+        assertEquals("12", metric.formatTileValue(12, UNIT_REPS));
+        assertEquals("55", metric.formatTileValue(55, UNIT_REVS));
+        // rates and everything else keep their unit
+        assertEquals("170 steps/min", metric.formatTileValue(170, UNIT_SPM));
+        assertEquals("10 km", metric.formatTileValue(10, UNIT_KILOMETERS));
+    }
+
+    @Test
+    public void plainFormatValueStillShowsCountUnits() {
+        // only tiles drop the unit, e.g. the Details tab rows keep it
+        assertEquals("8432 steps", metric(8432, UNIT_STEPS));
     }
 
     // --- Speed ---

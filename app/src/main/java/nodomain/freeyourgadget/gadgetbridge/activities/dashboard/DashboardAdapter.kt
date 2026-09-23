@@ -7,6 +7,7 @@ import android.view.ViewGroup
 import android.widget.FrameLayout
 import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.card.MaterialCardView
+import com.google.android.material.color.MaterialColors
 import nodomain.freeyourgadget.gadgetbridge.GBApplication
 import nodomain.freeyourgadget.gadgetbridge.R
 import nodomain.freeyourgadget.gadgetbridge.util.Prefs
@@ -163,6 +164,8 @@ class DashboardAdapter : RecyclerView.Adapter<DashboardAdapter.ViewHolder>() {
 
     private fun applyCardStyle(card: MaterialCardView) {
         val density = card.resources.displayMetrics.density
+        // Same fill as the stat tiles, so it follows the theme.
+        card.setCardBackgroundColor(MaterialColors.getColor(card, R.attr.stat_tile_bg))
         if (cardsEnabled) {
             card.radius = 4 * density
             card.cardElevation = 4 * density

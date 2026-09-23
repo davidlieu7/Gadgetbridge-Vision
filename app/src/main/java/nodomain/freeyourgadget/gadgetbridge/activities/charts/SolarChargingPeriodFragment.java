@@ -23,6 +23,7 @@ import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.LinearLayout;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
@@ -52,6 +53,8 @@ import java.util.Locale;
 
 import nodomain.freeyourgadget.gadgetbridge.GBApplication;
 import nodomain.freeyourgadget.gadgetbridge.R;
+import nodomain.freeyourgadget.gadgetbridge.activities.workouts.StatTileData;
+import nodomain.freeyourgadget.gadgetbridge.activities.workouts.StatTileGridUtilKt;
 import nodomain.freeyourgadget.gadgetbridge.activities.workouts.WorkoutValueFormatter;
 import nodomain.freeyourgadget.gadgetbridge.database.DBHandler;
 import nodomain.freeyourgadget.gadgetbridge.devices.DeviceCoordinator;
@@ -88,10 +91,7 @@ public class SolarChargingPeriodFragment extends AbstractChartFragment<SolarChar
     private SolarMetric selectedMetric = DEFAULT_METRIC;
 
     private TextView mDateView;
-    private TextView luxHoursTotalTile;
-    private TextView batteryGainTotalTile;
-    private TextView luxHoursAvgTile;
-    private TextView batteryGainAvgTile;
+    private LinearLayout statsContainer;
     private BarChart chart;
     private ChipGroup metricChipGroup;
 
@@ -132,10 +132,7 @@ public class SolarChargingPeriodFragment extends AbstractChartFragment<SolarChar
         });
 
         mDateView = rootView.findViewById(R.id.solar_charging_period_date_view);
-        luxHoursTotalTile = rootView.findViewById(R.id.solar_charging_period_lux_hours_total);
-        batteryGainTotalTile = rootView.findViewById(R.id.solar_charging_period_battery_gain_total);
-        luxHoursAvgTile = rootView.findViewById(R.id.solar_charging_period_lux_hours_avg);
-        batteryGainAvgTile = rootView.findViewById(R.id.solar_charging_period_battery_gain_avg);
+        statsContainer = rootView.findViewById(R.id.solar_charging_period_stats_container);
         chart = rootView.findViewById(R.id.solar_charging_period_chart);
         metricChipGroup = rootView.findViewById(R.id.solar_charging_period_chip_group);
 
@@ -254,10 +251,13 @@ public class SolarChargingPeriodFragment extends AbstractChartFragment<SolarChar
         final WorkoutValueFormatter unitFormatter = new WorkoutValueFormatter();
         final String kiloLuxHoursUnit = unitFormatter.getStringResourceByName(UNIT_LUX_HOURS_KILO);
         final String minutesUnit = unitFormatter.getStringResourceByName(UNIT_MINUTES);
-        luxHoursTotalTile.setText(String.format(Locale.getDefault(), "%.1f%s", luxHoursAccumulator.getSum() / 1000.0, kiloLuxHoursUnit));
-        batteryGainTotalTile.setText(String.format(Locale.getDefault(), "+ %.0f %s", gainMinutesAccumulator.getSum(), minutesUnit));
-        luxHoursAvgTile.setText(String.format(Locale.getDefault(), "%.1f%s", luxHoursAccumulator.getAverage() / 1000.0, kiloLuxHoursUnit));
-        batteryGainAvgTile.setText(String.format(Locale.getDefault(), "+ %.0f %s", gainMinutesAccumulator.getAverage(), minutesUnit));
+        statsContainer.removeAllViews();
+        final List<StatTileData> stats = new ArrayList<>();
+        stats.add(new StatTileData(String.format(Locale.getDefault(), "%.1f%s", luxHoursAccumulator.getSum() / 1000.0, kiloLuxHoursUnit), getString(R.string.solar_charging_lux_hours_total)));
+        stats.add(new StatTileData(String.format(Locale.getDefault(), "+ %.0f %s", gainMinutesAccumulator.getSum(), minutesUnit), getString(R.string.solar_charging_battery_gain_total)));
+        stats.add(new StatTileData(String.format(Locale.getDefault(), "%.1f%s", luxHoursAccumulator.getAverage() / 1000.0, kiloLuxHoursUnit), getString(R.string.solar_charging_lux_hours_avg)));
+        stats.add(new StatTileData(String.format(Locale.getDefault(), "+ %.0f %s", gainMinutesAccumulator.getAverage(), minutesUnit), getString(R.string.solar_charging_battery_gain_avg)));
+        StatTileGridUtilKt.addStatTileGrid(statsContainer, requireContext(), stats, 0);
 
         final String fmt = TOTAL_DAYS <= 7 ? "EEE" : "dd";
         final SimpleDateFormat formatDay = new SimpleDateFormat(fmt, Locale.getDefault());

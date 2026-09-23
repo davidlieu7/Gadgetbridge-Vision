@@ -66,6 +66,7 @@ import nodomain.freeyourgadget.gadgetbridge.devices.DeviceCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
 import nodomain.freeyourgadget.gadgetbridge.model.ActivityAmounts;
 import nodomain.freeyourgadget.gadgetbridge.model.RecordedDataTypes;
+import nodomain.freeyourgadget.gadgetbridge.util.BarShade;
 import nodomain.freeyourgadget.gadgetbridge.util.DateTimeUtils;
 import nodomain.freeyourgadget.gadgetbridge.util.GB;
 import nodomain.freeyourgadget.gadgetbridge.util.LimitedQueue;
@@ -131,7 +132,9 @@ public class ActivityChartsActivity extends AbstractGBActivity implements Charts
     @Override
     protected void onCreate(final Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        final boolean tabRowShade = BarShade.moveBelowRow(this, R.attr.tab_bar_bg);
         setContentView(R.layout.activity_charts);
+        findViewById(R.id.charts_tab_shade).setVisibility(tabRowShade ? View.VISIBLE : View.GONE);
 
         final Bundle extras = getIntent().getExtras();
         if (extras == null) {
