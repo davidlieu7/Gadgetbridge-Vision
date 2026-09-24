@@ -47,12 +47,14 @@ import nodomain.freeyourgadget.gadgetbridge.database.DBHandler;
 import nodomain.freeyourgadget.gadgetbridge.database.DBHelper;
 import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEventBatteryInfo;
 import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEventVersionInfo;
+import nodomain.freeyourgadget.gadgetbridge.devices.DeviceCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.GenericBodyCompositionSampleProvider;
 import nodomain.freeyourgadget.gadgetbridge.devices.GenericBloodLipidSampleProvider;
 import nodomain.freeyourgadget.gadgetbridge.devices.GenericBloodPressureSampleProvider;
 import nodomain.freeyourgadget.gadgetbridge.devices.GenericSpo2SampleProvider;
 import nodomain.freeyourgadget.gadgetbridge.devices.GenericStressSampleProvider;
 import nodomain.freeyourgadget.gadgetbridge.devices.GenericTemperatureSampleProvider;
+import nodomain.freeyourgadget.gadgetbridge.devices.veepoo.AbstractVeepooCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.veepoo.VeepooConstants;
 import nodomain.freeyourgadget.gadgetbridge.entities.BaseActivitySummary;
 import nodomain.freeyourgadget.gadgetbridge.entities.BaseActivitySummaryDao;
@@ -89,6 +91,7 @@ import nodomain.freeyourgadget.gadgetbridge.model.ActivitySample;
 import nodomain.freeyourgadget.gadgetbridge.model.ActivitySummaryData;
 import nodomain.freeyourgadget.gadgetbridge.model.ActivitySummaryEntries;
 import nodomain.freeyourgadget.gadgetbridge.model.ActivityTrack;
+import nodomain.freeyourgadget.gadgetbridge.model.ActivityUser;
 import nodomain.freeyourgadget.gadgetbridge.model.Alarm;
 import nodomain.freeyourgadget.gadgetbridge.model.BatteryState;
 import nodomain.freeyourgadget.gadgetbridge.model.DeviceService;
@@ -346,6 +349,9 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
         // Password confirmation carries the phone time; followed by an explicit time sync.
         writeFrame(builder, buildPwdConfirmTimeFrame());
         writeFrame(builder, buildSyncTimeFrame());
+        // Vendor flow: personal info + goals right after the time sync. The height calibrates
+        // the band's stride, which drives its step-based distance for non-GPS workouts.
+        writeFrame(builder, buildPersonInfoFrame());
         writeFrame(builder, new byte[]{VeepooConstants.OP_READ_BATTERY, 0x00});
         writeFrame(builder, new byte[]{VeepooConstants.OP_PRODUCTION_INFO, 0x00});
         // Defer the auto-measure settings read to steady state: issued inside this connect
@@ -498,6 +504,35 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
         return frame;
     }
 
+    /**
+     * Opcode 0xA3: personal info + goals (vendor p000if/s1.java): [1]=height cm, [2]=weight kg,
+     * [3]=age, [4]=sex (1=male, 2=female), [5..6]=step goal BE u16, [7..8]=sleep goal hours BE
+     * u16. The vendor app pushes this on every connect right after the time sync; the band uses
+     * the height for its stride/distance estimates, so skipping it leaves workout distance on an
+     * uncalibrated default stride.
+     */
+    byte[] buildPersonInfoFrame() {
+        ActivityUser user = new ActivityUser();
+        return personInfoFrame(user.getHeightCm(), user.getWeightKg(), user.getAge(),
+                user.getGender() == ActivityUser.GENDER_MALE, user.getStepsGoal(),
+                user.getSleepDurationGoal() / 60);
+    }
+
+    static byte[] personInfoFrame(int heightCm, int weightKg, int age, boolean male,
+                                  int stepsGoal, int sleepHours) {
+        byte[] frame = new byte[VeepooConstants.PACKET_SIZE];
+        frame[0] = VeepooConstants.OP_PERSON_INFO;
+        frame[1] = (byte) heightCm;
+        frame[2] = (byte) weightKg;
+        frame[3] = (byte) age;
+        frame[4] = (byte) (male ? 1 : 2);
+        frame[5] = (byte) ((stepsGoal >> 8) & 0xFF);
+        frame[6] = (byte) (stepsGoal & 0xFF);
+        frame[7] = (byte) ((sleepHours >> 8) & 0xFF);
+        frame[8] = (byte) (sleepHours & 0xFF);
+        return frame;
+    }
+
     @Override
     public boolean onCharacteristicChanged(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic, byte[] value) {
         if (value != null && characteristic.getUuid().equals(VeepooConstants.UUID_CHARACTERISTIC_F008_DATA)) {
@@ -533,6 +568,11 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
             case 0xA5:
                 if (data.length >= 2) {
                     LOG.info("Time sync status: {}", data[1] & 0xFF);
+                }
+                break;
+            case 0xA3:
+                if (data.length >= 2) {
+                    LOG.info("Personal info push: {}", (data[1] & 0xFF) == 1 ? "success" : "rejected");
                 }
                 break;
             case 0xA0:
@@ -1737,12 +1777,15 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
             workout.setUser(user);
 
             List<ActivityPoint> trackPoints = toActivityPoints(gpsPoints);
+            boolean usingPhoneTrack = false;
             if (trackPoints.size() < 2 && phoneTrack != null) {
                 // No band GPS: attach the route recorded with the phone, when it matches this session.
-                if (phoneTrack.points.size() >= 2
+                final List<ActivityPoint> trimmedPhoneTrack = trimPhoneGpsTrackToSession(phoneTrack.points, startTime, stopTime);
+                if (trimmedPhoneTrack.size() >= 2
                         && Math.abs(phoneTrack.startMs - startTime.getTime()) <= PHONE_GPS_MATCH_TOLERANCE_MS) {
-                    LOG.info("Workout day {}: attaching the phone GPS track ({} points)", dayIndex, phoneTrack.points.size());
-                    trackPoints = phoneTrack.points;
+                    LOG.info("Workout day {}: attaching the phone GPS track ({} points)", dayIndex, trimmedPhoneTrack.size());
+                    trackPoints = trimmedPhoneTrack;
+                    usingPhoneTrack = true;
                 } else {
                     LOG.info("Workout day {}: discarding a pending phone GPS track that does not match the session", dayIndex);
                 }
@@ -1751,7 +1794,7 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
                 try {
                     summary.setHasGps(true);
                     workout.setGpxTrack(writeSportGpx(startTime, workout.getName(), device, user, trackPoints));
-                    if (phoneTrack != null && trackPoints == phoneTrack.points) {
+                    if (usingPhoneTrack) {
                         // Without GNSS the band's distance is a step estimate; the recorded route
                         // provides a real one for the summary and the Health Connect sync.
                         final double gpsDistanceMeters = trackDistance(trackPoints);
@@ -1771,6 +1814,31 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
             LOG.error("Error saving VeePoo workout session (day {})", dayIndex, e);
         }
         getDevice().sendDeviceUpdateIntent(getContext());
+    }
+
+    /**
+     * Trims the phone GPS fixes to the session window (with a little margin on each side) so that
+     * stationary time before the start or after the stop - for example left over from a failed
+     * stop command that kept the phone recording - never ends up in the exported track or the
+     * computed distance. Falls back to the untrimmed track when nothing survives the window.
+     */
+    static List<ActivityPoint> trimPhoneGpsTrackToSession(List<ActivityPoint> points, Date startTime, Date stopTime) {
+        if (points == null || points.isEmpty() || startTime == null || stopTime == null) {
+            return points;
+        }
+        final long fromMs = startTime.getTime() - 60_000L;
+        final long toMs = stopTime.getTime() + 120_000L;
+        final List<ActivityPoint> trimmed = new ArrayList<>();
+        for (ActivityPoint point : points) {
+            if (point.getTime() == null) {
+                continue;
+            }
+            final long timeMs = point.getTime().getTime();
+            if (timeMs >= fromMs && timeMs <= toMs) {
+                trimmed.add(point);
+            }
+        }
+        return trimmed.isEmpty() ? points : trimmed;
     }
 
     /** Writes the collected GPS track points as a .gpx file in the export directory. */
@@ -2149,6 +2217,14 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
             }
         }
         return "";
+    }
+
+    /** Mirrors the live workout state (confirmed by the device) onto the card's start/stop action. */
+    void onLiveWorkoutStateChanged(final boolean running) {
+        final DeviceCoordinator coordinator = getDevice().getDeviceCoordinator();
+        if (coordinator instanceof AbstractVeepooCoordinator) {
+            ((AbstractVeepooCoordinator) coordinator).setWorkoutRunning(running);
+        }
     }
 
     /** Fetches day 0 of the workout history (called by VeepooLiveWorkoutModule's post-stop task). */

@@ -69,6 +69,19 @@ class VeepooLiveWorkoutModule {
     private int liveReportTotalChunks = 0;
     private boolean postStopFetchScheduled = false;
 
+    // Run-state polling and stop recovery: the band can end a workout on its own or ack a stop
+    // command it then ignores, so while a session is tracked the run state keeps getting polled,
+    // the phone GPS only stops once the band reports the session as ended (a hard deadline is the
+    // backstop), and a failed stop is retried with the sport type the band itself reports.
+    static final long LIVE_STATE_POLL_INTERVAL_MS = 60_000L;
+    private static final int MAX_STOP_ATTEMPTS = 3;
+    private static final long STOP_CONFIRM_WINDOW_MS = 2 * 60_000L;
+    private static final long PHONE_GPS_STOP_DEADLINE_MS = 5 * 60_000L;
+    private boolean stopRequested = false;
+    private int stopAttempts = 0;
+    private boolean stopRetryExhaustedToasted = false;
+    private long lastStopAckOkAtMs = 0L;
+
     // Phone GPS track recording (the band has no GNSS of its own). The track is buffered while a
     // phone-initiated workout runs and handed to saveSportSession once the session is fetched.
     static final float MAX_GPS_SPEED_MPS = 30f; // ~108 km/h; a faster fix-to-fix jump is a glitch
@@ -105,7 +118,12 @@ class VeepooLiveWorkoutModule {
             precheckInProgress = true;
             precheckSportType = sportType;
             liveReportChunks.clear();
+            stopRequested = false;
+            stopAttempts = 0;
+            stopRetryExhaustedToasted = false;
+            lastStopAckOkAtMs = 0L;
         }
+        support.mainHandler.removeCallbacks(phoneGpsStopDeadline);
         try {
             TransactionBuilder builder = support.performInitialized("start workout");
             support.writeFrame(builder, support.buildPwdConfirmTimeFrame());
@@ -142,8 +160,9 @@ class VeepooLiveWorkoutModule {
             support.writeFrame(builder, new byte[]{VeepooConstants.OP_SPORT_CONTROL});
             support.writeFrame(builder, new byte[]{VeepooConstants.OP_SPORT_CONTROL, 0x01,
                     (byte) (sportType & 0xFF), (byte) ((sportType >> 8) & 0xFF),
-                    (byte) VeepooConstants.SPORT_CTRL_START});
+                     (byte) VeepooConstants.SPORT_CTRL_START});
             builder.queue();
+            support.mainHandler.removeCallbacks(workoutCommandTimeout);
             support.mainHandler.postDelayed(workoutCommandTimeout, 10000L);
             LOG.info("Workout start command sent (sport type {})", sportType);
         } catch (IOException e) {
@@ -155,10 +174,9 @@ class VeepooLiveWorkoutModule {
     }
 
     /**
-     * Stops the running workout with the same sport type it was started with (vendor behavior).
-     * If the active sport type is unknown (session started elsewhere), the device run state is
-     * queried first and its reported sport type used. After a successful ack, day 0 of the
-     * workout history is re-fetched so the finished session shows up immediately.
+     * Stops the running workout. Always queries the device run state first: the vendor firmware
+     * acks but ignores a STOP that does not carry the active session's sport type, so the STOP is
+     * sent with the reported one. After a successful ack the finished session is re-fetched.
      */
     void stopWorkout() {
         synchronized (liveWorkoutLock) {
@@ -169,28 +187,22 @@ class VeepooLiveWorkoutModule {
             }
             workoutCommandPending = true;
             pendingCommandIsStop = true;
+            stopRequested = true;
+            stopRetryExhaustedToasted = false;
+            liveReportChunks.clear();
+            stopPrecheckInProgress = true;
         }
         try {
             TransactionBuilder builder = support.performInitialized("stop workout");
-            if (liveSportType == 0) {
-                // Unknown active sport type: the vendor's STOP(NONE) is acked but ignored by the
-                // device, so query the run state first and stop with the reported sport type.
-                synchronized (liveWorkoutLock) {
-                    stopPrecheckInProgress = true;
-                    liveReportChunks.clear();
-                }
-                support.writeFrame(builder, new byte[]{VeepooConstants.OP_SPORT_CONTROL});
-                support.writeFrame(builder, new byte[]{VeepooConstants.OP_SPORT_CONTROL, 0x02,
-                        0x00, 0x00, (byte) VeepooConstants.SPORT_CTRL_READ});
-                LOG.info("Workout stop: querying the device for the active sport type");
-            } else {
-                support.writeFrame(builder, new byte[]{VeepooConstants.OP_SPORT_CONTROL, 0x01,
-                        (byte) (liveSportType & 0xFF), (byte) ((liveSportType >> 8) & 0xFF),
-                        (byte) VeepooConstants.SPORT_CTRL_STOP});
-                LOG.info("Workout stop requested");
-            }
+            // readSportControlInfo: the device answers with a live report carrying the run state
+            // and the active sport type, which the STOP command must repeat.
+            support.writeFrame(builder, new byte[]{VeepooConstants.OP_SPORT_CONTROL});
+            support.writeFrame(builder, new byte[]{VeepooConstants.OP_SPORT_CONTROL, 0x02,
+                    0x00, 0x00, (byte) VeepooConstants.SPORT_CTRL_READ});
             builder.queue();
+            support.mainHandler.removeCallbacks(workoutCommandTimeout);
             support.mainHandler.postDelayed(workoutCommandTimeout, 10000L);
+            LOG.info("Workout stop: querying the device for the active sport type");
         } catch (IOException e) {
             synchronized (liveWorkoutLock) {
                 workoutCommandPending = false;
@@ -199,6 +211,7 @@ class VeepooLiveWorkoutModule {
             }
             LOG.error("Error requesting workout stop", e);
         }
+        refreshLiveStatePolling();
     }
 
     /** Sends the STOP command with the given sport type (vendor requires the active one). */
@@ -208,6 +221,9 @@ class VeepooLiveWorkoutModule {
                 liveSportType = sportType;
             }
             stopPrecheckInProgress = false;
+            workoutCommandPending = true;
+            pendingCommandIsStop = true;
+            stopAttempts++;
         }
         try {
             TransactionBuilder builder = support.performInitialized("send workout stop command");
@@ -215,8 +231,9 @@ class VeepooLiveWorkoutModule {
                     (byte) (liveSportType & 0xFF), (byte) ((liveSportType >> 8) & 0xFF),
                     (byte) VeepooConstants.SPORT_CTRL_STOP});
             builder.queue();
+            support.mainHandler.removeCallbacks(workoutCommandTimeout);
             support.mainHandler.postDelayed(workoutCommandTimeout, 10000L);
-            LOG.info("Workout stop command sent (sport type {})", liveSportType);
+            LOG.info("Workout stop command sent (attempt {}, sport type {})", stopAttempts, liveSportType);
         } catch (IOException e) {
             synchronized (liveWorkoutLock) {
                 workoutCommandPending = false;
@@ -245,14 +262,61 @@ class VeepooLiveWorkoutModule {
                 Toast.LENGTH_SHORT, GB.ERROR);
     };
 
-    private final Runnable postStopFetchTask = () -> {
+    private final Runnable postStopFetchFirst = () -> {
         synchronized (liveWorkoutLock) {
             postStopFetchScheduled = false;
         }
         support.startPostWorkoutFetch();
     };
 
-    /** Delays the day-0 history fetch so the firmware can finalize the stopped session. */
+    /** Second fetch pass: the firmware has been observed to take minutes to finalize day 0. */
+    private final Runnable postStopFetchRetry = () -> {
+        synchronized (liveWorkoutLock) {
+            postStopFetchScheduled = false;
+        }
+        support.startPostWorkoutFetch();
+    };
+
+    /** Periodically reads the device run state so band-side stops and ignored stops are detected. */
+    private final Runnable liveStatePollTask = () -> {
+        final boolean wanted;
+        synchronized (liveWorkoutLock) {
+            wanted = livePollingWanted();
+        }
+        if (!wanted) {
+            return;
+        }
+        int sportType;
+        synchronized (liveWorkoutLock) {
+            sportType = liveSportType;
+        }
+        try {
+            TransactionBuilder builder = support.performInitialized("poll the live workout state");
+            support.writeFrame(builder, new byte[]{VeepooConstants.OP_SPORT_CONTROL});
+            support.writeFrame(builder, new byte[]{VeepooConstants.OP_SPORT_CONTROL, 0x02,
+                    (byte) (sportType & 0xFF), (byte) ((sportType >> 8) & 0xFF),
+                    (byte) VeepooConstants.SPORT_CTRL_READ});
+            builder.queue();
+        } catch (IOException e) {
+            LOG.warn("Error polling the live workout state", e);
+        }
+        refreshLiveStatePolling();
+    };
+
+    /** One-shot backstop: the phone GPS must not keep recording if no end report ever arrives. */
+    private final Runnable phoneGpsStopDeadline = () -> {
+        boolean recording;
+        synchronized (liveWorkoutLock) {
+            recording = phoneGpsRecording;
+        }
+        if (!recording) {
+            return;
+        }
+        LOG.warn("No end-of-session report arrived in time; stopping the phone GPS after the deadline");
+        stopPhoneGps();
+    };
+
+    /** Delays the day-0 history fetch (and a second pass later) so the firmware can finalize. */
     private void schedulePostStopFetch() {
         synchronized (liveWorkoutLock) {
             if (postStopFetchScheduled) {
@@ -260,9 +324,108 @@ class VeepooLiveWorkoutModule {
             }
             postStopFetchScheduled = true;
         }
+        support.mainHandler.removeCallbacks(postStopFetchFirst);
+        support.mainHandler.removeCallbacks(postStopFetchRetry);
         // The device takes a while to finalize the finished session into day 0 (minutes have
         // been observed), so do not poll too early.
-        support.mainHandler.postDelayed(postStopFetchTask, 60000L);
+        support.mainHandler.postDelayed(postStopFetchFirst, 60_000L);
+        support.mainHandler.postDelayed(postStopFetchRetry, 240_000L);
+    }
+
+    /** True while the run state needs polling: an active session, a pending stop, or the short
+     *  confirm window after an ok stop ack (the firmware has been seen to ack stops it ignores). */
+    private boolean livePollingWanted() {
+        return liveWorkoutActive || phoneGpsRecording || stopRequested
+                || (lastStopAckOkAtMs > 0L
+                        && System.currentTimeMillis() - lastStopAckOkAtMs < STOP_CONFIRM_WINDOW_MS);
+    }
+
+    /** Keeps the run-state poll scheduled while a session is tracked and drops it otherwise. */
+    private void refreshLiveStatePolling() {
+        final boolean wanted;
+        synchronized (liveWorkoutLock) {
+            wanted = livePollingWanted();
+        }
+        if (wanted) {
+            support.mainHandler.removeCallbacks(liveStatePollTask);
+            support.mainHandler.postDelayed(liveStatePollTask, LIVE_STATE_POLL_INTERVAL_MS);
+        } else {
+            support.mainHandler.removeCallbacks(liveStatePollTask);
+        }
+    }
+
+    /** Schedules the one-shot deadline that force-stops the phone GPS. */
+    private void schedulePhoneGpsStopDeadline() {
+        support.mainHandler.removeCallbacks(phoneGpsStopDeadline);
+        support.mainHandler.postDelayed(phoneGpsStopDeadline, PHONE_GPS_STOP_DEADLINE_MS);
+    }
+
+    /**
+     * The band reports the session as ended (run state finished or not started): stop the phone
+     * GPS, fetch the finished session and drop back to the idle card state. Covers stops done on
+     * the watch and stop commands the device acked but did not act on.
+     */
+    private void handleSessionEndedByBand() {
+        final boolean wasTracked;
+        synchronized (liveWorkoutLock) {
+            wasTracked = liveWorkoutActive || phoneGpsRecording || stopRequested;
+            liveWorkoutActive = false;
+            stopRequested = false;
+            stopAttempts = 0;
+            stopRetryExhaustedToasted = false;
+        }
+        if (!wasTracked) {
+            return;
+        }
+        LOG.info("The band reported the workout as ended");
+        stopPhoneGps();
+        schedulePostStopFetch();
+        support.onLiveWorkoutStateChanged(false);
+        refreshLiveStatePolling();
+    }
+
+    /** Reacts to a report that still shows the session running although it was expected to end. */
+    private void handleActiveSessionReport(final int reportedSportType) {
+        final boolean reassertStop;
+        synchronized (liveWorkoutLock) {
+            reassertStop = !stopRequested && lastStopAckOkAtMs > 0L
+                    && System.currentTimeMillis() - lastStopAckOkAtMs < STOP_CONFIRM_WINDOW_MS;
+        }
+        if (reassertStop) {
+            LOG.warn("The band still reports a running workout after an ok stop ack; re-issuing the stop");
+            synchronized (liveWorkoutLock) {
+                stopRequested = true;
+                stopAttempts = 0;
+                stopRetryExhaustedToasted = false;
+            }
+            support.onLiveWorkoutStateChanged(true);
+        }
+        maybeRetryStop(reportedSportType);
+    }
+
+    /** Re-sends the stop while the band still reports a running session, up to a bounded count. */
+    private void maybeRetryStop(final int reportedSportType) {
+        final boolean shouldRetry;
+        synchronized (liveWorkoutLock) {
+            shouldRetry = stopRequested && !workoutCommandPending && !stopPrecheckInProgress
+                    && stopAttempts < MAX_STOP_ATTEMPTS;
+        }
+        if (shouldRetry) {
+            LOG.warn("The band still reports a running workout; retrying the stop (attempt {})", stopAttempts + 1);
+            support.mainHandler.post(() -> sendStopCommand(reportedSportType));
+            return;
+        }
+        final boolean exhaustedNow;
+        synchronized (liveWorkoutLock) {
+            exhaustedNow = stopRequested && !stopRetryExhaustedToasted && stopAttempts >= MAX_STOP_ATTEMPTS;
+            if (exhaustedNow) {
+                stopRetryExhaustedToasted = true;
+            }
+        }
+        if (exhaustedNow) {
+            LOG.error("The band keeps reporting a running workout after {} stop attempts", MAX_STOP_ATTEMPTS);
+            GB.toast(support.getContext(), R.string.veepoo_workout_still_running, Toast.LENGTH_SHORT, GB.ERROR);
+        }
     }
 
     /**
@@ -292,7 +455,16 @@ class VeepooLiveWorkoutModule {
                 workoutCommandPending = false;
                 wasStop = pendingCommandIsStop;
                 pendingCommandIsStop = false;
-                liveWorkoutActive = !wasStop && ok;
+                if (wasStop) {
+                    // A failed stop leaves the session running on the band; the run-state poll
+                    // retries it, so keep the session marked active until the band agrees.
+                    if (ok) {
+                        liveWorkoutActive = false;
+                        stopRequested = false;
+                    }
+                } else {
+                    liveWorkoutActive = ok;
+                }
             }
             support.mainHandler.removeCallbacks(workoutCommandTimeout);
             if (wasStop) {
@@ -300,8 +472,16 @@ class VeepooLiveWorkoutModule {
                 GB.toast(support.getContext(), ok ? R.string.veepoo_workout_stopped : R.string.veepoo_workout_stop_failed,
                         Toast.LENGTH_SHORT, ok ? GB.INFO : GB.ERROR);
                 if (ok) {
-                    stopPhoneGps();
+                    // The ack only means the command was accepted. Keep recording until the band
+                    // reports the session as ended (the poll checks within a minute, which also
+                    // catches the firmware acking a stop it ignores), with the hard deadline as a
+                    // backstop, and fetch the finished session afterwards.
+                    synchronized (liveWorkoutLock) {
+                        lastStopAckOkAtMs = System.currentTimeMillis();
+                    }
+                    schedulePhoneGpsStopDeadline();
                     schedulePostStopFetch();
+                    support.onLiveWorkoutStateChanged(false);
                 }
             } else {
                 LOG.info("Workout start command {}", ok ? "accepted" : "FAILED by the device");
@@ -309,8 +489,10 @@ class VeepooLiveWorkoutModule {
                         Toast.LENGTH_SHORT, ok ? GB.INFO : GB.ERROR);
                 if (ok) {
                     startPhoneGps();
+                    support.onLiveWorkoutStateChanged(true);
                 }
             }
+            refreshLiveStatePolling();
             return;
         }
 
@@ -417,7 +599,8 @@ class VeepooLiveWorkoutModule {
             return;
         }
 
-        boolean finished = false;
+        // RunState: 0 not started, 1 running, 2 paused, 3 resuming, 4 finished.
+        final boolean sessionActive = runState == 1 || runState == 2 || runState == 3;
         int precheckDecision = 0; // 1 = proceed with start, -1 = session already active
         int stopPrecheckDecision = 0; // 1 = send stop, -1 = no active session
         final int[] startTypeRef = {0};
@@ -425,16 +608,11 @@ class VeepooLiveWorkoutModule {
             if (sportType > 0) {
                 liveSportType = sportType;
             }
-            // RunState: 0 not started, 1 running, 2 paused, 3 resuming, 4 finished.
-            if (runState == 4) {
-                finished = true;
+            if (runState == 4 || runState == 0) {
                 liveWorkoutActive = false;
-            } else if (runState == 0) {
-                liveWorkoutActive = false;
-            } else if (runState == 1 || runState == 2 || runState == 3) {
+            } else if (sessionActive) {
                 liveWorkoutActive = true;
             }
-            boolean sessionActive = runState == 1 || runState == 2 || runState == 3;
             if (precheckInProgress) {
                 startTypeRef[0] = precheckSportType;
                 precheckInProgress = false;
@@ -475,9 +653,10 @@ class VeepooLiveWorkoutModule {
             LOG.info("No active workout on the band; nothing to stop");
             GB.toast(support.getContext(), R.string.veepoo_workout_none_active, Toast.LENGTH_SHORT, GB.INFO);
         }
-        if (finished) {
-            stopPhoneGps();
-            schedulePostStopFetch();
+        if (runState == 0 || runState == 4) {
+            handleSessionEndedByBand();
+        } else if (sessionActive) {
+            handleActiveSessionReport(sportType);
         }
         persistLiveHeartRate(heartRate);
     }
@@ -623,8 +802,11 @@ class VeepooLiveWorkoutModule {
     }
 
     void dispose() {
-        support.mainHandler.removeCallbacks(postStopFetchTask);
+        support.mainHandler.removeCallbacks(postStopFetchFirst);
+        support.mainHandler.removeCallbacks(postStopFetchRetry);
         support.mainHandler.removeCallbacks(workoutCommandTimeout);
+        support.mainHandler.removeCallbacks(liveStatePollTask);
+        support.mainHandler.removeCallbacks(phoneGpsStopDeadline);
         stopPhoneGps();
         synchronized (liveWorkoutLock) {
             phoneGpsPoints.clear();

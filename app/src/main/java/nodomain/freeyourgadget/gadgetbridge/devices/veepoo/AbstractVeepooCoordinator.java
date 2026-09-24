@@ -290,7 +290,7 @@ public abstract class AbstractVeepooCoordinator extends AbstractBLEDeviceCoordin
         @Override
         public void onClick(@NonNull final GBDevice device, @NonNull final Context context) {
             if (workoutRunning) {
-                setWorkoutRunning(false);
+                // The card state is updated once the device confirms the stop.
                 GBApplication.deviceService(device).onSendConfiguration(VeepooConstants.CONFIG_WORKOUT_STOP);
             } else {
                 final Intent intent = new Intent(context, VeepooWorkoutStartActivity.class);

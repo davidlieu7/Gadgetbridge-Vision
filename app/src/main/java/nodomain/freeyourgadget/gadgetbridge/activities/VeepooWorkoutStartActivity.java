@@ -28,7 +28,6 @@ import org.slf4j.LoggerFactory;
 
 import nodomain.freeyourgadget.gadgetbridge.GBApplication;
 import nodomain.freeyourgadget.gadgetbridge.R;
-import nodomain.freeyourgadget.gadgetbridge.devices.veepoo.AbstractVeepooCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.veepoo.VeepooConstants;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
 import nodomain.freeyourgadget.gadgetbridge.util.GB;
@@ -63,9 +62,6 @@ public class VeepooWorkoutStartActivity extends AbstractGBActivity {
             LOG.info("Starting workout with sport type {}", SPORT_TYPES[position]);
             GBApplication.deviceService(device).onSendConfiguration(
                     VeepooConstants.CONFIG_WORKOUT_START_PREFIX + SPORT_TYPES[position]);
-            if (device.getDeviceCoordinator() instanceof AbstractVeepooCoordinator) {
-                ((AbstractVeepooCoordinator) device.getDeviceCoordinator()).setWorkoutRunning(true);
-            }
             finish();
         });
         setContentView(listView);
