@@ -703,7 +703,8 @@ class VeepooLiveWorkoutModule {
         persistLiveHeartRate(heartRate);
     }
 
-    /** Stores a live workout heart rate so it shows up in the regular heart-rate views. */
+    /** Stores a live workout heart rate so it shows up in the regular heart-rate views, and
+     *  broadcasts it so the live activity screen can draw its HR line while the session runs. */
     private void persistLiveHeartRate(int bpm) {
         if (bpm < 30 || bpm > 220) {
             return;
@@ -719,6 +720,7 @@ class VeepooLiveWorkoutModule {
             sample.setUserId(userId);
             sample.setDeviceId(deviceId);
             new nodomain.freeyourgadget.gadgetbridge.devices.GenericHeartRateSampleProvider(support.getDevice(), session).addSample(sample);
+            support.notifyVitalSample(sample);
         } catch (Exception e) {
             LOG.error("Error saving live workout heart rate", e);
         }
