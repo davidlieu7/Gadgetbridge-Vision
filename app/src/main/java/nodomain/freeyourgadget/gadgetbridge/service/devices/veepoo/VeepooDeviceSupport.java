@@ -596,6 +596,9 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
             case 0xD4:
                 handleSportFrame(data);
                 break;
+            case 0xD3:
+                handleSportCrcFrame(data);
+                break;
             case 0xDA:
                 liveWorkoutModule.handleFrame(data);
                 break;
@@ -2225,6 +2228,31 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
         if (coordinator instanceof AbstractVeepooCoordinator) {
             ((AbstractVeepooCoordinator) coordinator).setWorkoutRunning(running);
         }
+    }
+
+    /**
+     * Opcode 0xD3 frame (workout history CRC, vendor "sport_model_crc_oprate"): [1]==2 means the
+     * band just finalized a workout session on its own, and any other non-zero state carries the
+     * per-day CRCs (little-endian u16 at [3+2i..4+2i]) that the vendor app compares to skip
+     * already-synced days. We never request this opcode, so every frame is a push from the band:
+     * it announces that a finished session has landed in the history, which can happen earlier
+     * than the run-state poll notices it.
+     */
+    private void handleSportCrcFrame(byte[] data) {
+        if (data.length < 3) {
+            LOG.debug("Dropping short 0xD3 frame: {} bytes ({})", data.length, hexBytes(data));
+            return;
+        }
+        int state = data[1] & 0xFF;
+        if (state == 0) {
+            LOG.debug("Workout history CRC report: the band could not read its history");
+            return;
+        }
+        final int[] crcs = new int[(data.length - 3) / 2];
+        for (int i = 0; i < crcs.length; i++) {
+            crcs[i] = le16(data, 3 + 2 * i);
+        }
+        liveWorkoutModule.onSportHistoryCrcReport(state, crcs);
     }
 
     /** Fetches day 0 of the workout history (called by VeepooLiveWorkoutModule's post-stop task). */

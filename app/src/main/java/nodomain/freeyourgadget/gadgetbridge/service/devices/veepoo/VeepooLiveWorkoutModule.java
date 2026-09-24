@@ -29,6 +29,7 @@ import java.nio.BufferUnderflowException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Date;
 import java.util.List;
 
@@ -68,6 +69,10 @@ class VeepooLiveWorkoutModule {
     private final List<byte[]> liveReportChunks = new ArrayList<>();
     private int liveReportTotalChunks = 0;
     private boolean postStopFetchScheduled = false;
+
+    // Last per-day workout-history CRCs from an unsolicited 0xD3 push; the first report of a
+    // connection only sets the baseline, since the connect sync picks up anything already stored.
+    private int[] sportHistoryCrcs = null;
 
     // Run-state polling and stop recovery: the band can end a workout on its own or ack a stop
     // command it then ignores, so while a session is tracked the run state keeps getting polled,
@@ -382,6 +387,43 @@ class VeepooLiveWorkoutModule {
         schedulePostStopFetch();
         support.onLiveWorkoutStateChanged(false);
         refreshLiveStatePolling();
+    }
+
+    /**
+     * Reacts to an unsolicited 0xD3 workout-history-CRC push: state 2 means the band finalized a
+     * session on its own, and a changed CRC list means a history slot was rewritten. Either way a
+     * finished record is (or will be) in day 0, so run the same end-of-session path as a
+     * band-side stop report; outside a tracked session only the delayed fetch is needed.
+     */
+    void onSportHistoryCrcReport(int state, int[] crcs) {
+        final boolean changed;
+        synchronized (liveWorkoutLock) {
+            if (sportHistoryCrcs == null) {
+                sportHistoryCrcs = crcs.clone();
+                changed = false;
+            } else {
+                changed = crcs.length != sportHistoryCrcs.length || !Arrays.equals(crcs, sportHistoryCrcs);
+                if (changed) {
+                    sportHistoryCrcs = crcs.clone();
+                }
+            }
+        }
+        final boolean finalized = state == 2;
+        LOG.info("Workout history CRC report: state={} crcs={}", state, Arrays.toString(crcs));
+        if (!finalized && !changed) {
+            return;
+        }
+        final boolean wasTracked;
+        synchronized (liveWorkoutLock) {
+            wasTracked = liveWorkoutActive || phoneGpsRecording || stopRequested;
+        }
+        if (wasTracked) {
+            LOG.info("The band finalized a tracked workout session");
+            handleSessionEndedByBand();
+        } else {
+            LOG.info("The band reports new workout history; scheduling a day-0 fetch");
+            schedulePostStopFetch();
+        }
     }
 
     /** Reacts to a report that still shows the session running although it was expected to end. */
