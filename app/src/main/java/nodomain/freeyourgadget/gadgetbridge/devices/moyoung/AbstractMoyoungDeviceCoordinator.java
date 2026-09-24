@@ -262,7 +262,9 @@ public abstract class AbstractMoyoungDeviceCoordinator extends AbstractBLEDevice
         new MoyoungSettingBool("SEDENTARY_REMINDER", MoyoungConstants.CMD_QUERY_SEDENTARY_REMINDER, MoyoungConstants.CMD_SET_SEDENTARY_REMINDER),
         new MoyoungSettingRemindersToMove("REMINDERS_TO_MOVE_PERIOD", MoyoungConstants.CMD_QUERY_REMINDERS_TO_MOVE_PERIOD, MoyoungConstants.CMD_SET_REMINDERS_TO_MOVE_PERIOD),
         new MoyoungSettingTimeRange("DO_NOT_DISTURB_TIME", MoyoungConstants.CMD_QUERY_DO_NOT_DISTURB_TIME, MoyoungConstants.CMD_SET_DO_NOT_DISTURB_TIME),
-        new MoyoungSettingBool("DO_NOT_DISTURB_ONOFF", MoyoungConstants.CMD_QUERY_DO_NOT_DISTURB_TIME, MoyoungConstants.CMD_SET_DO_NOT_DISTURB_TIME),
+        // Not queried: the watch answers CMD_QUERY_DO_NOT_DISTURB_TIME with the time range, which
+        // this setting cannot decode. Its state arrives with the device's own updates instead.
+        new MoyoungSettingBool("DO_NOT_DISTURB_ONOFF", (byte) -1, MoyoungConstants.CMD_SET_DO_NOT_DISTURB_TIME),
         // (*) new MoyoungSetting("PSYCHOLOGICAL_PERIOD", MoyoungConstants.CMD_QUERY_PSYCHOLOGICAL_PERIOD, MoyoungConstants.CMD_SET_PSYCHOLOGICAL_PERIOD),
 
         new MoyoungSettingBool("BREATHING_LIGHT", MoyoungConstants.CMD_QUERY_BREATHING_LIGHT, MoyoungConstants.CMD_SET_BREATHING_LIGHT),
