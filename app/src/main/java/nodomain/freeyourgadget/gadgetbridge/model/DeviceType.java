@@ -610,6 +610,7 @@ import nodomain.freeyourgadget.gadgetbridge.devices.xiaomi.watches.XiaomiWatchS1
 import nodomain.freeyourgadget.gadgetbridge.devices.xiaomi.watches.XiaomiWatchS1ProCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.xiaomi.watches.XiaomiWatchS3Coordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.xiaomi.watches.XiaomiWatchS4Coordinator;
+import nodomain.freeyourgadget.gadgetbridge.devices.xiaomi_hipee.XiaomiHipeeP1Coordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.xiaomi_scooters.XiaomiScooter5MaxCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.zeblaze.Beyond3ProCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.xplora.XploraXmoveDeviceCoordinator;
@@ -1157,6 +1158,7 @@ public enum DeviceType {
     REALME_BUDS_AIR_6_PRO(RealmeBudsAir6ProCoordinator.class),
     SOFLOW_SO6(SoFlowCoordinator.class),
     XIAOMI_SCOOTER_5_MAX(XiaomiScooter5MaxCoordinator.class),
+    XIAOMI_HIPEE_P1(XiaomiHipeeP1Coordinator.class),
     WITHINGS_STEEL_HR(WithingsSteelHRDeviceCoordinator.class),
     SONY_WENA_3(SonyWena3Coordinator.class),
     FEMOMETER_VINCA2(FemometerVinca2DeviceCoordinator.class),

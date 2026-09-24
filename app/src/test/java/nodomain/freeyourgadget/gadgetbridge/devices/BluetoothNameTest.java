@@ -262,6 +262,7 @@ public class BluetoothNameTest extends TestBase {
             put("una watch 403795", null); // #6504
             put("UNA Watch403795", null); // #6504
             put("UNA Watch ", null); // #6504
+            put("Hi-JZ-12CUT0073A8", DeviceType.XIAOMI_HIPEE_P1); // #6812
             put("ROIDMI Cleaner F1", DeviceType.ROIDMI_F8); // #6674
             put("Xiaomi Smart Band 10 Pro AB01", DeviceType.MIBAND10PRO); // #6248
             put("SmartShunt HQ2303UCHFV", DeviceType.VICTRON_SMARTSHUNT); // #6263

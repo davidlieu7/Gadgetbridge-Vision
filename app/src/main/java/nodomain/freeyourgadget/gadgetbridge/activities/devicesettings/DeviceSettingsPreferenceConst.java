@@ -824,6 +824,18 @@ public class DeviceSettingsPreferenceConst {
     public static final String PREF_XIAOMI_SCOOTER_TIRE_PRESSURE_REMAINING_DAYS = "xiaomi_scooter_tire_pressure_remaining_days";
     public static final String PREF_XIAOMI_SCOOTER_TIRE_PRESSURE_RESET = "xiaomi_scooter_tire_pressure_reset";
 
+    public static final String PREF_XIAOMI_HIPEE_P1_SET_STANDARD_POSTURE = "xiaomi_hipee_p1_set_standard_posture";
+    public static final String PREF_XIAOMI_HIPEE_P1_CANCEL_STANDARD_POSTURE = "xiaomi_hipee_p1_cancel_standard_posture";
+    public static final String PREF_XIAOMI_HIPEE_P1_STANDARD_POSTURE_STATUS = "xiaomi_hipee_p1_standard_posture_status";
+    public static final String PREF_XIAOMI_HIPEE_P1_VIEW_LIVE_POSTURE = "xiaomi_hipee_p1_view_live_posture";
+    public static final String PREF_XIAOMI_HIPEE_P1_LONG_VIBRATION = "xiaomi_hipee_p1_long_vibration";
+    public static final String PREF_XIAOMI_HIPEE_P1_REMINDER_ANGLE = "xiaomi_hipee_p1_reminder_angle";
+    public static final String PREF_XIAOMI_HIPEE_P1_EXERCISE_REMINDER_ANGLE = "xiaomi_hipee_p1_exercise_reminder_angle";
+    public static final String PREF_XIAOMI_HIPEE_P1_SEDENTARY_REMINDER = "xiaomi_hipee_p1_sedentary_reminder";
+    public static final String PREF_XIAOMI_HIPEE_P1_DELAY_REMINDER = "xiaomi_hipee_p1_delay_reminder";
+    public static final String PREF_XIAOMI_HIPEE_P1_DOUBLE_REMINDER = "xiaomi_hipee_p1_double_reminder";
+    public static final String PREF_XIAOMI_HIPEE_P1_DOUBLE_REMINDER_INTERVAL = "xiaomi_hipee_p1_double_reminder_interval";
+
     // Roidmi F8 Cordless Vacuum Cleaner
     public static final String PREF_ROIDMI_F8_BATTERY_TEMPERATURE = "pref_roidmi_f8_battery_temperature";
     public static final String PREF_ROIDMI_F8_STANDARD_GEAR = "pref_roidmi_f8_standard_gear";

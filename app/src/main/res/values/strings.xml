@@ -2263,6 +2263,7 @@
     <string name="devicetype_mismartscale" translatable="false">Mi Smart Scale 2</string>
     <string name="devicetype_micompositionscale" translatable="false">Mi Body Composition Scale 2</string>
     <string name="devicetype_qnscale" translatable="false">QN-Scale (Chipsea CS20)</string>
+    <string name="devicetype_xiaomi_hipee_p1" translatable="false">Xiaomi Hipee Smart Posture Corrector P1</string>
     <string name="devicetype_onebyone_scale" translatable="false">1byone Health Scale</string>
     <string name="devicetype_itag" translatable="false">iTag</string>
     <string name="devicetype_idasen" translatable="false">IKEA Idasen Desk</string>
@@ -4246,6 +4247,30 @@
     <string name="xiaomi_scooter_tire_pressure_reset_title">Reset reminder</string>
     <string name="xiaomi_scooter_tire_pressure_reset_summary">Click this button to restart the tire pressure maintenance timer.</string>
     <string name="xiaomi_scooter_tire_pressure_reset_confirmation">Reset the tire pressure maintenance reminder?</string>
+    <string name="mi_hipee_p1_history">Raw posture history</string>
+    <string name="mi_hipee_p1_position">Position</string>
+    <string name="mi_hipee_p1_history_forward">Forward (humpback)</string>
+    <string name="mi_hipee_p1_history_leftward">Leftward</string>
+    <string name="mi_hipee_p1_history_rightward">Rightward</string>
+    <string name="mi_hipee_p1_history_hour_details">Forward: %1$d, leftward: %2$d, rightward: %3$d</string>
+    <string name="mi_hipee_p1_history_total_corrections">Total corrections</string>
+    <string name="mi_hipee_p1_history_marker_forward">Forward (humpback): %1$d</string>
+    <string name="mi_hipee_p1_history_marker_leftward">Leftward: %1$d</string>
+    <string name="mi_hipee_p1_history_marker_rightward">Rightward: %1$d</string>
+    <string name="mi_hipee_p1_history_marker_no_corrections">No corrections</string>
+    <string name="mi_hipee_p1_set_standard_posture">Set standard posture</string>
+    <string name="mi_hipee_p1_view_live_posture">View live posture</string>
+    <string name="mi_hipee_p1_reminder_angle">Reminder angle</string>
+    <string name="mi_hipee_p1_long_vibration">Long vibration</string>
+    <string name="mi_hipee_p1_exercise_reminder_angle">Exercise reminder angle</string>
+    <string name="mi_hipee_p1_sedentary_reminder">Sedentary reminder</string>
+    <string name="mi_hipee_p1_delay_reminder">Delay reminder</string>
+    <string name="mi_hipee_p1_double_reminder">Double reminder</string>
+    <string name="mi_hipee_p1_double_reminder_interval">Double reminder interval</string>
+    <string name="mi_hipee_p1_pairing_confirmation">Press the device button to confirm pairing</string>
+    <string name="mi_hipee_p1_set_standard_posture_instruction">Set in correct posture and remain still</string>
+    <string name="mi_hipee_p1_standard_posture_set">Standard posture set</string>
+    <string name="mi_hipee_p1_standard_posture_rejected">Standard posture rejected (code 0x%1$02x)</string>
     <string name="pref_roidmi_f8_battery_temperature_title">Battery temperature</string>
     <string name="pref_roidmi_f8_standard_gear_title">Standard gear</string>
     <string name="pref_roidmi_f8_standard_gear_summary">Default power when starting to clean</string>
@@ -4688,6 +4713,7 @@
     <string name="battery_polling_failed_start">Failed to start the battery polling</string>
 
     <string name="none">None</string>
+    <string name="no_delay">No delay</string>
     <string name="garmin_agps_url_i">AGPS %1$d URL</string>
     <string name="no_folder_selected">No folder selected</string>
     <string name="folder_is_empty">Folder is empty</string>

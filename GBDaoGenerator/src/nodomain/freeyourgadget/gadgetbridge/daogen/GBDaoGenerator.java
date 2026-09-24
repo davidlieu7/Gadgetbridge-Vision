@@ -110,7 +110,7 @@ public class GBDaoGenerator {
             outputDir.mkdirs();
         }
 
-        final Schema schema = new Schema(143, MAIN_PACKAGE + ".entities");
+        final Schema schema = new Schema(144, MAIN_PACKAGE + ".entities");
 
         final List<Entity> sampleProvidersToGenerate = new LinkedList<>();
         final List<Entity> batterySampleProvidersToGenerate = new LinkedList<>();
@@ -123,6 +123,7 @@ public class GBDaoGenerator {
         addHealthConnectSyncState(schema, device);
         addHealthConnectSleepSession(schema, device);
         addInternetFirewallRule(schema, device);
+        addXiaomiHipeeP1Reading(schema, device);
 
         // yeah deep shit, has to be here (after device) for db upgrade and column order
         // because addDevice adds a property to deviceAttributes also....
@@ -2519,6 +2520,27 @@ public class GBDaoGenerator {
         sample.addIntProperty("minHumidity").notNull();
         sample.addIntProperty("maxHumidity").notNull();
         return sample;
+    }
+
+    private static Entity addXiaomiHipeeP1Reading(Schema schema, Entity device) {
+        Entity reading = addEntity(schema, "XiaomiHipeeP1Reading");
+        reading.addIdProperty().autoincrement();
+        Property deviceId = reading.addLongProperty("deviceId").notNull().getProperty();
+        Property recordType = reading.addIntProperty("recordType").notNull().getProperty();
+        Property dataNum = reading.addIntProperty("dataNum").notNull().getProperty();
+        Property dataCount = reading.addIntProperty("dataCount").notNull().getProperty();
+        Property startupTime = reading.addLongProperty("startupTime").notNull().getProperty();
+        Property timestamp = reading.addLongProperty("timestamp").notNull().getProperty();
+        Property forwardAngle = reading.addIntProperty("forwardAngle").notNull().getProperty();
+        Property bankAngle = reading.addIntProperty("bankAngle").notNull().getProperty();
+        Index identity = new Index();
+        identity.addProperty(deviceId);
+        identity.addProperty(recordType);
+        identity.addProperty(startupTime);
+        identity.addProperty(timestamp);
+        identity.makeUnique();
+        reading.addIndex(identity);
+        return reading;
     }
 
     private static Entity addMiScaleWeightSample(Schema schema, Entity user, Entity device) {

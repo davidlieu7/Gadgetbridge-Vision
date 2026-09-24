@@ -1119,6 +1119,12 @@
             android:exported="true"/>
 
         <activity
+            android:name=".activities.hipee.XiaomiHipeeP1HistoryActivity"
+            android:exported="false" />
+        <activity
+            android:name=".activities.hipee.XiaomiHipeeP1LivePostureActivity"
+            android:exported="false" />
+        <activity
             android:name=".activities.dashboard.DashboardCalendarActivity"
             android:label="@string/menuitem_calendar"
             android:parentActivityName=".activities.ControlCenterv2" />
