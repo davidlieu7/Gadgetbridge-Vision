@@ -114,6 +114,9 @@ class VeepooLiveWorkoutModule {
             }
             if (liveWorkoutActive) {
                 LOG.warn("A workout is already running; ignoring the start request");
+                // The card may still show "start" if the session was adopted or started before a
+                // reconnect; flip it to "stop" so the user can end the session.
+                support.onLiveWorkoutStateChanged(true);
                 GB.toast(support.getContext(), R.string.veepoo_workout_already_running, Toast.LENGTH_SHORT, GB.WARN);
                 return;
             }
@@ -646,6 +649,7 @@ class VeepooLiveWorkoutModule {
         int precheckDecision = 0; // 1 = proceed with start, -1 = session already active
         int stopPrecheckDecision = 0; // 1 = send stop, -1 = no active session
         final int[] startTypeRef = {0};
+        final boolean[] adopted = {false};
         synchronized (liveWorkoutLock) {
             if (sportType > 0) {
                 liveSportType = sportType;
@@ -653,6 +657,11 @@ class VeepooLiveWorkoutModule {
             if (runState == 4 || runState == 0) {
                 liveWorkoutActive = false;
             } else if (sessionActive) {
+                // A session the band runs that we never started in this connection (started from
+                // the vendor app, or surviving a reconnect): adopt it so the card offers a stop.
+                if (!liveWorkoutActive && !stopRequested) {
+                    adopted[0] = true;
+                }
                 liveWorkoutActive = true;
             }
             if (precheckInProgress) {
@@ -699,6 +708,12 @@ class VeepooLiveWorkoutModule {
             handleSessionEndedByBand();
         } else if (sessionActive) {
             handleActiveSessionReport(sportType);
+            if (adopted[0]) {
+                LOG.info("The band reports a workout we were not tracking; adopting it");
+                support.onLiveWorkoutStateChanged(true);
+                startPhoneGps();
+                refreshLiveStatePolling();
+            }
         }
         persistLiveHeartRate(heartRate);
     }
