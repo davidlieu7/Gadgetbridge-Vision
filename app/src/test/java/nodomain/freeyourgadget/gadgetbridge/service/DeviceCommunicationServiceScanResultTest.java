@@ -16,6 +16,8 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 package nodomain.freeyourgadget.gadgetbridge.service;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertThrows;
@@ -36,13 +38,15 @@ import org.junit.Test;
 import org.robolectric.Robolectric;
 
 import nodomain.freeyourgadget.gadgetbridge.GBException;
+import nodomain.freeyourgadget.gadgetbridge.database.DBHelper;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
 import nodomain.freeyourgadget.gadgetbridge.test.TestBase;
 
 /**
- * How {@link DeviceCommunicationService#handleScanResult} hands advertisements to a scan-only
- * device: only to a device that already has a struct, through a support that is created once
- * and never replaced under a live one, and without letting a failing support or factory out.
+ * How {@link DeviceCommunicationService} treats a scan-only device: connecting to it stores it and
+ * puts it to waiting for scan, and {@link DeviceCommunicationService#handleScanResult} hands
+ * advertisements only to a device that has a struct, through a support that is created once and
+ * never replaced under a live one, without letting a failing support or factory out.
  */
 public class DeviceCommunicationServiceScanResultTest extends TestBase {
     private static final String ADDRESS = "00:11:22:33:44:55";
@@ -57,6 +61,20 @@ public class DeviceCommunicationServiceScanResultTest extends TestBase {
         factory = mock(DeviceSupportFactory.class);
         service.setDeviceSupportFactory(factory);
         device = createDummyGDevice(ADDRESS);
+    }
+
+    @Test
+    public void connectingToAScanOnlyDeviceStoresItAndWaitsForScanInstead() throws Exception {
+        service.waitForScanOnlyDevice(device);
+
+        assertEquals(GBDevice.State.WAITING_FOR_SCAN, device.getState());
+        assertNotNull("the device must be stored, or it is gone after a restart", DBHelper.findDevice(device, daoSession));
+        final DeviceCommunicationService.DeviceStruct struct = service.getDeviceStruct(device);
+        verifyNoMoreInteractions(factory);
+
+        // once more, as a reconnect would: the same struct, not a second one
+        service.waitForScanOnlyDevice(device);
+        assertSame(struct, service.getDeviceStruct(device));
     }
 
     @Test

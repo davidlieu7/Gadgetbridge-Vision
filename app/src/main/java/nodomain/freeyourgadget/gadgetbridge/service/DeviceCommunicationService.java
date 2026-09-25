@@ -79,6 +79,8 @@ import nodomain.freeyourgadget.gadgetbridge.GBApplication;
 import nodomain.freeyourgadget.gadgetbridge.GBException;
 import nodomain.freeyourgadget.gadgetbridge.R;
 import nodomain.freeyourgadget.gadgetbridge.activities.HeartRateUtils;
+import nodomain.freeyourgadget.gadgetbridge.database.DBHandler;
+import nodomain.freeyourgadget.gadgetbridge.database.DBHelper;
 import nodomain.freeyourgadget.gadgetbridge.devices.DeviceCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.externalevents.BluetoothConnectReceiver;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
@@ -615,6 +617,24 @@ public class DeviceCommunicationService extends Service implements SharedPrefere
         stopService(scanServiceIntent);
     }
 
+    /**
+     * Puts a {@link #isScanOnlyDevice(GBDevice) scan-only} device into
+     * {@link GBDevice.State#WAITING_FOR_SCAN}, storing it first if it is new: only an initialized
+     * device is stored on a state change, and a scan-only device is never initialized.
+     */
+    @VisibleForTesting
+    void waitForScanOnlyDevice(final GBDevice device) {
+        try (DBHandler db = GBApplication.acquireDB()) {
+            DBHelper.getDevice(device, db.getDaoSession());
+        } catch (final Exception e) {
+            LOG.error("waitForScanOnlyDevice - failed to store {}", device.getAddress(), e);
+        }
+        if (getDeviceStructOrNull(device) == null) {
+            createDeviceStruct(device);
+        }
+        device.setUpdateState(GBDevice.State.WAITING_FOR_SCAN, this);
+    }
+
     @VisibleForTesting
     DeviceStruct createDeviceStruct(GBDevice target) {
         DeviceStruct registeredStruct = new DeviceStruct();
@@ -664,6 +684,14 @@ public class DeviceCommunicationService extends Service implements SharedPrefere
             final String deviceAddress = gbDevice.getAddress();
 
             LOG.debug("Will attempt to connect to {}", gbDevice);
+
+            if (isScanOnlyDevice(gbDevice)) {
+                // Nothing to connect to: the device is scanned for instead. Connecting from the
+                // discovery activity ends here too, so this is also how such a device is added.
+                LOG.debug("connectToDevice - {} is scan-only, waiting for scan instead", deviceAddress);
+                waitForScanOnlyDevice(gbDevice);
+                continue;
+            }
 
             if (!gbDevice.getDeviceCoordinator().isConnectable()) {
                 // we cannot connect to beacons, skip this device
