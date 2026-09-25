@@ -1,5 +1,6 @@
 package nodomain.freeyourgadget.gadgetbridge.activities.charts.vico
 
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
@@ -8,9 +9,11 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import com.patrykandpatrick.vico.compose.cartesian.CartesianChartHost
 import com.patrykandpatrick.vico.compose.cartesian.CartesianDrawingContext
 import com.patrykandpatrick.vico.compose.cartesian.Zoom
+import com.patrykandpatrick.vico.compose.cartesian.axis.Axis
 import com.patrykandpatrick.vico.compose.cartesian.axis.HorizontalAxis
 import com.patrykandpatrick.vico.compose.cartesian.axis.VerticalAxis
 import com.patrykandpatrick.vico.compose.cartesian.data.CartesianChartModelProducer
@@ -30,10 +33,16 @@ import com.patrykandpatrick.vico.compose.cartesian.rememberVicoZoomState
 import com.patrykandpatrick.vico.compose.common.DashedShape
 import com.patrykandpatrick.vico.compose.common.Fill
 import com.patrykandpatrick.vico.compose.common.component.rememberLineComponent
+import com.patrykandpatrick.vico.compose.common.component.rememberShapeComponent
 import com.patrykandpatrick.vico.compose.common.component.rememberTextComponent
 
 private const val AREA_FILL_ALPHA = 0.24f
 private const val LIMIT_LINE_THICKNESS_DP = 1.5f
+private const val POINT_SIZE_DP = 5f
+private const val DATA_LABEL_SIZE_SP = 10f
+
+/** Gentle, so a line through sparse points does not overshoot them far. */
+private const val CURVATURE = 0.3f
 private const val DASH_LENGTH_DP = 6f
 private const val DASH_GAP_DP = 4f
 
@@ -69,6 +78,33 @@ fun GbLineChart(spec: ChartSpec, theme: ChartTheme, modifier: Modifier = Modifie
             } else {
                 null
             },
+            pointProvider = if (style.showPoints) {
+                LineCartesianLayer.PointProvider.single(
+                    LineCartesianLayer.Point(
+                        rememberShapeComponent(fill = Fill(color), shape = CircleShape),
+                        POINT_SIZE_DP.dp,
+                    )
+                )
+            } else {
+                null
+            },
+            interpolator = if (style.curved) {
+                LineCartesianLayer.Interpolator.cubic(CURVATURE)
+            } else {
+                LineCartesianLayer.Interpolator.Sharp
+            },
+            dataLabel = if (style.pointLabel != null) {
+                rememberTextComponent(
+                    style = TextStyle(color = Color(theme.secondaryTextColor), fontSize = DATA_LABEL_SIZE_SP.sp),
+                )
+            } else {
+                null
+            },
+            dataLabelValueFormatter = remember(style.pointLabel) {
+                style.pointLabel?.let { label ->
+                    CartesianValueFormatter { _, value, _ -> label(value) }
+                } ?: CartesianValueFormatter.decimal()
+            },
         )
     }
 
@@ -87,7 +123,10 @@ fun GbLineChart(spec: ChartSpec, theme: ChartTheme, modifier: Modifier = Modifie
         LineCartesianLayer.LineProvider.series(lines),
         rangeProvider = rangeProvider,
     )
-    val startAxis = VerticalAxis.rememberStart(valueFormatter = valueFormatterFor(spec.yAxis.format))
+    val startAxis = VerticalAxis.rememberStart(
+        valueFormatter = valueFormatterFor(spec.yAxis.format),
+        itemPlacer = verticalItemPlacer(spec.yAxis),
+    )
     val bottomItemPlacer = remember(spec.xAxis.format, spec.xAxis.minimum, spec.xAxis.maximum) {
         val minX = spec.xAxis.minimum
         val maxX = spec.xAxis.maximum
@@ -122,9 +161,10 @@ fun GbLineChart(spec: ChartSpec, theme: ChartTheme, modifier: Modifier = Modifie
     // vico defaults to zoomed-in. Fit to the axis's configured range
     val zoomState = rememberVicoZoomState(initialZoom = Zoom.Content)
 
+    val markerValueFormatter = markerFormatterFor(spec)
     val marker = rememberDefaultCartesianMarker(
         label = rememberTextComponent(style = TextStyle(color = Color(theme.textColor))),
-        valueFormatter = remember { SingleValueFormatter },
+        valueFormatter = remember(markerValueFormatter) { SingleValueFormatter(markerValueFormatter) },
         guideline = rememberLineComponent(fill = Fill(Color(theme.secondaryTextColor)), thickness = 1.dp),
     )
 
@@ -135,6 +175,7 @@ fun GbLineChart(spec: ChartSpec, theme: ChartTheme, modifier: Modifier = Modifie
             bottomAxis = bottomAxis,
             decorations = decorations,
             marker = marker,
+            persistentMarkers = spec.markedX?.let { x -> { marker.at(x) } },
         ),
         modelProducer = modelProducer,
         modifier = modifier,
@@ -146,16 +187,50 @@ fun GbLineChart(spec: ChartSpec, theme: ChartTheme, modifier: Modifier = Modifie
 }
 
 /**
- * Avoid repeated values on steep segments.
+ * Avoid repeated values on steep segments. [formatter] renders the value the way the chart does,
+ * so a weight keeps its decimal instead of being shown as a whole number.
  */
-private object SingleValueFormatter : DefaultCartesianMarker.ValueFormatter {
+private class SingleValueFormatter(private val formatter: CartesianValueFormatter) : DefaultCartesianMarker.ValueFormatter {
     override fun format(context: CartesianDrawingContext, targets: List<CartesianMarker.Target>): CharSequence {
         val latestPoint = targets
             .filterIsInstance<LineCartesianLayerMarkerTarget>()
             .flatMap { it.points }
             .maxByOrNull { it.entry.x }
             ?: return ""
-        return latestPoint.entry.y.toInt().toString()
+        return formatter.format(context, latestPoint.entry.y, Axis.Position.Vertical.Start)
+    }
+}
+
+/**
+ * How the marker renders a value: [ChartSpec.markerLabel] when given; the series' own
+ * [SeriesStyle.Line.pointLabel] when the chart has a single series (with several, the marker
+ * cannot tell which series a value came from, so it must not borrow one series' units for
+ * another); otherwise the y-axis format, so the marker reads like the axis beside it.
+ */
+@Composable
+private fun markerFormatterFor(spec: ChartSpec): CartesianValueFormatter {
+    val label = spec.markerLabel
+        ?: spec.series.singleOrNull()?.let { (it.style as? SeriesStyle.Line)?.pointLabel }
+    return if (label != null) {
+        remember(label) { CartesianValueFormatter { _, value, _ -> label(value) } }
+    } else {
+        valueFormatterFor(spec.yAxis.format)
+    }
+}
+
+/**
+ * Labels every [AxisSpec.step] units where the spec asks for it; otherwise vico's own placement,
+ * which is what every chart got before the step existed.
+ */
+@Composable
+private fun verticalItemPlacer(axis: AxisSpec): VerticalAxis.ItemPlacer {
+    val step = axis.step
+    return remember(step) {
+        if (step != null && step > 0) {
+            VerticalAxis.ItemPlacer.step({ step })
+        } else {
+            VerticalAxis.ItemPlacer.step()
+        }
     }
 }
 

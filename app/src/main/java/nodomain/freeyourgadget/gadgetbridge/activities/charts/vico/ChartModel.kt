@@ -11,11 +11,18 @@ data class ChartPoint(val x: Double, val y: Double)
 sealed interface SeriesStyle {
     /**
      * A line, optionally filled underneath (an area chart) or curved.
+     *
+     * [showPoints] marks each measurement with a dot, for series whose points matter more than the
+     * shape between them, and [pointLabel] writes each value next to its point. The label is a
+     * function rather than a [ChartValueFormat] because a series may need its own units, e.g. a
+     * weight in the unit the user chose.
      */
     data class Line(
         val color: Int,
         val filled: Boolean = false,
         val curved: Boolean = false,
+        val showPoints: Boolean = false,
+        val pointLabel: ((Double) -> String)? = null,
     ) : SeriesStyle
 
     /**
@@ -52,6 +59,8 @@ data class AxisSpec(
     val format: ChartValueFormat = ChartValueFormat.DECIMAL,
     val minimum: Double? = null,
     val maximum: Double? = null,
+    /** Distance between labels, in the axis' own units. Null lets vico choose. */
+    val step: Double? = null,
 )
 
 /**
@@ -80,6 +89,14 @@ data class ChartSpec(
     val yAxis: AxisSpec = AxisSpec(),
     val limitLines: List<LimitLineSpec> = emptyList(),
     val legend: List<LegendItemSpec> = emptyList(),
+    /**
+     * An x at which the value marker is shown permanently, e.g. the latest measurement. Must equal
+     * a plotted [ChartPoint.x] exactly: vico looks the marker up by that value and draws nothing
+     * for an x that no series has.
+     */
+    val markedX: Double? = null,
+    /** How the marker renders a value when the y-axis format is not enough (units, decimals). */
+    val markerLabel: ((Double) -> String)? = null,
 ) {
     val isEmpty: Boolean get() = series.all { it.points.isEmpty() }
 
