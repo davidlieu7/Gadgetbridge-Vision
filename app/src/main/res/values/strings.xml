@@ -3239,6 +3239,7 @@
     <string name="activity_detail_inspect_file">Inspect file</string>
     <string name="activity_detail_share_raw_summary">Share Raw Summary</string>
     <string name="activity_detail_share_raw_details">Share Raw Details</string>
+    <string name="activity_detail_share_raw_gps">Share Raw GPS</string>
     <string name="activity_detail_share_json_details">Share JSON Details</string>
     <string name="gps_track">GPS track</string>
     <string name="dev_tools">Dev Tools</string>

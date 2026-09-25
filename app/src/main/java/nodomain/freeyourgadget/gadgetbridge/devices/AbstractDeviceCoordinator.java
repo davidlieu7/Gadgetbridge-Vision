@@ -75,6 +75,7 @@ import nodomain.freeyourgadget.gadgetbridge.entities.BatteryLevelDao;
 import nodomain.freeyourgadget.gadgetbridge.entities.BatteryPowerSampleDao;
 import nodomain.freeyourgadget.gadgetbridge.entities.BatteryTemperatureSampleDao;
 import nodomain.freeyourgadget.gadgetbridge.entities.BatteryVoltageSampleDao;
+import nodomain.freeyourgadget.gadgetbridge.entities.BaseActivitySummary;
 import nodomain.freeyourgadget.gadgetbridge.entities.CyclingSample;
 import nodomain.freeyourgadget.gadgetbridge.entities.DaoSession;
 import nodomain.freeyourgadget.gadgetbridge.entities.Device;
@@ -489,6 +490,18 @@ public abstract class AbstractDeviceCoordinator implements DeviceCoordinator {
     public ActivityTrackProvider getActivityTrackProvider(@NonNull final GBDevice device, @NonNull final Context context) {
         // By default, most devices write a gpx file when there's an activity track
         return new GpxActivityTrackProvider();
+    }
+
+    @Nullable
+    @Override
+    public File getWorkoutRawDetailsFile(@NonNull final GBDevice device, @NonNull final BaseActivitySummary summary) {
+        return FileUtils.tryFixPath(summary.getRawDetailsPath());
+    }
+
+    @Nullable
+    @Override
+    public File getWorkoutRawGpsFile(@NonNull final GBDevice device, @NonNull final BaseActivitySummary summary) {
+        return null;
     }
 
     public boolean isHealthWearable(BluetoothDevice device) {

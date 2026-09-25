@@ -46,6 +46,7 @@ import nodomain.freeyourgadget.gadgetbridge.capabilities.HeartRateCapability;
 import nodomain.freeyourgadget.gadgetbridge.capabilities.loyaltycards.BarcodeFormat;
 import nodomain.freeyourgadget.gadgetbridge.capabilities.password.PasswordCapabilityImpl;
 import nodomain.freeyourgadget.gadgetbridge.capabilities.widgets.WidgetManager;
+import nodomain.freeyourgadget.gadgetbridge.entities.BaseActivitySummary;
 import nodomain.freeyourgadget.gadgetbridge.entities.CyclingSample;
 import nodomain.freeyourgadget.gadgetbridge.entities.DaoSession;
 import nodomain.freeyourgadget.gadgetbridge.entities.Device;
@@ -579,6 +580,20 @@ public interface DeviceCoordinator {
      * Returns the {@link ActivityTrackProvider} for the device being supported.
      */
     ActivityTrackProvider getActivityTrackProvider(@NonNull final GBDevice device, @NonNull final Context context);
+
+    /**
+     * Returns the raw per-sample file the device sent for a workout, as stored on disk, or null
+     * when there is none. May query the database, so call it off the main thread.
+     */
+    @Nullable
+    File getWorkoutRawDetailsFile(@NonNull final GBDevice device, @NonNull final BaseActivitySummary summary);
+
+    /**
+     * Returns the raw GPS track file for devices that send it apart from the details file, or
+     * null. May query the database, so call it off the main thread.
+     */
+    @Nullable
+    File getWorkoutRawGpsFile(@NonNull final GBDevice device, @NonNull final BaseActivitySummary summary);
 
     /**
      * Returns true if this device/coordinator supports installing files like firmware,
