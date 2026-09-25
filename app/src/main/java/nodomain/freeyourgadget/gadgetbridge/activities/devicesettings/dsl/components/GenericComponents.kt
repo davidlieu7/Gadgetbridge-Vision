@@ -27,6 +27,7 @@ import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.Langua
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.ListEntry
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.ListSetting
 import nodomain.freeyourgadget.gadgetbridge.externalevents.gps.GBLocationService
+import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.MultiSelectSetting
 import nodomain.freeyourgadget.gadgetbridge.util.Prefs
 
 /**
@@ -67,6 +68,33 @@ inline fun <reified T> DeviceSettingsScope.enumList(
             icon = icon,
             entries = entries,
             defaultValue = defaultValue.name.lowercase(),
+            dependency = dependency,
+            connectedOnly = connectedOnly,
+            visibleWhen = visibleWhen,
+        )
+    )
+}
+
+inline fun <reified T> DeviceSettingsScope.multiEnumList(
+    key: String,
+    @StringRes title: Int,
+    @DrawableRes icon: Int = 0,
+    defaultValue: Set<T>,
+    dependency: String? = null,
+    connectedOnly: Boolean = true,
+    noinline filter: ((T) -> Boolean)? = null,
+    noinline visibleWhen: ((Prefs) -> Boolean)? = null,
+) where T : Enum<T>, T : LabeledEntry {
+    val all = enumValues<T>()
+    val entries = (if (filter != null) all.filter(filter) else all.toList())
+        .map { e -> ListEntry.Res(e.name.lowercase(), e.label) }
+    items.add(
+        MultiSelectSetting(
+            key = key,
+            title = title,
+            icon = icon,
+            entries = entries,
+            defaultValue = defaultValue.map { it.name.lowercase() }.toSet(),
             dependency = dependency,
             connectedOnly = connectedOnly,
             visibleWhen = visibleWhen,
@@ -154,3 +182,4 @@ fun DeviceSettingsScope.workoutSendGpsToBand() {
         connectedOnly = false,
     )
 }
+
