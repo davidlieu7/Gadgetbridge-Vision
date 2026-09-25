@@ -5946,6 +5946,34 @@
     <string name="workout_upload_toast_already_uploaded">%1$s already has this workout</string>
     <string name="workout_upload_toast_updated">Updated the activity on %1$s</string>
     <string name="workout_upload_toast_no_payload">Could not build the file to upload to %1$s</string>
+    <plurals name="workout_upload_batch_started">
+        <item quantity="one">Sending %d workout, this can take a while</item>
+        <item quantity="other">Sending %d workouts, this can take a while</item>
+    </plurals>
+    <string name="workout_upload_batch_busy">Workouts are already being sent, wait for the summary</string>
+    <string name="workout_upload_batch_title">Upload summary</string>
+    <string name="workout_upload_batch_line">%1$s: %2$s</string>
+    <string name="workout_upload_batch_done">Workout upload finished: %1$d of %2$d sent</string>
+    <plurals name="workout_upload_batch_uploaded">
+        <item quantity="one">%d uploaded</item>
+        <item quantity="other">%d uploaded</item>
+    </plurals>
+    <plurals name="workout_upload_batch_updated">
+        <item quantity="one">%d updated</item>
+        <item quantity="other">%d updated</item>
+    </plurals>
+    <plurals name="workout_upload_batch_in_step">
+        <item quantity="one">%d already up to date</item>
+        <item quantity="other">%d already up to date</item>
+    </plurals>
+    <plurals name="workout_upload_batch_not_applicable">
+        <item quantity="one">%d not supported by this service</item>
+        <item quantity="other">%d not supported by this service</item>
+    </plurals>
+    <plurals name="workout_upload_batch_failed">
+        <item quantity="one">%d failed</item>
+        <item quantity="other">%d failed</item>
+    </plurals>
 
     <!-- Workout summary section headers -->
     <string name="goals">Goals</string>

@@ -25,7 +25,6 @@ import android.view.LayoutInflater
 import android.view.Menu
 import android.view.MenuInflater
 import android.view.MenuItem
-import android.view.SubMenu
 import android.view.View
 import android.view.ViewGroup
 import android.widget.LinearLayout
@@ -300,7 +299,7 @@ class WorkoutDetailsFragment : Fragment(), MenuProvider {
     override fun onMenuItemSelected(menuItem: MenuItem): Boolean {
         val workout = currentWorkout ?: return false
 
-        if (menuItem.itemId == UPLOAD_ALL_ITEM_ID) {
+        if (menuItem.itemId == WorkoutUploadMenu.UPLOAD_ALL_ITEM_ID) {
             uploadToAll()
             return true
         }
@@ -512,48 +511,11 @@ class WorkoutDetailsFragment : Fragment(), MenuProvider {
         overflowMenu2?.findItem(R.id.activity_summary_detail_action_add_photo)?.isVisible = workout.summary.headerPhoto == null
         overflowMenu2?.findItem(R.id.activity_summary_detail_action_remove_photo)?.isVisible = workout.summary.headerPhoto != null
 
-        if (overflowMenu != null) {
-            buildUploadMenu(overflowMenu)
-        }
-    }
-
-    /**
-     * Adds an entry per service that can take the workout on screen: one item when there is a
-     * single service, and a submenu led by "all services" when there are several, since a row per
-     * service would crowd out everything else in the share menu.
-     *
-     * The items are built here rather than declared in the menu resource, so a service is offered
-     * because it is set up and can express this workout, not because someone remembered to add an
-     * id for it.
-     */
-    private fun buildUploadMenu(shareMenu: SubMenu) {
         uploadMenuItems.clear()
-        if (offeredServices.isEmpty()) {
-            return
-        }
-        if (offeredServices.size == 1) {
-            val target = offeredServices.first()
-            shareMenu.add(
-                UPLOAD_GROUP_ID,
-                UPLOAD_ITEM_ID_BASE,
-                UPLOAD_MENU_ORDER,
-                getString(R.string.activity_detail_upload_to_service, getString(target.nameRes))
-            ).setIcon(R.drawable.ic_file_upload)
-            uploadMenuItems[UPLOAD_ITEM_ID_BASE] = target
-            return
-        }
-
-        val submenu = shareMenu.addSubMenu(
-            UPLOAD_GROUP_ID,
-            Menu.NONE,
-            UPLOAD_MENU_ORDER,
-            R.string.activity_detail_upload_to
-        )
-        submenu.setIcon(R.drawable.ic_file_upload)
-        submenu.add(UPLOAD_GROUP_ID, UPLOAD_ALL_ITEM_ID, 0, R.string.activity_detail_upload_to_all)
-        offeredServices.forEachIndexed { index, target ->
-            submenu.add(UPLOAD_GROUP_ID, UPLOAD_ITEM_ID_BASE + index, index + 1, target.nameRes)
-            uploadMenuItems[UPLOAD_ITEM_ID_BASE + index] = target
+        if (overflowMenu != null) {
+            uploadMenuItems.putAll(
+                WorkoutUploadMenu.build(overflowMenu, requireContext(), offeredServices, UPLOAD_MENU_ORDER)
+            )
         }
     }
 
@@ -1008,17 +970,6 @@ class WorkoutDetailsFragment : Fragment(), MenuProvider {
         private val LOG = LoggerFactory.getLogger(WorkoutDetailsFragment::class.java)
 
         private const val ARG_WORKOUT_ID = "workout_id"
-
-        /** Group the runtime-built upload entries belong to, so they can be cleared together. */
-        private const val UPLOAD_GROUP_ID = 0x0f000000
-
-        /**
-         * Id of the first upload entry, the rest following it. Outside the range aapt gives the
-         * ids in the menu resource, and not zero, which a menu reads as "no id at all".
-         */
-        private const val UPLOAD_ITEM_ID_BASE = 0x0f000010
-
-        private const val UPLOAD_ALL_ITEM_ID = 0x0f00000f
 
         /** Between sharing the GPX and sharing the FIT; see the menu resource. */
         private const val UPLOAD_MENU_ORDER = 40
