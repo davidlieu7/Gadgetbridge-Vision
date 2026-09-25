@@ -78,7 +78,11 @@ public class OppoHeadphonesSupport extends AbstractHeadphoneBTBRDeviceSupport {
 
     public OppoHeadphonesSupport() {
         super(LOG, MAX_MTU);
-        addSupportedService(UUID.fromString("0000079a-d102-11e1-9b23-00025b00a5a5"));
+    }
+
+    @Override
+    public UUID getSupportedService() {
+        return getCoordinator().ctrlUuid(getDevice()).getUuid();
     }
 
     @Override
