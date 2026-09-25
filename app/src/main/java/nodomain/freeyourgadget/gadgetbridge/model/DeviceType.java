@@ -572,6 +572,7 @@ import nodomain.freeyourgadget.gadgetbridge.devices.test.TestDeviceCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.thermalprinter.ThermalPrinterCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.tlw64.TLW64Coordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.ultrahuman.UltrahumanDeviceCoordinator;
+import nodomain.freeyourgadget.gadgetbridge.devices.ugreen.hitunemax5c.UgreenHituneMax5cCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.um25.Coordinator.UM25Coordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.una.UnaDeviceCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.vesc.VescCoordinator;
@@ -1073,6 +1074,7 @@ public enum DeviceType {
     JABRA_EVOLVE2_65(JabraEvolve265Coordinator.class),
     ONEMORE_SONOFLOW(OneMoreSonoFlowCoordinator.class),
     ONEMORE_SONOFLOW_SE(OneMoreSonoFlowSECoordinator.class),
+    UGREEN_HITUNE_MAX_5C(UgreenHituneMax5cCoordinator.class),
     HONORBAND3(HonorBand3Coordinator.class),
     HONORBAND4(HonorBand4Coordinator.class),
     HONORBAND5(HonorBand5Coordinator.class),

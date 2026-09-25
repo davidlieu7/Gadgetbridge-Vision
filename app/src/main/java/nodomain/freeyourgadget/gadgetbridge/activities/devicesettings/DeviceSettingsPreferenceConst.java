@@ -411,6 +411,16 @@ public class DeviceSettingsPreferenceConst {
     public static final String PREF_HEADPHONES_LOW_LATENCY = "pref_headphones_low_latency";
     public static final String PREF_NOTHING_EAR1_SPATIAL_AUDIO = "pref_nothing_spatial_audio";
 
+    public static final String PREF_UGREEN_ANC_MODE = "ugreen_anc_mode";
+    public static final String PREF_UGREEN_LAST_ACTIVE_ANC = "ugreen_last_active_anc";
+    public static final String PREF_UGREEN_EQ_PRESET = "ugreen_eq_preset";
+    public static final String PREF_UGREEN_PROMPT_LANG = "ugreen_prompt_lang";
+    public static final String PREF_UGREEN_PROMPT_VOLUME = "ugreen_prompt_volume";
+    public static final String PREF_UGREEN_GAME_MODE = "ugreen_game_mode";
+    public static final String PREF_UGREEN_DUAL_CONNECT = "ugreen_dual_connect";
+    public static final String PREF_UGREEN_SPATIAL_AUDIO = "ugreen_spatial_audio";
+    public static final String PREF_UGREEN_HIGH_QUALITY = "ugreen_high_quality";
+
     public static final String PREF_HUAWEI_FREEBUDS_INEAR = "pref_freebuds_inear_detection";
     public static final String PREF_HUAWEI_FREEBUDS_AUDIOMODE = "pref_freebuds_audiomode";
     public static final String PREF_HUAWEI_FREEBUDS_ANC_MODE = "pref_freebuds_anc_mode";

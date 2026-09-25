@@ -5740,4 +5740,13 @@
     <string name="devicetype_f8" translatable="false">F8</string>
     <string name="f8_prefs_users">Users</string>
     <string name="f8_prefs_active_user_title">Active User</string>
+
+    <!-- UGREEN HiTune Max 5c -->
+    <string name="devicetype_ugreen_hitune_max_5c" translatable="false">UGREEN HiTune Max 5c</string>
+    <string name="ugreen_anc_mode_medium">Medium</string>
+    <string name="ugreen_equalizer_treble">Treble</string>
+    <string name="ugreen_game_mode_summary">Reduce audio latency for gaming and video</string>
+    <string name="ugreen_spatial_audio_summary">Enable immersive spatial sound effect</string>
+    <string name="ugreen_high_quality">Hi-Res Audio Decoding</string>
+    <string name="ugreen_high_quality_summary">Enable high-resolution audio decoding (LDAC)</string>
 </resources>
