@@ -149,9 +149,11 @@ public class ActivityChartsActivity extends AbstractGBActivity implements Charts
     @Override
     protected void onCreate(final Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        final boolean tabRowShade = BarShade.moveBelowRow(this, R.attr.tab_bar_bg);
         setContentView(R.layout.activity_charts);
-        findViewById(R.id.charts_tab_shade).setVisibility(tabRowShade ? View.VISIBLE : View.GONE);
+        if (BarShade.continuesToolbar(this, R.attr.tab_bar_bg)) {
+            setTopShade(findViewById(R.id.charts_tab_shade));
+        }
+        setBottomShade(findViewById(R.id.charts_date_bar_shade));
 
         final Bundle extras = getIntent().getExtras();
         if (extras == null) {

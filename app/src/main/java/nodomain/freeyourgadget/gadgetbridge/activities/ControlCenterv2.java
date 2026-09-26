@@ -45,6 +45,7 @@ import androidx.core.view.WindowInsetsCompat;
 import androidx.drawerlayout.widget.DrawerLayout;
 import androidx.fragment.app.Fragment;
 import androidx.fragment.app.FragmentActivity;
+import androidx.fragment.app.FragmentManager;
 import androidx.localbroadcastmanager.content.LocalBroadcastManager;
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
 import androidx.viewpager2.adapter.FragmentStateAdapter;
@@ -94,6 +95,8 @@ public class ControlCenterv2 extends AppCompatActivity
     private FragmentStateAdapter pagerAdapter;
     private SwipeRefreshLayout swipeLayout;
     private AlertDialog clDialog;
+    private BarShade.Follower barShades;
+    private View toolbarShade;
 
     private final BroadcastReceiver mReceiver = new BroadcastReceiver() {
         @Override
@@ -256,9 +259,11 @@ public class ControlCenterv2 extends AppCompatActivity
         toolbar.setBackgroundColor(MaterialColors.getColor(toolbar, R.attr.toolbar_bg));
         // Same for the bottom bar; main_bar_bg follows toolbar_bg in every theme, so both bars match
         navigationView.setBackgroundColor(MaterialColors.getColor(navigationView, R.attr.main_bar_bg));
-        findViewById(R.id.bottom_nav_shade).setVisibility(navigationView.getVisibility());
-        final View toolbarShade = findViewById(R.id.toolbar_shade);
-        final boolean dashboardDateRowShade = BarShade.continuesToolbar(this, R.attr.datestep_row_bg);
+        toolbarShade = findViewById(R.id.toolbar_shade);
+        barShades = new BarShade.Follower(findViewById(R.id.main_content));
+        if (navigationView.getVisibility() == View.VISIBLE) {
+            barShades.setBottomShade(findViewById(R.id.bottom_nav_shade));
+        }
         if (!GBApplication.areDynamicColorsEnabled()) {
             // Dynamic Color already ties title/icon colors to colorOnSurface/colorControlNormal
             toolbar.setTitleTextColor(GBApplication.getTextColor(this));
@@ -272,7 +277,20 @@ public class ControlCenterv2 extends AppCompatActivity
             viewPager.setCurrentItem(1, false);
             navigationView.getMenu().getItem(1).setChecked(true);
         }
-        toolbarShade.setVisibility(dashboardDateRowShade && viewPager.getCurrentItem() == 0 ? View.GONE : View.VISIBLE);
+        // A page's fragment, and its view, are created after the page is selected
+        getSupportFragmentManager().registerFragmentLifecycleCallbacks(new FragmentManager.FragmentLifecycleCallbacks() {
+            @Override
+            public void onFragmentViewCreated(@NonNull final FragmentManager fm, @NonNull final Fragment fragment,
+                                              @NonNull final View view, final Bundle savedInstanceState) {
+                bindTopShade();
+            }
+
+            @Override
+            public void onFragmentViewDestroyed(@NonNull final FragmentManager fm, @NonNull final Fragment fragment) {
+                bindTopShade();
+            }
+        }, false);
+        bindTopShade();
 
         // Sync ViewPager changes with BottomNavigationView
         viewPager.registerOnPageChangeCallback(new ViewPager2.OnPageChangeCallback() {
@@ -281,7 +299,7 @@ public class ControlCenterv2 extends AppCompatActivity
             @Override
             public void onPageSelected(int position) {
                 navigationView.getMenu().getItem(position).setChecked(true);
-                toolbarShade.setVisibility(dashboardDateRowShade && position == 0 ? View.GONE : View.VISIBLE);
+                bindTopShade();
 
                 // Ensure the menu provider is set to the current fragment
                 if (existingMenuProvider != null) {
@@ -367,6 +385,17 @@ public class ControlCenterv2 extends AppCompatActivity
         }
 
         GBApplication.deviceService().requestDeviceInfo();
+    }
+
+    /**
+     * Uses the shade of the visible page, if it has one of its own, in place of the shade below
+     * the toolbar.
+     */
+    private void bindTopShade() {
+        final Fragment fragment = getSupportFragmentManager().findFragmentByTag("f" + viewPager.getCurrentItem());
+        final View headerShade = fragment instanceof HeaderShadePage
+                ? ((HeaderShadePage) fragment).getHeaderShade() : null;
+        barShades.setTopShade(headerShade != null ? headerShade : toolbarShade);
     }
 
     @Override

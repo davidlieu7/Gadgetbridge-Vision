@@ -46,6 +46,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import nodomain.freeyourgadget.gadgetbridge.GBApplication
 import nodomain.freeyourgadget.gadgetbridge.R
+import nodomain.freeyourgadget.gadgetbridge.activities.AbstractGBActivity
 import nodomain.freeyourgadget.gadgetbridge.activities.endurain.EndurainApiClient
 import nodomain.freeyourgadget.gadgetbridge.activities.endurain.EndurainSetupViewModel
 import nodomain.freeyourgadget.gadgetbridge.activities.endurain.WandererApiClient
@@ -118,8 +119,9 @@ class WorkoutDetailsFragment : Fragment(), MenuProvider {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
 
-        binding.tabRowShade.visibility =
-            if (BarShade.continuesToolbar(requireContext(), R.attr.tab_bar_bg)) View.VISIBLE else View.GONE
+        if (BarShade.continuesToolbar(requireContext(), R.attr.tab_bar_bg)) {
+            (requireActivity() as AbstractGBActivity).setTopShade(binding.tabRowShade)
+        }
 
         // Attach workout tabs.
         val viewPager = binding.tabsViewPager

@@ -42,6 +42,7 @@
         android:layout_width="0dp"
         android:layout_height="8dp"
         android:background="?attr/bar_shade"
+        android:visibility="gone"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"
         app:layout_constraintTop_toBottomOf="@id/appbarlayout" />
@@ -51,6 +52,7 @@
         android:layout_width="0dp"
         android:layout_height="8dp"
         android:background="?attr/bar_shade"
+        android:visibility="gone"
         android:rotation="180"
         app:layout_constraintStart_toStartOf="parent"
         app:layout_constraintEnd_toEndOf="parent"

@@ -25,7 +25,9 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.os.Bundle;
 import android.view.View;
+import android.view.ViewGroup;
 
+import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
@@ -37,10 +39,13 @@ import java.util.Locale;
 import nodomain.freeyourgadget.gadgetbridge.GBApplication;
 import nodomain.freeyourgadget.gadgetbridge.R;
 import nodomain.freeyourgadget.gadgetbridge.util.AndroidUtils;
+import nodomain.freeyourgadget.gadgetbridge.util.BarShade;
 
 
 public abstract class AbstractGBActivity extends AppCompatActivity implements GBActivity {
     private boolean isLanguageInvalid = false;
+    private BarShade.Follower barShades;
+    private View actionBarShade;
 
     public static final int NONE = 0;
     public static final int NO_ACTIONBAR = 1;
@@ -159,12 +164,54 @@ public abstract class AbstractGBActivity extends AppCompatActivity implements GB
     public void setContentView(final int layoutResID) {
         super.setContentView(layoutResID);
         applyEdgeToEdgeInsets();
+        installBarShades();
     }
 
     @Override
     public void setContentView(final View view) {
         super.setContentView(view);
         applyEdgeToEdgeInsets();
+        installBarShades();
+    }
+
+    /**
+     * Adds the shade below the action bar, and follows the content that scrolls under it.
+     */
+    private void installBarShades() {
+        final ViewGroup content = findViewById(android.R.id.content);
+        if (actionBarShade != null) {
+            content.removeView(actionBarShade);
+            actionBarShade = null;
+        }
+        if (barShades != null) {
+            barShades.detach();
+        }
+        barShades = new BarShade.Follower(content);
+        if (getSupportActionBar() == null) {
+            return;
+        }
+        actionBarShade = getLayoutInflater().inflate(R.layout.view_bar_shade, content, false);
+        content.addView(actionBarShade);
+        barShades.setTopShade(actionBarShade);
+    }
+
+    /**
+     * Shows {@code shade} in place of the shade below the action bar, for a screen that has a row
+     * of its own below the action bar.
+     */
+    public void setTopShade(@Nullable final View shade) {
+        if (actionBarShade != null) {
+            ((ViewGroup) actionBarShade.getParent()).removeView(actionBarShade);
+            actionBarShade = null;
+        }
+        barShades.setTopShade(shade);
+    }
+
+    /**
+     * Shows {@code shade} above a bar at the bottom of the screen.
+     */
+    public void setBottomShade(@Nullable final View shade) {
+        barShades.setBottomShade(shade);
     }
 
     /**

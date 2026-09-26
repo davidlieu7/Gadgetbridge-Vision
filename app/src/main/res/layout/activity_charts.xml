@@ -46,6 +46,15 @@
                 android:layout_height="8dp"
                 android:background="?attr/bar_shade"
                 android:visibility="gone" />
+
+            <View
+                android:id="@+id/charts_date_bar_shade"
+                android:layout_width="match_parent"
+                android:layout_height="8dp"
+                android:layout_gravity="bottom"
+                android:rotation="180"
+                android:background="?attr/bar_shade"
+                android:visibility="gone" />
         </FrameLayout>
 
         <ProgressBar

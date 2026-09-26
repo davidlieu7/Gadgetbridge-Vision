@@ -11,7 +11,6 @@ import nodomain.freeyourgadget.gadgetbridge.R
 import nodomain.freeyourgadget.gadgetbridge.activities.AbstractGBActivity
 import nodomain.freeyourgadget.gadgetbridge.databinding.ActivityWorkoutDetailsBinding
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice
-import nodomain.freeyourgadget.gadgetbridge.util.BarShade
 import nodomain.freeyourgadget.gadgetbridge.util.kotlin.getParcelableCompat
 import nodomain.freeyourgadget.gadgetbridge.util.kotlin.getSerializableCompat
 
@@ -21,7 +20,6 @@ class WorkoutDetailsActivity : AbstractGBActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        BarShade.moveBelowRow(this, R.attr.tab_bar_bg)
         binding = ActivityWorkoutDetailsBinding.inflate(layoutInflater)
         setContentView(binding.root)
 

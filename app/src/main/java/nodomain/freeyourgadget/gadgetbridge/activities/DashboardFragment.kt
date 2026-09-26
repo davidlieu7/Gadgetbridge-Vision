@@ -56,7 +56,7 @@ import java.util.GregorianCalendar
  * Hosts the widget grid: date header, calendar/settings menu, and the [RecyclerView] the
  * [DashboardAdapter] renders configured widgets into, driven by [DashboardViewModel].
  */
-class DashboardFragment : Fragment(), MenuProvider {
+class DashboardFragment : Fragment(), MenuProvider, HeaderShadePage {
     private val day: Calendar = GregorianCalendar.getInstance()
     private lateinit var textViewDate: TextView
     private lateinit var arrowRight: TextView
@@ -98,8 +98,6 @@ class DashboardFragment : Fragment(), MenuProvider {
         textViewDate = view.findViewById(R.id.dashboard_date)
         recyclerView = view.findViewById(R.id.dashboard_recyclerview)
         arrowRight = view.findViewById(R.id.arrow_right)
-        view.findViewById<View>(R.id.dashboard_date_row_shade).visibility =
-            if (BarShade.continuesToolbar(requireContext(), R.attr.datestep_row_bg)) View.VISIBLE else View.GONE
 
         viewModel = ViewModelProvider(this)[DashboardViewModel::class.java]
         adapter = DashboardAdapter()
@@ -227,6 +225,11 @@ class DashboardFragment : Fragment(), MenuProvider {
         }
 
         viewModel.refresh(day, showAllDevices, deviceList)
+    }
+
+    override fun getHeaderShade(): View? {
+        val shade = view?.findViewById<View>(R.id.dashboard_date_row_shade) ?: return null
+        return if (BarShade.continuesToolbar(shade.context, R.attr.datestep_row_bg)) shade else null
     }
 
     private fun isDeviceInScope(device: GBDevice): Boolean {
