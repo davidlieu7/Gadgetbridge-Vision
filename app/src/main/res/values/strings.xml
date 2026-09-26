@@ -5926,6 +5926,7 @@
     <string name="dreeve_error_uploads_disabled">This Dreeve server imports activities from Strava and does not accept uploaded files</string>
     <string name="service_name_fittrackee" translatable="false">FitTrackee</string>
     <string name="fittrackee_setup_hint">Create an application in your FitTrackee profile, under Apps, with the redirect URL app://fittrackee/oauth/callback and the scopes workouts:read, workouts:write, profile:read and media:write.</string>
+    <string name="fittrackee_scope_missing">the application Gadgetbridge logs in with lacks the %1$s scope. Create an application with it and log in again.</string>
     <string name="fittrackee_media_not_allowed">FitTrackee did not take the header photo: the application Gadgetbridge logs in with lacks the media:write scope. Create an application with it and log in again.</string>
     <string name="select_at_least_option">Please select at least %1$d option</string>
 

@@ -179,6 +179,14 @@ object FitTrackeeService : WorkoutUploadTarget {
     ): WorkoutUploader.UploadResult {
         val server = serverUrl() ?: return WorkoutUploader.UploadResult(false, null, null)
         val apiClient = FitTrackeeApiClient(server, FitTrackeeTokenManager(context))
+        if (!apiClient.allows(FitTrackeeApiClient.SCOPE_WORKOUTS_WRITE)) {
+            LOG.warn("FitTrackee login lacks {}, not uploading summary {}",
+                FitTrackeeApiClient.SCOPE_WORKOUTS_WRITE, summary.id)
+            return WorkoutUploader.UploadResult(
+                false, null,
+                context.getString(R.string.fittrackee_scope_missing, FitTrackeeApiClient.SCOPE_WORKOUTS_WRITE)
+            )
+        }
         val kept = carry as? KeptContent
         val hasTrack = WorkoutUploader.summaryHasTrack(summary)
 
@@ -186,13 +194,14 @@ object FitTrackeeService : WorkoutUploadTarget {
         if (!hasTrack && figures == null) {
             return WorkoutUploader.UploadResult(false, null, null)
         }
+        val sportId = sportIdOf(apiClient, summary) ?: return WorkoutUploader.UploadResult(false, null, null)
 
         val photo = summary.headerPhoto?.let { apiClient.uploadMedia(File(it)) }
         val photoId = (photo as? FitTrackeeMediaResult.Done)?.mediaId
         val mediaIds = listOfNotNull(photoId) + kept?.mediaIds.orEmpty()
 
         val body = JSONObject()
-            .put("sport_id", sportIdFor(summary) ?: DEFAULT_SPORT_ID)
+            .put("sport_id", sportId)
             .put("title", WorkoutUploader.nameFor(context, summary).take(MAX_TITLE_LENGTH))
         if (mediaIds.isNotEmpty()) {
             body.put("media_attachment_ids", JSONArray(mediaIds))
@@ -224,18 +233,21 @@ object FitTrackeeService : WorkoutUploadTarget {
         summary: BaseActivitySummary
     ): Boolean {
         val server = serverUrl() ?: return false
-        return FitTrackeeApiClient(server, FitTrackeeTokenManager(context)).updateWorkout(
+        val apiClient = FitTrackeeApiClient(server, FitTrackeeTokenManager(context))
+        val sportId = sportIdOf(apiClient, summary) ?: return false
+        return apiClient.updateWorkout(
             remoteActivityId,
             WorkoutUploader.nameFor(context, summary).take(MAX_TITLE_LENGTH),
-            sportIdFor(summary) ?: DEFAULT_SPORT_ID
+            sportId
         )
     }
 
     /**
      * What moves onto the replacement: the text, equipment and visibility settings the user may
      * have set on the server, and every media item except the photo Gadgetbridge put there, which
-     * the replacement gets afresh from the workout. Comments and likes are not reachable through
-     * the API and go with the old workout.
+     * the replacement gets afresh from the workout. Comments and likes cannot be moved: deleting
+     * the workout deletes its likes and leaves its comments attached to no workout, so a workout
+     * that has either is not re-created.
      */
     override fun snapshotRemote(
         context: Context,
@@ -247,10 +259,19 @@ object FitTrackeeService : WorkoutUploadTarget {
         return when (val lookup = apiClient.getWorkout(remoteActivityId)) {
             is FitTrackeeWorkoutLookup.Failed -> RemoteSnapshot.Failed
             is FitTrackeeWorkoutLookup.Gone -> RemoteSnapshot.Gone
-            is FitTrackeeWorkoutLookup.Found ->
-                RemoteSnapshot.Found(KeptContent.of(lookup.workout, row.photoMediaRef), false)
+            is FitTrackeeWorkoutLookup.Found -> {
+                val comments = apiClient.countComments(remoteActivityId) ?: return RemoteSnapshot.Failed
+                RemoteSnapshot.Found(
+                    KeptContent.of(lookup.workout, row.photoMediaRef),
+                    losesUserContent = hasReactions(lookup.workout, comments)
+                )
+            }
         }
     }
+
+    /** Whether [workout], with [comments] comments, has likes or comments a re-create would lose. */
+    internal fun hasReactions(workout: JSONObject, comments: Int): Boolean =
+        workout.optInt("likes_count", 0) > 0 || comments > 0
 
     override fun deleteRemote(context: Context, remoteActivityId: String): Boolean {
         val server = serverUrl() ?: return false
@@ -330,7 +351,7 @@ object FitTrackeeService : WorkoutUploadTarget {
      * it needs a sport it knows, a distance and a duration, none of them zero.
      */
     internal fun figuresOf(summary: BaseActivitySummary): Figures? {
-        if (sportIdFor(summary) == null) return null
+        if (sportLabelFor(summary) == null) return null
         val data = summary.summaryData?.let {
             try {
                 ActivitySummaryData.fromJson(it)
@@ -392,45 +413,59 @@ object FitTrackeeService : WorkoutUploadTarget {
     }
 
     /**
-     * The sport the workout is filed under, or null when FitTrackee has none that fits. These are
-     * the ids of the sports FitTrackee seeds a new instance with, which is all a client can go on:
-     * they are rows in the instance's own table and an administrator can add more.
+     * The id on this instance of the sport [summary] is filed under. A workout with a track whose
+     * kind has no match, or whose sport the instance lacks, goes under [DEFAULT_SPORT_LABEL]; one
+     * without a track is not sent at all then. Null when there is nothing to file it under or the
+     * sports could not be read.
      */
-    internal fun sportIdFor(summary: BaseActivitySummary): Int? =
+    private fun sportIdOf(apiClient: FitTrackeeApiClient, summary: BaseActivitySummary): Int? {
+        val sports = apiClient.fetchSportIds() ?: return null
+        val label = sportLabelFor(summary)
+        label?.let { sports[it] }?.let { return it }
+        if (label != null) LOG.warn("FitTrackee instance has no sport '{}'", label)
+        return if (WorkoutUploader.summaryHasTrack(summary)) sports[DEFAULT_SPORT_LABEL] else null
+    }
+
+    /**
+     * The label of the FitTrackee sport the workout is filed under, or null when FitTrackee has
+     * none that fits. Labels are what `GET /api/sports` answers, as seeded by FitTrackee's
+     * migrations.
+     */
+    internal fun sportLabelFor(summary: BaseActivitySummary): String? =
         when (ActivityKind.fromCode(summary.activityKind)) {
             ActivityKind.CYCLING, ActivityKind.OUTDOOR_CYCLING,
-            ActivityKind.ROAD_BIKE, ActivityKind.GRAVEL_BIKE, ActivityKind.CYCLO_CROSS -> 1
+            ActivityKind.ROAD_BIKE, ActivityKind.GRAVEL_BIKE, ActivityKind.CYCLO_CROSS -> "Cycling (Sport)"
 
-            ActivityKind.BIKE_COMMUTE -> 2
-            ActivityKind.HIKING, ActivityKind.MOUNTAIN_HIKE, ActivityKind.TRAIL_HIKE -> 3
-            ActivityKind.MOUNTAIN_BIKE, ActivityKind.CYCLING_DOWNHILL -> 4
+            ActivityKind.BIKE_COMMUTE -> "Cycling (Transport)"
+            ActivityKind.HIKING, ActivityKind.MOUNTAIN_HIKE, ActivityKind.TRAIL_HIKE -> "Hiking"
+            ActivityKind.MOUNTAIN_BIKE, ActivityKind.CYCLING_DOWNHILL -> "Mountain Biking"
 
             ActivityKind.RUNNING, ActivityKind.OUTDOOR_RUNNING, ActivityKind.INDOOR_RUNNING,
             ActivityKind.STREET_RUNNING, ActivityKind.TRACK_RUN, ActivityKind.INDOOR_TRACK_RUNNING,
-            ActivityKind.ULTRA_RUN, ActivityKind.TREADMILL, ActivityKind.VIRTUAL_RUN -> 5
+            ActivityKind.ULTRA_RUN, ActivityKind.TREADMILL, ActivityKind.VIRTUAL_RUN -> "Running"
 
             ActivityKind.WALKING, ActivityKind.OUTDOOR_WALKING, ActivityKind.INDOOR_WALKING,
-            ActivityKind.RACE_WALKING -> 6
+            ActivityKind.RACE_WALKING -> "Walking"
 
-            ActivityKind.E_MOUNTAIN_BIKE -> 7
-            ActivityKind.TRAIL_RUN, ActivityKind.CROSS_COUNTRY_RUNNING -> 8
-            ActivityKind.SKIING, ActivityKind.BACKCOUNTRY_SKIING -> 9
-            ActivityKind.CROSS_COUNTRY_SKIING -> 10
-            ActivityKind.ROWING, ActivityKind.ROWING_MACHINE -> 11
-            ActivityKind.SNOWSHOE -> 12
-            ActivityKind.INDOOR_CYCLING, ActivityKind.SPINNING -> 13
-            ActivityKind.MOUNTAINEERING -> 14
-            ActivityKind.PARAGLIDING -> 15
-            ActivityKind.SWIMMING_OPENWATER -> 16
-            ActivityKind.BIKE_TOUR -> 17
-            ActivityKind.KAYAKING -> 19
-            ActivityKind.CANOEING -> 20
-            ActivityKind.WINDSURFING -> 22
-            ActivityKind.STAND_UP_PADDLEBOARDING, ActivityKind.PADDLING -> 23
-            ActivityKind.TENNIS -> 24
-            ActivityKind.PADEL -> 25
-            ActivityKind.ICE_SKATING -> 28
-            ActivityKind.INLINE_SKATING, ActivityKind.ROLLER_SKATING -> 29
+            ActivityKind.E_MOUNTAIN_BIKE -> "Mountain Biking (Electric)"
+            ActivityKind.TRAIL_RUN, ActivityKind.CROSS_COUNTRY_RUNNING -> "Trail"
+            ActivityKind.SKIING, ActivityKind.BACKCOUNTRY_SKIING -> "Skiing (Alpine)"
+            ActivityKind.CROSS_COUNTRY_SKIING -> "Skiing (Cross Country)"
+            ActivityKind.ROWING, ActivityKind.ROWING_MACHINE -> "Rowing"
+            ActivityKind.SNOWSHOE -> "Snowshoes"
+            ActivityKind.INDOOR_CYCLING, ActivityKind.SPINNING -> "Cycling (Virtual)"
+            ActivityKind.MOUNTAINEERING -> "Mountaineering"
+            ActivityKind.PARAGLIDING -> "Paragliding"
+            ActivityKind.SWIMMING_OPENWATER -> "Open Water Swimming"
+            ActivityKind.BIKE_TOUR -> "Cycling (Trekking)"
+            ActivityKind.KAYAKING -> "Kayaking"
+            ActivityKind.CANOEING -> "Canoeing"
+            ActivityKind.WINDSURFING -> "Windsurfing"
+            ActivityKind.STAND_UP_PADDLEBOARDING, ActivityKind.PADDLING -> "Standup Paddleboarding"
+            ActivityKind.TENNIS -> "Tennis (Outdoor)"
+            ActivityKind.PADEL -> "Padel (Outdoor)"
+            ActivityKind.ICE_SKATING -> "Ice Skating"
+            ActivityKind.INLINE_SKATING, ActivityKind.ROLLER_SKATING -> "Inline Skating"
             else -> null
         }
 
@@ -439,11 +474,8 @@ object FitTrackeeService : WorkoutUploadTarget {
     /** Where the setup wizard listens for the outcome of the browser login. */
     const val LOGIN_CALLBACK_ACTION = "nodomain.freeyourgadget.gadgetbridge.FITTRACKEE_CALLBACK"
 
-    /**
-     * Cycling, the first sport every instance is seeded with, for a workout with a track whose
-     * kind has no match. A workout without one is not sent at all in that case.
-     */
-    private const val DEFAULT_SPORT_ID = 1
+    /** The first sport every instance is seeded with. */
+    private const val DEFAULT_SPORT_LABEL = "Cycling (Sport)"
 
     private const val MAX_TITLE_LENGTH = 255
 

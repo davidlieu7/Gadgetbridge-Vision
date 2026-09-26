@@ -117,14 +117,16 @@ class FitTrackeeApiClient(
         }
         return try {
             val json = JSONObject(text)
+            val accessLifetime = json.optInt("expires_in", DEFAULT_ACCESS_LIFETIME_SECONDS)
             tokenManager.saveTokens(
                 json.getString("access_token"),
                 json.getString("refresh_token"),
-                json.optInt("expires_in", DEFAULT_ACCESS_LIFETIME_SECONDS),
-                // FitTrackee does not say when the refresh token stops working, so it is treated
-                // as lasting until it is refused, which shows up as a failed refresh.
-                REFRESH_LIFETIME_SECONDS
+                accessLifetime,
+                // FitTrackee accepts a refresh token until twice the access token's lifetime has
+                // passed since the pair was issued (OAuth2Token.is_refresh_token_active).
+                accessLifetime * 2
             )
+            tokenManager.saveGrantedScope(json.optString("scope").takeIf { it.isNotEmpty() })
             true
         } catch (e: Exception) {
             LOG.error("Could not read the FitTrackee token response", e)
@@ -180,6 +182,25 @@ class FitTrackeeApiClient(
             }
         } catch (e: Exception) {
             LOG.warn("Could not read the FitTrackee profile", e)
+            null
+        }
+    }
+
+    /**
+     * The instance's sports, id by label. Sport ids are rows of the instance's own table, while a
+     * label ("Cycling (Sport)") is unique and never changes once a migration has added it. Blocking;
+     * null when the list could not be read.
+     */
+    fun fetchSportIds(): Map<String, Int>? {
+        val response = request("/api/sports")
+        if (response.statusCode !in 200..299) return null
+        return try {
+            val sports = JSONObject(response.body ?: return null).getJSONObject("data").getJSONArray("sports")
+            (0 until sports.length()).associate { i ->
+                sports.getJSONObject(i).let { it.getString("label") to it.getInt("id") }
+            }
+        } catch (e: Exception) {
+            LOG.warn("Could not read the FitTrackee sports", e)
             null
         }
     }
@@ -258,6 +279,22 @@ class FitTrackeeApiClient(
         }
     }
 
+    /**
+     * How many comments on [workoutId] the signed-in user can see, or null when they could not be
+     * read. For the owner that is every comment except those another user addressed only to the
+     * people they mention. Blocking.
+     */
+    fun countComments(workoutId: String): Int? {
+        val response = request("/api/workouts/$workoutId/comments")
+        if (response.statusCode !in 200..299) return null
+        return try {
+            JSONObject(response.body ?: return null).getJSONObject("data").getJSONArray("comments").length()
+        } catch (e: Exception) {
+            LOG.warn("Could not read the comments of FitTrackee workout {}", workoutId, e)
+            null
+        }
+    }
+
     /** Sets the title and sport of a workout that already exists. Blocking. */
     fun updateWorkout(workoutId: String, title: String, sportId: Int): Boolean {
         val body = JSONObject().put("title", title).put("sport_id", sportId)
@@ -279,10 +316,19 @@ class FitTrackeeApiClient(
         request("/api/workouts/$workoutId", "DELETE").statusCode in 200..299
 
     /**
+     * Whether the current login was granted [scope]. A request it was not is answered by
+     * FitTrackee before the request body is read, and a multipart upload sent through the Internet
+     * Helper then fails as a broken connection instead of the 403, so it is not sent at all.
+     */
+    fun allows(scope: String): Boolean = scopeAllows(tokenManager.getGrantedScope(), scope)
+
+    /**
      * Uploads [photo] as a media item that belongs to no workout yet; [FitTrackeeMediaResult.Done]
      * carries its id. Needs the `media:write` scope. Blocking.
      */
-    fun uploadMedia(photo: File): FitTrackeeMediaResult = try {
+    fun uploadMedia(photo: File): FitTrackeeMediaResult = if (!allows(SCOPE_MEDIA_WRITE)) {
+        FitTrackeeMediaResult.NotAllowed
+    } else try {
         ExternalServicePhotos.withAcceptedFormat(photo, ALLOWED_PHOTO_EXTENSIONS) { file ->
             file?.let { postMedia(it, retry = true) } ?: FitTrackeeMediaResult.Failed
         }
@@ -324,11 +370,14 @@ class FitTrackeeApiClient(
 
     /** Deletes a media item. One that is already gone counts as deleted. Blocking. */
     fun deleteMedia(mediaId: String): FitTrackeeMediaResult =
-        when (request("/api/media/$mediaId", "DELETE").statusCode) {
+        if (!allows(SCOPE_MEDIA_WRITE)) {
+            FitTrackeeMediaResult.NotAllowed
+        } else when (request("/api/media/$mediaId", "DELETE").statusCode) {
             in 200..299, 404 -> FitTrackeeMediaResult.Done(null)
             403 -> FitTrackeeMediaResult.NotAllowed
             else -> FitTrackeeMediaResult.Failed
         }
+
     private fun workoutIdOf(responseText: String): String? = try {
         JSONObject(responseText)
             .getJSONObject("data")
@@ -364,7 +413,15 @@ class FitTrackeeApiClient(
 
         private const val DEFAULT_ACCESS_LIFETIME_SECONDS = 864000
 
-        /** Ten years: long enough to mean "until the server refuses it". */
-        private const val REFRESH_LIFETIME_SECONDS = 10 * 365 * 24 * 60 * 60
+        const val SCOPE_WORKOUTS_WRITE = "workouts:write"
+        const val SCOPE_MEDIA_WRITE = "media:write"
+
+        /**
+         * Whether [granted], the space-separated scopes a token response named, includes [scope].
+         * Tokens obtained before the granted scope was recorded have none on file, and are assumed
+         * to allow it so that they keep working as they did.
+         */
+        fun scopeAllows(granted: String?, scope: String): Boolean =
+            granted == null || scope in granted.split(' ').filter { it.isNotEmpty() }
     }
 }

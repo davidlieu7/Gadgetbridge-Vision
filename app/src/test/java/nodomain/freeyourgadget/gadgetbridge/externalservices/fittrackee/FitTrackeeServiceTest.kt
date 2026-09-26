@@ -127,7 +127,15 @@ class FitTrackeeServiceTest : TestBase() {
 
     @Test
     fun hasNoSportForAKindItDoesNotKnow() {
-        assertNull(FitTrackeeService.sportIdFor(trackless(kind = ActivityKind.YOGA)))
-        assertEquals(13, FitTrackeeService.sportIdFor(trackless(kind = ActivityKind.INDOOR_CYCLING)))
+        assertNull(FitTrackeeService.sportLabelFor(trackless(kind = ActivityKind.YOGA)))
+        assertEquals("Cycling (Virtual)", FitTrackeeService.sportLabelFor(trackless(kind = ActivityKind.INDOOR_CYCLING)))
+    }
+
+    @Test
+    fun aWorkoutWithLikesOrCommentsIsNotReCreated() {
+        assertFalse(FitTrackeeService.hasReactions(JSONObject().put("likes_count", 0), 0))
+        assertFalse(FitTrackeeService.hasReactions(JSONObject(), 0))
+        assertTrue(FitTrackeeService.hasReactions(JSONObject().put("likes_count", 1), 0))
+        assertTrue(FitTrackeeService.hasReactions(JSONObject().put("likes_count", 0), 2))
     }
 }

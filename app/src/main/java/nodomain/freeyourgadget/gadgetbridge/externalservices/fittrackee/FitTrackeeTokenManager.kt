@@ -63,11 +63,23 @@ class FitTrackeeTokenManager(context: Context) : OAuthTokenStore(context, "fittr
 
     fun getTimezone(): String? = preferences.getString(KEY_TIMEZONE, null)
 
+    /**
+     * The scopes the current tokens were granted, space-separated as the token response has them,
+     * which can be fewer than were asked for: FitTrackee grants no more than the application was
+     * registered with. Null for tokens obtained before it was recorded.
+     */
+    fun saveGrantedScope(scope: String?) {
+        preferences.edit { if (scope != null) putString(KEY_SCOPE, scope) else remove(KEY_SCOPE) }
+    }
+
+    fun getGrantedScope(): String? = preferences.getString(KEY_SCOPE, null)
+
     companion object {
         private const val KEY_CLIENT_ID = "client_id"
         private const val KEY_CLIENT_SECRET = "client_secret"
         private const val KEY_CODE_VERIFIER = "code_verifier"
         private const val KEY_USERNAME = "username"
         private const val KEY_TIMEZONE = "timezone"
+        private const val KEY_SCOPE = "granted_scope"
     }
 }
