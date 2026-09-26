@@ -47,6 +47,16 @@ import nodomain.freeyourgadget.gadgetbridge.model.Alarm;
 import nodomain.freeyourgadget.gadgetbridge.model.DeviceService;
 import nodomain.freeyourgadget.gadgetbridge.model.Reminder;
 import nodomain.freeyourgadget.gadgetbridge.model.WorldClock;
+import nodomain.freeyourgadget.gadgetbridge.proto.xiaomi.AlarmDelete;
+import nodomain.freeyourgadget.gadgetbridge.proto.xiaomi.AlarmDetails;
+import nodomain.freeyourgadget.gadgetbridge.proto.xiaomi.AlarmInfo;
+import nodomain.freeyourgadget.gadgetbridge.proto.xiaomi.ReminderDelete;
+import nodomain.freeyourgadget.gadgetbridge.proto.xiaomi.ReminderDetails;
+import nodomain.freeyourgadget.gadgetbridge.proto.xiaomi.Reminders;
+import nodomain.freeyourgadget.gadgetbridge.proto.xiaomi.ReminderInfo;
+import nodomain.freeyourgadget.gadgetbridge.proto.xiaomi.Schedule;
+import nodomain.freeyourgadget.gadgetbridge.proto.xiaomi.WearCommon;
+import nodomain.freeyourgadget.gadgetbridge.proto.xiaomi.WorldClocks;
 import nodomain.freeyourgadget.gadgetbridge.proto.xiaomi.XiaomiProto;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.xiaomi.XiaomiPreferences;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.xiaomi.XiaomiSupport;
@@ -175,7 +185,7 @@ public class XiaomiScheduleService extends AbstractXiaomiService {
         getSupport().sendCommand("request reminders", COMMAND_TYPE, CMD_REMINDERS_GET);
     }
 
-    public void handleReminders(final XiaomiProto.Reminders reminders) {
+    public void handleReminders(final Reminders reminders) {
         LOG.debug("Got {} reminders from the watch", reminders.getReminderCount());
 
         final GBDeviceEventUpdatePreferences eventUpdatePreferences = new GBDeviceEventUpdatePreferences()
@@ -184,8 +194,8 @@ public class XiaomiScheduleService extends AbstractXiaomiService {
         getSupport().evaluateGBDeviceEvent(eventUpdatePreferences);
 
         watchReminders.clear();
-        for (final XiaomiProto.Reminder reminder : reminders.getReminderList()) {
-            final nodomain.freeyourgadget.gadgetbridge.entities.Reminder gbReminder = new nodomain.freeyourgadget.gadgetbridge.entities.Reminder();
+        for (final var reminder : reminders.getReminderList()) {
+            final var gbReminder = new nodomain.freeyourgadget.gadgetbridge.entities.Reminder();
             gbReminder.setReminderId(REMINDER_DB_PREFIX + reminder.getId());
             gbReminder.setMessage(reminder.getReminderDetails().getTitle());
             gbReminder.setDate(XiaomiPreferences.toDate(reminder.getReminderDetails().getDate(), reminder.getReminderDetails().getTime()));
@@ -308,14 +318,14 @@ public class XiaomiScheduleService extends AbstractXiaomiService {
             final Calendar reminderTime = GregorianCalendar.getInstance(TimeZone.getTimeZone("UTC"));
             reminderTime.setTimeInMillis(reminder.getDate().getTime());
 
-            final XiaomiProto.ReminderDetails.Builder reminderDetails = XiaomiProto.ReminderDetails.newBuilder()
-                    .setTime(XiaomiProto.Time.newBuilder()
+            final var reminderDetails = ReminderDetails.newBuilder()
+                    .setTime(WearCommon.Time.newBuilder()
                             .setHour(reminderTime.get(Calendar.HOUR_OF_DAY))
                             .setMinute(reminderTime.get(Calendar.MINUTE))
                             .setSecond(reminderTime.get(Calendar.SECOND))
                             .setMillisecond(reminderTime.get(Calendar.MILLISECOND))
                             .build())
-                    .setDate(XiaomiProto.Date.newBuilder()
+                    .setDate(WearCommon.Date.newBuilder()
                             .setYear(reminderTime.get(Calendar.YEAR))
                             .setMonth(reminderTime.get(Calendar.MONTH) + 1)
                             .setDay(reminderTime.get(Calendar.DATE))
@@ -342,14 +352,14 @@ public class XiaomiScheduleService extends AbstractXiaomiService {
                     break;
             }
 
-            final XiaomiProto.Schedule.Builder schedule = XiaomiProto.Schedule.newBuilder();
+            final var schedule = Schedule.newBuilder();
 
             if (!isCreateReminder) {
                 // update existing alarm
                 LOG.debug("Update reminder {}", reminder.getReminderId());
                 watchReminders.put(reminder.getReminderId(), reminder);
                 schedule.setEditReminder(
-                        XiaomiProto.Reminder.newBuilder()
+                        ReminderInfo.newBuilder()
                                 .setId(Integer.parseInt(reminder.getReminderId().replace(REMINDER_DB_PREFIX, "")))
                                 .setReminderDetails(reminderDetails)
                                 .build()
@@ -372,11 +382,11 @@ public class XiaomiScheduleService extends AbstractXiaomiService {
         }
 
         if (!remindersToDelete.isEmpty()) {
-            final XiaomiProto.ReminderDelete reminderDelete = XiaomiProto.ReminderDelete.newBuilder()
+            final var reminderDelete = ReminderDelete.newBuilder()
                     .addAllId(remindersToDelete)
                     .build();
 
-            final XiaomiProto.Schedule schedule = XiaomiProto.Schedule.newBuilder()
+            final var schedule = Schedule.newBuilder()
                     .setDeleteReminder(reminderDelete)
                     .build();
 
@@ -392,7 +402,7 @@ public class XiaomiScheduleService extends AbstractXiaomiService {
     }
 
     public void onSetWorldClocks(final ArrayList<? extends WorldClock> clocks) {
-        final XiaomiProto.WorldClocks.Builder worldClocksBuilder = XiaomiProto.WorldClocks.newBuilder();
+        final var worldClocksBuilder = WorldClocks.newBuilder();
 
         for (final WorldClock clock : clocks) {
             final String clockCode = WORLD_CLOCK_CODES.get(clock.getTimeZoneId());
@@ -403,7 +413,7 @@ public class XiaomiScheduleService extends AbstractXiaomiService {
             }
         }
 
-        final XiaomiProto.Schedule schedule = XiaomiProto.Schedule.newBuilder()
+        final var schedule = Schedule.newBuilder()
                 .setWorldClocks(worldClocksBuilder.build())
                 .build();
 
@@ -421,7 +431,7 @@ public class XiaomiScheduleService extends AbstractXiaomiService {
         getSupport().sendCommand("get world clocks", COMMAND_TYPE, CMD_WORLD_CLOCKS_GET);
     }
 
-    public void handleWorldClocks(final XiaomiProto.WorldClocks worldClocks) {
+    public void handleWorldClocks(final nodomain.freeyourgadget.gadgetbridge.proto.xiaomi.WorldClocks worldClocks) {
         LOG.info("Got {} world clocks: {}", worldClocks.getWorldClockCount(), worldClocks.getWorldClockList());
         // TODO map the world clock codes
     }
@@ -453,12 +463,12 @@ public class XiaomiScheduleService extends AbstractXiaomiService {
                 continue;
             }
 
-            final XiaomiProto.HourMinute hourMinute = XiaomiProto.HourMinute.newBuilder()
+            final var hourMinute = WearCommon.HourMinute.newBuilder()
                     .setHour(alarm.getHour())
                     .setMinute(alarm.getMinute())
                     .build();
 
-            final XiaomiProto.AlarmDetails.Builder alarmDetails = XiaomiProto.AlarmDetails.newBuilder()
+            final var alarmDetails = AlarmDetails.newBuilder()
                     .setTime(hourMinute)
                     .setEnabled(alarm.getEnabled())
                     .setSmart(alarm.getSmartWakeup() ? ALARM_SMART : ALARM_NORMAL);
@@ -476,17 +486,17 @@ public class XiaomiScheduleService extends AbstractXiaomiService {
                     break;
             }
 
-            final XiaomiProto.Schedule.Builder schedule = XiaomiProto.Schedule.newBuilder();
+            final var schedule = Schedule.newBuilder();
 
             if (watchAlarm != null) {
                 // update existing alarm
                 LOG.debug("Update alarm {}", alarm.getPosition());
                 watchAlarms.put(alarm.getPosition(), alarm);
                 schedule.setEditAlarm(
-                        XiaomiProto.Alarm.newBuilder()
-                                .setId(alarm.getPosition() + 1)
-                                .setAlarmDetails(alarmDetails)
-                                .build()
+                    AlarmInfo.newBuilder()
+                        .setId(alarm.getPosition() + 1)
+                        .setAlarmDetails(alarmDetails)
+                        .build()
                 );
             } else {
                 LOG.debug("Create alarm {}", alarm.getPosition());
@@ -506,11 +516,11 @@ public class XiaomiScheduleService extends AbstractXiaomiService {
         }
 
         if (!alarmsToDelete.isEmpty()) {
-            final XiaomiProto.AlarmDelete alarmDelete = XiaomiProto.AlarmDelete.newBuilder()
+            final var alarmDelete = AlarmDelete.newBuilder()
                     .addAllId(alarmsToDelete)
                     .build();
 
-            final XiaomiProto.Schedule schedule = XiaomiProto.Schedule.newBuilder()
+            final var schedule = Schedule.newBuilder()
                     .setDeleteAlarm(alarmDelete)
                     .build();
 
@@ -529,7 +539,7 @@ public class XiaomiScheduleService extends AbstractXiaomiService {
         getSupport().sendCommand("get alarms", COMMAND_TYPE, CMD_ALARMS_GET);
     }
 
-    public void handleAlarms(final XiaomiProto.Alarms alarms) {
+    public void handleAlarms(final nodomain.freeyourgadget.gadgetbridge.proto.xiaomi.Alarms alarms) {
         LOG.debug("Got {} alarms from the watch", alarms.getAlarmCount());
 
         final GBDeviceEventUpdatePreferences eventUpdatePreferences = new GBDeviceEventUpdatePreferences()
@@ -538,7 +548,7 @@ public class XiaomiScheduleService extends AbstractXiaomiService {
         getSupport().evaluateGBDeviceEvent(eventUpdatePreferences);
 
         watchAlarms.clear();
-        for (final XiaomiProto.Alarm alarm : alarms.getAlarmList()) {
+        for (final var alarm : alarms.getAlarmList()) {
             final nodomain.freeyourgadget.gadgetbridge.entities.Alarm gbAlarm = new nodomain.freeyourgadget.gadgetbridge.entities.Alarm();
             gbAlarm.setUnused(false); // If the band sent it, it's not unused
             gbAlarm.setPosition(alarm.getId() - 1); // band id starts at 1
@@ -610,7 +620,7 @@ public class XiaomiScheduleService extends AbstractXiaomiService {
                 reminder1.getRepetition() == reminder2.getRepetition();
     }
 
-    private void handleSleepModeConfig(final XiaomiProto.SleepMode sleepMode) {
+    private void handleSleepModeConfig(final nodomain.freeyourgadget.gadgetbridge.proto.xiaomi.SleepMode sleepMode) {
         LOG.debug("Got sleep mode config");
 
         final String start = XiaomiPreferences.prefFromHourMin(sleepMode.getSchedule().getStart());
@@ -634,9 +644,9 @@ public class XiaomiScheduleService extends AbstractXiaomiService {
         final Date start = prefs.getTimePreference(DeviceSettingsPreferenceConst.PREF_SLEEP_MODE_SCHEDULE_START, "22:00");
         final Date end = prefs.getTimePreference(DeviceSettingsPreferenceConst.PREF_SLEEP_MODE_SCHEDULE_END, "06:00");
 
-        final XiaomiProto.SleepMode sleepMode = XiaomiProto.SleepMode.newBuilder()
+        final var sleepMode = nodomain.freeyourgadget.gadgetbridge.proto.xiaomi.SleepMode.newBuilder()
                 .setEnabled(enabled)
-                .setSchedule(XiaomiProto.SleepModeSchedule.newBuilder()
+                .setSchedule(nodomain.freeyourgadget.gadgetbridge.proto.xiaomi.SleepModeSchedule.newBuilder()
                         .setUnknown3(0)
                         .setStart(XiaomiPreferences.prefToHourMin(start))
                         .setEnd(XiaomiPreferences.prefToHourMin(end)))
@@ -647,7 +657,7 @@ public class XiaomiScheduleService extends AbstractXiaomiService {
                 XiaomiProto.Command.newBuilder()
                         .setType(COMMAND_TYPE)
                         .setSubtype(CMD_SLEEP_MODE_SET)
-                        .setSchedule(XiaomiProto.Schedule.newBuilder().setSleepMode(sleepMode))
+                        .setSchedule(Schedule.newBuilder().setSleepMode(sleepMode))
                         .build()
         );
     }

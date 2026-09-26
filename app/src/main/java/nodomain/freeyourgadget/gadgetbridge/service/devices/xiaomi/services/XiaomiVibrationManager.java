@@ -27,6 +27,7 @@ import nodomain.freeyourgadget.gadgetbridge.GBApplication;
 import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEventUpdatePreferences;
 import nodomain.freeyourgadget.gadgetbridge.devices.xiaomi.XiaomiCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.proto.xiaomi.XiaomiProto;
+import nodomain.freeyourgadget.gadgetbridge.proto.xiaomi.XiaomiSystem;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.xiaomi.XiaomiSupport;
 import nodomain.freeyourgadget.gadgetbridge.util.GB;
 import nodomain.freeyourgadget.gadgetbridge.util.preferences.DevicePrefs;
@@ -98,7 +99,7 @@ public final class XiaomiVibrationManager {
         }
     }
 
-    private void handlePatterns(final XiaomiProto.VibrationPatterns vibrationPatterns) {
+    private void handlePatterns(final XiaomiSystem.VibrationPatterns vibrationPatterns) {
         LOG.info("[vibration] response: {} notification types, {} custom patterns",
                 vibrationPatterns.getNotificationTypeCount(), vibrationPatterns.getCustomVibrationPatternCount());
 
@@ -114,20 +115,20 @@ public final class XiaomiVibrationManager {
 
     private void addPattern() {
         final XiaomiCoordinator coordinator = support.getCoordinator();
-        final XiaomiProto.VibrationPatterns existing = parseVibrationPatterns(prefs().getString(PREF_PATTERNS, null));
+        final XiaomiSystem.VibrationPatterns existing = parseVibrationPatterns(prefs().getString(PREF_PATTERNS, null));
         int nextId = 1;
-        for (final XiaomiProto.CustomVibrationPattern p : existing.getCustomVibrationPatternList()) {
+        for (final XiaomiSystem.CustomVibrationPattern p : existing.getCustomVibrationPatternList()) {
             if (!coordinator.isProtectedVibrationPatternId(p.getId()) && p.getId() >= nextId) {
                 nextId = p.getId() + 1;
             }
         }
 
-        final XiaomiProto.CustomVibrationPattern requested = parseAddPattern(prefs().getString(PREF_ADD_PATTERN, null));
+        final XiaomiSystem.CustomVibrationPattern requested = parseAddPattern(prefs().getString(PREF_ADD_PATTERN, null));
         if (requested == null) {
             LOG.warn("No vibration pattern to add");
             return;
         }
-        final XiaomiProto.CustomVibrationPattern pattern = requested.toBuilder().setId(nextId).build();
+        final XiaomiSystem.CustomVibrationPattern pattern = requested.toBuilder().setId(nextId).build();
 
         LOG.info("[vibration-add] sending ADD for pattern (id={})", nextId);
         support.sendCommand(
@@ -135,7 +136,7 @@ public final class XiaomiVibrationManager {
                 XiaomiProto.Command.newBuilder()
                         .setType(XiaomiSystemService.COMMAND_TYPE)
                         .setSubtype(CMD_ADD)
-                        .setSystem(XiaomiProto.System.newBuilder().setVibrationPatternCreate(pattern))
+                        .setSystem(XiaomiSystem.System.newBuilder().setVibrationPatternCreate(pattern))
                         .build()
         );
     }
@@ -157,8 +158,8 @@ public final class XiaomiVibrationManager {
                 XiaomiProto.Command.newBuilder()
                         .setType(XiaomiSystemService.COMMAND_TYPE)
                         .setSubtype(CMD_REMOVE)
-                        .setSystem(XiaomiProto.System.newBuilder().setVibrationRemove(
-                                XiaomiProto.VibrationRemove.newBuilder().addId(removeId)))
+                        .setSystem(XiaomiSystem.System.newBuilder().setVibrationRemove(
+                                XiaomiSystem.VibrationRemove.newBuilder().addId(removeId)))
                         .build()
         );
     }
@@ -167,13 +168,13 @@ public final class XiaomiVibrationManager {
         return GBApplication.getDevicePrefs(support.getDevice());
     }
 
-    public static XiaomiProto.VibrationPatterns parseVibrationPatterns(final String hex) {
-        final XiaomiProto.VibrationPatterns parsed = parseProtoHex(hex, XiaomiProto.VibrationPatterns.parser());
-        return parsed != null ? parsed : XiaomiProto.VibrationPatterns.getDefaultInstance();
+    public static XiaomiSystem.VibrationPatterns parseVibrationPatterns(final String hex) {
+        final XiaomiSystem.VibrationPatterns parsed = parseProtoHex(hex, XiaomiSystem.VibrationPatterns.parser());
+        return parsed != null ? parsed : XiaomiSystem.VibrationPatterns.getDefaultInstance();
     }
 
-    private static XiaomiProto.CustomVibrationPattern parseAddPattern(final String hex) {
-        return parseProtoHex(hex, XiaomiProto.CustomVibrationPattern.parser());
+    private static XiaomiSystem.CustomVibrationPattern parseAddPattern(final String hex) {
+        return parseProtoHex(hex, XiaomiSystem.CustomVibrationPattern.parser());
     }
 
     private static <T extends MessageLite> T parseProtoHex(final String hex, final Parser<T> parser) {

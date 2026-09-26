@@ -55,6 +55,31 @@ import nodomain.freeyourgadget.gadgetbridge.model.ActivityKind;
 import nodomain.freeyourgadget.gadgetbridge.model.ActivitySample;
 import nodomain.freeyourgadget.gadgetbridge.model.ActivityUser;
 import nodomain.freeyourgadget.gadgetbridge.model.DeviceService;
+import nodomain.freeyourgadget.gadgetbridge.proto.xiaomi.ActivitySyncRequestToday;
+import nodomain.freeyourgadget.gadgetbridge.proto.xiaomi.AdvancedMonitoring;
+import nodomain.freeyourgadget.gadgetbridge.proto.xiaomi.AxisSensor;
+import nodomain.freeyourgadget.gadgetbridge.proto.xiaomi.Goal;
+import nodomain.freeyourgadget.gadgetbridge.proto.xiaomi.GoalNotification;
+import nodomain.freeyourgadget.gadgetbridge.proto.xiaomi.GoalsConfig;
+import nodomain.freeyourgadget.gadgetbridge.proto.xiaomi.Health;
+import nodomain.freeyourgadget.gadgetbridge.proto.xiaomi.HeartRate;
+import nodomain.freeyourgadget.gadgetbridge.proto.xiaomi.HeartRateAlarmLow;
+import nodomain.freeyourgadget.gadgetbridge.proto.xiaomi.RawSensorAck;
+import nodomain.freeyourgadget.gadgetbridge.proto.xiaomi.RawSensorBatch;
+import nodomain.freeyourgadget.gadgetbridge.proto.xiaomi.RealTimeStats;
+import nodomain.freeyourgadget.gadgetbridge.proto.xiaomi.RelaxReminder;
+import nodomain.freeyourgadget.gadgetbridge.proto.xiaomi.SpO2;
+import nodomain.freeyourgadget.gadgetbridge.proto.xiaomi.Spo2AlarmLow;
+import nodomain.freeyourgadget.gadgetbridge.proto.xiaomi.Spo2Mode;
+import nodomain.freeyourgadget.gadgetbridge.proto.xiaomi.StandingReminder;
+import nodomain.freeyourgadget.gadgetbridge.proto.xiaomi.Stress;
+import nodomain.freeyourgadget.gadgetbridge.proto.xiaomi.UserInfo;
+import nodomain.freeyourgadget.gadgetbridge.proto.xiaomi.VitalityScore;
+import nodomain.freeyourgadget.gadgetbridge.proto.xiaomi.WorkoutLocation;
+import nodomain.freeyourgadget.gadgetbridge.proto.xiaomi.WorkoutOpenReply;
+import nodomain.freeyourgadget.gadgetbridge.proto.xiaomi.WorkoutOpenWatch;
+import nodomain.freeyourgadget.gadgetbridge.proto.xiaomi.WorkoutStatusWatch;
+import nodomain.freeyourgadget.gadgetbridge.proto.xiaomi.WorkoutStatusWatchSport;
 import nodomain.freeyourgadget.gadgetbridge.proto.xiaomi.XiaomiProto;
 import nodomain.freeyourgadget.gadgetbridge.service.SleepAsAndroidSender;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.xiaomi.XiaomiPreferences;
@@ -317,7 +342,7 @@ public class XiaomiHealthService extends AbstractXiaomiService {
             maxHeartRate = 175;
         }
 
-        final XiaomiProto.UserInfo userInfo = XiaomiProto.UserInfo.newBuilder()
+        final var userInfo = UserInfo.newBuilder()
                 .setHeight(activityUser.getHeightCm())
                 .setWeight(activityUser.getWeightKg())
                 .setBirthday(Integer.parseInt(String.format(Locale.ROOT, "%04d%02d%02d", birthYear, birthMonth, birthDay)))
@@ -329,7 +354,7 @@ public class XiaomiHealthService extends AbstractXiaomiService {
                 .setGoalMoving(activityUser.getActiveTimeGoalMinutes())
                 .build();
 
-        final XiaomiProto.Health health = XiaomiProto.Health.newBuilder()
+        final var health = Health.newBuilder()
                 .setUserInfo(userInfo)
                 .build();
 
@@ -343,7 +368,7 @@ public class XiaomiHealthService extends AbstractXiaomiService {
         );
     }
 
-    private void handleGoalNotificationConfig(final XiaomiProto.GoalNotification goalNotification) {
+    private void handleGoalNotificationConfig(final GoalNotification goalNotification) {
         LOG.debug("Got goal notification config");
 
         final GBDeviceEventUpdatePreferences eventUpdatePreferences = new GBDeviceEventUpdatePreferences()
@@ -358,11 +383,11 @@ public class XiaomiHealthService extends AbstractXiaomiService {
 
         LOG.debug("Setting goal notification enabled = {}", enabled);
 
-        final XiaomiProto.GoalNotification.Builder goalNotification = XiaomiProto.GoalNotification.newBuilder()
+        final var goalNotification = GoalNotification.newBuilder()
                 .setEnabled(enabled)
                 .setUnknown2(1);
 
-        final XiaomiProto.Health health = XiaomiProto.Health.newBuilder()
+        final var health = Health.newBuilder()
                 .setGoalNotification(goalNotification)
                 .build();
 
@@ -376,16 +401,16 @@ public class XiaomiHealthService extends AbstractXiaomiService {
         );
     }
 
-    private void handleGoalsConfig(final XiaomiProto.GoalsConfig goalsConfig) {
+    private void handleGoalsConfig(final GoalsConfig goalsConfig) {
         LOG.debug("Got goals config");
 
         currentGoals.clear();
         supportedGoals.clear();
 
-        for (final XiaomiProto.Goal goal : goalsConfig.getCurrentGoalsList()) {
+        for (final Goal goal : goalsConfig.getCurrentGoalsList()) {
             currentGoals.add(goal.getId());
         }
-        for (final XiaomiProto.Goal goal : goalsConfig.getSupportedGoalsList()) {
+        for (final Goal goal : goalsConfig.getSupportedGoalsList()) {
             supportedGoals.add(goal.getId());
         }
 
@@ -404,25 +429,25 @@ public class XiaomiHealthService extends AbstractXiaomiService {
 
         LOG.debug("Setting goals config = {}", goalSecondary);
 
-        final XiaomiProto.GoalsConfig.Builder goalsConfig = XiaomiProto.GoalsConfig.newBuilder();
+        final var goalsConfig = GoalsConfig.newBuilder();
 
         for (final Integer currentGoal : currentGoals) {
             if (!currentGoal.equals(GOAL_STANDING_TIME) && !currentGoal.equals(GOAL_MOVING_TIME)) {
-                goalsConfig.addCurrentGoals(XiaomiProto.Goal.newBuilder().setId(currentGoal));
+                goalsConfig.addCurrentGoals(Goal.newBuilder().setId(currentGoal));
             }
         }
 
         if (goalSecondary.equals("active_time")) {
-            goalsConfig.addCurrentGoals(XiaomiProto.Goal.newBuilder().setId(GOAL_MOVING_TIME));
+            goalsConfig.addCurrentGoals(Goal.newBuilder().setId(GOAL_MOVING_TIME));
         } else {
-            goalsConfig.addCurrentGoals(XiaomiProto.Goal.newBuilder().setId(GOAL_STANDING_TIME));
+            goalsConfig.addCurrentGoals(Goal.newBuilder().setId(GOAL_STANDING_TIME));
         }
 
         for (final Integer supportedGoal : supportedGoals) {
-            goalsConfig.addSupportedGoals(XiaomiProto.Goal.newBuilder().setId(supportedGoal));
+            goalsConfig.addSupportedGoals(Goal.newBuilder().setId(supportedGoal));
         }
 
-        final XiaomiProto.Health health = XiaomiProto.Health.newBuilder()
+        final var health = Health.newBuilder()
                 .setGoalsConfig(goalsConfig)
                 .build();
 
@@ -436,7 +461,7 @@ public class XiaomiHealthService extends AbstractXiaomiService {
         );
     }
 
-    private void handleVitalityScore(final XiaomiProto.VitalityScore vitalityScore) {
+    private void handleVitalityScore(final VitalityScore vitalityScore) {
         LOG.debug("Got vitality score config");
 
         final GBDeviceEventUpdatePreferences eventUpdatePreferences = new GBDeviceEventUpdatePreferences()
@@ -453,12 +478,12 @@ public class XiaomiHealthService extends AbstractXiaomiService {
 
         LOG.debug("Setting vitality score config, 7day={}, daily={}", prefSevenDay, prefDaily);
 
-        final XiaomiProto.VitalityScore vitalityScore = XiaomiProto.VitalityScore.newBuilder()
+        final var vitalityScore = VitalityScore.newBuilder()
                 .setSevenDay(prefSevenDay)
                 .setDailyProgress(prefDaily)
                 .build();
 
-        final XiaomiProto.Health health = XiaomiProto.Health.newBuilder()
+        final var health = Health.newBuilder()
                 .setVitalityScore(vitalityScore)
                 .build();
 
@@ -472,7 +497,7 @@ public class XiaomiHealthService extends AbstractXiaomiService {
         );
     }
 
-    private void handleSpo2Config(final XiaomiProto.SpO2 spo2) {
+    private void handleSpo2Config(final SpO2 spo2) {
         LOG.debug("Got SpO2 config");
 
         final GBDeviceEventUpdatePreferences eventUpdatePreferences = new GBDeviceEventUpdatePreferences()
@@ -481,7 +506,7 @@ public class XiaomiHealthService extends AbstractXiaomiService {
                 // only all-day maps to the on/off preference in Gadgetbridge.
                 // Sleep-only is valid on the wire but is not shown in the on-watch
                 // UI nor in the vendor app UI of Mi Band 10, so it reads as off here.
-                .withPreference(DeviceSettingsPreferenceConst.PREF_SPO2_ALL_DAY_MONITORING, spo2.getMode() == XiaomiProto.Spo2Mode.SPO2_MODE_ALL_DAY)
+                .withPreference(DeviceSettingsPreferenceConst.PREF_SPO2_ALL_DAY_MONITORING, spo2.getMode() == Spo2Mode.SPO2_MODE_ALL_DAY)
                 .withPreference(
                         DeviceSettingsPreferenceConst.PREF_SPO2_LOW_ALERT_THRESHOLD,
                         String.valueOf(spo2.getAlarmLow().getAlarmLowEnabled() ? spo2.getAlarmLow().getAlarmLowThreshold() : 0)
@@ -497,16 +522,16 @@ public class XiaomiHealthService extends AbstractXiaomiService {
         final boolean allDayMonitoring = prefs.getBoolean(DeviceSettingsPreferenceConst.PREF_SPO2_ALL_DAY_MONITORING, false);
         final int lowAlertThreshold = prefs.getInt(DeviceSettingsPreferenceConst.PREF_SPO2_LOW_ALERT_THRESHOLD, 0);
 
-        final XiaomiProto.Spo2AlarmLow.Builder spo2alarmLowBuilder = XiaomiProto.Spo2AlarmLow.newBuilder()
+        final var spo2alarmLowBuilder = Spo2AlarmLow.newBuilder()
                 .setAlarmLowEnabled(lowAlertThreshold != 0);
 
         if (lowAlertThreshold != 0) {
             spo2alarmLowBuilder.setAlarmLowThreshold(lowAlertThreshold);
         }
 
-        final XiaomiProto.SpO2.Builder spo2 = XiaomiProto.SpO2.newBuilder()
+        final var spo2 = SpO2.newBuilder()
                 .setUnknown1(1)
-                .setMode(allDayMonitoring ? XiaomiProto.Spo2Mode.SPO2_MODE_ALL_DAY : XiaomiProto.Spo2Mode.SPO2_MODE_OFF)
+                .setMode(allDayMonitoring ? Spo2Mode.SPO2_MODE_ALL_DAY : Spo2Mode.SPO2_MODE_OFF)
                 .setAlarmLow(spo2alarmLowBuilder);
 
         getSupport().sendCommand(
@@ -514,12 +539,12 @@ public class XiaomiHealthService extends AbstractXiaomiService {
                 XiaomiProto.Command.newBuilder()
                         .setType(COMMAND_TYPE)
                         .setSubtype(CMD_CONFIG_SPO2_SET)
-                        .setHealth(XiaomiProto.Health.newBuilder().setSpo2(spo2))
+                        .setHealth(Health.newBuilder().setSpo2(spo2))
                         .build()
         );
     }
 
-    private void handleHeartRateConfig(final XiaomiProto.HeartRate heartRate) {
+    private void handleHeartRateConfig(final HeartRate heartRate) {
         LOG.debug("Got heart rate config");
 
         final GBDeviceEventUpdatePreferences eventUpdatePreferences = new GBDeviceEventUpdatePreferences();
@@ -575,15 +600,15 @@ public class XiaomiHealthService extends AbstractXiaomiService {
                 alertLow
         );
 
-        final XiaomiProto.HeartRate.Builder heartRate = XiaomiProto.HeartRate.newBuilder()
+        final var heartRate = HeartRate.newBuilder()
                 .setDisabled(intervalSeconds == 0)
                 .setInterval(intervalMin)
-                .setAdvancedMonitoring(XiaomiProto.AdvancedMonitoring.newBuilder()
+                .setAdvancedMonitoring(AdvancedMonitoring.newBuilder()
                         .setEnabled(sleepDetection))
                 .setBreathingScore(sleepBreathingQuality ? 1 : 2)
                 .setAlarmHighEnabled(alertHigh > 0)
                 .setAlarmHighThreshold(alertHigh)
-                .setHeartRateAlarmLow(XiaomiProto.HeartRateAlarmLow.newBuilder()
+                .setHeartRateAlarmLow(HeartRateAlarmLow.newBuilder()
                         .setAlarmLowEnabled(alertLow > 0)
                         .setAlarmLowThreshold(alertLow))
                 .setUnknown7(1);
@@ -593,12 +618,12 @@ public class XiaomiHealthService extends AbstractXiaomiService {
                 XiaomiProto.Command.newBuilder()
                         .setType(COMMAND_TYPE)
                         .setSubtype(CMD_CONFIG_HEART_RATE_SET)
-                        .setHealth(XiaomiProto.Health.newBuilder().setHeartRate(heartRate))
+                        .setHealth(Health.newBuilder().setHeartRate(heartRate))
                         .build()
         );
     }
 
-    private void handleStandingReminderConfig(final XiaomiProto.StandingReminder standingReminder) {
+    private void handleStandingReminderConfig(final StandingReminder standingReminder) {
         LOG.debug("Got standing reminder config");
 
         final String start = XiaomiPreferences.prefFromHourMin(standingReminder.getStart());
@@ -629,7 +654,7 @@ public class XiaomiHealthService extends AbstractXiaomiService {
         final Date dndStart = prefs.getTimePreference(DeviceSettingsPreferenceConst.PREF_INACTIVITY_DND_START, "12:00");
         final Date dndEnd = prefs.getTimePreference(DeviceSettingsPreferenceConst.PREF_INACTIVITY_DND_END, "14:00");
 
-        final XiaomiProto.StandingReminder standingReminder = XiaomiProto.StandingReminder.newBuilder()
+        final var standingReminder = StandingReminder.newBuilder()
                 .setEnabled(enabled)
                 .setStart(XiaomiPreferences.prefToHourMin(start))
                 .setEnd(XiaomiPreferences.prefToHourMin(end))
@@ -643,12 +668,12 @@ public class XiaomiHealthService extends AbstractXiaomiService {
                 XiaomiProto.Command.newBuilder()
                         .setType(COMMAND_TYPE)
                         .setSubtype(CMD_CONFIG_STANDING_REMINDER_SET)
-                        .setHealth(XiaomiProto.Health.newBuilder().setStandingReminder(standingReminder))
+                        .setHealth(Health.newBuilder().setStandingReminder(standingReminder))
                         .build()
         );
     }
 
-    private void handleStressConfig(final XiaomiProto.Stress stress) {
+    private void handleStressConfig(final Stress stress) {
         LOG.debug("Got stress config");
 
         final GBDeviceEventUpdatePreferences eventUpdatePreferences = new GBDeviceEventUpdatePreferences()
@@ -666,21 +691,21 @@ public class XiaomiHealthService extends AbstractXiaomiService {
         final boolean enabled = prefs.getBoolean(DeviceSettingsPreferenceConst.PREF_HEARTRATE_STRESS_MONITORING, false);
         final boolean relaxReminder = prefs.getBoolean(DeviceSettingsPreferenceConst.PREF_HEARTRATE_STRESS_RELAXATION_REMINDER, false);
 
-        final XiaomiProto.Stress.Builder stress = XiaomiProto.Stress.newBuilder()
+        final var stress = Stress.newBuilder()
                 .setAllDayTracking(enabled)
-                .setRelaxReminder(XiaomiProto.RelaxReminder.newBuilder().setEnabled(relaxReminder).setUnknown2(0));
+                .setRelaxReminder(RelaxReminder.newBuilder().setEnabled(relaxReminder).setUnknown2(0));
 
         getSupport().sendCommand(
                 "set stress config",
                 XiaomiProto.Command.newBuilder()
                         .setType(COMMAND_TYPE)
                         .setSubtype(CMD_CONFIG_STRESS_SET)
-                        .setHealth(XiaomiProto.Health.newBuilder().setStress(stress))
+                        .setHealth(Health.newBuilder().setStress(stress))
                         .build()
         );
     }
 
-    private void handleWorkoutOpen(final XiaomiProto.WorkoutOpenWatch workoutOpenWatch) {
+    private void handleWorkoutOpen(final WorkoutOpenWatch workoutOpenWatch) {
         LOG.debug(
                 "Workout open on watch: {}, workoutStarted={}, gpsStarted={}, gpsFixAcquired={}, saa={}",
                 workoutOpenWatch.getSport(),
@@ -698,8 +723,8 @@ public class XiaomiHealthService extends AbstractXiaomiService {
                     XiaomiProto.Command.newBuilder()
                             .setType(COMMAND_TYPE)
                             .setSubtype(CMD_WORKOUT_WATCH_OPEN)
-                            .setHealth(XiaomiProto.Health.newBuilder().setWorkoutOpenReply(
-                                    XiaomiProto.WorkoutOpenReply.newBuilder()
+                            .setHealth(Health.newBuilder().setWorkoutOpenReply(
+                                    WorkoutOpenReply.newBuilder()
                                             .setUnknown1(0)
                                             .setUnknown2(2)
                                             .setUnknown3(2)
@@ -717,8 +742,8 @@ public class XiaomiHealthService extends AbstractXiaomiService {
                     XiaomiProto.Command.newBuilder()
                             .setType(COMMAND_TYPE)
                             .setSubtype(CMD_WORKOUT_WATCH_OPEN)
-                            .setHealth(XiaomiProto.Health.newBuilder().setWorkoutOpenReply(
-                                    XiaomiProto.WorkoutOpenReply.newBuilder()
+                            .setHealth(Health.newBuilder().setWorkoutOpenReply(
+                                    WorkoutOpenReply.newBuilder()
                                             .setUnknown1(3)
                                             .setUnknown2(2)
                                             .setUnknown3(10)
@@ -751,7 +776,7 @@ public class XiaomiHealthService extends AbstractXiaomiService {
         }
     }
 
-    private void handleWorkoutStatus(final XiaomiProto.WorkoutStatusWatch workoutStatus) {
+    private void handleWorkoutStatus(final WorkoutStatusWatch workoutStatus) {
         LOG.debug("Got workout status: {}, sport={}", workoutStatus.getStatus(), workoutStatus.getSport());
 
         // Ignore the synthetic SaA workout — it must not trigger OpenTracks or
@@ -792,8 +817,8 @@ public class XiaomiHealthService extends AbstractXiaomiService {
                     XiaomiProto.Command.newBuilder()
                             .setType(COMMAND_TYPE)
                             .setSubtype(CMD_WORKOUT_WATCH_OPEN)
-                            .setHealth(XiaomiProto.Health.newBuilder().setWorkoutOpenReply(
-                                    XiaomiProto.WorkoutOpenReply.newBuilder()
+                            .setHealth(Health.newBuilder().setWorkoutOpenReply(
+                                    WorkoutOpenReply.newBuilder()
                                             .setUnknown1(0)
                                             .setUnknown2(2)
                                             .setUnknown3(2)
@@ -803,7 +828,7 @@ public class XiaomiHealthService extends AbstractXiaomiService {
         }
 
         if (workoutStarted) {
-            final XiaomiProto.WorkoutLocation.Builder workoutLocation = XiaomiProto.WorkoutLocation.newBuilder()
+            final var workoutLocation = WorkoutLocation.newBuilder()
                     .setUnknown1(2)
                     .setTimestamp((int) (location.getTime() / 1000L))
                     .setLongitude(location.getLongitude())
@@ -825,7 +850,7 @@ public class XiaomiHealthService extends AbstractXiaomiService {
                     XiaomiProto.Command.newBuilder()
                             .setType(COMMAND_TYPE)
                             .setSubtype(CMD_WORKOUT_LOCATION)
-                            .setHealth(XiaomiProto.Health.newBuilder().setWorkoutLocation(workoutLocation))
+                            .setHealth(Health.newBuilder().setWorkoutLocation(workoutLocation))
                             .build()
             );
         }
@@ -866,9 +891,9 @@ public class XiaomiHealthService extends AbstractXiaomiService {
                 XiaomiProto.Command.newBuilder()
                         .setType(COMMAND_TYPE)
                         .setSubtype(CMD_ACTIVITY_FETCH_TODAY)
-                        .setHealth(XiaomiProto.Health.newBuilder().setActivitySyncRequestToday(
+                        .setHealth(Health.newBuilder().setActivitySyncRequestToday(
                                 // TODO official app sends 0, but sometimes 1?
-                                XiaomiProto.ActivitySyncRequestToday.newBuilder().setUnknown1(0)
+                                ActivitySyncRequestToday.newBuilder().setUnknown1(0)
                         ))
                         .build()
         );
@@ -890,7 +915,7 @@ public class XiaomiHealthService extends AbstractXiaomiService {
                 XiaomiProto.Command.newBuilder()
                         .setType(COMMAND_TYPE)
                         .setSubtype(CMD_ACTIVITY_FETCH_REQUEST)
-                        .setHealth(XiaomiProto.Health.newBuilder().setActivityRequestFileIds(
+                        .setHealth(Health.newBuilder().setActivityRequestFileIds(
                                 ByteString.copyFrom(fileId.toBytes())
                         ))
                         .build()
@@ -903,7 +928,7 @@ public class XiaomiHealthService extends AbstractXiaomiService {
                 XiaomiProto.Command.newBuilder()
                         .setType(COMMAND_TYPE)
                         .setSubtype(CMD_ACTIVITY_FETCH_ACK)
-                        .setHealth(XiaomiProto.Health.newBuilder().setActivitySyncAckFileIds(
+                        .setHealth(Health.newBuilder().setActivitySyncAckFileIds(
                                 ByteString.copyFrom(fileId.toBytes())
                         ))
                         .build()
@@ -981,7 +1006,7 @@ public class XiaomiHealthService extends AbstractXiaomiService {
         );
     }
 
-    private void handleRealtimeStats(final XiaomiProto.RealTimeStats realTimeStats) {
+    private void handleRealtimeStats(final RealTimeStats realTimeStats) {
         LOG.debug("Got realtime stats");
 
         if (!realtimeOneShot && !realtimeStarted) {
@@ -1075,10 +1100,10 @@ public class XiaomiHealthService extends AbstractXiaomiService {
                 XiaomiProto.Command.newBuilder()
                         .setType(COMMAND_TYPE)
                         .setSubtype(CMD_WORKOUT_WATCH_STATUS)
-                        .setHealth(XiaomiProto.Health.newBuilder().setWorkoutStatusWatch(
-                                XiaomiProto.WorkoutStatusWatch.newBuilder()
+                        .setHealth(Health.newBuilder().setWorkoutStatusWatch(
+                                WorkoutStatusWatch.newBuilder()
                                         .setTimestamp(ts)
-                                        .setSportInfo(XiaomiProto.WorkoutStatusWatchSport.newBuilder()
+                                        .setSportInfo(WorkoutStatusWatchSport.newBuilder()
                                                 .setType(SAA_SPORT_INFO_TYPE))
                                         .setSport(SAA_SYNTHETIC_SPORT)
                                         .setStatus(status)
@@ -1088,12 +1113,12 @@ public class XiaomiHealthService extends AbstractXiaomiService {
         );
     }
 
-    private void handleRawSensorBatch(final XiaomiProto.RawSensorBatch batch) {
+    private void handleRawSensorBatch(final RawSensorBatch batch) {
         final int n = batch.getAccelCount();
         LOG.debug("Got raw sensor batch: {} accel samples", n);
         if (sleepAsAndroidSender != null && n > 0) {
             for (int i = 0; i < n; i++) {
-                final XiaomiProto.AxisSensor s = batch.getAccel(i);
+                final AxisSensor s = batch.getAccel(i);
                 sleepAsAndroidSender.onAccelChanged(s.getX(), s.getY(), s.getZ());
             }
         }
@@ -1112,8 +1137,8 @@ public class XiaomiHealthService extends AbstractXiaomiService {
                 XiaomiProto.Command.newBuilder()
                         .setType(COMMAND_TYPE)
                         .setSubtype(CMD_RAW_SENSOR_ACK)
-                        .setHealth(XiaomiProto.Health.newBuilder().setRawSensorAck(
-                                XiaomiProto.RawSensorAck.newBuilder()
+                        .setHealth(Health.newBuilder().setRawSensorAck(
+                                RawSensorAck.newBuilder()
                                         .setCounter(counter)
                                         .setUnknown2(0)
                                         .setUnknown3(0)

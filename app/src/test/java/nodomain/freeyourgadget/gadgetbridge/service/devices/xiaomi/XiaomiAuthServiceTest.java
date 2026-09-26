@@ -25,6 +25,8 @@ import com.google.protobuf.ByteString;
 
 import org.junit.Test;
 
+import nodomain.freeyourgadget.gadgetbridge.proto.xiaomi.Account;
+import nodomain.freeyourgadget.gadgetbridge.proto.xiaomi.Auth;
 import nodomain.freeyourgadget.gadgetbridge.proto.xiaomi.XiaomiProto;
 
 public class XiaomiAuthServiceTest {
@@ -37,14 +39,14 @@ public class XiaomiAuthServiceTest {
     /// Wear OS watches need the phone's identity in the nonce, or they refuse the handshake.
     @Test
     public void testNonceCommandWithDeviceId() {
-        final XiaomiProto.PhoneNonce phoneNonce = XiaomiAuthService
+        final Auth.AppVerify appVerify = XiaomiAuthService
                 .buildNonceCommand(NONCE, "0123456789abcdef0123456789abcdef")
                 .getAuth()
-                .getPhoneNonce();
+                .getAppVerify();
 
-        assertArrayEquals(NONCE, phoneNonce.getNonce().toByteArray());
-        assertTrue(phoneNonce.hasDeviceId());
-        assertEquals("0123456789abcdef0123456789abcdef", phoneNonce.getDeviceId());
+        assertArrayEquals(NONCE, appVerify.getNonce().toByteArray());
+        assertTrue(appVerify.hasDeviceId());
+        assertEquals("0123456789abcdef0123456789abcdef", appVerify.getDeviceId());
     }
 
     /// Every other Xiaomi device has no device id to send, and must keep producing exactly the
@@ -54,8 +56,8 @@ public class XiaomiAuthServiceTest {
         final byte[] expected = XiaomiProto.Command.newBuilder()
                 .setType(XiaomiAuthService.COMMAND_TYPE)
                 .setSubtype(XiaomiAuthService.CMD_NONCE)
-                .setAuth(XiaomiProto.Auth.newBuilder().setPhoneNonce(
-                        XiaomiProto.PhoneNonce.newBuilder()
+                .setAuth(Account.newBuilder().setAppVerify(
+                        Auth.AppVerify.newBuilder()
                                 .setNonce(ByteString.copyFrom(NONCE))
                                 .build()
                 ))
@@ -64,7 +66,7 @@ public class XiaomiAuthServiceTest {
 
         for (final String noDeviceId : new String[]{null, ""}) {
             final XiaomiProto.Command cmd = XiaomiAuthService.buildNonceCommand(NONCE, noDeviceId);
-            assertFalse(cmd.getAuth().getPhoneNonce().hasDeviceId());
+            assertFalse(cmd.getAuth().getAppVerify().hasDeviceId());
             assertArrayEquals(expected, cmd.toByteArray());
         }
     }

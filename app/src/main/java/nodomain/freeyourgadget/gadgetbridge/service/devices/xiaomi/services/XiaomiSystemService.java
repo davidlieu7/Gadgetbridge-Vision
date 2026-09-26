@@ -54,7 +54,9 @@ import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
 import nodomain.freeyourgadget.gadgetbridge.model.BatteryState;
 import nodomain.freeyourgadget.gadgetbridge.model.SleepState;
 import nodomain.freeyourgadget.gadgetbridge.model.WearingState;
+import nodomain.freeyourgadget.gadgetbridge.proto.xiaomi.WearCommon;
 import nodomain.freeyourgadget.gadgetbridge.proto.xiaomi.XiaomiProto;
+import nodomain.freeyourgadget.gadgetbridge.proto.xiaomi.XiaomiSystem;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.xiaomi.XiaomiPreferences;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.xiaomi.XiaomiSupport;
 import nodomain.freeyourgadget.gadgetbridge.util.CheckSums;
@@ -306,8 +308,8 @@ public class XiaomiSystemService extends AbstractXiaomiService implements Xiaomi
                 XiaomiProto.Command.newBuilder()
                         .setType(COMMAND_TYPE)
                         .setSubtype(CMD_LANGUAGE)
-                        .setSystem(XiaomiProto.System.newBuilder().setLanguage(
-                                XiaomiProto.Language.newBuilder().setCode(localeString.toLowerCase(Locale.ROOT))
+                        .setSystem(XiaomiSystem.System.newBuilder().setLanguage(
+                                XiaomiSystem.Language.newBuilder().setCode(localeString.toLowerCase(Locale.ROOT))
                         ))
                         .build()
         );
@@ -322,19 +324,19 @@ public class XiaomiSystemService extends AbstractXiaomiService implements Xiaomi
         final String timeFormat = getDevicePrefs().getTimeFormat();
         final boolean is24hour = DeviceSettingsPreferenceConst.PREF_TIMEFORMAT_24H.equals(timeFormat);
 
-        final XiaomiProto.Clock clock = XiaomiProto.Clock.newBuilder()
-                .setTime(XiaomiProto.Time.newBuilder()
+        final var clock = XiaomiSystem.Clock.newBuilder()
+                .setTime(WearCommon.Time.newBuilder()
                         .setHour(now.get(Calendar.HOUR_OF_DAY))
                         .setMinute(now.get(Calendar.MINUTE))
                         .setSecond(now.get(Calendar.SECOND))
                         .setMillisecond(now.get(Calendar.MILLISECOND))
                         .build())
-                .setDate(XiaomiProto.Date.newBuilder()
+                .setDate(WearCommon.Date.newBuilder()
                         .setYear(now.get(Calendar.YEAR))
                         .setMonth(now.get(Calendar.MONTH) + 1)
                         .setDay(now.get(Calendar.DATE))
                         .build())
-                .setTimezone(XiaomiProto.TimeZone.newBuilder()
+                .setTimezone(WearCommon.TimeZone.newBuilder()
                         .setZoneOffset(((now.get(Calendar.ZONE_OFFSET) / 1000) / 60) / 15)
                         .setDstOffset(((now.get(Calendar.DST_OFFSET) / 1000) / 60) / 15)
                         .setName(tz.getID())
@@ -347,12 +349,12 @@ public class XiaomiSystemService extends AbstractXiaomiService implements Xiaomi
                 XiaomiProto.Command.newBuilder()
                         .setType(COMMAND_TYPE)
                         .setSubtype(CMD_CLOCK)
-                        .setSystem(XiaomiProto.System.newBuilder().setClock(clock).build())
+                        .setSystem(XiaomiSystem.System.newBuilder().setClock(clock).build())
                         .build()
         );
     }
 
-    private void handleDeviceInfo(final XiaomiProto.DeviceInfo deviceInfo) {
+    private void handleDeviceInfo(final XiaomiSystem.DeviceInfo deviceInfo) {
         LOG.debug("Got device info: fw={} hw={} sn={}", deviceInfo.getFirmware(), deviceInfo.getModel(), deviceInfo.getSerialNumber());
 
         final GBDeviceEventVersionInfo gbDeviceEventVersionInfo = new GBDeviceEventVersionInfo();
@@ -377,7 +379,7 @@ public class XiaomiSystemService extends AbstractXiaomiService implements Xiaomi
         return BatteryState.UNKNOWN;
     }
 
-    private void handleBattery(final XiaomiProto.Battery battery) {
+    private void handleBattery(final XiaomiSystem.Battery battery) {
         LOG.debug("Got battery: {}", battery.getLevel());
 
         final GBDeviceEventBatteryInfo batteryInfo = new GBDeviceEventBatteryInfo();
@@ -415,7 +417,7 @@ public class XiaomiSystemService extends AbstractXiaomiService implements Xiaomi
             return;
         }
 
-        final XiaomiProto.Password.Builder passwordBuilder = XiaomiProto.Password.newBuilder()
+        final var passwordBuilder = XiaomiSystem.Password.newBuilder()
                 .setState(passwordEnabled ? 2 : 1)
                 .setPassword(password);
 
@@ -424,12 +426,12 @@ public class XiaomiSystemService extends AbstractXiaomiService implements Xiaomi
                 XiaomiProto.Command.newBuilder()
                         .setType(COMMAND_TYPE)
                         .setSubtype(CMD_PASSWORD_SET)
-                        .setSystem(XiaomiProto.System.newBuilder().setPassword(passwordBuilder).build())
+                        .setSystem(XiaomiSystem.System.newBuilder().setPassword(passwordBuilder).build())
                         .build()
         );
     }
 
-    private void handlePassword(final XiaomiProto.Password password) {
+    private void handlePassword(final XiaomiSystem.Password password) {
         LOG.debug("Got device password");
         final GBDeviceEventUpdatePreferences eventUpdatePreferences = new GBDeviceEventUpdatePreferences(
                 PasswordCapabilityImpl.PREF_PASSWORD_ENABLED,
@@ -449,7 +451,7 @@ public class XiaomiSystemService extends AbstractXiaomiService implements Xiaomi
         getSupport().evaluateGBDeviceEvent(eventUpdatePreferences);
     }
 
-    private void handleMiscSettingSet(final XiaomiProto.MiscSettingSet miscSettingSet) {
+    private void handleMiscSettingSet(final XiaomiSystem.MiscSettingSet miscSettingSet) {
         LOG.debug("Got misc setting set");
 
         final GBDeviceEventUpdatePreferences eventUpdatePreferences = new GBDeviceEventUpdatePreferences();
@@ -503,16 +505,16 @@ public class XiaomiSystemService extends AbstractXiaomiService implements Xiaomi
                 XiaomiProto.Command.newBuilder()
                         .setType(COMMAND_TYPE)
                         .setSubtype(CMD_MISC_SETTING_SET)
-                        .setSystem(XiaomiProto.System.newBuilder().setMiscSettingSet(
-                                XiaomiProto.MiscSettingSet.newBuilder().setWearingMode(
-                                        XiaomiProto.WearingMode.newBuilder().setMode(wearModeInt)
+                        .setSystem(XiaomiSystem.System.newBuilder().setMiscSettingSet(
+                                XiaomiSystem.MiscSettingSet.newBuilder().setWearingMode(
+                                        XiaomiSystem.WearingMode.newBuilder().setMode(wearModeInt)
                                 )
                         ))
                         .build()
         );
     }
 
-    private void handleCameraRemote(final XiaomiProto.Camera camera) {
+    private void handleCameraRemote(final XiaomiSystem.Camera camera) {
         LOG.debug("Got camera remote enabled={}", camera.getEnabled());
 
         final GBDeviceEventUpdatePreferences eventUpdatePreferences = new GBDeviceEventUpdatePreferences()
@@ -532,8 +534,8 @@ public class XiaomiSystemService extends AbstractXiaomiService implements Xiaomi
                 XiaomiProto.Command.newBuilder()
                         .setType(COMMAND_TYPE)
                         .setSubtype(CMD_CAMERA_REMOTE_SET)
-                        .setSystem(XiaomiProto.System.newBuilder().setCamera(
-                                XiaomiProto.Camera.newBuilder().setEnabled(enabled)
+                        .setSystem(XiaomiSystem.System.newBuilder().setCamera(
+                                XiaomiSystem.Camera.newBuilder().setEnabled(enabled)
                         ))
                         .build()
         );
@@ -572,7 +574,7 @@ public class XiaomiSystemService extends AbstractXiaomiService implements Xiaomi
         }
 
         boolean inMoreSection = false;
-        final XiaomiProto.DisplayItems.Builder displayItems = XiaomiProto.DisplayItems.newBuilder();
+        final var displayItems = XiaomiSystem.DisplayItems.newBuilder();
         for (final String enabledScreen : enabledScreens) {
             if (enabledScreen.equals("more")) {
                 inMoreSection = true;
@@ -582,7 +584,7 @@ public class XiaomiSystemService extends AbstractXiaomiService implements Xiaomi
                 continue;
             }
 
-            final XiaomiProto.DisplayItem.Builder displayItem = XiaomiProto.DisplayItem.newBuilder()
+            final var displayItem = XiaomiSystem.DisplayItem.newBuilder()
                     .setCode(enabledScreen)
                     .setName(labelsMap.get(enabledScreen))
                     .setUnknown5(1);
@@ -603,7 +605,7 @@ public class XiaomiSystemService extends AbstractXiaomiService implements Xiaomi
                 continue;
             }
 
-            final XiaomiProto.DisplayItem.Builder displayItem = XiaomiProto.DisplayItem.newBuilder()
+            final var displayItem = XiaomiSystem.DisplayItem.newBuilder()
                     .setCode(screen)
                     .setName(labelsMap.get(screen))
                     .setDisabled(true)
@@ -617,12 +619,12 @@ public class XiaomiSystemService extends AbstractXiaomiService implements Xiaomi
                 XiaomiProto.Command.newBuilder()
                         .setType(COMMAND_TYPE)
                         .setSubtype(CMD_DISPLAY_ITEMS_SET)
-                        .setSystem(XiaomiProto.System.newBuilder().setDisplayItems(displayItems))
+                        .setSystem(XiaomiSystem.System.newBuilder().setDisplayItems(displayItems))
                         .build()
         );
     }
 
-    private void handleDisplayItems(final XiaomiProto.DisplayItems displayItems) {
+    private void handleDisplayItems(final XiaomiSystem.DisplayItems displayItems) {
         LOG.debug("Got {} display items", displayItems.getDisplayItemCount());
 
         final List<String> allScreens = new ArrayList<>();
@@ -630,7 +632,7 @@ public class XiaomiSystemService extends AbstractXiaomiService implements Xiaomi
         final List<String> mainScreens = new ArrayList<>();
         final List<String> moreScreens = new ArrayList<>();
         String settingsCode = null;
-        for (final XiaomiProto.DisplayItem displayItem : displayItems.getDisplayItemList()) {
+        for (final var displayItem : displayItems.getDisplayItemList()) {
             allScreens.add(displayItem.getCode());
             allScreensLabels.add(displayItem.getName().replace(",", ""));
             if (!displayItem.getDisabled()) {
@@ -669,11 +671,11 @@ public class XiaomiSystemService extends AbstractXiaomiService implements Xiaomi
         getSupport().evaluateGBDeviceEvent(eventUpdatePreferences);
     }
 
-    private void handleWorkoutTypes(final XiaomiProto.WorkoutTypes workoutTypes) {
+    private void handleWorkoutTypes(final XiaomiSystem.WorkoutTypes workoutTypes) {
         LOG.debug("Got {} workout types", workoutTypes.getWorkoutTypeCount());
 
         final List<String> codes = new ArrayList<>(workoutTypes.getWorkoutTypeCount());
-        for (final XiaomiProto.WorkoutType workoutType : workoutTypes.getWorkoutTypeList()) {
+        for (final XiaomiSystem.WorkoutType workoutType : workoutTypes.getWorkoutTypeList()) {
             codes.add(String.valueOf(workoutType.getType()));
         }
 
@@ -738,7 +740,7 @@ public class XiaomiSystemService extends AbstractXiaomiService implements Xiaomi
         sendPhoneSilentMode(SilentMode.isPhoneInSilenceMode(getSupport().getDevice().getAddress()));
     }
 
-    public void handlePhoneSilentModeSet(final XiaomiProto.PhoneSilentModeSet phoneSilentModeSet) {
+    public void handlePhoneSilentModeSet(final XiaomiSystem.PhoneSilentModeSet phoneSilentModeSet) {
         final boolean silent = phoneSilentModeSet.getPhoneSilentMode().getSilent();
 
         LOG.debug("Set phone silent mode = {}", silent);
@@ -751,16 +753,16 @@ public class XiaomiSystemService extends AbstractXiaomiService implements Xiaomi
                 XiaomiProto.Command.newBuilder()
                         .setType(COMMAND_TYPE)
                         .setSubtype(CMD_SILENT_MODE_SET_FROM_PHONE)
-                        .setSystem(XiaomiProto.System.newBuilder().setPhoneSilentModeSet(
-                                XiaomiProto.PhoneSilentModeSet.newBuilder().setPhoneSilentMode(
-                                        XiaomiProto.PhoneSilentMode.newBuilder().setSilent(enabled)
+                        .setSystem(XiaomiSystem.System.newBuilder().setPhoneSilentModeSet(
+                                XiaomiSystem.PhoneSilentModeSet.newBuilder().setPhoneSilentMode(
+                                        XiaomiSystem.PhoneSilentMode.newBuilder().setSilent(enabled)
                                 )
                         ))
                         .build()
         );
     }
 
-    public void handleBasicDeviceState(XiaomiProto.BasicDeviceState deviceState) {
+    public void handleBasicDeviceState(XiaomiSystem.BasicDeviceState deviceState) {
         LOG.debug("Got basic device state: {}", deviceState);
 
         if (null == deviceState) {
@@ -829,7 +831,7 @@ public class XiaomiSystemService extends AbstractXiaomiService implements Xiaomi
         rearmBatteryStateRequestTimer();
     }
 
-    public void handleDeviceState(XiaomiProto.DeviceState deviceState) {
+    public void handleDeviceState(XiaomiSystem.DeviceState deviceState) {
         LOG.debug("Got device state: {}", deviceState);
 
         if (null == deviceState) {
@@ -865,7 +867,7 @@ public class XiaomiSystemService extends AbstractXiaomiService implements Xiaomi
         getSupport().sendCommand("request battery state", COMMAND_TYPE, CMD_BATTERY);
     }
 
-    private void handleWidgetScreens(final XiaomiProto.WidgetScreens widgetScreens) {
+    private void handleWidgetScreens(final XiaomiSystem.WidgetScreens widgetScreens) {
         LOG.debug("Got {} widget screens", widgetScreens.getWidgetScreenCount());
         final GBDeviceEventUpdatePreferences eventUpdatePreferences = new GBDeviceEventUpdatePreferences()
                 // FIXME we're just persisting the protobuf bytes - probably not a good idea
@@ -874,7 +876,7 @@ public class XiaomiSystemService extends AbstractXiaomiService implements Xiaomi
         getSupport().evaluateGBDeviceEvent(eventUpdatePreferences);
     }
 
-    private void handleWidgetParts(final XiaomiProto.WidgetParts widgetParts) {
+    private void handleWidgetParts(final XiaomiSystem.WidgetParts widgetParts) {
         LOG.debug("Got {} widget parts", widgetParts.getWidgetPartCount());
         final GBDeviceEventUpdatePreferences eventUpdatePreferences = new GBDeviceEventUpdatePreferences()
                 .withPreference(XiaomiPreferences.FEAT_WIDGETS, widgetParts.getWidgetPartCount() > 0)
@@ -892,9 +894,9 @@ public class XiaomiSystemService extends AbstractXiaomiService implements Xiaomi
             return;
         }
 
-        final XiaomiProto.WidgetScreens widgetScreens;
+        final XiaomiSystem.WidgetScreens widgetScreens;
         try {
-            widgetScreens = XiaomiProto.WidgetScreens.parseFrom(GB.hexStringToByteArray(hex));
+            widgetScreens = XiaomiSystem.WidgetScreens.parseFrom(GB.hexStringToByteArray(hex));
         } catch (final InvalidProtocolBufferException e) {
             LOG.warn("failed to parse raw widget screns hex");
             return;
@@ -907,7 +909,7 @@ public class XiaomiSystemService extends AbstractXiaomiService implements Xiaomi
                 XiaomiProto.Command.newBuilder()
                         .setType(COMMAND_TYPE)
                         .setSubtype(CMD_WIDGET_SCREENS_SET)
-                        .setSystem(XiaomiProto.System.newBuilder().setWidgetScreens(widgetScreens))
+                        .setSystem(XiaomiSystem.System.newBuilder().setWidgetScreens(widgetScreens))
                         .build()
         );
     }
@@ -922,7 +924,7 @@ public class XiaomiSystemService extends AbstractXiaomiService implements Xiaomi
                     XiaomiProto.Command.newBuilder()
                             .setType(COMMAND_TYPE)
                             .setSubtype(CMD_FIND_PHONE)
-                            .setSystem(XiaomiProto.System.newBuilder().setFindDevice(1).build())
+                            .setSystem(XiaomiSystem.System.newBuilder().setFindDevice(1).build())
                             .build()
             );
         }
@@ -936,7 +938,7 @@ public class XiaomiSystemService extends AbstractXiaomiService implements Xiaomi
                 XiaomiProto.Command.newBuilder()
                         .setType(COMMAND_TYPE)
                         .setSubtype(CMD_FIND_WATCH)
-                        .setSystem(XiaomiProto.System.newBuilder().setFindDevice(start ? 0 : 1).build())
+                        .setSystem(XiaomiSystem.System.newBuilder().setFindDevice(start ? 0 : 1).build())
                         .build()
         );
     }
@@ -952,8 +954,8 @@ public class XiaomiSystemService extends AbstractXiaomiService implements Xiaomi
                 XiaomiProto.Command.newBuilder()
                         .setType(COMMAND_TYPE)
                         .setSubtype(CMD_FIRMWARE_INSTALL)
-                        .setSystem(XiaomiProto.System.newBuilder().setFirmwareInstallRequest(
-                                XiaomiProto.FirmwareInstallRequest.newBuilder()
+                        .setSystem(XiaomiSystem.System.newBuilder().setFirmwareInstallRequest(
+                                XiaomiSystem.FirmwareInstallRequest.newBuilder()
                                         .setUnknown1(0)
                                         .setUnknown2(0)
                                         .setVersion(fwHelper.getVersion())
