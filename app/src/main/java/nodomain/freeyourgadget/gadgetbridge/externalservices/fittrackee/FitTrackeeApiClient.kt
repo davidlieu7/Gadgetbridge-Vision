@@ -18,15 +18,27 @@ package nodomain.freeyourgadget.gadgetbridge.externalservices.fittrackee
 
 import androidx.core.net.toUri
 import nodomain.freeyourgadget.gadgetbridge.activities.workouts.WorkoutUploader
+import nodomain.freeyourgadget.gadgetbridge.externalservices.ExternalServicePhotos
 import nodomain.freeyourgadget.gadgetbridge.util.InternetUtils
+import org.json.JSONArray
 import org.json.JSONObject
 import org.slf4j.LoggerFactory
 import java.io.File
 import java.net.URLEncoder
 
+/** What `GET /api/workouts/<id>` answered. */
+sealed interface FitTrackeeWorkoutLookup {
+    data class Found(val workout: JSONObject) : FitTrackeeWorkoutLookup
+    object Gone : FitTrackeeWorkoutLookup
+    object Failed : FitTrackeeWorkoutLookup
+}
+
 /**
  * FitTrackee's API. Authentication is OAuth2 with PKCE against an application the user registers
  * on their own instance, which is why the client id and secret are theirs rather than ours.
+ *
+ * Both workout creation endpoints load their body straight into a fixed set of fields and answer
+ * an unknown key with a 500, so only keys the endpoint documents are ever sent.
  */
 class FitTrackeeApiClient(
     private val baseUrl: String,
@@ -36,6 +48,8 @@ class FitTrackeeApiClient(
         val token = tokenManager.getAccessToken() ?: return emptyMap()
         return mapOf("Authorization" to "Bearer $token")
     }
+
+    private fun url(path: String) = "${baseUrl.trimEnd('/')}$path".toUri()
 
     /**
      * Page to send the user to so they can approve the app. They are already signed in there in
@@ -77,7 +91,7 @@ class FitTrackeeApiClient(
             .joinToString("&") { (k, v) -> "$k=${URLEncoder.encode(v, "UTF-8")}" }
 
         val response = InternetUtils.doStringRequestWithStatus(
-            uri = "${baseUrl.trimEnd('/')}/api/oauth/token".toUri(),
+            uri = url("/api/oauth/token"),
             method = "POST",
             requestHeaders = mapOf("Content-Type" to "application/x-www-form-urlencoded"),
             body = body
@@ -117,29 +131,60 @@ class FitTrackeeApiClient(
         return call()
     }
 
+    private fun request(path: String, method: String = "GET", json: JSONObject? = null) =
+        retryingUnauthorized({ it.statusCode == 401 }) {
+            InternetUtils.doStringRequestWithStatus(
+                uri = url(path),
+                method = method,
+                requestHeaders = authHeaders() +
+                        (if (json != null) mapOf("Content-Type" to "application/json") else emptyMap()),
+                body = json?.toString()
+            )
+        }.also {
+            if (it.statusCode !in 200..299) {
+                LOG.warn("FitTrackee {} {} answered {}: {}", method, path, it.statusCode, messageOf(it.body))
+            }
+        }
+
     /** Whether the stored access token is still accepted. */
-    fun checkAccess(): Boolean {
-        val response = InternetUtils.doStringRequestWithStatus(
-            uri = "${baseUrl.trimEnd('/')}/api/auth/profile".toUri(),
-            requestHeaders = authHeaders()
-        )
-        return response.statusCode in 200..299
+    fun checkAccess(): Boolean = fetchProfile() != null
+
+    /**
+     * Reads the signed-in user's name and timezone, and keeps them in [tokenManager]: the name
+     * identifies the account uploads go to, the timezone is what a workout date is read in.
+     * Blocking; null when the profile could not be read.
+     */
+    fun fetchProfile(): JSONObject? {
+        val response = request("/api/auth/profile")
+        if (response.statusCode !in 200..299) return null
+        return try {
+            JSONObject(response.body ?: return null).getJSONObject("data").also {
+                tokenManager.saveProfile(
+                    it.optString("username").takeIf { name -> name.isNotEmpty() },
+                    it.optString("timezone").takeIf { tz -> tz.isNotEmpty() && tz != "null" }
+                )
+            }
+        } catch (e: Exception) {
+            LOG.warn("Could not read the FitTrackee profile", e)
+            null
+        }
     }
 
     /**
-     * Uploads one workout. The new workout's id is nested in the answer rather than being a field
-     * of it, so it is read out of `data.workouts[0]`.
+     * Creates a workout from [file]. [data] is the `data` form field: `sport_id` and whichever
+     * optional keys the endpoint takes. The new workout's id is nested in the answer rather than
+     * being a field of it, so it is read out of `data.workouts[0]`.
      */
-    fun uploadWorkout(file: File, sportId: Int): WorkoutUploader.UploadResult {
+    fun uploadWorkout(file: File, data: JSONObject): WorkoutUploader.UploadResult {
         var result = WorkoutUploader.UploadResult(false, null, null)
         try {
             var rejected = false
             InternetUtils.uploadBinaryFile(
-                uri = "${baseUrl.trimEnd('/')}/api/workouts".toUri(),
+                uri = url("/api/workouts"),
                 file = file,
                 requestHeaders = authHeaders(),
                 method = "POST",
-                formFields = mapOf("data" to JSONObject().put("sport_id", sportId).toString())
+                formFields = mapOf("data" to data.toString())
             ) { success, statusCode, responseText, reason ->
                 result = if (success && statusCode in 200..299 && responseText != null) {
                     WorkoutUploader.UploadResult(true, workoutIdOf(responseText), null)
@@ -152,7 +197,7 @@ class FitTrackeeApiClient(
             }
             if (rejected && refreshTokens()) {
                 LOG.info("FitTrackee refused the access token, renewed it and sent the workout again")
-                return uploadWorkout(file, sportId)
+                return uploadWorkout(file, data)
             }
         } catch (e: Exception) {
             LOG.error("FitTrackee upload errored", e)
@@ -161,30 +206,108 @@ class FitTrackeeApiClient(
         return result
     }
 
-    /** Sets the title and sport of a workout that already exists. Blocking. */
-    fun updateWorkout(workoutId: String, title: String, sportId: Int): Boolean {
-        val body = JSONObject().put("title", title).put("sport_id", sportId).toString()
-        val status = retryingUnauthorized({ it == 401 }) {
-            InternetUtils.doStringRequestWithStatus(
-                uri = "${baseUrl.trimEnd('/')}/api/workouts/$workoutId".toUri(),
-                method = "PATCH",
-                requestHeaders = authHeaders() + ("Content-Type" to "application/json"),
-                body = body
-            ).statusCode
+    /**
+     * Creates a workout that has no file, from figures alone (`POST /api/workouts/no_gpx`). Such a
+     * workout can never be given a file afterwards.
+     */
+    fun createWorkoutWithoutFile(body: JSONObject): WorkoutUploader.UploadResult {
+        val response = try {
+            request("/api/workouts/no_gpx", "POST", body)
+        } catch (e: Exception) {
+            LOG.error("FitTrackee upload without a file errored", e)
+            return WorkoutUploader.UploadResult(false, null, e.localizedMessage)
         }
-        return status in 200..299
+        val text = response.body
+        if (response.statusCode !in 200..299 || text == null) {
+            val message = messageOf(text) ?: response.statusCode?.let { "HTTP $it" }
+            LOG.error("FitTrackee upload without a file failed: {}", message)
+            return WorkoutUploader.UploadResult(false, null, message)
+        }
+        return WorkoutUploader.UploadResult(true, workoutIdOf(text), null)
     }
 
-    fun deleteWorkout(workoutId: String): Boolean {
-        val status = retryingUnauthorized({ it == 401 }) {
-            InternetUtils.doStringRequestWithStatus(
-                uri = "${baseUrl.trimEnd('/')}/api/workouts/$workoutId".toUri(),
-                method = "DELETE",
-                requestHeaders = authHeaders()
-            ).statusCode
+    fun getWorkout(workoutId: String): FitTrackeeWorkoutLookup {
+        val response = request("/api/workouts/$workoutId")
+        return when (response.statusCode) {
+            in 200..299 -> try {
+                FitTrackeeWorkoutLookup.Found(
+                    JSONObject(response.body!!).getJSONObject("data").getJSONArray("workouts")
+                        .getJSONObject(0)
+                )
+            } catch (e: Exception) {
+                LOG.warn("Could not read FitTrackee workout {}", workoutId, e)
+                FitTrackeeWorkoutLookup.Failed
+            }
+
+            404 -> FitTrackeeWorkoutLookup.Gone
+            else -> FitTrackeeWorkoutLookup.Failed
         }
-        return status in 200..299
     }
+
+    /** Sets the title and sport of a workout that already exists. Blocking. */
+    fun updateWorkout(workoutId: String, title: String, sportId: Int): Boolean {
+        val body = JSONObject().put("title", title).put("sport_id", sportId)
+        return request("/api/workouts/$workoutId", "PATCH", body).statusCode in 200..299
+    }
+
+    /**
+     * Attaches the media [mediaIds] to [workoutId], on top of what it already carries. The list
+     * must not be empty: FitTrackee reads an empty `media_attachment_ids` as "delete every media
+     * item of this workout".
+     */
+    fun attachMedia(workoutId: String, mediaIds: List<String>): Boolean {
+        require(mediaIds.isNotEmpty())
+        val body = JSONObject().put("media_attachment_ids", JSONArray(mediaIds))
+        return request("/api/workouts/$workoutId", "PATCH", body).statusCode in 200..299
+    }
+
+    fun deleteWorkout(workoutId: String): Boolean =
+        request("/api/workouts/$workoutId", "DELETE").statusCode in 200..299
+
+    /**
+     * Uploads [photo] as a media item that belongs to no workout yet, and answers its id, or null
+     * when it did not go through. Needs the `media:write` scope. Blocking.
+     */
+    fun uploadMedia(photo: File): String? = try {
+        ExternalServicePhotos.withAcceptedFormat(photo, ALLOWED_PHOTO_EXTENSIONS) { file ->
+            file?.let { postMedia(it, retry = true) }
+        }
+    } catch (e: Exception) {
+        LOG.error("FitTrackee media upload errored", e)
+        null
+    }
+
+    private fun postMedia(file: File, retry: Boolean): String? {
+        var mediaId: String? = null
+        var rejected = false
+        InternetUtils.uploadBinaryFile(
+            uri = url("/api/media"),
+            file = file,
+            requestHeaders = authHeaders(),
+            method = "POST"
+        ) { success, statusCode, responseText, reason ->
+            if (success && statusCode in 200..299 && responseText != null) {
+                mediaId = try {
+                    JSONObject(responseText).getString("id")
+                } catch (e: Exception) {
+                    LOG.warn("FitTrackee answered a media upload without an id", e)
+                    null
+                }
+            } else {
+                rejected = statusCode == 401
+                LOG.error("FitTrackee media upload failed: {}",
+                    messageOf(responseText) ?: reason ?: statusCode?.let { "HTTP $it" })
+            }
+        }
+        if (rejected && retry && refreshTokens()) {
+            return postMedia(file, retry = false)
+        }
+        return mediaId
+    }
+
+    /** Deletes a media item. One that is already gone counts as deleted. Blocking. */
+    fun deleteMedia(mediaId: String): Boolean =
+        request("/api/media/$mediaId", "DELETE").statusCode.let { it in 200..299 || it == 404 }
 
     private fun workoutIdOf(responseText: String): String? = try {
         JSONObject(responseText)
@@ -213,7 +336,11 @@ class FitTrackeeApiClient(
          */
         const val REDIRECT_URI = "app://fittrackee/oauth/callback"
 
-        const val SCOPE = "workouts:read workouts:write profile:read"
+        /** `media:write` is its own scope: `workouts:write` does not cover uploading a photo. */
+        const val SCOPE = "workouts:read workouts:write profile:read media:write"
+
+        /** What `POST /api/media` accepts, by file extension. */
+        private val ALLOWED_PHOTO_EXTENSIONS = setOf("gif", "jpeg", "jpg", "png", "webp")
 
         private const val DEFAULT_ACCESS_LIFETIME_SECONDS = 864000
 

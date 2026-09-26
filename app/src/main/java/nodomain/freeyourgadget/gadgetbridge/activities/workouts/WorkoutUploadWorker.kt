@@ -81,7 +81,10 @@ class WorkoutUploadWorker(
         }
         val deviceId = deviceEntityId(gbDevice) ?: return Result.success()
 
-        val rowsByTarget = targets.associateWith { WorkoutUploadStore.allUploadedRows(it.service) }
+        val rowsByTarget = targets.associateWith { target ->
+            WorkoutUploadStore.allUploadedRows(target.service)
+                .filterValues { WorkoutUploadTargets.holds(context, target, it) }
+        }
         val provider = gbDevice.deviceCoordinator.getActivityTrackProvider(gbDevice, context)
         val failures = mutableMapOf<WorkoutUploadTarget, String>()
 

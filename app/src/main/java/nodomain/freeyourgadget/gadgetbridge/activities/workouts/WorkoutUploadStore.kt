@@ -139,21 +139,24 @@ object WorkoutUploadStore {
     /**
      * Records a successful upload of [summaryId] to [service], overwriting any prior row.
      * [photoHash] is the fingerprint (see [photoHashOf]) of the header photo that was uploaded,
-     * so a later change can be detected; null when the workout had no photo. [photoMediaId] is
-     * the remote media entry that photo became, needed to delete it when it is replaced.
-     * [sourceHash], [payloadHash] and [hadTrack] drive the re-sync gate; see [sourceHashOf].
-     * [lastError] carries a part of the sync the service refused, and is cleared when omitted.
+     * so a later change can be detected; null when the workout had no photo. [photoMediaRef] is
+     * the service's id for the media entry that photo became, needed to delete it when it is
+     * replaced. [sourceHash], [payloadHash] and [hadTrack] drive the re-sync gate; see
+     * [sourceHashOf]. [lastError] carries a part of the sync the service refused, and is cleared
+     * when omitted. [remoteAccount] is the account holding the activity; see
+     * [WorkoutUploadTarget.accountKey].
      */
     fun recordSuccess(
         summaryId: Long,
         service: Int,
         remoteActivityId: String?,
         photoHash: String?,
-        photoMediaId: Int? = null,
+        photoMediaRef: String? = null,
         sourceHash: String? = null,
         payloadHash: String? = null,
         hadTrack: Boolean? = null,
-        lastError: String? = null
+        lastError: String? = null,
+        remoteAccount: String? = null
     ) {
         try {
             GBApplication.acquireDB().use { db ->
@@ -165,11 +168,12 @@ object WorkoutUploadStore {
                         STATUS_SUCCESS,
                         System.currentTimeMillis(),
                         photoHash,
-                        photoMediaId,
+                        photoMediaRef,
                         sourceHash,
                         payloadHash,
                         hadTrack,
-                        lastError
+                        lastError,
+                        remoteAccount
                     )
                 )
             }
@@ -186,21 +190,32 @@ object WorkoutUploadStore {
      * does not un-upload the activity, and the row still has to drive the next re-sync attempt.
      * A first upload that fails has no such row, so it lands as [STATUS_FAILED] and does not stop
      * the workout being picked up again.
+     *
+     * A row another account left (see [WorkoutUploadTarget.accountKey]) is not touched: it still
+     * describes that account's activity, and [remoteAccount] failing says nothing about it.
      */
-    fun recordFailure(summaryId: Long, service: Int, reason: String?) {
+    @JvmOverloads
+    fun recordFailure(summaryId: Long, service: Int, reason: String?, remoteAccount: String? = null) {
         try {
             GBApplication.acquireDB().use { db ->
                 val dao = db.daoSession.workoutUploadDao
-                val row = dao.queryBuilder()
+                val existing = dao.queryBuilder()
                     .where(
                         WorkoutUploadDao.Properties.SummaryId.eq(summaryId),
                         WorkoutUploadDao.Properties.Service.eq(service)
                     )
                     .unique()
-                    ?: WorkoutUpload(
-                        summaryId, service, null, STATUS_FAILED,
-                        0L, null, null, null, null, null, null
-                    )
+                if (existing?.remoteAccount != null && remoteAccount != null &&
+                    existing.remoteAccount != remoteAccount
+                ) {
+                    LOG.info("Not recording the failure of summary {} on service {} over another account's row",
+                        summaryId, service)
+                    return
+                }
+                val row = existing ?: WorkoutUpload(
+                    summaryId, service, null, STATUS_FAILED,
+                    0L, null, null, null, null, null, null, remoteAccount
+                )
                 row.updatedAt = System.currentTimeMillis()
                 row.lastError = reason
                 dao.insertOrReplace(row)

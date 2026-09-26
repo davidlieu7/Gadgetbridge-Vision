@@ -32,6 +32,8 @@ import java.util.Date;
 import java.util.EnumSet;
 import java.util.Set;
 
+import kotlin.jvm.functions.Function1;
+
 import nodomain.freeyourgadget.gadgetbridge.entities.BaseActivitySummary;
 import nodomain.freeyourgadget.gadgetbridge.externalservices.dreeve.DreeveService;
 import nodomain.freeyourgadget.gadgetbridge.model.ActivityKind;
@@ -44,9 +46,10 @@ import nodomain.freeyourgadget.gadgetbridge.test.TestBase;
 public class UploadCapabilitiesTest extends TestBase {
 
     private static final Set<RemoteOp> NOTHING = Collections.emptySet();
+    private static final Function1<BaseActivitySummary, Boolean> ANY = summary -> true;
 
     private UploadCapabilities capabilities(final WorkoutPayloadFormat... formats) {
-        return new UploadCapabilities(Arrays.asList(formats), NOTHING, NOTHING, NOTHING, false);
+        return new UploadCapabilities(Arrays.asList(formats), NOTHING, NOTHING, NOTHING, ANY);
     }
 
     private UploadCapabilities withMedia(final RemoteOp... ops) {
@@ -55,7 +58,7 @@ public class UploadCapabilitiesTest extends TestBase {
                 NOTHING,
                 NOTHING,
                 ops.length == 0 ? NOTHING : EnumSet.copyOf(Arrays.asList(ops)),
-                false
+                ANY
         );
     }
 
@@ -136,20 +139,30 @@ public class UploadCapabilitiesTest extends TestBase {
     public void testMetadataIsEditableOnlyWhenItCanBeUpdatedInPlace() {
         assertTrue(new UploadCapabilities(
                 Collections.singletonList(WorkoutPayloadFormat.FIT),
-                NOTHING, EnumSet.of(RemoteOp.UPDATE), NOTHING, false).getEditableMetadata());
+                NOTHING, EnumSet.of(RemoteOp.UPDATE), NOTHING, ANY).getEditableMetadata());
         assertFalse(new UploadCapabilities(
                 Collections.singletonList(WorkoutPayloadFormat.FIT),
-                NOTHING, EnumSet.of(RemoteOp.CREATE), NOTHING, false).getEditableMetadata());
+                NOTHING, EnumSet.of(RemoteOp.CREATE), NOTHING, ANY).getEditableMetadata());
     }
 
     @Test
     public void testAServiceThatMapsWhatItIsGivenTakesNothingWithoutARoute() throws Exception {
         final UploadCapabilities routeOnly = new UploadCapabilities(
                 Arrays.asList(WorkoutPayloadFormat.FIT, WorkoutPayloadFormat.GPX),
-                NOTHING, NOTHING, NOTHING, true);
+                NOTHING, NOTHING, NOTHING, UploadCapabilities.REQUIRES_ROUTE);
         assertNull(routeOnly.formatFor(summary(false)));
         assertFalse(routeOnly.appliesTo(summary(false)));
         assertEquals(WorkoutPayloadFormat.FIT, routeOnly.formatFor(summary(true)));
+    }
+
+    @Test
+    public void testAServiceCanRefuseWorkoutsOnItsOwnTerms() throws Exception {
+        final UploadCapabilities notRunning = new UploadCapabilities(
+                Collections.singletonList(WorkoutPayloadFormat.FIT),
+                NOTHING, NOTHING, NOTHING,
+                summary -> summary.getActivityKind() != ActivityKind.RUNNING.getCode());
+        assertNull(notRunning.formatFor(summary(true)));
+        assertFalse(notRunning.appliesTo(summary(false)));
     }
 
     @Test

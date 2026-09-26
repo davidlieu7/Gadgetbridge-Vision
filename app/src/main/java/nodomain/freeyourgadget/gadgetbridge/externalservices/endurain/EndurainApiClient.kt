@@ -16,13 +16,12 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 package nodomain.freeyourgadget.gadgetbridge.externalservices.endurain
 
-import android.graphics.Bitmap
-import android.graphics.BitmapFactory
 import android.net.Uri
 import androidx.core.net.toUri
 import com.google.gson.Gson
 import nodomain.freeyourgadget.gadgetbridge.GBApplication
 import nodomain.freeyourgadget.gadgetbridge.R
+import nodomain.freeyourgadget.gadgetbridge.externalservices.ExternalServicePhotos
 import nodomain.freeyourgadget.gadgetbridge.model.ActivityKind
 import nodomain.freeyourgadget.gadgetbridge.util.InternetUtils
 import nodomain.freeyourgadget.gadgetbridge.util.gson.GsonSerialized
@@ -491,70 +490,41 @@ class EndurainApiClient(
      */
     fun uploadActivityPhoto(activityId: Int, file: File, callback: ((mediaId: Int?) -> Unit)? = null) {
         Thread {
-            var converted: File? = null
             try {
-                val uploadFile = if (file.extension.lowercase() in ALLOWED_PHOTO_EXTENSIONS) {
-                    file
-                } else {
-                    converted = convertToJpeg(file)
-                    if (converted == null) {
+                ExternalServicePhotos.withAcceptedFormat(file, ALLOWED_PHOTO_EXTENSIONS) { uploadFile ->
+                    if (uploadFile == null) {
                         callback?.invoke(null)
-                        return@Thread
+                        return@withAcceptedFormat
                     }
-                    converted
-                }
-                val uri = (if (resourceRoutes()) "${activityPath(activityId)}/media"
-                else "$baseUrl/api/v1/activities_media/upload/activity_id/$activityId").toUri()
-                val headers = buildHeaders(EndurainAuthType.AUTH_TOKEN)
+                    val uri = (if (resourceRoutes()) "${activityPath(activityId)}/media"
+                    else "$baseUrl/api/v1/activities_media/upload/activity_id/$activityId").toUri()
+                    val headers = buildHeaders(EndurainAuthType.AUTH_TOKEN)
 
-                InternetUtils.uploadBinaryFile(
-                    uri = uri,
-                    file = uploadFile,
-                    requestHeaders = headers
-                ) { success, statusCode, responseText, reason ->
-                    if (success && responseText != null) {
-                        LOG.debug("Response ($statusCode) from Endurain: $responseText")
-                        val mediaId = try {
-                            JSONObject(responseText).optInt("id").takeIf { it > 0 }
-                        } catch (e: Exception) {
-                            LOG.warn("Could not read media id from Endurain response", e)
-                            null
+                    InternetUtils.uploadBinaryFile(
+                        uri = uri,
+                        file = uploadFile,
+                        requestHeaders = headers
+                    ) { success, statusCode, responseText, reason ->
+                        if (success && responseText != null) {
+                            LOG.debug("Response ($statusCode) from Endurain: $responseText")
+                            val mediaId = try {
+                                JSONObject(responseText).optInt("id").takeIf { it > 0 }
+                            } catch (e: Exception) {
+                                LOG.warn("Could not read media id from Endurain response", e)
+                                null
+                            }
+                            callback?.invoke(mediaId)
+                        } else {
+                            LOG.error("Activity photo upload to Endurain failed. Response ($statusCode, reason {}) received: $responseText", reason)
+                            callback?.invoke(null)
                         }
-                        callback?.invoke(mediaId)
-                    } else {
-                        LOG.error("Activity photo upload to Endurain failed. Response ($statusCode, reason {}) received: $responseText", reason)
-                        callback?.invoke(null)
                     }
                 }
             } catch (e: Exception) {
                 LOG.error("Activity photo upload error", e)
                 callback?.invoke(null)
-            } finally {
-                converted?.delete()
             }
         }.start()
-    }
-
-    /** Re-encodes [file] as a JPEG in the cache directory, or answers null when it cannot be decoded. */
-    private fun convertToJpeg(file: File): File? {
-        val bitmap = BitmapFactory.decodeFile(file.path)
-        if (bitmap == null) {
-            LOG.warn("Cannot decode photo {} to convert it for Endurain", file.name)
-            return null
-        }
-        return try {
-            val jpeg = File.createTempFile("endurain_photo", ".jpg", GBApplication.getContext().cacheDir)
-            val written = jpeg.outputStream().use { bitmap.compress(Bitmap.CompressFormat.JPEG, 90, it) }
-            if (!written) {
-                LOG.warn("Cannot encode photo {} as JPEG for Endurain", file.name)
-                jpeg.delete()
-                return null
-            }
-            LOG.debug("Converted photo {} to JPEG for Endurain", file.name)
-            jpeg
-        } finally {
-            bitmap.recycle()
-        }
     }
 
     /** Reads back the user-owned parts of [activityId]. */

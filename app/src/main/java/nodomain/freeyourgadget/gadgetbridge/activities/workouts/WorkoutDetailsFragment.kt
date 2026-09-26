@@ -549,8 +549,10 @@ class WorkoutDetailsFragment : Fragment(), MenuProvider {
      */
     internal fun showUploadStatus(summary: BaseActivitySummary) {
         val context = requireContext()
-        val rows = WorkoutUploadStore.rowsForSummaries(listOfNotNull(summary.id))
-            .values.firstOrNull().orEmpty()
+        val rows = WorkoutUploadTargets.currentAccountRows(
+            context,
+            WorkoutUploadStore.rowsForSummaries(listOfNotNull(summary.id)).values.firstOrNull().orEmpty()
+        )
         val prefs = GBApplication.getPrefs()
         val hasTrack = WorkoutUploader.summaryHasTrack(summary)
         val sourceHash = WorkoutUploadStore.sourceHashOf(summary)

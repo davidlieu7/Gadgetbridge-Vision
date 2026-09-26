@@ -74,11 +74,14 @@ data class UploadCapabilities(
     val media: Set<RemoteOp>,
 
     /**
-     * Whether the service refuses a workout that went nowhere, whatever it is written as. A
+     * Whether the service takes [BaseActivitySummary] at all, beyond having a format for it. A
      * service that maps what it is given wants a route even in a format that can be written
-     * without one, and answers a file that has none with an error rather than a bare workout.
+     * without one (see [REQUIRES_ROUTE]); another may want a distance, or a sport it knows.
+     *
+     * It has to answer from what the summary stores, never from anything that can differ between
+     * two runs, for the reason given on [formatFor].
      */
-    val requiresRoute: Boolean = false
+    val accepts: (BaseActivitySummary) -> Boolean = { true }
 ) {
     /**
      * Format to export [summary] in, or null when the service can take no form of this workout.
@@ -88,10 +91,10 @@ data class UploadCapabilities(
      * was sent, so a choice that could differ between two runs would re-upload on every sync.
      */
     fun formatFor(summary: BaseActivitySummary): WorkoutPayloadFormat? {
-        val hasTrack = WorkoutUploader.summaryHasTrack(summary)
-        if (requiresRoute && !hasTrack) {
+        if (!accepts(summary)) {
             return null
         }
+        val hasTrack = WorkoutUploader.summaryHasTrack(summary)
         return formats.firstOrNull { !it.needsTrack || hasTrack }
     }
 
@@ -129,6 +132,40 @@ data class UploadCapabilities(
         !hadPhoto && hasPhoto -> RemoteOp.CREATE in media
         else -> media.canChange()
     }
+
+    companion object {
+        /**
+         * For a service that refuses a workout that went nowhere, whatever it is written as, and
+         * answers a file without a route with an error rather than a bare workout.
+         */
+        @JvmField
+        val REQUIRES_ROUTE: (BaseActivitySummary) -> Boolean = { WorkoutUploader.summaryHasTrack(it) }
+    }
+}
+
+/**
+ * Which half of re-creating an activity goes first. Creating first means the workout never has no
+ * online copy, and lets a service move what hangs off the old activity onto the new one before it
+ * goes; deleting first is for a service that refuses or mishandles a second activity at the same
+ * start time.
+ */
+enum class RecreateOrder { CREATE_THEN_DELETE, DELETE_THEN_CREATE }
+
+/** What a service holds under an activity id, read before that activity is re-created. */
+sealed interface RemoteSnapshot {
+    /** Deleted on the service's side: the re-create is a plain upload with nothing to delete. */
+    object Gone : RemoteSnapshot
+
+    /** Could not be read this time; the next run retries. */
+    object Failed : RemoteSnapshot
+
+    /**
+     * The activity is there. [carry] is whatever the service can move onto the replacement, in a
+     * form only that service reads, handed back to [WorkoutUploadTarget.upload]. [losesUserContent]
+     * says the user added something there that cannot be carried over, so re-creating would
+     * destroy it.
+     */
+    data class Found(val carry: Any?, val losesUserContent: Boolean) : RemoteSnapshot
 }
 
 /** Outcome of bringing the track of an already-uploaded activity in line with the local workout. */
@@ -139,7 +176,7 @@ sealed interface TrackUpdateResult {
     /**
      * The service could only do it by re-creating the activity, so the caller stores the new ids.
      */
-    data class Recreated(val remoteActivityId: String, val photoMediaId: Int?) : TrackUpdateResult
+    data class Recreated(val remoteActivityId: String, val photoMediaRef: String?) : TrackUpdateResult
 
     /**
      * The service could have done it and deliberately did not, for a reason the user has to
@@ -210,10 +247,38 @@ interface WorkoutUploadTarget : ExternalService {
     ): WorkoutUploader.UploadResult
 
     /**
-     * Asks the service whether it still holds [remoteActivityId], which it no longer does once the
-     * user deleted it there. Called only when [UploadCapabilities.canLookUp]. Blocking.
+     * Uploads [summary] as the replacement of an activity being re-created, applying [carry], what
+     * [snapshotRemote] read off the activity it replaces (null when there was none to read).
      */
-    fun lookupRemote(context: Context, remoteActivityId: String): RemoteLookup = RemoteLookup.FAILED
+    fun upload(
+        context: Context,
+        summary: BaseActivitySummary,
+        payload: File,
+        carry: Any?
+    ): WorkoutUploader.UploadResult = upload(context, summary, payload)
+
+    /**
+     * Names the account activities are uploaded to, so an activity id recorded under one account
+     * is never acted on under another: an id means nothing, or another user's activity, once the
+     * user points the service at a different server or signs in as someone else. Read on every
+     * sync, so it must not touch the network. Null when it cannot tell, which matches anything.
+     */
+    fun accountKey(context: Context): String? =
+        serverUrl()?.trim()?.trimEnd('/')?.lowercase()?.takeIf { it.isNotEmpty() }
+
+    /** Which half of a re-create goes first; see [RecreateOrder]. */
+    val recreateOrder: RecreateOrder get() = RecreateOrder.DELETE_THEN_CREATE
+
+    /**
+     * Reads what the service holds under [remoteActivityId] before it is re-created. Called only
+     * when [UploadCapabilities.trackChangeIsDestructive]. [row] is what was last uploaded there,
+     * so what Gadgetbridge put on the activity can be told from what the user added.
+     */
+    fun snapshotRemote(context: Context, remoteActivityId: String, row: WorkoutUpload): RemoteSnapshot =
+        RemoteSnapshot.Found(null, false)
+
+    /** Deletes [remoteActivityId] as part of re-creating it. Blocking. */
+    fun deleteRemote(context: Context, remoteActivityId: String): Boolean = false
 
     /**
      * Pushes the name and activity kind onto an activity that already exists remotely. Called only
@@ -226,10 +291,10 @@ interface WorkoutUploadTarget : ExternalService {
     ): Boolean = false
 
     /**
-     * Makes the track of the remote activity match [payload], which is called only when
-     * [UploadCapabilities.trackUpdate] says there is a way. [row] is what was last uploaded, so a
-     * service that has to re-create the activity can tell a track being added from one merely
-     * changing, and can weigh that against how destructive re-creating is.
+     * Writes [payload] as the new track of the remote activity, keeping its id. Called only when
+     * [RemoteOp.UPDATE] is in [UploadCapabilities.activity]; a service that can only replace an
+     * activity is re-created by [WorkoutUploader] through [snapshotRemote], [upload] and
+     * [deleteRemote] instead. [row] is what was last uploaded.
      */
     fun updateTrack(
         context: Context,
@@ -242,14 +307,15 @@ interface WorkoutUploadTarget : ExternalService {
     /**
      * Brings the header photo of an existing remote activity in line with the local workout, which
      * is called only when [UploadCapabilities.media]. [photoFile] is null when the photo was
-     * removed.
+     * removed. [previousMediaRef] is the media entry the last sync left there, in the form this
+     * service handed it back.
      */
     fun syncPhoto(
         context: Context,
         remoteActivityId: String,
         photoFile: File?,
-        previousMediaId: Int?
-    ): WorkoutUploader.PhotoSyncResult = WorkoutUploader.PhotoSyncResult(false, previousMediaId)
+        previousMediaRef: String?
+    ): WorkoutUploader.PhotoSyncResult = WorkoutUploader.PhotoSyncResult(false, previousMediaRef)
 
     companion object {
         /** Clear of the ids the rest of the app posts notifications under. */
@@ -278,4 +344,25 @@ object WorkoutUploadTargets {
     @JvmStatic
     fun autoUploadEnabled(context: Context, prefs: GBPrefs): List<WorkoutUploadTarget> =
         configured(context).filter { it.isAutoUploadEnabled(prefs) }
+
+    /**
+     * Whether [row] describes an activity held by the account [target] is signed in to now. A row
+     * left by another account is treated as if the workout had never been sent, so nothing is
+     * shown, updated or deleted through an id that belongs elsewhere. Either side unknown matches.
+     */
+    @JvmStatic
+    fun holds(context: Context, target: WorkoutUploadTarget, row: WorkoutUpload): Boolean {
+        val recorded = row.remoteAccount ?: return true
+        val current = target.accountKey(context) ?: return true
+        return recorded == current
+    }
+
+    /** [rows] keyed by service, without those another account left; see [holds]. */
+    @JvmStatic
+    fun currentAccountRows(context: Context, rows: Map<Int, WorkoutUpload>): Map<Int, WorkoutUpload> {
+        val targetsByService = ALL.associateBy { it.service }
+        return rows.filter { (service, row) ->
+            targetsByService[service]?.let { holds(context, it, row) } ?: true
+        }
+    }
 }

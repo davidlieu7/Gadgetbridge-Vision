@@ -51,9 +51,23 @@ class FitTrackeeTokenManager(context: Context) : OAuthTokenStore(context, "fittr
         preferences.edit { remove(KEY_CODE_VERIFIER) }
     }
 
+    /** The signed-in user's name and profile timezone, as last read from the server. */
+    fun saveProfile(username: String?, timezone: String?) {
+        preferences.edit {
+            username?.let { putString(KEY_USERNAME, it) }
+            timezone?.let { putString(KEY_TIMEZONE, it) }
+        }
+    }
+
+    fun getUsername(): String? = preferences.getString(KEY_USERNAME, null)
+
+    fun getTimezone(): String? = preferences.getString(KEY_TIMEZONE, null)
+
     companion object {
         private const val KEY_CLIENT_ID = "client_id"
         private const val KEY_CLIENT_SECRET = "client_secret"
         private const val KEY_CODE_VERIFIER = "code_verifier"
+        private const val KEY_USERNAME = "username"
+        private const val KEY_TIMEZONE = "timezone"
     }
 }

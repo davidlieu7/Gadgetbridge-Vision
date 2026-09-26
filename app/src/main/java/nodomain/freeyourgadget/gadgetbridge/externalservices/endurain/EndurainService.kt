@@ -24,8 +24,8 @@ import androidx.fragment.app.Fragment
 import nodomain.freeyourgadget.gadgetbridge.GBApplication
 import nodomain.freeyourgadget.gadgetbridge.R
 import nodomain.freeyourgadget.gadgetbridge.activities.workouts.RemoteOp
-import nodomain.freeyourgadget.gadgetbridge.activities.workouts.RemoteLookup
-import nodomain.freeyourgadget.gadgetbridge.activities.workouts.TrackUpdateResult
+import nodomain.freeyourgadget.gadgetbridge.activities.workouts.RecreateOrder
+import nodomain.freeyourgadget.gadgetbridge.activities.workouts.RemoteSnapshot
 import nodomain.freeyourgadget.gadgetbridge.activities.workouts.UploadCapabilities
 import nodomain.freeyourgadget.gadgetbridge.activities.workouts.WorkoutPayloadFormat
 import nodomain.freeyourgadget.gadgetbridge.activities.workouts.WorkoutUploadStore
@@ -52,8 +52,8 @@ object EndurainService : WorkoutUploadTarget {
         // A FIT can be synthesized from the summary alone, so a trackless workout still uploads.
         formats = listOf(WorkoutPayloadFormat.FIT),
         // No endpoint replaces an activity's track, so changing one means delete plus re-upload,
-        // which gives the activity a new id. See updateTrack.
-        activity = setOf(RemoteOp.CREATE, RemoteOp.REPLACE, RemoteOp.DELETE, RemoteOp.READ),
+        // which gives the activity a new id. See snapshotRemote.
+        activity = setOf(RemoteOp.CREATE, RemoteOp.REPLACE, RemoteOp.DELETE),
         metadata = setOf(RemoteOp.UPDATE),
         // Media is listed, deleted and uploaded, so a photo changes by way of a new media entry.
         media = setOf(RemoteOp.CREATE, RemoteOp.REPLACE, RemoteOp.DELETE)
@@ -111,7 +111,7 @@ object EndurainService : WorkoutUploadTarget {
         ExternalServiceTokenRefreshWorker.schedule(context, this)
     }
 
-    // recreateActivity compares the remote activity against what was uploaded and gives up when
+    // snapshotRemote compares the remote activity against what was uploaded and gives up when
     // it no longer matches.
     override val keepsRemoteEdits = true
 
@@ -179,7 +179,7 @@ object EndurainService : WorkoutUploadTarget {
                     }
                     try {
                         apiClient.uploadActivityPhoto(newId, File(photoPath)) { mediaId ->
-                            done(WorkoutUploader.UploadResult(true, newId.toString(), null, mediaId))
+                            done(WorkoutUploader.UploadResult(true, newId.toString(), null, mediaId?.toString()))
                         }
                     } catch (e: Exception) {
                         LOG.warn("Endurain uploadActivityPhoto failed for id {}", newId, e)
@@ -219,111 +219,68 @@ object EndurainService : WorkoutUploadTarget {
     }
 
     /**
-     * Endurain can edit an activity's metadata but never its track, so the only way to push a
-     * changed track is to delete the activity and upload it again under a new id.
-     *
-     * That is done unconditionally only when it is purely additive: the activity was uploaded
-     * without a track and now has one, which is the case of a workout synced from a watch that
-     * records none, with a GPX attached afterwards. Any other change re-creates an activity the
-     * user may have been looking at for a while, so it needs their explicit consent.
-     */
-    override fun updateTrack(
-        context: Context,
-        remoteActivityId: String,
-        payload: File,
-        summary: BaseActivitySummary,
-        row: WorkoutUpload
-    ): TrackUpdateResult {
-        val (result, refusal) = recreateActivity(context, summary, remoteActivityId, payload)
-        if (result?.remoteActivityId != null) {
-            return TrackUpdateResult.Recreated(result.remoteActivityId, result.photoMediaId)
-        }
-        return when (refusal) {
-            RecreateRefusal.REMOTE_EDITED ->
-                TrackUpdateResult.Refused(
-                    context.getString(R.string.service_remote_edited, context.getString(nameRes))
-                )
-
-            else -> TrackUpdateResult.Failed
-        }
-    }
-
-    /** Why a re-create was not carried out, for the message shown to the user. Null means it was. */
-    private enum class RecreateRefusal { REMOTE_EDITED, FAILED }
-
-    /**
-     * Re-creates the activity [remoteActivityId] from [payload], because Endurain has no endpoint
-     * that replaces an activity's track: `PUT /api/v1/activities/edit` takes metadata only.
-     * Deleting and re-uploading is therefore the only way to push a track, and the reason this
-     * operation is destructive at all. An endpoint that replaced a track in place would remove the
-     * need for the whole function.
+     * Endurain can edit an activity's metadata but never its track (`PUT /api/v1/activities/edit`
+     * takes metadata only), so a changed track is pushed by re-creating the activity, which
+     * [WorkoutUploader] drives through this, [upload] and [deleteRemote].
      *
      * Refuses when the remote activity carries anything the user wrote there (a description,
-     * private notes or a gear assignment), since re-creating would destroy it. Whatever the API
-     * does let us carry over is read first and restored afterwards, but the activity id changes,
-     * so links to it break and anything Endurain later attaches to an activity id would be lost.
+     * private notes or a gear assignment) or media beyond the header photo, since re-creating
+     * would destroy it. The rest of what the API exposes is carried over, but the activity id
+     * changes, so links to it break.
      *
      * The re-upload reuses the workout's start time. Endurain wedges a start time that already
      * carries two activities, and every upload at it fails with a 500 from then on, so a workout
-     * uploaded by hand more than once cannot be re-created at all:
+     * uploaded by hand more than once cannot be re-created at all, and the old activity has to go
+     * before the new one is created:
      * <https://codeberg.org/endurain-project/endurain/issues/858>.
-     *
-     * Blocking; call off the main thread.
      */
-    private fun recreateActivity(
+    override fun snapshotRemote(
         context: Context,
-        summary: BaseActivitySummary,
         remoteActivityId: String,
-        payload: File
-    ): Pair<WorkoutUploader.UploadResult?, RecreateRefusal?> {
-        val activityId = remoteActivityId.toIntOrNull()
-            ?: return null to RecreateRefusal.FAILED
-        val server = serverUrl() ?: return null to RecreateRefusal.FAILED
+        row: WorkoutUpload
+    ): RemoteSnapshot {
+        val activityId = remoteActivityId.toIntOrNull() ?: return RemoteSnapshot.Failed
+        val server = serverUrl() ?: return RemoteSnapshot.Failed
         val apiClient = EndurainApiClient(server, EndurainTokenManager(context))
-
-        val details = when (val lookup = apiClient.getActivityDetails(activityId)) {
-            is EndurainActivityLookup.Failed -> return null to RecreateRefusal.FAILED
-
-            // Deleted on the server since we uploaded it. Nothing to preserve and nothing to
-            // delete, so this becomes a plain upload that adopts a new id.
-            is EndurainActivityLookup.Gone -> null
-
+        return when (val lookup = apiClient.getActivityDetails(activityId)) {
+            is EndurainActivityLookup.Failed -> RemoteSnapshot.Failed
+            is EndurainActivityLookup.Gone -> RemoteSnapshot.Gone
             is EndurainActivityLookup.Found -> {
-                if (lookup.details.hasUserContent) {
-                    LOG.info("Not re-creating Endurain activity {}, it carries user edits", activityId)
-                    return null to RecreateRefusal.REMOTE_EDITED
-                }
-                val media = apiClient.listActivityMedia(activityId)
-                    ?: return null to RecreateRefusal.FAILED
-                if (media.size > 1) {
-                    LOG.info("Not re-creating Endurain activity {}, it carries extra media", activityId)
-                    return null to RecreateRefusal.REMOTE_EDITED
-                }
-                if (!apiClient.deleteActivity(activityId)) {
-                    return null to RecreateRefusal.FAILED
-                }
-                lookup.details
-            }
-        }
-
-        val result = upload(context, summary, payload)
-        if (!result.success || result.remoteActivityId == null) {
-            // The activity is already gone at this point, so the workout is left with no online
-            // copy until the next sync retries it.
-            LOG.error("Re-upload of summary {} failed after its activity was deleted", summary.id)
-            return null to RecreateRefusal.FAILED
-        }
-        if (details != null) {
-            result.remoteActivityId.toIntOrNull()?.let {
-                apiClient.restoreActivityDetails(
-                    it,
-                    ActivityKind.fromCode(summary.activityKind),
-                    WorkoutUploader.nameFor(context, summary),
-                    details
+                val media = apiClient.listActivityMedia(activityId) ?: return RemoteSnapshot.Failed
+                RemoteSnapshot.Found(
+                    lookup.details,
+                    losesUserContent = lookup.details.hasUserContent || media.size > 1
                 )
             }
         }
-        return result to null
+    }
+
+    override val recreateOrder = RecreateOrder.DELETE_THEN_CREATE
+
+    override fun deleteRemote(context: Context, remoteActivityId: String): Boolean {
+        val activityId = remoteActivityId.toIntOrNull() ?: return false
+        val server = serverUrl() ?: return false
+        return EndurainApiClient(server, EndurainTokenManager(context)).deleteActivity(activityId)
+    }
+
+    /** Uploads the replacement, then restores on it what [snapshotRemote] read off the original. */
+    override fun upload(
+        context: Context,
+        summary: BaseActivitySummary,
+        payload: File,
+        carry: Any?
+    ): WorkoutUploader.UploadResult {
+        val result = upload(context, summary, payload)
+        val details = carry as? EndurainActivityDetails ?: return result
+        val newId = result.remoteActivityId?.toIntOrNull() ?: return result
+        val server = serverUrl() ?: return result
+        EndurainApiClient(server, EndurainTokenManager(context)).restoreActivityDetails(
+            newId,
+            ActivityKind.fromCode(summary.activityKind),
+            WorkoutUploader.nameFor(context, summary),
+            details
+        )
+        return result
     }
 
     override fun lookupRemote(context: Context, remoteActivityId: String): RemoteLookup {
@@ -337,17 +294,18 @@ object EndurainService : WorkoutUploadTarget {
     }
 
     /**
-     * Deletes the media entry a previous sync created ([previousMediaId]) and uploads [photoFile],
-     * which is null when the photo was removed locally. Media the user attached on the server is
-     * left alone, since only the entry Gadgetbridge created is deleted.
+     * Deletes the media entry a previous sync created ([previousMediaRef], an Endurain media id)
+     * and uploads [photoFile], which is null when the photo was removed locally. Media the user
+     * attached on the server is left alone, since only the entry Gadgetbridge created is deleted.
      */
     override fun syncPhoto(
         context: Context,
         remoteActivityId: String,
         photoFile: File?,
-        previousMediaId: Int?
+        previousMediaRef: String?
     ): WorkoutUploader.PhotoSyncResult {
-        val failed = WorkoutUploader.PhotoSyncResult(false, previousMediaId)
+        val failed = WorkoutUploader.PhotoSyncResult(false, previousMediaRef)
+        val previousMediaId = previousMediaRef?.toIntOrNull()
         val activityId = remoteActivityId.toIntOrNull()
         if (activityId == null) {
             LOG.warn("Cannot sync photo: non-numeric Endurain activity id '{}'", remoteActivityId)
@@ -377,7 +335,7 @@ object EndurainService : WorkoutUploadTarget {
                             done(WorkoutUploader.PhotoSyncResult(removed, null))
                         } else {
                             apiClient.uploadActivityPhoto(activityId, photoFile) { mediaId ->
-                                done(WorkoutUploader.PhotoSyncResult(mediaId != null, mediaId))
+                                done(WorkoutUploader.PhotoSyncResult(mediaId != null, mediaId?.toString()))
                             }
                         }
                     } catch (e: Exception) {

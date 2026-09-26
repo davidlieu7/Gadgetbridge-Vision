@@ -170,26 +170,8 @@ object WorkoutUploader {
         val id = summary.id ?: return SyncOutcome.NotApplicable
         val sourceHash = WorkoutUploadStore.sourceHashOf(summary)
         val row = WorkoutUploadStore.rowsForSummaries(listOf(id))[id]?.get(target.service)
-        val action = syncActionFor(row, sourceHash)
-        val remoteId = row?.remoteActivityId
-        if (verifyRemote && action != SyncAction.UPLOAD && remoteId != null && target.capabilities.canLookUp) {
-            renewExpiredCredentials(context, target)
-            when (target.lookupRemote(context, remoteId)) {
-                RemoteLookup.GONE -> {
-                    LOG.info("Service {} no longer holds activity {} of summary {}, uploading it again",
-                        target.service, remoteId, id)
-                    // Dropped first so that a failed upload leaves a failed first attempt, which the
-                    // background worker picks up again, rather than a row naming an activity that
-                    // no longer exists.
-                    WorkoutUploadStore.delete(id, target.service)
-                    return uploadNew(context, gbDevice, provider, target, summary, sourceHash, summaryData)
-                }
-
-                RemoteLookup.FAILED -> return SyncOutcome.Failed(null)
-                RemoteLookup.PRESENT -> Unit
-            }
-        }
-        return when (action) {
+            ?.takeIf { WorkoutUploadTargets.holds(context, target, it) }
+        return when (syncActionFor(row, sourceHash)) {
             SyncAction.UPLOAD ->
                 uploadNew(context, gbDevice, provider, target, summary, sourceHash, summaryData)
 
@@ -277,7 +259,7 @@ object WorkoutUploader {
         val result = target.upload(context, summary, payload)
         if (!result.success) {
             LOG.warn("Upload of summary {} to service {} failed: {}", id, target.service, result.reason)
-            WorkoutUploadStore.recordFailure(id, target.service, result.reason)
+            WorkoutUploadStore.recordFailure(id, target.service, result.reason, target.accountKey(context))
             return SyncOutcome.Failed(result.reason)
         }
         // A photo the service could have taken and did not leaves both fingerprints unset, so the
@@ -285,18 +267,19 @@ object WorkoutUploader {
         // that holds no media has nothing to come back for.
         val photoLanded = summary.headerPhoto == null ||
                 RemoteOp.CREATE !in target.capabilities.media ||
-                result.photoMediaId != null
+                result.photoMediaRef != null
         WorkoutUploadStore.recordSuccess(
             id, target.service, result.remoteActivityId,
             if (photoLanded) WorkoutUploadStore.photoHashOf(summary.headerPhoto) else null,
-            result.photoMediaId,
+            result.photoMediaRef,
             if (photoLanded) sourceHash else null,
             WorkoutUploadStore.trackHashOf(
                 summary,
                 target.capabilities.metadataComesFromFile &&
                         !target.capabilities.trackChangeIsDestructive
             ),
-            summaryHasTrack(summary)
+            summaryHasTrack(summary),
+            remoteAccount = target.accountKey(context)
         )
         return SyncOutcome.Uploaded
     }
@@ -325,14 +308,15 @@ object WorkoutUploader {
         // leaving the workout looking unfinished and bringing every later sync back to it.
         var remoteId = row.remoteActivityId ?: run {
             WorkoutUploadStore.recordSuccess(
-                id, target.service, null, row.photoHash, row.photoMediaId,
-                sourceHash, row.payloadHash, row.hadTrack
+                id, target.service, null, row.photoHash, row.photoMediaRef,
+                sourceHash, row.payloadHash, row.hadTrack,
+                remoteAccount = row.remoteAccount
             )
             return SyncOutcome.AlreadyInStep
         }
         renewExpiredCredentials(context, target)
         var photoHash = row.photoHash
-        var photoMediaId = row.photoMediaId
+        var photoMediaRef = row.photoMediaRef
         var payloadHash = row.payloadHash
         var hadTrack = row.hadTrack
         var refusal: String? = null
@@ -366,7 +350,12 @@ object WorkoutUploader {
                 context.getString(target.nameRes)
             )
         } else if (payload != null) {
-            when (val update = target.updateTrack(context, remoteId, payload, summary, row)) {
+            val update = if (target.capabilities.trackChangeIsDestructive) {
+                recreate(context, target, remoteId, payload, summary, row)
+            } else {
+                target.updateTrack(context, remoteId, payload, summary, row)
+            }
+            when (update) {
                 is TrackUpdateResult.Updated -> {
                     payloadHash = newTrackHash
                     hadTrack = summaryHasTrack(summary)
@@ -377,10 +366,10 @@ object WorkoutUploader {
                     hadTrack = summaryHasTrack(summary)
                     remoteId = update.remoteActivityId
                     recreated = true
-                    photoMediaId = update.photoMediaId
+                    photoMediaRef = update.photoMediaRef
                     // The replacement is uploaded from the current workout, so it carries the
                     // current photo, but only once the media id comes back.
-                    if (summary.headerPhoto == null || update.photoMediaId != null) {
+                    if (summary.headerPhoto == null || update.photoMediaRef != null) {
                         photoHash = WorkoutUploadStore.photoHashOf(summary.headerPhoto)
                     } else {
                         pending = true
@@ -411,11 +400,11 @@ object WorkoutUploader {
                 photoHash = newPhotoHash
             } else {
                 val sync = target.syncPhoto(
-                    context, remoteId, summary.headerPhoto?.let { File(it) }, row.photoMediaId
+                    context, remoteId, summary.headerPhoto?.let { File(it) }, row.photoMediaRef
                 )
                 if (sync.success) {
                     photoHash = newPhotoHash
-                    photoMediaId = sync.mediaId
+                    photoMediaRef = sync.mediaRef
                 } else {
                     LOG.warn("Photo sync to service {} failed for summary {}", target.service, id)
                     pending = true
@@ -431,10 +420,70 @@ object WorkoutUploader {
         // A transient failure has already returned by here, so the only reason left is a refusal
         // the user has to resolve, which the row carries until a later sync goes through.
         WorkoutUploadStore.recordSuccess(
-            id, target.service, remoteId, photoHash, photoMediaId,
-            if (pending) row.sourceHash else sourceHash, payloadHash, hadTrack, refusal
+            id, target.service, remoteId, photoHash, photoMediaRef,
+            if (pending) row.sourceHash else sourceHash, payloadHash, hadTrack, refusal,
+            target.accountKey(context) ?: row.remoteAccount
         )
         return SyncOutcome.Resynced(refusal)
+    }
+
+    /**
+     * Brings the track of [remoteActivityId] in line by replacing the activity, for a service
+     * that offers no way to write a new track onto one it holds. What the service can move off
+     * the old activity is read first and handed to the upload of the new one; when something the
+     * user added there cannot be moved, the activity is left as it is and the user told why.
+     */
+    internal fun recreate(
+        context: Context,
+        target: WorkoutUploadTarget,
+        remoteActivityId: String,
+        payload: File,
+        summary: BaseActivitySummary,
+        row: WorkoutUpload
+    ): TrackUpdateResult {
+        val snapshot = target.snapshotRemote(context, remoteActivityId, row)
+        val carry = when (snapshot) {
+            is RemoteSnapshot.Failed -> return TrackUpdateResult.Failed
+            is RemoteSnapshot.Found -> {
+                if (snapshot.losesUserContent) {
+                    LOG.info("Not re-creating {} on service {}, it carries edits made there",
+                        remoteActivityId, target.service)
+                    return TrackUpdateResult.Refused(
+                        context.getString(R.string.service_remote_edited, context.getString(target.nameRes))
+                    )
+                }
+                snapshot.carry
+            }
+
+            is RemoteSnapshot.Gone -> null
+        }
+        val stillThere = snapshot is RemoteSnapshot.Found
+        val createFirst = target.recreateOrder == RecreateOrder.CREATE_THEN_DELETE
+        if (stillThere && !createFirst && !target.deleteRemote(context, remoteActivityId)) {
+            LOG.warn("Could not delete {} on service {}, leaving it as it was",
+                remoteActivityId, target.service)
+            return TrackUpdateResult.Failed
+        }
+        val result = target.upload(context, summary, payload, carry)
+        val newId = result.remoteActivityId
+        if (!result.success || newId == null) {
+            if (stillThere && !createFirst) {
+                // The activity is already gone, so the workout has no online copy until the next
+                // sync retries it.
+                LOG.error("Re-upload of summary {} to service {} failed after {} was deleted",
+                    summary.id, target.service, remoteActivityId)
+            }
+            return TrackUpdateResult.Failed
+        }
+        if (stillThere && createFirst && !target.deleteRemote(context, remoteActivityId)) {
+            // The replacement is recorded all the same: a leftover duplicate can be removed by
+            // hand, whereas forgetting the replacement would upload a third copy next time.
+            LOG.warn("Replaced {} on service {} with {} but could not delete the old one",
+                remoteActivityId, target.service, newId)
+        }
+        LOG.info("Re-created {} on service {} as {} for summary {}",
+            remoteActivityId, target.service, newId, summary.id)
+        return TrackUpdateResult.Recreated(newId, result.photoMediaRef)
     }
 
     /**
@@ -468,22 +517,22 @@ object WorkoutUploader {
 
     /**
      * Outcome of an upload attempt. [remoteActivityId] is the id the service assigned to the new
-     * activity, null on failure. [photoMediaId] is the media entry the header photo was uploaded
-     * as, null when there was no photo or the photo step failed. [reason] is a localized failure
-     * explanation, null on success.
+     * activity, null on failure. [photoMediaRef] is the service's id for the media entry the
+     * header photo was uploaded as, null when there was no photo or the photo step failed.
+     * [reason] is a localized failure explanation, null on success.
      */
     data class UploadResult(
         val success: Boolean,
         val remoteActivityId: String?,
         val reason: String?,
-        val photoMediaId: Int? = null
+        val photoMediaRef: String? = null
     )
 
     /**
-     * Outcome of a header photo sync. [mediaId] is the media entry now holding the photo, null
-     * when the photo was removed or the upload failed.
+     * Outcome of a header photo sync. [mediaRef] is the service's id for the media entry now
+     * holding the photo, null when the photo was removed or the upload failed.
      */
-    data class PhotoSyncResult(val success: Boolean, val mediaId: Int?)
+    data class PhotoSyncResult(val success: Boolean, val mediaRef: String?)
 
     /**
      * Runs a service's callback-style upload to completion, answering a failure the user can read

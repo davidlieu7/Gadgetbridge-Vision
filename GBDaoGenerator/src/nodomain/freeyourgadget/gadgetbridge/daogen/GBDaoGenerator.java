@@ -110,7 +110,7 @@ public class GBDaoGenerator {
             outputDir.mkdirs();
         }
 
-        final Schema schema = new Schema(158, MAIN_PACKAGE + ".entities");
+        final Schema schema = new Schema(159, MAIN_PACKAGE + ".entities");
 
         final List<Entity> sampleProvidersToGenerate = new LinkedList<>();
         final List<Entity> batterySampleProvidersToGenerate = new LinkedList<>();
@@ -1909,9 +1909,10 @@ public class GBDaoGenerator {
         // Fingerprint of the header photo at the time of the last upload, so a photo added or
         // replaced afterwards can be detected and re-synced to the remote activity.
         upload.addStringProperty("photoHash");
-        // Id of the media entry the header photo was uploaded as, so it can be deleted when the
-        // photo is replaced or removed without touching media the user attached on the server.
-        upload.addIntProperty("photoMediaId");
+        // The service's own id of the media entry the header photo was uploaded as, so it can be
+        // deleted when the photo is replaced or removed without touching media the user attached
+        // on the server. Opaque: each service writes and reads back its own format.
+        upload.addStringProperty("photoMediaRef");
         // Fingerprint of everything about the summary that a later edit or a reprocess can
         // change. Compared on every sync to decide whether the workout is worth re-exporting.
         upload.addStringProperty("sourceHash");
@@ -1924,6 +1925,9 @@ public class GBDaoGenerator {
         // Why the last attempt failed, in the user's language, or null once one succeeds. Set on a
         // failed re-sync too, where the row keeps the successful status of the upload it describes.
         upload.addStringProperty("lastError");
+        // Which account holds remoteActivityId, as the service names it (see
+        // WorkoutUploadTarget.accountKey), or null when it could not name one.
+        upload.addStringProperty("remoteAccount");
     }
 
     private static Entity addWorkoutTemplate(final Schema schema, final Entity device) {

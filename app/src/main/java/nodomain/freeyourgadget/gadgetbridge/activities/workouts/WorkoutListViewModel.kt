@@ -149,7 +149,12 @@ class WorkoutListViewModel : ViewModel() {
         val storedSummaryData = WorkoutUploadStore.storedSummaryData(summaryIds)
         return summaries.mapNotNull { summary ->
             val id = summary.id ?: return@mapNotNull null
-            workoutUploadStatus(summary, rowsBySummary[id].orEmpty(), targets, storedSummaryData[id])
+            workoutUploadStatus(
+                summary,
+                WorkoutUploadTargets.currentAccountRows(context, rowsBySummary[id].orEmpty()),
+                targets,
+                storedSummaryData[id]
+            )
                 ?.let { id to it }
         }.toMap()
     }
