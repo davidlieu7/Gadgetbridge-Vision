@@ -89,7 +89,13 @@ public final class ActivitySummaryUtils {
         final File gpxFile = new File(rawCacheDir, gpxFileName);
 
         final GPXExporter gpxExporter = new GPXExporter();
-        gpxExporter.performExport(activityTrack, gpxFile, summary);
+        try {
+            gpxExporter.performExport(activityTrack, gpxFile, summary);
+        } catch (final IOException | ActivityTrackExporter.GPXTrackEmptyException e) {
+            //noinspection ResultOfMethodCallIgnored
+            gpxFile.delete();
+            throw e;
+        }
 
         return gpxFile;
     }

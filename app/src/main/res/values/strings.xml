@@ -3279,6 +3279,19 @@
     <string name="sports_activity_quick_filter_select">Time period</string>
     <string name="sports_activity_confirm_delete_title">Delete %d activities</string>
     <string name="sports_activity_confirm_delete_description">Are you sure you want to delete %d activities?</string>
+    <string name="workout_export_title">Export workouts</string>
+    <string name="workout_export_fit">FIT files</string>
+    <string name="workout_export_gpx">GPX tracks (workouts with GPS)</string>
+    <string name="workout_export_raw">Raw device files</string>
+    <string name="workout_export_share_as">Share as</string>
+    <string name="workout_export_separate_files">Separate files</string>
+    <string name="workout_export_one_zip">One zip file</string>
+    <string name="workout_export_preparing">Preparing export…</string>
+    <string name="workout_export_nothing">Nothing to export for the selected workouts</string>
+    <plurals name="workout_export_skipped">
+        <item quantity="one">%d file could not be exported, see the log</item>
+        <item quantity="other">%d files could not be exported, see the log</item>
+    </plurals>
     <string name="activity_summaries_all_devices">All devices</string>
     <string name="activity_filter_from_placeholder">distant past</string>
     <string name="activity_filter_to_placeholder">today</string>
