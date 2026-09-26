@@ -814,7 +814,12 @@ class WorkoutDetailsFragment : Fragment(), MenuProvider {
             when (outcome) {
                 is WorkoutUploader.SyncOutcome.Uploaded -> {
                     uploadStateChanged()
-                    GB.toast(target.uploadedMessage(context), Toast.LENGTH_SHORT, GB.INFO)
+                    val refusal = outcome.refusal
+                    if (refusal != null) {
+                        GB.toast(refusal, Toast.LENGTH_LONG, GB.WARN)
+                    } else {
+                        GB.toast(target.uploadedMessage(context), Toast.LENGTH_SHORT, GB.INFO)
+                    }
                 }
 
                 is WorkoutUploader.SyncOutcome.Resynced -> {

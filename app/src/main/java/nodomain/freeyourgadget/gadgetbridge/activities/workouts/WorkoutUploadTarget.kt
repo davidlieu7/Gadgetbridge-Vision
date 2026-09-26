@@ -175,8 +175,13 @@ sealed interface TrackUpdateResult {
 
     /**
      * The service could only do it by re-creating the activity, so the caller stores the new ids.
+     * [photoRefusal] is as on [WorkoutUploader.UploadResult.photoRefusal].
      */
-    data class Recreated(val remoteActivityId: String, val photoMediaRef: String?) : TrackUpdateResult
+    data class Recreated(
+        val remoteActivityId: String,
+        val photoMediaRef: String?,
+        val photoRefusal: String? = null
+    ) : TrackUpdateResult
 
     /**
      * The service could have done it and deliberately did not, for a reason the user has to

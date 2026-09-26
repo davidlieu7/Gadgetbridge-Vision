@@ -168,7 +168,8 @@ object FitTrackeeService : WorkoutUploadTarget {
     /**
      * Uploads the header photo, then creates the workout naming it together with whatever
      * [carry] moves over from a workout being replaced. A photo that does not go up leaves the
-     * workout without one, and the next sync comes back for it.
+     * workout without one, and the next sync comes back for it; one the login is not allowed to
+     * upload is reported as a refusal instead.
      */
     override fun upload(
         context: Context,
@@ -186,7 +187,8 @@ object FitTrackeeService : WorkoutUploadTarget {
             return WorkoutUploader.UploadResult(false, null, null)
         }
 
-        val photoId = summary.headerPhoto?.let { apiClient.uploadMedia(File(it)) }
+        val photo = summary.headerPhoto?.let { apiClient.uploadMedia(File(it)) }
+        val photoId = (photo as? FitTrackeeMediaResult.Done)?.mediaId
         val mediaIds = listOfNotNull(photoId) + kept?.mediaIds.orEmpty()
 
         val body = JSONObject()
@@ -208,8 +210,13 @@ object FitTrackeeService : WorkoutUploadTarget {
             photoId?.let { apiClient.deleteMedia(it) }
             return result
         }
-        return result.copy(photoMediaRef = photoId)
+        return result.copy(
+            photoMediaRef = photoId,
+            photoRefusal = if (photo == FitTrackeeMediaResult.NotAllowed) mediaNotAllowed(context) else null
+        )
     }
+
+    private fun mediaNotAllowed(context: Context) = context.getString(R.string.fittrackee_media_not_allowed)
 
     override fun updateMetadata(
         context: Context,
@@ -263,14 +270,25 @@ object FitTrackeeService : WorkoutUploadTarget {
         val failed = WorkoutUploader.PhotoSyncResult(false, previousMediaRef)
         val server = serverUrl() ?: return failed
         val apiClient = FitTrackeeApiClient(server, FitTrackeeTokenManager(context))
-        if (previousMediaRef != null && !apiClient.deleteMedia(previousMediaRef)) {
-            return failed
+        if (previousMediaRef != null) {
+            when (apiClient.deleteMedia(previousMediaRef)) {
+                is FitTrackeeMediaResult.Done -> {}
+                is FitTrackeeMediaResult.NotAllowed ->
+                    return WorkoutUploader.PhotoSyncResult(false, previousMediaRef, mediaNotAllowed(context))
+
+                is FitTrackeeMediaResult.Failed -> return failed
+            }
         }
         if (photoFile == null) {
             return WorkoutUploader.PhotoSyncResult(true, null)
         }
-        val mediaId = apiClient.uploadMedia(photoFile)
-            ?: return WorkoutUploader.PhotoSyncResult(false, null)
+        val mediaId = when (val upload = apiClient.uploadMedia(photoFile)) {
+            is FitTrackeeMediaResult.Done -> upload.mediaId ?: return WorkoutUploader.PhotoSyncResult(false, null)
+            is FitTrackeeMediaResult.NotAllowed ->
+                return WorkoutUploader.PhotoSyncResult(false, null, mediaNotAllowed(context))
+
+            is FitTrackeeMediaResult.Failed -> return WorkoutUploader.PhotoSyncResult(false, null)
+        }
         if (!apiClient.attachMedia(remoteActivityId, listOf(mediaId))) {
             apiClient.deleteMedia(mediaId)
             return WorkoutUploader.PhotoSyncResult(false, null)

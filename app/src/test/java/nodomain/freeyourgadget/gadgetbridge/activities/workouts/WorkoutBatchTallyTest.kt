@@ -10,12 +10,12 @@ class WorkoutBatchTallyTest {
     @Test
     fun countsEachOutcomePerService() {
         val tally = WorkoutBatchTally(listOf(WandererService, DreeveService))
-        tally.record(WandererService, WorkoutUploader.SyncOutcome.Uploaded)
+        tally.record(WandererService, WorkoutUploader.SyncOutcome.Uploaded())
         tally.record(WandererService, WorkoutUploader.SyncOutcome.Resynced(null))
         tally.record(WandererService, WorkoutUploader.SyncOutcome.AlreadyInStep)
         tally.record(WandererService, WorkoutUploader.SyncOutcome.NotApplicable)
         tally.record(DreeveService, WorkoutUploader.SyncOutcome.Failed("HTTP 500"))
-        tally.record(DreeveService, WorkoutUploader.SyncOutcome.Uploaded)
+        tally.record(DreeveService, WorkoutUploader.SyncOutcome.Uploaded())
 
         val wanderer = tally.byTarget.getValue(WandererService)
         assertEquals(1, wanderer.uploaded)
@@ -34,7 +34,7 @@ class WorkoutBatchTallyTest {
     @Test
     fun totalsLeaveOutWorkoutsAServiceCannotTake() {
         val tally = WorkoutBatchTally(listOf(WandererService, DreeveService))
-        tally.record(WandererService, WorkoutUploader.SyncOutcome.Uploaded)
+        tally.record(WandererService, WorkoutUploader.SyncOutcome.Uploaded())
         tally.record(WandererService, WorkoutUploader.SyncOutcome.NotApplicable)
         tally.record(DreeveService, WorkoutUploader.SyncOutcome.AlreadyInStep)
         tally.record(DreeveService, WorkoutUploader.SyncOutcome.Failed(null))
@@ -57,7 +57,7 @@ class WorkoutBatchTallyTest {
     @Test
     fun ignoresServicesOutsideTheBatch() {
         val tally = WorkoutBatchTally(listOf(WandererService))
-        tally.record(DreeveService, WorkoutUploader.SyncOutcome.Uploaded)
+        tally.record(DreeveService, WorkoutUploader.SyncOutcome.Uploaded())
 
         assertEquals(listOf(WandererService), tally.byTarget.keys.toList())
         assertEquals(0, tally.sent)

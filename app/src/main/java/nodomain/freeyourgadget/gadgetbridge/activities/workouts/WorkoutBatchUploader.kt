@@ -158,7 +158,10 @@ class WorkoutBatchTally(targets: List<WorkoutUploadTarget>) {
     fun record(target: WorkoutUploadTarget, outcome: WorkoutUploader.SyncOutcome) {
         val counts = byTarget[target] ?: return
         when (outcome) {
-            is WorkoutUploader.SyncOutcome.Uploaded -> counts.uploaded++
+            is WorkoutUploader.SyncOutcome.Uploaded -> {
+                counts.uploaded++
+                if (counts.reason == null) counts.reason = outcome.refusal
+            }
             is WorkoutUploader.SyncOutcome.Resynced -> {
                 counts.updated++
                 if (counts.reason == null) counts.reason = outcome.refusal

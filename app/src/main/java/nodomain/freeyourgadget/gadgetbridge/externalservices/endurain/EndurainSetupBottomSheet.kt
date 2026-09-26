@@ -31,19 +31,19 @@ import androidx.core.content.edit
 import androidx.core.net.toUri
 import androidx.fragment.app.viewModels
 import androidx.localbroadcastmanager.content.LocalBroadcastManager
-import com.google.android.material.bottomsheet.BottomSheetDialogFragment
 import com.google.android.material.button.MaterialButton
 import com.google.android.material.button.MaterialButtonToggleGroup
 import com.google.android.material.textfield.TextInputEditText
 import com.google.android.material.textfield.TextInputLayout
 import nodomain.freeyourgadget.gadgetbridge.GBApplication
 import nodomain.freeyourgadget.gadgetbridge.R
+import nodomain.freeyourgadget.gadgetbridge.externalservices.ExternalServiceSetupBottomSheet
 import nodomain.freeyourgadget.gadgetbridge.externalservices.externalServiceLoginResultKey
 import nodomain.freeyourgadget.gadgetbridge.util.GB
 import nodomain.freeyourgadget.gadgetbridge.util.InternetUtils
 import org.slf4j.LoggerFactory
 
-class EndurainSetupBottomSheet : BottomSheetDialogFragment() {
+class EndurainSetupBottomSheet : ExternalServiceSetupBottomSheet() {
 
     private val LOG = LoggerFactory.getLogger(EndurainSetupBottomSheet::class.java)
     private val prefs get() = GBApplication.getPrefs().preferences

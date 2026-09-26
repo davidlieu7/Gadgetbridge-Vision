@@ -123,8 +123,11 @@ object WorkoutUploader {
 
     /** What a sync of one workout to one service did. */
     sealed interface SyncOutcome {
-        /** The service took the workout for the first time. */
-        object Uploaded : SyncOutcome
+        /**
+         * The service took the workout for the first time. [refusal] is the localized reason for
+         * a part of it the service would not take, null when all of it went through.
+         */
+        data class Uploaded(val refusal: String? = null) : SyncOutcome
 
         /**
          * The remote activity was brought in line with the workout. [refusal] is the localized
@@ -268,20 +271,25 @@ object WorkoutUploader {
         val photoLanded = summary.headerPhoto == null ||
                 RemoteOp.CREATE !in target.capabilities.media ||
                 result.photoMediaRef != null
+        // A photo refused for a reason only the user can fix is not worth retrying on every run:
+        // the workout counts as in step, the reason is kept for the user, and the photo fingerprint
+        // stays unset so the next sync that is asked for tries it again.
+        val photoRefused = !photoLanded && result.photoRefusal != null
         WorkoutUploadStore.recordSuccess(
             id, target.service, result.remoteActivityId,
             if (photoLanded) WorkoutUploadStore.photoHashOf(summary.headerPhoto) else null,
             result.photoMediaRef,
-            if (photoLanded) sourceHash else null,
+            if (photoLanded || photoRefused) sourceHash else null,
             WorkoutUploadStore.trackHashOf(
                 summary,
                 target.capabilities.metadataComesFromFile &&
                         !target.capabilities.trackChangeIsDestructive
             ),
             summaryHasTrack(summary),
-            remoteAccount = target.accountKey(context)
+            if (photoRefused) result.photoRefusal else null,
+            target.accountKey(context)
         )
-        return SyncOutcome.Uploaded
+        return SyncOutcome.Uploaded(if (photoRefused) result.photoRefusal else null)
     }
 
     /**
@@ -371,6 +379,10 @@ object WorkoutUploader {
                     // current photo, but only once the media id comes back.
                     if (summary.headerPhoto == null || update.photoMediaRef != null) {
                         photoHash = WorkoutUploadStore.photoHashOf(summary.headerPhoto)
+                    } else if (update.photoRefusal != null) {
+                        // The replacement has no photo; see the photo refusal below.
+                        photoHash = null
+                        refusal = refusal ?: update.photoRefusal
                     } else {
                         pending = true
                     }
@@ -405,6 +417,11 @@ object WorkoutUploader {
                 if (sync.success) {
                     photoHash = newPhotoHash
                     photoMediaRef = sync.mediaRef
+                } else if (sync.refusal != null) {
+                    // Not retried on its own, for the reason given in uploadNew; the photo
+                    // fingerprint stays as it was so the next sync that is asked for tries again.
+                    photoMediaRef = sync.mediaRef
+                    refusal = refusal ?: sync.refusal
                 } else {
                     LOG.warn("Photo sync to service {} failed for summary {}", target.service, id)
                     pending = true
@@ -412,19 +429,23 @@ object WorkoutUploader {
             }
         }
 
-        if (!recreated && target.capabilities.editableMetadata) {
-            // A replacement activity is created with the right name and type already.
-            target.updateMetadata(context, remoteId, summary)
+        // A replacement activity is created with the right name and type already.
+        val metadataFailed = !recreated && target.capabilities.editableMetadata &&
+                !target.updateMetadata(context, remoteId, summary)
+        if (metadataFailed) {
+            LOG.warn("Metadata update to service {} failed for summary {}", target.service, id)
+            pending = true
         }
 
-        // A transient failure has already returned by here, so the only reason left is a refusal
-        // the user has to resolve, which the row carries until a later sync goes through.
+        // What went through is recorded either way. A transient failure keeps the old fingerprint
+        // so the next run retries; a refusal the user has to resolve is carried by the row until a
+        // later sync goes through.
         WorkoutUploadStore.recordSuccess(
             id, target.service, remoteId, photoHash, photoMediaRef,
             if (pending) row.sourceHash else sourceHash, payloadHash, hadTrack, refusal,
             target.accountKey(context) ?: row.remoteAccount
         )
-        return SyncOutcome.Resynced(refusal)
+        return if (metadataFailed) SyncOutcome.Failed(null) else SyncOutcome.Resynced(refusal)
     }
 
     /**
@@ -483,7 +504,7 @@ object WorkoutUploader {
         }
         LOG.info("Re-created {} on service {} as {} for summary {}",
             remoteActivityId, target.service, newId, summary.id)
-        return TrackUpdateResult.Recreated(newId, result.photoMediaRef)
+        return TrackUpdateResult.Recreated(newId, result.photoMediaRef, result.photoRefusal)
     }
 
     /**
@@ -519,20 +540,25 @@ object WorkoutUploader {
      * Outcome of an upload attempt. [remoteActivityId] is the id the service assigned to the new
      * activity, null on failure. [photoMediaRef] is the service's id for the media entry the
      * header photo was uploaded as, null when there was no photo or the photo step failed.
-     * [reason] is a localized failure explanation, null on success.
+     * [reason] is a localized failure explanation, null on success. [photoRefusal] is the localized
+     * reason the service would not take the photo when that is for the user to fix, such as the
+     * login not allowing media, rather than a failure the next run may get past.
      */
     data class UploadResult(
         val success: Boolean,
         val remoteActivityId: String?,
         val reason: String?,
-        val photoMediaRef: String? = null
+        val photoMediaRef: String? = null,
+        val photoRefusal: String? = null
     )
 
     /**
      * Outcome of a header photo sync. [mediaRef] is the service's id for the media entry now
-     * holding the photo, null when the photo was removed or the upload failed.
+     * holding the photo, null when the photo was removed or the upload failed. [refusal] is set in
+     * place of success when the service would not take the photo for a reason the user has to fix;
+     * see [UploadResult.photoRefusal].
      */
-    data class PhotoSyncResult(val success: Boolean, val mediaRef: String?)
+    data class PhotoSyncResult(val success: Boolean, val mediaRef: String?, val refusal: String? = null)
 
     /**
      * Runs a service's callback-style upload to completion, answering a failure the user can read

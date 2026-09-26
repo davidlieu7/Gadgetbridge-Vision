@@ -28,7 +28,6 @@ import androidx.annotation.IdRes
 import androidx.annotation.LayoutRes
 import androidx.core.content.edit
 import androidx.lifecycle.lifecycleScope
-import com.google.android.material.bottomsheet.BottomSheetDialogFragment
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -49,7 +48,7 @@ abstract class AbstractApiTokenSetupBottomSheet(
     @param:IdRes private val apiTokenViewId: Int,
     /** Field holding the address of the user's instance, absent for a hosted service. */
     @param:IdRes private val serverViewId: Int? = null,
-) : BottomSheetDialogFragment() {
+) : ExternalServiceSetupBottomSheet() {
     /** The service being set up. */
     protected abstract val service: ExternalService
 

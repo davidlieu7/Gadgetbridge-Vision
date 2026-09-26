@@ -31,9 +31,9 @@ import android.widget.Toast
 import androidx.core.content.edit
 import androidx.core.net.toUri
 import androidx.localbroadcastmanager.content.LocalBroadcastManager
-import com.google.android.material.bottomsheet.BottomSheetDialogFragment
 import nodomain.freeyourgadget.gadgetbridge.GBApplication
 import nodomain.freeyourgadget.gadgetbridge.R
+import nodomain.freeyourgadget.gadgetbridge.externalservices.ExternalServiceSetupBottomSheet
 import nodomain.freeyourgadget.gadgetbridge.externalservices.PkceHelper
 import nodomain.freeyourgadget.gadgetbridge.externalservices.externalServiceLoginResultKey
 import nodomain.freeyourgadget.gadgetbridge.util.GB
@@ -47,7 +47,7 @@ import org.slf4j.LoggerFactory
  * never sees their password. What comes back is handled by [FitTrackeeService.onLoginCallback],
  * which reports here.
  */
-class FitTrackeeSetupBottomSheet : BottomSheetDialogFragment() {
+class FitTrackeeSetupBottomSheet : ExternalServiceSetupBottomSheet() {
     private lateinit var serverInput: EditText
     private lateinit var clientIdInput: EditText
     private lateinit var clientSecretInput: EditText

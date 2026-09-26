@@ -141,6 +141,7 @@ class WorkoutUploadWorker(
      */
     private fun WorkoutUploader.SyncOutcome.failureReason(): String? = when (this) {
         is WorkoutUploader.SyncOutcome.Failed -> reason
+        is WorkoutUploader.SyncOutcome.Uploaded -> refusal
         is WorkoutUploader.SyncOutcome.Resynced -> refusal
         else -> null
     }

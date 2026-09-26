@@ -26,6 +26,20 @@ import org.slf4j.LoggerFactory
 import java.io.File
 import java.net.URLEncoder
 
+/** What a media request came to. */
+sealed interface FitTrackeeMediaResult {
+    /** It went through; [mediaId] is the new item's id when one was created. */
+    data class Done(val mediaId: String?) : FitTrackeeMediaResult
+
+    /**
+     * Refused because the login does not allow media, which takes an application with the
+     * `media:write` scope: nothing a retry can change.
+     */
+    object NotAllowed : FitTrackeeMediaResult
+
+    object Failed : FitTrackeeMediaResult
+}
+
 /** What `GET /api/workouts/<id>` answered. */
 sealed interface FitTrackeeWorkoutLookup {
     data class Found(val workout: JSONObject) : FitTrackeeWorkoutLookup
@@ -265,20 +279,20 @@ class FitTrackeeApiClient(
         request("/api/workouts/$workoutId", "DELETE").statusCode in 200..299
 
     /**
-     * Uploads [photo] as a media item that belongs to no workout yet, and answers its id, or null
-     * when it did not go through. Needs the `media:write` scope. Blocking.
+     * Uploads [photo] as a media item that belongs to no workout yet; [FitTrackeeMediaResult.Done]
+     * carries its id. Needs the `media:write` scope. Blocking.
      */
-    fun uploadMedia(photo: File): String? = try {
+    fun uploadMedia(photo: File): FitTrackeeMediaResult = try {
         ExternalServicePhotos.withAcceptedFormat(photo, ALLOWED_PHOTO_EXTENSIONS) { file ->
-            file?.let { postMedia(it, retry = true) }
+            file?.let { postMedia(it, retry = true) } ?: FitTrackeeMediaResult.Failed
         }
     } catch (e: Exception) {
         LOG.error("FitTrackee media upload errored", e)
-        null
+        FitTrackeeMediaResult.Failed
     }
 
-    private fun postMedia(file: File, retry: Boolean): String? {
-        var mediaId: String? = null
+    private fun postMedia(file: File, retry: Boolean): FitTrackeeMediaResult {
+        var result: FitTrackeeMediaResult = FitTrackeeMediaResult.Failed
         var rejected = false
         InternetUtils.uploadBinaryFile(
             uri = url("/api/media"),
@@ -287,14 +301,17 @@ class FitTrackeeApiClient(
             method = "POST"
         ) { success, statusCode, responseText, reason ->
             if (success && statusCode in 200..299 && responseText != null) {
-                mediaId = try {
-                    JSONObject(responseText).getString("id")
+                result = try {
+                    FitTrackeeMediaResult.Done(JSONObject(responseText).getString("id"))
                 } catch (e: Exception) {
                     LOG.warn("FitTrackee answered a media upload without an id", e)
-                    null
+                    FitTrackeeMediaResult.Failed
                 }
             } else {
                 rejected = statusCode == 401
+                if (statusCode == 403) {
+                    result = FitTrackeeMediaResult.NotAllowed
+                }
                 LOG.error("FitTrackee media upload failed: {}",
                     messageOf(responseText) ?: reason ?: statusCode?.let { "HTTP $it" })
             }
@@ -302,13 +319,16 @@ class FitTrackeeApiClient(
         if (rejected && retry && refreshTokens()) {
             return postMedia(file, retry = false)
         }
-        return mediaId
+        return result
     }
 
     /** Deletes a media item. One that is already gone counts as deleted. Blocking. */
-    fun deleteMedia(mediaId: String): Boolean =
-        request("/api/media/$mediaId", "DELETE").statusCode.let { it in 200..299 || it == 404 }
-
+    fun deleteMedia(mediaId: String): FitTrackeeMediaResult =
+        when (request("/api/media/$mediaId", "DELETE").statusCode) {
+            in 200..299, 404 -> FitTrackeeMediaResult.Done(null)
+            403 -> FitTrackeeMediaResult.NotAllowed
+            else -> FitTrackeeMediaResult.Failed
+        }
     private fun workoutIdOf(responseText: String): String? = try {
         JSONObject(responseText)
             .getJSONObject("data")
