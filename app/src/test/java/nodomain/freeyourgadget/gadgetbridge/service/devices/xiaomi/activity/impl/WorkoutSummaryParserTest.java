@@ -245,6 +245,28 @@ public class WorkoutSummaryParserTest {
         assertEquals(7, num(data, ActivitySummaryEntries.VITALITY_GAIN), 0.001);
     }
 
+    /** Outdoor cycling v6 (Smart Band 10), 23 May 2026, 11.98 km ride, no route. */
+    private static final String OUTDOOR_CYCLING_V6_23MAY =
+            "V7kRaggG3QD3//9fw5CPBgBXuRFqJsoRas8QAADPEAAAzi4AABoCtwFoAAAApCYAACNkIEG56wlC"
+                    + "W41IAAAAAAAAAAAAAAAAAAAAAAAAAACamRk/AAAAAAAAAAAAAAAAAAAAAAAAAAAKAAAAYQAAAFYE"
+                    + "AAAAAAAAAAAAAAAAAAAAAAAFAAEAAAAAAAAAAAAAAAAAAAAAAAAAANY0wh8=";
+
+    @Test
+    public void outdoorCyclingV6_extractsCaloriesPaceAndLoad() {
+        final ActivitySummaryData data = parse(OUTDOOR_CYCLING_V6_23MAY);
+
+        assertEquals(11982, num(data, ActivitySummaryEntries.DISTANCE_METERS), 0.001);
+        assertEquals(538, num(data, ActivitySummaryEntries.CALORIES_TOTAL), 0.001);
+        assertEquals(439, num(data, ActivitySummaryEntries.CALORIES_BURNT), 0.001);
+        // Fastest pace 104 s/km is 34.6 km/h, the maximum speed of the ride
+        assertEquals(104, num(data, ActivitySummaryEntries.PACE_MAX), 0.001);
+        assertEquals(34.48, num(data, ActivitySummaryEntries.SPEED_MAX), 0.01);
+        assertEquals(10, num(data, ActivitySummaryEntries.HR_ZONE_AEROBIC), 0.001);
+        assertEquals(97, num(data, ActivitySummaryEntries.HR_ZONE_FAT_BURN), 0.001);
+        assertEquals(1110, num(data, ActivitySummaryEntries.HR_ZONE_WARM_UP), 0.001);
+        assertEquals(5, num(data, ActivitySummaryEntries.WORKOUT_LOAD), 0.001);
+    }
+
     /** The route byte sits at offset 0x8D of a v8 cycling summary; a route ride carries
      *  8 more bytes after it. */
     @Test
