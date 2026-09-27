@@ -2,23 +2,34 @@
 
     <!-- light theme -->
     <style name="GadgetbridgeTheme" parent="Theme.Material3.Light">
-        <item name="textColorPrimary">@color/primarytext_light</item>
-        <item name="textColorSecondary">@color/secondarytext</item>
+        <item name="colorSurface">@color/window_background_light</item>
+        <item name="colorSurfaceContainerLowest">@color/surface_container_lowest_light</item>
+        <item name="colorSurfaceContainerLow">@color/surface_container_low_light</item>
+        <item name="colorSurfaceContainer">@color/surface_container_light</item>
+        <item name="colorSurfaceContainerHigh">@color/surface_container_high_light</item>
+        <item name="colorSurfaceContainerHighest">@color/surface_container_highest_light</item>
+        <item name="colorSurfaceVariant">@color/surface_container_high_light</item>
+        <item name="colorOnSurface">@color/primarytext_light</item>
+        <item name="colorOnSurfaceVariant">@color/on_surface_variant_light</item>
+        <item name="colorOutline">@color/outline_light</item>
+        <item name="colorOutlineVariant">@color/outline_variant_light</item>
+
+        <item name="textColorPrimary">?attr/colorOnSurface</item>
+        <item name="textColorSecondary">?attr/colorOnSurfaceVariant</item>
         <item name="textColorTertiary">@color/tertiarytext_light</item>
 
         <item name="colorPrimary">?attr/tab_pill</item>
         <item name="colorPrimaryDark">?attr/tab_pill</item>
         <item name="colorOnPrimary">?attr/tab_pill_on</item>
 
-        <item name="colorPrimaryContainer">@color/accent</item>
-        <item name="colorOnPrimaryContainer">@android:color/white</item>
+        <item name="colorPrimaryContainer">?attr/subtab_pill</item>
+        <item name="colorOnPrimaryContainer">?attr/subtab_pill_on</item>
+        <item name="colorSecondaryContainer">?attr/subtab_pill</item>
+        <item name="colorOnSecondaryContainer">?attr/subtab_pill_on</item>
 
         <item name="elevationOverlayEnabled">false</item>
 
-        <item name="actionBarStyle">@style/GadgetbridgeTheme.LightActionBar</item>
-        <item name="drawerArrowStyle">@style/GadgetbridgeTheme.LightDrawerButtonStyle</item>
-        <item name="toolbarNavigationButtonStyle">@style/GadgetbridgeTheme.LightNavigationButtonStyle</item>
-        <item name="actionOverflowButtonStyle">@style/GadgetbridgeTheme.LightOverflowMenuButton</item>
+        <item name="actionBarStyle">@style/GadgetbridgeTheme.ActionBar</item>
         <item name="actionOverflowMenuStyle">@style/GadgetbridgeTheme.OverflowMenuStyle</item>
         <item name="actionModeStyle">@style/GadgetbridgeTheme.ActionMode</item>
         <item name="actionModeCloseButtonStyle">@style/GadgetbridgeTheme.ActionModeCloseButton</item>
@@ -26,8 +37,8 @@
 
         <item name="drawer_header_color">?attr/toolbar_bg</item>
         <item name="drawer_title_color">?attr/textColorPrimary</item>
-        <item name="cardview_background_color">@color/cardview_light_background</item>
-        <item name="actionmenu_icon_color">@color/primarytext_light</item>
+        <item name="cardview_background_color">?attr/colorSurface</item>
+        <item name="actionmenu_icon_color">?attr/colorOnSurface</item>
         <item name="chart_deep_sleep">@color/chart_deep_sleep_light</item>
         <item name="chart_light_sleep">@color/chart_light_sleep_light</item>
         <item name="chart_rem_sleep">@color/chart_rem_sleep_light</item>
@@ -36,43 +47,43 @@
         <item name="chart_not_worn">@color/chart_not_worn_light</item>
         <item name="spo2_avg_color">@color/spo2_avg_color_light</item>
         <item name="training_acute_load">@color/training_load</item>
-        <item name="alternate_row_background">@color/alternate_row_background_light</item>
+        <item name="alternate_row_background">?attr/colorSecondaryContainer</item>
         <item name="row_separator">@color/row_separator_light</item>
-        <item name="stat_tile_bg">@color/stat_tile_bg_light</item>
-        <item name="stat_tile_border">@color/stat_tile_border_light</item>
-        <item name="activity_icon_bg">@color/activity_icon_bg_light</item>
+        <item name="stat_tile_bg">?attr/colorSurface</item>
+        <item name="stat_tile_border">?attr/colorOutlineVariant</item>
+        <item name="activity_icon_bg">?attr/colorSurfaceContainerHigh</item>
         <item name="table_header_rule">@color/table_header_rule_light</item>
 
-        <item name="tab_bar_bg">@color/tab_bar_bg_light</item>
+        <item name="tab_bar_bg">?attr/toolbar_bg</item>
         <item name="tab_pill">@color/primarydark_light</item>
         <item name="tab_pill_on">@android:color/white</item>
-        <item name="tab_text_off">@color/tab_text_off_light</item>
+        <item name="tab_text_off">?attr/colorOnSurfaceVariant</item>
         <item name="subtab_pill">@color/subtab_pill_light</item>
         <item name="subtab_pill_on">@color/primarydark_light</item>
-        <item name="subtab_text_off">@color/subtab_text_off_light</item>
+        <item name="subtab_text_off">?attr/colorOnSurfaceVariant</item>
         <item name="subtab_active">?attr/tab_pill</item>
         <item name="chip_border_off">?attr/stat_tile_border</item>
         <item name="chip_text_off">?attr/colorOnSurfaceVariant</item>
 
-        <item name="datestep_row_bg">?android:attr/windowBackground</item>
-        <item name="datestep_bg">@color/datestep_bg_light</item>
-        <item name="datestep_icon">@color/datestep_icon_light</item>
-        <item name="datestep_caption">@color/datestep_caption_light</item>
-        <item name="datestep_primary_bg">?attr/tab_pill</item>
-        <item name="datestep_primary_icon">?attr/tab_pill_on</item>
-        <item name="datestep_primary_caption">?attr/tab_pill_on</item>
-        <item name="datestep_label">@color/primarytext_light</item>
+        <item name="datestep_row_bg">?attr/toolbar_bg</item>
+        <item name="datestep_bg">?attr/colorSurfaceContainerHigh</item>
+        <item name="datestep_icon">?attr/colorOnSurfaceVariant</item>
+        <item name="datestep_caption">?attr/colorOnSurfaceVariant</item>
+        <item name="datestep_primary_bg">?attr/colorPrimary</item>
+        <item name="datestep_primary_icon">?attr/colorOnPrimary</item>
+        <item name="datestep_primary_caption">?attr/colorOnPrimary</item>
+        <item name="datestep_label">?attr/colorOnSurface</item>
 
-        <item name="toolbar_bg">@color/toolbar_bg_light</item>
+        <item name="toolbar_bg">?attr/colorSurface</item>
         <item name="bar_shade">@drawable/bar_shade_light</item>
-        <item name="toolbar_title">@android:color/white</item>
-        <item name="toolbar_subtitle">@color/toolbar_subtitle</item>
-        <item name="toolbar_icon">@color/tab_text_off_dark</item>
+        <item name="toolbar_title">?attr/colorOnSurface</item>
+        <item name="toolbar_subtitle">?attr/colorOnSurfaceVariant</item>
+        <item name="toolbar_icon">?attr/colorOnSurfaceVariant</item>
         <item name="main_bar_bg">?attr/toolbar_bg</item>
-        <item name="summary_tile_label">@color/accent</item>
-        <item name="accent_color">@color/accent</item>
-        <item name="value_line">@color/value_line_color</item>
-        <item name="gauge_track">@color/gauge_line_color</item>
+        <item name="summary_tile_label">?attr/subtab_active</item>
+        <item name="accent_color">?attr/subtab_active</item>
+        <item name="value_line">?attr/colorOutlineVariant</item>
+        <item name="gauge_track">?attr/colorSurfaceContainerHighest</item>
 
         <item name="checkmarkColor">#669900</item>
         <item name="deviceIconPrimary">#2196f3</item>
@@ -80,44 +91,57 @@
         <item name="deviceIconLight">#1f7fdb</item>
         <item name="deviceIconDark">#4dabf5</item>
 
-        <!-- Neutral light grey, instead of the slightly tinted Material 3 default -->
         <item name="android:windowBackground">@color/window_background_light</item>
         <item name="android:colorBackground">@color/window_background_light</item>
         <item name="android:statusBarColor">?attr/toolbar_bg</item>
         <item name="android:windowLightStatusBar" tools:targetApi="23">true</item>
-        <!-- An explicit color, not ?android:attr/windowBackground: dialogs redefine windowBackground as
+        <!-- colorSurface, not ?android:attr/windowBackground: dialogs redefine windowBackground as
              a drawable, and windows read this as a color, which crashed when opening one -->
-        <item name="android:navigationBarColor">@color/window_background_light</item>
+        <item name="android:navigationBarColor">?attr/colorSurface</item>
         <!-- FIXME: SDK 21 to 27 has light navbar on light background -->
         <item name="android:windowLightNavigationBar" tools:targetApi="27">true</item>
     </style>
 
     <!-- dark theme -->
     <style name="GadgetbridgeThemeDark" parent="Theme.Material3.Dark">
-        <item name="textColorPrimary">@color/primarytext_dark</item>
-        <item name="textColorSecondary">@color/secondarytext</item>
+        <!-- Neutral greys, instead of the slightly tinted Material 3 defaults -->
+        <item name="colorSurface">@color/window_background_dark</item>
+        <item name="colorSurfaceContainerLowest">@color/surface_container_lowest_dark</item>
+        <item name="colorSurfaceContainerLow">@color/surface_container_low_dark</item>
+        <item name="colorSurfaceContainer">@color/surface_container_dark</item>
+        <item name="colorSurfaceContainerHigh">@color/surface_container_high_dark</item>
+        <item name="colorSurfaceContainerHighest">@color/surface_container_highest_dark</item>
+        <item name="colorSurfaceVariant">@color/surface_container_high_dark</item>
+        <item name="colorOnSurface">@color/primarytext_dark</item>
+        <item name="colorOnSurfaceVariant">@color/on_surface_variant_dark</item>
+        <item name="colorOutline">@color/outline_dark</item>
+        <item name="colorOutlineVariant">@color/outline_variant_dark</item>
+
+        <item name="textColorPrimary">?attr/colorOnSurface</item>
+        <item name="textColorSecondary">?attr/colorOnSurfaceVariant</item>
         <item name="textColorTertiary">@color/tertiarytext_dark</item>
 
         <item name="colorPrimary">?attr/tab_pill</item>
         <item name="colorPrimaryDark">?attr/tab_pill</item>
-
         <item name="colorOnPrimary">?attr/tab_pill_on</item>
-        <item name="colorPrimaryContainer">@color/accent</item>
-        <item name="colorOnPrimaryContainer">@android:color/white</item>
+
+        <item name="colorPrimaryContainer">?attr/subtab_pill</item>
+        <item name="colorOnPrimaryContainer">?attr/subtab_pill_on</item>
+        <item name="colorSecondaryContainer">?attr/subtab_pill</item>
+        <item name="colorOnSecondaryContainer">?attr/subtab_pill_on</item>
 
         <item name="elevationOverlayEnabled">false</item>
 
-        <item name="actionBarStyle">@style/GadgetbridgeTheme.DarkActionBar</item>
-        <item name="drawerArrowStyle">@style/GadgetbridgeTheme.DrawerButtonStyle</item>
-        <item name="toolbarNavigationButtonStyle">@style/GadgetbridgeTheme.NavigationButtonStyle</item>
-        <item name="actionOverflowButtonStyle">@style/GadgetbridgeTheme.OverflowMenuButton</item>
+        <item name="actionBarStyle">@style/GadgetbridgeTheme.ActionBar</item>
         <item name="actionOverflowMenuStyle">@style/GadgetbridgeTheme.OverflowMenuStyle</item>
+        <item name="actionModeStyle">@style/GadgetbridgeTheme.ActionMode</item>
+        <item name="actionModeCloseButtonStyle">@style/GadgetbridgeTheme.ActionModeCloseButton</item>
         <item name="preferenceTheme">@style/AppPreferenceThemeOverlay</item>
 
         <item name="drawer_header_color">?attr/toolbar_bg</item>
         <item name="drawer_title_color">?attr/textColorPrimary</item>
-        <item name="cardview_background_color">@color/cardview_dark_background</item>
-        <item name="actionmenu_icon_color">@android:color/white</item>
+        <item name="cardview_background_color">?attr/colorSurface</item>
+        <item name="actionmenu_icon_color">?attr/colorOnSurface</item>
         <item name="chart_deep_sleep">@color/chart_deep_sleep_dark</item>
         <item name="chart_light_sleep">@color/chart_light_sleep_dark</item>
         <item name="chart_rem_sleep">@color/chart_rem_sleep_dark</item>
@@ -126,43 +150,45 @@
         <item name="chart_not_worn">@color/chart_not_worn_dark</item>
         <item name="spo2_avg_color">@color/spo2_avg_color_dark</item>
         <item name="training_acute_load">@color/training_load_dark</item>
-        <item name="alternate_row_background">@color/alternate_row_background_dark</item>
+        <item name="alternate_row_background">?attr/colorSecondaryContainer</item>
         <item name="row_separator">@color/row_separator_dark</item>
-        <item name="stat_tile_bg">@color/stat_tile_bg_dark</item>
-        <item name="stat_tile_border">@color/stat_tile_border_dark</item>
-        <item name="activity_icon_bg">@color/activity_icon_bg_dark</item>
+        <item name="stat_tile_bg">?attr/colorSurface</item>
+        <item name="stat_tile_border">?attr/colorOutlineVariant</item>
+        <item name="activity_icon_bg">?attr/colorSurfaceContainerHigh</item>
         <item name="table_header_rule">@color/table_header_rule_dark</item>
 
         <item name="tab_bar_bg">?attr/toolbar_bg</item>
         <item name="tab_pill">@color/primarydark_dark</item>
         <item name="tab_pill_on">@android:color/white</item>
-        <item name="tab_text_off">@color/tab_text_off_dark</item>
+        <item name="tab_text_off">?attr/colorOnSurfaceVariant</item>
         <item name="subtab_pill">@color/subtab_pill_dark</item>
         <item name="subtab_pill_on">@color/subtab_pill_on_dark</item>
-        <item name="subtab_text_off">@color/subtab_text_off_dark</item>
+        <item name="subtab_text_off">?attr/colorOnSurfaceVariant</item>
         <item name="subtab_active">?attr/tab_pill</item>
         <item name="chip_border_off">?attr/stat_tile_border</item>
         <item name="chip_text_off">?attr/colorOnSurfaceVariant</item>
 
-        <item name="datestep_row_bg">?android:attr/windowBackground</item>
-        <item name="datestep_bg">@color/datestep_bg_dark</item>
-        <item name="datestep_icon">@color/datestep_icon_dark</item>
-        <item name="datestep_caption">@color/datestep_caption_dark</item>
-        <item name="datestep_primary_bg">?attr/tab_pill</item>
-        <item name="datestep_primary_icon">?attr/tab_pill_on</item>
-        <item name="datestep_primary_caption">?attr/tab_pill_on</item>
-        <item name="datestep_label">@android:color/white</item>
+        <item name="datestep_row_bg">?attr/toolbar_bg</item>
+        <item name="datestep_bg">?attr/colorSurfaceContainerHigh</item>
+        <item name="datestep_icon">?attr/colorOnSurfaceVariant</item>
+        <item name="datestep_caption">?attr/colorOnSurfaceVariant</item>
+        <item name="datestep_primary_bg">?attr/colorPrimary</item>
+        <item name="datestep_primary_icon">?attr/colorOnPrimary</item>
+        <item name="datestep_primary_caption">?attr/colorOnPrimary</item>
+        <item name="datestep_label">?attr/colorOnSurface</item>
 
-        <item name="toolbar_bg">@color/toolbar_bg</item>
+        <item name="toolbar_bg">?attr/colorSurface</item>
         <item name="bar_shade">@drawable/bar_shade_dark</item>
-        <item name="toolbar_title">@android:color/white</item>
-        <item name="toolbar_subtitle">@color/toolbar_subtitle</item>
-        <item name="toolbar_icon">@color/tab_text_off_dark</item>
+        <item name="toolbar_title">?attr/colorOnSurface</item>
+        <item name="toolbar_subtitle">?attr/colorOnSurfaceVariant</item>
+        <item name="toolbar_icon">?attr/colorOnSurfaceVariant</item>
         <item name="main_bar_bg">?attr/toolbar_bg</item>
-        <item name="summary_tile_label">@color/accent</item>
-        <item name="accent_color">@color/accent</item>
-        <item name="value_line">@color/value_line_color</item>
-        <item name="gauge_track">@color/gauge_line_color</item>
+        <!-- subtab_active, not tab_pill: the White preset's pill color has no contrast against
+             the background, and the preset gives subtab_active a readable color instead -->
+        <item name="summary_tile_label">?attr/subtab_active</item>
+        <item name="accent_color">?attr/subtab_active</item>
+        <item name="value_line">?attr/colorOutlineVariant</item>
+        <item name="gauge_track">?attr/colorSurfaceContainerHighest</item>
 
         <item name="checkmarkColor">#669900</item>
         <item name="deviceIconPrimary">#2196f3</item>
@@ -174,7 +200,7 @@
         <item name="android:colorBackground">@color/window_background_dark</item>
         <item name="android:statusBarColor">?attr/toolbar_bg</item>
         <item name="android:windowLightStatusBar" tools:targetApi="23">false</item>
-        <item name="android:navigationBarColor">@color/window_background_dark</item>
+        <item name="android:navigationBarColor">?attr/colorSurface</item>
         <item name="android:windowLightNavigationBar" tools:targetApi="27">false</item>
     </style>
 
@@ -188,6 +214,7 @@
         <item name="toolbar_bg">@color/toolbar_bg_amoled</item>
         <item name="bar_shade">@drawable/bar_shade_amoled</item>
         <item name="tab_bar_bg">@android:color/black</item>
+        <item name="datestep_row_bg">@android:color/black</item>
         <item name="stat_tile_bg">@color/stat_tile_bg_amoled</item>
         <item name="stat_tile_border">@color/stat_tile_border_amoled</item>
         <item name="android:navigationBarColor">@android:color/black</item>
@@ -198,7 +225,7 @@
     <style name="GadgetbridgeThemeDynamicLight" parent="Theme.Material3.DynamicColors.Light">
         <item name="textColorPrimary">?attr/colorOnSurface</item>
         <item name="textColorSecondary">?attr/colorOnSurfaceVariant</item>
-        <item name="actionBarStyle">@style/GadgetbridgeThemeDynamic.ActionBar</item>
+        <item name="actionBarStyle">@style/GadgetbridgeTheme.ActionBar</item>
         <item name="actionOverflowMenuStyle">@style/GadgetbridgeTheme.OverflowMenuStyle</item>
         <item name="android:statusBarColor">?attr/toolbar_bg</item>
         <item name="android:windowLightStatusBar" tools:targetApi="23">true</item>
@@ -259,7 +286,7 @@
     <style name="GadgetbridgeThemeDynamicDark" parent="Theme.Material3.DynamicColors.Dark">
         <item name="textColorPrimary">?attr/colorOnSurface</item>
         <item name="textColorSecondary">?attr/colorOnSurfaceVariant</item>
-        <item name="actionBarStyle">@style/GadgetbridgeThemeDynamic.ActionBar</item>
+        <item name="actionBarStyle">@style/GadgetbridgeTheme.ActionBar</item>
         <item name="actionOverflowMenuStyle">@style/GadgetbridgeTheme.OverflowMenuStyle</item>
         <item name="android:statusBarColor">?attr/toolbar_bg</item>
         <item name="android:windowLightStatusBar" tools:targetApi="23">false</item>
@@ -382,80 +409,30 @@
         <item name="actionMenuTextColor">?attr/toolbar_icon</item>
     </style>
 
-    <style name="GadgetbridgeTheme.DarkActionBar" parent="Widget.Material3.ActionBar.Solid">
+    <style name="GadgetbridgeTheme.ActionBar" parent="Widget.Material3.ActionBar.Solid">
         <item name="background">?attr/toolbar_bg</item>
         <item name="android:height">52dp</item>
         <item name="titleTextStyle">@style/GadgetbridgeTheme.ToolbarTitleStyle</item>
         <item name="subtitleTextStyle">@style/GadgetbridgeTheme.ToolbarSubtitleStyle</item>
+        <!-- No shadow under the bar: it showed as a gradient on the tab row below -->
         <item name="elevation">0dp</item>
         <item name="android:theme">@style/GadgetbridgeTheme.ToolbarIconOverlay</item>
-    </style>
-    <!-- Light theme only: a plain light bar (toolbar_bg), independent of both the dark chrome
-         (GadgetbridgeTheme.DarkActionBar) and the chosen accent color - dark text/icons for
-         contrast against it. -->
-    <style name="GadgetbridgeTheme.LightActionBar" parent="Widget.Material3.ActionBar.Solid">
-        <item name="background">?attr/toolbar_bg</item>
-        <item name="android:height">52dp</item>
-        <item name="titleTextStyle">@style/GadgetbridgeTheme.LightToolbarTitleStyle</item>
-        <item name="subtitleTextStyle">@style/GadgetbridgeTheme.LightToolbarSubtitleStyle</item>
-        <!-- No shadow under the bar, like the dark and dynamic action bars: it showed as a gradient
-             on the tab row below -->
-        <item name="elevation">0dp</item>
-        <item name="android:theme">@style/GadgetbridgeTheme.LightToolbarIconOverlay</item>
-    </style>
-    <style name="GadgetbridgeTheme.LightToolbarTitleStyle" parent="TextAppearance.App.ToolbarTitle">
-        <item name="android:textColor">@color/primarytext_light</item>
-    </style>
-    <style name="GadgetbridgeTheme.LightToolbarSubtitleStyle" parent="TextAppearance.App.ToolbarSubtitle">
-        <item name="android:textColor">@color/secondarytext</item>
-    </style>
-    <style name="GadgetbridgeTheme.LightToolbarIconOverlay" parent="">
-        <item name="colorControlNormal">@color/primarytext_light</item>
-        <item name="actionMenuTextColor">@color/primarytext_light</item>
-    </style>
-    <style name="GadgetbridgeTheme.LightNavigationButtonStyle" parent="Widget.AppCompat.Toolbar.Button.Navigation">
-        <item name="tint">@color/primarytext_light</item>
-    </style>
-    <style name="GadgetbridgeTheme.LightDrawerButtonStyle" parent="@style/Widget.AppCompat.DrawerArrowToggle">
-        <item name="spinBars">true</item>
-        <item name="color">@color/primarytext_light</item>
-    </style>
-    <style name="GadgetbridgeTheme.LightOverflowMenuButton" parent="Widget.AppCompat.ActionButton.Overflow">
-        <item name="tint">@color/primarytext_light</item>
-    </style>
-    <style name="GadgetbridgeThemeDynamic.ActionBar" parent="Widget.Material3.ActionBar.Solid">
-        <item name="background">?attr/toolbar_bg</item>
-        <item name="android:height">52dp</item>
-        <item name="titleTextStyle">@style/GadgetbridgeTheme.ToolbarTitleStyle</item>
-        <item name="subtitleTextStyle">@style/GadgetbridgeTheme.ToolbarSubtitleStyle</item>
-        <item name="elevation">0dp</item>
-        <item name="android:theme">@style/GadgetbridgeTheme.ToolbarIconOverlay</item>
-    </style>
-    <style name="GadgetbridgeTheme.DrawerButtonStyle" parent="@style/Widget.AppCompat.DrawerArrowToggle">
-        <item name="spinBars">true</item>
-        <item name="color">@android:color/white</item>
-    </style>
-    <style name="GadgetbridgeTheme.NavigationButtonStyle" parent="Widget.AppCompat.Toolbar.Button.Navigation">
-        <item name="tint">@android:color/white</item>
-    </style>
-    <style name="GadgetbridgeTheme.OverflowMenuButton" parent="Widget.AppCompat.ActionButton.Overflow">
-        <item name="tint">@android:color/white</item>
     </style>
     <style name="GadgetbridgeTheme.ActionMode" parent="Widget.AppCompat.ActionMode">
-        <item name="background">@color/primary_light</item>
-        <item name="titleTextStyle">@style/GadgetbridgeTheme.ActionBarTitleStyle</item>
-        <item name="subtitleTextStyle">@style/GadgetbridgeTheme.ActionBarTitleStyle</item>
+        <item name="background">?attr/colorPrimary</item>
+        <item name="titleTextStyle">@style/GadgetbridgeTheme.ActionModeTitleStyle</item>
+        <item name="subtitleTextStyle">@style/GadgetbridgeTheme.ActionModeTitleStyle</item>
         <item name="android:theme">@style/GadgetbridgeTheme.ActionModeOverlay</item>
     </style>
     <style name="GadgetbridgeTheme.ActionModeOverlay" parent="">
-        <item name="colorControlNormal">@android:color/white</item>
-        <item name="actionmenu_icon_color">@android:color/white</item>
+        <item name="colorControlNormal">?attr/colorOnPrimary</item>
+        <item name="actionmenu_icon_color">?attr/colorOnPrimary</item>
     </style>
     <style name="GadgetbridgeTheme.ActionModeCloseButton" parent="Widget.AppCompat.ActionButton">
-        <item name="android:tint">@android:color/white</item>
+        <item name="android:tint">?attr/colorOnPrimary</item>
     </style>
-    <style name="GadgetbridgeTheme.ActionBarTitleStyle" parent="TextAppearance.Material3.ActionBar.Title">
-        <item name="android:textColor">@color/primarytext_dark</item>
+    <style name="GadgetbridgeTheme.ActionModeTitleStyle" parent="TextAppearance.Material3.ActionBar.Title">
+        <item name="android:textColor">?attr/colorOnPrimary</item>
     </style>
     <style name="GadgetbridgeTheme.OverflowMenuStyle" parent="Widget.Material3.PopupMenu.Overflow" />
 

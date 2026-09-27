@@ -264,10 +264,6 @@ public class ControlCenterv2 extends AppCompatActivity
         if (navigationView.getVisibility() == View.VISIBLE) {
             barShades.setBottomShade(findViewById(R.id.bottom_nav_shade));
         }
-        if (!GBApplication.areDynamicColorsEnabled()) {
-            // Dynamic Color already ties title/icon colors to colorOnSurface/colorControlNormal
-            toolbar.setTitleTextColor(GBApplication.getTextColor(this));
-        }
 
         // Configure ViewPager2 with fragment adapter and default fragment
         viewPager = findViewById(R.id.dashboard_viewpager);

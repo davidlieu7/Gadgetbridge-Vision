@@ -47,7 +47,7 @@
     <attr name="datestep_primary_caption" format="color" />
     <attr name="datestep_label" format="color" />
 
-    <!-- App-wide toolbar (dark chrome, 3b variant) -->
+    <!-- App-wide toolbar, same color as the window -->
     <attr name="toolbar_bg" format="color" />
     <attr name="toolbar_title" format="color" />
     <attr name="toolbar_subtitle" format="color" />

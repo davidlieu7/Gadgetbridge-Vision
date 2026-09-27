@@ -757,8 +757,11 @@ public class GBApplication extends Application {
     public static int getSecondaryTextColor(Context context) {
         if (AndroidUtils.isDynamicColorActive()) {
             return AndroidUtils.getDynamicColor(context, com.google.android.material.R.attr.colorOnSurfaceVariant);
+        } else if (isDarkThemeEnabled()) {
+            return context.getResources().getColor(R.color.on_surface_variant_dark);
+        } else {
+            return context.getResources().getColor(R.color.on_surface_variant_light);
         }
-        return context.getResources().getColor(R.color.secondarytext);
     }
 
     @Override
