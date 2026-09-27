@@ -22,11 +22,8 @@
     <color name="subtab_pill_on_dark" type="color">#FF6E5C</color>
     <color name="subtab_pill_light" type="color">#FBDBD5</color>
 
-    <color name="toolbar_bg_amoled" type="color">#0F0F0F</color>
-
     <color name="bar_shade_light" type="color">#1A000000</color>
     <color name="bar_shade_dark" type="color">#59000000</color>
-    <color name="bar_shade_amoled_end" type="color">#000F0F0F</color>
 
     <!-- Static Light theme screen background -->
     <color name="window_background_light" type="color">#FAFAFA</color>

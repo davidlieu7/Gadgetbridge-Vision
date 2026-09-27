@@ -208,13 +208,7 @@
     <style name="GadgetbridgeThemeBlack" parent="GadgetbridgeThemeDark">
         <item name="android:windowBackground">@android:color/black</item>
         <item name="android:colorBackground">@android:color/black</item>
-        <!-- The toolbar (and the status bar, bottom bar and drawer header, which follow it) is a near-black
-             toolbar_bg_amoled, set apart from the black window. An explicit
-             color: it is read as a color, so it must not alias windowBackground. -->
-        <item name="toolbar_bg">@color/toolbar_bg_amoled</item>
-        <item name="bar_shade">@drawable/bar_shade_amoled</item>
-        <item name="tab_bar_bg">@android:color/black</item>
-        <item name="datestep_row_bg">@android:color/black</item>
+        <item name="toolbar_bg">@android:color/black</item>
         <item name="stat_tile_bg">@color/stat_tile_bg_amoled</item>
         <item name="stat_tile_border">@color/stat_tile_border_amoled</item>
         <item name="android:navigationBarColor">@android:color/black</item>
@@ -343,16 +337,13 @@
         <item name="value_line">?attr/colorOutlineVariant</item>
         <item name="gauge_track">?attr/colorSurfaceContainerHighest</item>
     </style>
-    <!-- Mirrors GadgetbridgeThemeBlack: black window, near-black toolbar_bg_amoled chrome. Explicit colors: toolbar_bg is
+    <!-- Mirrors GadgetbridgeThemeBlack: black window and black chrome. Explicit colors: toolbar_bg is
          read as a color, so it must not alias windowBackground. Tiles keep the AMOLED values, as a
          wallpaper-tinted tile would break the black look. -->
     <style name="GadgetbridgeThemeDynamicDarkAmoled" parent="GadgetbridgeThemeDynamicDark">
         <item name="android:windowBackground">@android:color/black</item>
         <item name="android:colorBackground">@android:color/black</item>
-        <item name="toolbar_bg">@color/toolbar_bg_amoled</item>
-        <item name="bar_shade">@drawable/bar_shade_amoled</item>
-        <item name="tab_bar_bg">@android:color/black</item>
-        <item name="datestep_row_bg">@android:color/black</item>
+        <item name="toolbar_bg">@android:color/black</item>
         <item name="stat_tile_bg">@color/stat_tile_bg_amoled</item>
         <item name="stat_tile_border">@color/stat_tile_border_amoled</item>
         <item name="android:navigationBarColor">@android:color/black</item>

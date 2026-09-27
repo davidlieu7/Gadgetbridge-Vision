@@ -1,6 +1,7 @@
 package nodomain.freeyourgadget.gadgetbridge.activities.dashboard
 
 import android.annotation.SuppressLint
+import android.graphics.Color
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
@@ -164,16 +165,16 @@ class DashboardAdapter : RecyclerView.Adapter<DashboardAdapter.ViewHolder>() {
 
     private fun applyCardStyle(card: MaterialCardView) {
         val density = card.resources.displayMetrics.density
-        // Same fill as the stat tiles, so it follows the theme.
-        card.setCardBackgroundColor(MaterialColors.getColor(card, R.attr.stat_tile_bg))
+        card.strokeWidth = 0
         if (cardsEnabled) {
+            // Same fill as the stat tiles, so it follows the theme.
+            card.setCardBackgroundColor(MaterialColors.getColor(card, R.attr.stat_tile_bg))
             card.radius = 4 * density
             card.cardElevation = 4 * density
-            card.strokeWidth = 0
         } else {
+            card.setCardBackgroundColor(Color.TRANSPARENT)
             card.radius = 0f
             card.cardElevation = 0f
-            card.strokeWidth = 0
         }
     }
 }
