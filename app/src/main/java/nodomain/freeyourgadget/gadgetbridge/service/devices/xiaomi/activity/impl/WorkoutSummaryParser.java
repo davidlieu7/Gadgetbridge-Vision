@@ -235,6 +235,8 @@ public class WorkoutSummaryParser extends XiaomiActivityParser implements Activi
                 parser = getOutdoorCyclingV2Parser(fileId);
                 break;
             case SPORTS_OUTDOOR_CYCLING:
+                // The workout type field overrides this when the version is parsed
+                summary.setActivityKind(ActivityKind.OUTDOOR_CYCLING.getCode());
                 parser = getOutdoorCyclingParser(fileId);
                 break;
             case SPORTS_TREADMILL:
@@ -585,6 +587,9 @@ public class WorkoutSummaryParser extends XiaomiActivityParser implements Activi
             case 6:
                 headerSize = 7;
                 break;
+            case 8:   // Smart Band 10 Pro
+                headerSize = 8;
+                break;
             default:
                 LOG.warn("Unable to parse outdoor cycling summary version {}", fileId.getVersion());
                 return null;
@@ -598,10 +603,19 @@ public class WorkoutSummaryParser extends XiaomiActivityParser implements Activi
         builder.addInt(ACTIVE_SECONDS, UNIT_SECONDS);
         builder.addUnknown(4);
         builder.addInt(DISTANCE_METERS, UNIT_METERS);
-        builder.addUnknown(2);
+        if (version >= 8) {
+            builder.addShort(CALORIES_TOTAL, UNIT_KCAL);
+        } else {
+            builder.addUnknown(2);
+        }
         builder.addShort(CALORIES_BURNT, UNIT_KCAL);
-        builder.addUnknown(4);
-        builder.addUnknown(4);
+        if (version >= 8) {
+            builder.addInt(PACE_MAX, UNIT_SECONDS_PER_KM);
+            builder.addInt(PACE_MIN, UNIT_SECONDS_PER_KM);
+        } else {
+            builder.addUnknown(4);
+            builder.addUnknown(4);
+        }
         if (version >= 5) {
             builder.addFloat(SPEED_AVG, UNIT_KMPH);
         }
@@ -618,6 +632,9 @@ public class WorkoutSummaryParser extends XiaomiActivityParser implements Activi
         builder.addUnknown(1);
         builder.addFloat(TRAINING_EFFECT_ANAEROBIC, UNIT_NONE);
         builder.addUnknown(1);
+        if (version >= 8) {
+            builder.addUnknown(5); // reserved (5 bytes)
+        }
         builder.addByte(MAXIMUM_OXYGEN_UPTAKE, UNIT_ML_KG_MIN);
         builder.addUnknown(1);
         builder.addUnknown(1);
@@ -628,6 +645,20 @@ public class WorkoutSummaryParser extends XiaomiActivityParser implements Activi
         builder.addInt(HR_ZONE_AEROBIC, UNIT_SECONDS);
         builder.addInt(HR_ZONE_FAT_BURN, UNIT_SECONDS);
         builder.addInt(HR_ZONE_WARM_UP, UNIT_SECONDS);
+        if (version >= 8) {
+            builder.addUnknown(5); // reserved (5 bytes)
+            builder.addInt(TIME_GOAL, UNIT_SECONDS);
+            builder.addShort(CALORIES_GOAL, UNIT_KCAL);
+            builder.addInt(DISTANCE_GOAL, UNIT_METERS);
+            builder.addFloat(SPEED_GOAL, UNIT_KMPH);
+            // Set when the ride follows a route. The watch then inserts 8 more bytes here,
+            // which this fixed layout cannot follow, so the fields below shift for such rides.
+            builder.addUnknown(1);
+            builder.addShort(WORKOUT_LOAD, UNIT_NONE);
+            builder.addUnknown(15); // reserved (15 bytes)
+            builder.addByte(VITALITY_GAIN, UNIT_NONE);
+            builder.addUnknown(8); // reserved (8 bytes)
+        }
 
         return builder.build();
     }

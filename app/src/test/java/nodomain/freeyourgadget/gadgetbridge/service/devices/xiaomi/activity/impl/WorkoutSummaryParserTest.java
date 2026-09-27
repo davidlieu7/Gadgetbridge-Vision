@@ -203,4 +203,51 @@ public class WorkoutSummaryParserTest {
         assertEquals("heart rate zones should add up to the active seconds",
                 num(data, ActivitySummaryEntries.ACTIVE_SECONDS), zones, 0.001);
     }
+
+    /** Outdoor cycling v8 (Smart Band 10 Pro), 23 Sep 2026, 5.28 km ride, no route. */
+    private static final String OUTDOOR_CYCLING_V8_23SEP =
+            "doGzaggI3QD3/n/X/4chPwYAdoGzaqGHs2orBgAAKwYAAKIUAACmAH8ATAAAAAwEAABRrkBBnbQ7QoWo"
+                    + "UAAAAAAAAAAAAAAAAAAAAAAAAAAAMzMTQADNzEw/AAAAAAAAAAAADQAAAAAAAF8AAAAuAwAAVAEA"
+                    + "ABsBAAAAAAAAAAAAAAAAAAAAAAAAAAAAABwAAAAAAAAAAQAAAAAAAAAABwAAAAAAAAAAy+id1Q==";
+
+    @Test
+    public void outdoorCyclingV8_extractsStatsZonesLoadVitality() {
+        final BaseActivitySummary summary = new BaseActivitySummary();
+        summary.setRawSummaryData(Base64.getDecoder().decode(OUTDOOR_CYCLING_V8_23SEP));
+        new WorkoutSummaryParser().parseBinaryData(summary, true);
+        assertEquals(ActivityKind.OUTDOOR_CYCLING.getCode(), summary.getActivityKind());
+
+        final ActivitySummaryData data = ActivitySummaryData.fromJson(summary.getSummaryData());
+        assertEquals(1579, num(data, ActivitySummaryEntries.ACTIVE_SECONDS), 0.001);
+        assertEquals(5282, num(data, ActivitySummaryEntries.DISTANCE_METERS), 0.001);
+        assertEquals(166, num(data, ActivitySummaryEntries.CALORIES_TOTAL), 0.001);
+        assertEquals(127, num(data, ActivitySummaryEntries.CALORIES_BURNT), 0.001);
+        assertEquals(76, num(data, ActivitySummaryEntries.PACE_MAX), 0.001);
+        assertEquals(1036, num(data, ActivitySummaryEntries.PACE_MIN), 0.001);
+        // Average speed must agree with distance over time: 5282 m / 1579 s = 12.04 km/h
+        assertEquals(12.04, num(data, ActivitySummaryEntries.SPEED_AVG), 0.01);
+        assertEquals(46.93, num(data, ActivitySummaryEntries.SPEED_MAX), 0.01);
+        assertEquals(133, num(data, ActivitySummaryEntries.HR_AVG), 0.001);
+        assertEquals(168, num(data, ActivitySummaryEntries.HR_MAX), 0.001);
+        assertEquals(80, num(data, ActivitySummaryEntries.HR_MIN), 0.001);
+        assertEquals(2.3, num(data, ActivitySummaryEntries.TRAINING_EFFECT_AEROBIC), 0.01);
+        assertEquals(0.8, num(data, ActivitySummaryEntries.TRAINING_EFFECT_ANAEROBIC), 0.01);
+        assertEquals(13, num(data, ActivitySummaryEntries.RECOVERY_TIME), 0.001);
+        assertEquals(95, num(data, ActivitySummaryEntries.HR_ZONE_ANAEROBIC), 0.001);
+        assertEquals(814, num(data, ActivitySummaryEntries.HR_ZONE_AEROBIC), 0.001);
+        assertEquals(340, num(data, ActivitySummaryEntries.HR_ZONE_FAT_BURN), 0.001);
+        assertEquals(283, num(data, ActivitySummaryEntries.HR_ZONE_WARM_UP), 0.001);
+        assertEquals(28, num(data, ActivitySummaryEntries.WORKOUT_LOAD), 0.001);
+        assertEquals(7, num(data, ActivitySummaryEntries.VITALITY_GAIN), 0.001);
+    }
+
+    @Test
+    public void outdoorCyclingUnsupportedVersion_isStillCycling() {
+        final byte[] bytes = Base64.getDecoder().decode(OUTDOOR_CYCLING_V8_23SEP);
+        bytes[5] = 99; // fileId version byte
+        final BaseActivitySummary summary = new BaseActivitySummary();
+        summary.setRawSummaryData(bytes);
+        new WorkoutSummaryParser().parseBinaryData(summary, true);
+        assertEquals(ActivityKind.OUTDOOR_CYCLING.getCode(), summary.getActivityKind());
+    }
 }
