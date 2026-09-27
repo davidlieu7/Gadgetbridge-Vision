@@ -651,9 +651,10 @@ public class WorkoutSummaryParser extends XiaomiActivityParser implements Activi
             builder.addShort(CALORIES_GOAL, UNIT_KCAL);
             builder.addInt(DISTANCE_GOAL, UNIT_METERS);
             builder.addFloat(SPEED_GOAL, UNIT_KMPH);
-            // Set when the ride follows a route. The watch then inserts 8 more bytes here,
-            // which this fixed layout cannot follow, so the fields below shift for such rides.
+            // Route byte: 0xFC, 0xFD or 0xFF when the ride follows a route, in which case
+            // 8 more bytes follow it.
             builder.addUnknown(1);
+            builder.addUnknownIfPreviousByte(8, route -> route == 0xFC || route == 0xFD || route == 0xFF);
             builder.addShort(WORKOUT_LOAD, UNIT_NONE);
             builder.addUnknown(15); // reserved (15 bytes)
             builder.addByte(VITALITY_GAIN, UNIT_NONE);

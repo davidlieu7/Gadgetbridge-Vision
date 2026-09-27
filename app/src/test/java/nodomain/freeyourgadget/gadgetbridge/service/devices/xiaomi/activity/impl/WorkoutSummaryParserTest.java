@@ -22,12 +22,16 @@ import static org.junit.Assert.assertTrue;
 
 import org.junit.Test;
 
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
+import java.util.Arrays;
 import java.util.Base64;
 
 import nodomain.freeyourgadget.gadgetbridge.entities.BaseActivitySummary;
 import nodomain.freeyourgadget.gadgetbridge.model.ActivityKind;
 import nodomain.freeyourgadget.gadgetbridge.model.ActivitySummaryData;
 import nodomain.freeyourgadget.gadgetbridge.model.ActivitySummaryEntries;
+import nodomain.freeyourgadget.gadgetbridge.util.CheckSums;
 
 /**
  * Tests for {@link WorkoutSummaryParser} using captured device data. Each base64 blob
@@ -237,6 +241,25 @@ public class WorkoutSummaryParserTest {
         assertEquals(814, num(data, ActivitySummaryEntries.HR_ZONE_AEROBIC), 0.001);
         assertEquals(340, num(data, ActivitySummaryEntries.HR_ZONE_FAT_BURN), 0.001);
         assertEquals(283, num(data, ActivitySummaryEntries.HR_ZONE_WARM_UP), 0.001);
+        assertEquals(28, num(data, ActivitySummaryEntries.WORKOUT_LOAD), 0.001);
+        assertEquals(7, num(data, ActivitySummaryEntries.VITALITY_GAIN), 0.001);
+    }
+
+    /** The route byte sits at offset 0x8D of a v8 cycling summary; a route ride carries
+     *  8 more bytes after it. */
+    @Test
+    public void outdoorCyclingV8_routeRide_keepsLoadAndVitalityAligned() {
+        final byte[] plain = Base64.getDecoder().decode(OUTDOOR_CYCLING_V8_23SEP);
+        final int routeOffset = 0x8D;
+        final byte[] route = new byte[plain.length + 8];
+        System.arraycopy(plain, 0, route, 0, routeOffset + 1);
+        route[routeOffset] = (byte) 0xFF;
+        Arrays.fill(route, routeOffset + 1, routeOffset + 9, (byte) 0x5A);
+        System.arraycopy(plain, routeOffset + 1, route, routeOffset + 9, plain.length - routeOffset - 1);
+        final ByteBuffer crc = ByteBuffer.wrap(route).order(ByteOrder.LITTLE_ENDIAN);
+        crc.putInt(route.length - 4, CheckSums.getCRC32(route, 0, route.length - 4));
+
+        final ActivitySummaryData data = parse(Base64.getEncoder().encodeToString(route));
         assertEquals(28, num(data, ActivitySummaryEntries.WORKOUT_LOAD), 0.001);
         assertEquals(7, num(data, ActivitySummaryEntries.VITALITY_GAIN), 0.001);
     }
