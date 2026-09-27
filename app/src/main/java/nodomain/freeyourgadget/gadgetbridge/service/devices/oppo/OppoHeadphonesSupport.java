@@ -61,6 +61,7 @@ import nodomain.freeyourgadget.gadgetbridge.devices.oppo.OppoHeadphonesPreferenc
 import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEvent;
 import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEventBatteryInfo;
 import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEventUpdatePreferences;
+import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEventFindPhone;
 
 public class OppoHeadphonesSupport extends AbstractHeadphoneBTBRDeviceSupport {
     private static final Logger LOG = LoggerFactory.getLogger(OppoHeadphonesSupport.class);
@@ -217,6 +218,7 @@ public class OppoHeadphonesSupport extends AbstractHeadphoneBTBRDeviceSupport {
             case OppoHeadphonesPreferences.ANC_SELECTOR -> ancModeSet();
             case OppoHeadphonesPreferences.ANC_TOUCH_CYCLE_MODES -> touchAncCycleModesSet();
             case OppoHeadphonesPreferences.MULTIPOINT -> multipointSet();
+            case OppoHeadphonesPreferences.FIND_PHONE -> findPhoneSet();
 	    default -> super.onSendConfiguration(config);
         }
     }
@@ -281,6 +283,10 @@ public class OppoHeadphonesSupport extends AbstractHeadphoneBTBRDeviceSupport {
                 }
 
                 parseAncConfig(payload);
+            }
+            case FIND_PHONE -> {
+                LOG.debug("Got {}", command);
+                parseFindPhone(payload);
             }
             default -> LOG.warn("Unhandled command {}", command);
         }
@@ -503,6 +509,12 @@ public class OppoHeadphonesSupport extends AbstractHeadphoneBTBRDeviceSupport {
         miscConfigSet(MiscConfigType.MULTIPOINT, isEnabled);
     }
 
+    private void findPhoneSet() {
+        final boolean isEnabled = getDevicePrefs().getBoolean(OppoHeadphonesPreferences.FIND_PHONE, false);
+        LOG.debug("Send MiscConfigType.FIND_PHONE = {}", isEnabled);
+        miscConfigSet(MiscConfigType.FIND_PHONE, isEnabled);
+    }
+
     private void miscConfigSet(final MiscConfigType type, final boolean isEnabled) {
         final byte[] payload = new byte[] {
                 (byte) type.getCode(),
@@ -519,6 +531,8 @@ public class OppoHeadphonesSupport extends AbstractHeadphoneBTBRDeviceSupport {
             types.add(MiscConfigType.MULTIPOINT);
         if (getCoordinator().supportsGameMode(getDevice()))
             types.add(MiscConfigType.GAME_MODE);
+        if (getCoordinator().supportsFindPhone(getDevice()))
+            types.add(MiscConfigType.FIND_PHONE);
         if (types.isEmpty())
             return;
 
@@ -581,6 +595,12 @@ public class OppoHeadphonesSupport extends AbstractHeadphoneBTBRDeviceSupport {
                     LOG.debug("Got misc config for GAME_MODE = {}", isEnabled);
                     eventUpdatePreferences.withPreference(
                             OppoHeadphonesPreferences.GAME_MODE,
+                            isEnabled);
+                }
+                case FIND_PHONE -> {
+                    LOG.debug("Got misc config for FIND_PHONE = {}", isEnabled);
+                    eventUpdatePreferences.withPreference(
+                            OppoHeadphonesPreferences.FIND_PHONE,
                             isEnabled);
                 }
                 default -> LOG.warn("Unknown misc config type code 0x{}", OppoUtils.numberToHex(typeCode, 2));
@@ -688,6 +708,20 @@ public class OppoHeadphonesSupport extends AbstractHeadphoneBTBRDeviceSupport {
                 break;
             }
         }
+        evaluateGBDeviceEvent(event);
+    }
+
+    private void parseFindPhone(final byte[] payload) {
+        final GBDeviceEventFindPhone event = new GBDeviceEventFindPhone();
+        final int eventCode = payload[0];
+        if (eventCode == 0x05) {
+            event.event = GBDeviceEventFindPhone.Event.START;
+        } else if (eventCode == 0x06) {
+            event.event = GBDeviceEventFindPhone.Event.STOP;
+        } else {
+            LOG.warn("Unexpected byte 0x{} for FIND_PHONE", OppoUtils.numberToHex(eventCode, 2));
+        }
+
         evaluateGBDeviceEvent(event);
     }
 

@@ -104,9 +104,6 @@ abstract class OppoHeadphonesCoordinator : AbstractBLClassicDeviceCoordinator() 
     }
 
     private fun DeviceSettingsScope.touchOptions(device: GBDevice) {
-        if (touchOptions.isEmpty()) {
-            return
-        }
         screen(
             DeviceSpecificSettingsScreen.TOUCH_OPTIONS,
             R.drawable.ic_touch,
@@ -133,6 +130,13 @@ abstract class OppoHeadphonesCoordinator : AbstractBLClassicDeviceCoordinator() 
                 }
             if (supportsAnc(device)) {
                 touchOptionsAncCycleModes()
+            }
+            if (supportsFindPhone(device)) {
+                switchSetting(
+                    key = OppoHeadphonesPreferences.FIND_PHONE,
+                    title = R.string.prefs_find_phone,
+                    icon = R.drawable.ic_vibration,
+                )
             }
         }
     }
@@ -166,4 +170,5 @@ abstract class OppoHeadphonesCoordinator : AbstractBLClassicDeviceCoordinator() 
     open fun supportsMultipoint(device: GBDevice): Boolean = false
     open fun supportsGameMode(device: GBDevice): Boolean = false
     open fun supportsAnc(device: GBDevice): Boolean = false
+    open fun supportsFindPhone(device: GBDevice): Boolean = false
 }
