@@ -129,7 +129,7 @@ public class WorkoutDetailsParser extends XiaomiActivityParser {
         if (r.hr > 0) builder.setHeartRate(r.hr);
         if (r.cadence != null && r.cadence > 0) builder.setCadence(r.cadence);
         if (r.speedMps != null) {
-            if (r.speedMps > 0f) builder.setSpeed(r.speedMps);
+            builder.setSpeed(r.speedMps);
         } else if (version == 6 && r.speedRaw != null && r.speedRaw > 0) {
             final float speedMps = 256000f / r.speedRaw;
             if (speedMps > 0f && speedMps < 20f) {
@@ -183,7 +183,7 @@ public class WorkoutDetailsParser extends XiaomiActivityParser {
         if (r.hr > 0) p.setHeartRate(r.hr);
         if (r.cadence != null && r.cadence > 0) p.setCadence(r.cadence);
         if (r.speedMps != null) {
-            if (r.speedMps > 0f) p.setSpeed(r.speedMps);
+            p.setSpeed(r.speedMps);
         } else if (version == 6 && r.speedRaw != null && r.speedRaw > 0) {
             final float speedMps = 256000f / r.speedRaw;
             if (speedMps > 0f && speedMps < 20f) p.setSpeed(speedMps);

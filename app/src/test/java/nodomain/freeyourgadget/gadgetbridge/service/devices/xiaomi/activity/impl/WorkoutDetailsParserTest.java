@@ -915,6 +915,8 @@ public class WorkoutDetailsParserTest {
         assertEquals(2, points.size());
         assertEquals(46.4f / 3.6f, points.get(0).getSpeed(), 0.001f);
         assertEquals(121, points.get(1).getHeartRate());
+        // A standstill is a measured zero, so the speed chart does not break there
+        assertEquals(0f, points.get(1).getSpeed(), 0.001f);
     }
 
     // ---- freestyle v3 (signature FF BB; the byte after the signature is the record-count
