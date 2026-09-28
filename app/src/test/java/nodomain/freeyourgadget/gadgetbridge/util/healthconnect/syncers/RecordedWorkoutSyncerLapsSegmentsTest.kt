@@ -1,6 +1,8 @@
 package nodomain.freeyourgadget.gadgetbridge.util.healthconnect.syncers
 
 import androidx.health.connect.client.records.ExerciseSegment
+import androidx.health.connect.client.records.ExerciseSessionRecord
+import androidx.health.connect.client.records.metadata.Metadata
 import nodomain.freeyourgadget.gadgetbridge.model.ActivityPoint
 import nodomain.freeyourgadget.gadgetbridge.model.ActivityTrack
 import nodomain.freeyourgadget.gadgetbridge.model.ActivityTrack.SegmentInfo
@@ -22,6 +24,9 @@ class RecordedWorkoutSyncerLapsSegmentsTest {
     private val start: Instant = Instant.parse("2026-05-26T21:00:00Z")
     private val end: Instant = start.plusSeconds(960) // 16 min
     private val device = "test-device"
+
+    /** A session type without a sport-specific segment type, so work segments stay UNKNOWN. */
+    private val OTHER = ExerciseSessionRecord.EXERCISE_TYPE_OTHER_WORKOUT
 
     private fun point(secondsFromStart: Long): ActivityPoint =
         ActivityPoint(Date.from(start.plusSeconds(secondsFromStart)))
@@ -76,7 +81,7 @@ class RecordedWorkoutSyncerLapsSegmentsTest {
 
     @Test
     fun segments_keepAll_typed() {
-        val segments = RecordedWorkoutSyncer.buildSegments(bounds(intervalTrack()))
+        val segments = RecordedWorkoutSyncer.buildSegments(bounds(intervalTrack()), OTHER)
         assertEquals(3, segments.size)
         assertEquals(ExerciseSegment.EXERCISE_SEGMENT_TYPE_UNKNOWN, segments[0].segmentType)
         assertEquals(ExerciseSegment.EXERCISE_SEGMENT_TYPE_REST, segments[1].segmentType)
@@ -91,6 +96,67 @@ class RecordedWorkoutSyncerLapsSegmentsTest {
     }
 
     @Test
+    fun segments_workTypedAsSessionSport() {
+        val segments = RecordedWorkoutSyncer.buildSegments(
+            bounds(intervalTrack()),
+            ExerciseSessionRecord.EXERCISE_TYPE_ROWING_MACHINE
+        )
+        assertEquals(ExerciseSegment.EXERCISE_SEGMENT_TYPE_ROWING_MACHINE, segments[0].segmentType)
+        assertEquals(ExerciseSegment.EXERCISE_SEGMENT_TYPE_REST, segments[1].segmentType)
+        assertEquals(ExerciseSegment.EXERCISE_SEGMENT_TYPE_ROWING_MACHINE, segments[2].segmentType)
+    }
+
+    @Test
+    fun workSegmentType_acceptedByHcForEverySessionType() {
+        // ExerciseSessionRecord's constructor rejects a segment type its exercise type does not allow.
+        // Every HC session type is checked, not only those an ActivityKind maps to today.
+        val sessionTypes = ExerciseSessionRecord::class.java.fields
+            .filter { it.name.startsWith("EXERCISE_TYPE_") && it.type == Int::class.javaPrimitiveType }
+            .map { it.getInt(null) }
+            .toSet()
+        assertTrue(sessionTypes.size > 50)
+        val restStart = start.plusSeconds(420)
+        for (sessionType in sessionTypes) {
+            val segments = listOf(
+                ExerciseSegment(start, restStart, RecordedWorkoutSyncer.workSegmentType(sessionType)),
+                ExerciseSegment(restStart, end, ExerciseSegment.EXERCISE_SEGMENT_TYPE_REST)
+            )
+            ExerciseSessionRecord(
+                startTime = start,
+                startZoneOffset = null,
+                endTime = end,
+                endZoneOffset = null,
+                exerciseType = sessionType,
+                segments = segments,
+                metadata = Metadata.unknownRecordingMethod()
+            )
+        }
+    }
+
+    @Test(expected = IllegalArgumentException::class)
+    fun hcRejectsIncompatibleSegmentType() {
+        ExerciseSessionRecord(
+            startTime = start,
+            startZoneOffset = null,
+            endTime = end,
+            endZoneOffset = null,
+            exerciseType = ExerciseSessionRecord.EXERCISE_TYPE_ROWING,
+            segments = listOf(ExerciseSegment(start, end, ExerciseSegment.EXERCISE_SEGMENT_TYPE_ROWING_MACHINE)),
+            metadata = Metadata.unknownRecordingMethod()
+        )
+    }
+
+    @Test
+    fun workSegmentType_sportWhereHcHasOne() {
+        assertEquals(ExerciseSegment.EXERCISE_SEGMENT_TYPE_RUNNING, RecordedWorkoutSyncer.workSegmentType(ExerciseSessionRecord.EXERCISE_TYPE_RUNNING))
+        assertEquals(ExerciseSegment.EXERCISE_SEGMENT_TYPE_WALKING, RecordedWorkoutSyncer.workSegmentType(ExerciseSessionRecord.EXERCISE_TYPE_HIKING))
+        assertEquals(ExerciseSegment.EXERCISE_SEGMENT_TYPE_SWIMMING_POOL, RecordedWorkoutSyncer.workSegmentType(ExerciseSessionRecord.EXERCISE_TYPE_SWIMMING_POOL))
+        assertEquals(ExerciseSegment.EXERCISE_SEGMENT_TYPE_UNKNOWN, RecordedWorkoutSyncer.workSegmentType(ExerciseSessionRecord.EXERCISE_TYPE_ROWING))
+        assertEquals(ExerciseSegment.EXERCISE_SEGMENT_TYPE_UNKNOWN, RecordedWorkoutSyncer.workSegmentType(ExerciseSessionRecord.EXERCISE_TYPE_STRENGTH_TRAINING))
+        assertEquals(ExerciseSegment.EXERCISE_SEGMENT_TYPE_UNKNOWN, RecordedWorkoutSyncer.workSegmentType(OTHER))
+    }
+
+    @Test
     fun unknownIntensity_keptAsUnknownInBothLists() {
         // Garmin-style plain distance laps: no explicit intensity -> UNKNOWN, all kept.
         val track = trackOf(
@@ -100,7 +166,7 @@ class RecordedWorkoutSyncerLapsSegmentsTest {
         )
         val b = bounds(track)
         assertEquals(3, RecordedWorkoutSyncer.buildLaps(b).size)
-        val segments = RecordedWorkoutSyncer.buildSegments(b)
+        val segments = RecordedWorkoutSyncer.buildSegments(b, OTHER)
         assertEquals(3, segments.size)
         assertTrue(segments.all { it.segmentType == ExerciseSegment.EXERCISE_SEGMENT_TYPE_UNKNOWN })
     }
@@ -111,7 +177,7 @@ class RecordedWorkoutSyncerLapsSegmentsTest {
         val b = bounds(track)
         assertEquals(1, b.size) // call-site >= 2 guard then suppresses emission
         assertEquals(1, RecordedWorkoutSyncer.buildLaps(b).size)
-        assertEquals(1, RecordedWorkoutSyncer.buildSegments(b).size)
+        assertEquals(1, RecordedWorkoutSyncer.buildSegments(b, OTHER).size)
     }
 
     @Test
@@ -124,7 +190,7 @@ class RecordedWorkoutSyncerLapsSegmentsTest {
         )
         val b = bounds(track)
         assertEquals(2, b.size)
-        assertEquals(2, RecordedWorkoutSyncer.buildSegments(b).size)
+        assertEquals(2, RecordedWorkoutSyncer.buildSegments(b, OTHER).size)
     }
 
     @Test
@@ -145,7 +211,7 @@ class RecordedWorkoutSyncerLapsSegmentsTest {
         val b = bounds(ActivityTrack())
         assertTrue(b.isEmpty())
         assertTrue(RecordedWorkoutSyncer.buildLaps(b).isEmpty())
-        assertTrue(RecordedWorkoutSyncer.buildSegments(b).isEmpty())
+        assertTrue(RecordedWorkoutSyncer.buildSegments(b, OTHER).isEmpty())
     }
 
     @Test
@@ -160,7 +226,7 @@ class RecordedWorkoutSyncerLapsSegmentsTest {
         val b = bounds(track)
         assertTrue(b.isEmpty())
         assertTrue(RecordedWorkoutSyncer.buildLaps(b).isEmpty())
-        assertTrue(RecordedWorkoutSyncer.buildSegments(b).isEmpty())
+        assertTrue(RecordedWorkoutSyncer.buildSegments(b, OTHER).isEmpty())
     }
 
     @Test
@@ -177,7 +243,7 @@ class RecordedWorkoutSyncerLapsSegmentsTest {
         assertEquals(start.plusSeconds(300), b[0].end)
         assertEquals(start.plusSeconds(420), b[1].start)
         assertEquals(2, RecordedWorkoutSyncer.buildLaps(b).size)
-        assertEquals(2, RecordedWorkoutSyncer.buildSegments(b).size)
+        assertEquals(2, RecordedWorkoutSyncer.buildSegments(b, OTHER).size)
     }
 
     @Test
@@ -188,7 +254,7 @@ class RecordedWorkoutSyncerLapsSegmentsTest {
             SegDesc(SegmentIntensity.REST, null, 420, 539),
             SegDesc(SegmentIntensity.ACTIVE, null, 540, 960)
         )
-        val segments = RecordedWorkoutSyncer.buildSegments(bounds(track))
+        val segments = RecordedWorkoutSyncer.buildSegments(bounds(track), OTHER)
         assertEquals(3, segments.size)
         assertEquals(segments[1].startTime, segments[0].endTime)
         assertEquals(segments[2].startTime, segments[1].endTime)
@@ -202,7 +268,7 @@ class RecordedWorkoutSyncerLapsSegmentsTest {
             SegDesc(SegmentIntensity.ACTIVE, null, 0, 300),
             SegDesc(SegmentIntensity.ACTIVE, null, 300, 1200) // 1200s > 960s session end
         )
-        val segments = RecordedWorkoutSyncer.buildSegments(bounds(track))
+        val segments = RecordedWorkoutSyncer.buildSegments(bounds(track), OTHER)
         assertEquals(2, segments.size)
         assertEquals(end, segments[1].endTime)
     }

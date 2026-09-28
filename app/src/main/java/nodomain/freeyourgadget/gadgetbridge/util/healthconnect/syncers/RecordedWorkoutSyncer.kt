@@ -400,7 +400,7 @@ internal object RecordedWorkoutSyncer {
         // a single entry spanning the whole session conveys nothing.
         val segmentBounds = buildSanitisedSegmentBounds(activityTrack, workoutStartInstant, workoutEndInstant, deviceName)
         val laps = buildLaps(segmentBounds).takeIf { it.size >= 2 } ?: emptyList()
-        val segments = buildSegments(segmentBounds).takeIf { it.size >= 2 } ?: emptyList()
+        val segments = buildSegments(segmentBounds, exerciseType).takeIf { it.size >= 2 } ?: emptyList()
         if (laps.isNotEmpty() || segments.isNotEmpty()) {
             LOG.info("Adding ${laps.size} lap(s) and ${segments.size} segment(s) for workout on device '$deviceName'.")
         }
@@ -638,21 +638,52 @@ internal object RecordedWorkoutSyncer {
     }
 
     /** Full typed phase list: one [ExerciseSegment] per boundary (REST included). REST maps to
-     *  EXERCISE_SEGMENT_TYPE_REST, everything else to EXERCISE_SEGMENT_TYPE_UNKNOWN — both are in
-     *  HC's universal-segment set, so they are compatible with any session type. Segments carry no
-     *  length; per-interval distance lives on the laps instead. */
-    internal fun buildSegments(bounds: List<SegmentBound>): List<ExerciseSegment> {
+     *  EXERCISE_SEGMENT_TYPE_REST, everything else to [workSegmentType] of the session. Segments
+     *  carry no length; per-interval distance lives on the laps instead. */
+    internal fun buildSegments(bounds: List<SegmentBound>, exerciseType: Int): List<ExerciseSegment> {
+        val workType = workSegmentType(exerciseType)
         val segments = ArrayList<ExerciseSegment>(bounds.size)
         for (b in bounds) {
             val segmentType = if (b.info.intensity == ActivityTrack.SegmentIntensity.REST) {
                 ExerciseSegment.EXERCISE_SEGMENT_TYPE_REST
             } else {
-                ExerciseSegment.EXERCISE_SEGMENT_TYPE_UNKNOWN
+                workType
             }
             segments.add(ExerciseSegment(startTime = b.start, endTime = b.end, segmentType = segmentType))
         }
         return segments
     }
+
+    /**
+     * Segment type of a session's working phases: every session type in HC's compatibility table
+     * that allows exactly one sport, whether or not an ActivityKind maps to it yet. Left out are
+     * EXERCISE_CLASS, which allows several sports, and the strength-style sessions (calisthenics,
+     * gymnastics, strength training, weightlifting), whose segments name individual exercises that
+     * a timed interval does not identify. All other sessions allow only universal segments
+     * (UNKNOWN, REST, PAUSE, ...).
+     */
+    private val WORK_SEGMENT_TYPES: Map<Int, Int> = mapOf(
+        ExerciseSessionRecord.EXERCISE_TYPE_BIKING to ExerciseSegment.EXERCISE_SEGMENT_TYPE_BIKING,
+        ExerciseSessionRecord.EXERCISE_TYPE_BIKING_STATIONARY to ExerciseSegment.EXERCISE_SEGMENT_TYPE_BIKING_STATIONARY,
+        ExerciseSessionRecord.EXERCISE_TYPE_ELLIPTICAL to ExerciseSegment.EXERCISE_SEGMENT_TYPE_ELLIPTICAL,
+        ExerciseSessionRecord.EXERCISE_TYPE_HIKING to ExerciseSegment.EXERCISE_SEGMENT_TYPE_WALKING,
+        ExerciseSessionRecord.EXERCISE_TYPE_PILATES to ExerciseSegment.EXERCISE_SEGMENT_TYPE_PILATES,
+        ExerciseSessionRecord.EXERCISE_TYPE_ROWING_MACHINE to ExerciseSegment.EXERCISE_SEGMENT_TYPE_ROWING_MACHINE,
+        ExerciseSessionRecord.EXERCISE_TYPE_RUNNING to ExerciseSegment.EXERCISE_SEGMENT_TYPE_RUNNING,
+        ExerciseSessionRecord.EXERCISE_TYPE_RUNNING_TREADMILL to ExerciseSegment.EXERCISE_SEGMENT_TYPE_RUNNING_TREADMILL,
+        ExerciseSessionRecord.EXERCISE_TYPE_STAIR_CLIMBING to ExerciseSegment.EXERCISE_SEGMENT_TYPE_STAIR_CLIMBING,
+        ExerciseSessionRecord.EXERCISE_TYPE_STAIR_CLIMBING_MACHINE to ExerciseSegment.EXERCISE_SEGMENT_TYPE_STAIR_CLIMBING_MACHINE,
+        ExerciseSessionRecord.EXERCISE_TYPE_SWIMMING_OPEN_WATER to ExerciseSegment.EXERCISE_SEGMENT_TYPE_SWIMMING_OPEN_WATER,
+        ExerciseSessionRecord.EXERCISE_TYPE_SWIMMING_POOL to ExerciseSegment.EXERCISE_SEGMENT_TYPE_SWIMMING_POOL,
+        ExerciseSessionRecord.EXERCISE_TYPE_WALKING to ExerciseSegment.EXERCISE_SEGMENT_TYPE_WALKING,
+        ExerciseSessionRecord.EXERCISE_TYPE_WHEELCHAIR to ExerciseSegment.EXERCISE_SEGMENT_TYPE_WHEELCHAIR,
+        ExerciseSessionRecord.EXERCISE_TYPE_YOGA to ExerciseSegment.EXERCISE_SEGMENT_TYPE_YOGA,
+    )
+
+    /** HC rejects a whole session whose segment type is incompatible with its exercise type; the
+     *  pairs in [WORK_SEGMENT_TYPES] follow HC's compatibility table, and UNKNOWN fits any session. */
+    internal fun workSegmentType(exerciseType: Int): Int =
+        WORK_SEGMENT_TYPES[exerciseType] ?: ExerciseSegment.EXERCISE_SEGMENT_TYPE_UNKNOWN
 
     private fun processAggregateWorkout(
         gbDevice: GBDevice,
