@@ -118,7 +118,8 @@ public class GarminRfcommListener extends Thread {
                 LOG.info("RFCOMM connection from {}", socket.getRemoteDevice().getAddress());
                 final InputStream in = socket.getInputStream();
                 out = socket.getOutputStream();
-                final CobsCoDec cobsCoDec = new CobsCoDec();
+                // device reports max packet 0x4000 over RFCOMM, file chunks use all of it
+                final CobsCoDec cobsCoDec = new CobsCoDec(0x10000);
                 int n;
                 while ((n = in.read(buf)) > 0) {
                     // feed byte by byte: one read can hold several frames, the decoder yields one at a time
@@ -126,7 +127,12 @@ public class GarminRfcommListener extends Thread {
                         cobsCoDec.receivedBytes(new byte[]{buf[i]});
                         final byte[] message = cobsCoDec.retrieveMessage();
                         if (message != null) {
-                            support.onMessage(message);
+                            try {
+                                support.onMessage(message);
+                            } catch (final RuntimeException e) {
+                                // an uncaught exception here would kill the app
+                                LOG.error("Failed to handle RFCOMM message", e);
+                            }
                         }
                     }
                 }
