@@ -22,6 +22,9 @@ import android.os.SystemClock;
 
 import androidx.annotation.Nullable;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 /**
  * Drives the vibration Sleep as Android asks for on devices that have no alarm of their own to
  * ring, by toggling find-device on and off.
@@ -39,6 +42,8 @@ import androidx.annotation.Nullable;
  * elsewhere.
  */
 public class SleepAsAndroidVibration {
+
+    private static final Logger LOG = LoggerFactory.getLogger(SleepAsAndroidVibration.class);
 
     public interface Toggle {
         void set(boolean on);
@@ -66,24 +71,20 @@ public class SleepAsAndroidVibration {
     static final int ALARM_BURST_PULSES = 3;
     static final long ALARM_BURST_INTERVAL_MS = 5_000L;
     /**
-     * Nothing stops the alarm if STOP_ALARM never arrives, so it cannot run unbounded. It has to
-     * outlast a real alarm by a wide margin, though: the wearable falling silent while the phone is
-     * still ringing is the louder failure of the two.
+     * How long an alarm rings when the user has not set a limit. Nothing stops the alarm if
+     * STOP_ALARM never arrives, which happens to an alarm that rang outside a session, so it cannot
+     * run unbounded. It has to outlast a real alarm by a wide margin, though: the wearable falling
+     * silent while the phone is still ringing is the louder failure of the two.
      */
-    static final long ALARM_MAX_DURATION_MS = 10 * 60_000L;
-    /**
-     * The cap for an alarm that rang with no Sleep as Android session behind it. Such an alarm has
-     * been seen to get no STOP_ALARM at all, and there is no session whose end could stop it
-     * either, so it is the case most likely to run to the cap rather than be stopped.
-     */
-    static final long ALARM_MAX_DURATION_NO_SESSION_MS = 2 * 60_000L;
+    public static final int DEFAULT_ALARM_MAX_MINUTES = 5;
+    public static final int MIN_ALARM_MAX_MINUTES = 1;
 
     private final Handler handler;
     private final Toggle toggle;
 
     private boolean alarmRunning = false;
     private boolean toggledOn = false;
-    private long maxDuration = ALARM_MAX_DURATION_MS;
+    private long maxDuration = DEFAULT_ALARM_MAX_MINUTES * 60_000L;
     private long alarmDeadline = 0;
 
     public SleepAsAndroidVibration(final Handler handler, final Toggle toggle) {
@@ -164,6 +165,7 @@ public class SleepAsAndroidVibration {
         if (alarmDeadline == 0) {
             alarmDeadline = SystemClock.elapsedRealtime() + maxDuration;
         } else if (SystemClock.elapsedRealtime() > alarmDeadline) {
+            LOG.info("Sleep as Android alarm reached its {} ms cap, stopping", maxDuration);
             stopNow();
             return;
         }

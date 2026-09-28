@@ -33,6 +33,9 @@ import nodomain.freeyourgadget.gadgetbridge.test.TestBase;
 
 public class SleepAsAndroidVibrationTest extends TestBase {
 
+    private static final long CAP = SleepAsAndroidVibration.DEFAULT_ALARM_MAX_MINUTES * 60_000L;
+    private static final long SHORT_CAP = SleepAsAndroidVibration.MIN_ALARM_MAX_MINUTES * 60_000L;
+
     /** Every find-device toggle, in order. */
     private List<Boolean> toggles;
     /** Elapsed time of every link wake, in order. */
@@ -96,7 +99,7 @@ public class SleepAsAndroidVibrationTest extends TestBase {
     public void alarmRepeatsWhileNothingStopsIt() {
         // The failure this guards: Sleep as Android sends START_ALARM once, and the band used to
         // buzz a single burst then fall silent while the phone kept ringing.
-        vibration.startAlarm(0, SleepAsAndroidVibration.ALARM_MAX_DURATION_MS);
+        vibration.startAlarm(0, CAP);
         idle(30_000);
 
         Assert.assertTrue("expected repeated bursts, saw " + countOn() + " pulses",
@@ -105,7 +108,7 @@ public class SleepAsAndroidVibrationTest extends TestBase {
 
     @Test
     public void alarmHonoursTheInitialDelay() {
-        vibration.startAlarm(10_000, SleepAsAndroidVibration.ALARM_MAX_DURATION_MS);
+        vibration.startAlarm(10_000, CAP);
 
         idle(9_000);
         Assert.assertEquals(0, countOn());
@@ -116,7 +119,7 @@ public class SleepAsAndroidVibrationTest extends TestBase {
 
     @Test
     public void stopEndsTheAlarmPromptly() {
-        vibration.startAlarm(0, SleepAsAndroidVibration.ALARM_MAX_DURATION_MS);
+        vibration.startAlarm(0, CAP);
         idle(12_000);
         Assert.assertTrue(vibration.isAlarmRunning());
 
@@ -134,7 +137,7 @@ public class SleepAsAndroidVibrationTest extends TestBase {
     public void stopFromAnotherThreadIsQueuedOnTheHandler() throws InterruptedException {
         // A connection cancels the alarm from the Bluetooth thread. Touching the schedule there
         // would let a burst that is midway through posting its next step outlive the cancel.
-        vibration.startAlarm(0, SleepAsAndroidVibration.ALARM_MAX_DURATION_MS);
+        vibration.startAlarm(0, CAP);
         idle(12_000);
         Assert.assertTrue(vibration.isAlarmRunning());
 
@@ -156,10 +159,10 @@ public class SleepAsAndroidVibrationTest extends TestBase {
 
     @Test
     public void negativeDelayCancelsARunningAlarm() {
-        vibration.startAlarm(0, SleepAsAndroidVibration.ALARM_MAX_DURATION_MS);
+        vibration.startAlarm(0, CAP);
         idle(12_000);
 
-        vibration.startAlarm(-1, SleepAsAndroidVibration.ALARM_MAX_DURATION_MS);
+        vibration.startAlarm(-1, CAP);
         final int afterCancel = toggles.size();
         idle(60_000);
 
@@ -171,8 +174,8 @@ public class SleepAsAndroidVibrationTest extends TestBase {
     public void alarmStopsAtTheSafetyCap() {
         // STOP_ALARM never arrives, so the loop must give up rather than vibrate until the
         // battery is flat.
-        vibration.startAlarm(0, SleepAsAndroidVibration.ALARM_MAX_DURATION_MS);
-        idle(SleepAsAndroidVibration.ALARM_MAX_DURATION_MS + 30_000);
+        vibration.startAlarm(0, CAP);
+        idle(CAP + 30_000);
 
         final int atCap = toggles.size();
         Assert.assertFalse(vibration.isAlarmRunning());
@@ -183,9 +186,9 @@ public class SleepAsAndroidVibrationTest extends TestBase {
 
     @Test
     public void theCapIsMeasuredFromTheFirstBurstNotFromScheduling() {
-        // Sleep as Android's default DELAY is a minute, which would otherwise eat half of the cap
-        // an alarm gets when no session is running.
-        final long cap = SleepAsAndroidVibration.ALARM_MAX_DURATION_NO_SESSION_MS;
+        // Sleep as Android's default DELAY is a minute, which would otherwise eat all of the
+        // shortest cap the user can set.
+        final long cap = SHORT_CAP;
         vibration.startAlarm((int) cap, cap);
 
         idle(cap + 1);
@@ -199,9 +202,9 @@ public class SleepAsAndroidVibrationTest extends TestBase {
 
     @Test
     public void aShorterCapStopsTheAlarmSooner() {
-        vibration.startAlarm(0, SleepAsAndroidVibration.ALARM_MAX_DURATION_NO_SESSION_MS);
+        vibration.startAlarm(0, SHORT_CAP);
 
-        idle(SleepAsAndroidVibration.ALARM_MAX_DURATION_NO_SESSION_MS + 30_000);
+        idle(SHORT_CAP + 30_000);
 
         Assert.assertFalse(vibration.isAlarmRunning());
         Assert.assertFalse("must leave the wearable quiet", toggles.get(toggles.size() - 1));
@@ -224,7 +227,7 @@ public class SleepAsAndroidVibrationTest extends TestBase {
     @Test
     public void everyAlarmBurstWakesTheLinkFirst() {
         // The link goes idle between bursts, so each one pays the wake-up latency again.
-        vibration.startAlarm(0, SleepAsAndroidVibration.ALARM_MAX_DURATION_MS);
+        vibration.startAlarm(0, CAP);
         idle(30_000);
 
         Assert.assertTrue("expected one wake per burst, saw " + wakes.size() + " for "
@@ -234,7 +237,7 @@ public class SleepAsAndroidVibrationTest extends TestBase {
 
     @Test
     public void theLeadPulseWaitsOutTheWakeLead() {
-        vibration.startAlarm(0, SleepAsAndroidVibration.ALARM_MAX_DURATION_MS);
+        vibration.startAlarm(0, CAP);
 
         idle(SleepAsAndroidVibration.WAKE_LEAD_MS - 1);
         Assert.assertEquals("the leading pulse must not go out before the link is awake",
@@ -246,7 +249,7 @@ public class SleepAsAndroidVibrationTest extends TestBase {
 
     @Test
     public void aCancelledAlarmNeverWakesTheLinkAgain() {
-        vibration.startAlarm(0, SleepAsAndroidVibration.ALARM_MAX_DURATION_MS);
+        vibration.startAlarm(0, CAP);
         idle(12_000);
         vibration.stop();
         final int afterStop = wakes.size();
@@ -268,7 +271,7 @@ public class SleepAsAndroidVibrationTest extends TestBase {
 
     @Test
     public void aSecondStopSaysNothing() {
-        vibration.startAlarm(0, SleepAsAndroidVibration.ALARM_MAX_DURATION_MS);
+        vibration.startAlarm(0, CAP);
         idle(12_000);
 
         vibration.stop();
@@ -283,11 +286,11 @@ public class SleepAsAndroidVibrationTest extends TestBase {
 
     @Test
     public void restartingTheAlarmDoesNotStackLoops() {
-        vibration.startAlarm(0, SleepAsAndroidVibration.ALARM_MAX_DURATION_MS);
+        vibration.startAlarm(0, CAP);
         idle(20_000);
         final int firstRun = countOn();
 
-        vibration.startAlarm(0, SleepAsAndroidVibration.ALARM_MAX_DURATION_MS);
+        vibration.startAlarm(0, CAP);
         idle(20_000);
 
         // A second loop running in parallel would roughly double the pulse rate.

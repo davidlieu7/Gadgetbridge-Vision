@@ -4714,6 +4714,7 @@
     <string name="pref_sleepasandroid_features_title">Features</string>
     <string name="pref_sleepasandroid_features_summary">Support differs from device to device</string>
     <string name="pref_sleepasandroid_feat_alarms">Alarms</string>
+    <string name="pref_sleepasandroid_alarm_max_minutes">Maximum alarm vibration (minutes)</string>
     <string name="pref_sleepasandroid_slot_title">Alarms slot</string>
     <string name="pref_sleepasandroid_slot_summary">Which alarm slot to use when setting alarms</string>
     <string name="alarm_slot_reset">Alarm slot has been set to default</string>

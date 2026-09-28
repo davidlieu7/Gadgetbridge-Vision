@@ -512,7 +512,9 @@ public class XiaomiSupport extends AbstractBluetoothDeviceSupport {
         // Ahead of validateAction, which gates STOP_TRACKING on the sensor features while gating
         // START_ALARM on the alarm one, so a session with both sensors off could start an alarm
         // that its own end was then not allowed to stop.
-        saaAlarms.onAction(action, extras, sleepAsAndroidSender.isTrackingOngoing(), alarmsEnabled());
+        saaAlarms.onAction(action, extras,
+                SleepAsAndroidAlarmController.alarmMaxDurationMs(GBApplication.getPrefs()),
+                alarmsEnabled());
 
         try {
             sleepAsAndroidSender.validateAction(action);

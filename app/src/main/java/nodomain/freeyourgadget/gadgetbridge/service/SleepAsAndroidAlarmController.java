@@ -26,6 +26,8 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import nodomain.freeyourgadget.gadgetbridge.externalevents.sleepasandroid.SleepAsAndroidAction;
+import nodomain.freeyourgadget.gadgetbridge.util.GBPrefs;
+import nodomain.freeyourgadget.gadgetbridge.util.Prefs;
 
 /**
  * Decides when a wearable with no alarm of its own buzzes for Sleep as Android, and when it stops.
@@ -59,13 +61,13 @@ public class SleepAsAndroidAlarmController {
      * stoppable whatever the preferences say now, and silencing a wearable is safe in a way that
      * starting it is not.
      *
-     * @param trackingOngoing whether a Sleep as Android session is running, which decides how long
-     *                        an alarm may ring unattended
-     * @param alarmsEnabled   whether the user allows Sleep as Android to ring this wearable
+     * @param maxDurationMs how long an alarm may ring if Sleep as Android never stops it, see
+     *                      {@link #alarmMaxDurationMs(Prefs)}
+     * @param alarmsEnabled whether the user allows Sleep as Android to ring this wearable
      */
     public void onAction(final String action,
                          @Nullable final Bundle extras,
-                         final boolean trackingOngoing,
+                         final long maxDurationMs,
                          final boolean alarmsEnabled) {
         if (action == null) {
             return;
@@ -80,9 +82,7 @@ public class SleepAsAndroidAlarmController {
                 hint.stop();
                 alarm.startAlarm(
                         extras != null ? extras.getInt("DELAY", DEFAULT_ALARM_DELAY_MS) : DEFAULT_ALARM_DELAY_MS,
-                        trackingOngoing
-                                ? SleepAsAndroidVibration.ALARM_MAX_DURATION_MS
-                                : SleepAsAndroidVibration.ALARM_MAX_DURATION_NO_SESSION_MS);
+                        maxDurationMs);
                 break;
             case SleepAsAndroidAction.STOP_ALARM:
                 stop();
@@ -136,6 +136,17 @@ public class SleepAsAndroidAlarmController {
 
     public boolean isAlarmRunning() {
         return alarm.isAlarmRunning();
+    }
+
+    /**
+     * The user's limit on how long an alarm rings, in milliseconds. Imported or hand-edited
+     * preferences can hold a value the settings screen would refuse, so it is clamped here too.
+     */
+    public static long alarmMaxDurationMs(final Prefs prefs) {
+        final int minutes = prefs.getInt(
+                GBPrefs.SLEEP_AS_ANDROID_ALARM_MAX_MINUTES,
+                SleepAsAndroidVibration.DEFAULT_ALARM_MAX_MINUTES);
+        return Math.max(SleepAsAndroidVibration.MIN_ALARM_MAX_MINUTES, minutes) * 60_000L;
     }
 
     private void stop() {

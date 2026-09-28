@@ -37,6 +37,7 @@ import nodomain.freeyourgadget.gadgetbridge.util.GBPrefs;
 import nodomain.freeyourgadget.gadgetbridge.R;
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsPreferenceConst;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
+import nodomain.freeyourgadget.gadgetbridge.service.SleepAsAndroidVibration;
 import nodomain.freeyourgadget.gadgetbridge.util.GB;
 import nodomain.freeyourgadget.gadgetbridge.devices.SleepAsAndroidFeature;
 
@@ -50,6 +51,8 @@ public class SleepAsAndroidPreferencesActivity extends AbstractSettingsActivityV
         @Override
         public void onCreatePreferences(@Nullable Bundle savedInstanceState, @Nullable String rootKey) {
             setPreferencesFromResource(R.xml.sleepasandroid_preferences, rootKey);
+            setNumericInputTypeWithRangeFor(GBPrefs.SLEEP_AS_ANDROID_ALARM_MAX_MINUTES,
+                    SleepAsAndroidVibration.MIN_ALARM_MAX_MINUTES, 999, false);
 
             final ListPreference sleepAsAndroidSlots = findPreference(GBPrefs.SLEEP_AS_ANDROID_ALARM_SLOT);
             if (sleepAsAndroidSlots != null)
@@ -71,6 +74,7 @@ public class SleepAsAndroidPreferencesActivity extends AbstractSettingsActivityV
                             Set<SleepAsAndroidFeature> supportedFeatures = device.getDeviceCoordinator().getSleepAsAndroidFeatures(device);
                             findPreference(GBPrefs.SLEEP_AS_ANDROID_ALARM_SLOT).setEnabled(supportedFeatures.contains(SleepAsAndroidFeature.ALARMS));
                             findPreference("pref_key_sleepasandroid_feat_alarms").setEnabled(supportedFeatures.contains(SleepAsAndroidFeature.ALARMS));
+                            findPreference(GBPrefs.SLEEP_AS_ANDROID_ALARM_MAX_MINUTES).setEnabled(supportedFeatures.contains(SleepAsAndroidFeature.ALARMS));
                             findPreference("pref_key_sleepasandroid_feat_notifications").setEnabled(supportedFeatures.contains(SleepAsAndroidFeature.NOTIFICATIONS));
                             findPreference("pref_key_sleepasandroid_feat_movement").setEnabled(supportedFeatures.contains(SleepAsAndroidFeature.ACCELEROMETER));
                             findPreference("pref_key_sleepasandroid_feat_hr").setEnabled(supportedFeatures.contains(SleepAsAndroidFeature.HEART_RATE));
@@ -108,6 +112,7 @@ public class SleepAsAndroidPreferencesActivity extends AbstractSettingsActivityV
                     Set<SleepAsAndroidFeature> supportedFeatures = device.getDeviceCoordinator().getSleepAsAndroidFeatures(device);
                     findPreference(GBPrefs.SLEEP_AS_ANDROID_ALARM_SLOT).setEnabled(supportedFeatures.contains(SleepAsAndroidFeature.ALARMS));
                     findPreference("pref_key_sleepasandroid_feat_alarms").setEnabled(supportedFeatures.contains(SleepAsAndroidFeature.ALARMS));
+                    findPreference(GBPrefs.SLEEP_AS_ANDROID_ALARM_MAX_MINUTES).setEnabled(supportedFeatures.contains(SleepAsAndroidFeature.ALARMS));
                     findPreference("pref_key_sleepasandroid_feat_notifications").setEnabled(supportedFeatures.contains(SleepAsAndroidFeature.NOTIFICATIONS));
                     findPreference("pref_key_sleepasandroid_feat_movement").setEnabled(supportedFeatures.contains(SleepAsAndroidFeature.ACCELEROMETER));
                     findPreference("pref_key_sleepasandroid_feat_hr").setEnabled(supportedFeatures.contains(SleepAsAndroidFeature.HEART_RATE));
