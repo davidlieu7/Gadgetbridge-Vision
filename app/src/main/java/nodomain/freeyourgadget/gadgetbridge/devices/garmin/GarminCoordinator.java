@@ -154,6 +154,14 @@ public abstract class GarminCoordinator extends AbstractBLEDeviceCoordinator {
         return true;
     }
 
+    /**
+     * Whether the device serves files over a Classic Bluetooth RFCOMM link that it opens
+     * towards the phone, instead of over BLE.
+     */
+    public boolean supportsRfcommFileTransfer() {
+        return false;
+    }
+
     @Override
     public Map<AbstractDao<?, ?>, Property> getAllDeviceDao( @NonNull final DaoSession session) {
         return new HashMap<>() {{

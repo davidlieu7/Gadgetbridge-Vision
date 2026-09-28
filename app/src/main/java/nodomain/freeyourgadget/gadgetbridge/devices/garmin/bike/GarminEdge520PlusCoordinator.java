@@ -39,4 +39,13 @@ public class GarminEdge520PlusCoordinator extends GarminBikeComputerCoordinator 
     public boolean supportsFindDevice(@NonNull final GBDevice device) {
         return false;
     }
+
+    /**
+     * The directory is empty over BLE, files are only listed over RFCOMM.
+     * Requires "New sync protocol" to be disabled: this device rejects the protobuf file list.
+     */
+    @Override
+    public boolean supportsRfcommFileTransfer() {
+        return true;
+    }
 }
