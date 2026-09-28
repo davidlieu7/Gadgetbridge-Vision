@@ -254,7 +254,7 @@ public class ZeppOsCalendarService extends AbstractZeppOsService {
                 LOG.error("Failed to decode description");
                 return;
             }
-            i += description.second;
+            i += description.second + 1;
 
             final int startTime = BLETypeConversions.toUint32(payload, i);
             i += 4;
@@ -277,14 +277,21 @@ public class ZeppOsCalendarService extends AbstractZeppOsService {
             }
             i += unknown.second + 1;
 
+            if (!unknown.first.isEmpty()) {
+                LOG.debug("unknown is not empty: {}", unknown);
+            }
+
             i += 5;
 
-            final Pair<String, Integer> address = StringUtils.untilNullTerminatorWithLength(payload, i);
-            if (address == null) {
-                LOG.error("Failed to decode address");
-                return;
+            Pair<String, Integer> address = new Pair<>("", 0);
+            if (version == 3) {
+                address = StringUtils.untilNullTerminatorWithLength(payload, i);
+                if (address == null) {
+                    LOG.error("Failed to decode address");
+                    return;
+                }
+                i += address.second + 1;
             }
-            i += address.second + 1;
 
 
             LOG.info("Calendar Event {}: {}. address = {}, all day = {}", eventId, title.first, address.first, allDay);
