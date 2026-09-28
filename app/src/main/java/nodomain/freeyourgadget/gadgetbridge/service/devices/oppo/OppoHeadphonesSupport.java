@@ -56,6 +56,7 @@ import nodomain.freeyourgadget.gadgetbridge.service.devices.oppo.commands.AncCon
 import nodomain.freeyourgadget.gadgetbridge.service.devices.oppo.commands.AncConfigValue;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.oppo.commands.SubscriptionType;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.oppo.modules.FirmwareVersionModule;
+import nodomain.freeyourgadget.gadgetbridge.service.devices.oppo.modules.MiscConfigModule;
 import nodomain.freeyourgadget.gadgetbridge.devices.oppo.OppoHeadphonesCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.oppo.OppoHeadphonesPreferences;
 import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEvent;
@@ -101,7 +102,7 @@ public class OppoHeadphonesSupport extends AbstractHeadphoneBTBRDeviceSupport {
         seqNum = 0;
 
         batteryReq();
-        miscConfigReq();
+        queueCommand(getMiscConfigModule().encodeReq(getMiscSupports()));
         ancConfigReq();
         touchConfigReq();
         subscriptionSet();
@@ -109,6 +110,19 @@ public class OppoHeadphonesSupport extends AbstractHeadphoneBTBRDeviceSupport {
 
         builder.setDeviceState(GBDevice.State.INITIALIZED);
         return builder;
+    }
+
+    private EnumSet<MiscConfigType> getMiscSupports() {
+        final EnumSet<MiscConfigType> supports = EnumSet.noneOf(MiscConfigType.class);
+        if (getCoordinator().supportsLdac(getDevice()))
+            supports.add(MiscConfigType.LDAC);
+        if (getCoordinator().supportsMultipoint(getDevice()))
+            supports.add(MiscConfigType.MULTIPOINT);
+        if (getCoordinator().supportsGameMode(getDevice()))
+            supports.add(MiscConfigType.GAME_MODE);
+        if (getCoordinator().supportsFindPhone(getDevice()))
+            supports.add(MiscConfigType.FIND_PHONE);
+        return supports;
     }
 
     @Override
@@ -213,13 +227,25 @@ public class OppoHeadphonesSupport extends AbstractHeadphoneBTBRDeviceSupport {
         }
 
         switch (config) {
-            case OppoHeadphonesPreferences.LDAC -> ldacSet();
-            case OppoHeadphonesPreferences.GAME_MODE -> gameModeSet();
+            case OppoHeadphonesPreferences.LDAC -> {
+                final boolean isEnabled = getDevicePrefs().getBoolean(OppoHeadphonesPreferences.LDAC, false);
+                queueCommand(getMiscConfigModule().encodeSet(MiscConfigType.LDAC, isEnabled));
+            }
+            case OppoHeadphonesPreferences.GAME_MODE -> {
+                final boolean isEnabled = getDevicePrefs().getBoolean(OppoHeadphonesPreferences.GAME_MODE, false);
+                queueCommand(getMiscConfigModule().encodeSet(MiscConfigType.GAME_MODE, isEnabled));
+            }
+            case OppoHeadphonesPreferences.MULTIPOINT -> {
+                final boolean isEnabled = getDevicePrefs().getBoolean(OppoHeadphonesPreferences.MULTIPOINT, false);
+                queueCommand(getMiscConfigModule().encodeSet(MiscConfigType.MULTIPOINT, isEnabled));
+            }
+            case OppoHeadphonesPreferences.FIND_PHONE -> {
+                final boolean isEnabled = getDevicePrefs().getBoolean(OppoHeadphonesPreferences.FIND_PHONE, false);
+                queueCommand(getMiscConfigModule().encodeSet(MiscConfigType.FIND_PHONE, isEnabled));
+            }
             case OppoHeadphonesPreferences.ANC_SELECTOR -> ancModeSet();
             case OppoHeadphonesPreferences.ANC_TOUCH_CYCLE_MODES -> touchAncCycleModesSet();
-            case OppoHeadphonesPreferences.MULTIPOINT -> multipointSet();
-            case OppoHeadphonesPreferences.FIND_PHONE -> findPhoneSet();
-	    default -> super.onSendConfiguration(config);
+            default -> super.onSendConfiguration(config);
         }
     }
 
@@ -273,7 +299,32 @@ public class OppoHeadphonesSupport extends AbstractHeadphoneBTBRDeviceSupport {
                     break;
                 }
 
-                parseMiscConfig(payload);
+                getMiscConfigModule()
+                        .decodeRet(payload)
+                        .forEach((type, value) -> {
+                            switch (type) {
+                                case LDAC -> {
+                                    evaluateGBDeviceEvent(
+                                            new GBDeviceEventUpdatePreferences(
+                                                    OppoHeadphonesPreferences.LDAC, value));
+                                }
+                                case MULTIPOINT -> {
+                                    evaluateGBDeviceEvent(
+                                            new GBDeviceEventUpdatePreferences(
+                                                    OppoHeadphonesPreferences.MULTIPOINT, value));
+                                }
+                                case GAME_MODE -> {
+                                    evaluateGBDeviceEvent(
+                                            new GBDeviceEventUpdatePreferences(
+                                                    OppoHeadphonesPreferences.GAME_MODE, value));
+                                }
+                                case FIND_PHONE -> {
+                                    evaluateGBDeviceEvent(
+                                            new GBDeviceEventUpdatePreferences(
+                                                    OppoHeadphonesPreferences.FIND_PHONE, value));
+                                }
+                            }
+                        });
             }
             case ANC_CONFIG_RET -> {
                 final int zero = buf.get();
@@ -491,124 +542,6 @@ public class OppoHeadphonesSupport extends AbstractHeadphoneBTBRDeviceSupport {
         evaluateGBDeviceEvent(eventUpdatePreferences);
     }
 
-    private void ldacSet() {
-        final boolean isEnabled = getDevicePrefs().getBoolean(OppoHeadphonesPreferences.LDAC, false);
-        LOG.debug("Send MiscConfigType.LDAC = {}", isEnabled);
-        miscConfigSet(MiscConfigType.LDAC, isEnabled);
-    }
-
-    private void gameModeSet() {
-        final boolean isEnabled = getDevicePrefs().getBoolean(OppoHeadphonesPreferences.GAME_MODE, false);
-        LOG.debug("Send MiscConfigType.GAME_MODE = {}", isEnabled);
-        miscConfigSet(MiscConfigType.GAME_MODE, isEnabled);
-    }
-
-    private void multipointSet() {
-        final boolean isEnabled = getDevicePrefs().getBoolean(OppoHeadphonesPreferences.MULTIPOINT, false);
-        LOG.debug("Send MiscConfigType.MULTIPOINT = {}", isEnabled);
-        miscConfigSet(MiscConfigType.MULTIPOINT, isEnabled);
-    }
-
-    private void findPhoneSet() {
-        final boolean isEnabled = getDevicePrefs().getBoolean(OppoHeadphonesPreferences.FIND_PHONE, false);
-        LOG.debug("Send MiscConfigType.FIND_PHONE = {}", isEnabled);
-        miscConfigSet(MiscConfigType.FIND_PHONE, isEnabled);
-    }
-
-    private void miscConfigSet(final MiscConfigType type, final boolean isEnabled) {
-        final byte[] payload = new byte[] {
-                (byte) type.getCode(),
-                (byte) (isEnabled ? 0x01 : 0x00),
-        };
-        queueCommand(OppoCommand.MISC_CONFIG_SET, payload);
-    }
-
-    private void miscConfigReq() {
-        final EnumSet<MiscConfigType> types = EnumSet.noneOf(MiscConfigType.class);
-        if (getCoordinator().supportsLdac(getDevice()))
-            types.add(MiscConfigType.LDAC);
-        if (getCoordinator().supportsMultipoint(getDevice()))
-            types.add(MiscConfigType.MULTIPOINT);
-        if (getCoordinator().supportsGameMode(getDevice()))
-            types.add(MiscConfigType.GAME_MODE);
-        if (getCoordinator().supportsFindPhone(getDevice()))
-            types.add(MiscConfigType.FIND_PHONE);
-        if (types.isEmpty())
-            return;
-
-        byte[] payload = new byte[1 + types.size()];
-        payload[0] = (byte) types.size();
-
-        int i = 1;
-        for (MiscConfigType type : types) {
-            payload[i++] = (byte) type.getCode();
-        }
-        queueCommand(OppoCommand.MISC_CONFIG_REQ, payload);
-    }
-
-    private void parseMiscConfig(final byte[] payload) {
-        final ByteBuffer buf = ByteBuffer.wrap(payload);
-        if (buf.remaining() < 2) {
-            LOG.warn("Unexpected misc config ret payload remaining {}, expected >=2", buf.remaining());
-            return;
-        }
-
-        final int zero = buf.get();
-        final int numTypes = buf.get() & 0xFF;
-        if (buf.remaining() < (numTypes * 2)) {
-            LOG.warn("Unexpected misc config ret payload remaining {}, expected >= {}", buf.remaining(),
-                    (numTypes * 2));
-            return;
-        }
-
-        final GBDeviceEventUpdatePreferences eventUpdatePreferences = new GBDeviceEventUpdatePreferences();
-        for (int i = 0; i < numTypes; i++) {
-            if (buf.remaining() < 2) {
-                LOG.warn("Unexpected misc config ret payload remaining {}, expected >= 2", buf.remaining());
-                break;
-            }
-
-            final int typeCode = buf.get() & 0xFF;
-            final int valueCode = buf.get() & 0xFF;
-            final boolean isEnabled = (valueCode == 1);
-
-            final MiscConfigType type = MiscConfigType.fromCode(typeCode);
-            if (type == null) {
-                LOG.warn("Unknown misc config type code {}", typeCode);
-                continue;
-            }
-
-            switch (type) {
-                case LDAC -> {
-                    LOG.debug("Got misc config for LDAC = {}", isEnabled);
-                    eventUpdatePreferences.withPreference(
-                            OppoHeadphonesPreferences.LDAC,
-                            isEnabled);
-                }
-                case MULTIPOINT -> {
-                    LOG.debug("Got misc config for MULTIPOINT = {}", isEnabled);
-                    eventUpdatePreferences.withPreference(
-                            OppoHeadphonesPreferences.MULTIPOINT,
-                            isEnabled);
-                }
-                case GAME_MODE -> {
-                    LOG.debug("Got misc config for GAME_MODE = {}", isEnabled);
-                    eventUpdatePreferences.withPreference(
-                            OppoHeadphonesPreferences.GAME_MODE,
-                            isEnabled);
-                }
-                case FIND_PHONE -> {
-                    LOG.debug("Got misc config for FIND_PHONE = {}", isEnabled);
-                    eventUpdatePreferences.withPreference(
-                            OppoHeadphonesPreferences.FIND_PHONE,
-                            isEnabled);
-                }
-                default -> LOG.warn("Unknown misc config type code 0x{}", OppoUtils.numberToHex(typeCode, 2));
-            }
-        }
-        evaluateGBDeviceEvent(eventUpdatePreferences);
-    }
-
     private void ancModeSet() {
         final String valuePrefId = getDevicePrefs().getString(
                 OppoHeadphonesPreferences.ANC_SELECTOR,
@@ -794,6 +727,10 @@ public class OppoHeadphonesSupport extends AbstractHeadphoneBTBRDeviceSupport {
 
     protected FirmwareVersionModule getFwVersionModule() {
         return new FirmwareVersionModule(getContext());
+    }
+
+    protected MiscConfigModule getMiscConfigModule() {
+        return new MiscConfigModule(getContext());
     }
 
     @Override
