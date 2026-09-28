@@ -40,6 +40,7 @@ import androidx.health.connect.client.units.Power
 import androidx.health.connect.client.units.Velocity
 import nodomain.freeyourgadget.gadgetbridge.GBApplication
 import nodomain.freeyourgadget.gadgetbridge.model.ActivityPoint
+import nodomain.freeyourgadget.gadgetbridge.model.ActivitySample
 import nodomain.freeyourgadget.gadgetbridge.model.ActivitySummaryData
 import nodomain.freeyourgadget.gadgetbridge.model.ActivitySummaryEntries
 import nodomain.freeyourgadget.gadgetbridge.model.GPSCoordinate
@@ -58,6 +59,13 @@ import java.time.ZoneOffset
 import java.util.Date
 
 private val LOG = LoggerFactory.getLogger("RecordedWorkoutSyncer")
+
+/** Time span of a recorded workout; its distance is written as one session-wide DistanceRecord. */
+internal data class WorkoutWindow(val start: Instant, val end: Instant) {
+    /** Whether the one-minute activity sample ending at [endTs] overlaps this workout. */
+    fun overlapsMinuteEndingAt(endTs: Instant): Boolean =
+        endTs.isAfter(start) && endTs.minusSeconds(60).isBefore(end)
+}
 
 /**
  * Syncs workouts from BaseActivitySummary for devices that support activity tracks.
@@ -109,9 +117,11 @@ internal object RecordedWorkoutSyncer {
             try {
                 val workoutStartInstant = workout.startTime.toInstant()
                 val workoutEndInstant = workout.endTime.toInstant()
+                val activityKind = ActivityKind.fromCode(workout.activityKind)
 
-                if (workoutEndInstant.isBefore(workoutStartInstant)) {
-                    LOG.warn("Skipping invalid workout for device '$deviceName' (Type: ${workout.activityKind}): End time $workoutEndInstant is before start time $workoutStartInstant.")
+                if (!isSyncedWorkout(workout)) {
+                    LOG.debug("Skipping workout for device '{}' (Type: {}, Start: {}, End: {}): invalid span or non-exercise kind.",
+                        deviceName, activityKind, workoutStartInstant, workoutEndInstant)
                     continue
                 }
 
@@ -122,17 +132,7 @@ internal object RecordedWorkoutSyncer {
                 val endOffset = zoneId.rules.getOffset(workoutEndInstant)
 
                 val recordsToInsert = mutableListOf<Record>()
-                val activityKind = ActivityKind.fromCode(workout.activityKind)
                 val exerciseType = WorkoutSyncerUtils.mapActivityKindToExerciseType(activityKind)
-
-                // Skip non-exercise activities (but allow UNKNOWN since it's in BaseActivitySummary - was explicitly recorded)
-                if (activityKind == ActivityKind.NOT_MEASURED ||
-                        activityKind == ActivityKind.NOT_WORN ||
-                        ActivityKind.isSleep(activityKind)) {
-                    LOG.debug("Skipping non-exercising or sleep-related ActivityKind {} for device '{}'.", activityKind, deviceName)
-                    workoutsProcessedInThisSlice--
-                    continue
-                }
 
                 var activityPoints: List<ActivityPoint>? = null
 
@@ -182,6 +182,18 @@ internal object RecordedWorkoutSyncer {
                     )
                 }
 
+                addWorkoutDistanceRecord(
+                    healthConnectClient,
+                    gbDevice,
+                    workout,
+                    WorkoutWindow(workoutStartInstant, workoutEndInstant),
+                    startOffset,
+                    endOffset,
+                    metadata,
+                    grantedPermissions,
+                    recordsToInsert
+                )
+
                 if (recordsToInsert.isEmpty()) {
                     LOG.warn("No records were created for workout (Type: ${activityKind}, Start: $workoutStartInstant) for device '$deviceName'. This should not happen.")
                     continue
@@ -215,6 +227,38 @@ internal object RecordedWorkoutSyncer {
         return SyncerStatistics(recordsSynced = workoutRecordList.size, recordType = "Workout", latestRecordTimestamp = latestWorkoutEndTs)
     }
 
+    /** UNKNOWN is kept: a BaseActivitySummary row was explicitly recorded as a workout. */
+    private fun isSyncedWorkout(workout: BaseActivitySummary): Boolean {
+        if (workout.endTime.before(workout.startTime)) {
+            return false
+        }
+        val activityKind = ActivityKind.fromCode(workout.activityKind)
+        return activityKind != ActivityKind.NOT_MEASURED &&
+            activityKind != ActivityKind.NOT_WORN &&
+            !ActivityKind.isSleep(activityKind)
+    }
+
+    /** Windows of the workouts this syncer writes that overlap [from, to]. */
+    internal fun queryWorkoutWindows(gbDevice: GBDevice, from: Instant, to: Instant): List<WorkoutWindow> {
+        try {
+            GBApplication.acquireDbReadOnly().use { db ->
+                val device = DBHelper.getDevice(gbDevice, db.daoSession)
+                return db.daoSession.baseActivitySummaryDao.queryBuilder()
+                    .where(
+                        BaseActivitySummaryDao.Properties.DeviceId.eq(device.id),
+                        BaseActivitySummaryDao.Properties.StartTime.lt(Date.from(to)),
+                        BaseActivitySummaryDao.Properties.EndTime.gt(Date.from(from))
+                    )
+                    .build()
+                    .list()
+                    .filter { isSyncedWorkout(it) }
+                    .map { WorkoutWindow(it.startTime.toInstant(), it.endTime.toInstant()) }
+            }
+        } catch (e: Exception) {
+            LOG.error("Error querying workout windows for device '{}'", gbDevice.aliasOrName, e)
+            return emptyList()
+        }
+    }
 
     private fun queryWorkoutsFromDatabase(
         gbDevice: GBDevice,
@@ -324,9 +368,6 @@ internal object RecordedWorkoutSyncer {
 
         val summaryData = parseSummaryData(workout.summaryData)
         if (summaryData != null) {
-            if (!device.deviceCoordinator.supportsActivityDistance(device)) {
-                addDistanceRecord(summaryData, workoutStartInstant, workoutEndInstant, startOffset, endOffset, metadata, grantedPermissions, recordsToInsert, deviceName)
-            }
             if (!device.deviceCoordinator.supportsActiveCalories(device)) {
                 addCaloriesRecords(summaryData, workoutStartInstant, workoutEndInstant, startOffset, endOffset, metadata, grantedPermissions, recordsToInsert, deviceName)
             }
@@ -446,9 +487,6 @@ internal object RecordedWorkoutSyncer {
 
         val summaryData = parseSummaryData(workout.summaryData)
         if (summaryData != null) {
-            if (!gbDevice.deviceCoordinator.supportsActivityDistance(gbDevice)) {
-                addDistanceRecord(summaryData, workoutStartInstant, workoutEndInstant, startOffset, endOffset, metadata, grantedPermissions, recordsToInsert, deviceName)
-            }
             addSpeedRecord(summaryData, workoutStartInstant, workoutEndInstant, startOffset, endOffset, metadata, grantedPermissions, recordsToInsert, deviceName)
             if (!gbDevice.deviceCoordinator.supportsActiveCalories(gbDevice)) {
                 addCaloriesRecords(summaryData, workoutStartInstant, workoutEndInstant, startOffset, endOffset, metadata, grantedPermissions, recordsToInsert, deviceName)
@@ -607,37 +645,103 @@ internal object RecordedWorkoutSyncer {
         }
     }
 
-    private fun addDistanceRecord(
-        summaryData: ActivitySummaryData,
-        startTime: Instant,
-        endTime: Instant,
+    /**
+     * Distance of the whole workout: the summary's when it has one, else what the per-minute
+     * activity samples counted inside the window. The per-minute stream can hold far less than
+     * the workout (a fraction on Xiaomi bands, nothing for Garmin pool swims), and
+     * [DistanceSyncer] leaves these minutes to the workout, so this record is the only
+     * distance HC gets for them.
+     */
+    internal fun workoutDistanceMeters(
+        summaryData: ActivitySummaryData?,
+        samples: List<ActivitySample>,
+        window: WorkoutWindow
+    ): Double {
+        val summaryMeters = summaryData?.getNumber(ActivitySummaryEntries.DISTANCE_METERS, 0.0)?.toDouble() ?: 0.0
+        if (summaryMeters > 0) {
+            return summaryMeters
+        }
+        return samplesInWindow(samples, window)
+            .filter { it.distanceCm > 0 }
+            .sumOf { it.distanceCm / 100.0 }
+    }
+
+    private fun samplesInWindow(samples: List<ActivitySample>, window: WorkoutWindow): List<ActivitySample> =
+        samples.filter { window.overlapsMinuteEndingAt(Instant.ofEpochSecond(it.timestamp.toLong())) }
+
+    private fun loadActivitySamples(gbDevice: GBDevice, window: WorkoutWindow): List<ActivitySample> {
+        try {
+            GBApplication.acquireDbReadOnly().use { db ->
+                return HealthConnectUtils.getActivitySamples(
+                    db,
+                    gbDevice,
+                    window.start.epochSecond.toInt(),
+                    window.end.epochSecond.toInt() + 60
+                )
+            }
+        } catch (e: Exception) {
+            LOG.error("Error loading activity samples for workout at {} on device '{}'", window.start, gbDevice.aliasOrName, e)
+            return emptyList()
+        }
+    }
+
+    /**
+     * Writes one DistanceRecord spanning the workout and deletes any per-minute DistanceRecords
+     * [DistanceSyncer] wrote inside it, which it does when the workout reached the database after
+     * its minutes were synced.
+     */
+    private suspend fun addWorkoutDistanceRecord(
+        healthConnectClient: HealthConnectClient,
+        gbDevice: GBDevice,
+        workout: BaseActivitySummary,
+        window: WorkoutWindow,
         startOffset: ZoneOffset,
         endOffset: ZoneOffset,
         metadata: Metadata,
         grantedPermissions: Set<String>,
-        recordsToInsert: MutableList<Record>,
-        deviceName: String
+        recordsToInsert: MutableList<Record>
     ) {
-        val distancePermission = HealthPermission.getWritePermission(DistanceRecord::class)
-
-        if (distancePermission !in grantedPermissions) {
+        val deviceName = gbDevice.aliasOrName
+        if (HealthPermission.getWritePermission(DistanceRecord::class) !in grantedPermissions) {
+            return
+        }
+        if (!window.end.isAfter(window.start)) {
             return
         }
 
-        val distanceMeters = summaryData.getNumber(ActivitySummaryEntries.DISTANCE_METERS, 0.0)
-        if (distanceMeters.toDouble() > 0) {
-            recordsToInsert.add(
-                DistanceRecord(
-                    startTime = startTime,
-                    startZoneOffset = startOffset,
-                    endTime = endTime,
-                    endZoneOffset = endOffset,
-                    distance = Length.meters(distanceMeters.toDouble()),
-                    metadata = metadata
-                )
-            )
-            LOG.debug("Added DistanceRecord ({} meters) for workout at {} for device '{}'.", distanceMeters, startTime, deviceName)
+        val samples = if (gbDevice.deviceCoordinator.supportsActivityDistance(gbDevice)) {
+            loadActivitySamples(gbDevice, window)
+        } else {
+            emptyList()
         }
+
+        val device = metadata.device
+        if (device != null) {
+            val staleIds = samplesInWindow(samples, window).map { distanceClientRecordId(device, it.timestamp.toLong()) }
+            if (staleIds.isNotEmpty()) {
+                try {
+                    healthConnectClient.deleteRecords(DistanceRecord::class, emptyList(), staleIds)
+                } catch (e: Exception) {
+                    LOG.warn("Failed to delete per-minute DistanceRecords inside workout at {} for device '{}'", window.start, deviceName, e)
+                }
+            }
+        }
+
+        val distanceMeters = workoutDistanceMeters(parseSummaryData(workout.summaryData), samples, window)
+        if (distanceMeters <= 0) {
+            return
+        }
+        recordsToInsert.add(
+            DistanceRecord(
+                startTime = window.start,
+                startZoneOffset = startOffset,
+                endTime = window.end,
+                endZoneOffset = endOffset,
+                distance = Length.meters(distanceMeters),
+                metadata = metadata
+            )
+        )
+        LOG.debug("Added DistanceRecord ({} meters) for workout at {} for device '{}'.", distanceMeters, window.start, deviceName)
     }
 
     private fun addSpeedRecord(
