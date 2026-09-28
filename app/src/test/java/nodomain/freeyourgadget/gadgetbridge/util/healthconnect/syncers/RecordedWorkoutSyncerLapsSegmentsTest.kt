@@ -181,6 +181,21 @@ class RecordedWorkoutSyncerLapsSegmentsTest {
     }
 
     @Test
+    fun sampleSpacingGap_closedToNextStart() {
+        // Xiaomi phases: each phase's last 1 Hz sample is one second before the next phase's first.
+        val track = trackOf(
+            SegDesc(SegmentIntensity.ACTIVE, null, 0, 419),
+            SegDesc(SegmentIntensity.REST, null, 420, 539),
+            SegDesc(SegmentIntensity.ACTIVE, null, 540, 960)
+        )
+        val segments = RecordedWorkoutSyncer.buildSegments(bounds(track))
+        assertEquals(3, segments.size)
+        assertEquals(segments[1].startTime, segments[0].endTime)
+        assertEquals(segments[2].startTime, segments[1].endTime)
+        assertEquals(end, segments[2].endTime)
+    }
+
+    @Test
     fun outOfWindowSegment_clampedIntoBounds() {
         // A segment straddling the session end gets clamped to `end`.
         val track = trackOf(

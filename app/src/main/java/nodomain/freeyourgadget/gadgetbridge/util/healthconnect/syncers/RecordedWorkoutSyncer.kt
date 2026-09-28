@@ -58,6 +58,7 @@ import nodomain.freeyourgadget.gadgetbridge.util.elevation.ElevationTiles
 import nodomain.freeyourgadget.gadgetbridge.util.healthconnect.HealthConnectUtils
 import nodomain.freeyourgadget.gadgetbridge.util.healthconnect.HealthConnectWorkoutSync
 import org.slf4j.LoggerFactory
+import java.time.Duration
 import java.time.Instant
 import java.time.ZoneId
 import java.time.ZoneOffset
@@ -82,6 +83,9 @@ internal data class WorkoutWindow(val start: Instant, val end: Instant) {
 internal object RecordedWorkoutSyncer {
     /** HC's ExerciseLap accepts a length in the range 0..1,000,000 m; clamp to the upper bound. */
     private const val LAP_MAX_LENGTH_METERS = 1_000_000
+
+    /** Largest gap between consecutive segments still treated as sample spacing, not a pause. */
+    private val SEGMENT_GAP_TOLERANCE: Duration = Duration.ofSeconds(10)
 
     suspend fun sync(
         healthConnectClient: HealthConnectClient,
@@ -589,6 +593,12 @@ internal object RecordedWorkoutSyncer {
                     // Zero-length / reversed after clamping — HC's require(start < end) would throw.
                     droppedDegenerate++
                     continue
+                }
+                // A segment's end is its last sample, so consecutive phases are one sample
+                // interval apart. HC allows a segment to end exactly where the next starts, so
+                // close that gap; longer gaps are real pauses and stay.
+                if (prevEnd != null && Duration.between(prevEnd, start) <= SEGMENT_GAP_TOLERANCE) {
+                    bounds[bounds.lastIndex] = bounds.last().copy(end = start)
                 }
                 bounds.add(SegmentBound(start, end, info))
                 lastEnd = end
