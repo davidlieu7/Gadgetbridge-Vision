@@ -110,7 +110,7 @@ public class GBDaoGenerator {
             outputDir.mkdirs();
         }
 
-        final Schema schema = new Schema(147, MAIN_PACKAGE + ".entities");
+        final Schema schema = new Schema(148, MAIN_PACKAGE + ".entities");
 
         final List<Entity> sampleProvidersToGenerate = new LinkedList<>();
         final List<Entity> batterySampleProvidersToGenerate = new LinkedList<>();
@@ -310,6 +310,7 @@ public class GBDaoGenerator {
         sampleProvidersToGenerate.add(addGenericTrainingLoadAcuteSample(schema, user, device));
         sampleProvidersToGenerate.add(addGenericTrainingLoadChronicSample(schema, user, device));
         sampleProvidersToGenerate.add(addGenericWeightSample(schema, user, device));
+        sampleProvidersToGenerate.add(addVeepooWeightSample(schema, user, device));
         sampleProvidersToGenerate.add(addGenericImpedanceSample(schema, user, device));
         sampleProvidersToGenerate.add(addGlucoseSample(schema, user, device));
         addGenericMetricsSample(schema, user, device);
@@ -2836,6 +2837,20 @@ public class GBDaoGenerator {
         sample.addFloatProperty(SAMPLE_WEIGHT_KG).notNull().codeBeforeGetter(OVERRIDE);
         // Raw bio-impedance in Ohms, for scales that report it (see MiScaleWeightSample).
         sample.addIntProperty(SAMPLE_IMPEDANCE_OHM).codeBeforeGetter(OVERRIDE);
+        return sample;
+    }
+
+    private static Entity addVeepooWeightSample(Schema schema, Entity user, Entity device) {
+        // Weight with the finished body-composition values reported by the Veepoo band, which
+        // sends vendor metrics instead of a raw impedance (see VeepooVitalDetectModule).
+        Entity sample = addEntity(schema, "VeepooWeightSample");
+        addCommonTimeSampleProperties("AbstractVeepooWeightSample", sample, user, device);
+        sample.addFloatProperty(SAMPLE_WEIGHT_KG).notNull().codeBeforeGetter(OVERRIDE);
+        sample.addFloatProperty("bodyFatPercent");
+        sample.addFloatProperty("bodyWaterPercent");
+        sample.addFloatProperty("muscleMassKg");
+        sample.addFloatProperty("boneMassKg");
+        sample.addIntProperty("basalMetabolicRate");
         return sample;
     }
 

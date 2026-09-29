@@ -45,6 +45,7 @@ import nodomain.freeyourgadget.gadgetbridge.devices.GenericStressSampleProvider;
 import nodomain.freeyourgadget.gadgetbridge.devices.GenericTemperatureSampleProvider;
 import nodomain.freeyourgadget.gadgetbridge.devices.SampleProvider;
 import nodomain.freeyourgadget.gadgetbridge.devices.TimeSampleProvider;
+import nodomain.freeyourgadget.gadgetbridge.devices.VeepooWeightSampleProvider;
 import nodomain.freeyourgadget.gadgetbridge.devices.veepoo.samples.VeepooActivitySampleProvider;
 import nodomain.freeyourgadget.gadgetbridge.entities.DaoSession;
 import nodomain.freeyourgadget.gadgetbridge.entities.GenericBodyCompositionSampleDao;
@@ -58,6 +59,7 @@ import nodomain.freeyourgadget.gadgetbridge.entities.GenericTemperatureSampleDao
 import nodomain.freeyourgadget.gadgetbridge.entities.VeepooActivitySampleDao;
 import nodomain.freeyourgadget.gadgetbridge.entities.VeepooEcgSampleDao;
 import nodomain.freeyourgadget.gadgetbridge.entities.VeepooSleepSummarySampleDao;
+import nodomain.freeyourgadget.gadgetbridge.entities.VeepooWeightSampleDao;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
 import nodomain.freeyourgadget.gadgetbridge.model.ActivitySample;
 import nodomain.freeyourgadget.gadgetbridge.model.ActivityTrackProvider;
@@ -68,6 +70,7 @@ import nodomain.freeyourgadget.gadgetbridge.model.RespiratoryRateSample;
 import nodomain.freeyourgadget.gadgetbridge.model.Spo2Sample;
 import nodomain.freeyourgadget.gadgetbridge.model.StressSample;
 import nodomain.freeyourgadget.gadgetbridge.model.TemperatureSample;
+import nodomain.freeyourgadget.gadgetbridge.model.WeightSample;
 import nodomain.freeyourgadget.gadgetbridge.service.DeviceSupport;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.veepoo.VeepooDeviceSupport;
 
@@ -143,7 +146,13 @@ public abstract class AbstractVeepooCoordinator extends AbstractBLEDeviceCoordin
             put(session.getGenericBodyCompositionSampleDao(), GenericBodyCompositionSampleDao.Properties.DeviceId);
             put(session.getGenericBloodLipidSampleDao(), GenericBloodLipidSampleDao.Properties.DeviceId);
             put(session.getGenericHrvValueSampleDao(), GenericHrvValueSampleDao.Properties.DeviceId);
+            put(session.getVeepooWeightSampleDao(), VeepooWeightSampleDao.Properties.DeviceId);
         }};
+    }
+
+    @Override
+    public TimeSampleProvider<? extends WeightSample> getWeightSampleProvider(@NonNull final GBDevice device, @NonNull final DaoSession session) {
+        return new VeepooWeightSampleProvider(device, session);
     }
 
     @Override
@@ -199,6 +208,12 @@ public abstract class AbstractVeepooCoordinator extends AbstractBLEDeviceCoordin
 
     @Override
     public boolean supportsSpo2(@NonNull GBDevice device) {
+        return true;
+    }
+
+    @Override
+    public boolean supportsWeightMeasurement(@NonNull final GBDevice device) {
+        // The body-composition measurement (0x93) yields a weight derived from the vendor's water/fat share.
         return true;
     }
 

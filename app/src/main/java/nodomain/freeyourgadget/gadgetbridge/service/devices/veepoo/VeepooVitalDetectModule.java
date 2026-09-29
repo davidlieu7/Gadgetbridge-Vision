@@ -895,8 +895,9 @@ class VeepooVitalDetectModule {
     /**
      * Opcode 0x93 frame: [1]=4, [2]=event (1 detect / 2 stop), [3]=state. State 0 streams
      * progress at [4]; state 1 carries data frames with [4]=seq (1-based), [5]=total and a
-     * 14-byte chunk at [6..19]. The concatenated chunks must start with 0x9C followed by 14
-     * big-endian u16 values (divided by 10): BMI, body fat %, fat weight, FFM, muscle %,
+     * 14-byte chunk at [6..19]. The concatenated chunks start with a 2-byte header (observed as
+     * A0 1C; not validated) followed by 14 little-endian u16 values (divided by 10): BMI, body
+     * fat %, fat weight, FFM, muscle %,
      * muscle mass, subcutaneous fat, body water %, water content, skeletal muscle %,
      * bone mass, protein %, protein mass, BMR. States 2/3/4 are failed/busy/low battery.
      */
@@ -953,8 +954,8 @@ class VeepooVitalDetectModule {
 
     /**
      * Decodes the concatenated body composition payload into 14 values, or null when invalid.
-     * The first two bytes are a header (0xA0 on this firmware), then 14 little-endian u16
-     * values divided by 10.
+     * The first two bytes are a header (observed as A0 1C; not validated), then 14
+     * little-endian u16 values divided by 10.
      */
     private static float[] parseBodyCompositionBlob(byte[] blob) {
         if (blob == null || blob.length < 30) {

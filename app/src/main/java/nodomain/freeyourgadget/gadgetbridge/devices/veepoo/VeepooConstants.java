@@ -110,8 +110,8 @@ public final class VeepooConstants {
      * Body composition detection. Start {0x93,4,1}, stop {0x93,4,2}. Response frames are
      * [0x93][4][event 1 detect / 2 stop][state]. State: 0 progress ([4]=%), 1 data, 2 failed,
      * 3 busy, 4 low battery. Data frames carry [4]=seq (1-based), [5]=total and a 14-byte chunk
-     * at [6..19]; the concatenated chunks form a payload whose first byte must be 0x9C followed
-     * by 14 big-endian u16 values (divided by 10).
+     * at [6..19]; the concatenated chunks form a payload with a 2-byte header (observed as
+     * A0 1C; not validated) followed by 14 little-endian u16 values divided by 10.
      */
     public static final byte OP_BODY_COMPOSITION_REALTIME = (byte) 0x93;
     /**

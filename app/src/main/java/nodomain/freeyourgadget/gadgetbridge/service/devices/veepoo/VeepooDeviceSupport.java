@@ -83,6 +83,7 @@ import nodomain.freeyourgadget.gadgetbridge.model.TemperatureSample;
 import nodomain.freeyourgadget.gadgetbridge.entities.VeepooActivitySample;
 import nodomain.freeyourgadget.gadgetbridge.entities.VeepooSleepSummarySample;
 import nodomain.freeyourgadget.gadgetbridge.entities.VeepooSleepSummarySampleDao;
+import nodomain.freeyourgadget.gadgetbridge.entities.VeepooWeightSample;
 import nodomain.freeyourgadget.gadgetbridge.export.GPXExporter;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
 import nodomain.freeyourgadget.gadgetbridge.model.ActivityKind;
@@ -2430,8 +2431,9 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
             DaoSession session = dbHandler.getDaoSession();
             Long userId = DBHelper.getUser(session).getId();
             Long deviceId = DBHelper.getDevice(getDevice(), session).getId();
+            long timestamp = System.currentTimeMillis();
             GenericBodyCompositionSample sample = new GenericBodyCompositionSample();
-            sample.setTimestamp(System.currentTimeMillis());
+            sample.setTimestamp(timestamp);
             sample.setBmi(v[0]);
             sample.setBodyFatRate(v[1]);
             sample.setFatWeight(v[2]);
@@ -2449,11 +2451,53 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
             sample.setUserId(userId);
             sample.setDeviceId(deviceId);
             new GenericBodyCompositionSampleProvider(getDevice(), session).addSample(sample);
+            saveBcWeightSample(session, userId, deviceId, timestamp, v);
             return sample;
         } catch (Exception e) {
             LOG.error("Error saving body composition sample", e);
             return null;
         }
+    }
+
+    /**
+     * Also stores the measurement as a weight sample so the generic widgets and charts show it.
+     * The band sends finished vendor values instead of a raw impedance, so the weight is derived
+     * from the vendor's water or fat share and the composition fields carry the reported values.
+     */
+    private void saveBcWeightSample(final DaoSession session, final Long userId, final Long deviceId,
+                                    final long timestamp, final float[] v) {
+        final Float weightKg = deriveWeightKg(v);
+        if (weightKg == null) {
+            LOG.warn("body composition sample carries no usable weight, skipping the weight sample");
+            return;
+        }
+        VeepooWeightSample sample = new VeepooWeightSample();
+        sample.setTimestamp(timestamp);
+        sample.setWeightKg(weightKg);
+        sample.setBodyFatPercent(v[1]);
+        sample.setBodyWaterPercent(v[7]);
+        sample.setMuscleMassKg(v[5]);
+        sample.setBoneMassKg(v[10]);
+        sample.setBasalMetabolicRate((int) v[13]);
+        sample.setUserId(userId);
+        sample.setDeviceId(deviceId);
+        session.getVeepooWeightSampleDao().insert(sample);
+    }
+
+    /**
+     * Derives the body weight in kg from the vendor's water or fat share (e.g. 38.1 kg of water at
+     * 63.6 % is about 59.9 kg), or null when neither share yields a plausible weight.
+     */
+    static Float deriveWeightKg(final float[] v) {
+        final Float fromWater = plausibleWeight(v[8] / (v[7] / 100f), v[7] >= 30f && v[7] <= 80f && v[8] > 0);
+        if (fromWater != null) {
+            return fromWater;
+        }
+        return plausibleWeight(v[2] / (v[1] / 100f), v[1] >= 3f && v[1] <= 70f && v[2] > 0);
+    }
+
+    private static Float plausibleWeight(final float weightKg, final boolean sharePlausible) {
+        return sharePlausible && weightKg >= 20f && weightKg <= 300f ? weightKg : null;
     }
 
     /**
