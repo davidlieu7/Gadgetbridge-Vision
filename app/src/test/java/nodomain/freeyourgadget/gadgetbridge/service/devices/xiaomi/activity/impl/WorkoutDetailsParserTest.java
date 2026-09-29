@@ -101,6 +101,15 @@ public class WorkoutDetailsParserTest {
                 recordSize = 12;
                 tsPosition = 4;
                 break;
+            case 9:
+                signature = new byte[]{
+                        (byte) 0xFF, (byte) 0xFF, (byte) 0xF8, (byte) 0xBF,
+                        (byte) 0xFB, (byte) 0xBB, (byte) 0xBF
+                };
+                segmentHeaderSize = 27;
+                recordSize = 25;
+                tsPosition = 8;
+                break;
             default:
                 throw new IllegalArgumentException("Unknown version: " + version);
         }
@@ -162,6 +171,11 @@ public class WorkoutDetailsParserTest {
                         buf.put((byte) rec[4]); // spo2
                         buf.put((byte) rec[5]); // cadence
                         buf.putShort((short) rec[6]); // pace
+                        break;
+                    case 9:
+                        buf.put((byte) rec[0]); // steps, in the low nibble
+                        buf.put((byte) rec[1]); // hr
+                        buf.put(new byte[23]);  // 23 unidentified bytes
                         break;
                     case 6:
                         buf.put((byte) rec[0]); // steps
@@ -865,6 +879,46 @@ public class WorkoutDetailsParserTest {
         assertEquals(124, points.get(2).getHeartRate());
     }
 
+    @Test
+    public void testV5OutdoorCyclingHr() {
+        final int startTs = 1790152566;
+        final byte[] bytes = buildHrOnlyBytes(
+                new byte[]{(byte) 0xDF, (byte) 0xCF, (byte) 0xFB}, 23, 7, 4, 8,
+                startTs, new int[]{80, 133, 168});
+
+        final List<WorkoutDetailRecord> records = WorkoutDetailsParser.parseBytes(makeFileId(5), bytes);
+
+        assertNotNull(records);
+        assertEquals(3, records.size());
+        assertEquals(startTs, records.get(0).ts);
+        assertEquals(startTs + 2, records.get(2).ts);
+        assertEquals(80, records.get(0).hr);
+        assertEquals(133, records.get(1).hr);
+        assertEquals(168, records.get(2).hr);
+    }
+
+    @Test
+    public void testV5OutdoorCyclingSpeed() {
+        final int startTs = 1790152566;
+        final byte[] bytes = buildHrOnlyBytes(
+                new byte[]{(byte) 0xDF, (byte) 0xCF, (byte) 0xFB}, 23, 7, 4, 8,
+                startTs, new int[]{120, 121});
+        // Record speed is uint16 LE at record bytes 4-5, in 0.1 km/h
+        final int firstRecord = 7 + 1 + 3 + 23;
+        bytes[firstRecord + 4] = (byte) 0xD0; // 464 → 46.4 km/h
+        bytes[firstRecord + 5] = (byte) 0x01;
+
+        final ActivityTrack track = new WorkoutDetailsParser().getActivityTrack(makeFileId(5), bytes);
+
+        assertNotNull(track);
+        final List<ActivityPoint> points = track.getAllPoints();
+        assertEquals(2, points.size());
+        assertEquals(46.4f / 3.6f, points.get(0).getSpeed(), 0.001f);
+        assertEquals(121, points.get(1).getHeartRate());
+        // A standstill is a measured zero, so the speed chart does not break there
+        assertEquals(0f, points.get(1).getSpeed(), 0.001f);
+    }
+
     // ---- freestyle v3 (signature FF BB; the byte after the signature is the record-count
     //      low byte and varies per workout — not a fixed 0x53). ----
 
@@ -917,5 +971,35 @@ public class WorkoutDetailsParserTest {
         assertEquals(100, records.get(0).hr);
         assertEquals(150, records.get(1).hr);
         assertEquals(188, records.get(2).hr);
+    }
+
+    /// The Xiaomi Watch 5 records outdoor walks as version 9: the same walking layout as v8, but
+    /// with 25-byte records and one extra field group flagged in the bitmap. Only the leading
+    /// step nibble and heart rate are mapped.
+    @Test
+    public void testWalkingV9() {
+        final byte[] bytes = buildBytes(9, new Segment(1787401873, new int[][]{
+                {3, 111},
+                {2, 107},
+                {4, 90},
+                {1, 122},
+        }));
+
+        final List<WorkoutDetailRecord> records = WorkoutDetailsParser.parseBytes(makeFileId(9), bytes);
+
+        assertNotNull(records);
+        assertEquals(4, records.size());
+
+        assertEquals(111, records.get(0).hr);
+        assertEquals(107, records.get(1).hr);
+        assertEquals(90, records.get(2).hr);
+        assertEquals(122, records.get(3).hr);
+
+        assertEquals(3, records.get(0).steps.intValue());
+        assertEquals(1, records.get(3).steps.intValue());
+
+        // one record per second from the segment start
+        assertEquals(1787401873, records.get(0).ts);
+        assertEquals(1787401876, records.get(3).ts);
     }
 }

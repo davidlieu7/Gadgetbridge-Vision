@@ -1,6 +1,6 @@
 /*  Copyright (C) 2016-2026 Andreas Shimokawa, Arjan Schrijver, beardhatcode,
     Carsten Pfeiffer, Daniele Gobbetti, Enrico Brambilla, José Rebelo, Taavi
-    Eomäe, Avery Sterk
+    Eomäe, Avery Sterk, Thomas Kuehne
 
     This file is part of Gadgetbridge.
 
@@ -21,9 +21,12 @@ package nodomain.freeyourgadget.gadgetbridge.model
 import android.location.Location
 import android.os.Parcel
 import android.os.Parcelable
+import nodomain.freeyourgadget.gadgetbridge.util.gson.GsonSerialized
+import nodomain.freeyourgadget.gadgetbridge.util.kotlin.readListCompat
+import nodomain.freeyourgadget.gadgetbridge.util.kotlin.readParcelableCompat
 import net.e175.klaus.solarpositioning.DeltaT
 import net.e175.klaus.solarpositioning.SPA
-import net.e175.klaus.solarpositioning.SunriseTransitSet
+import net.e175.klaus.solarpositioning.SunriseResult
 import java.util.Date
 import java.util.GregorianCalendar
 import kotlin.math.floor
@@ -34,6 +37,7 @@ import kotlin.random.Random
  * The package for this class must not change, since that is used by external apps such as
  * Tiny Weather Forecast Germany.
  */
+@GsonSerialized
 class WeatherSpec() : Parcelable {
     var timestamp: Int = 0 // unix epoch timestamp, in seconds
     var location: String? = null
@@ -84,18 +88,21 @@ class WeatherSpec() : Parcelable {
             windDirection = parcel.readInt()
             if (version < 4) {
                 // Deserialize the old Forecast list and convert them to Daily
-                val oldForecasts = ArrayList<Forecast>()
-                parcel.readList(oldForecasts, Forecast::class.java.classLoader)
-                for (forecast in oldForecasts) {
-                    val d = Daily()
-                    d.minTemp = forecast.minTemp
-                    d.maxTemp = forecast.maxTemp
-                    d.conditionCode = forecast.conditionCode
-                    d.humidity = forecast.humidity
-                    forecasts.add(d)
+                @Suppress("DEPRECATION")
+                run {
+                    val oldForecasts = ArrayList<Forecast>()
+                    parcel.readListCompat<Forecast>(oldForecasts, Forecast::class.java.classLoader)
+                    for (forecast in oldForecasts) {
+                        val d = Daily()
+                        d.minTemp = forecast.minTemp
+                        d.maxTemp = forecast.maxTemp
+                        d.conditionCode = forecast.conditionCode
+                        d.humidity = forecast.humidity
+                        forecasts.add(d)
+                    }
                 }
             } else {
-                parcel.readList(forecasts, Daily::class.java.classLoader)
+                parcel.readListCompat<Daily>(forecasts, Daily::class.java.classLoader)
             }
         }
         if (version >= 3) {
@@ -116,10 +123,10 @@ class WeatherSpec() : Parcelable {
             longitude = parcel.readFloat()
             feelsLikeTemp = parcel.readInt()
             isCurrentLocation = parcel.readInt()
-            airQuality = parcel.readParcelable(
+            airQuality = parcel.readParcelableCompat<AirQuality>(
                 AirQuality::class.java.classLoader
             )
-            parcel.readList(hourly, Hourly::class.java.classLoader)
+            parcel.readListCompat<Hourly>(hourly, Hourly::class.java.classLoader)
         }
     }
 
@@ -310,6 +317,8 @@ class WeatherSpec() : Parcelable {
     }
 
     @Deprecated("Kept for backwards compatibility with old weather apps")
+    @Suppress("DEPRECATION")
+    @GsonSerialized
     class Forecast() : Parcelable {
         var minTemp: Int = 0 // Kelvin
         var maxTemp: Int = 0 // Kelvin
@@ -365,6 +374,7 @@ class WeatherSpec() : Parcelable {
         }
     }
 
+    @GsonSerialized
     class AirQuality : Parcelable {
         var aqi: Int =
             -1 // Air Quality Index - usually the max across all AQI values for pollutants
@@ -479,23 +489,53 @@ class WeatherSpec() : Parcelable {
         }
     }
 
+    @GsonSerialized
     class Daily() : Parcelable {
-        var minTemp: Int = 0 // Kelvin
-        var maxTemp: Int = 0 // Kelvin
-        var conditionCode: Int = 0 // OpenWeatherMap condition code
+        /** minimum air temperature in Kelvin */
+        var minTemp: Int = 0
+
+        /** maximum air temperature in Kelvin */
+        var maxTemp: Int = 0
+
+        /** OpenWeatherMap condition code */
+        var conditionCode: Int = 0
+
+        /** relative humidity in percent */
         var humidity: Int = 0
-        var windSpeed: Float = 0f // km per hour
-        var windDirection: Int = 0 // deg
-        var uvIndex: Float = 0f // 0.0 to 15.0
-        var precipProbability: Int = 0 // %
+
+        /** wind speed in kilometer per hour */
+        var windSpeed: Float = 0f
+
+        /** wind direction in [0 - 360[ degrees */
+        var windDirection: Int = 0
+
+        /** UV index (0-15) */
+        var uvIndex: Float = 0f
+
+        /** total precipitation probability in percent */
+        var precipProbability: Int = 0
+
+        /** sun rise in Unix epoc seconds */
         var sunRise: Int = 0
+
+        /** sun set in Unix epoc seconds */
         var sunSet: Int = 0
+
+        /** moon rise in Unix epoc seconds */
         var moonRise: Int = 0
+
+        /** moon set in Unix epoc seconds */
         var moonSet: Int = 0
+
+        /** moon phase in degree */
         var moonPhase: Int = 0
         var airQuality: AirQuality? = null
-        var pressure: Float = 0f // mbar
-        var cloudCover: Int = 0 // %
+
+        /** atmospheric air pressure in millibar */
+        var pressure: Float = 0f
+
+        /** total cloud cover in percent */
+        var cloudCover: Int = 0
 
 
         internal constructor(parcel: Parcel) : this() {
@@ -513,7 +553,7 @@ class WeatherSpec() : Parcelable {
             moonRise = parcel.readInt()
             moonSet = parcel.readInt()
             moonPhase = parcel.readInt()
-            airQuality = parcel.readParcelable(
+            airQuality = parcel.readParcelableCompat<AirQuality>(
                 AirQuality::class.java.classLoader
             )
             if (version >= 2) {
@@ -609,18 +649,40 @@ class WeatherSpec() : Parcelable {
         }
     }
 
+    @GsonSerialized
     class Hourly() : Parcelable {
-        var timestamp: Int = 0 // unix epoch timestamp, in seconds
-        var temp: Int = 0 // Kelvin
-        var conditionCode: Int = 0 // OpenWeatherMap condition code
+        /** Unix epoch timestamp in seconds */
+        var timestamp: Int = 0
+
+        /** air temperature in Kelvin */
+        var temp: Int = 0
+
+        /** OpenWeatherMap condition code */
+        var conditionCode: Int = 0
+
+        /** relative humididty in percent */
         var humidity: Int = 0
-        var windSpeed: Float = 0f // km per hour
-        var windDirection: Int = 0 // deg
-        var uvIndex: Float = 0f // 0.0 to 15.0
-        var precipProbability: Int = 0 // %
-        var dewPoint: Int = 0 // Kelvin
-        var pressure: Float = 0f // millibar
-        var cloudCover: Int = 0 // percent
+
+        /** wind speed in kilometer per hour */
+        var windSpeed: Float = 0f
+
+        /** wind direction in [0 - 360[ degrees */
+        var windDirection: Int = 0
+
+        /** UV index (0-15) */
+        var uvIndex: Float = 0f
+
+        /** total precipitation probability in percent */
+        var precipProbability: Int = 0
+
+        /** dew point in Kelvin */
+        var dewPoint: Int = 0
+
+        /** atmospheric air pressure in millibar */
+        var pressure: Float = 0f
+
+        /** total cloud cover in percent */
+        var cloudCover: Int = 0
 
 
         internal constructor(parcel: Parcel) : this() {
@@ -736,7 +798,7 @@ class WeatherSpec() : Parcelable {
             return floor((normalized / 360.0) * synodicMonth).toInt() + 1
         }
 
-        fun sunriseTransitSet(date: GregorianCalendar, location: Location): SunriseTransitSet {
+        fun sunriseTransitSet(date: GregorianCalendar, location: Location): SunriseResult {
             return SPA.calculateSunriseTransitSet(
                 date.toZonedDateTime(),
                 location.latitude,
@@ -752,7 +814,7 @@ class WeatherSpec() : Parcelable {
             if (location == null) {
                 return null
             }
-            return sunriseTransitSet(date, location).sunrise?.let {
+            return (sunriseTransitSet(date, location) as? SunriseResult.RegularDay)?.sunrise()?.let {
                 return Date.from(it.toInstant())
             }
         }
@@ -764,7 +826,7 @@ class WeatherSpec() : Parcelable {
             if (location == null) {
                 return null
             }
-            return sunriseTransitSet(date, location).sunset?.let {
+            return (sunriseTransitSet(date, location) as? SunriseResult.RegularDay)?.sunset()?.let {
                 return Date.from(it.toInstant())
             }
         }
@@ -797,18 +859,21 @@ class WeatherSpec() : Parcelable {
             weather.currentConditionCode = conditionCode
             weather.currentCondition = conditionText
 
-            weather.windDirection = 12
-            weather.precipProbability = 99
-            weather.windSpeed = 10f
+            weather.windDirection = Random.nextInt(0, 359)
+            weather.precipProbability = Random.nextInt(0, 100)
+            weather.windSpeed = Random.nextInt(0, 300) / 3.0f
             weather.feelsLikeTemp = weather.currentTemp + Random.nextInt(-5, 5)
             weather.currentHumidity = Random.nextInt(20, 80)
-            weather.latitude = 38.250137f
-            weather.longitude = -122.410805f
-            weather.dewPoint = weather.currentTemp - Random.nextInt(5, 10)
+            weather.latitude = Random.nextFloat() * 360.0f - 180.0f
+            weather.longitude = Random.nextFloat() * 360.0f - 180.0f
+            weather.dewPoint = weather.currentTemp + Random.nextInt(-10, 10)
+            weather.cloudCover = Random.nextInt(0, 100)
+            weather.visibility = Random.nextInt(0, 10000).toFloat()
+            weather.uvIndex = Random.nextInt(0, 30) / 2.0f
+            weather.pressure = 1010.0f + Random.nextInt(-30, 31)
             val airQuality = AirQuality()
             airQuality.aqi = 50
             weather.airQuality = airQuality
-            weather.currentHumidity = 30
 
             weather.hourly = ArrayList()
             var hourlyTimestamp = weather.timestamp + 3600
@@ -843,6 +908,11 @@ class WeatherSpec() : Parcelable {
 
                 val (conditionCode, conditionText) = conditions.random()
                 gbForecast.conditionCode = conditionCode
+
+                gbForecast.humidity = 10 * (i + 1)
+                gbForecast.windSpeed = 5.0f * (i + 1)
+                gbForecast.windDirection = 45 * (i + 1)
+                gbForecast.uvIndex = i.toFloat()
 
                 gbForecast.precipProbability = 50 + i
                 val airQualityDaily = AirQuality()

@@ -36,9 +36,11 @@ import nodomain.freeyourgadget.gadgetbridge.model.CalendarEventSpec;
 import nodomain.freeyourgadget.gadgetbridge.model.CallSpec;
 import nodomain.freeyourgadget.gadgetbridge.model.CannedMessagesSpec;
 import nodomain.freeyourgadget.gadgetbridge.model.Contact;
+import nodomain.freeyourgadget.gadgetbridge.model.FindDeviceTarget;
 import nodomain.freeyourgadget.gadgetbridge.model.MusicSpec;
 import nodomain.freeyourgadget.gadgetbridge.model.MusicStateSpec;
 import nodomain.freeyourgadget.gadgetbridge.model.NavigationInfoSpec;
+import nodomain.freeyourgadget.gadgetbridge.model.NavigationRouteSpec;
 import nodomain.freeyourgadget.gadgetbridge.model.NotificationSpec;
 import nodomain.freeyourgadget.gadgetbridge.model.Reminder;
 import nodomain.freeyourgadget.gadgetbridge.model.WorldClock;
@@ -65,6 +67,13 @@ public interface EventHandler {
 
     void onSetContacts(ArrayList<? extends Contact> contacts);
 
+    /**
+     * Sends the workout template with the given id to the device.
+     *
+     * @param templateId the id of the WorkoutTemplate row
+     */
+    void onSyncWorkoutTemplate(long templateId);
+
     void onSetCallState(CallSpec callSpec);
 
     void onSetCannedMessages(@NonNull CannedMessagesSpec cannedMessagesSpec);
@@ -83,6 +92,8 @@ public interface EventHandler {
     void onChangePhoneSilentMode(int ringerMode);
 
     void onSetNavigationInfo(@NonNull NavigationInfoSpec navigationInfoSpec);
+
+    void onSetNavigationRoute(@NonNull NavigationRouteSpec navigationRouteSpec);
 
     void onEnableRealtimeSteps(boolean enable);
 
@@ -106,13 +117,24 @@ public interface EventHandler {
 
     void onFetchRecordedData(int dataTypes);
 
-    void onReset(int flags);
+    void onReboot();
+
+    void onFactoryReset();
 
     void onHeartRateTest();
 
     void onEnableRealtimeHeartRateMeasurement(boolean enable);
 
     void onFindDevice(boolean start);
+
+    /**
+     * Starts or stops the "find device" function on a specific target of the device.
+     * Only devices that support {@link DeviceCoordinator#supportsFindDevicePerEarbud}
+     * must implement this method.
+     */
+    default void onFindDevice(final boolean start, @NonNull final FindDeviceTarget target) {
+        onFindDevice(start);
+    }
 
     void onFindPhone(boolean start);
 

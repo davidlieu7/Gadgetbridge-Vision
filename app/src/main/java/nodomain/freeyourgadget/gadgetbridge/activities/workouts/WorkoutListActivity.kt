@@ -10,9 +10,13 @@ import android.view.ActionMode
 import android.view.Menu
 import android.view.MenuItem
 import android.view.View
+import android.widget.CheckBox
+import android.widget.RadioGroup
 import android.widget.Toast
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
-import androidx.core.content.FileProvider
+import androidx.appcompat.app.AlertDialog
+import androidx.lifecycle.lifecycleScope
 import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import androidx.recyclerview.widget.RecyclerView
 import androidx.recyclerview.widget.SimpleItemAnimator
@@ -29,13 +33,20 @@ import nodomain.freeyourgadget.gadgetbridge.entities.BaseActivitySummary
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice
 import nodomain.freeyourgadget.gadgetbridge.model.ActivityKind
 import nodomain.freeyourgadget.gadgetbridge.model.RecordedDataTypes
-import nodomain.freeyourgadget.gadgetbridge.util.ActivitySummaryUtils
+import nodomain.freeyourgadget.gadgetbridge.util.AndroidUtils
 import nodomain.freeyourgadget.gadgetbridge.util.GB
 import nodomain.freeyourgadget.gadgetbridge.util.WorkoutFilterUtils
+import nodomain.freeyourgadget.gadgetbridge.util.kotlin.getParcelableCompat
+import nodomain.freeyourgadget.gadgetbridge.util.kotlin.getSerializableCompat
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.slf4j.LoggerFactory
-import java.io.File
 import java.util.BitSet
 import java.util.Calendar
+import java.util.Locale
+import androidx.core.view.get
+import androidx.core.view.size
 
 class WorkoutListActivity : AbstractListActivity<BaseActivitySummary>() {
     private val viewModel: WorkoutListViewModel by viewModels()
@@ -50,13 +61,33 @@ class WorkoutListActivity : AbstractListActivity<BaseActivitySummary>() {
     private var gbDevice: GBDevice? = null
     private var selectedItems: BitSet? = null
     private lateinit var swipeLayout: SwipeRefreshLayout
+    private var summariesAdapter: WorkoutSummariesAdapter? = null
     private var actionMode: ActionMode? = null
+
+    private val activityDetailLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        if (result.resultCode == WorkoutDetailsActivity.RESULT_WORKOUT_CHANGED) {
+            // FIXME we could try to only update the workouts that changed
+            refresh()
+        }
+    }
+
+    private val activityFilterLauncher = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        result.data?.extras?.let { bundle ->
+            activityFilter = bundle.getInt("activityFilter", 0)
+            dateFromFilter = bundle.getLong("dateFromFilter", 0)
+            dateToFilter = bundle.getLong("dateToFilter", 0)
+            deviceFilter = bundle.getLong("deviceFilter", 0)
+            nameContainsFilter = bundle.getString("nameContainsFilter")
+            itemsFilter = bundle.getSerializableCompat<ArrayList<Long>>("itemsFilter")
+            refresh()
+        }
+    }
 
     private val receiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
             when (intent.action) {
                 GBDevice.ACTION_DEVICE_CHANGED -> {
-                    val device = intent.getParcelableExtra<GBDevice>(GBDevice.EXTRA_DEVICE)
+                    val device = intent.getParcelableCompat<GBDevice>(GBDevice.EXTRA_DEVICE)
                     if (device == null) {
                         LOG.error("Got device changed without device")
                         return
@@ -112,32 +143,8 @@ class WorkoutListActivity : AbstractListActivity<BaseActivitySummary>() {
         }
     }
 
-    override fun onActivityResult(requestCode: Int, resultCode: Int, resultData: Intent?) {
-        super.onActivityResult(requestCode, resultCode, resultData)
-        when (requestCode) {
-            ACTIVITY_FILTER -> {
-                resultData?.extras?.let { bundle ->
-                    activityFilter = bundle.getInt("activityFilter", 0)
-                    dateFromFilter = bundle.getLong("dateFromFilter", 0)
-                    dateToFilter = bundle.getLong("dateToFilter", 0)
-                    deviceFilter = bundle.getLong("deviceFilter", 0)
-                    nameContainsFilter = bundle.getString("nameContainsFilter")
-                    @Suppress("UNCHECKED_CAST")
-                    itemsFilter = bundle.getSerializable("itemsFilter") as? List<Long>
-                    refresh()
-                }
-            }
-            ACTIVITY_DETAIL -> {
-                if (resultCode == WorkoutDetailsActivity.RESULT_WORKOUT_CHANGED) {
-                    // FIXME we could try to only update the workouts that changed
-                    refresh()
-                }
-            }
-        }
-    }
-
     override fun onCreate(savedInstanceState: Bundle?) {
-        gbDevice = intent.getParcelableExtra(GBDevice.EXTRA_DEVICE)
+        gbDevice = intent.getParcelableCompat<GBDevice>(GBDevice.EXTRA_DEVICE)
             ?: throw IllegalArgumentException("Must provide a device when invoking this activity")
         deviceFilter = getDeviceId(gbDevice!!)
 
@@ -209,6 +216,7 @@ class WorkoutListActivity : AbstractListActivity<BaseActivitySummary>() {
         }
 
         setItemAdapter(workoutSummariesAdapter)
+        summariesAdapter = workoutSummariesAdapter
 
         // The dashboard row gets a notifyItemChanged on every silent
         // refresh during sync; the default ChangeAnimator cross-fades
@@ -233,6 +241,8 @@ class WorkoutListActivity : AbstractListActivity<BaseActivitySummary>() {
 
     private fun setupViewModel() {
         viewModel.summaries.observe(this) { summaries ->
+            // Set before the items, so the first bind of every row already has its indicator.
+            summariesAdapter?.uploadStatuses = viewModel.uploadStatuses.value.orEmpty()
             itemAdapter?.setItems(summaries, true)
             activityKindMap = fillKindMap()
         }
@@ -284,8 +294,8 @@ class WorkoutListActivity : AbstractListActivity<BaseActivitySummary>() {
                 val typedValue = android.util.TypedValue()
                 theme.resolveAttribute(R.attr.actionmenu_icon_color, typedValue, true)
                 val iconColor = typedValue.data
-                for (i in 0 until menu.size()) {
-                    menu.getItem(i).icon?.setTint(iconColor)
+                for (i in 0 until menu.size) {
+                    menu[i].icon?.setTint(iconColor)
                 }
 
                 findViewById<View>(R.id.fab).visibility = View.INVISIBLE
@@ -308,28 +318,20 @@ class WorkoutListActivity : AbstractListActivity<BaseActivitySummary>() {
                             .setTitle(getString(R.string.sports_activity_confirm_delete_title, toDelete.size))
                             .setMessage(getString(R.string.sports_activity_confirm_delete_description, toDelete.size))
                             .setIcon(R.drawable.ic_delete_forever)
-                            .setPositiveButton(android.R.string.yes) { _, _ -> deleteItems(toDelete) }
-                            .setNegativeButton(android.R.string.no, null)
+                            .setPositiveButton(R.string.yes) { _, _ -> deleteItems(toDelete) }
+                            .setNegativeButton(R.string.no, null)
                             .show()
 
                         return true
                     }
                     R.id.activity_action_export -> {
-                        val paths = ArrayList<String>()
+                        val toExport = ArrayList<BaseActivitySummary>()
                         for (i in 0 until selectedItems!!.length()) {
                             if (selectedItems!!.get(i)) {
-                                itemAdapter?.getItem(i)?.let { summary ->
-                                    val activityTrackProvider =
-                                        gbDevice?.deviceCoordinator?.getActivityTrackProvider(gbDevice!!, this@WorkoutListActivity)
-                                    if (activityTrackProvider != null) {
-                                        ActivitySummaryUtils.getShareableGpxFile(activityTrackProvider, summary)?.let { file ->
-                                            paths.add(file.path)
-                                        }
-                                    }
-                                }
+                                itemAdapter?.getItem(i)?.let { toExport.add(it) }
                             }
                         }
-                        shareMultiple(paths)
+                        showExportDialog(toExport)
                         return true
                     }
                     R.id.activity_action_select_all -> {
@@ -417,7 +419,7 @@ class WorkoutListActivity : AbstractListActivity<BaseActivitySummary>() {
         items.forEach { item ->
             try {
                 item.delete()
-            } catch (e: Exception) {
+            } catch (_: Exception) {
                 // pass delete error
             }
         }
@@ -438,24 +440,80 @@ class WorkoutListActivity : AbstractListActivity<BaseActivitySummary>() {
         }
     }
 
-    private fun shareMultiple(paths: List<String>) {
-        val uris = paths.map { path ->
-            val file = File(path)
-            FileProvider.getUriForFile(
-                this,
-                "${applicationContext.packageName}.screenshot_provider",
-                file
-            )
-        }
+    private fun showExportDialog(summaries: List<BaseActivitySummary>) {
+        val device = gbDevice ?: return
+        if (summaries.isEmpty()) return
 
-        if (uris.isNotEmpty()) {
-            val intent = Intent(Intent.ACTION_SEND_MULTIPLE).apply {
-                type = "application/gpx+xml"
-                putParcelableArrayListExtra(Intent.EXTRA_STREAM, ArrayList(uris))
+        val prefs = GBApplication.getPrefs()
+        val view = layoutInflater.inflate(R.layout.dialog_workout_export, null)
+        val boxes = mapOf(
+            WorkoutBatchExporter.Part.FIT to view.findViewById<CheckBox>(R.id.workout_export_fit),
+            WorkoutBatchExporter.Part.GPX to view.findViewById<CheckBox>(R.id.workout_export_gpx),
+            WorkoutBatchExporter.Part.RAW to view.findViewById<CheckBox>(R.id.workout_export_raw)
+        )
+        fun prefKey(part: WorkoutBatchExporter.Part) = "workout_export_" + part.name.lowercase(Locale.ROOT)
+        boxes.forEach { (part, box) ->
+            box.isChecked = prefs.getBoolean(prefKey(part), part != WorkoutBatchExporter.Part.RAW)
+        }
+        val shareAs = view.findViewById<RadioGroup>(R.id.workout_export_share_as)
+        shareAs.check(
+            if (prefs.getBoolean(PREF_EXPORT_AS_ZIP, false)) R.id.workout_export_zip else R.id.workout_export_separate
+        )
+
+        val dialog = MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.workout_export_title)
+            .setView(view)
+            .setPositiveButton(android.R.string.ok) { _, _ ->
+                val asZip = shareAs.checkedRadioButtonId == R.id.workout_export_zip
+                prefs.preferences.edit().apply {
+                    boxes.forEach { (part, box) -> putBoolean(prefKey(part), box.isChecked) }
+                    putBoolean(PREF_EXPORT_AS_ZIP, asZip)
+                    apply()
+                }
+                val parts = boxes.filterValues { it.isChecked }.keys
+                exportWorkouts(device, summaries, parts, asZip)
             }
-            startActivity(Intent.createChooser(intent, "SHARE"))
-        } else {
-            GB.toast(this, "No selected activity contains a GPX track to share", Toast.LENGTH_SHORT, GB.ERROR)
+            .setNegativeButton(android.R.string.cancel, null)
+            .create()
+        dialog.show()
+        val ok = dialog.getButton(AlertDialog.BUTTON_POSITIVE)
+        ok.isEnabled = boxes.values.any { it.isChecked }
+        boxes.values.forEach { box ->
+            box.setOnCheckedChangeListener { _, _ -> ok.isEnabled = boxes.values.any { it.isChecked } }
+        }
+    }
+
+    private fun exportWorkouts(
+        device: GBDevice,
+        summaries: List<BaseActivitySummary>,
+        parts: Set<WorkoutBatchExporter.Part>,
+        asZip: Boolean
+    ) {
+        actionMode?.finish()
+        GB.toast(this, getString(R.string.workout_export_preparing), Toast.LENGTH_SHORT, GB.INFO)
+        lifecycleScope.launch {
+            val result = try {
+                withContext(Dispatchers.IO) {
+                    WorkoutBatchExporter.export(this@WorkoutListActivity, device, summaries, parts, asZip)
+                }
+            } catch (e: Exception) {
+                LOG.error("Failed to export workouts", e)
+                GB.toast(this@WorkoutListActivity, getString(R.string.workout_export_nothing), Toast.LENGTH_LONG, GB.ERROR)
+                return@launch
+            }
+            if (result.files.isEmpty()) {
+                GB.toast(this@WorkoutListActivity, getString(R.string.workout_export_nothing), Toast.LENGTH_LONG, GB.ERROR)
+                return@launch
+            }
+            if (result.skipped > 0) {
+                GB.toast(
+                    this@WorkoutListActivity,
+                    resources.getQuantityString(R.plurals.workout_export_skipped, result.skipped, result.skipped),
+                    Toast.LENGTH_LONG,
+                    GB.WARN
+                )
+            }
+            AndroidUtils.shareFiles(this@WorkoutListActivity, result.files, WorkoutBatchExporter.mimeTypeFor(result.files))
         }
     }
 
@@ -471,7 +529,7 @@ class WorkoutListActivity : AbstractListActivity<BaseActivitySummary>() {
             deviceFilter,
             itemsFilter
         )
-        startActivityForResult(intent, ACTIVITY_DETAIL)
+        activityDetailLauncher.launch(intent)
     }
 
     private fun runFilterActivity() {
@@ -485,7 +543,7 @@ class WorkoutListActivity : AbstractListActivity<BaseActivitySummary>() {
             putExtra("initial_deviceFilter", getDeviceId(gbDevice!!))
             putExtra("nameContainsFilter", nameContainsFilter)
         }
-        startActivityForResult(filterIntent, ACTIVITY_FILTER)
+        activityFilterLauncher.launch(filterIntent)
     }
 
     private fun getDeviceId(device: GBDevice): Long {
@@ -528,7 +586,6 @@ class WorkoutListActivity : AbstractListActivity<BaseActivitySummary>() {
 
     companion object {
         private val LOG = LoggerFactory.getLogger(WorkoutListActivity::class.java)
-        const val ACTIVITY_FILTER = 1
-        const val ACTIVITY_DETAIL = 11
+        private const val PREF_EXPORT_AS_ZIP = "workout_export_as_zip"
     }
 }

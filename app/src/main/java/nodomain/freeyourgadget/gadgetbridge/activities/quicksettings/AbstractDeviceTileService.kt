@@ -33,6 +33,7 @@ import nodomain.freeyourgadget.gadgetbridge.R
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.QuickSettingType
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.QuickSettings
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice
+import nodomain.freeyourgadget.gadgetbridge.util.kotlin.getDevice
 import org.slf4j.LoggerFactory
 
 /**
@@ -54,12 +55,7 @@ abstract class AbstractDeviceTileService : TileService() {
     // Refreshes the tile whenever device connection state changes while the panel is open.
     private val deviceStateReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
-            val changedDevice = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-                intent.getParcelableExtra(GBDevice.EXTRA_DEVICE, GBDevice::class.java)
-            } else {
-                @Suppress("DEPRECATION")
-                intent.getParcelableExtra(GBDevice.EXTRA_DEVICE)
-            }
+            val changedDevice = intent.getDevice()
 
             if (changedDevice == null || changedDevice.address != deviceAddress) {
                 return
@@ -135,7 +131,7 @@ abstract class AbstractDeviceTileService : TileService() {
                 tile.icon = Icon.createWithResource(this, descriptor.icon)
                 when (descriptor.type) {
                     QuickSettingType.TOGGLE -> {
-                        val value = QuickSettings.currentBool(address, key)
+                        val value = QuickSettings.currentBool(descriptor)
                         tile.state = if (value) Tile.STATE_ACTIVE else Tile.STATE_INACTIVE
                         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                             tile.subtitle = device.aliasOrName
@@ -150,11 +146,13 @@ abstract class AbstractDeviceTileService : TileService() {
                         }
                     }
                 }
-                if (!device.isInitialized) {
+                if (descriptor.connectedOnly && !device.isInitialized) {
                     tile.state = Tile.STATE_UNAVAILABLE
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
                         tile.subtitle = getString(R.string.qs_tile_not_connected, device.aliasOrName)
                     }
+                } else if (!descriptor.visible) {
+                    tile.state = Tile.STATE_UNAVAILABLE
                 }
             }
         }

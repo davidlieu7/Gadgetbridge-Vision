@@ -17,8 +17,11 @@
 package nodomain.freeyourgadget.gadgetbridge.model;
 
 import static nodomain.freeyourgadget.gadgetbridge.model.ActivitySummaryEntries.UNIT_KCAL_PER_DAY;
+import static nodomain.freeyourgadget.gadgetbridge.model.ActivitySummaryEntries.UNIT_METERS;
 import static nodomain.freeyourgadget.gadgetbridge.model.ActivitySummaryEntries.UNIT_ML_KG_MIN;
+import static nodomain.freeyourgadget.gadgetbridge.model.ActivitySummaryEntries.UNIT_MINUTES;
 import static nodomain.freeyourgadget.gadgetbridge.model.ActivitySummaryEntries.UNIT_NONE;
+import static nodomain.freeyourgadget.gadgetbridge.model.ActivitySummaryEntries.UNIT_SECONDS_SPORT;
 import static nodomain.freeyourgadget.gadgetbridge.model.ActivitySummaryEntries.UNIT_WATT;
 
 import androidx.annotation.IntRange;
@@ -27,12 +30,16 @@ import androidx.annotation.Nullable;
 import androidx.annotation.StringRes;
 
 import nodomain.freeyourgadget.gadgetbridge.R;
+import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.messages.FitDiveReadiness;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.messages.FitEnduranceScore;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.messages.FitFunctionalMetrics;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.messages.FitHillScore;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.messages.FitMaxMetData;
+import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.messages.FitMetricRecovery;
+import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.messages.FitMonitoring;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.messages.FitMonitoringInfo;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.messages.FitPhysiologicalMetrics;
+import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.messages.FitRacePrediction;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.messages.FitTrainingLoad;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.messages.FitTrainingReadiness;
 
@@ -59,11 +66,11 @@ public interface MetricSample extends TimeSample {
         setMetricExtra(extra);
     }
 
-    @IntRange(from = 0, to = 18)
+    @IntRange(from = 0, to = 26)
     int getMetricType();
 
     /// use {@link #setMetric(Metric)} or {@link #setMetric(Metric, double, Long)} instead
-    void setMetricType(@IntRange(from = 1, to = 18) int type);
+    void setMetricType(@IntRange(from = 1, to = 26) int type);
 
     double getMetricScore();
 
@@ -129,6 +136,22 @@ public interface MetricSample extends TimeSample {
         /// Sleep Regularity Index (Phillips 2017) — 0-100, higher = more regular.
         /// metricScore: 0-100. metricExtra: number of nights compared.
         GENERIC_SLEEP_REGULARITY(18, UNIT_NONE),
+        /// @see FitRacePrediction#getTime5k()
+        GENERIC_RACE_PREDICTOR_5K(19, UNIT_SECONDS_SPORT, R.string.metric_generic_race_predictor_5k),
+        /// @see FitRacePrediction#getTime10k()
+        GENERIC_RACE_PREDICTOR_10K(20, UNIT_SECONDS_SPORT, R.string.metric_generic_race_predictor_10k),
+        /// @see FitRacePrediction#getTimeHalfMarathon()
+        GENERIC_RACE_PREDICTOR_HALF_MARATHON(21, UNIT_SECONDS_SPORT, R.string.metric_generic_race_predictor_half_marathon),
+        /// @see FitRacePrediction#getTimeFullMarathon()
+        GENERIC_RACE_PREDICTOR_FULL_MARATHON(22, UNIT_SECONDS_SPORT, R.string.metric_generic_race_predictor_full_marathon),
+        /// @see FitMetricRecovery#getRecoveryMinutes()
+        GARMIN_RECOVERY_TIME(23, UNIT_MINUTES, R.string.recoveryTime),
+        /// @see FitMonitoring#getTotalAscent()
+        DAILY_TOTAL_ASCENT(24, UNIT_METERS, R.string.ascentMeters),
+        /// @see FitMonitoring#getTotalDescent()
+        DAILY_TOTAL_DESCENT(25, UNIT_METERS, R.string.descentMeters),
+        /// @see FitDiveReadiness#getDiveReadiness()
+        GARMIN_DIVE_READINESS(26, UNIT_NONE, R.string.metric_garmin_dive_readiness),
         ;
 
         public final int dbId;

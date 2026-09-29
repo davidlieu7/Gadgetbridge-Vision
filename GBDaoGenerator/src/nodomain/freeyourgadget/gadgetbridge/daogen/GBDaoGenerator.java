@@ -81,6 +81,7 @@ public class GBDaoGenerator {
     private static final String SAMPLE_STRESS = "stress";
     private static final String SAMPLE_TEMPERATURE = "temperature";
     private static final String SAMPLE_WEIGHT_KG = "weightKg";
+    private static final String SAMPLE_IMPEDANCE_OHM = "impedanceOhm";
     private static final String SAMPLE_BLOOD_PRESSURE_SYSTOLIC = "bpSystolic";
     private static final String SAMPLE_BLOOD_PRESSURE_DIASTOLIC = "bpDiastolic";
     private static final String TIMESTAMP_FROM = "timestampFrom";
@@ -109,7 +110,7 @@ public class GBDaoGenerator {
             outputDir.mkdirs();
         }
 
-        final Schema schema = new Schema(138, MAIN_PACKAGE + ".entities");
+        final Schema schema = new Schema(147, MAIN_PACKAGE + ".entities");
 
         final List<Entity> sampleProvidersToGenerate = new LinkedList<>();
         final List<Entity> batterySampleProvidersToGenerate = new LinkedList<>();
@@ -122,6 +123,7 @@ public class GBDaoGenerator {
         addHealthConnectSyncState(schema, device);
         addHealthConnectSleepSession(schema, device);
         addInternetFirewallRule(schema, device);
+        addXiaomiHipeeP1Reading(schema, device);
 
         // yeah deep shit, has to be here (after device) for db upgrade and column order
         // because addDevice adds a property to deviceAttributes also....
@@ -133,6 +135,7 @@ public class GBDaoGenerator {
         addMakibesHR3ActivitySample(schema, user, device);
         addOVTouch26ActivitySample(schema, user, device);
         addAk102ActivitySample(schema, user, device);
+        addWearFitActivitySample(schema, user, device);
         addMiBandActivitySample(schema, user, device);
         addHuamiExtendedActivitySample(schema, user, device);
         sampleProvidersToGenerate.add(addHuamiStressSample(schema, user, device));
@@ -191,6 +194,7 @@ public class GBDaoGenerator {
         addGarminActivitySample(schema, user, device);
         sampleProvidersToGenerate.add(addGarminStressSample(schema, user, device));
         sampleProvidersToGenerate.add(addGarminBodyEnergySample(schema, user, device));
+        sampleProvidersToGenerate.add(addGarminSolarChargeSample(schema, user, device));
         sampleProvidersToGenerate.add(addGarminSpo2Sample(schema, user, device));
         sampleProvidersToGenerate.add(addGarminSleepStageSample(schema, user, device));
         addGarminEventSample(schema, user, device);
@@ -274,11 +278,16 @@ public class GBDaoGenerator {
         addAudioRecordings(schema, device);
         addPebbleAppstoreIdEntry(schema);
 
+        Entity weightSampleF8 = addWeightSampleF8(schema, user, device);
+
         Entity notificationFilter = addNotificationFilters(schema);
 
         addNotificationFilterEntry(schema, notificationFilter);
 
         addActivitySummary(schema, user, device);
+        addWorkoutUpload(schema);
+        final Entity workoutTemplate = addWorkoutTemplate(schema, device);
+        addWorkoutTemplateStep(schema, workoutTemplate);
         // FIXME: BatteryLevel timestamp is in seconds, maybe migrate it once #6177 is merged
         addBatteryLevel(schema, device);
         batterySampleProvidersToGenerate.add(addBatteryVoltageSample(schema, device));
@@ -296,6 +305,7 @@ public class GBDaoGenerator {
         sampleProvidersToGenerate.add(addGenericTrainingLoadAcuteSample(schema, user, device));
         sampleProvidersToGenerate.add(addGenericTrainingLoadChronicSample(schema, user, device));
         sampleProvidersToGenerate.add(addGenericWeightSample(schema, user, device));
+        sampleProvidersToGenerate.add(addGenericImpedanceSample(schema, user, device));
         sampleProvidersToGenerate.add(addGlucoseSample(schema, user, device));
         addGenericMetricsSample(schema, user, device);
         sampleProvidersToGenerate.add(addGenericSleepScoreSample(schema, user, device));
@@ -571,6 +581,16 @@ public class GBDaoGenerator {
         activitySample.addIntProperty(SAMPLE_BLOOD_PRESSURE_SYSTOLIC).notNull();
         activitySample.addIntProperty(SAMPLE_BLOOD_PRESSURE_DIASTOLIC).notNull();
         activitySample.addIntProperty("sleep");
+        activitySample.addIntProperty(SAMPLE_RAW_KIND).notNull().codeBeforeGetterAndSetter(OVERRIDE);
+        addHeartRateProperties(activitySample);
+        return activitySample;
+    }
+
+    private static Entity addWearFitActivitySample(Schema schema, Entity user, Entity device) {
+        Entity activitySample = addEntity(schema, "WearFitActivitySample");
+        activitySample.implementsSerializable();
+        addCommonActivitySampleProperties("AbstractActivitySample", activitySample, user, device);
+        activitySample.addIntProperty(SAMPLE_STEPS).notNull().codeBeforeGetterAndSetter(OVERRIDE);
         activitySample.addIntProperty(SAMPLE_RAW_KIND).notNull().codeBeforeGetterAndSetter(OVERRIDE);
         addHeartRateProperties(activitySample);
         return activitySample;
@@ -1167,6 +1187,14 @@ public class GBDaoGenerator {
         return stressSample;
     }
 
+    private static Entity addGarminSolarChargeSample(Schema schema, Entity user, Entity device) {
+        Entity solarChargeSample = addEntity(schema, "GarminSolarChargeSample");
+        addCommonTimeSampleProperties("AbstractSolarChargeSample", solarChargeSample, user, device);
+        solarChargeSample.addFloatProperty("percent").notNull().codeBeforeGetter(OVERRIDE);
+        solarChargeSample.addLongProperty("gain").notNull().codeBeforeGetter(OVERRIDE);
+        return solarChargeSample;
+    }
+
     private static Entity addGarminSpo2Sample(Schema schema, Entity user, Entity device) {
         Entity spo2sample = addEntity(schema, "GarminSpo2Sample");
         addCommonTimeSampleProperties("AbstractSpo2Sample", spo2sample, user, device);
@@ -1185,8 +1213,11 @@ public class GBDaoGenerator {
     private static Entity addGarminEventSample(Schema schema, Entity user, Entity device) {
         Entity sleepStageSample = addEntity(schema, "GarminEventSample");
         addCommonTimeSampleProperties("AbstractTimeSample", sleepStageSample, user, device);
-        sleepStageSample.addIntProperty("event").notNull().primaryKey();
-        sleepStageSample.addIntProperty("eventType");
+
+        sleepStageSample.addIntProperty("event").notNull().primaryKey()
+                .codeBeforeSetter("public void setEvent(nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.enums.Event eventEnum) {\n\t\tsetEvent(eventEnum.num);\n\t}\n");
+        sleepStageSample.addIntProperty("eventType")
+                .codeBeforeSetter("public void setEventType(@Nullable nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.enums.EventType eventTypeEnum) {\n\t\tsetEventType(eventTypeEnum == null ? null : eventTypeEnum.num);\n\t}\n");
         sleepStageSample.addLongProperty("data");
         return sleepStageSample;
     }
@@ -1442,6 +1473,7 @@ public class GBDaoGenerator {
 
     private static Entity addMoyoungSpo2Sample(Schema schema, Entity user, Entity device) {
         Entity spo2sample = addEntity(schema, "MoyoungSpo2Sample");
+        spo2sample.implementsSerializable();
         addCommonTimeSampleProperties("AbstractSpo2Sample", spo2sample, user, device);
         spo2sample.addIntProperty("spo2").notNull().codeBeforeGetter(OVERRIDE);
         return spo2sample;
@@ -1752,7 +1784,8 @@ public class GBDaoGenerator {
         summary.addStringProperty("name").codeBeforeGetter(OVERRIDE);
         summary.addDateProperty("startTime").notNull().codeBeforeGetter(OVERRIDE);
         summary.addDateProperty("endTime").notNull().codeBeforeGetter(OVERRIDE);
-        summary.addIntProperty("activityKind").notNull().codeBeforeGetter(OVERRIDE);
+        summary.addBooleanProperty("overrideActivityKind").notNull();
+        summary.addIntProperty("activityKind").notNull().codeBeforeGetter(OVERRIDE).codeInSetter("if (!getOverrideActivityKind()) { this.activityKind = activityKind; }");
 
         summary.addIntProperty("baseLongitude").javaDocGetterAndSetter("Temporary, bip-specific");
         summary.addIntProperty("baseLatitude").javaDocGetterAndSetter("Temporary, bip-specific");
@@ -1768,6 +1801,166 @@ public class GBDaoGenerator {
         summary.addToOne(user, userId);
         summary.addStringProperty("summaryData").codeBeforeGetter(OVERRIDE);
         summary.addByteArrayProperty("rawSummaryData");
+    }
+
+    private static void addWorkoutUpload(Schema schema) {
+        Entity upload = addEntity(schema, "WorkoutUpload");
+        upload.implementsSerializable();
+        upload.setJavaDoc(
+                "Tracks the upload of a workout summary to an external service (Endurain, Wanderer).\n"
+                + "Keyed by (summaryId, service). Stores the remote activity id and status so a workout\n"
+                + "is never uploaded twice and later edits can be re-synced.");
+        upload.addLongProperty("summaryId").primaryKey().notNull();
+        upload.addIntProperty("service").primaryKey().notNull();
+        upload.addStringProperty("remoteActivityId");
+        upload.addIntProperty("status").notNull();
+        upload.addLongProperty("updatedAt").notNull();
+        // Fingerprint of the header photo at the time of the last upload, so a photo added or
+        // replaced afterwards can be detected and re-synced to the remote activity.
+        upload.addStringProperty("photoHash");
+        // Id of the media entry the header photo was uploaded as, so it can be deleted when the
+        // photo is replaced or removed without touching media the user attached on the server.
+        upload.addIntProperty("photoMediaId");
+        // Fingerprint of everything about the summary that a later edit or a reprocess can
+        // change. Compared on every sync to decide whether the workout is worth re-exporting.
+        upload.addStringProperty("sourceHash");
+        // Fingerprint of the exported file that was actually uploaded, compared once the source
+        // hash has already shown that something changed.
+        upload.addStringProperty("payloadHash");
+        // Whether the uploaded file carried a GPS track, so a track added afterwards can be told
+        // apart from a track that merely changed.
+        upload.addBooleanProperty("hadTrack");
+        // Why the last attempt failed, in the user's language, or null once one succeeds. Set on a
+        // failed re-sync too, where the row keeps the successful status of the upload it describes.
+        upload.addStringProperty("lastError");
+    }
+
+    private static Entity addWorkoutTemplate(final Schema schema, final Entity device) {
+        final Entity template = addEntity(schema, "WorkoutTemplate");
+        template.setJavaDoc(
+                """
+                A user-created structured workout, for one device. See WorkoutTemplateStep for its steps.
+                """);
+        template.addIdProperty().autoincrement();
+        final Property deviceId = template.addLongProperty("deviceId").notNull().getProperty();
+        template.addToOne(device, deviceId);
+        template.addStringProperty("vendorId").notNull()
+                .javaDocGetterAndSetter("Per WorkoutTemplateSpec#getVendorId.");
+        template.addStringProperty("name").notNull();
+        template.addStringProperty("note");
+        template.addIntProperty("activityKind").notNull()
+                .javaDocGetterAndSetter("Follows ActivityKind#getCode");
+        template.addLongProperty("createdAt").notNull();
+        template.addLongProperty("updatedAt").notNull();
+
+        // Pool swim only
+        template.addStringProperty("poolLengthUnit")
+                .javaDocGetterAndSetter("Pool swim only, per WorkoutPoolLengthUnit.");
+        template.addIntProperty("poolLength")
+                .javaDocGetterAndSetter("Pool swim only, in centimeters. Null if unspecified/preset.");
+
+        // Multisport only
+        template.addBooleanProperty("transitions")
+                .javaDocGetterAndSetter("Multisport only. Whether to add a transition step between legs.");
+
+        // Sync status on the device
+        template.addStringProperty("syncStatus")
+                .javaDocGetterAndSetter("Per WorkoutSyncStateStatus. Null if never sent to the device.");
+        template.addIntProperty("syncContentHash")
+                .javaDocGetterAndSetter("The hash of the template as it was last sent.");
+        template.addStringProperty("syncRemoteId")
+                .javaDocGetterAndSetter("The id of the workout on the device.");
+        template.addStringProperty("syncError")
+                .javaDocGetterAndSetter("The reason of the last failure.");
+
+        return template;
+    }
+
+    private static void addWorkoutTemplateStep(final Schema schema, final Entity workoutTemplate) {
+        final Entity step = addEntity(schema, "WorkoutTemplateStep");
+        step.setJavaDoc(
+                """
+                        One node of a WorkoutTemplate's step tree: a step, a repeat group or a multisport leg.
+                        [sortOrder] is the position within the template.
+
+                        Units:
+                          TIME/SEND_OFF_TIME duration -> milliseconds
+                          CSS_SEND_OFF_TIME duration -> seconds (may be negative)
+                          DISTANCE duration / pool length -> centimeters
+                          CALORIES -> kcal
+                          HR_ABOVE/HR_BELOW -> bpm
+                          POWER_ABOVE/POWER_BELOW -> watt
+                          REPS/STROKES/LAPS -> count
+                          SPEED target -> mm/s
+                          PACE target -> ms per km, or ms per 100m for pool swim
+                          CADENCE/STROKE_RATE -> per minute
+                          CSS_OFFSET -> seconds (may be negative)
+                          weight -> grams
+                          PERCENT_1RM -> percent
+                        """);
+
+        step.addIdProperty().autoincrement();
+        final Property templateId = step.addLongProperty("templateId").notNull().getProperty();
+        step.addToOne(workoutTemplate, templateId);
+        step.addLongProperty("parentId")
+                .javaDocGetterAndSetter("The containing repeat/leg node, or null for a top-level node.");
+        final Property sortOrder = step.addIntProperty("sortOrder").notNull()
+                .javaDocGetterAndSetter("The position among siblings.")
+                .getProperty();
+        step.addStringProperty("nodeType").notNull()
+                .javaDocGetterAndSetter("Per WorkoutNodeType");
+
+        // Node fields
+        step.addStringProperty("stepType")
+                .javaDocGetterAndSetter("Per WorkoutStepType; null for REPEAT/LEG.");
+        step.addStringProperty("note");
+        step.addIntProperty("repeatCount")
+                .javaDocGetterAndSetter("REPEAT only.");
+        step.addIntProperty("legActivityKind")
+                .javaDocGetterAndSetter("LEG only, follows ActivityKind#getCode");
+
+        // End condition (duration)
+        step.addStringProperty("durationType")
+                .javaDocGetterAndSetter("Per WorkoutDurationType.");
+        step.addLongProperty("durationValue");
+
+        // Primary target
+        step.addStringProperty("targetType")
+                .javaDocGetterAndSetter("Per WorkoutTargetType.");
+        step.addIntProperty("targetZone");
+        step.addLongProperty("targetLow");
+        step.addLongProperty("targetHigh");
+        step.addStringProperty("targetEnum")
+                .javaDocGetterAndSetter("EFFORT only, per WorkoutEffort.");
+
+        // Secondary target
+        step.addStringProperty("secondaryTargetType");
+        step.addIntProperty("secondaryTargetZone");
+        step.addLongProperty("secondaryTargetLow");
+        step.addLongProperty("secondaryTargetHigh");
+        step.addStringProperty("secondaryTargetEnum");
+
+        // Exercise/pose/move for strength/HIIT/cardio/yoga/Pilates/mobility
+        step.addStringProperty("exerciseId")
+                .javaDocGetterAndSetter("A WorkoutExercise#getId in the catalog of the template's vendor.");
+        step.addStringProperty("weightType")
+                .javaDocGetterAndSetter("Per WorkoutWeightType.");
+        step.addIntProperty("weightValue")
+                .javaDocGetterAndSetter("Grams, or percent for PERCENT_1RM, or a count for RM.");
+
+        // Pool swim
+        step.addStringProperty("swimStroke");
+        step.addStringProperty("swimDrill");
+        step.addStringProperty("swimEquipment")
+                .javaDocGetterAndSetter("Per WorkoutEquipment.");
+
+        // Zepp OS per-interval unit override (metric/imperial)
+        step.addStringProperty("measurementSystem");
+
+        final Index index = new Index();
+        index.addProperty(templateId);
+        index.addProperty(sortOrder);
+        step.addIndex(index);
     }
 
     private static Property findProperty(Entity entity, String propertyName) {
@@ -2462,10 +2655,37 @@ public class GBDaoGenerator {
         return sample;
     }
 
+    private static Entity addXiaomiHipeeP1Reading(Schema schema, Entity device) {
+        Entity reading = addEntity(schema, "XiaomiHipeeP1Reading");
+        reading.addIdProperty().autoincrement();
+        Property deviceId = reading.addLongProperty("deviceId").notNull().getProperty();
+        Property recordType = reading.addIntProperty("recordType").notNull().getProperty();
+        Property dataNum = reading.addIntProperty("dataNum").notNull().getProperty();
+        Property dataCount = reading.addIntProperty("dataCount").notNull().getProperty();
+        Property startupTime = reading.addLongProperty("startupTime").notNull().getProperty();
+        Property timestamp = reading.addLongProperty("timestamp").notNull().getProperty();
+        Property forwardAngle = reading.addIntProperty("forwardAngle").notNull().getProperty();
+        Property bankAngle = reading.addIntProperty("bankAngle").notNull().getProperty();
+        Index identity = new Index();
+        identity.addProperty(deviceId);
+        identity.addProperty(recordType);
+        identity.addProperty(startupTime);
+        identity.addProperty(timestamp);
+        identity.makeUnique();
+        reading.addIndex(identity);
+        return reading;
+    }
+
     private static Entity addMiScaleWeightSample(Schema schema, Entity user, Entity device) {
         Entity sample = addEntity(schema, "MiScaleWeightSample");
         addCommonTimeSampleProperties("AbstractWeightSample", sample, user, device);
         sample.addFloatProperty(SAMPLE_WEIGHT_KG).notNull().codeBeforeGetter(OVERRIDE);
+        // Raw BLE impedance (Ohms) from the Body Composition Measurement characteristic (0x2A9C),
+        // present only on devices with a Body Composition Service (e.g. MIBFS). Null when the
+        // scale has no impedance sensor, or the reading did not carry one. Body fat/muscle/water
+        // etc. are derived from this plus a user profile, not stored raw (formula-dependent,
+        // see https://codeberg.org/Freeyourgadget/Gadgetbridge/issues/6393).
+        sample.addIntProperty(SAMPLE_IMPEDANCE_OHM).codeBeforeGetter(OVERRIDE);
         return sample;
     }
 
@@ -2539,6 +2759,24 @@ public class GBDaoGenerator {
         Entity sample = addEntity(schema, "GenericWeightSample");
         addCommonTimeSampleProperties("AbstractWeightSample", sample, user, device);
         sample.addFloatProperty(SAMPLE_WEIGHT_KG).notNull().codeBeforeGetter(OVERRIDE);
+        // Raw bio-impedance in Ohms, for scales that report it (see MiScaleWeightSample).
+        sample.addIntProperty(SAMPLE_IMPEDANCE_OHM).codeBeforeGetter(OVERRIDE);
+        return sample;
+    }
+
+    private static Entity addGenericImpedanceSample(Schema schema, Entity user, Entity device) {
+        // One raw bio-impedance reading. A scale can report several at the same instant, one per
+        // body section and frequency, so both are part of the key alongside time and device.
+        Entity sample = addEntity(schema, "GenericImpedanceSample");
+        addCommonTimeSampleProperties("AbstractTimeSample", sample, user, device);
+        // Body section the reading was taken across, numbered as the device numbers it; 0 for
+        // scales that only measure the whole body.
+        sample.addIntProperty("bodySectionIdx").notNull().primaryKey();
+        // Measurement frequency in Hz, or -1 when the device does not say which it used. In Hz
+        // rather than kHz because scales use fractional kHz: 6.25 kHz is 6250 Hz exactly.
+        sample.addIntProperty("frequencyHz").notNull().primaryKey();
+        // Raw bio-impedance in Ohms, as reported by the device.
+        sample.addFloatProperty(SAMPLE_IMPEDANCE_OHM).notNull();
         return sample;
     }
 
@@ -2588,6 +2826,23 @@ public class GBDaoGenerator {
         final Configuration config = new Configuration(Configuration.VERSION_2_3_23);
         config.setClassForTemplateLoading(GBDaoGenerator.class, "/");
         return config.getTemplate(name);
+    }
+    private static Entity addWeightSampleF8(Schema schema, Entity user, Entity device) {
+        Entity weightSampleF8 = addEntity(schema, "F8WeightSample");
+
+        weightSampleF8.setJavaDoc("Contains Weight samples of F8 scale (with optional linked multiple Impedance Readings)." +
+                "User data are persisted to allow re-calculations of derived values.");
+
+        addCommonTimeSampleProperties("AbstractWeightSample", weightSampleF8, user, device);
+
+        weightSampleF8.addFloatProperty(SAMPLE_WEIGHT_KG).notNull();
+        weightSampleF8.addIntProperty("bfaType");
+        weightSampleF8.addIntProperty("userIndex");
+        weightSampleF8.addIntProperty("userHeight");
+        weightSampleF8.addIntProperty("userAge");
+        weightSampleF8.addIntProperty("userPersonTypeIdx");
+        weightSampleF8.addIntProperty("userSexIdx");
+        return weightSampleF8;
     }
 
     private static void generateSampleProvider(final Template template, final Entity entity) throws Exception {

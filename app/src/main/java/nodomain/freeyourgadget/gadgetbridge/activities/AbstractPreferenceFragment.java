@@ -68,7 +68,9 @@ import nodomain.freeyourgadget.gadgetbridge.util.XTimePreferenceFragment;
 import nodomain.freeyourgadget.gadgetbridge.util.dialogs.MaterialEditTextPreferenceDialogFragment;
 import nodomain.freeyourgadget.gadgetbridge.util.dialogs.MaterialListPreferenceDialogFragment;
 import nodomain.freeyourgadget.gadgetbridge.util.dialogs.MaterialMultiSelectListPreferenceDialogFragment;
+import nodomain.freeyourgadget.gadgetbridge.util.dialogs.MaterialSubtitleListPreferenceDialogFragment;
 import nodomain.freeyourgadget.gadgetbridge.util.preferences.MinMaxTextWatcher;
+import nodomain.freeyourgadget.gadgetbridge.util.preferences.SubtitleListPreference;
 
 public abstract class AbstractPreferenceFragment extends PreferenceFragmentCompat implements MenuProvider {
     private static final Logger LOG = LoggerFactory.getLogger(AbstractPreferenceFragment.class);
@@ -165,6 +167,8 @@ public abstract class AbstractPreferenceFragment extends PreferenceFragmentCompa
             dialogFragment = new XDatePreferenceFragment();
         } else if (preference instanceof DragSortListPreference) {
             dialogFragment = new DragSortListPreferenceFragment();
+        } else if (preference instanceof SubtitleListPreference) {
+            dialogFragment = MaterialSubtitleListPreferenceDialogFragment.newInstance(preference.getKey());
         } else if (preference instanceof EditTextPreference) {
             dialogFragment = MaterialEditTextPreferenceDialogFragment.newInstance(preference.getKey());
         } else if (preference instanceof ListPreference) {
@@ -218,6 +222,22 @@ public abstract class AbstractPreferenceFragment extends PreferenceFragmentCompa
     }
 
     protected void index(@XmlRes final int preferencesResId, final int breadcrumb) {
+        final SearchConfiguration searchConfiguration = getSearchConfiguration();
+        if (searchConfiguration != null) {
+            final SearchConfiguration.SearchIndexItem indexItem = searchConfiguration.index(preferencesResId);
+            if (breadcrumb != 0) {
+                indexItem.addBreadcrumb(breadcrumb);
+            }
+        }
+    }
+
+    /**
+     * Returns the {@link SearchConfiguration} for this fragment's "searchPreference" preference,
+     * lazily creating it the first time it is needed. Returns null if the current preference
+     * screen does not declare a "searchPreference" preference.
+     */
+    @Nullable
+    protected SearchConfiguration getSearchConfiguration() {
         if (mSearchConfiguration == null) {
             final SearchPreference searchPreference = findPreference("searchPreference");
             if (searchPreference != null) {
@@ -228,12 +248,7 @@ public abstract class AbstractPreferenceFragment extends PreferenceFragmentCompa
             }
         }
 
-        if (mSearchConfiguration != null) {
-            final SearchConfiguration.SearchIndexItem indexItem = mSearchConfiguration.index(preferencesResId);
-            if (breadcrumb != 0) {
-                indexItem.addBreadcrumb(breadcrumb);
-            }
-        }
+        return mSearchConfiguration;
     }
 
     /**

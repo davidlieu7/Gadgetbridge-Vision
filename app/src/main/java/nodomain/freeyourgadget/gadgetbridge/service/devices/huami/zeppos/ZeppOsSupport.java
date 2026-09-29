@@ -38,7 +38,6 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
-import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Date;
@@ -57,6 +56,7 @@ import java.util.concurrent.TimeUnit;
 
 import nodomain.freeyourgadget.gadgetbridge.GBApplication;
 import nodomain.freeyourgadget.gadgetbridge.R;
+import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsPreferenceConst;
 import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEventAppInfo;
 import nodomain.freeyourgadget.gadgetbridge.capabilities.loyaltycards.LoyaltyCard;
 import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEventDisplayMessage;
@@ -64,8 +64,10 @@ import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEventScreenshot
 import nodomain.freeyourgadget.gadgetbridge.devices.huami.zeppos.ZeppOsMapsInstallHandler;
 import nodomain.freeyourgadget.gadgetbridge.devices.huami.zeppos.ZeppOsMusicInstallHandler;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
+import nodomain.freeyourgadget.gadgetbridge.model.DeviceType;
 import nodomain.freeyourgadget.gadgetbridge.model.RecordedDataTypes;
 import nodomain.freeyourgadget.gadgetbridge.model.WorldClock;
+import nodomain.freeyourgadget.gadgetbridge.service.AbstractBluetoothDeviceSupport;
 import nodomain.freeyourgadget.gadgetbridge.service.AbstractDeviceSupport;
 import nodomain.freeyourgadget.gadgetbridge.service.SleepAsAndroidSender;
 import nodomain.freeyourgadget.gadgetbridge.devices.huami.zeppos.ZeppOsCoordinator;
@@ -137,13 +139,13 @@ import nodomain.freeyourgadget.gadgetbridge.service.devices.huami.zeppos.service
 import nodomain.freeyourgadget.gadgetbridge.service.devices.huami.zeppos.services.ZeppOsWifiService;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.huami.zeppos.services.ZeppOsWorkoutService;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.huami.zeppos.services.ZeppOsWorldClocksService;
-import nodomain.freeyourgadget.gadgetbridge.util.AlarmUtils;
+import nodomain.freeyourgadget.gadgetbridge.service.devices.huami.zeppos.workouts.ZeppOsWorkoutTemplateUploader;
 import nodomain.freeyourgadget.gadgetbridge.util.FileUtils;
 import nodomain.freeyourgadget.gadgetbridge.util.GB;
 import nodomain.freeyourgadget.gadgetbridge.util.Prefs;
 import nodomain.freeyourgadget.gadgetbridge.util.RealtimeSamplesAggregator;
 
-public class ZeppOsSupport extends AbstractDeviceSupport
+public class ZeppOsSupport extends AbstractBluetoothDeviceSupport
         implements Huami2021Handler, HuamiFetcher.HuamiFetchSupport, ZeppOsFileTransferService.DownloadCallback {
     private static final Logger LOG = LoggerFactory.getLogger(ZeppOsSupport.class);
 
@@ -410,11 +412,29 @@ public class ZeppOsSupport extends AbstractDeviceSupport
 
     @Override
     public void onSetCallState(final CallSpec callSpec) {
+        if (!getCoordinator().hasDisplay() && getDevice().getType() != DeviceType.AMAZFITHELIORING) {
+            if (callSpec.getCommand() == CallSpec.CALL_INCOMING) {
+                findDeviceService.vibrateForCall(true);
+            } else if (callSpec.getCommand() == CallSpec.CALL_START || callSpec.getCommand() == CallSpec.CALL_END) {
+                findDeviceService.vibrateForCall(false);
+            }
+            return;
+        }
         notificationService.setCallState(callSpec);
     }
 
     @Override
     public void onNotification(final NotificationSpec notificationSpec) {
+        if (!getDevicePrefs().getBoolean(DeviceSettingsPreferenceConst.PREF_SEND_APP_NOTIFICATIONS, true)) {
+            LOG.debug("App notifications disabled - ignoring");
+            return;
+        }
+
+        if (!getCoordinator().hasDisplay() && getDevice().getType() != DeviceType.AMAZFITHELIORING) {
+            findDeviceService.vibrateForNotification();
+            return;
+        }
+
         notificationService.sendNotification(notificationSpec);
     }
 
@@ -439,6 +459,11 @@ public class ZeppOsSupport extends AbstractDeviceSupport
     public void onSetContacts(ArrayList<? extends Contact> contacts) {
         //noinspection unchecked
         contactsService.setContacts((List<Contact>) contacts);
+    }
+
+    @Override
+    public void onSyncWorkoutTemplate(final long templateId) {
+        ZeppOsWorkoutTemplateUploader.INSTANCE.upload(getContext(), fileTransferService, templateId);
     }
 
     @Override
@@ -740,8 +765,8 @@ public class ZeppOsSupport extends AbstractDeviceSupport
             // Received when the app sends a notificaation
             case SleepAsAndroidAction.SHOW_NOTIFICATION:
                 NotificationSpec notificationSpec = new NotificationSpec();
-                notificationSpec.title = extras.getString("TITLE");
-                notificationSpec.body = extras.getString("TEXT");
+                notificationSpec.setTitle(extras.getString("TITLE"));
+                notificationSpec.setBody(extras.getString("TEXT"));
                 notificationService.sendNotification(notificationSpec);
                 break;
             // Received when the app updates an alarm (Snoozing included too)
@@ -750,7 +775,6 @@ public class ZeppOsSupport extends AbstractDeviceSupport
             case SleepAsAndroidAction.UPDATE_ALARM:
                 long alarmTimestamp = extras.getLong("TIMESTAMP");
 
-                // Sets the alarm at a giver hour and minute
                 // Snoozing from the app will create a new alarm in the future
                 setSleepAsAndroidAlarm(alarmTimestamp);
                 break;
@@ -820,10 +844,7 @@ public class ZeppOsSupport extends AbstractDeviceSupport
     }
 
     private void setSleepAsAndroidAlarm(long alarmTimestamp) {
-
-        Calendar calendar = Calendar.getInstance();
-        calendar.setTimeInMillis(new Timestamp(alarmTimestamp).getTime());
-        Alarm alarm = AlarmUtils.createSingleShot(SleepAsAndroidSender.getAlarmSlot(), false, false, calendar);
+        Alarm alarm = SleepAsAndroidSender.createAlarm(SleepAsAndroidSender.getAlarmSlot(), alarmTimestamp, Calendar.getInstance());
         ArrayList<Alarm> alarms = new ArrayList<>(1);
         alarms.add(alarm);
 

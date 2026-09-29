@@ -9,10 +9,13 @@ import android.os.Bundle
 import android.view.View
 import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import androidx.recyclerview.widget.LinearLayoutManager
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import nodomain.freeyourgadget.gadgetbridge.R
 import nodomain.freeyourgadget.gadgetbridge.activities.AbstractGBActivity
 import nodomain.freeyourgadget.gadgetbridge.databinding.ActivityMultipointPairingBinding
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice
+import nodomain.freeyourgadget.gadgetbridge.util.kotlin.getParcelableArrayListCompat
+import nodomain.freeyourgadget.gadgetbridge.util.kotlin.getParcelableCompat
 import org.slf4j.LoggerFactory
 
 class MultipointPairingActivity : AbstractGBActivity() {
@@ -23,6 +26,8 @@ class MultipointPairingActivity : AbstractGBActivity() {
 
     private var devices = mutableListOf<MultipointDevice>()
     private var isMultipointEnabled = false
+    private var isMultipointDisableSupported = false
+    private var isPairingNewDeviceSupported = false
     private var pairingNewDevice = false
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -30,13 +35,13 @@ class MultipointPairingActivity : AbstractGBActivity() {
         binding = ActivityMultipointPairingBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        gbDevice = intent.getParcelableExtra(GBDevice.EXTRA_DEVICE)
+        gbDevice = intent.getParcelableCompat<GBDevice>(GBDevice.EXTRA_DEVICE)
             ?: throw IllegalArgumentException("GBDevice must not be null")
 
         initViews()
         setupRecyclerView()
-        updateUI()
         registerBroadcastReceiver()
+        updateUI()
         requestStatus()
         requestDeviceList()
     }
@@ -60,6 +65,7 @@ class MultipointPairingActivity : AbstractGBActivity() {
                 MultipointDeviceAdapter.Action.DISCONNECT -> disconnectFromDevice(device.address)
                 MultipointDeviceAdapter.Action.SET_ACTIVE -> setActiveDevice(device.address)
                 MultipointDeviceAdapter.Action.UNSET_ACTIVE -> unsetActiveDevice(device.address)
+                MultipointDeviceAdapter.Action.FORGET -> forgetDevice(device)
             }
         }
 
@@ -93,7 +99,7 @@ class MultipointPairingActivity : AbstractGBActivity() {
                 return
             }
 
-            val device = intent.getParcelableExtra<GBDevice>(GBDevice.EXTRA_DEVICE)
+            val device = intent.getParcelableCompat<GBDevice>(GBDevice.EXTRA_DEVICE)
             if (device?.address != gbDevice.address) {
                 LOG.warn("Got multipoint action {} for {}, but we're {}", intent.action, device, gbDevice)
                 return // not for this device
@@ -102,7 +108,7 @@ class MultipointPairingActivity : AbstractGBActivity() {
             when (intent.action) {
                 ACTION_MULTIPOINT_DEVICE_LIST -> {
                     LOG.debug("Got multipoint device list")
-                    val deviceList = intent.getParcelableArrayListExtra<MultipointDevice>(EXTRA_DEVICE_LIST)
+                    val deviceList = intent.getParcelableArrayListCompat<MultipointDevice>(EXTRA_DEVICE_LIST)
                     if (deviceList != null) {
                         updateDeviceList(deviceList)
                     }
@@ -111,6 +117,14 @@ class MultipointPairingActivity : AbstractGBActivity() {
                 ACTION_MULTIPOINT_STATUS_UPDATE -> {
                     LOG.debug("Got multipoint status update")
                     isMultipointEnabled = intent.getBooleanExtra(EXTRA_MULTIPOINT_ENABLED, false)
+                    isMultipointDisableSupported = intent.getBooleanExtra(
+                        EXTRA_MULTIPOINT_DISABLE_SUPPORTED,
+                        false,
+                    )
+                    isPairingNewDeviceSupported = intent.getBooleanExtra(
+                        EXTRA_MULTIPOINT_PAIR_SUPPORTED,
+                        false,
+                    )
                     updateUI()
                 }
 
@@ -143,7 +157,7 @@ class MultipointPairingActivity : AbstractGBActivity() {
             binding.emptyStateLayout.visibility = View.GONE
         }
 
-        binding.buttonPairNewDevice.isEnabled =
+        binding.buttonPairNewDevice.isEnabled = isPairingNewDeviceSupported &&
             gbDevice.isInitialized && isMultipointEnabled && devices.count { it.isConnected } < 2
     }
 
@@ -151,14 +165,15 @@ class MultipointPairingActivity : AbstractGBActivity() {
     private fun updateUI() {
         binding.multipointEnabled.setOnCheckedChangeListener(null)
         binding.multipointEnabled.isChecked = isMultipointEnabled
-        binding.multipointEnabled.isEnabled = gbDevice.isInitialized
+        binding.multipointEnabled.isEnabled = gbDevice.isInitialized &&
+            (!isMultipointEnabled || isMultipointDisableSupported)
         binding.multipointEnabled.setOnCheckedChangeListener { _, isChecked ->
             if (isChecked != isMultipointEnabled) {
                 toggleMultipoint(isChecked)
             }
         }
 
-        binding.buttonPairNewDevice.isEnabled =
+        binding.buttonPairNewDevice.isEnabled = isPairingNewDeviceSupported &&
             gbDevice.isInitialized && isMultipointEnabled && devices.count { it.isConnected } < 2
         binding.buttonPairNewDevice.text = if (pairingNewDevice) {
             getString(R.string.bluetooth_multipoint_pair_stop)
@@ -213,6 +228,20 @@ class MultipointPairingActivity : AbstractGBActivity() {
         sendDeviceIntent(intent)
     }
 
+    private fun forgetDevice(device: MultipointDevice) {
+        val name = device.name ?: device.address
+        MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.bluetooth_multipoint_forget)
+            .setMessage(getString(R.string.bluetooth_multipoint_forget_message, name))
+            .setPositiveButton(R.string.delete) { _, _ ->
+                val intent = Intent(ACTION_MULTIPOINT_FORGET_DEVICE)
+                intent.putExtra(EXTRA_DEVICE_ADDRESS, device.address)
+                sendDeviceIntent(intent)
+            }
+            .setNegativeButton(R.string.cancel, null)
+            .show()
+    }
+
     private fun sendDeviceIntent(intent: Intent) {
         intent.putExtra(GBDevice.EXTRA_DEVICE, gbDevice)
         LocalBroadcastManager.getInstance(this).sendBroadcast(intent)
@@ -243,11 +272,15 @@ class MultipointPairingActivity : AbstractGBActivity() {
             "nodomain.freeyourgadget.gadgetbridge.ACTION_MULTIPOINT_SET_ACTIVE_DEVICE"
         const val ACTION_MULTIPOINT_UNSET_ACTIVE_DEVICE =
             "nodomain.freeyourgadget.gadgetbridge.ACTION_MULTIPOINT_UNSET_ACTIVE_DEVICE"
+        const val ACTION_MULTIPOINT_FORGET_DEVICE =
+            "nodomain.freeyourgadget.gadgetbridge.ACTION_MULTIPOINT_FORGET_DEVICE"
         const val ACTION_MULTIPOINT_START_PAIRING =
             "nodomain.freeyourgadget.gadgetbridge.ACTION_MULTIPOINT_START_PAIRING"
 
         const val EXTRA_DEVICE_LIST = "device_list"
         const val EXTRA_MULTIPOINT_ENABLED = "enabled"
+        const val EXTRA_MULTIPOINT_DISABLE_SUPPORTED = "disable_supported"
+        const val EXTRA_MULTIPOINT_PAIR_SUPPORTED = "pair_supported"
         const val EXTRA_PAIRING_ENABLED = "enabled"
         const val EXTRA_DEVICE_ADDRESS = "device_address"
     }

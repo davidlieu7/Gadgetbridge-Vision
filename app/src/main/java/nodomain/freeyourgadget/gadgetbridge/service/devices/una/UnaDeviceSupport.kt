@@ -33,6 +33,7 @@ import nodomain.freeyourgadget.gadgetbridge.model.ActivitySample
 import nodomain.freeyourgadget.gadgetbridge.model.ActivitySummaryData
 import nodomain.freeyourgadget.gadgetbridge.model.ActivitySummaryEntries
 import nodomain.freeyourgadget.gadgetbridge.model.ActivitySummaryParser
+import nodomain.freeyourgadget.gadgetbridge.model.NotificationSpec
 import nodomain.freeyourgadget.gadgetbridge.model.RecordedDataTypes
 import nodomain.freeyourgadget.gadgetbridge.service.btle.AbstractBTLESingleDeviceSupport
 import nodomain.freeyourgadget.gadgetbridge.service.btle.BLETypeConversions
@@ -47,13 +48,17 @@ import nodomain.freeyourgadget.gadgetbridge.service.btle.profiles.deviceinfo.Dev
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.FitFile
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.NativeFITMessages
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.RecordData
+import nodomain.freeyourgadget.gadgetbridge.util.kotlin.getParcelableCompat
 import nodomain.freeyourgadget.gadgetbridge.util.GB
 import nodomain.freeyourgadget.gadgetbridge.util.Prefs
 import nodomain.freeyourgadget.gadgetbridge.util.StringUtils
+import org.json.JSONException
+import org.json.JSONObject
 import org.slf4j.LoggerFactory
 import java.util.Calendar
 import java.util.Date
 import java.util.GregorianCalendar
+import java.text.SimpleDateFormat
 import java.util.Locale
 
 /**
@@ -63,6 +68,8 @@ import java.util.Locale
  * Workout sync reads `/Apps/latest_activity.txt`, a manifest of pending `.fit` paths the firmware
  * maintains, which avoids walking every app's Activity directory. Imported paths are remembered
  * locally; nothing is deleted or acknowledged on the watch.
+ *
+ * A saved activity is announced on the CCS event characteristic and fetched immediately.
  *
  * Health data is split by age, because the watch exposes the same data two ways:
  *
@@ -93,12 +100,16 @@ class UnaDeviceSupport : AbstractBTLESingleDeviceSupport(LOG) {
     private val batteryInfoProfile: BatteryInfoProfile<UnaDeviceSupport>
 
     /** What the in-flight FTS read is for, since all three ride the same request/response path. */
-    private enum class ReadKind { MANIFEST, ACTIVITY, DAILY_HEALTH }
+    private enum class ReadKind { SETTINGS, MANIFEST, ACTIVITY, DAILY_HEALTH }
 
     private var draining = false
     private val pendingManifestPaths = ArrayDeque<String>()
     private var currentReadPath: String? = null
     private var currentReadKind = ReadKind.MANIFEST
+    private val notificationStore = UnaNotificationStore()
+
+    /** Null until /settings.json has been read; false means the watch discards every event. */
+    private var notificationsEnabledOnWatch: Boolean? = null
     private var currentReadWindow = UnaReadWindow(UnaConstants.READ_WINDOW_SIZE)
     private val pendingHealthFileDays = ArrayDeque<Calendar>()
     private var currentHealthFileDay: Calendar? = null
@@ -113,13 +124,14 @@ class UnaDeviceSupport : AbstractBTLESingleDeviceSupport(LOG) {
         addSupportedService(GattService.UUID_SERVICE_CURRENT_TIME)
         addSupportedService(UnaConstants.UUID_SERVICE_FTS)
         addSupportedService(UnaConstants.UUID_SERVICE_CCS)
+        addSupportedService(UnaConstants.UUID_SERVICE_CANS)
 
         val listener = IntentListener { intent ->
             when (intent.action) {
                 DeviceInfoProfile.ACTION_DEVICE_INFO ->
-                    handleDeviceInfo(intent.getParcelableExtra(DeviceInfoProfile.EXTRA_DEVICE_INFO)!!)
+                    handleDeviceInfo(intent.getParcelableCompat<DeviceInfo>(DeviceInfoProfile.EXTRA_DEVICE_INFO)!!)
                 BatteryInfoProfile.ACTION_BATTERY_INFO ->
-                    handleBatteryInfo(intent.getParcelableExtra(BatteryInfoProfile.EXTRA_BATTERY_INFO)!!)
+                    handleBatteryInfo(intent.getParcelableCompat<BatteryInfo>(BatteryInfoProfile.EXTRA_BATTERY_INFO)!!)
             }
         }
 
@@ -164,6 +176,8 @@ class UnaDeviceSupport : AbstractBTLESingleDeviceSupport(LOG) {
 
         builder.notify(UnaConstants.UUID_CHARACTERISTIC_FTS, true)
         builder.notify(UnaConstants.UUID_CHARACTERISTIC_CCS_COMMAND, true)
+        builder.notify(UnaConstants.UUID_CHARACTERISTIC_CCS_EVENT, true)
+        builder.notify(UnaConstants.UUID_CHARACTERISTIC_CANS_COMMAND, true)
 
         builder.setDeviceState(GBDevice.State.INITIALIZED)
         return builder
@@ -206,7 +220,7 @@ class UnaDeviceSupport : AbstractBTLESingleDeviceSupport(LOG) {
 
         // FTS must complete before CCS is touched at all: afterwards the firmware's FTS read
         // handler rejects every subsequent request, and no settle delay recovers it.
-        startReadFile(MANIFEST_PATH, ReadKind.MANIFEST)
+        startReadFile(SETTINGS_PATH, ReadKind.SETTINGS)
     }
 
     private fun requestNextDailyHealth() {
@@ -307,9 +321,118 @@ class UnaDeviceSupport : AbstractBTLESingleDeviceSupport(LOG) {
                 handleReadChunk(chunk)
             }
             UnaConstants.UUID_CHARACTERISTIC_CCS_COMMAND -> handleCcsResponse(value)
+            UnaConstants.UUID_CHARACTERISTIC_CCS_EVENT -> handleCcsEvent(value)
+            UnaConstants.UUID_CHARACTERISTIC_CANS_COMMAND -> handleCansCommand(value)
             else -> return super.onCharacteristicChanged(gatt, characteristic, value)
         }
         return true
+    }
+
+    override fun onNotification(notificationSpec: NotificationSpec) {
+        val uid = notificationSpec.id
+        notificationStore.put(uid, attributesFor(notificationSpec))
+        if (notificationsEnabledOnWatch == false) {
+            LOG.warn("Sending notification {} but the watch has phone notifications turned off", uid)
+        }
+        sendNotificationEvent(uid, UnaConstants.ACTION_ADD, categoryFor(notificationSpec))
+    }
+
+    override fun onDeleteNotification(id: Int) {
+        sendNotificationEvent(id, UnaConstants.ACTION_REMOVE, UnaConstants.CATEGORY_OTHER)
+        notificationStore.remove(id)
+    }
+
+    private fun sendNotificationEvent(uid: Int, action: Int, category: Int) {
+        val builder = createTransactionBuilder("notification $action for $uid")
+        builder.write(
+            UnaConstants.UUID_CHARACTERISTIC_CANS_NOTIFICATION,
+            *UnaCansProtocol.buildEvent(uid, action, category),
+        )
+        builder.queue()
+    }
+
+    /** The watch offers only these three, so everything that is not a call or a message is Other. */
+    private fun categoryFor(spec: NotificationSpec): Int = when (spec.type?.genericType) {
+        "generic_phone" -> UnaConstants.CATEGORY_CALL
+        "generic_sms", "generic_email", "generic_chat" -> UnaConstants.CATEGORY_MESSAGE
+        else -> UnaConstants.CATEGORY_OTHER
+    }
+
+    private fun attributesFor(spec: NotificationSpec): Map<Int, ByteArray> {
+        val body = (spec.body ?: "").toByteArray()
+        val attributes = mutableMapOf(
+            UnaConstants.ATTRIBUTE_TITLE to (spec.title ?: spec.sender ?: "").toByteArray(),
+            UnaConstants.ATTRIBUTE_SUBTITLE to (spec.subject ?: "").toByteArray(),
+            UnaConstants.ATTRIBUTE_MESSAGE to body,
+            UnaConstants.ATTRIBUTE_MESSAGE_CONTENT_SIZE to BLETypeConversions.fromUint16(body.size),
+            UnaConstants.ATTRIBUTE_APP_IDENTIFIER to (spec.sourceAppId ?: "").toByteArray(),
+            UnaConstants.ATTRIBUTE_APP_NAME to (spec.sourceName ?: "").toByteArray(),
+            UnaConstants.ATTRIBUTE_TIMESTAMP to timestampFor(spec).toByteArray(),
+        )
+        spec.cannedReplies?.firstOrNull()?.let {
+            attributes[UnaConstants.ATTRIBUTE_POSITIVE_ACTION_LABEL] = it.toByteArray()
+        }
+        return attributes
+    }
+
+    private fun timestampFor(spec: NotificationSpec): String {
+        val format = SimpleDateFormat(UnaConstants.TIMESTAMP_PATTERN, Locale.US)
+        return format.format(if (spec.`when` > 0) Date(spec.`when`) else Date())
+    }
+
+    /**
+     * Answers what the watch asks for, in as many rounds as it asks. A notification it asks about
+     * after a restart is refused rather than ignored, or it waits for an answer that is not coming.
+     */
+    private fun handleCansCommand(value: ByteArray) {
+        when (val command = UnaCansProtocol.parseCommand(value)) {
+            is UnaCansCommand.RequestAttributes -> {
+                val answer = notificationStore.answer(command.uid, command.requested)
+                if (answer == null) {
+                    LOG.debug("Watch asked about notification {} which is no longer held", command.uid)
+                    sendCansResponse(
+                        UnaCansProtocol.buildErrorResponse(UnaConstants.ERROR_NOTIFICATION_UID_NOT_FOUND)
+                    )
+                    return
+                }
+                sendCansResponse(UnaCansProtocol.buildAttributeResponse(command.uid, answer))
+            }
+            is UnaCansCommand.ExecuteAction ->
+                LOG.debug("Watch executed the {} action on notification {}",
+                    if (command.positive) "positive" else "negative", command.uid)
+            null -> LOG.debug("Unrecognized CANS command: {}", StringUtils.bytesToHex(value))
+        }
+    }
+
+    private fun sendCansResponse(payload: ByteArray) {
+        val builder = createTransactionBuilder("cans response")
+        for (fragment in UnaCansProtocol.fragment(payload, mtu - ATT_WRITE_OVERHEAD)) {
+            builder.write(UnaConstants.UUID_CHARACTERISTIC_CANS_COMMAND, *fragment)
+        }
+        builder.queue()
+    }
+
+    /** Records whether the watch will act on notifications at all, which it never reports. */
+    private fun handleSettings(bytes: ByteArray) {
+        notificationsEnabledOnWatch = try {
+            JSONObject(String(bytes)).optJSONObject("phone")?.optBoolean("notifications", false)
+        } catch (e: JSONException) {
+            LOG.warn("Could not read /settings.json", e)
+            null
+        }
+        LOG.debug("Watch phone notifications enabled: {}", notificationsEnabledOnWatch)
+    }
+
+    /** Starts the same fetch the sync button does, unless one is already running. */
+    private fun handleCcsEvent(value: ByteArray) {
+        val saved = UnaCcsEventProtocol.parseActivitySaved(value)
+        if (saved == null) {
+            LOG.debug("Ignoring CCS event: {}", StringUtils.bytesToHex(value))
+            return
+        }
+        LOG.info("Watch saved an activity in app {}", saved.appIdHex)
+        if (draining) return
+        onFetchRecordedData(RecordedDataTypes.TYPE_ACTIVITY)
     }
 
     /**
@@ -399,6 +522,7 @@ class UnaDeviceSupport : AbstractBTLESingleDeviceSupport(LOG) {
 
     private fun onFileReadComplete(path: String, bytes: ByteArray) {
         when (currentReadKind) {
+            ReadKind.SETTINGS -> handleSettings(bytes)
             ReadKind.MANIFEST -> handleManifest(bytes)
             ReadKind.ACTIVITY -> if (handleActivityFile(path, bytes)) markSynced(path)
             ReadKind.DAILY_HEALTH -> handleDailyHealthFile(path, bytes)
@@ -411,6 +535,10 @@ class UnaDeviceSupport : AbstractBTLESingleDeviceSupport(LOG) {
      * the next, since the firmware answers one FTS request at a time and responses are anonymous.
      */
     private fun advanceFtsPhase() {
+        if (currentReadKind == ReadKind.SETTINGS) {
+            startReadFile(MANIFEST_PATH, ReadKind.MANIFEST)
+            return
+        }
         pendingManifestPaths.removeFirstOrNull()?.let {
             startReadFile(it, ReadKind.ACTIVITY)
             return
@@ -749,6 +877,10 @@ class UnaDeviceSupport : AbstractBTLESingleDeviceSupport(LOG) {
     companion object {
         private val LOG = LoggerFactory.getLogger(UnaDeviceSupport::class.java)
         private const val MANIFEST_PATH = "/Apps/latest_activity.txt"
+        private const val SETTINGS_PATH = "/settings.json"
+
+        /** ATT's opcode and handle, which a write has to leave room for alongside its payload. */
+        private const val ATT_WRITE_OVERHEAD = 3
         private const val PREF_KEY_SYNCED_PATHS = "una_synced_activity_paths"
         private const val PREF_KEY_IMPORTED_HEALTH_DATES = "una_imported_health_dates"
 

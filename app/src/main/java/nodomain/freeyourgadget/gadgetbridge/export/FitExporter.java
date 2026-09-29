@@ -1,4 +1,4 @@
-/*  Copyright (C) 2026 Dany Mestas
+/*  Copyright (C) 2026 Dany Mestas, Thomas Kuehne
 
     This file is part of Gadgetbridge.
 
@@ -45,6 +45,8 @@ import nodomain.freeyourgadget.gadgetbridge.model.GPSCoordinate;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.FileType;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.FitFile;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.RecordData;
+import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.enums.Event;
+import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.enums.EventType;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.enums.GarminSport;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.messages.FitActivity;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.messages.FitEvent;
@@ -77,11 +79,6 @@ public class FitExporter {
     private final int manufacturerId;
 
     // FIT event enum values (subset)
-    private static final int EVENT_TIMER = 0;
-    private static final int EVENT_ACTIVITY = 26;
-    private static final int EVENT_TYPE_START = 0;
-    private static final int EVENT_TYPE_STOP = 1;
-    private static final int EVENT_TYPE_STOP_ALL = 9;
     private static final int ACTIVITY_TYPE_MANUAL = 0;
 
     // Local message type slots (per-file message numbering)
@@ -232,21 +229,12 @@ public class FitExporter {
         return strokes * strokeLengthM;
     }
 
-    // Mean Earth radius (m) for the haversine great-circle distance below.
-    private static final double EARTH_RADIUS_M = 6_371_000.0;
-
     /// Great-circle distance in metres between two coordinates. Pure Java (haversine) —
     /// deliberately NOT GPSCoordinate.getDistance, which delegates to
     /// android.location.Location and is unavailable in the exporter's plain-JVM unit tests.
     private static double haversineMeters(@NonNull final GPSCoordinate a,
                                           @NonNull final GPSCoordinate b) {
-        final double lat1 = Math.toRadians(a.getLatitude());
-        final double lat2 = Math.toRadians(b.getLatitude());
-        final double dLat = lat2 - lat1;
-        final double dLon = Math.toRadians(b.getLongitude() - a.getLongitude());
-        final double h = Math.sin(dLat / 2) * Math.sin(dLat / 2)
-                + Math.cos(lat1) * Math.cos(lat2) * Math.sin(dLon / 2) * Math.sin(dLon / 2);
-        return 2 * EARTH_RADIUS_M * Math.asin(Math.min(1.0, Math.sqrt(h)));
+        return GPSCoordinate.distanceHaversine(a, b);
     }
 
     public void performExport(@Nullable final ActivityTrack track,
@@ -339,7 +327,7 @@ public class FitExporter {
         if (workoutName != null && !workoutName.isEmpty()) {
             records.add(buildWorkout(workoutName, sport, subSport));
         }
-        records.add(buildEvent(startSeconds, EVENT_TYPE_START));
+        records.add(buildEvent(startSeconds, EventType.START));
 
         final PointAggregates totalAgg = new PointAggregates();
         final List<LapDescriptor> lapDescriptors = new ArrayList<>();
@@ -393,7 +381,7 @@ public class FitExporter {
                 // honour pauses (Strava, Garmin Connect) see them. Skip if a STOP/START
                 // event was already emitted at this same second.
                 if (p.getDescription() != null && !p.getDescription().isEmpty() && ts != lastEventTs) {
-                    records.add(buildEvent(ts, EVENT_TYPE_STOP_ALL));
+                    records.add(buildEvent(ts, EventType.STOP_DISABLE_ALL));
                     lastEventTs = ts;
                 }
                 // Skip only when this point is byte-identical to the previously emitted one
@@ -463,7 +451,7 @@ public class FitExporter {
 
         // Final stop event — skip if a pause STOP_ALL already lands on endSeconds.
         if (endSeconds != lastEventTs) {
-            records.add(buildEvent(endSeconds, EVENT_TYPE_STOP_ALL));
+            records.add(buildEvent(endSeconds, EventType.STOP_DISABLE_ALL));
         }
         records.addAll(lapRecords);
         // Per-length swim records — only emitted for lap-swimming workouts (sport=5,
@@ -633,8 +621,8 @@ public class FitExporter {
         b.setMessageIndex(messageIndex);
         b.setStartTime(info.startTimeSec);
         b.setTimestamp(info.startTimeSec + (long) Math.round(info.totalElapsedTimeSec));
-        b.setEvent(EVENT_TIMER);
-        b.setEventType(EVENT_TYPE_STOP);
+        b.setEvent(Event.TIMER);
+        b.setEventType(EventType.STOP);
         b.setTotalElapsedTime(info.totalElapsedTimeSec);
         b.setTotalTimerTime(info.totalTimerTimeSec);
         if (info.totalStrokes != null) b.setTotalStrokes(info.totalStrokes);
@@ -645,10 +633,10 @@ public class FitExporter {
         return b.build(LMT_LENGTH);
     }
 
-    private RecordData buildEvent(final long timestampSeconds, final int eventType) {
+    private RecordData buildEvent(final long timestampSeconds, final EventType eventType) {
         return new FitEvent.Builder()
                 .setTimestamp(timestampSeconds)
-                .setEvent(EVENT_TIMER)
+                .setEvent(Event.TIMER)
                 .setEventGroup(0)
                 .setEventType(eventType)
                 .build(LMT_EVENT);
@@ -819,8 +807,8 @@ public class FitExporter {
         b.setMessageIndex(messageIndex);
         b.setTimestamp(startSeconds + elapsedSeconds);
         b.setStartTime(startSeconds);
-        b.setEvent(EVENT_TIMER);
-        b.setEventType(EVENT_TYPE_STOP);
+        b.setEvent(Event.TIMER);
+        b.setEventType(EventType.STOP);
         b.setSport(sport);
         b.setLapTrigger(0); // manual
         b.setIntensity(mapIntensity(intensity));
@@ -1035,8 +1023,8 @@ public class FitExporter {
         b.setMessageIndex(0);
         b.setTimestamp(startSeconds + elapsedSeconds);
         b.setStartTime(startSeconds);
-        b.setEvent(EVENT_TIMER);
-        b.setEventType(EVENT_TYPE_STOP);
+        b.setEvent(Event.TIMER);
+        b.setEventType(EventType.STOP);
         b.setSport(sport);
         b.setSubSport(subSport);
         // SESSION field 7 (total_elapsed_time) is unscaled in NativeFITMessage and stored
@@ -1262,7 +1250,7 @@ public class FitExporter {
         final Long zAnaer = readSeconds(data, ActivitySummaryEntries.HR_ZONE_ANAEROBIC);
         final Long zMax   = readSeconds(data, ActivitySummaryEntries.HR_ZONE_EXTREME);
         if (zWarm != null || zEasy != null || zAer != null || zAnaer != null || zMax != null) {
-            b.setTimeInHrZone(new Number[]{
+            b.setTimeInHrZone(new Double[]{
                     nz(zWarm), nz(zEasy), nz(zAer), nz(zAnaer), nz(zMax)
             });
         }
@@ -1522,8 +1510,8 @@ public class FitExporter {
                 .setTotalTimerTime(elapsedSeconds * 1000L)
                 .setNumSessions(1)
                 .setType(ACTIVITY_TYPE_MANUAL)
-                .setEvent(EVENT_ACTIVITY)
-                .setEventType(EVENT_TYPE_STOP)
+                .setEvent(Event.ACTIVITY)
+                .setEventType(EventType.STOP)
                 .setEventGroup(0)
                 .build(LMT_ACTIVITY);
     }
@@ -1729,10 +1717,10 @@ public class FitExporter {
         return a != null ? a : b;
     }
 
-    /// Coerces a nullable Long to a non-null Number (0 for null). Used by setTimeInHrZone
+    /// Coerces a nullable Long to a non-null Double (0 for null). Used by setTimeInHrZone
     /// where individual array slots cannot be null but missing zones should encode as 0.
-    private static Number nz(@Nullable final Long v) {
-        return v != null ? v : 0L;
+    private static Double nz(@Nullable final Long v) {
+        return v != null ? v.doubleValue() : 0.0;
     }
 
     /// Maps a Xiaomi-band SWIM_STYLE byte to the FIT swim_stroke enum.

@@ -57,8 +57,8 @@ import androidx.annotation.Nullable;
 
 import nodomain.freeyourgadget.gadgetbridge.GBApplication;
 import nodomain.freeyourgadget.gadgetbridge.R;
-import nodomain.freeyourgadget.gadgetbridge.activities.dashboard.AbstractDashboardVO2MaxWidget;
 import nodomain.freeyourgadget.gadgetbridge.activities.dashboard.GaugeDrawer;
+import nodomain.freeyourgadget.gadgetbridge.widgets.impl.Vo2MaxGaugeWidget;
 import nodomain.freeyourgadget.gadgetbridge.database.DBHandler;
 import nodomain.freeyourgadget.gadgetbridge.devices.DeviceCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.TimeSampleProvider;
@@ -252,8 +252,8 @@ public class VO2MaxPeriodFragment extends AbstractChartFragment<VO2MaxPeriodFrag
     }
 
     private void updateGaugeTiles(final VO2MaxData vo2MaxData) {
-        final int[] colors = AbstractDashboardVO2MaxWidget.getColors();
-        final float[] segments = AbstractDashboardVO2MaxWidget.getSegments();
+        final int[] colors = Vo2MaxGaugeWidget.colors(requireContext());
+        final float[] segments = Vo2MaxGaugeWidget.SEGMENTS;
         final ActivityUser activityUser = new ActivityUser();
         final int age = activityUser.getAgeAt(LocalDate.ofInstant(getEndDate().toInstant(), ZoneId.systemDefault()));
         if (supportsVO2MultiSport(device)) {

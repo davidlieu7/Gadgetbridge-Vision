@@ -235,6 +235,8 @@ public class WorkoutSummaryParser extends XiaomiActivityParser implements Activi
                 parser = getOutdoorCyclingV2Parser(fileId);
                 break;
             case SPORTS_OUTDOOR_CYCLING:
+                // The workout type field overrides this when the version is parsed
+                summary.setActivityKind(ActivityKind.OUTDOOR_CYCLING.getCode());
                 parser = getOutdoorCyclingParser(fileId);
                 break;
             case SPORTS_TREADMILL:
@@ -460,6 +462,9 @@ public class WorkoutSummaryParser extends XiaomiActivityParser implements Activi
             case 1:  // for Smart Band 8 Active
                 headerSize = 5;
                 break;
+            case 2: // redmi watch 3
+                headerSize = 6;
+                break;
             case 4:
                 headerSize = 7;
                 break;
@@ -504,20 +509,20 @@ public class WorkoutSummaryParser extends XiaomiActivityParser implements Activi
         builder.addByte(HR_AVG, UNIT_BPM);
         builder.addByte(HR_MAX, UNIT_BPM);
         builder.addByte(HR_MIN, UNIT_BPM);
+        builder.addUnknown(20);
+        builder.addFloat(TRAINING_EFFECT_AEROBIC, UNIT_NONE);
         if (version == 1) {
-            builder.addUnknown(33);
+            builder.addUnknown(9);
         } else {
-            builder.addUnknown(20);
-            builder.addFloat(TRAINING_EFFECT_AEROBIC, UNIT_NONE);
             builder.addUnknown(1);
             builder.addFloat(TRAINING_EFFECT_ANAEROBIC, UNIT_NONE);
             if (version >= 9) {
                 builder.addUnknown(6);
-                builder.addByte(MAXIMUM_OXYGEN_UPTAKE, UNIT_ML_KG_MIN);
-                builder.addUnknown(2);
             } else {
-                builder.addUnknown(4);
+                builder.addUnknown(1);
             }
+            builder.addByte(MAXIMUM_OXYGEN_UPTAKE, UNIT_ML_KG_MIN);
+            builder.addUnknown(2);
             builder.addShort(RECOVERY_TIME, UNIT_HOURS);
             builder.addUnknown(1);
         }
@@ -582,6 +587,9 @@ public class WorkoutSummaryParser extends XiaomiActivityParser implements Activi
             case 6:
                 headerSize = 7;
                 break;
+            case 8:   // Smart Band 10 Pro
+                headerSize = 8;
+                break;
             default:
                 LOG.warn("Unable to parse outdoor cycling summary version {}", fileId.getVersion());
                 return null;
@@ -595,10 +603,10 @@ public class WorkoutSummaryParser extends XiaomiActivityParser implements Activi
         builder.addInt(ACTIVE_SECONDS, UNIT_SECONDS);
         builder.addUnknown(4);
         builder.addInt(DISTANCE_METERS, UNIT_METERS);
-        builder.addUnknown(2);
+        builder.addShort(CALORIES_TOTAL, UNIT_KCAL);
         builder.addShort(CALORIES_BURNT, UNIT_KCAL);
-        builder.addUnknown(4);
-        builder.addUnknown(4);
+        builder.addInt(PACE_MAX, UNIT_SECONDS_PER_KM);
+        builder.addInt(PACE_MIN, UNIT_SECONDS_PER_KM);
         if (version >= 5) {
             builder.addFloat(SPEED_AVG, UNIT_KMPH);
         }
@@ -615,6 +623,9 @@ public class WorkoutSummaryParser extends XiaomiActivityParser implements Activi
         builder.addUnknown(1);
         builder.addFloat(TRAINING_EFFECT_ANAEROBIC, UNIT_NONE);
         builder.addUnknown(1);
+        if (version >= 7) {
+            builder.addUnknown(5); // reserved (5 bytes)
+        }
         builder.addByte(MAXIMUM_OXYGEN_UPTAKE, UNIT_ML_KG_MIN);
         builder.addUnknown(1);
         builder.addUnknown(1);
@@ -625,6 +636,29 @@ public class WorkoutSummaryParser extends XiaomiActivityParser implements Activi
         builder.addInt(HR_ZONE_AEROBIC, UNIT_SECONDS);
         builder.addInt(HR_ZONE_FAT_BURN, UNIT_SECONDS);
         builder.addInt(HR_ZONE_WARM_UP, UNIT_SECONDS);
+        if (version >= 6) {
+            if (version >= 7) {
+                builder.addUnknown(5); // reserved (5 bytes)
+            }
+            builder.addInt(TIME_GOAL, UNIT_SECONDS);
+            builder.addShort(CALORIES_GOAL, UNIT_KCAL);
+            builder.addInt(DISTANCE_GOAL, UNIT_METERS);
+            builder.addFloat(SPEED_GOAL, UNIT_KMPH);
+            // Route byte: 0xFC, 0xFD or 0xFF when the ride follows a route, in which case
+            // 8 more bytes follow it.
+            builder.addUnknown(1);
+            builder.addUnknownIfPreviousByte(8, route -> route == 0xFC || route == 0xFD || route == 0xFF);
+            builder.addShort(WORKOUT_LOAD, UNIT_NONE);
+            builder.addUnknown(15); // reserved (15 bytes)
+            builder.addByte(VITALITY_GAIN, UNIT_NONE);
+            builder.addUnknown(5); // reserved (5 bytes)
+            if (version >= 7) {
+                builder.addUnknown(2); // reserved (2 bytes)
+            }
+            if (version >= 8) {
+                builder.addUnknown(1); // reserved (1 byte)
+            }
+        }
 
         return builder.build();
     }
@@ -785,6 +819,9 @@ public class WorkoutSummaryParser extends XiaomiActivityParser implements Activi
             case 7:
                 headerSize = 5;
                 break;
+            case 8:
+                headerSize = 6;
+                break;
             default:
                 LOG.warn("Unable to parse rowing summary version {}", fileId.getVersion());
                 return null;
@@ -817,6 +854,13 @@ public class WorkoutSummaryParser extends XiaomiActivityParser implements Activi
         builder.addInt(HR_ZONE_AEROBIC, UNIT_SECONDS);
         builder.addInt(HR_ZONE_FAT_BURN, UNIT_SECONDS);
         builder.addInt(HR_ZONE_WARM_UP, UNIT_SECONDS);
+        if (version >= 8) {
+            // v8 inserts five bytes here. Confirmed on a rowing v8 file: without the padding
+            // the stroke fields land on nonsense (318767104 strokes), with it they read 46
+            // strokes at 18 average and 27 maximum strokes per minute, which is consistent
+            // with 46 strokes over the 147 recorded seconds.
+            builder.addUnknown(5);
+        }
         if (version >= 7) {
             // totalCal (active + basal). Decoded as 94 kcal for a workout whose
             // CALORIES_BURNT (active) = 70 kcal — diff 24 kcal over 872 s matches basal

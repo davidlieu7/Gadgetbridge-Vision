@@ -24,6 +24,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.os.Handler;
+import android.os.Looper;
 import android.os.ParcelUuid;
 
 import androidx.annotation.Nullable;
@@ -60,7 +61,7 @@ public class SonyHeadphonesSupport extends AbstractHeadphoneSerialDeviceSupportV
     private static final UUID BTRFCOMM_UUID_V2 = UUID.fromString("956C7B26-D49A-4BA8-B03F-B17D393CB6E2");
 
     // Track whether we got the first init reply
-    private final Handler handler = new Handler();
+    private final Handler handler = new Handler(Looper.getMainLooper());
     private int initRetries = 0;
 
     private final ByteBuffer packetBuffer = ByteBuffer.allocate(2048).order(ByteOrder.LITTLE_ENDIAN);
@@ -317,6 +318,7 @@ public class SonyHeadphonesSupport extends AbstractHeadphoneSerialDeviceSupportV
 
     @Override
     protected TransactionBuilder initializeDevice(final TransactionBuilder builder) {
+        initRetries = 0;
         packetBuffer.clear();
         builder.write(mDeviceProtocol.encodeInit());
         builder.setDeviceState(GBDevice.State.INITIALIZING);
@@ -410,7 +412,7 @@ public class SonyHeadphonesSupport extends AbstractHeadphoneSerialDeviceSupportV
     }
 
     private void scheduleInitRetry() {
-        LOG.info("Scheduling init retry");
+        LOG.debug("Scheduling init retry {}", initRetries);
 
         handler.postDelayed(initSendRunnable, 1250);
     }

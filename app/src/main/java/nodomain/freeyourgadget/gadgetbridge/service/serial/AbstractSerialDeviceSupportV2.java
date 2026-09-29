@@ -22,6 +22,7 @@ import android.location.Location;
 import android.os.Bundle;
 import android.os.ParcelUuid;
 
+import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 import org.slf4j.Logger;
@@ -37,6 +38,7 @@ import nodomain.freeyourgadget.gadgetbridge.model.Alarm;
 import nodomain.freeyourgadget.gadgetbridge.model.CalendarEventSpec;
 import nodomain.freeyourgadget.gadgetbridge.model.CallSpec;
 import nodomain.freeyourgadget.gadgetbridge.model.CannedMessagesSpec;
+import nodomain.freeyourgadget.gadgetbridge.model.FindDeviceTarget;
 import nodomain.freeyourgadget.gadgetbridge.model.MusicSpec;
 import nodomain.freeyourgadget.gadgetbridge.model.MusicStateSpec;
 import nodomain.freeyourgadget.gadgetbridge.model.NotificationSpec;
@@ -149,7 +151,7 @@ public abstract class AbstractSerialDeviceSupportV2<T extends GBDeviceProtocol> 
 
     @Override
     public void onSetCallState(final CallSpec callSpec) {
-        byte[] bytes = mDeviceProtocol.encodeSetCallState(callSpec.number, callSpec.name, callSpec.command);
+        byte[] bytes = mDeviceProtocol.encodeSetCallState(callSpec.getNumber(), callSpec.getName(), callSpec.getCommand());
         sendToDevice(bytes);
     }
 
@@ -161,13 +163,13 @@ public abstract class AbstractSerialDeviceSupportV2<T extends GBDeviceProtocol> 
 
     @Override
     public void onSetMusicState(final MusicStateSpec stateSpec) {
-        byte[] bytes = mDeviceProtocol.encodeSetMusicState(stateSpec.state, stateSpec.position, stateSpec.playRate, stateSpec.shuffle, stateSpec.repeat);
+        byte[] bytes = mDeviceProtocol.encodeSetMusicState(stateSpec.getState(), stateSpec.getPosition(), stateSpec.getPlayRate(), stateSpec.getShuffle(), stateSpec.getRepeat());
         sendToDevice(bytes);
     }
 
     @Override
     public void onSetMusicInfo(final MusicSpec musicSpec) {
-        byte[] bytes = mDeviceProtocol.encodeSetMusicInfo(musicSpec.artist, musicSpec.album, musicSpec.track, musicSpec.duration, musicSpec.trackCount, musicSpec.trackNr);
+        byte[] bytes = mDeviceProtocol.encodeSetMusicInfo(musicSpec.getArtist(), musicSpec.getAlbum(), musicSpec.getTrack(), musicSpec.getDuration(), musicSpec.getTrackCount(), musicSpec.getTrackNr());
         sendToDevice(bytes);
     }
 
@@ -208,14 +210,26 @@ public abstract class AbstractSerialDeviceSupportV2<T extends GBDeviceProtocol> 
     }
 
     @Override
-    public void onReset(final int flags) {
-        byte[] bytes = mDeviceProtocol.encodeReset(flags);
+    public void onReboot() {
+        byte[] bytes = mDeviceProtocol.encodeReset(GBDeviceProtocol.RESET_FLAGS_REBOOT);
+        sendToDevice(bytes);
+    }
+
+    @Override
+    public void onFactoryReset() {
+        byte[] bytes = mDeviceProtocol.encodeReset(GBDeviceProtocol.RESET_FLAGS_FACTORY_RESET);
         sendToDevice(bytes);
     }
 
     @Override
     public void onFindDevice(final boolean start) {
         byte[] bytes = mDeviceProtocol.encodeFindDevice(start);
+        sendToDevice(bytes);
+    }
+
+    @Override
+    public void onFindDevice(final boolean start, @NonNull final FindDeviceTarget target) {
+        byte[] bytes = mDeviceProtocol.encodeFindDevice(start, target);
         sendToDevice(bytes);
     }
 

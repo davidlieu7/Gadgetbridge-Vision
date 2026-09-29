@@ -25,8 +25,13 @@ import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import java.security.GeneralSecurityException
 
+// FIXME MasterKey/EncryptedSharedPreferences is deprecated - we should move to Tink
+@Suppress("DEPRECATION")
 class WandererTokenManager(context: Context) {
-    private val LOG: Logger = LoggerFactory.getLogger(EndurainTokenManager::class.java)
+    companion object {
+        private val LOG: Logger = LoggerFactory.getLogger(WandererTokenManager::class.java)
+    }
+
     private val masterKey = MasterKey.Builder(context)
         .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
         .build()
@@ -44,7 +49,8 @@ class WandererTokenManager(context: Context) {
             )
         } catch (e: GeneralSecurityException) {
             LOG.warn("Unable to decrypt wanderer token preferences, resetting them instead\n", e)
-            context.deleteSharedPreferences("wanderer_tokens")
+            context.getSharedPreferences("wanderer_tokens", Context.MODE_PRIVATE)
+                .edit(commit = true) { clear() }
             EncryptedSharedPreferences.create(
                 context,
                 "wanderer_tokens",
@@ -66,6 +72,18 @@ class WandererTokenManager(context: Context) {
     }
 
     fun getAPIToken(): String? = tokenPreferences.getString("api_token", null)
+
+    /**
+     * Stores the account's Wanderer handle, the `preferred_username` half of `@user@domain`. Trail
+     * pages are namespaced by their owner's handle, so a link to one cannot be built without it.
+     */
+    fun saveHandle(handle: String) {
+        tokenPreferences.edit {
+            putString("handle", handle)
+        }
+    }
+
+    fun getHandle(): String? = tokenPreferences.getString("handle", null)
 
     fun isLoggedIn(): Boolean {
         return getAPIToken() != null && getAPIToken()?.startsWith("wanderer_key_") == true

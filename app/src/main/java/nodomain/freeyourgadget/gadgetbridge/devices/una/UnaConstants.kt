@@ -44,10 +44,51 @@ object UnaConstants {
     // calendar day, and 60 per-minute heart rates for one hour. CCS also carries find-phone, reset,
     // EPO and firmware update, none of which are implemented.
     //
-    // -0001- takes commands and answers them. -0002- is notify-only, carrying watch to phone events
-    // such as activity-ended and find-phone, and is unused here.
+    // -0001- takes commands and answers them. -0002- is notify-only and carries watch to phone
+    // events.
     val UUID_SERVICE_CCS: UUID = UUID.fromString("554e4100-a2cf-4df8-0000-7e1e48595106")
     val UUID_CHARACTERISTIC_CCS_COMMAND: UUID = UUID.fromString("554e4100-a2cf-4df8-0001-7e1e48595106")
+    val UUID_CHARACTERISTIC_CCS_EVENT: UUID = UUID.fromString("554e4100-a2cf-4df8-0002-7e1e48595106")
+
+    const val EVENT_ACTIVITY_SAVED: Int = 0x01
+
+    // ANCS re-done on a vendor service: -0001- announces a notification, -0002- carries the
+    // watch's requests for its text and the answers. The watch discards every announcement without
+    // a word unless `phone.notifications` is true in /settings.json.
+    val UUID_SERVICE_CANS: UUID = UUID.fromString("554e4100-28e7-4811-0000-141f8b92ee40")
+    val UUID_CHARACTERISTIC_CANS_NOTIFICATION: UUID = UUID.fromString("554e4100-28e7-4811-0001-141f8b92ee40")
+    val UUID_CHARACTERISTIC_CANS_COMMAND: UUID = UUID.fromString("554e4100-28e7-4811-0002-141f8b92ee40")
+
+    const val NOTIFICATION_EVENT: Int = 0x01
+
+    const val ACTION_ADD: Int = 0
+    const val ACTION_REMOVE: Int = 1
+    const val ACTION_MODIFY: Int = 2
+
+    const val CATEGORY_OTHER: Int = 0
+    const val CATEGORY_MESSAGE: Int = 1
+    const val CATEGORY_CALL: Int = 2
+
+    const val SERVER_REQUEST_ATTRIBUTES: Int = 3
+    const val SERVER_EXECUTE_POSITIVE_ACTION: Int = 4
+    const val SERVER_EXECUTE_NEGATIVE_ACTION: Int = 5
+
+    const val ATTRIBUTE_TITLE: Int = 1
+    const val ATTRIBUTE_SUBTITLE: Int = 2
+    const val ATTRIBUTE_MESSAGE_CONTENT_SIZE: Int = 3
+    const val ATTRIBUTE_MESSAGE: Int = 4
+    const val ATTRIBUTE_APP_IDENTIFIER: Int = 5
+    const val ATTRIBUTE_APP_NAME: Int = 6
+    const val ATTRIBUTE_TIMESTAMP: Int = 7
+    const val ATTRIBUTE_POSITIVE_ACTION_LABEL: Int = 8
+    const val ATTRIBUTE_NEGATIVE_ACTION_LABEL: Int = 9
+
+    const val ERROR_INVALID_REQUEST_FORMAT: Int = 128
+    const val ERROR_NOTIFICATION_UID_NOT_FOUND: Int = 129
+    const val ERROR_ATTRIBUTE_DATA_NOT_AVAILABLE: Int = 130
+
+    /** The format the watch's own companion writes into the timestamp attribute. */
+    const val TIMESTAMP_PATTERN: String = "yyyyMMdd'T'HHmmss"
 
     const val CMD_DAILY_HEALTH: Int = 0x10
     const val CMD_HOURLY_HR: Int = 0x14
