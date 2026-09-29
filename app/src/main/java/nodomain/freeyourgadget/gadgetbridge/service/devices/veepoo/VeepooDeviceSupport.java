@@ -1801,11 +1801,7 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
                     if (usingPhoneTrack) {
                         // Without GNSS the band's distance is a step estimate; the recorded route
                         // provides a real one for the summary and the Health Connect sync.
-                        final double gpsDistanceMeters = trackDistance(trackPoints);
-                        if (gpsDistanceMeters > 0) {
-                            summary.add(ActivitySummaryEntries.DISTANCE_METERS,
-                                    Math.round(gpsDistanceMeters), ActivitySummaryEntries.UNIT_METERS);
-                        }
+                        applyPhoneTrackMetrics(summary, trackPoints, startTime, stopTime);
                     }
                 } catch (Exception e) {
                     LOG.warn("Workout day {}: GPX export failed, saving without track", dayIndex, e);
@@ -1895,6 +1891,84 @@ public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
             last = point;
         }
         return meters;
+    }
+
+    /** Segments below walking pace (~1 m/s) are a standstill between fixes, not movement. */
+    private static final float MIN_MOVING_SPEED_MPS = 1f;
+
+    /**
+     * Replaces the band's distance-derived metrics with values computed from the recorded phone
+     * route: without GNSS the band estimates the distance from its steps, so its pace and speeds
+     * do not match the real distance and would be displayed next to it. Entries that cannot be
+     * recomputed are dropped rather than kept stale.
+     */
+    static void applyPhoneTrackMetrics(final ActivitySummaryData summary, final List<ActivityPoint> trackPoints,
+                                       final Date startTime, final Date stopTime) {
+        final double gpsDistanceMeters = trackDistance(trackPoints);
+        if (gpsDistanceMeters <= 0) {
+            return;
+        }
+        summary.add(ActivitySummaryEntries.DISTANCE_METERS, Math.round(gpsDistanceMeters), ActivitySummaryEntries.UNIT_METERS);
+
+        long activeSeconds = summary.getNumber(ActivitySummaryEntries.ACTIVE_SECONDS, 0L).longValue();
+        if (activeSeconds <= 0) {
+            activeSeconds = Math.max(0L, (stopTime.getTime() - startTime.getTime()) / 1000L);
+        }
+        if (activeSeconds > 0) {
+            final double kilometers = gpsDistanceMeters / 1000d;
+            summary.add(ActivitySummaryEntries.PACE_AVG_SECONDS_KM, Math.round(activeSeconds / kilometers),
+                    ActivitySummaryEntries.UNIT_SECONDS_PER_KM);
+            summary.add(ActivitySummaryEntries.SPEED_AVG, (kilometers * 3600d) / activeSeconds,
+                    ActivitySummaryEntries.UNIT_KMPH);
+        } else {
+            summary.remove(ActivitySummaryEntries.PACE_AVG_SECONDS_KM);
+            summary.remove(ActivitySummaryEntries.SPEED_AVG);
+        }
+
+        final double[] speedRangeKmH = trackSpeedRangeKmH(trackPoints);
+        if (speedRangeKmH != null) {
+            summary.add(ActivitySummaryEntries.SPEED_MAX, speedRangeKmH[0], ActivitySummaryEntries.UNIT_KMPH);
+            summary.add(ActivitySummaryEntries.SPEED_MIN, speedRangeKmH[1], ActivitySummaryEntries.UNIT_KMPH);
+        } else {
+            summary.remove(ActivitySummaryEntries.SPEED_MAX);
+            summary.remove(ActivitySummaryEntries.SPEED_MIN);
+        }
+    }
+
+    /**
+     * The maximum and minimum segment speeds of a track in km/h, using the same plausibility
+     * filter as {@link #trackDistance}; standstills are excluded from the minimum.
+     *
+     * @return {max, min}, or null when the track has no usable segment
+     */
+    static double[] trackSpeedRangeKmH(List<ActivityPoint> points) {
+        double maxMps = 0;
+        Double minMps = null;
+        ActivityPoint last = null;
+        for (ActivityPoint point : points) {
+            final GPSCoordinate location = point.getLocation();
+            if (location == null || point.getTime() == null) {
+                continue;
+            }
+            if (last != null) {
+                final double seconds = (point.getTime().getTime() - last.getTime().getTime()) / 1000.0;
+                final double distance = GPSCoordinate.distanceHaversine(last.getLocation(), location);
+                if (seconds > 0) {
+                    final double mps = distance / seconds;
+                    if (mps <= VeepooLiveWorkoutModule.MAX_GPS_SPEED_MPS) {
+                        maxMps = Math.max(maxMps, mps);
+                        if (mps >= MIN_MOVING_SPEED_MPS) {
+                            minMps = minMps == null ? mps : Math.min(minMps, mps);
+                        }
+                    }
+                }
+            }
+            last = point;
+        }
+        if (maxMps <= 0 || minMps == null) {
+            return null;
+        }
+        return new double[]{maxMps * 3.6, minMps * 3.6};
     }
 
     /** Maps the VeePoo ESportType value to the closest Gadgetbridge activity kind. */

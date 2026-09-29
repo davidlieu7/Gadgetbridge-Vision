@@ -136,6 +136,11 @@ public class ActivitySummaryData {
         return entries.containsKey(key);
     }
 
+    /// @return {@code true} if an entry with the given key was present and removed
+    public boolean remove(@NonNull final String key) {
+        return entries.remove(key) != null;
+    }
+
     public Number getNumber(@NonNull final String key, final Number defaultValue) {
         final ActivitySummaryEntry entry = entries.get(key);
         if (!(entry instanceof ActivitySummarySimpleEntry simpleEntry)) {
