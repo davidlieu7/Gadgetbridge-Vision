@@ -511,7 +511,7 @@ public class SonyHeadphonesProtocol extends GBDeviceProtocol {
     }
 
     public byte[] getFromQueue() {
-        return requestQueue.remove().encode(sequenceNumber);
+        return encodeRequest(requestQueue.remove());
     }
 
     public byte[] encodeRequest(final Request request) {
@@ -527,12 +527,14 @@ public class SonyHeadphonesProtocol extends GBDeviceProtocol {
     private GBDeviceEvent handleAck() {
         pendingAcks--;
 
+        if (pendingAcks != 0) {
+            return null;
+        }
+
         if (!requestQueue.isEmpty()) {
             LOG.debug("Outstanding requests in queue: {}", requestQueue.size());
 
-            final Request request = requestQueue.remove();
-
-            return new GBDeviceEventSendBytes(request.encode(sequenceNumber));
+            return new GBDeviceEventSendBytes(getFromQueue());
         }
 
         if (GBDevice.State.INITIALIZING.equals(getDevice().getState())) {

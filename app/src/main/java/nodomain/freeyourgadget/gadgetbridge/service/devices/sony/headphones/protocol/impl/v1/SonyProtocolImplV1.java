@@ -776,48 +776,48 @@ public class SonyProtocolImplV1 extends AbstractSonyProtocolImpl {
         capabilityRequests.add(getFirmwareVersion());
         capabilityRequests.add(getAudioCodec());
 
-        final Map<SonyHeadphonesCapabilities, Request> capabilityRequestMap = new LinkedHashMap<>() {{
-            put(SonyHeadphonesCapabilities.BatterySingle, getBattery(BatteryType.SINGLE));
-            put(SonyHeadphonesCapabilities.BatteryDual, getBattery(BatteryType.DUAL));
-            put(SonyHeadphonesCapabilities.BatteryDual2, getBattery(BatteryType.DUAL2));
-            put(SonyHeadphonesCapabilities.BatteryCase, getBattery(BatteryType.CASE));
-            put(SonyHeadphonesCapabilities.AmbientSoundControl, getAmbientSoundControl());
-            put(SonyHeadphonesCapabilities.AmbientSoundControl2, getAmbientSoundControl());
-            put(SonyHeadphonesCapabilities.AncOptimizer, getNoiseCancellingOptimizerState());
-            put(SonyHeadphonesCapabilities.AudioUpsampling, getAudioUpsampling());
-            put(SonyHeadphonesCapabilities.AudioLDAC, getAudioLDAC());
-            put(SonyHeadphonesCapabilities.ButtonFunctionNcAmbient, getButtonFunctionNcAmbient());
-            put(SonyHeadphonesCapabilities.ButtonModesLeftRight, getButtonModes());
-            put(SonyHeadphonesCapabilities.VoiceNotifications, getVoiceNotifications());
-            put(SonyHeadphonesCapabilities.VoiceAssistantFunction, getVoiceAssistant());
-            put(SonyHeadphonesCapabilities.AutomaticPowerOffWhenTakenOff, getAutomaticPowerOff());
-            put(SonyHeadphonesCapabilities.AutomaticPowerOffByTime, getAutomaticPowerOff());
-            put(SonyHeadphonesCapabilities.TouchSensorSingle, getTouchSensor());
-            put(SonyHeadphonesCapabilities.EqualizerSimple, getEqualizer());
-            put(SonyHeadphonesCapabilities.EqualizerWithCustomBands, getEqualizer());
-            put(SonyHeadphonesCapabilities.SoundPosition, getSoundPosition());
-            put(SonyHeadphonesCapabilities.SurroundMode, getSurroundMode());
-            put(SonyHeadphonesCapabilities.SpeakToChatEnabled, getSpeakToChatEnabled());
-            put(SonyHeadphonesCapabilities.SpeakToChatConfig, getSpeakToChatConfig());
-            put(SonyHeadphonesCapabilities.PauseWhenTakenOff, getPauseWhenTakenOff());
-            put(SonyHeadphonesCapabilities.AmbientSoundControlButtonMode, getAmbientSoundControlButtonMode());
-            put(SonyHeadphonesCapabilities.QuickAccess, getQuickAccess());
-            put(SonyHeadphonesCapabilities.Volume, getVolume());
-            put(SonyHeadphonesCapabilities.AdaptiveVolumeControl, getAdaptiveVolumeControl());
-            put(SonyHeadphonesCapabilities.WideAreaTap, getWideAreaTap());
-            put(SonyHeadphonesCapabilities.ConnectTwoDevices, getConnectTwoDevices());
-            put(SonyHeadphonesCapabilities.CaptureVoiceDuringCall, getCaptureVoiceDuringCall());
-            put(SonyHeadphonesCapabilities.ServiceLink, getServiceLink());
+        final List<Request> connectTwoDevicesRequests = new ArrayList<>();
+        connectTwoDevicesRequests.add(getConnectTwoDevices());
+        connectTwoDevicesRequests.addAll(getMultipointDevices());
+
+        final Map<SonyHeadphonesCapabilities, List<Request>> capabilityRequestMap = new LinkedHashMap<>() {{
+            put(SonyHeadphonesCapabilities.BatterySingle, Collections.singletonList(getBattery(BatteryType.SINGLE)));
+            put(SonyHeadphonesCapabilities.BatteryDual, Collections.singletonList(getBattery(BatteryType.DUAL)));
+            put(SonyHeadphonesCapabilities.BatteryDual2, Collections.singletonList(getBattery(BatteryType.DUAL2)));
+            put(SonyHeadphonesCapabilities.BatteryCase, Collections.singletonList(getBattery(BatteryType.CASE)));
+            put(SonyHeadphonesCapabilities.AmbientSoundControl, Collections.singletonList(getAmbientSoundControl()));
+            put(SonyHeadphonesCapabilities.AmbientSoundControl2, Collections.singletonList(getAmbientSoundControl()));
+            put(SonyHeadphonesCapabilities.AncOptimizer, Collections.singletonList(getNoiseCancellingOptimizerState()));
+            put(SonyHeadphonesCapabilities.AudioUpsampling, Collections.singletonList(getAudioUpsampling()));
+            put(SonyHeadphonesCapabilities.AudioLDAC, Collections.singletonList(getAudioLDAC()));
+            put(SonyHeadphonesCapabilities.ButtonFunctionNcAmbient, Collections.singletonList(getButtonFunctionNcAmbient()));
+            put(SonyHeadphonesCapabilities.ButtonModesLeftRight, Collections.singletonList(getButtonModes()));
+            put(SonyHeadphonesCapabilities.VoiceNotifications, Collections.singletonList(getVoiceNotifications()));
+            put(SonyHeadphonesCapabilities.VoiceAssistantFunction, Collections.singletonList(getVoiceAssistant()));
+            put(SonyHeadphonesCapabilities.AutomaticPowerOffWhenTakenOff, Collections.singletonList(getAutomaticPowerOff()));
+            put(SonyHeadphonesCapabilities.AutomaticPowerOffByTime, Collections.singletonList(getAutomaticPowerOff()));
+            put(SonyHeadphonesCapabilities.TouchSensorSingle, Collections.singletonList(getTouchSensor()));
+            put(SonyHeadphonesCapabilities.EqualizerSimple, Collections.singletonList(getEqualizer()));
+            put(SonyHeadphonesCapabilities.EqualizerWithCustomBands, Collections.singletonList(getEqualizer()));
+            put(SonyHeadphonesCapabilities.SoundPosition, Collections.singletonList(getSoundPosition()));
+            put(SonyHeadphonesCapabilities.SurroundMode, Collections.singletonList(getSurroundMode()));
+            put(SonyHeadphonesCapabilities.SpeakToChatEnabled, Collections.singletonList(getSpeakToChatEnabled()));
+            put(SonyHeadphonesCapabilities.SpeakToChatConfig, Collections.singletonList(getSpeakToChatConfig()));
+            put(SonyHeadphonesCapabilities.PauseWhenTakenOff, Collections.singletonList(getPauseWhenTakenOff()));
+            put(SonyHeadphonesCapabilities.AmbientSoundControlButtonMode, Collections.singletonList(getAmbientSoundControlButtonMode()));
+            put(SonyHeadphonesCapabilities.QuickAccess, Collections.singletonList(getQuickAccess()));
+            put(SonyHeadphonesCapabilities.Volume, Collections.singletonList(getVolume()));
+            put(SonyHeadphonesCapabilities.AdaptiveVolumeControl, Collections.singletonList(getAdaptiveVolumeControl()));
+            put(SonyHeadphonesCapabilities.WideAreaTap, Collections.singletonList(getWideAreaTap()));
+            put(SonyHeadphonesCapabilities.ConnectTwoDevices, connectTwoDevicesRequests);
+            put(SonyHeadphonesCapabilities.CaptureVoiceDuringCall, Collections.singletonList(getCaptureVoiceDuringCall()));
+            put(SonyHeadphonesCapabilities.ServiceLink, Collections.singletonList(getServiceLink()));
         }};
 
-        for (Map.Entry<SonyHeadphonesCapabilities, Request> capabilityEntry : capabilityRequestMap.entrySet()) {
+        for (Map.Entry<SonyHeadphonesCapabilities, List<Request>> capabilityEntry : capabilityRequestMap.entrySet()) {
             if (supports(capabilityEntry.getKey())) {
-                capabilityRequests.add(capabilityEntry.getValue());
+                capabilityRequests.addAll(capabilityEntry.getValue());
             }
-        }
-
-        if (supports(SonyHeadphonesCapabilities.ConnectTwoDevices)) {
-            capabilityRequests.addAll(getMultipointDevices());
         }
 
         // Remove any requests that are not supported by other protocol version

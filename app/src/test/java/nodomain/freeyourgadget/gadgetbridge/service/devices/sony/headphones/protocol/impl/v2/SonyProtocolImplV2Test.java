@@ -56,6 +56,7 @@ import nodomain.freeyourgadget.gadgetbridge.devices.sony.headphones.prefs.SpeakT
 import nodomain.freeyourgadget.gadgetbridge.devices.sony.headphones.prefs.SpeakToChatEnabled;
 import nodomain.freeyourgadget.gadgetbridge.devices.sony.headphones.prefs.VoiceNotifications;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.sony.headphones.deviceevents.SonyHeadphonesMultipointEvent;
+import nodomain.freeyourgadget.gadgetbridge.service.devices.sony.headphones.deviceevents.SonyHeadphonesEnqueueRequestEvent;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.sony.headphones.protocol.MessageType;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.sony.headphones.protocol.Request;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.sony.headphones.protocol.impl.v2.params.MultipointAction;
@@ -511,7 +512,25 @@ public class SonyProtocolImplV2Test {
 
     @Test
     public void handleInitResponse() {
-        // TODO
+        coordinator.getDefaultCapabilities().clear();
+        coordinator.addCapability(SonyHeadphonesCapabilities.ConnectTwoDevices);
+        coordinator.setGeneralSettingType(SonyHeadphonesCapabilities.ConnectTwoDevices, 0xd2);
+
+        final List<? extends GBDeviceEvent> events = protocol.handleInitResponse(new byte[0]);
+        assertEquals(1, events.size());
+        final List<Request> requests = ((SonyHeadphonesEnqueueRequestEvent) events.get(0)).getRequests();
+        assertEquals(4, requests.size());
+        assertRequest(requests.get(2), 0x0c, "d6:d2");
+        assertRequest(requests.get(3), 0x0e, "36:00");
+    }
+
+    @Test
+    public void handleInitResponseWithoutMultipoint() {
+        coordinator.getDefaultCapabilities().clear();
+
+        final List<? extends GBDeviceEvent> events = protocol.handleInitResponse(new byte[0]);
+        final List<Request> requests = ((SonyHeadphonesEnqueueRequestEvent) events.get(0)).getRequests();
+        assertEquals(2, requests.size());
     }
 
     @Test

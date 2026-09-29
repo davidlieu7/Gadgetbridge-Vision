@@ -229,13 +229,7 @@ public class SonyHeadphonesSupport extends AbstractHeadphoneSerialDeviceSupportV
             return;
         }
 
-        if (requests.size() > 1) {
-            mDeviceProtocol.enqueueRequests(requests.subList(1, requests.size()));
-        }
-
-        final TransactionBuilder builder = createTransactionBuilder("multipoint request");
-        builder.write(mDeviceProtocol.encodeRequest(requests.get(0)));
-        builder.queue();
+        evaluateGBDeviceEvent(new SonyHeadphonesEnqueueRequestEvent(requests));
     }
 
     private boolean isConnectTwoDevicesEnabled() {
@@ -307,8 +301,7 @@ public class SonyHeadphonesSupport extends AbstractHeadphoneSerialDeviceSupportV
         if (deviceEvent instanceof SonyHeadphonesEnqueueRequestEvent enqueueRequestEvent) {
             mDeviceProtocol.enqueueRequests(enqueueRequestEvent.getRequests());
 
-            if (mDeviceProtocol.getPendingAcks() == 0
-                    || GBDevice.State.INITIALIZED.equals(getDevice().getState())) {
+            if (mDeviceProtocol.getPendingAcks() == 0) {
                 // There are no pending acks, send one request from the queue
                 // TODO: A more elegant way of scheduling these?
                 final TransactionBuilder builder = createTransactionBuilder("enqueue request");

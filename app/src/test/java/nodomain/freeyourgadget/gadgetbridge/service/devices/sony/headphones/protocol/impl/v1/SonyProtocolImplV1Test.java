@@ -49,6 +49,7 @@ import nodomain.freeyourgadget.gadgetbridge.devices.sony.headphones.prefs.SpeakT
 import nodomain.freeyourgadget.gadgetbridge.devices.sony.headphones.prefs.SurroundMode;
 import nodomain.freeyourgadget.gadgetbridge.devices.sony.headphones.prefs.TouchSensor;
 import nodomain.freeyourgadget.gadgetbridge.devices.sony.headphones.prefs.VoiceNotifications;
+import nodomain.freeyourgadget.gadgetbridge.service.devices.sony.headphones.deviceevents.SonyHeadphonesEnqueueRequestEvent;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.sony.headphones.protocol.MessageType;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.sony.headphones.protocol.Request;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.sony.headphones.protocol.impl.MockSonyCoordinator;
@@ -453,7 +454,12 @@ public class SonyProtocolImplV1Test {
 
     @Test
     public void handleInitResponse() {
-        // TODO
+        coordinator.addCapability(SonyHeadphonesCapabilities.ConnectTwoDevices);
+
+        final List<? extends GBDeviceEvent> events = protocol.handleInitResponse(new byte[0]);
+        assertEquals(1, events.size());
+        final List<Request> requests = ((SonyHeadphonesEnqueueRequestEvent) events.get(0)).getRequests();
+        assertEquals(2, requests.size());
     }
 
     @Test
