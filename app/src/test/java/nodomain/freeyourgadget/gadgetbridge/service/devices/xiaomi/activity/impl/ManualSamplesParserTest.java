@@ -34,6 +34,9 @@ public class ManualSamplesParserTest {
     private static final String SPO2_97_PACKET = "EFB9856AF4011800FFEFB9856A0261511E4648";
     private static final String STRESS_40_PACKET = "65C0856AF4011800FF65C0856A03288CA20578";
     private static final String STRESS_27_PACKET = "D1C3856AF4011800FFD1C3856A031BFBF91375";
+    // Mi Watch Color Sport
+    private static final String SPO2_93_E0_PACKET = "6BE3BA6A08011800E0B2E9BB6A025DEE9C5FFC";
+    private static final String EMPTY_E0_PACKET = "EB91B96A08011800E0ACA5319B";
 
     @Test
     public void decodeVersion1Spo2() {
@@ -60,6 +63,25 @@ public class ManualSamplesParserTest {
         assertEquals(1, stress27.size());
         assertEquals(XiaomiManualSampleProvider.TYPE_STRESS, stress27.get(0).getType().intValue());
         assertEquals(27, stress27.get(0).getValue().intValue());
+    }
+
+    @Test
+    public void decodeVersion1Spo2E0Header() {
+        final List<XiaomiManualSample> samples = decode(SPO2_93_E0_PACKET);
+
+        assertNotNull(samples);
+        assertEquals(1, samples.size());
+        assertEquals(XiaomiManualSampleProvider.TYPE_SPO2, samples.get(0).getType().intValue());
+        assertEquals(93, samples.get(0).getValue().intValue());
+        assertEquals(1790699954000L, samples.get(0).getTimestamp());
+    }
+
+    @Test
+    public void decodeVersion1Empty() {
+        final List<XiaomiManualSample> samples = decode(EMPTY_E0_PACKET);
+
+        assertNotNull(samples);
+        assertEquals(0, samples.size());
     }
 
     @Test

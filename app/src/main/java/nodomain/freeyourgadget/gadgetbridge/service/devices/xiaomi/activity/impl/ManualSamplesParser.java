@@ -130,7 +130,9 @@ public class ManualSamplesParser extends XiaomiActivityParser {
         // Mi Band 9 Active files contain 7 file-id bytes, one padding byte, a 0xff
         // header, one or more 6-byte samples, and a final 4-byte CRC. Each sample is
         // a little-endian timestamp followed by a type and an unsigned byte value.
-        if (bytes.length < 19) {
+        // Mi Watch Color Sport uses the same layout with a 0xe0 header, and sends
+        // files without any samples when nothing was measured.
+        if (bytes.length < 13) {
             LOG.warn("Manual samples v1 packet too short: {}", bytes.length);
             return null;
         }
@@ -146,12 +148,12 @@ public class ManualSamplesParser extends XiaomiActivityParser {
         }
 
         final int header = buf.get() & 0xff;
-        if (header != 0xff) {
+        if (header != 0xff && header != 0xe0) {
             LOG.warn("Unexpected manual samples v1 header {}", header);
             return null;
         }
 
-        if (buf.remaining() == 0 || buf.remaining() % 6 != 0) {
+        if (buf.remaining() % 6 != 0) {
             LOG.warn("Unexpected manual samples v1 payload length {}", buf.remaining());
             return null;
         }
