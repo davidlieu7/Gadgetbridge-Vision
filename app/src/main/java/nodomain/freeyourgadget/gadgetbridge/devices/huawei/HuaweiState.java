@@ -502,10 +502,7 @@ public class HuaweiState {
     }
 
     public boolean supportsWheelchairMode() {
-        if (supportsExpandCapability()) {
-            return supportsExpandCapability(276);
-        }
-        return false;
+        return supportsExpandCapability(276);
     }
 
     public boolean supportsGpsAndTimeToDevice() {
