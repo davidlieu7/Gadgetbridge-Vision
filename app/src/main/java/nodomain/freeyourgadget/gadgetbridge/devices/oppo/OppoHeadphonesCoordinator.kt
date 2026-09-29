@@ -20,6 +20,7 @@ package nodomain.freeyourgadget.gadgetbridge.devices.oppo
 import android.bluetooth.BluetoothClass
 import android.util.Pair
 import java.util.Locale
+import java.nio.ByteOrder
 import nodomain.freeyourgadget.gadgetbridge.R
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSpecificSettingsCustomizer
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSpecificSettingsScreen
@@ -163,6 +164,7 @@ abstract class OppoHeadphonesCoordinator : AbstractBLClassicDeviceCoordinator() 
         DeviceCoordinator.DeviceKind.EARBUDS
 
     open fun ctrlUuid(device: GBDevice): OppoUuid = OppoUuid.VENDOR_RFCOMM
+    open fun multipointMacOrder(device: GBDevice): ByteOrder = ByteOrder.BIG_ENDIAN
     open fun supportsLdac(device: GBDevice): Boolean = false
     open fun supportsMultipoint(device: GBDevice): Boolean = false
     open fun supportsGameMode(device: GBDevice): Boolean = false

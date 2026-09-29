@@ -840,7 +840,7 @@ public class OppoHeadphonesSupport extends AbstractHeadphoneBTBRDeviceSupport {
     }
 
     protected MultipointDevicesModule getMultipointDevsModule() {
-        return new MultipointDevicesModule(getContext(), ByteOrder.BIG_ENDIAN);
+        return new MultipointDevicesModule(getContext(), getCoordinator().multipointMacOrder(getDevice()));
     }
 
     @Override
