@@ -29,6 +29,7 @@ import java.util.Date;
 
 import nodomain.freeyourgadget.gadgetbridge.entities.XiaomiDailySummarySample;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.xiaomi.activity.XiaomiActivityFileId;
+import nodomain.freeyourgadget.gadgetbridge.util.GB;
 
 /**
  * Synthetic-input tests for {@link DailySummaryParser}. No raw bins on disk — every
@@ -360,6 +361,33 @@ public class DailySummaryParserTest {
         assertNull(s.getHrAvg());
         assertNull(s.getStanding());
         assertNull(s.getCalories());
+        assertNull(s.getSpo2Avg());
+    }
+
+    // ----- real capture -------------------------------------------------------
+
+    /** Mi Watch Color Sport, fw 1.3.69, 2026-09-29 (watch showed 6189 steps, 243 kcal). */
+    private static final String V2_COLOR_SPORT =
+            "6BE3BA6A08020100FFFE2D180000F300483C8BCC85BB6A27405DBB6A571C530B03D802450A00009943B897";
+
+    @Test
+    public void decodesV2ColorSport() {
+        final byte[] bytes = GB.hexStringToByteArray(V2_COLOR_SPORT);
+        final XiaomiActivityFileId id = XiaomiActivityFileId.from(Arrays.copyOfRange(bytes, 0, 7));
+        final XiaomiDailySummarySample s = DailySummaryParser.decode(id, bytes);
+
+        assertNotNull(s);
+        assertEquals(Integer.valueOf(6189), s.getSteps());
+        assertEquals(Integer.valueOf(243), s.getActiveCalories());
+        assertEquals(Integer.valueOf(60), s.getHrResting());
+        assertEquals(Integer.valueOf(139), s.getHrMax());
+        assertEquals(Integer.valueOf(0x6ABB85CC), s.getHrMaxTs());
+        assertEquals(Integer.valueOf(39), s.getHrMin());
+        assertEquals(Integer.valueOf(0x6ABB5D40), s.getHrMinTs());
+        assertEquals(Integer.valueOf(28), s.getStressAvg());
+        assertEquals(Integer.valueOf(83), s.getStressMax());
+        assertEquals(Integer.valueOf(11), s.getStressMin());
+        assertEquals(Integer.valueOf(2629), s.getCalories());
         assertNull(s.getSpo2Avg());
     }
 }

@@ -149,6 +149,10 @@ public class DailySummaryParser extends XiaomiActivityParser {
         final int headerSize;
         final int slotCount;
         switch (version) {
+            case 2:   // Mi Watch Color Sport
+                headerSize = 2;
+                slotCount = 15;
+                break;
             case 3:   // Smart Band 8 Active
             case 4:   // Mi Band 9 Active
                 headerSize = 3;
