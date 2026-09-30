@@ -334,7 +334,7 @@ public abstract class XiaomiCoordinator extends AbstractBLEDeviceCoordinator {
 
     @Override
     public boolean supportsBodyEnergy(@NonNull GBDevice device) {
-        return false; // FIXME is should, but untested
+        return true;
     }
 
     @Override
