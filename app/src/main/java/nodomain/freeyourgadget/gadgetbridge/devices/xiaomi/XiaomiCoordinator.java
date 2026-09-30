@@ -338,6 +338,12 @@ public abstract class XiaomiCoordinator extends AbstractBLEDeviceCoordinator {
     }
 
     @Override
+    public boolean supportsVO2Max(@NonNull GBDevice device) {
+        // Persisted in the workout summaries - see WorkoutSummaryParser
+        return true;
+    }
+
+    @Override
     public boolean supportsHeartRateStats(@NonNull GBDevice device) {
         // TODO it does, and they're persisted - see DailySummaryParser
         return false;
