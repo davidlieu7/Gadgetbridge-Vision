@@ -49,9 +49,13 @@ public class GarminRfcommListener extends Thread {
     private volatile OutputStream out;
     private volatile String classicAddress;
 
-    public GarminRfcommListener(final GarminSupport support) {
+    /**
+     * @param classicAddress the device's Classic address if already known, queried once listening
+     */
+    public GarminRfcommListener(final GarminSupport support, final String classicAddress) {
         super("GarminRfcommListener");
         this.support = support;
+        this.classicAddress = classicAddress;
     }
 
     public boolean isConnected() {
@@ -102,6 +106,8 @@ public class GarminRfcommListener extends Thread {
             LOG.error("Failed to open RFCOMM server socket", e);
             return;
         }
+        // the device looks up our service record when queried, so only query once it exists
+        requestConnection(null);
 
         final byte[] buf = new byte[4096];
         while (running) {

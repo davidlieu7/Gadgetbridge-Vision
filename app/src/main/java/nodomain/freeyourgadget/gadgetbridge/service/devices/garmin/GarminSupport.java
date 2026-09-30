@@ -174,6 +174,7 @@ public class GarminSupport extends AbstractBTLESingleDeviceSupport implements IC
     private final List<FileType> supportedFileTypeList = new ArrayList<>();
     private ICommunicator communicator;
     private GarminRfcommListener rfcommListener;
+    private String classicAddress;
     private MediaManager mediaManager;
     private boolean mFirstConnect = false;
     private boolean isBusyFetching;
@@ -320,8 +321,8 @@ public class GarminSupport extends AbstractBTLESingleDeviceSupport implements IC
 
         resetFileSyncState();
 
-        if (getCoordinator().supportsRfcommFileTransfer() && rfcommListener == null) {
-            rfcommListener = new GarminRfcommListener(this);
+        if (getDevicePrefs().getBoolean(GarminPreferences.PREF_GARMIN_RFCOMM_FILE_TRANSFER, false) && rfcommListener == null) {
+            rfcommListener = new GarminRfcommListener(this, null);
             rfcommListener.start();
         }
 
@@ -439,8 +440,11 @@ public class GarminSupport extends AbstractBTLESingleDeviceSupport implements IC
 
         sendAck("send status", parsedMessage); //send status message
 
-        if (parsedMessage instanceof DeviceInformationMessage deviceInformation && rfcommListener != null && !isRfcommThread()) {
-            rfcommListener.requestConnection(deviceInformation.getClassicAddress());
+        if (parsedMessage instanceof DeviceInformationMessage deviceInformation && !isRfcommThread()) {
+            classicAddress = deviceInformation.getClassicAddress();
+            if (rfcommListener != null) {
+                rfcommListener.requestConnection(classicAddress);
+            }
         }
 
         sendOutgoingMessage("send reply", parsedMessage); //send reply if any
@@ -636,13 +640,9 @@ public class GarminSupport extends AbstractBTLESingleDeviceSupport implements IC
 
         // FIXME respect dataTypes?
 
-        if (rfcommListener != null) {
-            // This device only lists files over RFCOMM
-            if (!rfcommListener.isConnected()) {
-                // the device starts the sync by itself once it connects
-                rfcommListener.requestConnection(null);
-                return;
-            }
+        if (rfcommListener != null && rfcommListener.isConnected()) {
+            // This device only lists files over RFCOMM. When the link is down, the BLE fetch
+            // below returns no FIT files and onDirectoryWithoutFitFiles() requests the link.
             final GFDIMessage download = fileTransferHandler.initiateDownload();
             if (download != null) {
                 rfcommListener.sendMessage(download.getOutgoingMessage());
@@ -931,6 +931,28 @@ public class GarminSupport extends AbstractBTLESingleDeviceSupport implements IC
         }
 
         return weatherLocalMessage;
+    }
+
+    /**
+     * Some devices (e.g. Edge 520 Plus) list no files over BLE and only serve them over a Classic
+     * Bluetooth RFCOMM link, which they open after an SDP query. Remembered per device, so the
+     * listener is up on the next connect, when the device opens the link after saving an activity.
+     * Only reached with "New sync protocol" disabled, those devices reject the protobuf file list.
+     */
+    public void onDirectoryWithoutFitFiles() {
+        if (classicAddress == null) {
+            return;
+        }
+        if (rfcommListener != null) {
+            rfcommListener.requestConnection(classicAddress);
+            return;
+        }
+        LOG.info("Directory lists no FIT files, falling back to RFCOMM file transfer");
+        GBApplication.getDeviceSpecificSharedPrefs(gbDevice.getAddress()).edit()
+                .putBoolean(GarminPreferences.PREF_GARMIN_RFCOMM_FILE_TRANSFER, true)
+                .apply();
+        rfcommListener = new GarminRfcommListener(this, classicAddress);
+        rfcommListener.start();
     }
 
     private void completeRfcommInitialization() {
