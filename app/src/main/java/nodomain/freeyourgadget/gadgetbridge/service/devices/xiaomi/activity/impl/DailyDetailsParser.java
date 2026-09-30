@@ -27,6 +27,7 @@ import java.nio.ByteOrder;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.List;
+import java.util.Map;
 
 import nodomain.freeyourgadget.gadgetbridge.GBApplication;
 import nodomain.freeyourgadget.gadgetbridge.database.DBHandler;
@@ -85,6 +86,7 @@ public class DailyDetailsParser extends XiaomiActivityParser {
         timestamp.setTime(fileId.getTimestamp());
 
         final List<XiaomiActivitySample> samples = new ArrayList<>();
+        final List<EnergyStateStressCalculator.Entry> energyStates = new ArrayList<>();
         while (buf.position() < buf.limit()) {
             complexParser.reset();
 
@@ -137,8 +139,18 @@ public class DailyDetailsParser extends XiaomiActivityParser {
                 }
             }
 
+            int energyState = 0;
+            int energyStateValue = 0;
             if (complexParser.nextGroup(16)) {
-                // TODO
+                // TODO total calories (6 bits)
+                if (version == 2 && complexParser.hasSecond() && complexParser.hasThird()) {
+                    energyState = complexParser.get(6, 2);
+                    final int rawValue = complexParser.get(8, 8);
+                    energyStateValue = ((rawValue & 0x80) != 0 ? 1 : -1) * (rawValue & 0x7f);
+                }
+            }
+            if (sample.getEnergy() > 0 && sample.getEnergy() <= 100) {
+                energyStates.add(new EnergyStateStressCalculator.Entry(sample.getTimestamp(), energyState, energyStateValue));
             }
 
             if (version >= 3) {
@@ -175,6 +187,26 @@ public class DailyDetailsParser extends XiaomiActivityParser {
             samples.add(sample);
 
             timestamp.add(Calendar.MINUTE, 1);
+        }
+
+        if (version == 2 && !samples.isEmpty()) {
+            // No stress in the samples, derive it from the energy state like the official app
+            final Calendar dayStart = Calendar.getInstance();
+            dayStart.setTime(fileId.getTimestamp());
+            dayStart.set(Calendar.HOUR_OF_DAY, 0);
+            dayStart.set(Calendar.MINUTE, 0);
+            dayStart.set(Calendar.SECOND, 0);
+            dayStart.set(Calendar.MILLISECOND, 0);
+            final int dayStartSeconds = (int) (dayStart.getTimeInMillis() / 1000);
+            final Map<Integer, Integer> stressPerBucket = EnergyStateStressCalculator.compute(dayStartSeconds, energyStates);
+            for (final XiaomiActivitySample sample : samples) {
+                // Set it on the first sample of each half hour
+                final int bucket = EnergyStateStressCalculator.bucketStart(dayStartSeconds, sample.getTimestamp());
+                final Integer stress = stressPerBucket.remove(bucket);
+                if (stress != null) {
+                    sample.setStress(stress);
+                }
+            }
         }
 
         // save all the samples that we got
