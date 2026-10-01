@@ -12,6 +12,8 @@ import nodomain.freeyourgadget.gadgetbridge.model.BatteryState
 import nodomain.freeyourgadget.gadgetbridge.service.btle.AbstractBTLESingleDeviceSupport
 import nodomain.freeyourgadget.gadgetbridge.service.btle.TransactionBuilder
 import org.slf4j.LoggerFactory
+import java.nio.ByteBuffer
+import java.nio.ByteOrder
 import java.util.UUID
 import java.util.TimeZone
 
@@ -42,7 +44,7 @@ class NxWearB8Support : AbstractBTLESingleDeviceSupport(LOG) {
 
         val builder = createTransactionBuilder("Set Nx Wear B8 settings")
         if (config == ACTION_REFRESH_ACTIVITY) {
-            builder.write(WRITE_CHARACTERISTIC, *REFRESH_ACTIVITY_COMMAND)
+            builder.write(WRITE_CHARACTERISTIC, *encodeRefreshActivity())
             builder.queue()
             return
         }
@@ -68,70 +70,58 @@ class NxWearB8Support : AbstractBTLESingleDeviceSupport(LOG) {
         value: ByteArray,
     ): Boolean {
         if (characteristic.uuid == RESPONSE_CHARACTERISTIC) {
-            if (value.contentEquals(ACK)) {
-                // This fixed response only acknowledges the write; it does not report stored settings.
+            val packet = NxWearPacket.parse(value)
+            if (packet.raw.contentEquals(SETTINGS_ACK)) {
+                // This fixed response only acknowledges a settings write; it does not report stored settings.
                 LOG.debug("Nx Wear B8 acknowledged a settings write")
-            } else if (isBatteryNotification(value)) {
-                handleBatteryNotification(value)
-                acknowledgeBatteryNotification(value)
-            } else if (isActivityDataFrame(value)) {
-                // Refresh is confirmed, but activity fragment boundaries and metric fields are not decoded yet.
-                LOG.debug("Received Nx Wear B8 activity data frame; payload interpretation is not implemented")
-            } else if (isPotentialActivityFragment(value)) {
-                // Continuation packets observed after the 0x31/0x09 activity frame start with 0x01..0x04.
-                // Preserve them in diagnostics only; the capture does not establish their field layout.
-                LOG.debug("Received Nx Wear B8 activity continuation frame; payload interpretation is not implemented")
-            } else if (isCandidateSettingsReply(value)) {
-                // Observed after a repeated 0x6d request: 00 0b 00 <changing byte> 04 04 00 00 01 00 01 ...
-                // The changing 16-bit field may be a sequence number, but its meaning and the payload semantics
-                // have not been established, so do not treat this frame as settings readback.
-                val sequenceCandidate = ((value[2].toInt() and 0xff) shl 8) or (value[3].toInt() and 0xff)
-                LOG.debug("Received candidate Nx Wear B8 settings reply with sequence candidate {}", sequenceCandidate)
-            } else {
-                LOG.debug("Unexpected Nx Wear B8 response: {}", value.joinToString("") { "%02x".format(it) })
+            } else when {
+                isBatteryNotification(packet) -> {
+                    handleBatteryNotification(packet)
+                    acknowledgeBatteryNotification(packet)
+                }
+                packet.kind == NxWearPacket.Kind.FRAMED && packet.command == 0x31 && packet.subtype == 0x09 -> {
+                    // Refresh is confirmed, but activity fragment boundaries and metric fields are not decoded yet.
+                    LOG.debug("Received Nx Wear B8 activity data frame; payload interpretation is not implemented")
+                }
+                packet.kind == NxWearPacket.Kind.CONTINUATION -> {
+                    // Continuation bytes are retained opaque; their field layout is unknown.
+                    LOG.debug("Received Nx Wear B8 activity continuation frame; payload interpretation is not implemented")
+                }
+                isCandidateSettingsReply(packet) -> {
+                    // The changing header ID may be a sequence number; payload semantics remain unknown.
+                    LOG.debug("Received candidate Nx Wear B8 settings reply with sequence candidate {}", packet.notificationId)
+                }
+                else -> LOG.debug("Unexpected Nx Wear B8 response: {}", packet.raw.joinToString("") { "%02x".format(it) })
             }
             return true
         }
         return super.onCharacteristicChanged(gatt, characteristic, value)
     }
 
-    /**
-     * Battery values are interpreted from the supplied capture: payload byte 10 is the percentage,
-     * and byte 11 value 1 denotes charging. Other status values remain intentionally unmapped.
-     */
-    private fun isBatteryNotification(value: ByteArray): Boolean =
-        value.size == 20 &&
-            value[0] == 0x00.toByte() && value[1] == 0x0b.toByte() &&
-            value[4] == 0x31.toByte() && value[5] == 0x03.toByte() &&
-            value[6] == 0x00.toByte() && value[7] == 0x00.toByte() &&
-            value[8] == 0x02.toByte() && value[9] == 0x00.toByte() &&
-            (value[10].toInt() and 0xff) <= 100
+    /** Battery payload offsets 4 and 5 contain the observed level and charging status. */
+    private fun isBatteryNotification(packet: NxWearPacket): Boolean {
+        val payload = packet.payload
+        return packet.kind == NxWearPacket.Kind.FRAMED &&
+            packet.command == 0x31 && packet.subtype == 0x03 &&
+            payload.size == 14 && payload[0] == 0x00.toByte() && payload[1] == 0x00.toByte() &&
+            payload[2] == 0x02.toByte() && payload[3] == 0x00.toByte() &&
+            (payload[4].toInt() and 0xff) <= 100
+    }
 
-    private fun isActivityDataFrame(value: ByteArray): Boolean =
-        value.size >= 6 &&
-            value[0] == 0x00.toByte() && value[1] == 0x0b.toByte() &&
-            value[4] == 0x31.toByte() && value[5] == 0x09.toByte()
-
-    private fun isPotentialActivityFragment(value: ByteArray): Boolean =
-        value.size == 20 && (value[0].toInt() and 0xff) in 0x01..0x04
-
-    private fun handleBatteryNotification(value: ByteArray) {
-        val level = value[10].toInt() and 0xff
+    private fun handleBatteryNotification(packet: NxWearPacket) {
+        val payload = packet.payload
+        val level = payload[4].toInt() and 0xff
         evaluateGBDeviceEvent(GBDeviceEventBatteryIncrementalInfo(0, level))
-        if (value[11] == 0x01.toByte()) {
+        if (payload[5] == 0x01.toByte()) {
             evaluateGBDeviceEvent(GBDeviceEventBatteryIncrementalInfo(0, BatteryState.BATTERY_CHARGING))
         } else {
-            LOG.debug("Received Nx Wear B8 battery status {}, state mapping is not confirmed", value[11].toInt() and 0xff)
+            LOG.debug("Received Nx Wear B8 battery status {}, state mapping is not confirmed", payload[5].toInt() and 0xff)
         }
     }
 
-    private fun acknowledgeBatteryNotification(value: ByteArray) {
+    private fun acknowledgeBatteryNotification(packet: NxWearPacket) {
         // Echo the observed 16-bit header field; evidence does not support incrementing it.
-        val ack = byteArrayOf(
-            value[0], value[1], value[2], value[3],
-            0x04, 0x03, 0x00, 0x00, 0x01, 0x00, 0x01, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-        )
+        val ack = encodeBatteryAck(requireNotNull(packet.notificationId))
         createTransactionBuilder("Acknowledge Nx Wear B8 battery status")
             .write(WRITE_CHARACTERISTIC, *ack)
             .queue()
@@ -190,19 +180,15 @@ class NxWearB8Support : AbstractBTLESingleDeviceSupport(LOG) {
         builder.write(WRITE_CHARACTERISTIC, *encodeWristWakeSettings(enabled, start, end, duration))
     }
 
-    /** Matches the observed 20-byte 0x04/0x04 frame without assigning unverified semantics to it. */
-    private fun isCandidateSettingsReply(value: ByteArray): Boolean =
-        value.size == 20 &&
-            value[0] == 0x00.toByte() &&
-            value[1] == 0x0b.toByte() &&
-            value[4] == 0x04.toByte() &&
-            value[5] == 0x04.toByte() &&
-            value[6] == 0x00.toByte() &&
-            value[7] == 0x00.toByte() &&
-            value[8] == 0x01.toByte() &&
-            value[9] == 0x00.toByte() &&
-            value[10] == 0x01.toByte() &&
-            value.drop(11).all { it == 0x00.toByte() }
+    /** Matches the observed 0x04/0x04 frame without assigning unverified payload semantics. */
+    private fun isCandidateSettingsReply(packet: NxWearPacket): Boolean {
+        val payload = packet.payload
+        return packet.kind == NxWearPacket.Kind.FRAMED &&
+            packet.command == 0x04 && packet.subtype == 0x04 &&
+            payload.size == 14 && payload[0] == 0x00.toByte() && payload[1] == 0x00.toByte() &&
+            payload[2] == 0x01.toByte() && payload[3] == 0x00.toByte() && payload[4] == 0x01.toByte() &&
+            payload.drop(5).all { it == 0x00.toByte() }
+    }
 
     companion object {
         private val WRITE_CHARACTERISTIC = UUID.fromString("0000b002-0000-1000-8000-00805f9b34fb")
@@ -226,37 +212,45 @@ class NxWearB8Support : AbstractBTLESingleDeviceSupport(LOG) {
         ) + WRIST_WAKE_CONFIG_KEYS
 
         private const val ACTION_REFRESH_ACTIVITY = "nx_wear_b8_refresh_activity"
-        private val REFRESH_ACTIVITY_COMMAND = byteArrayOf(
-            0x00, 0x0b, 0x00, 0x00, 0x03, 0x09, 0x00, 0x00, 0x00, 0x00,
-            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        private fun Boolean.toWireByte(): Byte = compareTo(false).toByte()
+
+        private val SETTINGS_ACK = NxWearPacket.frame(
+            0, 0x34, 0x80,
+            byteArrayOf(0x00, 0x00, 0x01, 0x00, 0x01, 0x00, 0, 0, 0, 0, 0, 0, 0, 0),
         )
 
-        private val ACK = byteArrayOf(
-            0x00, 0x0b, 0x00, 0x00, 0x34, 0x80.toByte(), 0x00, 0x00, 0x01, 0x00,
-            0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+        internal fun encodeRefreshActivity(): ByteArray = NxWearPacket.frame(
+            0, 0x03, 0x09, ByteArray(14),
+        )
+
+        internal fun encodeBatteryAck(notificationId: Int): ByteArray = NxWearPacket.frame(
+            notificationId, 0x04, 0x03,
+            byteArrayOf(0, 0, 1, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0),
         )
 
         internal fun encodeDetectionSettings(heartRateEnabled: Boolean, intervalMinutes: Int, spo2Enabled: Boolean): ByteArray {
             require(intervalMinutes == 30 || intervalMinutes == 60) { "Unsupported detection interval: $intervalMinutes" }
-            return byteArrayOf(
-                0x00, 0x0b, 0x00, 0x00, 0x01, 0x80.toByte(), 0x00, 0x00, 0x08, 0x00,
-                if (heartRateEnabled) 0x01 else 0x00,
-                0x00,
-                intervalMinutes.toByte(),
-                0x00,
-                if (spo2Enabled) 0x01 else 0x00,
-                0x00, 0x00, 0x00, 0x00, 0x00,
+            return NxWearPacket.frame(
+                0, 0x01, 0x80,
+                byteArrayOf(
+                    0, 0, 8, 0, heartRateEnabled.toWireByte(), 0, intervalMinutes.toByte(), 0,
+                    spo2Enabled.toWireByte(), 0, 0, 0, 0, 0,
+                ),
             )
         }
 
         internal fun encodeClockSettings(timeMillis: Long, timezoneOffsetSeconds: Int, is24Hour: Boolean): ByteArray {
             val epochSeconds = timeMillis / 1000L
             val timezoneOffset = timezoneOffsetSeconds.toShort().toInt()
-            return byteArrayOf(
-                0x00, 0x0b, 0x00, 0x00, 0x01, 0x68, 0x00, 0x00, 0x09, 0x00,
-                epochSeconds.toByte(), (epochSeconds shr 8).toByte(), (epochSeconds shr 16).toByte(), (epochSeconds shr 24).toByte(),
-                timezoneOffset.toByte(), (timezoneOffset shr 8).toByte(),
-                0x00, 0x00, if (is24Hour) 0x01 else 0x00, 0x00,
+            // Captured packets store both values least-significant byte first.
+            val timeFields = ByteBuffer.allocate(6)
+                .order(ByteOrder.LITTLE_ENDIAN)
+                .putInt(epochSeconds.toInt())
+                .putShort(timezoneOffset.toShort())
+                .array()
+            return NxWearPacket.frame(
+                0, 0x01, 0x68,
+                byteArrayOf(0, 0, 9, 0) + timeFields + byteArrayOf(0, 0, is24Hour.toWireByte(), 0),
             )
         }
 
@@ -272,11 +266,12 @@ class NxWearB8Support : AbstractBTLESingleDeviceSupport(LOG) {
             }
             val (startHour, startMinute) = parseTime(start)
             val (endHour, endMinute) = parseTime(end)
-            return byteArrayOf(
-                0x00, 0x0b, 0x00, 0x00, 0x01, 0x7f, 0x00, 0x00, 0x06, 0x00,
-                if (enabled) 0x01 else 0x00,
-                startHour.toByte(), startMinute.toByte(), endHour.toByte(), endMinute.toByte(), durationSeconds.toByte(),
-                0x00, 0x00, 0x00, 0x00,
+            return NxWearPacket.frame(
+                0, 0x01, 0x7f,
+                byteArrayOf(
+                    0, 0, 6, 0, enabled.toWireByte(), startHour.toByte(), startMinute.toByte(),
+                    endHour.toByte(), endMinute.toByte(), durationSeconds.toByte(), 0, 0, 0, 0,
+                ),
             )
         }
 

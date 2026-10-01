@@ -23,6 +23,8 @@ class NxWearB8Coordinator : AbstractBLEDeviceCoordinator() {
 
     override fun getDeviceNameResource(): Int = R.string.devicetype_nx_wear_b8
 
+    override fun getBondingStyle(): Int = BONDING_STYLE_NONE
+
     override fun getDeviceSettings(device: GBDevice): DeviceSettingsSpec = deviceSettings {
         screen(
             key = "nx_wear_b8_health",
@@ -87,7 +89,7 @@ class NxWearB8Coordinator : AbstractBLEDeviceCoordinator() {
             list(
                 key = DeviceSettingsPreferenceConst.PREF_NX_WEAR_B8_DISPLAY_ON_LIFT_DURATION,
                 title = R.string.nx_wear_b8_wrist_wake_duration,
-                entries = (3..10).map { ListEntry(it.toString(), "$it s") },
+                entries = (3..10).map { ListEntry.Text(it.toString(), "$it s") },
                 defaultValue = "5",
                 dependency = DeviceSettingsPreferenceConst.PREF_ACTIVATE_DISPLAY_ON_LIFT,
             )
