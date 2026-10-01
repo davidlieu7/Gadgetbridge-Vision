@@ -79,13 +79,13 @@ class NxWearB8Coordinator : AbstractBLEDeviceCoordinator() {
             time(
                 key = DeviceSettingsPreferenceConst.PREF_DISPLAY_ON_LIFT_START,
                 title = R.string.mi2_prefs_do_not_disturb_start,
-                defaultValue = "00:00",
+                defaultValue = "09:00",
                 dependency = DeviceSettingsPreferenceConst.PREF_ACTIVATE_DISPLAY_ON_LIFT,
             )
             time(
                 key = DeviceSettingsPreferenceConst.PREF_DISPLAY_ON_LIFT_END,
                 title = R.string.mi2_prefs_do_not_disturb_end,
-                defaultValue = "00:00",
+                defaultValue = "23:59",
                 dependency = DeviceSettingsPreferenceConst.PREF_ACTIVATE_DISPLAY_ON_LIFT,
             )
             list(
