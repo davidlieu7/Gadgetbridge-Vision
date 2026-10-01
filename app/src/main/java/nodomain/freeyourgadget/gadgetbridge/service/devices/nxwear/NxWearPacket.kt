@@ -160,11 +160,15 @@ internal fun ByteArray.be32(offset: Int): Long {
 internal object NxWearDataType {
     const val BATTERY = 0x03
     const val ACTIVITY_04 = 0x04
+    const val ACTIVITY_05 = 0x05
     const val HEART_RATE = 0x07
+    const val ACTIVITY_08 = 0x08
     const val ACTIVITY_09 = 0x09
     const val SPO2 = 0x14
     const val HEART_RATE_CONTROL = 0x15
     const val MANUAL_HEART_RATE = 0x18
+    const val ACTIVITY_28 = 0x28
+    const val ACTIVITY_2A = 0x2a
     const val STRESS = 0x2d
     const val CLOCK = 0x68
     const val MESSAGE_NOTICE = 0x6b

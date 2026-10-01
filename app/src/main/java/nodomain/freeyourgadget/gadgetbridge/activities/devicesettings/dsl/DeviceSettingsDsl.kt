@@ -434,12 +434,13 @@ class DeviceSettingsScope {
     fun time(
         key: String,
         @StringRes title: Int,
+        @DrawableRes icon: Int = 0,
         defaultValue: String = "00:00",
         dependency: String? = null,
         connectedOnly: Boolean = true,
         visibleWhen: ((Prefs) -> Boolean)? = null,
     ) {
-        items.add(TimeSetting(key, title, defaultValue, dependency, visibleWhen, connectedOnly))
+        items.add(TimeSetting(key, title, icon, defaultValue, dependency, visibleWhen, connectedOnly))
     }
 
     fun externalSettings(

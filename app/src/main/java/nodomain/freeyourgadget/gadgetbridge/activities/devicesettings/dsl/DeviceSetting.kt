@@ -282,6 +282,7 @@ data class DateSetting(
 data class TimeSetting(
     override val key: String,
     @StringRes val title: Int,
+    @DrawableRes val icon: Int = 0,
     val defaultValue: String = "00:00",
     val dependency: String? = null,
     override val visibleWhen: ((Prefs) -> Boolean)? = null,

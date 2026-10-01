@@ -617,6 +617,7 @@ object DeviceSettingRenderer {
                     Preference(context).apply {
                         key = setting.key
                         setTitle(setting.title)
+                        if (setting.icon != 0) setIcon(setting.icon)
                         isPersistent = false
                         summary = sp.getString(setting.key, setting.defaultValue) ?: setting.defaultValue
                         val updateSummary = {

@@ -31,6 +31,24 @@ class NxWearPacketTest {
     }
 
     @Test
+    fun recognizesOptionalHistoryDataBeforeBatteryChanges() {
+        val historyFrame = NxWearPacket.parse(bytes("000b01033105000017000100012189be6aab0700"))
+        val continuation = NxWearPacket.parse(bytes("01001305000038d300005a040000000b00800100"))
+        val historyAck = bytes("000b000304050000010001000000000000000000")
+        val unplugged = NxWearPacket.parse(bytes("000b00063103000002004a00000001000903ff00"))
+        val charging = NxWearPacket.parse(bytes("000b00073103000002004a01000001000903ff00"))
+
+        assertEquals(NxWearDataType.ACTIVITY_05, historyFrame.dataType)
+        assertEquals(2, NxWearB8Support.expectedActivityFragmentCount(requireNotNull(historyFrame.declaredLength)))
+        assertEquals(1, continuation.continuationIndex)
+        assertEquals(true, NxWearB8Support.isHistoryDataType(requireNotNull(historyFrame.dataType)))
+        assertEquals(true, NxWearB8Support.isHistoryDataType(NxWearDataType.ACTIVITY_FA))
+        assertArrayEquals(historyAck, NxWearB8Support.encodeInitializationRead(3, NxWearDataType.ACTIVITY_05))
+        assertEquals(listOf(0x4a, 0x00), unplugged.payload.map { it.toInt() and 0xff })
+        assertEquals(listOf(0x4a, 0x01), charging.payload.map { it.toInt() and 0xff })
+    }
+
+    @Test
     fun parsesFirstPageHeaderAndTrimsPadding() {
         val raw = bytes("000b00113103000002000e01000001000903ff00")
         val packet = NxWearPacket.parse(raw)
@@ -158,8 +176,7 @@ class NxWearPacketTest {
     }
 
     @Test
-    fun buildsObservedRefreshAndAcknowledgementPackets() {
-        assertArrayEquals(bytes("000b000003090000000000000000000000000000"), NxWearB8Support.encodeRefreshActivity())
+    fun buildsObservedAcknowledgementPackets() {
         assertArrayEquals(bytes("000b000034800000010001000000000000000000"), NxWearPacket.frame(0, 0x34, 0x80, bytes("01")))
         assertArrayEquals(bytes("000b001104030000010001000000000000000000"), NxWearB8Support.encodeBatteryAck(0x0011))
     }
@@ -229,6 +246,17 @@ class NxWearPacketTest {
         assertEquals(1, readings?.size)
         assertEquals(1790865118000L, readings?.single()?.timestampMillis)
         assertEquals(71, readings?.single()?.bpm)
+    }
+
+    @Test
+    fun parsesCapturedHistoricalHeartRateReading() {
+        val frame = bytes("000b00033107000008000100013f90be6a4c0700")
+        val packet = NxWearPacket.parse(frame)
+        val reading = NxWearHeartRateReading.parse(packet)?.single()
+
+        assertEquals(3, packet.sequence)
+        assertEquals(0x6abe903fL * 1000L, reading?.timestampMillis)
+        assertEquals(76, reading?.bpm)
     }
 
     @Test
@@ -377,12 +405,21 @@ class NxWearPacketTest {
 
     @Test
     fun buildsObservedInitializationReadSequencePackets() {
-        assertArrayEquals(bytes("000b000104090000010001000000000000000000"),
-            NxWearB8Support.encodeInitializationRead(1, 0x09))
-        assertArrayEquals(bytes("000b000204040000010001000000000000000000"),
-            NxWearB8Support.encodeInitializationRead(2, 0x04))
-        assertArrayEquals(bytes("000b000304fa0000010001000000000000000000"),
-            NxWearB8Support.encodeInitializationRead(3, 0xfa))
+        val captured = listOf(
+            "000b000104090000010001000000000000000000",
+            "000b000204040000010001000000000000000000",
+            "000b000304070000010001000000000000000000",
+            "000b000404080000010001000000000000000000",
+            "000b000504280000010001000000000000000000",
+            "000b0006042a0000010001000000000000000000",
+            "000b000704fa0000010001000000000000000000",
+        )
+        for ((index, frame) in captured.withIndex()) {
+            val dataType = NxWearPacket.parse(bytes(frame)).dataType!!
+            assertArrayEquals(bytes(frame), NxWearB8Support.encodeInitializationRead(index + 1, dataType))
+        }
+        assertArrayEquals(bytes("000b000b04090000010001000000000000000000"),
+            NxWearB8Support.encodeInitializationRead(0x0b, NxWearDataType.ACTIVITY_09))
     }
 
     @Test

@@ -56,99 +56,102 @@ class NxWearB8Coordinator : AbstractBLEDeviceCoordinator() {
                 .apply()
         }
         return deviceSettings {
-        screen(
-            key = "nx_wear_b8_health",
-            title = R.string.pref_header_health,
-        ) {
-            switchSetting(
-                key = DeviceSettingsPreferenceConst.PREF_HEARTRATE_AUTOMATIC_ENABLE,
-                title = R.string.pref_heartrate_automatic_enable,
+            screen(
+                key = "nx_wear_b8_health",
+                title = R.string.pref_header_health,
                 icon = R.drawable.ic_heartrate,
-                defaultValue = false,
-            )
-            switchSetting(
-                key = DeviceSettingsPreferenceConst.PREF_SPO2_ALL_DAY_MONITORING,
-                title = R.string.prefs_spo2_monitoring_title,
-                icon = R.drawable.ic_spo2,
-                defaultValue = false,
-            )
-            list(
-                key = DeviceSettingsPreferenceConst.PREF_HEARTRATE_MEASUREMENT_INTERVAL,
-                title = R.string.pref_title_time_interval,
-                entries = getHeartRateMeasurementIntervals().map {
-                    ListEntry.Res(it.getIntervalSeconds().toString(), it.getLabel())
-                },
-                defaultValue = HeartRateCapability.MeasurementInterval.MINUTES_30.getIntervalSeconds().toString(),
-            )
-            action(
-                key = ACTION_MEASURE_STRESS,
-                title = R.string.nx_wear_b8_measure_stress,
-                icon = R.drawable.ic_stress,
-            ) { _, selectedDevice ->
-                if (selectedDevice != null) {
-                    GBApplication.deviceService(selectedDevice).onSendConfiguration(ACTION_MEASURE_STRESS)
+            ) {
+                switchSetting(
+                    key = DeviceSettingsPreferenceConst.PREF_HEARTRATE_AUTOMATIC_ENABLE,
+                    title = R.string.pref_heartrate_automatic_enable,
+                    icon = R.drawable.ic_heartrate,
+                    defaultValue = false,
+                )
+                switchSetting(
+                    key = DeviceSettingsPreferenceConst.PREF_SPO2_ALL_DAY_MONITORING,
+                    title = R.string.prefs_spo2_monitoring_title,
+                    icon = R.drawable.ic_spo2,
+                    defaultValue = false,
+                )
+                list(
+                    key = DeviceSettingsPreferenceConst.PREF_HEARTRATE_MEASUREMENT_INTERVAL,
+                    title = R.string.pref_title_time_interval,
+                    icon = R.drawable.ic_timer,
+                    entries = getHeartRateMeasurementIntervals().map {
+                        ListEntry.Res(it.getIntervalSeconds().toString(), it.getLabel())
+                    },
+                    defaultValue = HeartRateCapability.MeasurementInterval.MINUTES_30.getIntervalSeconds().toString(),
+                )
+                action(
+                    key = ACTION_MEASURE_STRESS,
+                    title = R.string.nx_wear_b8_measure_stress,
+                    icon = R.drawable.ic_stress,
+                ) { _, selectedDevice ->
+                    if (selectedDevice != null) {
+                        GBApplication.deviceService(selectedDevice).onSendConfiguration(ACTION_MEASURE_STRESS)
+                    }
+                    selectedDevice != null
                 }
-                selectedDevice != null
-            }
-            action(
-                key = ACTION_MEASURE_SPO2,
-                title = R.string.nx_wear_b8_measure_spo2,
-                icon = R.drawable.ic_spo2,
-            ) { _, selectedDevice ->
-                if (selectedDevice != null) {
-                    GBApplication.deviceService(selectedDevice).onSendConfiguration(ACTION_MEASURE_SPO2)
+                action(
+                    key = ACTION_MEASURE_SPO2,
+                    title = R.string.nx_wear_b8_measure_spo2,
+                    icon = R.drawable.ic_spo2,
+                ) { _, selectedDevice ->
+                    if (selectedDevice != null) {
+                        GBApplication.deviceService(selectedDevice).onSendConfiguration(ACTION_MEASURE_SPO2)
+                    }
+                    selectedDevice != null
                 }
-                selectedDevice != null
             }
-        }
-        screen(
-            key = "nx_wear_b8_clock",
-            title = R.string.pref_header_datetime,
-        ) {
+            screen(
+                key = "nx_wear_b8_display",
+                title = R.string.mi2_prefs_activate_display_on_lift,
+                icon = R.drawable.ic_brightness_medium,
+            ) {
+                switchSetting(
+                    key = PREF_LIFT_ENABLED,
+                    title = R.string.mi2_prefs_activate_display_on_lift,
+                    icon = R.drawable.ic_brightness_medium,
+                    defaultValue = false,
+                )
+                list(
+                    key = DeviceSettingsPreferenceConst.PREF_ACTIVATE_DISPLAY_ON_LIFT,
+                    title = R.string.mi2_prefs_activate_display_on_lift,
+                    entries = listOf(ListEntry.Res("off", R.string.off), ListEntry.Res("scheduled", R.string.on)),
+                    defaultValue = "off",
+                    visibleWhen = { false },
+                )
+                time(
+                    key = DeviceSettingsPreferenceConst.PREF_DISPLAY_ON_LIFT_START,
+                    title = R.string.mi2_prefs_do_not_disturb_start,
+                    icon = R.drawable.ic_wb_sunny,
+                    defaultValue = "09:00",
+                    dependency = PREF_LIFT_ENABLED,
+                )
+                time(
+                    key = DeviceSettingsPreferenceConst.PREF_DISPLAY_ON_LIFT_END,
+                    title = R.string.mi2_prefs_do_not_disturb_end,
+                    icon = R.drawable.ic_nights_stay,
+                    defaultValue = "23:59",
+                    dependency = PREF_LIFT_ENABLED,
+                )
+                list(
+                    key = DeviceSettingsPreferenceConst.PREF_NX_WEAR_B8_DISPLAY_ON_LIFT_DURATION,
+                    title = R.string.nx_wear_b8_wrist_wake_duration,
+                    icon = R.drawable.ic_timer,
+                    entries = (3..10).map { ListEntry.Text(it.toString(), "$it s") },
+                    defaultValue = "5",
+                    dependency = PREF_LIFT_ENABLED,
+                )
+            }
             list(
                 key = DeviceSettingsPreferenceConst.PREF_TIMEFORMAT,
                 title = R.string.pref_title_timeformat,
+                icon = R.drawable.ic_timer,
                 entriesRes = R.array.pref_timeformat_entries,
                 entryValuesRes = R.array.pref_timeformat_values,
                 defaultValue = DeviceSettingsPreferenceConst.PREF_TIMEFORMAT_AUTO,
             )
-        }
-        screen(
-            key = "nx_wear_b8_display",
-            title = R.string.mi2_prefs_activate_display_on_lift,
-        ) {
-            switchSetting(
-                key = PREF_LIFT_ENABLED,
-                title = R.string.mi2_prefs_activate_display_on_lift,
-                defaultValue = false,
-            )
-            list(
-                key = DeviceSettingsPreferenceConst.PREF_ACTIVATE_DISPLAY_ON_LIFT,
-                title = R.string.mi2_prefs_activate_display_on_lift,
-                entries = listOf(ListEntry.Res("off", R.string.off), ListEntry.Res("scheduled", R.string.on)),
-                defaultValue = "off",
-                visibleWhen = { false },
-            )
-            time(
-                key = DeviceSettingsPreferenceConst.PREF_DISPLAY_ON_LIFT_START,
-                title = R.string.mi2_prefs_do_not_disturb_start,
-                defaultValue = "09:00",
-                dependency = PREF_LIFT_ENABLED,
-            )
-            time(
-                key = DeviceSettingsPreferenceConst.PREF_DISPLAY_ON_LIFT_END,
-                title = R.string.mi2_prefs_do_not_disturb_end,
-                defaultValue = "23:59",
-                dependency = PREF_LIFT_ENABLED,
-            )
-            list(
-                key = DeviceSettingsPreferenceConst.PREF_NX_WEAR_B8_DISPLAY_ON_LIFT_DURATION,
-                title = R.string.nx_wear_b8_wrist_wake_duration,
-                entries = (3..10).map { ListEntry.Text(it.toString(), "$it s") },
-                defaultValue = "5",
-                dependency = PREF_LIFT_ENABLED,
-            )
-        }
         }
     }
 
