@@ -39,8 +39,8 @@ internal data class NxWearPacket(
                 )
             }
 
-            // Activity continuations were observed with leading bytes 01..04; their layout is unknown.
-            if (bytes.size == 20 && (bytes[0].toInt() and 0xff) in 0x01..0x04) {
+            // Activity continuations are 20-byte values with a nonzero fragment index; their layout is otherwise unknown.
+            if (bytes.size == 20 && bytes[0] != 0.toByte()) {
                 return NxWearPacket(bytes.copyOf(), Kind.CONTINUATION)
             }
             return NxWearPacket(bytes.copyOf(), Kind.RAW)

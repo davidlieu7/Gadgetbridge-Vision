@@ -15,6 +15,8 @@ import nodomain.freeyourgadget.gadgetbridge.service.devices.nxwear.NxWearB8Suppo
 import java.util.regex.Pattern
 
 class NxWearB8Coordinator : AbstractBLEDeviceCoordinator() {
+    fun getMtu(): Int = MTU
+
     override fun getSupportedDeviceName(): Pattern = Pattern.compile("^B8-SW$")
 
     override fun getManufacturer(): String = "Nx Wear"
@@ -120,6 +122,7 @@ class NxWearB8Coordinator : AbstractBLEDeviceCoordinator() {
 
     companion object {
         private const val ACTION_REFRESH_ACTIVITY = "nx_wear_b8_refresh_activity"
+        private const val MTU = 517
     }
 
     override fun isExperimental(): Boolean = true

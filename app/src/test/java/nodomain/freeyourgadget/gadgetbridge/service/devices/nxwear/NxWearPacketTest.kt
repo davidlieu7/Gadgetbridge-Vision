@@ -4,9 +4,18 @@ import org.junit.Assert.assertArrayEquals
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
+import nodomain.freeyourgadget.gadgetbridge.model.BatteryState
 
 class NxWearPacketTest {
     private fun bytes(hex: String) = hex.chunked(2).map { it.toInt(16).toByte() }.toByteArray()
+
+    @Test
+    fun mapsObservedBatteryStatusValues() {
+        assertEquals(BatteryState.BATTERY_NORMAL, NxWearB8Support.batteryStateForStatus(0x00))
+        assertEquals(BatteryState.BATTERY_CHARGING, NxWearB8Support.batteryStateForStatus(0x01))
+        assertEquals(BatteryState.BATTERY_CHARGING_FULL, NxWearB8Support.batteryStateForStatus(0x02))
+        assertEquals(BatteryState.UNKNOWN, NxWearB8Support.batteryStateForStatus(0xff))
+    }
 
     @Test
     fun parsesFramedPacketAndPreservesOpaquePayload() {
@@ -32,6 +41,17 @@ class NxWearPacketTest {
         assertNull(packet.subtype)
         assertEquals(0, packet.payload.size)
         assertArrayEquals(raw, packet.raw)
+    }
+
+    @Test
+    fun recognizesLaterActivityContinuationIndexes() {
+        for (index in 0x05..0x06) {
+            val raw = ByteArray(20).apply { this[0] = index.toByte() }
+            val packet = NxWearPacket.parse(raw)
+
+            assertEquals(NxWearPacket.Kind.CONTINUATION, packet.kind)
+            assertArrayEquals(raw, packet.raw)
+        }
     }
 
     @Test
@@ -89,6 +109,31 @@ class NxWearPacketTest {
         assertArrayEquals(bytes("000b000003090000000000000000000000000000"), NxWearB8Support.encodeRefreshActivity())
         assertArrayEquals(bytes("000b000034800000010001000000000000000000"), NxWearPacket.frame(0, 0x34, 0x80, bytes("0000010001000000000000000000")))
         assertArrayEquals(bytes("000b001104030000010001000000000000000000"), NxWearB8Support.encodeBatteryAck(0x0011))
+    }
+
+    @Test
+    fun buildsObservedInitializationBootstrapWithDynamicBigEndianTimestamp() {
+        val captured = bytes("00010300016e000043004100070c0066bcb50b00010114aa32000c0068eb53be6a201c0000010800027c01ffff00000400670004006d0113006f401f030000881300002c0100007869302a0500780000")
+        assertArrayEquals(captured, NxWearB8Support.encodeInitializationBootstrap(0x68eb53beL))
+        assertArrayEquals(bytes("68eb53c0"), NxWearB8Support.encodeInitializationBootstrap(0x68eb53c0L).copyOfRange(28, 32))
+    }
+
+    @Test
+    fun buildsObservedInitializationReadSequencePackets() {
+        assertArrayEquals(bytes("000b000104090000010001000000000000000000"),
+            NxWearB8Support.encodeInitializationRead(1, 0x09))
+        assertArrayEquals(bytes("000b000204040000010001000000000000000000"),
+            NxWearB8Support.encodeInitializationRead(2, 0x04))
+        assertArrayEquals(bytes("000b000304fa0000010001000000000000000000"),
+            NxWearB8Support.encodeInitializationRead(3, 0xfa))
+    }
+
+    @Test
+    fun calculatesActivityFragmentCountsFromDeclaredDataLength() {
+        assertEquals(5, NxWearB8Support.expectedActivityFragmentCount(70))
+        assertEquals(2, NxWearB8Support.expectedActivityFragmentCount(23))
+        assertEquals(4, NxWearB8Support.expectedActivityFragmentCount(59))
+        assertEquals(7, NxWearB8Support.expectedActivityFragmentCount(115))
     }
 
     @Test
