@@ -9,6 +9,7 @@ import nodomain.freeyourgadget.gadgetbridge.capabilities.HeartRateCapability
 import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEventBatteryInfo
 import nodomain.freeyourgadget.gadgetbridge.devices.nxwear.NxWearB8Coordinator
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice
+import nodomain.freeyourgadget.gadgetbridge.model.ActivityUser
 import nodomain.freeyourgadget.gadgetbridge.model.BatteryState
 import nodomain.freeyourgadget.gadgetbridge.service.btle.AbstractBTLESingleDeviceSupport
 import nodomain.freeyourgadget.gadgetbridge.service.btle.TransactionBuilder
@@ -26,6 +27,8 @@ class NxWearB8Support : AbstractBTLESingleDeviceSupport(LOG) {
     private var initializationFragments = 0
     private var expectedInitializationFragments = 0
     private var nextInitializationSequence = 1
+    private var deviceSyncPayload: ByteArray? = null
+    private var deviceSyncLength = 0
     override fun getCoordinator(): NxWearB8Coordinator = super.getCoordinator() as NxWearB8Coordinator
 
     init {
@@ -39,11 +42,13 @@ class NxWearB8Support : AbstractBTLESingleDeviceSupport(LOG) {
         initializationFragments = 0
         expectedInitializationFragments = 0
         nextInitializationSequence = 1
+        deviceSyncPayload = null
+        deviceSyncLength = 0
         builder.setDeviceState(GBDevice.State.INITIALIZING)
         builder.requestMtu(getCoordinator().getMtu())
         builder.notify(RESPONSE_CHARACTERISTIC, true)
         getCharacteristic(WRITE_CHARACTERISTIC)?.writeType = BluetoothGattCharacteristic.WRITE_TYPE_NO_RESPONSE
-        builder.write(WRITE_CHARACTERISTIC, *encodeInitializationBootstrap(System.currentTimeMillis() / 1000L))
+        builder.write(WRITE_CHARACTERISTIC, *encodeInitializationBootstrap(buildBootstrap()))
 
         builder.setDeviceState(GBDevice.State.INITIALIZED)
         return builder
@@ -133,6 +138,10 @@ class NxWearB8Support : AbstractBTLESingleDeviceSupport(LOG) {
         }
         expectedInitializationFragments = expectedActivityFragmentCount(declaredLength)
         initializationFragments = packet.pagesPresent
+        if (subtype == 0x09) {
+            deviceSyncPayload = packet.payload
+            deviceSyncLength = declaredLength
+        }
         advanceInitializationWhenComplete()
     }
 
@@ -140,11 +149,25 @@ class NxWearB8Support : AbstractBTLESingleDeviceSupport(LOG) {
         if (initializationStep == InitializationStep.COMPLETE || initializationFragments == 0) return
         if (packet.continuationIndex != initializationFragments) return
         initializationFragments += packet.pagesPresent
+        if (initializationStep == InitializationStep.WAIT_ACTIVITY_09) {
+            val current = deviceSyncPayload
+            if (current != null) {
+                deviceSyncPayload = (current + packet.payload).copyOfRange(0,
+                    minOf(current.size + packet.payload.size, deviceSyncLength))
+            }
+        }
         advanceInitializationWhenComplete()
     }
 
     private fun advanceInitializationWhenComplete() {
         if (initializationFragments < expectedInitializationFragments) return
+
+        if (initializationStep == InitializationStep.WAIT_ACTIVITY_09) {
+            deviceSyncPayload?.takeIf { it.size == deviceSyncLength }
+                ?.let { NxWearDeviceSync.parse(it)?.let(::applyDeviceSync) }
+            deviceSyncPayload = null
+            deviceSyncLength = 0
+        }
 
         initializationFragments = 0
         expectedInitializationFragments = 0
@@ -157,14 +180,34 @@ class NxWearB8Support : AbstractBTLESingleDeviceSupport(LOG) {
         initializationStep = nextStep
         createTransactionBuilder("Continue Nx Wear B8 initialization")
             .write(WRITE_CHARACTERISTIC, *request)
-            .also {
-                if (nextStep == InitializationStep.COMPLETE) {
-                    // The initialization reads have now all been issued; apply Gadgetbridge settings afterward.
-                    writeDetectionSettings(it)
-                    writeWristWakeSettings(it)
-                }
-            }
             .queue()
+    }
+
+    private fun applyDeviceSync(sync: NxWearDeviceSync) {
+        sync.firmwareVersion?.let {
+            getDevice().setFirmwareVersion(it)
+            getDevice().sendDeviceUpdateIntent(getContext())
+        }
+        if (sync.batteryLevel != null && sync.batteryStatus != null) {
+            evaluateGBDeviceEvent(GBDeviceEventBatteryInfo().apply {
+                level = sync.batteryLevel
+                state = batteryStateForStatus(sync.batteryStatus)
+            })
+        }
+        val editor = getDevicePrefs().getPreferences().edit()
+        sync.heartRateEnabled?.let { editor.putBoolean(DeviceSettingsPreferenceConst.PREF_HEARTRATE_AUTOMATIC_ENABLE, it) }
+        sync.heartRateIntervalMinutes?.let { editor.putString(DeviceSettingsPreferenceConst.PREF_HEARTRATE_MEASUREMENT_INTERVAL, (it * 60).toString()) }
+        sync.spo2Enabled?.let { editor.putBoolean(DeviceSettingsPreferenceConst.PREF_SPO2_ALL_DAY_MONITORING, it) }
+        sync.wristWakeEnabled?.let { enabled ->
+            if (!enabled || (sync.wristWakeStart != null && sync.wristWakeEnd != null)) {
+                val mode = if (!enabled) "off" else if (sync.wristWakeStart == "00:01" && sync.wristWakeEnd == "23:59") "on" else "scheduled"
+                editor.putString(DeviceSettingsPreferenceConst.PREF_ACTIVATE_DISPLAY_ON_LIFT, mode)
+            }
+        }
+        sync.wristWakeStart?.let { editor.putString(DeviceSettingsPreferenceConst.PREF_DISPLAY_ON_LIFT_START, it) }
+        sync.wristWakeEnd?.let { editor.putString(DeviceSettingsPreferenceConst.PREF_DISPLAY_ON_LIFT_END, it) }
+        sync.wristWakeDurationSeconds?.let { editor.putString(DeviceSettingsPreferenceConst.PREF_NX_WEAR_B8_DISPLAY_ON_LIFT_DURATION, it.toString()) }
+        editor.apply()
     }
 
     private fun nextInitializationRead(subtype: Int): ByteArray {
@@ -225,18 +268,40 @@ class NxWearB8Support : AbstractBTLESingleDeviceSupport(LOG) {
     }
 
     private fun writeClockSettings(builder: TransactionBuilder) {
-        val prefs = getDevicePrefs()
-        val timeFormat = prefs.getString(
+        val now = System.currentTimeMillis()
+        builder.write(WRITE_CHARACTERISTIC, *encodeClockSettings(now, TimeZone.getDefault().getOffset(now) / 1000, is24Hour()))
+    }
+
+    private fun is24Hour(): Boolean {
+        val timeFormat = getDevicePrefs().getString(
             DeviceSettingsPreferenceConst.PREF_TIMEFORMAT,
             DeviceSettingsPreferenceConst.PREF_TIMEFORMAT_AUTO,
         )
-        val is24Hour = when (timeFormat) {
+        return when (timeFormat) {
             DeviceSettingsPreferenceConst.PREF_TIMEFORMAT_24H -> true
             DeviceSettingsPreferenceConst.PREF_TIMEFORMAT_12H -> false
             else -> DateFormat.is24HourFormat(GBApplication.getContext())
         }
+    }
+
+    private fun buildBootstrap(): NxWearBootstrap {
+        val user = ActivityUser()
         val now = System.currentTimeMillis()
-        builder.write(WRITE_CHARACTERISTIC, *encodeClockSettings(now, TimeZone.getDefault().getOffset(now) / 1000, is24Hour))
+        return NxWearBootstrap(
+            userId = 0,
+            isMale = user.gender == ActivityUser.GENDER_MALE,
+            age = user.age.takeIf { it > 0 } ?: 20,
+            heightCm = user.heightCm,
+            weightKg = user.weightKg,
+            epochSeconds = now / 1000L,
+            timezoneOffsetSeconds = TimeZone.getDefault().getOffset(now) / 1000,
+            is24Hour = is24Hour(),
+            stepsGoal = user.stepsGoal,
+            distanceGoalMeters = user.distanceGoalMeters,
+            caloriesGoal = user.caloriesBurntGoal,
+            sleepGoalSeconds = user.sleepDurationGoal * 60,
+            activeTimeGoalSeconds = user.activeTimeGoalMinutes * 60,
+        )
     }
 
     private fun writeWristWakeSettings(builder: TransactionBuilder) {
@@ -302,16 +367,7 @@ class NxWearB8Support : AbstractBTLESingleDeviceSupport(LOG) {
             return continuationCount + 1
         }
 
-        internal fun encodeInitializationBootstrap(epochSeconds: Long): ByteArray {
-            require(epochSeconds in 0..0xffff_ffffL)
-            val payload = "4100070c0066bcb50b000114aa32000c0068994fbe6a201c00000108007c01ffff00000400670004006d0113006f401f0000881300002c0100007869302a0500780000"
-                .chunked(2).map { it.toInt(16).toByte() }.toByteArray()
-            payload[18] = epochSeconds.toByte()
-            payload[19] = (epochSeconds shr 8).toByte()
-            payload[20] = (epochSeconds shr 16).toByte()
-            payload[21] = (epochSeconds shr 24).toByte()
-            return NxWearPacket.frame(0, 0x01, 0x6e, payload, deviceType = 0x01)
-        }
+        internal fun encodeInitializationBootstrap(settings: NxWearBootstrap): ByteArray = settings.encode()
 
         internal fun encodeInitializationRead(sequence: Int, dataType: Int): ByteArray =
             NxWearPacket.frame(sequence, 0x04, dataType, byteArrayOf(1))

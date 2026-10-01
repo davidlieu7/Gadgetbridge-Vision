@@ -147,19 +147,47 @@ class NxWearPacketTest {
 
     @Test
     fun buildsObservedInitializationBootstrapWithDynamicLittleEndianTimestamp() {
+        val settings = NxWearBootstrap(
+            userId = 0x000bb5bc,
+            isMale = false,
+            age = 20,
+            heightCm = 170,
+            weightKg = 50,
+            epochSeconds = 0x68eb53beL,
+            timezoneOffsetSeconds = 7200,
+            is24Hour = true,
+            stepsGoal = 8000,
+            distanceGoalMeters = 5000,
+            caloriesGoal = 300,
+            sleepGoalSeconds = 27000,
+            activeTimeGoalSeconds = 10800,
+        )
         val captured = bytes("00010300016e000043004100070c0066bcb50b00010114aa32000c0068be53eb68201c0000010800027c01ffff00000400670004006d0113006f401f030000881300002c0100007869302a0500780000")
-        assertArrayEquals(captured, NxWearB8Support.encodeInitializationBootstrap(0x68eb53beL))
+        assertArrayEquals(captured, NxWearB8Support.encodeInitializationBootstrap(settings))
         val parsed = NxWearPacket.parse(captured)
         assertEquals(0x01, parsed.deviceType)
         assertEquals(0x6e, parsed.dataType)
         assertEquals(67, parsed.declaredLength)
         assertEquals(true, parsed.isComplete)
         assertArrayEquals(bytes("be53eb68"), parsed.payload.copyOfRange(18, 22))
-        val next = NxWearB8Support.encodeInitializationBootstrap(0x68eb53c0L)
+        val next = NxWearB8Support.encodeInitializationBootstrap(settings.copy(epochSeconds = 0x68eb53c0L))
         assertArrayEquals(bytes("68c053eb68"), next.copyOfRange(28, 33))
         assertEquals(0x01, next[20].toInt() and 0xff)
         assertEquals(0x02, next[40].toInt() and 0xff)
         assertEquals(0x03, next[60].toInt() and 0xff)
+    }
+
+    @Test
+    fun buildsInitializationBootstrapFromProfileAndGoalValues() {
+        val settings = NxWearBootstrap(0, true, 34, 182, 81, 0x12345678L, -3600,
+            false, 12000, 6500, 450, 28800, 5400)
+        val packet = NxWearPacket.parse(NxWearB8Support.encodeInitializationBootstrap(settings))
+        val payload = packet.payload
+
+        assertEquals(true, packet.isComplete)
+        assertArrayEquals(bytes("000000000022b65100"), payload.copyOfRange(6, 15))
+        assertArrayEquals(bytes("78563412f0f1ffff00"), payload.copyOfRange(18, 27))
+        assertArrayEquals(bytes("e02e000064190000c201000080701815"), payload.copyOfRange(46, 62))
     }
 
     @Test
