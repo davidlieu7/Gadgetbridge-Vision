@@ -12,15 +12,17 @@ import nodomain.freeyourgadget.gadgetbridge.capabilities.HeartRateCapability
 import nodomain.freeyourgadget.gadgetbridge.devices.AbstractBLEDeviceCoordinator
 import nodomain.freeyourgadget.gadgetbridge.devices.DeviceCoordinator
 import nodomain.freeyourgadget.gadgetbridge.devices.SampleProvider
+import nodomain.freeyourgadget.gadgetbridge.devices.GenericSpo2SampleProvider
 import nodomain.freeyourgadget.gadgetbridge.devices.GenericStressSampleProvider
 import nodomain.freeyourgadget.gadgetbridge.devices.TimeSampleProvider
-import nodomain.freeyourgadget.gadgetbridge.devices.generic_hr.GenericHeartRateActivitySampleProvider
 import nodomain.freeyourgadget.gadgetbridge.entities.AbstractActivitySample
 import nodomain.freeyourgadget.gadgetbridge.entities.DaoSession
 import nodomain.freeyourgadget.gadgetbridge.entities.GenericHeartRateSampleDao
+import nodomain.freeyourgadget.gadgetbridge.entities.GenericSpo2SampleDao
 import nodomain.freeyourgadget.gadgetbridge.entities.GenericStressSampleDao
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice
 import nodomain.freeyourgadget.gadgetbridge.model.StressSample
+import nodomain.freeyourgadget.gadgetbridge.model.Spo2Sample
 import nodomain.freeyourgadget.gadgetbridge.service.DeviceSupport
 import nodomain.freeyourgadget.gadgetbridge.service.devices.nxwear.NxWearB8Support
 import java.util.regex.Pattern
@@ -38,7 +40,22 @@ class NxWearB8Coordinator : AbstractBLEDeviceCoordinator() {
 
     override fun getBondingStyle(): Int = BONDING_STYLE_NONE
 
-    override fun getDeviceSettings(device: GBDevice): DeviceSettingsSpec = deviceSettings {
+    override fun getDeviceSettings(device: GBDevice): DeviceSettingsSpec {
+        val preferences = GBApplication.getDevicePrefs(device).preferences
+        val key = DeviceSettingsPreferenceConst.PREF_ACTIVATE_DISPLAY_ON_LIFT
+        val stored = preferences.all[key]
+        if (stored is Boolean || !preferences.contains(PREF_LIFT_ENABLED)) {
+            val enabled = when (stored) {
+                is Boolean -> stored
+                is String -> stored != "off"
+                else -> false
+            }
+            preferences.edit()
+                .putString(key, if (enabled) "scheduled" else "off")
+                .putBoolean(PREF_LIFT_ENABLED, enabled)
+                .apply()
+        }
+        return deviceSettings {
         screen(
             key = "nx_wear_b8_health",
             title = R.string.pref_header_health,
@@ -73,6 +90,16 @@ class NxWearB8Coordinator : AbstractBLEDeviceCoordinator() {
                 }
                 selectedDevice != null
             }
+            action(
+                key = ACTION_MEASURE_SPO2,
+                title = R.string.nx_wear_b8_measure_spo2,
+                icon = R.drawable.ic_spo2,
+            ) { _, selectedDevice ->
+                if (selectedDevice != null) {
+                    GBApplication.deviceService(selectedDevice).onSendConfiguration(ACTION_MEASURE_SPO2)
+                }
+                selectedDevice != null
+            }
         }
         screen(
             key = "nx_wear_b8_clock",
@@ -90,47 +117,38 @@ class NxWearB8Coordinator : AbstractBLEDeviceCoordinator() {
             key = "nx_wear_b8_display",
             title = R.string.mi2_prefs_activate_display_on_lift,
         ) {
+            switchSetting(
+                key = PREF_LIFT_ENABLED,
+                title = R.string.mi2_prefs_activate_display_on_lift,
+                defaultValue = false,
+            )
             list(
                 key = DeviceSettingsPreferenceConst.PREF_ACTIVATE_DISPLAY_ON_LIFT,
                 title = R.string.mi2_prefs_activate_display_on_lift,
-                entriesRes = R.array.activate_display_on_lift,
-                entryValuesRes = R.array.activate_display_on_lift_values,
+                entries = listOf(ListEntry.Res("off", R.string.off), ListEntry.Res("scheduled", R.string.on)),
                 defaultValue = "off",
+                visibleWhen = { false },
             )
             time(
                 key = DeviceSettingsPreferenceConst.PREF_DISPLAY_ON_LIFT_START,
                 title = R.string.mi2_prefs_do_not_disturb_start,
                 defaultValue = "09:00",
-                dependency = DeviceSettingsPreferenceConst.PREF_ACTIVATE_DISPLAY_ON_LIFT,
+                dependency = PREF_LIFT_ENABLED,
             )
             time(
                 key = DeviceSettingsPreferenceConst.PREF_DISPLAY_ON_LIFT_END,
                 title = R.string.mi2_prefs_do_not_disturb_end,
                 defaultValue = "23:59",
-                dependency = DeviceSettingsPreferenceConst.PREF_ACTIVATE_DISPLAY_ON_LIFT,
+                dependency = PREF_LIFT_ENABLED,
             )
             list(
                 key = DeviceSettingsPreferenceConst.PREF_NX_WEAR_B8_DISPLAY_ON_LIFT_DURATION,
                 title = R.string.nx_wear_b8_wrist_wake_duration,
                 entries = (3..10).map { ListEntry.Text(it.toString(), "$it s") },
                 defaultValue = "5",
-                dependency = DeviceSettingsPreferenceConst.PREF_ACTIVATE_DISPLAY_ON_LIFT,
+                dependency = PREF_LIFT_ENABLED,
             )
         }
-        screen(
-            key = "nx_wear_b8_activity",
-            title = R.string.nx_wear_b8_activity,
-        ) {
-            action(
-                key = ACTION_REFRESH_ACTIVITY,
-                title = R.string.nx_wear_b8_refresh_activity,
-                icon = R.drawable.ic_refresh,
-            ) { _, selectedDevice ->
-                if (selectedDevice != null) {
-                    GBApplication.deviceService(selectedDevice).onSendConfiguration(ACTION_REFRESH_ACTIVITY)
-                }
-                selectedDevice != null
-            }
         }
     }
 
@@ -149,23 +167,39 @@ class NxWearB8Coordinator : AbstractBLEDeviceCoordinator() {
 
     override fun supportsRealtimeData(device: GBDevice): Boolean = true
 
+    override fun supportsDataFetching(device: GBDevice): Boolean = true
+
+    override fun supportsActivityTracking(device: GBDevice): Boolean = true
+
+    override fun supportsActivityDistance(device: GBDevice): Boolean = true
+
+    override fun supportsActiveCalories(device: GBDevice): Boolean = true
+
     override fun supportsStressMeasurement(device: GBDevice): Boolean = true
 
+    override fun supportsSpo2(device: GBDevice): Boolean = true
+
     override fun getSampleProvider(device: GBDevice, session: DaoSession): SampleProvider<out AbstractActivitySample> =
-        GenericHeartRateActivitySampleProvider(device, session)
+        NxWearActivitySampleProvider(device, session)
 
     override fun getStressSampleProvider(device: GBDevice, session: DaoSession): TimeSampleProvider<out StressSample> =
         GenericStressSampleProvider(device, session)
 
+    override fun getSpo2SampleProvider(device: GBDevice, session: DaoSession): TimeSampleProvider<out Spo2Sample> =
+        GenericSpo2SampleProvider(device, session)
+
     override fun getAllDeviceDao(session: DaoSession): MutableMap<AbstractDao<*, *>, Property> =
         mutableMapOf<AbstractDao<*, *>, Property>(
             session.genericHeartRateSampleDao to GenericHeartRateSampleDao.Properties.DeviceId,
+            session.genericSpo2SampleDao to GenericSpo2SampleDao.Properties.DeviceId,
             session.genericStressSampleDao to GenericStressSampleDao.Properties.DeviceId,
+            session.nxWearSportSampleDao to nodomain.freeyourgadget.gadgetbridge.entities.NxWearSportSampleDao.Properties.DeviceId,
         )
 
     companion object {
-        private const val ACTION_REFRESH_ACTIVITY = "nx_wear_b8_refresh_activity"
+        const val PREF_LIFT_ENABLED = "nx_wear_b8_lift_enabled"
         private const val ACTION_MEASURE_STRESS = "nx_wear_b8_measure_stress"
+        private const val ACTION_MEASURE_SPO2 = "nx_wear_b8_measure_spo2"
         private const val MTU = 517
     }
 

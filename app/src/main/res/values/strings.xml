@@ -5923,10 +5923,10 @@
     <string name="workout_error_value_out_of_range">Value is out of range.</string>
     <string name="workout_error_exercise_not_supported">An exercise is not supported by this device.</string>
 
-    <string name="nx_wear_b8_activity">Activity</string>
-    <string name="nx_wear_b8_refresh_activity">Refresh activity</string>
     <string name="nx_wear_b8_measure_stress">Measure stress</string>
     <string name="nx_wear_b8_stress_result">Stress: %1$d</string>
+    <string name="nx_wear_b8_measure_spo2">Measure blood oxygen</string>
+    <string name="nx_wear_b8_spo2_result">Blood oxygen: %1$d%%</string>
     <string name="nx_wear_b8_wrist_wake_duration">Wake screen duration</string>
 
     <string name="workout_exercise_picker_title">Choose an exercise</string>
