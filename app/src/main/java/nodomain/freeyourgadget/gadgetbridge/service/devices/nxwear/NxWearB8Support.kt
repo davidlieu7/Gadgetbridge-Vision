@@ -2,17 +2,31 @@ package nodomain.freeyourgadget.gadgetbridge.service.devices.nxwear
 
 import android.bluetooth.BluetoothGatt
 import android.bluetooth.BluetoothGattCharacteristic
+import android.content.Intent
+import android.os.Handler
+import android.os.Looper
 import android.text.format.DateFormat
+import android.widget.Toast
+import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import nodomain.freeyourgadget.gadgetbridge.GBApplication
+import nodomain.freeyourgadget.gadgetbridge.R
+import nodomain.freeyourgadget.gadgetbridge.activities.HeartRateUtils
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsPreferenceConst
 import nodomain.freeyourgadget.gadgetbridge.capabilities.HeartRateCapability
+import nodomain.freeyourgadget.gadgetbridge.database.DBHelper
 import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEventBatteryInfo
+import nodomain.freeyourgadget.gadgetbridge.devices.GenericHeartRateSampleProvider
+import nodomain.freeyourgadget.gadgetbridge.devices.GenericStressSampleProvider
 import nodomain.freeyourgadget.gadgetbridge.devices.nxwear.NxWearB8Coordinator
+import nodomain.freeyourgadget.gadgetbridge.entities.GenericHeartRateSample
+import nodomain.freeyourgadget.gadgetbridge.entities.GenericStressSample
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice
 import nodomain.freeyourgadget.gadgetbridge.model.ActivityUser
 import nodomain.freeyourgadget.gadgetbridge.model.BatteryState
+import nodomain.freeyourgadget.gadgetbridge.model.DeviceService
 import nodomain.freeyourgadget.gadgetbridge.service.btle.AbstractBTLESingleDeviceSupport
 import nodomain.freeyourgadget.gadgetbridge.service.btle.TransactionBuilder
+import nodomain.freeyourgadget.gadgetbridge.util.GB
 import org.slf4j.LoggerFactory
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
@@ -29,6 +43,15 @@ class NxWearB8Support : AbstractBTLESingleDeviceSupport(LOG) {
     private var nextInitializationSequence = 1
     private var deviceSyncPayload: ByteArray? = null
     private var deviceSyncLength = 0
+    private var pendingStressSyncSequence: Int? = null
+    private var pendingStressSyncPages = 0
+    private var expectedStressSyncPages = 0
+    private val heartRateTimeoutHandler = Handler(Looper.getMainLooper())
+    private val heartRateTimeout = Runnable { stopManualHeartRate() }
+    @Volatile
+    private var manualHeartRateActive = false
+    @Volatile
+    private var continuousHeartRate = false
     override fun getCoordinator(): NxWearB8Coordinator = super.getCoordinator() as NxWearB8Coordinator
 
     init {
@@ -44,6 +67,12 @@ class NxWearB8Support : AbstractBTLESingleDeviceSupport(LOG) {
         nextInitializationSequence = 1
         deviceSyncPayload = null
         deviceSyncLength = 0
+        pendingStressSyncSequence = null
+        pendingStressSyncPages = 0
+        expectedStressSyncPages = 0
+        manualHeartRateActive = false
+        continuousHeartRate = false
+        heartRateTimeoutHandler.removeCallbacks(heartRateTimeout)
         builder.setDeviceState(GBDevice.State.INITIALIZING)
         builder.requestMtu(getCoordinator().getMtu())
         builder.notify(RESPONSE_CHARACTERISTIC, true)
@@ -58,6 +87,14 @@ class NxWearB8Support : AbstractBTLESingleDeviceSupport(LOG) {
         super.onSendConfiguration(config)
         if (config !in CONFIG_KEYS) return
 
+        if (config == ACTION_MEASURE_STRESS) {
+            if (isConnected()) {
+                createTransactionBuilder("Start Nx Wear B8 stress measurement")
+                    .write(WRITE_CHARACTERISTIC, *encodeStressMeasurementStart())
+                    .queue()
+            }
+            return
+        }
         val builder = createTransactionBuilder("Set Nx Wear B8 settings")
         if (config == ACTION_REFRESH_ACTIVITY) {
             builder.write(WRITE_CHARACTERISTIC, *encodeRefreshActivity())
@@ -86,6 +123,42 @@ class NxWearB8Support : AbstractBTLESingleDeviceSupport(LOG) {
             .queue()
     }
 
+    override fun onHeartRateTest() {
+        startManualHeartRate(false)
+    }
+
+    override fun onEnableRealtimeHeartRateMeasurement(enable: Boolean) {
+        if (enable) startManualHeartRate(true) else stopManualHeartRate()
+    }
+
+    @Synchronized
+    private fun startManualHeartRate(continuous: Boolean) {
+        if (!isConnected()) return
+        continuousHeartRate = continuous
+        heartRateTimeoutHandler.removeCallbacks(heartRateTimeout)
+        if (manualHeartRateActive) {
+            if (!continuous) heartRateTimeoutHandler.postDelayed(heartRateTimeout, HEART_RATE_TIMEOUT_MS)
+            return
+        }
+        manualHeartRateActive = true
+        if (!continuous) heartRateTimeoutHandler.postDelayed(heartRateTimeout, HEART_RATE_TIMEOUT_MS)
+        createTransactionBuilder("Start Nx Wear B8 heart rate reading")
+            .write(WRITE_CHARACTERISTIC, *encodeManualHeartRate(true))
+            .queue()
+    }
+
+    @Synchronized
+    private fun stopManualHeartRate() {
+        if (!manualHeartRateActive) return
+        manualHeartRateActive = false
+        continuousHeartRate = false
+        heartRateTimeoutHandler.removeCallbacks(heartRateTimeout)
+        if (!isConnected()) return
+        createTransactionBuilder("Stop Nx Wear B8 heart rate reading")
+            .write(WRITE_CHARACTERISTIC, *encodeManualHeartRate(false))
+            .queue()
+    }
+
     override fun onCharacteristicChanged(
         gatt: BluetoothGatt,
         characteristic: BluetoothGattCharacteristic,
@@ -105,10 +178,27 @@ class NxWearB8Support : AbstractBTLESingleDeviceSupport(LOG) {
                     handleBatteryNotification(packet)
                     acknowledgeBatteryNotification(packet)
                 }
+                NxWearHeartRateReading.parse(packet) != null -> handleManualHeartRate(packet)
+                NxWearStressReading.parse(packet) != null -> handleStressReading(packet)
+                packet.kind == NxWearPacket.Kind.FRAMED && packet.command == 0x31 && packet.dataType == NxWearDataType.HEART_RATE_CONTROL &&
+                    packet.isComplete && packet.payload.size == 1 -> {
+                    acknowledgeStressPacket(requireNotNull(packet.sequence), NxWearDataType.HEART_RATE_CONTROL)
+                }
+                packet.kind == NxWearPacket.Kind.FRAMED && packet.command == 0x34 && packet.dataType == NxWearDataType.STRESS -> {
+                    LOG.debug("Nx Wear B8 acknowledged stress measurement command")
+                }
+                packet.kind == NxWearPacket.Kind.FRAMED && packet.command == 0x34 && packet.dataType == NxWearDataType.MANUAL_HEART_RATE -> {
+                    LOG.debug("Nx Wear B8 acknowledged heart rate reading command")
+                }
+                packet.kind == NxWearPacket.Kind.FRAMED && packet.command == 0x31 && packet.dataType == NxWearDataType.ACTIVITY_FA &&
+                    initializationStep == InitializationStep.COMPLETE -> handleStressSyncFrame(packet)
                 packet.kind == NxWearPacket.Kind.FRAMED && packet.command == 0x31 && packet.dataType != null && packet.dataType in ACTIVITY_SUBTYPES -> {
                     handleInitializationActivityFrame(packet)
                 }
-                packet.kind == NxWearPacket.Kind.CONTINUATION -> handleInitializationContinuation(packet)
+                packet.kind == NxWearPacket.Kind.CONTINUATION -> {
+                    if (pendingStressSyncSequence != null) handleStressSyncContinuation(packet)
+                    else handleInitializationContinuation(packet)
+                }
                 isCandidateSettingsReply(packet) -> {
                     LOG.debug("Received candidate Nx Wear B8 settings reply with sequence {}", packet.sequence)
                 }
@@ -119,12 +209,99 @@ class NxWearB8Support : AbstractBTLESingleDeviceSupport(LOG) {
         return super.onCharacteristicChanged(gatt, characteristic, value)
     }
 
+    private fun handleStressReading(packet: NxWearPacket) {
+        val readings = requireNotNull(NxWearStressReading.parse(packet))
+        acknowledgeStressPacket(requireNotNull(packet.sequence), NxWearDataType.STRESS)
+        val valid = readings.filter { it.stress in 1..100 }
+        if (valid.isEmpty()) return
+        try {
+            GBApplication.acquireDB().use { db ->
+                val session = db.daoSession
+                val deviceId = requireNotNull(DBHelper.getDevice(getDevice(), session).id)
+                val userId = requireNotNull(DBHelper.getUser(session).id)
+                val samples = valid.map { GenericStressSample(it.timestampMillis, deviceId, userId, it.stress) }
+                GenericStressSampleProvider(getDevice(), session).addSamples(samples)
+            }
+            GB.signalActivityDataFinish(getDevice())
+            GB.toast(getContext(), getContext().getString(R.string.nx_wear_b8_stress_result, valid.last().stress),
+                Toast.LENGTH_LONG, GB.INFO)
+        } catch (e: Exception) {
+            LOG.error("Unable to save Nx Wear B8 stress reading", e)
+        }
+    }
+
+    private fun acknowledgeStressPacket(sequence: Int, dataType: Int) {
+        if (initializationStep != InitializationStep.COMPLETE) {
+            nextInitializationSequence = (sequence + 1) and 0xff
+        }
+        createTransactionBuilder("Acknowledge Nx Wear B8 stress data")
+            .write(WRITE_CHARACTERISTIC, *encodeStressAck(sequence, dataType))
+            .queue()
+    }
+
+    private fun handleStressSyncFrame(packet: NxWearPacket) {
+        val declaredLength = requireNotNull(packet.declaredLength)
+        pendingStressSyncSequence = packet.sequence
+        pendingStressSyncPages = packet.pagesPresent
+        expectedStressSyncPages = expectedActivityFragmentCount(declaredLength)
+        finishStressSyncIfComplete()
+    }
+
+    private fun handleStressSyncContinuation(packet: NxWearPacket) {
+        if (packet.continuationIndex != pendingStressSyncPages) return
+        pendingStressSyncPages += packet.pagesPresent
+        finishStressSyncIfComplete()
+    }
+
+    private fun finishStressSyncIfComplete() {
+        if (pendingStressSyncPages < expectedStressSyncPages) return
+        val sequence = pendingStressSyncSequence ?: return
+        pendingStressSyncSequence = null
+        pendingStressSyncPages = 0
+        expectedStressSyncPages = 0
+        acknowledgeStressPacket(sequence, NxWearDataType.ACTIVITY_FA)
+    }
+
+    private fun handleManualHeartRate(packet: NxWearPacket) {
+        val readings = requireNotNull(NxWearHeartRateReading.parse(packet))
+        val sequence = requireNotNull(packet.sequence)
+        if (initializationStep != InitializationStep.COMPLETE) {
+            nextInitializationSequence = (sequence + 1) and 0xff
+        }
+        createTransactionBuilder("Acknowledge Nx Wear B8 heart rate reading")
+            .write(WRITE_CHARACTERISTIC, *encodeHeartRateAck(sequence))
+            .queue()
+        val valid = readings.filter { HeartRateUtils.getInstance().isValidHeartRateValue(it.bpm) }
+        if (valid.isNotEmpty()) {
+            try {
+                GBApplication.acquireDB().use { db ->
+                    val session = db.daoSession
+                    val deviceId = requireNotNull(DBHelper.getDevice(getDevice(), session).id)
+                    val userId = requireNotNull(DBHelper.getUser(session).id)
+                    val samples = valid.map { GenericHeartRateSample(it.timestampMillis, deviceId, userId, it.bpm) }
+                    GenericHeartRateSampleProvider(getDevice(), session).addSamples(samples)
+                }
+                GB.signalActivityDataFinish(getDevice())
+            } catch (e: Exception) {
+                LOG.error("Unable to save Nx Wear B8 heart rate reading", e)
+            }
+        }
+        for (reading in valid) {
+            val intent = Intent(DeviceService.ACTION_REALTIME_SAMPLES)
+                .putExtra(GBDevice.EXTRA_DEVICE, getDevice())
+                .putExtra(DeviceService.EXTRA_REALTIME_SAMPLE, reading as java.io.Serializable)
+                .putExtra(DeviceService.EXTRA_TIMESTAMP, reading.timestampMillis)
+            LocalBroadcastManager.getInstance(getContext()).sendBroadcast(intent)
+            if (manualHeartRateActive && !continuousHeartRate) stopManualHeartRate()
+        }
+    }
+
     private fun handleInitializationActivityFrame(packet: NxWearPacket) {
         val subtype = requireNotNull(packet.dataType)
         val expectedSubtype = when (initializationStep) {
-            InitializationStep.WAIT_ACTIVITY_09 -> 0x09
-            InitializationStep.WAIT_ACTIVITY_04 -> 0x04
-            InitializationStep.WAIT_ACTIVITY_FA -> 0xfa
+            InitializationStep.WAIT_ACTIVITY_09 -> NxWearDataType.ACTIVITY_09
+            InitializationStep.WAIT_ACTIVITY_04 -> NxWearDataType.ACTIVITY_04
+            InitializationStep.WAIT_ACTIVITY_FA -> NxWearDataType.ACTIVITY_FA
             InitializationStep.COMPLETE -> null
         }
         if (subtype != expectedSubtype) {
@@ -138,7 +315,7 @@ class NxWearB8Support : AbstractBTLESingleDeviceSupport(LOG) {
         }
         expectedInitializationFragments = expectedActivityFragmentCount(declaredLength)
         initializationFragments = packet.pagesPresent
-        if (subtype == 0x09) {
+        if (subtype == NxWearDataType.ACTIVITY_09) {
             deviceSyncPayload = packet.payload
             deviceSyncLength = declaredLength
         }
@@ -172,9 +349,9 @@ class NxWearB8Support : AbstractBTLESingleDeviceSupport(LOG) {
         initializationFragments = 0
         expectedInitializationFragments = 0
         val (nextStep, request) = when (initializationStep) {
-            InitializationStep.WAIT_ACTIVITY_09 -> InitializationStep.WAIT_ACTIVITY_04 to nextInitializationRead(0x09)
-            InitializationStep.WAIT_ACTIVITY_04 -> InitializationStep.WAIT_ACTIVITY_FA to nextInitializationRead(0x04)
-            InitializationStep.WAIT_ACTIVITY_FA -> InitializationStep.COMPLETE to nextInitializationRead(0xfa)
+            InitializationStep.WAIT_ACTIVITY_09 -> InitializationStep.WAIT_ACTIVITY_04 to nextInitializationRead(NxWearDataType.ACTIVITY_09)
+            InitializationStep.WAIT_ACTIVITY_04 -> InitializationStep.WAIT_ACTIVITY_FA to nextInitializationRead(NxWearDataType.ACTIVITY_04)
+            InitializationStep.WAIT_ACTIVITY_FA -> InitializationStep.COMPLETE to nextInitializationRead(NxWearDataType.ACTIVITY_FA)
             InitializationStep.COMPLETE -> return
         }
         initializationStep = nextStep
@@ -219,7 +396,7 @@ class NxWearB8Support : AbstractBTLESingleDeviceSupport(LOG) {
     private fun isBatteryNotification(packet: NxWearPacket): Boolean {
         val payload = packet.payload
         return packet.kind == NxWearPacket.Kind.FRAMED &&
-            packet.command == 0x31 && packet.dataType == 0x03 && packet.isComplete &&
+            packet.command == 0x31 && packet.dataType == NxWearDataType.BATTERY && packet.isComplete &&
             payload.size == 2 && (payload[0].toInt() and 0xff) <= 100
     }
 
@@ -324,7 +501,7 @@ class NxWearB8Support : AbstractBTLESingleDeviceSupport(LOG) {
     private fun isCandidateSettingsReply(packet: NxWearPacket): Boolean {
         val payload = packet.payload
         return packet.kind == NxWearPacket.Kind.FRAMED &&
-            packet.command == 0x04 && packet.dataType == 0x04 && packet.isComplete &&
+            packet.command == 0x04 && packet.dataType == NxWearDataType.ACTIVITY_04 && packet.isComplete &&
             payload.contentEquals(byteArrayOf(0x01))
     }
 
@@ -347,10 +524,13 @@ class NxWearB8Support : AbstractBTLESingleDeviceSupport(LOG) {
         private val CONFIG_KEYS = HEALTH_CONFIG_KEYS + setOf(
             DeviceSettingsPreferenceConst.PREF_TIMEFORMAT,
             ACTION_REFRESH_ACTIVITY,
+            ACTION_MEASURE_STRESS,
         ) + WRIST_WAKE_CONFIG_KEYS
 
         private const val ACTION_REFRESH_ACTIVITY = "nx_wear_b8_refresh_activity"
-        private val ACTIVITY_SUBTYPES = setOf(0x09, 0x04, 0xfa)
+        private const val ACTION_MEASURE_STRESS = "nx_wear_b8_measure_stress"
+        private const val HEART_RATE_TIMEOUT_MS = 60_000L
+        private val ACTIVITY_SUBTYPES = setOf(NxWearDataType.ACTIVITY_09, NxWearDataType.ACTIVITY_04, NxWearDataType.ACTIVITY_FA)
         private fun Boolean.toWireByte(): Byte = compareTo(false).toByte()
 
         internal fun batteryStateForStatus(status: Int): BatteryState = when (status) {
@@ -372,20 +552,31 @@ class NxWearB8Support : AbstractBTLESingleDeviceSupport(LOG) {
         internal fun encodeInitializationRead(sequence: Int, dataType: Int): ByteArray =
             NxWearPacket.frame(sequence, 0x04, dataType, byteArrayOf(1))
 
-        private val SETTINGS_ACK = NxWearPacket.frame(0, 0x34, 0x80, byteArrayOf(1))
-        private val INITIALIZATION_ACK = NxWearPacket.frame(0, 0x34, 0x6e, byteArrayOf(1))
-        private val POWER_OFF_ACK = NxWearPacket.frame(0, 0x34, 0x77, byteArrayOf(1))
+        private val SETTINGS_ACK = NxWearPacket.frame(0, 0x34, NxWearDataType.DETECTION_SETTINGS, byteArrayOf(1))
+        private val INITIALIZATION_ACK = NxWearPacket.frame(0, 0x34, NxWearDataType.BOOTSTRAP, byteArrayOf(1))
+        private val POWER_OFF_ACK = NxWearPacket.frame(0, 0x34, NxWearDataType.POWER_OFF, byteArrayOf(1))
 
-        internal fun encodePowerOff(): ByteArray = NxWearPacket.frame(0, 0x01, 0x77, byteArrayOf(0))
+        internal fun encodePowerOff(): ByteArray = NxWearPacket.frame(0, 0x01, NxWearDataType.POWER_OFF, byteArrayOf(0))
 
-        internal fun encodeRefreshActivity(): ByteArray = NxWearPacket.frame(0, 0x03, 0x09, byteArrayOf())
+        internal fun encodeRefreshActivity(): ByteArray = NxWearPacket.frame(0, 0x03, NxWearDataType.ACTIVITY_09, byteArrayOf())
 
-        internal fun encodeBatteryAck(sequence: Int): ByteArray = NxWearPacket.frame(sequence, 0x04, 0x03, byteArrayOf(1))
+        internal fun encodeBatteryAck(sequence: Int): ByteArray = NxWearPacket.frame(sequence, 0x04, NxWearDataType.BATTERY, byteArrayOf(1))
+
+        internal fun encodeManualHeartRate(start: Boolean): ByteArray =
+            NxWearPacket.frame(0, 0x01, NxWearDataType.MANUAL_HEART_RATE, byteArrayOf((if (start) 1 else 0).toByte()))
+
+        internal fun encodeHeartRateAck(sequence: Int): ByteArray =
+            NxWearPacket.frame(sequence, 0x04, NxWearDataType.HEART_RATE, byteArrayOf(1))
+
+        internal fun encodeStressMeasurementStart(): ByteArray = NxWearPacket.frame(0, 0x01, NxWearDataType.STRESS, byteArrayOf(1))
+
+        internal fun encodeStressAck(sequence: Int, dataType: Int): ByteArray =
+            NxWearPacket.frame(sequence, 0x04, dataType, byteArrayOf(1))
 
         internal fun encodeDetectionSettings(heartRateEnabled: Boolean, intervalMinutes: Int, spo2Enabled: Boolean): ByteArray {
             require(intervalMinutes == 30 || intervalMinutes == 60) { "Unsupported detection interval: $intervalMinutes" }
             return NxWearPacket.frame(
-                0, 0x01, 0x80,
+                0, 0x01, NxWearDataType.DETECTION_SETTINGS,
                 byteArrayOf(
                     heartRateEnabled.toWireByte(), 0, intervalMinutes.toByte(), 0,
                     spo2Enabled.toWireByte(), 0, 0, 0,
@@ -403,7 +594,7 @@ class NxWearB8Support : AbstractBTLESingleDeviceSupport(LOG) {
                 .putShort(timezoneOffset.toShort())
                 .array()
             return NxWearPacket.frame(
-                0, 0x01, 0x68,
+                0, 0x01, NxWearDataType.CLOCK,
                 timeFields + byteArrayOf(0, 0, is24Hour.toWireByte()),
             )
         }
@@ -421,7 +612,7 @@ class NxWearB8Support : AbstractBTLESingleDeviceSupport(LOG) {
             val (startHour, startMinute) = parseTime(start)
             val (endHour, endMinute) = parseTime(end)
             return NxWearPacket.frame(
-                0, 0x01, 0x7f,
+                0, 0x01, NxWearDataType.WRIST_WAKE,
                 byteArrayOf(
                     enabled.toWireByte(), startHour.toByte(), startMinute.toByte(),
                     endHour.toByte(), endMinute.toByte(), durationSeconds.toByte(),

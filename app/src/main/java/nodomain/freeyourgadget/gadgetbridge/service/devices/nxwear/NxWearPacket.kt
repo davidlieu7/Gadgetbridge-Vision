@@ -13,6 +13,8 @@ internal data class NxWearPacket(
     val pagesPresent: Int = 0,
     val payload: ByteArray = byteArrayOf(),
 ) {
+    data class TimedReading(val timestampMillis: Long, val value: Int)
+
     enum class Kind {
         FRAMED,
         CONTINUATION,
@@ -21,6 +23,14 @@ internal data class NxWearPacket(
 
     val isComplete: Boolean
         get() = kind == Kind.FRAMED && payload.size == declaredLength && pagesPresent == pageCount?.plus(1)
+
+    fun timedReadings(expectedDataType: Int): List<TimedReading>? {
+        if (kind != Kind.FRAMED || !isComplete || command != 0x31 || dataType != expectedDataType ||
+            payload.size < 8 || (payload.size - 3) % 5 != 0) return null
+        return (3 until payload.size step 5).map { offset ->
+            TimedReading(payload.le32(offset) * 1000L, payload[offset + 4].toInt() and 0xff)
+        }
+    }
 
     companion object {
         private const val PAGE_SIZE = 20
@@ -129,4 +139,36 @@ internal data class NxWearPacket(
 internal fun ByteArray.le16(offset: Int): Int {
     require(offset >= 0 && offset <= size - 2) { "le16 offset $offset is outside byte array of size $size" }
     return (this[offset].toInt() and 0xff) or ((this[offset + 1].toInt() and 0xff) shl 8)
+}
+
+internal fun ByteArray.le32(offset: Int): Long {
+    require(offset >= 0 && offset <= size - 4) { "le32 offset $offset is outside byte array of size $size" }
+    return (this[offset].toLong() and 0xff) or
+        ((this[offset + 1].toLong() and 0xff) shl 8) or
+        ((this[offset + 2].toLong() and 0xff) shl 16) or
+        ((this[offset + 3].toLong() and 0xff) shl 24)
+}
+
+internal fun ByteArray.be32(offset: Int): Long {
+    require(offset >= 0 && offset <= size - 4) { "be32 offset $offset is outside byte array of size $size" }
+    return ((this[offset].toLong() and 0xff) shl 24) or
+        ((this[offset + 1].toLong() and 0xff) shl 16) or
+        ((this[offset + 2].toLong() and 0xff) shl 8) or
+        (this[offset + 3].toLong() and 0xff)
+}
+
+internal object NxWearDataType {
+    const val BATTERY = 0x03
+    const val ACTIVITY_04 = 0x04
+    const val HEART_RATE = 0x07
+    const val ACTIVITY_09 = 0x09
+    const val HEART_RATE_CONTROL = 0x15
+    const val MANUAL_HEART_RATE = 0x18
+    const val STRESS = 0x2d
+    const val CLOCK = 0x68
+    const val BOOTSTRAP = 0x6e
+    const val POWER_OFF = 0x77
+    const val WRIST_WAKE = 0x7f
+    const val DETECTION_SETTINGS = 0x80
+    const val ACTIVITY_FA = 0xfa
 }

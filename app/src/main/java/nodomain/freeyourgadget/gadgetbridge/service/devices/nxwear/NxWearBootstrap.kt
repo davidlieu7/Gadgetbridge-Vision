@@ -40,7 +40,7 @@ internal data class NxWearBootstrap(
         )
         val recordBytes = records.fold(byteArrayOf()) { result, record -> result + record }
         val payload = le16(recordBytes.size + 1) + byteArrayOf(records.size.toByte()) + recordBytes
-        return NxWearPacket.frame(0, 0x01, 0x6e, payload, deviceType = 0x01)
+        return NxWearPacket.frame(0, 0x01, NxWearDataType.BOOTSTRAP, payload, deviceType = 0x01)
     }
 
     private fun record(type: Int, data: ByteArray): ByteArray =

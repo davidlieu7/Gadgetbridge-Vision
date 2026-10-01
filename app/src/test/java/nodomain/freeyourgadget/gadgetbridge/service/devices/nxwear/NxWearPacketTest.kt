@@ -95,6 +95,25 @@ class NxWearPacketTest {
     }
 
     @Test
+    fun readsUnsigned32BitPayloadValues() {
+        val payload = bytes("0080fffe")
+
+        assertEquals(0xfeff8000L, payload.le32(0))
+        assertEquals(0x0080fffeL, payload.be32(0))
+        assertEquals(0x6abe70f9L, bytes("01f970be6a02").le32(1))
+    }
+
+    @Test(expected = IllegalArgumentException::class)
+    fun rejectsTruncated32BitPayloadValue() {
+        bytes("010203").le32(0)
+    }
+
+    @Test(expected = IllegalArgumentException::class)
+    fun rejectsTruncatedBigEndianPayloadValue() {
+        bytes("01020304").be32(1)
+    }
+
+    @Test
     fun buildsObservedHealthDetectionPackets() {
         assertArrayEquals(bytes("000b000001800000080000003c00000000000000"),
             NxWearB8Support.encodeDetectionSettings(false, 60, false))
@@ -143,6 +162,97 @@ class NxWearPacketTest {
         assertEquals(0x77, packet.dataType)
         assertEquals(1, packet.declaredLength)
         assertArrayEquals(bytes("00"), packet.payload)
+    }
+
+    @Test
+    fun buildsManualHeartRateCommandsAndAcknowledgement() {
+        val start = bytes("000b000001180000010001000000000000000000")
+        val stop = bytes("000b000001180000010000000000000000000000")
+        val acknowledgement = bytes("000b000904070000010001000000000000000000")
+
+        assertArrayEquals(start, NxWearB8Support.encodeManualHeartRate(true))
+        assertArrayEquals(stop, NxWearB8Support.encodeManualHeartRate(false))
+        assertArrayEquals(acknowledgement, NxWearB8Support.encodeHeartRateAck(9))
+    }
+
+    @Test
+    fun parsesManualHeartRateReading() {
+        val frame = bytes("000b0009310700000800010001de6ebe6a470000")
+        val packet = NxWearPacket.parse(frame)
+        val readings = NxWearHeartRateReading.parse(packet)
+
+        assertEquals(9, packet.sequence)
+        assertEquals(1, readings?.size)
+        assertEquals(1790865118000L, readings?.single()?.timestampMillis)
+        assertEquals(71, readings?.single()?.bpm)
+    }
+
+    @Test
+    fun rejectsTruncatedManualHeartRateReading() {
+        val frame = NxWearPacket.frame(9, 0x31, 0x07, bytes("010001de6ebe6a"))
+        val packet = NxWearPacket.parse(frame)
+
+        assertNull(NxWearHeartRateReading.parse(packet))
+    }
+
+    @Test
+    fun buildsStressMeasurementAndAcknowledgements() {
+        val start = bytes("000b0000012d0000010001000000000000000000")
+        val controlAck = bytes("000b005404150000010001000000000000000000")
+        val readingAck = bytes("000b0055042d0000010001000000000000000000")
+        val syncAck = bytes("000b005604fa0000010001000000000000000000")
+
+        assertArrayEquals(start, NxWearB8Support.encodeStressMeasurementStart())
+        assertArrayEquals(controlAck, NxWearB8Support.encodeStressAck(0x54, 0x15))
+        assertArrayEquals(readingAck, NxWearB8Support.encodeStressAck(0x55, 0x2d))
+        assertArrayEquals(syncAck, NxWearB8Support.encodeStressAck(0x56, 0xfa))
+    }
+
+    @Test
+    fun parsesStressReadingRatherThanControlStateAsScore() {
+        val controlFrame = bytes("000b00543115000001005100000000000000a0a7")
+        val readingFrame = bytes("000b0055312d00000800010001f970be6a330001")
+        val control = NxWearPacket.parse(controlFrame)
+        val reading = NxWearPacket.parse(readingFrame)
+        val readings = NxWearStressReading.parse(reading)
+
+        assertNull(NxWearStressReading.parse(control))
+        assertEquals(0x51, control.payload[0].toInt() and 0xff)
+        assertEquals(1, readings?.size)
+        assertEquals(51, readings?.single()?.stress)
+        assertEquals(0x6abe70f9L * 1000L, readings?.single()?.timestampMillis)
+    }
+
+    @Test
+    fun parsesMultipleTimedReadingsOnlyForMatchingDataType() {
+        val payload = bytes("010001f970be6a33f970be6a34")
+        val packet = NxWearPacket.parse(NxWearPacket.frame(0x55, 0x31, NxWearDataType.STRESS, payload))
+
+        assertNull(packet.timedReadings(NxWearDataType.HEART_RATE))
+        assertEquals(listOf(
+            NxWearPacket.TimedReading(0x6abe70f9L * 1000L, 51),
+            NxWearPacket.TimedReading(0x6abe70f9L * 1000L, 52),
+        ), packet.timedReadings(NxWearDataType.STRESS))
+    }
+
+    @Test
+    fun rejectsTruncatedStressReading() {
+        val packet = NxWearPacket.parse(NxWearPacket.frame(0x55, 0x31, 0x2d, bytes("010001f970be6a")))
+
+        assertNull(NxWearStressReading.parse(packet))
+    }
+
+    @Test
+    fun recognizesPostStressSyncContinuation() {
+        val first = NxWearPacket.parse(bytes("000b015631fa00000b00010001074a0000000001"))
+        val continuation = NxWearPacket.parse(bytes("0120000000000000000000000000000b00800100"))
+
+        assertEquals(0x56, first.sequence)
+        assertEquals(0xfa, first.dataType)
+        assertEquals(11, first.declaredLength)
+        assertEquals(2, NxWearB8Support.expectedActivityFragmentCount(first.declaredLength!!))
+        assertEquals(1, continuation.continuationIndex)
+        assertEquals(0x20, continuation.payload[0].toInt() and 0xff)
     }
 
     @Test

@@ -5925,6 +5925,8 @@
 
     <string name="nx_wear_b8_activity">Activity</string>
     <string name="nx_wear_b8_refresh_activity">Refresh activity</string>
+    <string name="nx_wear_b8_measure_stress">Measure stress</string>
+    <string name="nx_wear_b8_stress_result">Stress: %1$d</string>
     <string name="nx_wear_b8_wrist_wake_duration">Wake screen duration</string>
 
     <string name="workout_exercise_picker_title">Choose an exercise</string>

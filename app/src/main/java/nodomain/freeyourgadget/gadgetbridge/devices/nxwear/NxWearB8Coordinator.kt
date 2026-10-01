@@ -1,5 +1,7 @@
 package nodomain.freeyourgadget.gadgetbridge.devices.nxwear
 
+import de.greenrobot.dao.AbstractDao
+import de.greenrobot.dao.Property
 import nodomain.freeyourgadget.gadgetbridge.R
 import nodomain.freeyourgadget.gadgetbridge.GBApplication
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsPreferenceConst
@@ -9,7 +11,16 @@ import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.device
 import nodomain.freeyourgadget.gadgetbridge.capabilities.HeartRateCapability
 import nodomain.freeyourgadget.gadgetbridge.devices.AbstractBLEDeviceCoordinator
 import nodomain.freeyourgadget.gadgetbridge.devices.DeviceCoordinator
+import nodomain.freeyourgadget.gadgetbridge.devices.SampleProvider
+import nodomain.freeyourgadget.gadgetbridge.devices.GenericStressSampleProvider
+import nodomain.freeyourgadget.gadgetbridge.devices.TimeSampleProvider
+import nodomain.freeyourgadget.gadgetbridge.devices.generic_hr.GenericHeartRateActivitySampleProvider
+import nodomain.freeyourgadget.gadgetbridge.entities.AbstractActivitySample
+import nodomain.freeyourgadget.gadgetbridge.entities.DaoSession
+import nodomain.freeyourgadget.gadgetbridge.entities.GenericHeartRateSampleDao
+import nodomain.freeyourgadget.gadgetbridge.entities.GenericStressSampleDao
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice
+import nodomain.freeyourgadget.gadgetbridge.model.StressSample
 import nodomain.freeyourgadget.gadgetbridge.service.DeviceSupport
 import nodomain.freeyourgadget.gadgetbridge.service.devices.nxwear.NxWearB8Support
 import java.util.regex.Pattern
@@ -52,6 +63,16 @@ class NxWearB8Coordinator : AbstractBLEDeviceCoordinator() {
                 },
                 defaultValue = HeartRateCapability.MeasurementInterval.MINUTES_30.getIntervalSeconds().toString(),
             )
+            action(
+                key = ACTION_MEASURE_STRESS,
+                title = R.string.nx_wear_b8_measure_stress,
+                icon = R.drawable.ic_stress,
+            ) { _, selectedDevice ->
+                if (selectedDevice != null) {
+                    GBApplication.deviceService(selectedDevice).onSendConfiguration(ACTION_MEASURE_STRESS)
+                }
+                selectedDevice != null
+            }
         }
         screen(
             key = "nx_wear_b8_clock",
@@ -122,8 +143,29 @@ class NxWearB8Coordinator : AbstractBLEDeviceCoordinator() {
 
     override fun supportsPowerOff(device: GBDevice): Boolean = true
 
+    override fun supportsHeartRateMeasurement(device: GBDevice): Boolean = true
+
+    override fun supportsManualHeartRateMeasurement(device: GBDevice): Boolean = true
+
+    override fun supportsRealtimeData(device: GBDevice): Boolean = true
+
+    override fun supportsStressMeasurement(device: GBDevice): Boolean = true
+
+    override fun getSampleProvider(device: GBDevice, session: DaoSession): SampleProvider<out AbstractActivitySample> =
+        GenericHeartRateActivitySampleProvider(device, session)
+
+    override fun getStressSampleProvider(device: GBDevice, session: DaoSession): TimeSampleProvider<out StressSample> =
+        GenericStressSampleProvider(device, session)
+
+    override fun getAllDeviceDao(session: DaoSession): MutableMap<AbstractDao<*, *>, Property> =
+        mutableMapOf<AbstractDao<*, *>, Property>(
+            session.genericHeartRateSampleDao to GenericHeartRateSampleDao.Properties.DeviceId,
+            session.genericStressSampleDao to GenericStressSampleDao.Properties.DeviceId,
+        )
+
     companion object {
         private const val ACTION_REFRESH_ACTIVITY = "nx_wear_b8_refresh_activity"
+        private const val ACTION_MEASURE_STRESS = "nx_wear_b8_measure_stress"
         private const val MTU = 517
     }
 
