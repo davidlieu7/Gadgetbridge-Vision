@@ -140,8 +140,10 @@ object DeviceSettingRenderer {
             cat.isVisible = members.isNotEmpty() && members.any { it.isVisible }
         }
 
-        if (summaryPairs.isNotEmpty()) {
-            // A summaryProvider can read any preference, so refresh on every write.
+        if (summaryPairs.isNotEmpty() || visibilityPairs.isNotEmpty() || enabledPairs.isNotEmpty()) {
+            // A summaryProvider, visibility predicate, or enabled predicate can read any preference.
+            // Refresh on every write so changes made outside this renderer (for example by a
+            // device service action) are reflected in the rendered settings.
             val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, _ -> postRefresh() }
             spListeners.add(listener)
             sp.registerOnSharedPreferenceChangeListener(listener)

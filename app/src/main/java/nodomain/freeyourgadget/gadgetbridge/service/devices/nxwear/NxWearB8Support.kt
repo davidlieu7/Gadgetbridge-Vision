@@ -5,6 +5,7 @@ import android.bluetooth.BluetoothGattCharacteristic
 import android.content.Intent
 import android.os.Handler
 import android.os.Looper
+import android.os.SystemClock
 import android.text.format.DateFormat
 import android.widget.Toast
 import androidx.localbroadcastmanager.content.LocalBroadcastManager
@@ -65,6 +66,8 @@ class NxWearB8Support : AbstractBTLESingleDeviceSupport(LOG) {
     private var manualHeartRateActive = false
     @Volatile
     private var continuousHeartRate = false
+    private var exerciseStartedAt: Long? = null
+    private var exerciseSportType = NxWearSportSession.OUTDOOR_RUNNING
     override fun getCoordinator(): NxWearB8Coordinator = super.getCoordinator() as NxWearB8Coordinator
 
     init {
@@ -116,6 +119,29 @@ class NxWearB8Support : AbstractBTLESingleDeviceSupport(LOG) {
                 createTransactionBuilder("Start Nx Wear B8 blood oxygen measurement")
                     .write(WRITE_CHARACTERISTIC, *encodeSpo2MeasurementStart())
                     .queue()
+            }
+            return
+        }
+        if (config == NxWearB8Coordinator.ACTION_EXERCISE_START || config == NxWearB8Coordinator.ACTION_EXERCISE_STOP) {
+            if (!isConnected()) return
+            val starting = config == NxWearB8Coordinator.ACTION_EXERCISE_START
+            val prefs = getDevicePrefs().preferences
+            if (starting) {
+                exerciseSportType = getDevicePrefs()
+                    .getString(NxWearB8Coordinator.PREF_EXERCISE_SPORT, NxWearSportSession.OUTDOOR_RUNNING.toString())
+                    ?.toIntOrNull()
+                    ?.takeIf { selectedType -> NxWearSportSession.SPORTS.any { it.type == selectedType } }
+                    ?: NxWearSportSession.OUTDOOR_RUNNING
+                exerciseStartedAt = SystemClock.elapsedRealtime()
+                prefs.edit().putBoolean(NxWearB8Coordinator.PREF_EXERCISE_RUNNING, true).apply()
+            }
+            val elapsed = if (starting) 0L else exerciseStartedAt?.let { (SystemClock.elapsedRealtime() - it) / 1000L } ?: 0L
+            createTransactionBuilder(if (starting) "Start Nx Wear B8 exercise" else "Stop Nx Wear B8 exercise")
+                .write(WRITE_CHARACTERISTIC, *NxWearSportSession.encode(exerciseSportType, if (starting) NxWearSportSession.START else NxWearSportSession.STOP, elapsed))
+                .queue()
+            if (!starting) {
+                exerciseStartedAt = null
+                prefs.edit().putBoolean(NxWearB8Coordinator.PREF_EXERCISE_RUNNING, false).apply()
             }
             return
         }
@@ -704,6 +730,8 @@ class NxWearB8Support : AbstractBTLESingleDeviceSupport(LOG) {
             DeviceSettingsPreferenceConst.PREF_TIMEFORMAT,
             ACTION_MEASURE_STRESS,
             ACTION_MEASURE_SPO2,
+            NxWearB8Coordinator.ACTION_EXERCISE_START,
+            NxWearB8Coordinator.ACTION_EXERCISE_STOP,
         ) + WRIST_WAKE_CONFIG_KEYS
 
         private const val ACTION_MEASURE_STRESS = "nx_wear_b8_measure_stress"

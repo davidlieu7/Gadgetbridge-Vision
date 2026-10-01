@@ -25,6 +25,7 @@ import nodomain.freeyourgadget.gadgetbridge.model.StressSample
 import nodomain.freeyourgadget.gadgetbridge.model.Spo2Sample
 import nodomain.freeyourgadget.gadgetbridge.service.DeviceSupport
 import nodomain.freeyourgadget.gadgetbridge.service.devices.nxwear.NxWearB8Support
+import nodomain.freeyourgadget.gadgetbridge.service.devices.nxwear.NxWearSportSession
 import java.util.regex.Pattern
 
 class NxWearB8Coordinator : AbstractBLEDeviceCoordinator() {
@@ -99,6 +100,43 @@ class NxWearB8Coordinator : AbstractBLEDeviceCoordinator() {
                 ) { _, selectedDevice ->
                     if (selectedDevice != null) {
                         GBApplication.deviceService(selectedDevice).onSendConfiguration(ACTION_MEASURE_SPO2)
+                    }
+                    selectedDevice != null
+                }
+            }
+            screen(
+                key = "nx_wear_b8_exercise",
+                title = R.string.nx_wear_b8_exercise,
+                icon = R.drawable.ic_activity_free_training,
+            ) {
+                list(
+                    key = PREF_EXERCISE_SPORT,
+                    title = R.string.nx_wear_b8_exercise_sport,
+                    icon = R.drawable.ic_activity_free_training,
+                    entries = NxWearSportSession.SPORTS.map {
+                        ListEntry.Res(it.type.toString(), it.activityKind.getLabel())
+                    },
+                    defaultValue = NxWearSportSession.OUTDOOR_RUNNING.toString(),
+                )
+                action(
+                    key = ACTION_EXERCISE_START,
+                    title = R.string.nx_wear_b8_exercise_start,
+                    icon = R.drawable.ic_play,
+                    visibleWhen = { prefs -> !prefs.getBoolean(PREF_EXERCISE_RUNNING, false) },
+                ) { _, selectedDevice ->
+                    if (selectedDevice != null) {
+                        GBApplication.deviceService(selectedDevice).onSendConfiguration(ACTION_EXERCISE_START)
+                    }
+                    selectedDevice != null
+                }
+                action(
+                    key = ACTION_EXERCISE_STOP,
+                    title = R.string.nx_wear_b8_exercise_stop,
+                    icon = R.drawable.ic_stop,
+                    visibleWhen = { prefs -> prefs.getBoolean(PREF_EXERCISE_RUNNING, false) },
+                ) { _, selectedDevice ->
+                    if (selectedDevice != null) {
+                        GBApplication.deviceService(selectedDevice).onSendConfiguration(ACTION_EXERCISE_STOP)
                     }
                     selectedDevice != null
                 }
@@ -203,6 +241,10 @@ class NxWearB8Coordinator : AbstractBLEDeviceCoordinator() {
         const val PREF_LIFT_ENABLED = "nx_wear_b8_lift_enabled"
         private const val ACTION_MEASURE_STRESS = "nx_wear_b8_measure_stress"
         private const val ACTION_MEASURE_SPO2 = "nx_wear_b8_measure_spo2"
+        const val PREF_EXERCISE_SPORT = "nx_wear_b8_exercise_sport"
+        const val ACTION_EXERCISE_START = "nx_wear_b8_exercise_start"
+        const val ACTION_EXERCISE_STOP = "nx_wear_b8_exercise_stop"
+        const val PREF_EXERCISE_RUNNING = "nx_wear_b8_exercise_running"
         private const val MTU = 517
     }
 

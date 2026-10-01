@@ -5,6 +5,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
 import nodomain.freeyourgadget.gadgetbridge.model.BatteryState
+import nodomain.freeyourgadget.gadgetbridge.model.ActivityKind
 
 class NxWearPacketTest {
     private fun bytes(hex: String) = hex.chunked(2).map { it.toInt(16).toByte() }.toByteArray()
@@ -289,6 +290,38 @@ class NxWearPacketTest {
         assertArrayEquals(start, NxWearB8Support.encodeSpo2MeasurementStart())
         assertArrayEquals(controlAck, NxWearB8Support.encodeMeasurementAck(9, NxWearDataType.HEART_RATE_CONTROL))
         assertArrayEquals(readingAck, NxWearB8Support.encodeMeasurementAck(10, NxWearDataType.SPO2))
+    }
+
+    @Test
+    fun buildsOutdoorRunningPhoneExerciseStartAndStop() {
+        val start = NxWearPacket.parse(bytes("000b0000018200000a0005010000000000000000"))
+        val stop = NxWearPacket.parse(bytes("000b0000018200000a0005005f00000004000000"))
+
+        assertEquals(0x82, start.dataType)
+        assertEquals(5, start.payload[0].toInt() and 0xff)
+        assertEquals(1, start.payload[1].toInt() and 0xff)
+        assertArrayEquals(start.raw, NxWearSportSession.encode(5, NxWearSportSession.START))
+        assertArrayEquals(stop.raw, NxWearSportSession.encode(5, NxWearSportSession.STOP, 95, 4))
+    }
+
+    @Test
+    fun mapsEveryPhoneExerciseSportToActivityKind() {
+        val expected = mapOf(
+            5 to ActivityKind.OUTDOOR_RUNNING,
+            4 to ActivityKind.INDOOR_RUNNING,
+            2 to ActivityKind.OUTDOOR_CYCLING,
+            3 to ActivityKind.INDOOR_CYCLING,
+            7 to ActivityKind.OUTDOOR_WALKING,
+            11 to ActivityKind.BASKETBALL,
+            14 to ActivityKind.SOCCER,
+            10 to ActivityKind.BADMINTON,
+            6 to ActivityKind.SWIMMING,
+            12 to ActivityKind.JUMP_ROPING,
+            15 to ActivityKind.MOUNTAINEERING,
+            9 to ActivityKind.YOGA,
+        )
+
+        assertEquals(expected, NxWearSportSession.SPORTS.associate { it.type to it.activityKind })
     }
 
     @Test
