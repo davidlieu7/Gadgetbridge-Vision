@@ -101,6 +101,9 @@ object DeviceSettingsIndexer {
                 is DateSetting ->
                     indexSingle(context, searchConfiguration, item.key, title(context, item.title), 0, breadcrumbs, null)
 
+                is TimeSetting ->
+                    indexSingle(context, searchConfiguration, item.key, title(context, item.title), 0, breadcrumbs, null)
+
                 is FilePickerSetting ->
                     indexSingle(
                         context, searchConfiguration, item.key, title(context, item.title),

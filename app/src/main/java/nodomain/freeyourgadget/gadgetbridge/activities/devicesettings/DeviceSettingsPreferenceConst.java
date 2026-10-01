@@ -185,6 +185,7 @@ public class DeviceSettingsPreferenceConst {
     public static final String PREF_DISPLAY_ON_LIFT_START = "display_on_lift_start";
     public static final String PREF_DISPLAY_ON_LIFT_END = "display_on_lift_end";
     public static final String PREF_DISPLAY_ON_LIFT_SENSITIVITY = "display_on_lift_sensitivity";
+    public static final String PREF_NX_WEAR_B8_DISPLAY_ON_LIFT_DURATION = "nx_wear_b8_display_on_lift_duration";
 
     public static final String PREF_ALWAYS_ON_DISPLAY = "always_on_display";
     public static final String PREF_ALWAYS_ON_DISPLAY_MODE = "always_on_display_mode";
