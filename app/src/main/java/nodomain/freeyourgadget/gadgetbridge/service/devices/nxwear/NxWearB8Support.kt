@@ -75,6 +75,12 @@ class NxWearB8Support : AbstractBTLESingleDeviceSupport(LOG) {
             .queue()
     }
 
+    override fun onPowerOff() {
+        createTransactionBuilder("Power off Nx Wear B8")
+            .write(WRITE_CHARACTERISTIC, *encodePowerOff())
+            .queue()
+    }
+
     override fun onCharacteristicChanged(
         gatt: BluetoothGatt,
         characteristic: BluetoothGattCharacteristic,
@@ -87,6 +93,8 @@ class NxWearB8Support : AbstractBTLESingleDeviceSupport(LOG) {
                 LOG.debug("Nx Wear B8 acknowledged a settings write")
             } else if (packet.raw.contentEquals(INITIALIZATION_ACK)) {
                 LOG.debug("Nx Wear B8 acknowledged its initialization request")
+            } else if (packet.raw.contentEquals(POWER_OFF_ACK)) {
+                LOG.debug("Nx Wear B8 acknowledged its power-off request")
             } else when {
                 isBatteryNotification(packet) -> {
                     handleBatteryNotification(packet)
@@ -310,6 +318,9 @@ class NxWearB8Support : AbstractBTLESingleDeviceSupport(LOG) {
 
         private val SETTINGS_ACK = NxWearPacket.frame(0, 0x34, 0x80, byteArrayOf(1))
         private val INITIALIZATION_ACK = NxWearPacket.frame(0, 0x34, 0x6e, byteArrayOf(1))
+        private val POWER_OFF_ACK = NxWearPacket.frame(0, 0x34, 0x77, byteArrayOf(1))
+
+        internal fun encodePowerOff(): ByteArray = NxWearPacket.frame(0, 0x01, 0x77, byteArrayOf(0))
 
         internal fun encodeRefreshActivity(): ByteArray = NxWearPacket.frame(0, 0x03, 0x09, byteArrayOf())
 

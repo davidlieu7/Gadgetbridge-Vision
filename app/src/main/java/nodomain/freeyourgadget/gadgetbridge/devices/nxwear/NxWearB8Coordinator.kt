@@ -120,6 +120,8 @@ class NxWearB8Coordinator : AbstractBLEDeviceCoordinator() {
 
     override fun getDeviceKind(device: GBDevice): DeviceCoordinator.DeviceKind = DeviceCoordinator.DeviceKind.WATCH
 
+    override fun supportsPowerOff(device: GBDevice): Boolean = true
+
     companion object {
         private const val ACTION_REFRESH_ACTIVITY = "nx_wear_b8_refresh_activity"
         private const val MTU = 517

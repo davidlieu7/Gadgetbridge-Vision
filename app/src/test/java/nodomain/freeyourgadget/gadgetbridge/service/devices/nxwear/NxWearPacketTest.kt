@@ -133,6 +133,19 @@ class NxWearPacketTest {
     }
 
     @Test
+    fun buildsObservedPowerOffPacket() {
+        val frame = bytes("000b000001770000010000000000000000000000")
+        val packet = NxWearPacket.parse(NxWearB8Support.encodePowerOff())
+
+        assertArrayEquals(frame, packet.raw)
+        assertEquals(NxWearPacket.Kind.FRAMED, packet.kind)
+        assertEquals(0x01, packet.command)
+        assertEquals(0x77, packet.dataType)
+        assertEquals(1, packet.declaredLength)
+        assertArrayEquals(bytes("00"), packet.payload)
+    }
+
+    @Test
     fun buildsObservedInitializationBootstrapWithDynamicLittleEndianTimestamp() {
         val captured = bytes("00010300016e000043004100070c0066bcb50b00010114aa32000c0068be53eb68201c0000010800027c01ffff00000400670004006d0113006f401f030000881300002c0100007869302a0500780000")
         assertArrayEquals(captured, NxWearB8Support.encodeInitializationBootstrap(0x68eb53beL))
