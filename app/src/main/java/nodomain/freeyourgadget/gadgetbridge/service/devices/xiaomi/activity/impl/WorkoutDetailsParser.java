@@ -36,6 +36,7 @@ import nodomain.freeyourgadget.gadgetbridge.model.ActivityPoint;
 import nodomain.freeyourgadget.gadgetbridge.model.ActivityTrack;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.xiaomi.activity.XiaomiActivityFileId;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.xiaomi.activity.XiaomiActivityParser;
+import nodomain.freeyourgadget.gadgetbridge.util.ArrayUtils;
 import nodomain.freeyourgadget.gadgetbridge.util.GB;
 
 public class WorkoutDetailsParser extends XiaomiActivityParser {
@@ -50,6 +51,13 @@ public class WorkoutDetailsParser extends XiaomiActivityParser {
     private static final int RUN_WALK_GROUP_HR = 1;
     private static final int RUN_WALK_GROUP_CADENCE = 7;
     private static final int RUN_WALK_GROUP_PACE = 8;
+
+    private static final byte[] FREESTYLE_V3_BITMAP = {(byte) 0xFF, (byte) 0xBB};
+    private static final byte[] OUTDOOR_CYCLING_BITMAP = {(byte) 0xDF, (byte) 0xCF, (byte) 0xFB};
+    private static final byte[] ELLIPTICAL_V3_BITMAP = {(byte) 0xFF, (byte) 0xFF};
+    private static final byte[] ROWING_V4_BITMAP = {(byte) 0xFF, (byte) 0xFF};
+    private static final byte[] TREADMILL_V6_BITMAP = {(byte) 0xFF, (byte) 0xFF, (byte) 0x8B, (byte) 0xFF};
+    private static final byte[] INDOOR_CYCLING_V6_BITMAP = {(byte) 0xDF, (byte) 0xBB, (byte) 0xBB, (byte) 0xBF};
 
     /** Per-record output of {@link #parseBytes}. Fields are nullable when the version
      *  format does not encode them. Decoupled from {@link XiaomiActivitySample} so parsed
@@ -217,6 +225,31 @@ public class WorkoutDetailsParser extends XiaomiActivityParser {
         return records;
     }
 
+    /** True when the bitmap at offset 8 flags the same field groups present as {@code bitmap}:
+     *  bit 3 of every nibble matches. The other three bits of a nibble mark which values of the
+     *  group the band measured and vary between bands, without changing the record layout. */
+    private static boolean hasSameFieldGroups(final byte[] bytes, final byte[] bitmap) {
+        if (bytes.length < 8 + bitmap.length) {
+            return false;
+        }
+        for (int i = 0; i < bitmap.length; i++) {
+            if ((bytes[8 + i] & 0x88) != (bitmap[i] & 0x88)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /** True when the bitmap at offset 8 is {@code bitmap}, or when the file is of
+     *  {@code subtype} and its bitmap flags the same field groups present. The subtype is
+     *  required for the second case because sports share presence patterns with different
+     *  records (FF BB freestyle and FF FF elliptical both flag 4 groups). */
+    private static boolean matchesBitmap(final XiaomiActivityFileId fileId, final byte[] bytes,
+                                         final XiaomiActivityFileId.Subtype subtype, final byte[] bitmap) {
+        return ArrayUtils.equals(bytes, bitmap, 8)
+                || (fileId.getSubtype() == subtype && hasSameFieldGroups(bytes, bitmap));
+    }
+
     /**
      * Outdoor run/walk (subtype 0x16) v5 and v8. The fileId and padding are followed by a bitmap
      * with one nibble per field group, as read by {@link XiaomiComplexActivityParser}: a group is
@@ -364,8 +397,7 @@ public class WorkoutDetailsParser extends XiaomiActivityParser {
                     recordSize = 6;
                     tsPosition = 8;
                     nrPosition = 4;
-                } else if (bytes.length >= 10
-                        && bytes[8] == (byte) 0xFF && bytes[9] == (byte) 0xBB) {
+                } else if (matchesBitmap(fileId, bytes, XiaomiActivityFileId.Subtype.SPORTS_FREESTYLE, FREESTYLE_V3_BITMAP)) {
                     // SPORTS_FREESTYLE v3: signature FF BB. The byte after the signature is the
                     // low byte of the record count and varies per workout — earlier code matched
                     // a fixed third byte (0x53) and so parsed only one workout in seven.
@@ -377,14 +409,13 @@ public class WorkoutDetailsParser extends XiaomiActivityParser {
                     //   4-byte records: [hr][flags][reserved][reserved]. Validated against 7
                     //   captured workouts: each tiles exactly (19 + nr*4 == payload end) and the
                     //   per-record HR range is physiological (max 145-188).
-                    expectedSignature = new byte[]{(byte) 0xFF, (byte) 0xBB};
+                    expectedSignature = Arrays.copyOfRange(bytes, 8, 8 + FREESTYLE_V3_BITMAP.length);
                     segmentHeaderSize = 9;
                     recordSize = 4;
                     tsPosition = 4;
                     nrPosition = 0;
                     layoutCode = 103; // synthetic: v3-freestyle record shape
-                } else if (bytes.length >= 11
-                        && bytes[8] == (byte) 0xDF && bytes[9] == (byte) 0xCF && bytes[10] == (byte) 0xFB) {
+                } else if (matchesBitmap(fileId, bytes, XiaomiActivityFileId.Subtype.SPORTS_OUTDOOR_CYCLING, OUTDOOR_CYCLING_BITMAP)) {
                     // SPORTS_OUTDOOR_CYCLING (subtype 0x17) v3: signature DF CF FB.
                     //   17-byte segment header:
                     //     offset 0-3:   4 pad
@@ -394,19 +425,18 @@ public class WorkoutDetailsParser extends XiaomiActivityParser {
                     //     offset 13-16: int32 distance  — meters
                     //   7-byte records — HR decoded in case 113. Validated against the paired
                     //   cycling summary: the max per-record HR matched the summary HR_MAX.
-                    expectedSignature = new byte[]{(byte) 0xDF, (byte) 0xCF, (byte) 0xFB};
+                    expectedSignature = Arrays.copyOfRange(bytes, 8, 8 + OUTDOOR_CYCLING_BITMAP.length);
                     segmentHeaderSize = 17;
                     recordSize = 7;
                     tsPosition = 8;
                     nrPosition = 4;
                     layoutCode = 113; // synthetic: outdoor-cycling-v3 record shape
-                } else if (bytes.length >= 10
-                        && bytes[8] == (byte) 0xFF && bytes[9] == (byte) 0xFF) {
+                } else if (matchesBitmap(fileId, bytes, XiaomiActivityFileId.Subtype.SPORTS_ELLIPTICAL, ELLIPTICAL_V3_BITMAP)) {
                     // SPORTS_ELLIPTICAL (subtype 0x0B) v3: signature FF FF.
                     //   9-byte segment header: int32 nr | int32 ts | byte phase (0x7f only observed).
                     //   3-byte records — HR decoded in case 111. Validated against the paired
                     //   elliptical summary: the max per-record HR matched the summary HR_MAX.
-                    expectedSignature = new byte[]{(byte) 0xFF, (byte) 0xFF};
+                    expectedSignature = Arrays.copyOfRange(bytes, 8, 8 + ELLIPTICAL_V3_BITMAP.length);
                     segmentHeaderSize = 9;
                     recordSize = 3;
                     tsPosition = 4;
@@ -421,7 +451,7 @@ public class WorkoutDetailsParser extends XiaomiActivityParser {
             case 4:
                 // v4 is reused across multiple sport types with different payload layouts.
                 // Dispatch by the leading signature bytes at offset 8 to pick the format.
-                if (bytes.length >= 10 && bytes[8] == (byte) 0xFF && bytes[9] == (byte) 0xFF) {
+                if (matchesBitmap(fileId, bytes, XiaomiActivityFileId.Subtype.SPORTS_ROWING, ROWING_V4_BITMAP)) {
                     // Rowing: FF FF (2-byte sig) + 13-byte segment header + 3-byte records
                     //   [hr][events][stroke_rate]. Multi-segment, alternating active/rest.
                     // Segment header layout:
@@ -430,7 +460,7 @@ public class WorkoutDetailsParser extends XiaomiActivityParser {
                     //   offset 8:    byte  phase   — 0x81 = active rowing, 0x82 = rest/transition
                     //   offset 9-12: int32 strokes — strokes count for this segment;
                     //                                sum across segments matches summary STROKES.
-                    expectedSignature = new byte[]{(byte) 0xFF, (byte) 0xFF};
+                    expectedSignature = Arrays.copyOfRange(bytes, 8, 8 + ROWING_V4_BITMAP.length);
                     segmentHeaderSize = 13;
                     recordSize = 3;
                     tsPosition = 4;
@@ -476,8 +506,7 @@ public class WorkoutDetailsParser extends XiaomiActivityParser {
                     tsPosition = 2;
                     nrPosition = 0;
                     layoutCode = 205; // synthetic: treadmill-v5 record shape
-                } else if (bytes.length >= 11
-                        && bytes[8] == (byte) 0xDF && bytes[9] == (byte) 0xCF && bytes[10] == (byte) 0xFB) {
+                } else if (matchesBitmap(fileId, bytes, XiaomiActivityFileId.Subtype.SPORTS_OUTDOOR_CYCLING, OUTDOOR_CYCLING_BITMAP)) {
                     // SPORTS_OUTDOOR_CYCLING v5 (Smart Band 10 Pro): same records as v3, with
                     // 6 more bytes of segment header.
                     //   23-byte segment header:
@@ -491,7 +520,7 @@ public class WorkoutDetailsParser extends XiaomiActivityParser {
                     //   Validated against the paired summary: the records tile the file exactly,
                     //   their distances sum to DISTANCE_METERS, and HR min/avg/max and top speed
                     //   match the summary.
-                    expectedSignature = new byte[]{(byte) 0xDF, (byte) 0xCF, (byte) 0xFB};
+                    expectedSignature = Arrays.copyOfRange(bytes, 8, 8 + OUTDOOR_CYCLING_BITMAP.length);
                     segmentHeaderSize = 23;
                     recordSize = 7;
                     tsPosition = 8;
@@ -505,9 +534,7 @@ public class WorkoutDetailsParser extends XiaomiActivityParser {
                 break;
             case 6:
                 // v6 reused across sport types. Dispatch by signature.
-                if (bytes.length >= 12
-                        && bytes[8] == (byte) 0xFF && bytes[9] == (byte) 0xFF
-                        && bytes[10] == (byte) 0x8B && bytes[11] == (byte) 0xFF) {
+                if (matchesBitmap(fileId, bytes, XiaomiActivityFileId.Subtype.SPORTS_TREADMILL, TREADMILL_V6_BITMAP)) {
                     // SPORTS_TREADMILL: Signature FF FF 8B FF (4 bytes), segment header 13 bytes,
                     // 12-byte records. High-res HR + cadence + raw speed.
                     // Segment header layout:
@@ -515,20 +542,18 @@ public class WorkoutDetailsParser extends XiaomiActivityParser {
                     //   offset 4-7:  int32 ts            — segment start, unix seconds
                     //   offset 8:    byte  phase         — only 0x7f observed; semantic unconfirmed
                     //   offset 9-12: int32 distance      — meters; matches summary DISTANCE_METERS
-                    expectedSignature = new byte[]{(byte) 0xFF, (byte) 0xFF, (byte) 0x8B, (byte) 0xFF};
+                    expectedSignature = Arrays.copyOfRange(bytes, 8, 8 + TREADMILL_V6_BITMAP.length);
                     segmentHeaderSize = 13;
                     recordSize = 12;
                     tsPosition = 4;
                     nrPosition = 0;
-                } else if (bytes.length >= 12
-                        && bytes[8] == (byte) 0xDF && bytes[9] == (byte) 0xBB
-                        && bytes[10] == (byte) 0xBB && bytes[11] == (byte) 0xBF) {
+                } else if (matchesBitmap(fileId, bytes, XiaomiActivityFileId.Subtype.SPORTS_INDOOR_CYCLING, INDOOR_CYCLING_V6_BITMAP)) {
                     // SPORTS_INDOOR_CYCLING (subtype 0x07) v6: signature DF BB BB BF.
                     //   13-byte segment header (same shape as treadmill): int32 nr | int32 ts |
                     //   byte phase (0x7f only observed) | int32 distance.
                     //   9-byte records — HR decoded in case 116. Validated against the paired
                     //   indoor cycling summary: the max per-record HR matched the summary HR_MAX.
-                    expectedSignature = new byte[]{(byte) 0xDF, (byte) 0xBB, (byte) 0xBB, (byte) 0xBF};
+                    expectedSignature = Arrays.copyOfRange(bytes, 8, 8 + INDOOR_CYCLING_V6_BITMAP.length);
                     segmentHeaderSize = 13;
                     recordSize = 9;
                     tsPosition = 4;

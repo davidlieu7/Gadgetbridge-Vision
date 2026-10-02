@@ -1143,6 +1143,80 @@ public class WorkoutDetailsParserTest {
         }
     }
 
+    /// Treadmill runs from some bands flag fewer values valid (FF FB 8B FF) with the same groups
+    /// present, so the records keep the FF FF 8B FF layout.
+    @Test
+    public void testTreadmillV6WithFewerValidValues() {
+        final byte[] bytes = buildBytes(6, new Segment(1755619911, new int[][]{
+                {2, 88, 15, 82, 0x02088C},
+                {2, 88, 18, 82, 0x02048D},
+        }));
+        bytes[9] = (byte) 0xFB;
+
+        final List<WorkoutDetailRecord> records = WorkoutDetailsParser.parseBytes(makeFileId(0x03, 6), bytes);
+
+        assertNotNull(records);
+        assertEquals(2, records.size());
+        assertEquals(88, records.get(0).hr);
+        assertEquals(Integer.valueOf(164), records.get(0).cadence);
+        assertEquals(Integer.valueOf(0x02088C), records.get(0).speedRaw);
+
+        assertNull("other sports keep the exact bitmap", WorkoutDetailsParser.parseBytes(makeFileId(SUBTYPE_OUTDOOR_RUNNING, 6), bytes));
+    }
+
+    /// A bitmap that flags the same groups present as a known one, with other values marked
+    /// valid, keeps that sport's layout. Records carry HR at byte 1.
+    @Test
+    public void testValidFlagVariantsKeepTheSportLayout() {
+        final Object[][] cases = {
+                // subtype, version, bitmap, segment header size, record size, nr offset, ts offset
+                {0x17, 3, "DF CB FB", 17, 7, 4, 8},
+                {0x17, 5, "DF CB FB", 23, 7, 4, 8},
+                {0x0B, 3, "FF FB", 9, 3, 0, 4},
+                {0x07, 6, "DF BB BB BB", 13, 9, 0, 4},
+        };
+        for (final Object[] c : cases) {
+            final String label = c[0] + " v" + c[1] + " " + c[2];
+            final byte[] bytes = buildHrOnlyBytes(hex((String) c[2]), (int) c[3], (int) c[4], (int) c[5], (int) c[6],
+                    1751136604, new int[]{130, 141});
+
+            final List<WorkoutDetailRecord> records = WorkoutDetailsParser.parseBytes(makeFileId((int) c[0], (int) c[1]), bytes);
+
+            assertNotNull(label, records);
+            assertEquals(label, 2, records.size());
+            assertEquals(label, 141, records.get(1).hr);
+            assertNull(label, WorkoutDetailsParser.parseBytes(makeFileId(SUBTYPE_OUTDOOR_RUNNING, (int) c[1]), bytes));
+        }
+    }
+
+    @Test
+    public void testFreestyleV3ValidFlagVariant() {
+        final byte[] bytes = buildFreestyleV3Bytes(1748594392, new int[]{100, 150});
+        bytes[9] = (byte) 0xBF;
+
+        final List<WorkoutDetailRecord> records = WorkoutDetailsParser.parseBytes(makeFileId(0x08, 3), bytes);
+
+        assertNotNull(records);
+        assertEquals(150, records.get(1).hr);
+        assertNull(WorkoutDetailsParser.parseBytes(makeFileId(SUBTYPE_OUTDOOR_RUNNING, 3), bytes));
+    }
+
+    @Test
+    public void testRowingV4ValidFlagVariant() {
+        final byte[] bytes = buildBytes(4, new Segment(1700004000, new int[][]{
+                {120, 0, 28},
+                {125, 0, 30},
+        }, 0x81, 12));
+        bytes[9] = (byte) 0xFB;
+
+        final List<WorkoutDetailRecord> records = WorkoutDetailsParser.parseBytes(makeFileId(0x0D, 4), bytes);
+
+        assertNotNull(records);
+        assertEquals(125, records.get(1).hr);
+        assertEquals(Integer.valueOf(30), records.get(1).cadence);
+        assertNull(WorkoutDetailsParser.parseBytes(makeFileId(SUBTYPE_OUTDOOR_RUNNING, 4), bytes));
+    }
+
     @Test
     public void testRunWalkSegmentClaimingMoreRecordsThanPresentIsRejected() {
         final byte[] bytes = buildRunWalkBytes(5, "0C 0C 00 0C C0", 1790810050, 3,
