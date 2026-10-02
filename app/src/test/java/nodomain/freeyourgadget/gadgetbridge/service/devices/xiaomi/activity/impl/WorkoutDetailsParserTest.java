@@ -62,7 +62,7 @@ public class WorkoutDetailsParserTest {
      *                 v3: [calories, hr, speed_int32]
      *                 v4: [hr, events, stroke_rate]
      *                 v5: [steps, hr, events, calories, spo2, cadence, pace_int16]
-     *                 v6: [steps, hr, events, cadence, speedRaw_int24]
+     *                 v6: [steps, hr, distance_dm, stride, cadence, pace_int16]
      */
     private static byte[] buildBytes(final int version, final Segment... segments) {
         final byte[] signature;
@@ -178,17 +178,14 @@ public class WorkoutDetailsParserTest {
                         buf.put(new byte[23]);  // 23 unidentified bytes
                         break;
                     case 6:
-                        buf.put((byte) rec[0]); // steps
+                        buf.put((byte) rec[0]); // steps, in the low nibble
                         buf.put((byte) rec[1]); // hr
-                        buf.put((byte) rec[2]); // events
-                        buf.put((byte) rec[3]); // cadence
-                        buf.putInt(0);          // 4 unknown bytes (zero)
-                        buf.put((byte) 0);      // 1 unknown byte (zero)
-                        // speedRaw as 3-byte LE uint24
-                        final int spd = rec[4];
-                        buf.put((byte) (spd & 0xFF));
-                        buf.put((byte) ((spd >> 8) & 0xFF));
-                        buf.put((byte) ((spd >> 16) & 0xFF));
+                        buf.put((byte) rec[2]); // distance (dm)
+                        buf.put((byte) rec[3]); // stride (cm)
+                        buf.putInt(0);          // reserved
+                        buf.put((byte) 0);      // reserved
+                        buf.put((byte) rec[4]); // cadence
+                        buf.putShort((short) rec[5]); // pace
                         break;
                 }
             }
@@ -517,9 +514,9 @@ public class WorkoutDetailsParserTest {
         final int startTs = 1700009000;
         final byte[] bytes = buildBytes(6,
                 new Segment(startTs, new int[][]{
-                        // steps, hr, events, cadence (stride rate, ×2 -> spm), speedRaw (24-bit)
-                        {3, 165, 0x15, 82, 201579},
-                        {2, 167, 0x24, 84, 194159},
+                        // steps (calories in the high nibble), hr, distance, stride, cadence, pace
+                        {0x53, 165, 22, 82, 164, 430},
+                        {0x42, 167, 24, 84, 168, 425},
                 }));
 
         final List<WorkoutDetailRecord> records = WorkoutDetailsParser.parseBytes(makeFileId(6), bytes);
@@ -530,15 +527,16 @@ public class WorkoutDetailsParserTest {
         assertEquals(startTs, records.get(0).ts);
         assertEquals(165,     records.get(0).hr);
         assertEquals(Integer.valueOf(3), records.get(0).steps);
-        // 82 strides/min × 2 = 164 spm
-        assertEquals(Integer.valueOf(164),    records.get(0).cadence);
-        assertEquals(Integer.valueOf(201579), records.get(0).speedRaw);
+        assertEquals(Integer.valueOf(164), records.get(0).cadence);
+        assertEquals(Integer.valueOf(22), records.get(0).distanceDm);
+        // (22 + 24) dm over the 2-record segment
+        assertEquals(2.3f, records.get(0).speedMps, 0.0001f);
 
         assertEquals(startTs + 1, records.get(1).ts);
         assertEquals(167,         records.get(1).hr);
-        // 84 strides/min × 2 = 168 spm
-        assertEquals(Integer.valueOf(168),    records.get(1).cadence);
-        assertEquals(Integer.valueOf(194159), records.get(1).speedRaw);
+        assertEquals(Integer.valueOf(2), records.get(1).steps);
+        assertEquals(Integer.valueOf(168), records.get(1).cadence);
+        assertEquals(2.3f, records.get(1).speedMps, 0.0001f);
     }
 
     @Test
@@ -546,8 +544,8 @@ public class WorkoutDetailsParserTest {
         final int startTs = 1700010000;
         final byte[] bytes = buildBytes(6,
                 new Segment(startTs, new int[][]{
-                        {3, 170, 0x15, 85, 200000},
-                        {3, 172, 0x24, 86, 195000},
+                        {3, 170, 20, 85, 170, 400},
+                        {3, 172, 22, 86, 172, 390},
                 }));
 
         final ActivityTrack track = new WorkoutDetailsParser().getActivityTrack(makeFileId(6), bytes);
@@ -558,51 +556,31 @@ public class WorkoutDetailsParserTest {
 
         assertEquals(startTs * 1000L, points.get(0).getTime().getTime());
         assertEquals(170, points.get(0).getHeartRate());
-        // 85 strides/min × 2 = 170 spm
         assertEquals(170, points.get(0).getCadence());
         assertNull(points.get(0).getLocation());
-        // Speed conversion: 256000 / 200000 = 1.28 m/s
-        assertEquals(1.28f, points.get(0).getSpeed(), 0.001f);
+        assertEquals(2.1f, points.get(0).getSpeed(), 0.001f);
 
         assertEquals((startTs + 1) * 1000L, points.get(1).getTime().getTime());
         assertEquals(172, points.get(1).getHeartRate());
-        // 86 strides/min × 2 = 172 spm
         assertEquals(172, points.get(1).getCadence());
-        // 256000 / 195000 ≈ 1.3128 m/s
-        assertEquals(1.3128f, points.get(1).getSpeed(), 0.001f);
+        assertEquals(2.1f, points.get(1).getSpeed(), 0.001f);
     }
 
+    /// A stopped belt covers no distance, which plots as zero speed.
     @Test
-    public void testGetActivityTrackV6_dropsZeroSpeed() {
+    public void testGetActivityTrackV6_standstillIsZeroSpeed() {
         final int startTs = 1700011000;
         final byte[] bytes = buildBytes(6,
                 new Segment(startTs, new int[][]{
-                        // speedRaw=0 → treadmill paused, no speed value set
-                        {0, 80, 0x00, 0, 0},
+                        {0, 80, 0, 0, 0, 0},
                 }));
 
         final ActivityTrack track = new WorkoutDetailsParser().getActivityTrack(makeFileId(6), bytes);
 
         assertNotNull(track);
         final ActivityPoint p = track.getAllPoints().get(0);
-        // ActivityPoint.speed default = -1 when unset
-        assertEquals(-1f, p.getSpeed(), 0.0001f);
-    }
-
-    @Test
-    public void testGetActivityTrackV6_capsUnrealisticSpeed() {
-        final int startTs = 1700012000;
-        final byte[] bytes = buildBytes(6,
-                new Segment(startTs, new int[][]{
-                        // speedRaw=10 → 25600 m/s, far above 20 m/s cap, should be dropped
-                        {1, 100, 0x00, 80, 10},
-                }));
-
-        final ActivityTrack track = new WorkoutDetailsParser().getActivityTrack(makeFileId(6), bytes);
-
-        assertNotNull(track);
-        final ActivityPoint p = track.getAllPoints().get(0);
-        assertEquals(-1f, p.getSpeed(), 0.0001f);
+        assertEquals(0f, p.getSpeed(), 0.0001f);
+        assertEquals(-1, p.getCadence());
     }
 
     @Test
@@ -844,6 +822,31 @@ public class WorkoutDetailsParserTest {
         assertEquals(156, records.get(2).hr);
     }
 
+    /// Elliptical record: steps in the low nibble of byte 0 (calories in the high nibble), HR,
+    /// cadence.
+    @Test
+    public void testV3EllipticalStepsAndCadence() {
+        final byte[] bytes = buildHrOnlyBytes(
+                new byte[]{(byte) 0xFF, (byte) 0xFF}, 9, 3, 0, 4,
+                1739182000, new int[]{118, 140});
+        final int records0 = 7 + 1 + 2 + 9;
+        bytes[records0] = 0x52;
+        bytes[records0 + 2] = (byte) 150;
+        bytes[records0 + 3] = 0x01;
+        bytes[records0 + 5] = (byte) 152;
+        final ByteBuffer crc = ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN);
+        crc.putInt(bytes.length - 4, CheckSums.getCRC32(bytes, 0, bytes.length - 4));
+
+        final List<WorkoutDetailRecord> records = WorkoutDetailsParser.parseBytes(makeFileId(0x0B, 3), bytes);
+
+        assertNotNull(records);
+        assertEquals(Integer.valueOf(2), records.get(0).steps);
+        assertEquals(Integer.valueOf(150), records.get(0).cadence);
+        assertEquals(140, records.get(1).hr);
+        assertEquals(Integer.valueOf(1), records.get(1).steps);
+        assertEquals(Integer.valueOf(152), records.get(1).cadence);
+    }
+
     @Test
     public void testV6IndoorCyclingHr() {
         final int startTs = 1756745770;
@@ -1025,32 +1028,53 @@ public class WorkoutDetailsParserTest {
     /// records than it supplies.
     private static byte[] buildRunWalkBytes(final int version, final String bitmap, final int startTs,
                                             final int recordCount, final String... records) {
+        return buildRunWalkSegments(version, bitmap, new RunWalkSegment(startTs, recordCount, records));
+    }
+
+    private static final class RunWalkSegment {
+        final int startTs;
+        final int recordCount;
+        final String[] records;
+
+        RunWalkSegment(final int startTs, final int recordCount, final String... records) {
+            this.startTs = startTs;
+            this.recordCount = recordCount;
+            this.records = records;
+        }
+    }
+
+    private static byte[] buildRunWalkSegments(final int version, final String bitmap, final RunWalkSegment... segments) {
         final byte[] bitmapBytes = hex(bitmap);
         final int headerSize = version == 5 ? 17 : 27;
-        int dataSize = 7 + 1 + bitmapBytes.length + headerSize + 4;
-        for (final String record : records) {
-            dataSize += hex(record).length;
+        int dataSize = 7 + 1 + bitmapBytes.length + 4;
+        for (final RunWalkSegment segment : segments) {
+            dataSize += headerSize;
+            for (final String record : segment.records) {
+                dataSize += hex(record).length;
+            }
         }
         final ByteBuffer buf = ByteBuffer.allocate(dataSize).order(ByteOrder.LITTLE_ENDIAN);
         buf.put(new byte[7]);
         buf.put((byte) 0);
         buf.put(bitmapBytes);
-        final byte[] header = new byte[headerSize];
-        final ByteBuffer headerBuf = ByteBuffer.wrap(header).order(ByteOrder.LITTLE_ENDIAN);
-        headerBuf.putInt(4, recordCount);
-        headerBuf.putInt(8, startTs);
-        header[12] = (byte) 0x7f;
-        buf.put(header);
-        for (final String record : records) {
-            buf.put(hex(record));
+        for (final RunWalkSegment segment : segments) {
+            final byte[] header = new byte[headerSize];
+            final ByteBuffer headerBuf = ByteBuffer.wrap(header).order(ByteOrder.LITTLE_ENDIAN);
+            headerBuf.putInt(4, segment.recordCount);
+            headerBuf.putInt(8, segment.startTs);
+            header[12] = (byte) 0x7f;
+            buf.put(header);
+            for (final String record : segment.records) {
+                buf.put(hex(record));
+            }
         }
         final byte[] arr = buf.array();
         buf.putInt(CheckSums.getCRC32(arr, 0, arr.length - 4));
         return buf.array();
     }
 
-    /// Mi Band 9 Active outdoor run: the bitmap flags only HR, one reserved byte, cadence and
-    /// pace, so each record is 5 bytes. Records taken from the run in #6875.
+    /// Mi Band 9 Active outdoor run: the bitmap flags only HR, distance, cadence and pace, so
+    /// each record is 5 bytes. Records taken from the run in #6875.
     @Test
     public void testRunWalkV5MiBand9ActiveRun() {
         final byte[] bytes = buildRunWalkBytes(5, "0C 0C 00 0C C0", 1790810050, 2,
@@ -1066,8 +1090,9 @@ public class WorkoutDetailsParserTest {
         assertEquals(120, records.get(0).hr);
         assertEquals(121, records.get(1).hr);
         assertEquals(Integer.valueOf(141), records.get(0).cadence);
-        // pace 0x020E = 526 s/km
-        assertEquals(1000f / 526, records.get(0).speedMps, 0.0001f);
+        // distance 0x42 = 66 dm and 0x10 = 16 dm, averaged over the 2-record segment
+        assertEquals(4.1f, records.get(0).speedMps, 0.0001f);
+        assertEquals(4.1f, records.get(1).speedMps, 0.0001f);
         assertNull(records.get(0).steps);
     }
 
@@ -1085,15 +1110,15 @@ public class WorkoutDetailsParserTest {
             assertEquals(bitmap, 104, records.get(0).hr);
             assertEquals(bitmap, Integer.valueOf(2), records.get(0).steps);
             assertEquals(bitmap, Integer.valueOf(122), records.get(0).cadence);
-            // pace 0x0278 = 632 s/km
-            assertEquals(bitmap, 1000f / 632, records.get(0).speedMps, 0.0001f);
+            // distance 0x0F = 15 dm
+            assertEquals(bitmap, 1.5f, records.get(0).speedMps, 0.0001f);
         }
     }
 
-    /// The cadence nibble of this bitmap has its present bit set but its first value flagged
-    /// invalid, so the byte is skipped and cadence stays unset. A zero pace leaves speed unset.
+    /// The distance and cadence nibbles of this bitmap are B: present, with the first value bit
+    /// clear. The capture it comes from has real cadence and distance there, so both are read.
     @Test
-    public void testRunWalkV5InvalidCadenceAndZeroPace() {
+    public void testRunWalkV5BNibbleGroupsAreRead() {
         final byte[] bytes = buildRunWalkBytes(5, "DF CB B8 BB FF", 1747477626, 1,
                 "02 68 00 10 00 00 00 00 00 00 99 00 00");
 
@@ -1101,8 +1126,39 @@ public class WorkoutDetailsParserTest {
 
         assertNotNull(records);
         assertEquals(104, records.get(0).hr);
-        assertNull(records.get(0).cadence);
-        assertNull(records.get(0).speedMps);
+        assertEquals(Integer.valueOf(153), records.get(0).cadence);
+        assertEquals(1.6f, records.get(0).speedMps, 0.0001f);
+    }
+
+    /// Speed is the mean distance over 5 records centred on each record, clipped at the segment
+    /// edges, so a 0 followed by a doubled value plots as a steady speed. The second segment
+    /// does not borrow records from the first.
+    @Test
+    public void testRunWalkSpeedIsSmoothedWithinSegment() {
+        final byte[] bytes = buildRunWalkSegments(5, "0C 0C 00 0C C0",
+                new RunWalkSegment(1790810050, 6,
+                        "78 1E 8D 0E 02",
+                        "78 1E 8D 0E 02",
+                        "78 00 8D 0E 02",
+                        "78 3C 8D 0E 02",
+                        "78 1E 8D 0E 02",
+                        "78 1E 8D 0E 02"),
+                new RunWalkSegment(1790810100, 2,
+                        "78 0A 8D 0E 02",
+                        "78 0A 8D 0E 02"));
+
+        final List<WorkoutDetailRecord> records = WorkoutDetailsParser.parseBytes(makeFileId(SUBTYPE_OUTDOOR_WALKING_V2, 5), bytes);
+
+        assertNotNull(records);
+        assertEquals(8, records.size());
+        // 30, 30, 0, 60, 30, 30 dm
+        assertEquals(2.0f, records.get(0).speedMps, 0.0001f);  // (30 + 30 + 0) / 3
+        assertEquals(3.0f, records.get(2).speedMps, 0.0001f);  // (30 + 30 + 0 + 60 + 30) / 5
+        assertEquals(3.0f, records.get(3).speedMps, 0.0001f);  // (30 + 0 + 60 + 30 + 30) / 5
+        assertEquals(4.0f, records.get(5).speedMps, 0.0001f);  // (60 + 30 + 30) / 3
+        assertEquals(1.0f, records.get(6).speedMps, 0.0001f);
+        assertEquals(1.0f, records.get(7).speedMps, 0.0001f);
+        assertEquals(1790810100, records.get(6).ts);
     }
 
     /// 8-byte records: groups 5 and 6 absent.
@@ -1116,7 +1172,7 @@ public class WorkoutDetailsParserTest {
         assertNotNull(records);
         assertEquals(155, records.get(0).hr);
         assertEquals(Integer.valueOf(170), records.get(0).cadence);
-        assertEquals(1000f / 360, records.get(0).speedMps, 0.0001f);
+        assertEquals(0.8f, records.get(0).speedMps, 0.0001f);
     }
 
     /// v8 adds four 2-byte groups. The walking, outdoor running and outdoor walking bitmaps all
@@ -1139,6 +1195,8 @@ public class WorkoutDetailsParserTest {
             assertEquals(bitmap, 99, records.get(0).hr);
             assertEquals(bitmap, 103, records.get(1).hr);
             assertEquals(bitmap, Integer.valueOf(3), records.get(1).steps);
+            assertEquals(bitmap, Integer.valueOf(123), records.get(1).cadence);
+            assertEquals(bitmap, 1.55f, records.get(1).speedMps, 0.0001f);
             assertEquals(bitmap, 1767527043, records.get(1).ts);
         }
     }
@@ -1148,8 +1206,8 @@ public class WorkoutDetailsParserTest {
     @Test
     public void testTreadmillV6WithFewerValidValues() {
         final byte[] bytes = buildBytes(6, new Segment(1755619911, new int[][]{
-                {2, 88, 15, 82, 0x02088C},
-                {2, 88, 18, 82, 0x02048D},
+                {2, 88, 15, 82, 140, 520},
+                {2, 88, 18, 82, 141, 516},
         }));
         bytes[9] = (byte) 0xFB;
 
@@ -1158,8 +1216,8 @@ public class WorkoutDetailsParserTest {
         assertNotNull(records);
         assertEquals(2, records.size());
         assertEquals(88, records.get(0).hr);
-        assertEquals(Integer.valueOf(164), records.get(0).cadence);
-        assertEquals(Integer.valueOf(0x02088C), records.get(0).speedRaw);
+        assertEquals(Integer.valueOf(140), records.get(0).cadence);
+        assertEquals(1.65f, records.get(0).speedMps, 0.0001f);
 
         assertNull("other sports keep the exact bitmap", WorkoutDetailsParser.parseBytes(makeFileId(SUBTYPE_OUTDOOR_RUNNING, 6), bytes));
     }

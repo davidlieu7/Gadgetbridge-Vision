@@ -49,8 +49,10 @@ public class WorkoutDetailsParser extends XiaomiActivityParser {
     private static final int[] RUN_WALK_GROUP_BYTES = {1, 1, 1, 1, 1, 4, 1, 1, 2, 2, 2, 2, 2};
     private static final int RUN_WALK_GROUP_STEPS = 0;
     private static final int RUN_WALK_GROUP_HR = 1;
+    private static final int RUN_WALK_GROUP_DISTANCE = 3;
     private static final int RUN_WALK_GROUP_CADENCE = 7;
-    private static final int RUN_WALK_GROUP_PACE = 8;
+    /** Records averaged, centred on each record, to turn the per-second distance into speed. */
+    private static final int SPEED_WINDOW = 5;
 
     private static final byte[] FREESTYLE_V3_BITMAP = {(byte) 0xFF, (byte) 0xBB};
     private static final byte[] OUTDOOR_CYCLING_BITMAP = {(byte) 0xDF, (byte) 0xCF, (byte) 0xFB};
@@ -73,6 +75,9 @@ public class WorkoutDetailsParser extends XiaomiActivityParser {
         /** Speed in m/s, for layouts whose speed unit is confirmed. Takes precedence over
          *  {@link #speedRaw}. */
         public Float speedMps;
+        /** Distance covered during this record's second, in dm, for layouts that record it.
+         *  Feeds {@link #speedMps} through {@link #setSpeedFromDistance}. */
+        public Integer distanceDm;
         /** True on the first record of each interval/segment, for layouts whose phase
          *  semantics are confirmed (currently rowing v4 only). Drives
          *  {@link ActivityTrack} segment boundaries → one FIT lap per interval. */
@@ -94,7 +99,8 @@ public class WorkoutDetailsParser extends XiaomiActivityParser {
 
     /**
      * Build an {@link ActivityTrack} from DETAILS binary data for non-GPS workouts.
-     * {@link ActivityPoint}s carry HR, cadence, and (v6) speed but no GPS location.
+     * {@link ActivityPoint}s carry HR, cadence, and speed where the layout has them, but no
+     * GPS location.
      * Returns null on parse failure or if there are no records.
      */
     @Nullable
@@ -127,8 +133,8 @@ public class WorkoutDetailsParser extends XiaomiActivityParser {
         return track;
     }
 
-    /** v6 treadmill: speedRaw is uint24 inverse pace, m/s ≈ 256000 / speedRaw.
-     *  Bound: treadmills cap around 25 km/h (~7 m/s); reject anything above 20 m/s as noise. */
+    /** Treadmill v5 speed bound: treadmills cap around 25 km/h (~7 m/s); anything above
+     *  20 m/s is rejected as noise. */
     private static void applyMetrics(final ActivityPoint.Builder builder,
                                      final int version,
                                      final WorkoutDetailRecord r) {
@@ -136,11 +142,6 @@ public class WorkoutDetailsParser extends XiaomiActivityParser {
         if (r.cadence != null && r.cadence > 0) builder.setCadence(r.cadence);
         if (r.speedMps != null) {
             builder.setSpeed(r.speedMps);
-        } else if (version == 6 && r.speedRaw != null && r.speedRaw > 0) {
-            final float speedMps = 256000f / r.speedRaw;
-            if (speedMps > 0f && speedMps < 20f) {
-                builder.setSpeed(speedMps);
-            }
         } else if (version == 5 && r.speedRaw != null && r.speedRaw > 0) {
             // Treadmill v5 stores belt speed directly in 0.1 km/h units → m/s = raw / 36.
             final float speedMps = r.speedRaw / 36f;
@@ -190,9 +191,6 @@ public class WorkoutDetailsParser extends XiaomiActivityParser {
         if (r.cadence != null && r.cadence > 0) p.setCadence(r.cadence);
         if (r.speedMps != null) {
             p.setSpeed(r.speedMps);
-        } else if (version == 6 && r.speedRaw != null && r.speedRaw > 0) {
-            final float speedMps = 256000f / r.speedRaw;
-            if (speedMps > 0f && speedMps < 20f) p.setSpeed(speedMps);
         } else if (version == 5 && r.speedRaw != null && r.speedRaw > 0) {
             // Treadmill v5 stores belt speed directly in 0.1 km/h units → m/s = raw / 36.
             final float speedMps = r.speedRaw / 36f;
@@ -255,19 +253,22 @@ public class WorkoutDetailsParser extends XiaomiActivityParser {
      * with one nibble per field group, as read by {@link XiaomiComplexActivityParser}: a group is
      * in the record when bit 3 of its nibble is set. The record size follows from the bitmap,
      * which varies with the band and the sport (a Mi Band 9 Active run carries 4 of the groups).
+     * The other three bits do not tell whether these single-value groups hold data: a B nibble
+     * carries real cadence and distance, so only bit 3 is checked.
      *
      * Segment header, 17 bytes in v5 and 27 bytes in v8:
-     *   offset 4-7:  int32 record count
-     *   offset 8-11: int32 segment start, unix seconds
+     *   offset 4-7:   int32 record count
+     *   offset 8-11:  int32 segment start, unix seconds
+     *   offset 13-16: int32 segment distance, metres
      *
-     * Groups read, see {@link #RUN_WALK_GROUP_BYTES} for the sizes:
+     * One record per second. Groups read, see {@link #RUN_WALK_GROUP_BYTES} for the sizes:
      *   0: steps in the low nibble
      *   1: HR (bpm)
+     *   3: distance covered in that second (uint8, dm). Summed over a segment it equals the
+     *      segment distance in the header on every capture. Speed comes from it, see
+     *      {@link #setSpeedFromDistance}.
      *   7: cadence (steps/min)
-     *   8: pace (uint16, s/km). Validated on a Mi Band 9 Active run: HR min/avg/max, top cadence
-     *      and fastest/slowest pace equal the paired summary. The pace is smoothed: summing
-     *      1000 / pace over that run gives 83% of the summary distance, so it only feeds the
-     *      speed chart.
+     * HR min/avg/max and top cadence of a Mi Band 9 Active run equal the paired summary.
      *
      * Returns null when the segments do not consume the payload exactly.
      */
@@ -319,6 +320,7 @@ public class WorkoutDetailsParser extends XiaomiActivityParser {
             }
             LOG.debug("Segment: {} records of {} bytes starting at ts={}", nr, recordSize, ts);
 
+            final int firstRecord = records.size();
             for (int i = 0; i < nr; i++) {
                 groups.reset();
                 final WorkoutDetailRecord r = new WorkoutDetailRecord();
@@ -332,30 +334,45 @@ public class WorkoutDetailsParser extends XiaomiActivityParser {
                             r.steps = groups.get(4, 4);
                             break;
                         case RUN_WALK_GROUP_HR:
-                            if (groups.hasFirst()) {
-                                r.hr = groups.get(0, 8);
-                            }
+                            r.hr = groups.get(0, 8);
+                            break;
+                        case RUN_WALK_GROUP_DISTANCE:
+                            r.distanceDm = groups.get(0, 8);
                             break;
                         case RUN_WALK_GROUP_CADENCE:
-                            if (groups.hasFirst()) {
-                                r.cadence = groups.get(0, 8);
-                            }
-                            break;
-                        case RUN_WALK_GROUP_PACE:
-                            if (groups.hasFirst()) {
-                                final int pace = groups.get(0, 16);
-                                if (pace > 0) {
-                                    r.speedMps = 1000f / pace;
-                                }
-                            }
+                            r.cadence = groups.get(0, 8);
                             break;
                     }
                 }
                 records.add(r);
             }
+            setSpeedFromDistance(records, firstRecord);
         }
 
         return records;
+    }
+
+    /** Sets {@link WorkoutDetailRecord#speedMps} on the records of one segment, from
+     *  {@code first} to the end of {@code records}, as their mean {@link WorkoutDetailRecord#distanceDm}
+     *  over {@link #SPEED_WINDOW} records centred on each one and clipped to the segment. The
+     *  per-second distance arrives in bursts (a 0 every few seconds, then a doubled value), which
+     *  the window evens out. Records are one second apart. No-op when the layout carries no
+     *  distance. */
+    private static void setSpeedFromDistance(final List<WorkoutDetailRecord> records, final int first) {
+        final int last = records.size() - 1;
+        if (first > last || records.get(first).distanceDm == null) {
+            return;
+        }
+        final int half = SPEED_WINDOW / 2;
+        for (int i = first; i <= last; i++) {
+            final int from = Math.max(first, i - half);
+            final int to = Math.min(last, i + half);
+            int sum = 0;
+            for (int j = from; j <= to; j++) {
+                sum += records.get(j).distanceDm;
+            }
+            records.get(i).speedMps = sum / 10f / (to - from + 1);
+        }
     }
 
     @Nullable
@@ -434,7 +451,7 @@ public class WorkoutDetailsParser extends XiaomiActivityParser {
                 } else if (matchesBitmap(fileId, bytes, XiaomiActivityFileId.Subtype.SPORTS_ELLIPTICAL, ELLIPTICAL_V3_BITMAP)) {
                     // SPORTS_ELLIPTICAL (subtype 0x0B) v3: signature FF FF.
                     //   9-byte segment header: int32 nr | int32 ts | byte phase (0x7f only observed).
-                    //   3-byte records — HR decoded in case 111. Validated against the paired
+                    //   3-byte records decoded in case 111. Validated against the paired
                     //   elliptical summary: the max per-record HR matched the summary HR_MAX.
                     expectedSignature = Arrays.copyOfRange(bytes, 8, 8 + ELLIPTICAL_V3_BITMAP.length);
                     segmentHeaderSize = 9;
@@ -536,7 +553,7 @@ public class WorkoutDetailsParser extends XiaomiActivityParser {
                 // v6 reused across sport types. Dispatch by signature.
                 if (matchesBitmap(fileId, bytes, XiaomiActivityFileId.Subtype.SPORTS_TREADMILL, TREADMILL_V6_BITMAP)) {
                     // SPORTS_TREADMILL: Signature FF FF 8B FF (4 bytes), segment header 13 bytes,
-                    // 12-byte records. High-res HR + cadence + raw speed.
+                    // 12-byte records, decoded in case 6.
                     // Segment header layout:
                     //   offset 0-3:  int32 nr            — record count for this segment
                     //   offset 4-7:  int32 ts            — segment start, unix seconds
@@ -638,6 +655,7 @@ public class WorkoutDetailsParser extends XiaomiActivityParser {
                 segmentStrokes = strokes > 0 ? strokes : null;
             }
             boolean firstInSegment = true;
+            final int segmentFirstRecord = records.size();
 
             final int segmentEnd = buf.position() + nr * recordSize;
             if (segmentEnd > buf.limit()) {
@@ -685,22 +703,27 @@ public class WorkoutDetailsParser extends XiaomiActivityParser {
                         buf.getShort(); // pace
                         break;
                     case 6:
-                        r.steps = buf.get() & 0xFF;
+                        // SPORTS_TREADMILL v6: 12-byte record, one byte per bitmap nibble except
+                        // where noted. Checked on 55 treadmill workouts from two bands against the
+                        // paired summary and segment headers.
+                        //   byte 0:     steps in the low nibble; their sum equals summary steps
+                        //   byte 1:     HR (bpm)
+                        //   byte 2:     distance covered in that second (uint8, dm); its sum
+                        //               equals the segment header distance and summary distance
+                        //   byte 3:     stride (cm); median close to the summary step length
+                        //   bytes 4-8:  reserved (5 bytes)
+                        //   byte 9:     cadence (steps/min); its maximum equals summary max cadence
+                        //   bytes 10-11: pace (uint16 LE, s/km); its fastest value equals the
+                        //               summary fastest pace, but it lags the distance, so speed
+                        //               comes from byte 2
+                        r.steps = buf.get() & 0x0F;
                         r.hr = buf.get() & 0xFF;
-                        buf.get(); // events/flags
-                        // Stored as stride rate (strides/min); × 2 yields steps/min to match the
-                        // summary's averageCadence unit. Verified against a 9 km/h treadmill workout
-                        // whose summary averageCadence = 163 spm matched 2 × mean(byte3) once
-                        // warmup/cooldown were included.
-                        r.cadence = (buf.get() & 0xFF) * 2;
-                        buf.getInt(); // 4 unknown bytes (typically zero)
-                        buf.get();    // 1 unknown byte (typically zero)
-                        // Raw speed as 3-byte LE uint24; appears to encode inverse pace (≈ 256000 / speedRaw m/s),
-                        // not yet calibrated against more workouts.
-                        final int speedLo = buf.get() & 0xFF;
-                        final int speedMid = buf.get() & 0xFF;
-                        final int speedHi = buf.get() & 0xFF;
-                        r.speedRaw = speedLo | (speedMid << 8) | (speedHi << 16);
+                        r.distanceDm = buf.get() & 0xFF;
+                        buf.get();    // stride
+                        buf.getInt(); // reserved
+                        buf.get();    // reserved
+                        r.cadence = buf.get() & 0xFF;
+                        buf.getShort(); // pace
                         break;
                     case 103:
                         // v3 FREESTYLE (Mi Band 8). 4-byte record: HR at byte 0, byte 1 events/flags,
@@ -720,10 +743,14 @@ public class WorkoutDetailsParser extends XiaomiActivityParser {
                         buf.getInt();                    // reserved (4 bytes)
                         break;
                     case 111:
-                        // SPORTS_ELLIPTICAL v3: 3-byte record. HR at byte 1.
-                        buf.get();                       // reserved (1 byte)
+                        // SPORTS_ELLIPTICAL v3: 3-byte record. Checked against the paired summary:
+                        // the step nibbles sum to its steps and the cadence peak equals its max.
+                        //   byte 0: steps in the low nibble
+                        //   byte 1: HR (bpm)
+                        //   byte 2: cadence (steps/min)
+                        r.steps = buf.get() & 0x0F;
                         r.hr = buf.get() & 0xFF;
-                        buf.get();                       // reserved (1 byte)
+                        r.cadence = buf.get() & 0xFF;
                         break;
                     case 113:
                         // SPORTS_OUTDOOR_CYCLING v3 and v5: 7-byte record.
@@ -771,6 +798,7 @@ public class WorkoutDetailsParser extends XiaomiActivityParser {
                 records.add(r);
                 ts++;
             }
+            setSpeedFromDistance(records, segmentFirstRecord);
         }
 
         return records;
