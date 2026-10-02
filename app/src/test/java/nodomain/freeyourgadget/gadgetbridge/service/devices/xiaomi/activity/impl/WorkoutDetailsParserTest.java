@@ -734,7 +734,7 @@ public class WorkoutDetailsParserTest {
     public void testGetActivityTrackV5Treadmill() {
         final int startTs = 1782063192;
         final byte[] bytes = buildTreadmillV5Bytes(startTs, new int[][]{
-                {120, 0},  // speed 0 → no speed set
+                {120, 0},  // belt stopped → speed 0
                 {140, 90}, // 9.0 km/h → 2.5 m/s
         });
 
@@ -745,6 +745,8 @@ public class WorkoutDetailsParserTest {
         final List<ActivityPoint> points = track.getAllPoints();
         assertEquals(2, points.size());
         assertEquals(120, points.get(0).getHeartRate());
+        // a measured 0, not the unset default of -1
+        assertEquals(0f, points.get(0).getSpeed(), 0.001f);
         assertEquals(140, points.get(1).getHeartRate());
         // speed: raw 90 (0.1 km/h) / 36 = 2.5 m/s
         assertEquals(2.5f, points.get(1).getSpeed(), 0.001f);

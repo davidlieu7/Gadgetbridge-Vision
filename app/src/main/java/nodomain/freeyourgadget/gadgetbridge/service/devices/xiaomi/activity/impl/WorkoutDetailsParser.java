@@ -138,22 +138,28 @@ public class WorkoutDetailsParser extends XiaomiActivityParser {
         return track;
     }
 
-    /** Treadmill v5 speed bound: treadmills cap around 25 km/h (~7 m/s); anything above
-     *  20 m/s is rejected as noise. */
     private static void applyMetrics(final ActivityPoint.Builder builder,
                                      final int version,
                                      final WorkoutDetailRecord r) {
         if (r.hr > 0) builder.setHeartRate(r.hr);
         if (r.cadence != null && r.cadence > 0) builder.setCadence(r.cadence);
-        if (r.speedMps != null) {
-            builder.setSpeed(r.speedMps);
-        } else if (version == 5 && r.speedRaw != null && r.speedRaw > 0) {
-            // Treadmill v5 stores belt speed directly in 0.1 km/h units → m/s = raw / 36.
-            final float speedMps = r.speedRaw / 36f;
-            if (speedMps > 0f && speedMps < 20f) {
-                builder.setSpeed(speedMps);
-            }
-        }
+        final Float speedMps = pointSpeedMps(version, r);
+        if (speedMps != null) builder.setSpeed(speedMps);
+    }
+
+    /**
+     * Speed in m/s for the record's {@link ActivityPoint}, or null when it carries none or an
+     * implausible one. Treadmill v5 stores the belt speed in 0.1 km/h, m/s = speedRaw / 36. A
+     * raw 0 is a stopped belt (the rest intervals, where the cadence is 0 as well), so it is a
+     * speed of 0, not a missing sample. Treadmills cap around 25 km/h (~7 m/s); anything above
+     * 20 m/s is noise.
+     */
+    @Nullable
+    private static Float pointSpeedMps(final int version, final WorkoutDetailRecord r) {
+        if (r.speedMps != null) return r.speedMps;
+        if (version != 5 || r.speedRaw == null) return null;
+        final float speedMps = r.speedRaw / 36f;
+        return speedMps < 20f ? speedMps : null;
     }
 
     /** Apply parsed DETAILS metrics onto an existing track (e.g. from GPS) by matching
@@ -194,13 +200,8 @@ public class WorkoutDetailsParser extends XiaomiActivityParser {
                                             final WorkoutDetailRecord r) {
         if (r.hr > 0) p.setHeartRate(r.hr);
         if (r.cadence != null && r.cadence > 0) p.setCadence(r.cadence);
-        if (r.speedMps != null) {
-            p.setSpeed(r.speedMps);
-        } else if (version == 5 && r.speedRaw != null && r.speedRaw > 0) {
-            // Treadmill v5 stores belt speed directly in 0.1 km/h units → m/s = raw / 36.
-            final float speedMps = r.speedRaw / 36f;
-            if (speedMps > 0f && speedMps < 20f) p.setSpeed(speedMps);
-        }
+        final Float speedMps = pointSpeedMps(version, r);
+        if (speedMps != null) p.setSpeed(speedMps);
     }
 
     /**
