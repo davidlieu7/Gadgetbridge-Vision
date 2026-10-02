@@ -60,7 +60,7 @@ import java.util.Date
 
 private val LOG = LoggerFactory.getLogger("RecordedWorkoutSyncer")
 
-/** Time span of a recorded workout; its distance is written as one session-wide DistanceRecord. */
+/** Time span of a recorded workout whose summary distance is written as one session-wide DistanceRecord. */
 internal data class WorkoutWindow(val start: Instant, val end: Instant) {
     /** Whether the one-minute activity sample ending at [endTs] overlaps this workout. */
     fun overlapsMinuteEndingAt(endTs: Instant): Boolean =
@@ -238,12 +238,12 @@ internal object RecordedWorkoutSyncer {
             !ActivityKind.isSleep(activityKind)
     }
 
-    /** Windows of the workouts this syncer writes that overlap [from, to]. */
+    /** Windows of the workouts overlapping [from, to] that this syncer writes a summary distance for. */
     internal fun queryWorkoutWindows(gbDevice: GBDevice, from: Instant, to: Instant): List<WorkoutWindow> {
-        try {
+        val workouts = try {
             GBApplication.acquireDbReadOnly().use { db ->
                 val device = DBHelper.getDevice(gbDevice, db.daoSession)
-                return db.daoSession.baseActivitySummaryDao.queryBuilder()
+                db.daoSession.baseActivitySummaryDao.queryBuilder()
                     .where(
                         BaseActivitySummaryDao.Properties.DeviceId.eq(device.id),
                         BaseActivitySummaryDao.Properties.StartTime.lt(Date.from(to)),
@@ -251,14 +251,21 @@ internal object RecordedWorkoutSyncer {
                     )
                     .build()
                     .list()
-                    .filter { isSyncedWorkout(it) }
-                    .map { WorkoutWindow(it.startTime.toInstant(), it.endTime.toInstant()) }
             }
         } catch (e: Exception) {
             LOG.error("Error querying workout windows for device '{}'", gbDevice.aliasOrName, e)
             return emptyList()
         }
+        // Some devices (Xiaomi) only fill summaryData when the workout is parsed.
+        parseWorkoutSummaries(workouts, gbDevice, GBApplication.getContext(), gbDevice.aliasOrName)
+        return distanceWindows(workouts)
     }
+
+    /** Windows of the [workouts] whose summary carries a distance; only those replace per-minute distance. */
+    internal fun distanceWindows(workouts: List<BaseActivitySummary>): List<WorkoutWindow> =
+        workouts
+            .filter { isSyncedWorkout(it) && summaryDistanceMeters(parseSummaryData(it.summaryData)) > 0 }
+            .map { WorkoutWindow(it.startTime.toInstant(), it.endTime.toInstant()) }
 
     private fun queryWorkoutsFromDatabase(
         gbDevice: GBDevice,
@@ -646,25 +653,12 @@ internal object RecordedWorkoutSyncer {
     }
 
     /**
-     * Distance of the whole workout: the summary's when it has one, else what the per-minute
-     * activity samples counted inside the window. The per-minute stream can hold far less than
-     * the workout (a fraction on Xiaomi bands, nothing for Garmin pool swims), and
-     * [DistanceSyncer] leaves these minutes to the workout, so this record is the only
-     * distance HC gets for them.
+     * Distance of the whole workout from its summary, 0 when the summary has none. The per-minute
+     * stream can hold far less than the workout (a fraction on Xiaomi bands, nothing for Garmin
+     * pool swims), so when this is positive [DistanceSyncer] leaves the workout's minutes to it.
      */
-    internal fun workoutDistanceMeters(
-        summaryData: ActivitySummaryData?,
-        samples: List<ActivitySample>,
-        window: WorkoutWindow
-    ): Double {
-        val summaryMeters = summaryData?.getNumber(ActivitySummaryEntries.DISTANCE_METERS, 0.0)?.toDouble() ?: 0.0
-        if (summaryMeters > 0) {
-            return summaryMeters
-        }
-        return samplesInWindow(samples, window)
-            .filter { it.distanceCm > 0 }
-            .sumOf { it.distanceCm / 100.0 }
-    }
+    internal fun summaryDistanceMeters(summaryData: ActivitySummaryData?): Double =
+        summaryData?.getNumber(ActivitySummaryEntries.DISTANCE_METERS, 0.0)?.toDouble() ?: 0.0
 
     private fun samplesInWindow(samples: List<ActivitySample>, window: WorkoutWindow): List<ActivitySample> =
         samples.filter { window.overlapsMinuteEndingAt(Instant.ofEpochSecond(it.timestamp.toLong())) }
@@ -686,9 +680,10 @@ internal object RecordedWorkoutSyncer {
     }
 
     /**
-     * Writes one DistanceRecord spanning the workout and deletes any per-minute DistanceRecords
-     * [DistanceSyncer] wrote inside it, which it does when the workout reached the database after
-     * its minutes were synced.
+     * When the summary has a distance, writes one DistanceRecord spanning the workout and deletes
+     * any per-minute DistanceRecords [DistanceSyncer] wrote inside it, which it does when the
+     * workout reached the database after its minutes were synced. Without a summary distance the
+     * per-minute records are the workout's distance and stay.
      */
     private suspend fun addWorkoutDistanceRecord(
         healthConnectClient: HealthConnectClient,
@@ -706,6 +701,10 @@ internal object RecordedWorkoutSyncer {
             return
         }
         if (!window.end.isAfter(window.start)) {
+            return
+        }
+        val distanceMeters = summaryDistanceMeters(parseSummaryData(workout.summaryData))
+        if (distanceMeters <= 0) {
             return
         }
 
@@ -727,10 +726,6 @@ internal object RecordedWorkoutSyncer {
             }
         }
 
-        val distanceMeters = workoutDistanceMeters(parseSummaryData(workout.summaryData), samples, window)
-        if (distanceMeters <= 0) {
-            return
-        }
         recordsToInsert.add(
             DistanceRecord(
                 startTime = window.start,

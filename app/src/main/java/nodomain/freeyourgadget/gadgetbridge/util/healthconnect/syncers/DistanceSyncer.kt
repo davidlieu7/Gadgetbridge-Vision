@@ -39,9 +39,10 @@ internal object DistanceSyncer : AbstractActivitySampleSyncer<DistanceRecord>() 
     internal const val RECORD_TYPE = "distance"
 
     /**
-     * Drops the minutes a recorded workout covers. HC does not add up overlapping records from
-     * one app, so per-minute records there would compete with the workout's session-wide
-     * DistanceRecord instead of adding to it; see [RecordedWorkoutSyncer.workoutDistanceMeters].
+     * Drops the minutes covered by a recorded workout with a summary distance. HC does not add up
+     * overlapping records from one app, so per-minute records there would compete with the
+     * workout's session-wide DistanceRecord instead of adding to it; see
+     * [RecordedWorkoutSyncer.summaryDistanceMeters].
      */
     internal fun excludeWorkoutWindows(samples: List<ActivitySample>, windows: List<WorkoutWindow>): List<ActivitySample> {
         if (windows.isEmpty()) {

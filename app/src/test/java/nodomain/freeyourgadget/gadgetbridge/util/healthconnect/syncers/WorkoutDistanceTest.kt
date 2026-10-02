@@ -2,6 +2,7 @@ package nodomain.freeyourgadget.gadgetbridge.util.healthconnect.syncers
 
 import androidx.health.connect.client.records.metadata.Device
 import androidx.health.connect.client.records.metadata.Metadata
+import nodomain.freeyourgadget.gadgetbridge.entities.BaseActivitySummary
 import nodomain.freeyourgadget.gadgetbridge.model.ActivityKind
 import nodomain.freeyourgadget.gadgetbridge.model.ActivitySample
 import nodomain.freeyourgadget.gadgetbridge.model.ActivitySummaryData
@@ -10,6 +11,7 @@ import org.junit.Assert.assertEquals
 import org.junit.Test
 import java.time.Instant
 import java.time.ZoneOffset
+import java.util.Date
 
 class WorkoutDistanceTest {
 
@@ -42,29 +44,52 @@ class WorkoutDistanceTest {
             add(ActivitySummaryEntries.DISTANCE_METERS, meters, ActivitySummaryEntries.UNIT_METERS)
         }
 
+    private fun workout(summaryData: ActivitySummaryData?, kind: ActivityKind = ActivityKind.RUNNING): BaseActivitySummary =
+        BaseActivitySummary().apply {
+            startTime = Date.from(workoutStart)
+            endTime = Date.from(workoutEnd)
+            activityKind = kind.code
+            this.summaryData = summaryData?.toJson()
+        }
+
     @Test
-    fun summaryDistanceWinsOverUndercountingSamples() {
-        // Mi Band 9 Active run: summary says 4040 m, the per-minute stream holds half of that.
-        val samples = workoutMinutes(cmPerMinute = 6733)
-        val meters = RecordedWorkoutSyncer.workoutDistanceMeters(summaryWithDistance(4040), samples, window)
-        assertEquals(4040.0, meters, 0.001)
+    fun summaryDistanceIsTheWorkoutDistance() {
+        // Mi Band 9 Active run (#6875): the summary's GPS distance, not the per-minute stream.
+        assertEquals(4040.0, RecordedWorkoutSyncer.summaryDistanceMeters(summaryWithDistance(4040)), 0.001)
     }
 
     @Test
-    fun summaryDistanceUsedWhenSamplesCarryNoDistance() {
-        // Garmin pool swim: the per-minute stream does not advance during the swim.
+    fun summaryWithoutDistanceGivesZero() {
+        assertEquals(0.0, RecordedWorkoutSyncer.summaryDistanceMeters(ActivitySummaryData()), 0.001)
+        assertEquals(0.0, RecordedWorkoutSyncer.summaryDistanceMeters(null), 0.001)
+    }
+
+    @Test
+    fun distanceWindowsOnlyCoverWorkoutsWithSummaryDistance() {
+        val windows = RecordedWorkoutSyncer.distanceWindows(
+            listOf(
+                workout(summaryWithDistance(1025)),
+                workout(ActivitySummaryData()),
+                workout(null),
+                workout(summaryWithDistance(500), ActivityKind.SLEEP_ANY)
+            )
+        )
+        assertEquals(listOf(window), windows)
+    }
+
+    @Test
+    fun minutesOfWorkoutWithoutSummaryDistanceAreKept() {
+        val samples = workoutMinutes(cmPerMinute = 1000)
+        val windows = RecordedWorkoutSyncer.distanceWindows(listOf(workout(ActivitySummaryData())))
+        assertEquals(samples, DistanceSyncer.excludeWorkoutWindows(samples, windows))
+    }
+
+    @Test
+    fun minutesOfWorkoutWithSummaryDistanceAreDropped() {
+        // Garmin pool swim (#6815): the summary distance replaces minutes that carry nothing.
         val samples = workoutMinutes(cmPerMinute = 0)
-        val meters = RecordedWorkoutSyncer.workoutDistanceMeters(summaryWithDistance(1025), samples, window)
-        assertEquals(1025.0, meters, 0.001)
-    }
-
-    @Test
-    fun samplesInsideWindowUsedWhenSummaryHasNoDistance() {
-        val samples = workoutMinutes(cmPerMinute = 1000) +
-            sample(baseTs, 50_000) +
-            sample(baseTs + 31 * 60L, 50_000)
-        assertEquals(300.0, RecordedWorkoutSyncer.workoutDistanceMeters(ActivitySummaryData(), samples, window), 0.001)
-        assertEquals(300.0, RecordedWorkoutSyncer.workoutDistanceMeters(null, samples, window), 0.001)
+        val windows = RecordedWorkoutSyncer.distanceWindows(listOf(workout(summaryWithDistance(1025))))
+        assertEquals(emptyList<ActivitySample>(), DistanceSyncer.excludeWorkoutWindows(samples, windows))
     }
 
     @Test
