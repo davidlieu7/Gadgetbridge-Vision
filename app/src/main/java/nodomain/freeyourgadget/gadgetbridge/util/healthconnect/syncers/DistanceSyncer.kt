@@ -49,7 +49,7 @@ internal object DistanceSyncer : AbstractActivitySampleSyncer<DistanceRecord>() 
             return samples
         }
         return samples.filter { sample ->
-            val endTs = Instant.ofEpochSecond(sample.timestamp.toLong())
+            val endTs = Instant.ofEpochSecond(minuteBucketEnd(sample.timestamp.toLong()))
             windows.none { it.overlapsMinuteEndingAt(endTs) }
         }
     }

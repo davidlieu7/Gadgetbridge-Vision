@@ -661,7 +661,7 @@ internal object RecordedWorkoutSyncer {
         summaryData?.getNumber(ActivitySummaryEntries.DISTANCE_METERS, 0.0)?.toDouble() ?: 0.0
 
     private fun samplesInWindow(samples: List<ActivitySample>, window: WorkoutWindow): List<ActivitySample> =
-        samples.filter { window.overlapsMinuteEndingAt(Instant.ofEpochSecond(it.timestamp.toLong())) }
+        samples.filter { window.overlapsMinuteEndingAt(Instant.ofEpochSecond(minuteBucketEnd(it.timestamp.toLong()))) }
 
     private fun loadActivitySamples(gbDevice: GBDevice, window: WorkoutWindow): List<ActivitySample> {
         try {
@@ -716,7 +716,9 @@ internal object RecordedWorkoutSyncer {
 
         val device = metadata.device
         if (device != null) {
-            val staleIds = samplesInWindow(samples, window).map { distanceClientRecordId(device, it.timestamp.toLong()) }
+            val staleIds = samplesInWindow(samples, window)
+                .map { distanceClientRecordId(device, minuteBucketEnd(it.timestamp.toLong())) }
+                .distinct()
             if (staleIds.isNotEmpty()) {
                 try {
                     healthConnectClient.deleteRecords(DistanceRecord::class, emptyList(), staleIds)

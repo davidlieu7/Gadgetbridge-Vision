@@ -96,12 +96,13 @@ class WorkoutDistanceTest {
     fun excludeWorkoutWindowsDropsOnlyMinutesOverlappingAWorkout() {
         val before = sample(baseTs, 100) // minute ends exactly at workout start
         val inside = sample(baseTs + 60, 100)
-        val straddlingEnd = sample(baseTs + 30 * 60L + 30, 100)
+        val lastMinute = sample(baseTs + 30 * 60L - 30, 100) // sub-minute sample, bucket ends at workout end
+        val afterEnd = sample(baseTs + 30 * 60L + 30, 100) // sub-minute sample, bucket starts at workout end
         val after = sample(baseTs + 31 * 60L, 100) // minute starts exactly at workout end
 
-        val kept = DistanceSyncer.excludeWorkoutWindows(listOf(before, inside, straddlingEnd, after), listOf(window))
+        val kept = DistanceSyncer.excludeWorkoutWindows(listOf(before, inside, lastMinute, afterEnd, after), listOf(window))
 
-        assertEquals(listOf(before, after), kept)
+        assertEquals(listOf(before, afterEnd, after), kept)
     }
 
     @Test
@@ -119,5 +120,17 @@ class WorkoutDistanceTest {
         val record = DistanceSyncer.convertMinute(Instant.ofEpochSecond(endTs), listOf(sample(endTs, 100)), ZoneOffset.UTC, metadata, "dev", 1L)!!
 
         assertEquals(record.metadata.clientRecordId, distanceClientRecordId(device, endTs))
+    }
+
+    @Test
+    fun subMinuteSampleKeysOnItsMinuteBucket() {
+        val device = Device(type = Device.TYPE_WATCH, manufacturer = "Pine64", model = "PineTime")
+        val metadata = Metadata.activelyRecorded(device)
+        val sampleTs = baseTs + 60 + 13
+
+        val (bucketEnd, minuteSamples) = DistanceSyncer.bucketByMinute(listOf(sample(sampleTs, 100))).single()
+        val record = DistanceSyncer.convertMinute(bucketEnd, minuteSamples, ZoneOffset.UTC, metadata, "dev", 1L)!!
+
+        assertEquals(record.metadata.clientRecordId, distanceClientRecordId(device, minuteBucketEnd(sampleTs)))
     }
 }
