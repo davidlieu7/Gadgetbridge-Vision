@@ -751,4 +751,9 @@ public abstract class XiaomiCoordinator extends AbstractBLEDeviceCoordinator {
     public boolean supportsAlarms() {
         return true;
     }
+
+    // Keep other models on their existing alarm protocol until device evidence is available.
+    public boolean usesBand10AlarmProtocol() {
+        return false;
+    }
 }

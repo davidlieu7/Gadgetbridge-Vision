@@ -370,6 +370,9 @@ public class XiaomiSupport extends AbstractBluetoothDeviceSupport {
 
     @Override
     public void onFetchRecordedData(final int dataTypes) {
+        if (getCoordinator().usesBand10AlarmProtocol()) {
+            scheduleService.requestAlarms();
+        }
         healthService.onFetchRecordedData(dataTypes);
     }
 

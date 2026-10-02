@@ -39,6 +39,7 @@ public final class XiaomiPreferences {
     public static final String PREF_CANNED_MESSAGES_MIN = "canned_messages_min";
     public static final String PREF_CANNED_MESSAGES_MAX = "canned_messages_max";
     public static final String PREF_WORKOUT_TYPES = "workout_types";
+    public static final String PREF_DISPLAY_ITEMS = "xiaomi_display_items"; // protobuf hex string
     public static final String PREF_WIDGET_SCREENS = "widget_screens"; // FIXME the value is a protobuf hex string
     public static final String PREF_WIDGET_PARTS = "widget_parts"; // FIXME the value is a protobuf hex string
 

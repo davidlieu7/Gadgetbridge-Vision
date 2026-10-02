@@ -51,6 +51,12 @@ public class MiBand10Coordinator extends XiaomiCoordinator {
         return true;
     }
 
+    // Zero-based IDs and 17:5 for disabling were observed on Band 10 (M2459B1) only.
+    @Override
+    public boolean usesBand10AlarmProtocol() {
+        return true;
+    }
+
     @Override
     public DeviceCoordinator.DeviceKind getDeviceKind(@NonNull GBDevice device) {
         return DeviceCoordinator.DeviceKind.FITNESS_BAND;

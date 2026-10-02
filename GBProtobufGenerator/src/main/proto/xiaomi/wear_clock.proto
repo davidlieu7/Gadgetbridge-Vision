@@ -9,7 +9,8 @@ message Schedule {
   optional Alarms alarms = 1;
   // 17, 1
   optional AlarmDetails createAlarm = 2;
-  // 17, 3 -> returns 17, 5
+  // Observed on Smart Band 10: 17, 2 edits an alarm. 17, 5 disables it.
+  // Other models were not verified in this capture.
   optional AlarmInfo editAlarm = 3;
 
   optional uint32 ackId = 4; // id of created or edited alarm and reminder
@@ -46,7 +47,9 @@ message Alarms {
 }
 
 message AlarmInfo {
-  optional uint32 id = 1; // starts at 1
+  // ID 0 was observed on Smart Band 10.
+  // This capture does not verify the ID conventions of other models.
+  optional uint32 id = 1;
   optional AlarmDetails alarmDetails = 2;
 }
 

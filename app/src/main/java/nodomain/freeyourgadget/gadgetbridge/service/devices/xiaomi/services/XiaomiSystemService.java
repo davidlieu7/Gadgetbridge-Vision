@@ -52,6 +52,7 @@ import nodomain.freeyourgadget.gadgetbridge.devices.huami.HuamiConst;
 import nodomain.freeyourgadget.gadgetbridge.devices.xiaomi.XiaomiFWHelper;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
 import nodomain.freeyourgadget.gadgetbridge.model.BatteryState;
+import nodomain.freeyourgadget.gadgetbridge.model.DeviceType;
 import nodomain.freeyourgadget.gadgetbridge.model.SleepState;
 import nodomain.freeyourgadget.gadgetbridge.model.WearingState;
 import nodomain.freeyourgadget.gadgetbridge.proto.xiaomi.WearCommon;
@@ -206,6 +207,13 @@ public class XiaomiSystemService extends AbstractXiaomiService implements Xiaomi
                 return;
             case CMD_DISPLAY_ITEMS_GET:
                 handleDisplayItems(cmd.getSystem().getDisplayItems());
+                return;
+            case CMD_DISPLAY_ITEMS_SET:
+                if (getSupport().getDevice().getType() != DeviceType.MIBAND10) {
+                    break;
+                }
+                LOG.debug("Got display items set ack, status={}", cmd.getStatus());
+                getSupport().sendCommand("get display items", COMMAND_TYPE, CMD_DISPLAY_ITEMS_GET);
                 return;
             case CMD_WORKOUT_TYPES_GET:
                 handleWorkoutTypes(cmd.getSystem().getWorkoutTypes());
@@ -567,6 +575,20 @@ public class XiaomiSystemService extends AbstractXiaomiService implements Xiaomi
             labelsMap.put(allScreens.get(i), allLabels.get(i));
         }
 
+        final boolean isBand10 = getSupport().getDevice().getType() == DeviceType.MIBAND10;
+        final Map<String, XiaomiSystem.DisplayItem> originalItems = new HashMap<>();
+        final String originalHex = isBand10 ? prefs.getString(XiaomiPreferences.PREF_DISPLAY_ITEMS, null) : null;
+        if (originalHex != null) {
+            try {
+                final XiaomiSystem.DisplayItems original = XiaomiSystem.DisplayItems.parseFrom(GB.hexStringToByteArray(originalHex));
+                for (final XiaomiSystem.DisplayItem item : original.getDisplayItemList()) {
+                    originalItems.put(item.getCode(), item);
+                }
+            } catch (final InvalidProtocolBufferException | IllegalArgumentException | IndexOutOfBoundsException e) {
+                LOG.warn("Failed to read cached display items", e);
+            }
+        }
+
         LOG.debug("Setting display items: {}", enabledScreens);
 
         if (settingsCode != null && !enabledScreens.contains(settingsCode)) {
@@ -584,10 +606,10 @@ public class XiaomiSystemService extends AbstractXiaomiService implements Xiaomi
                 continue;
             }
 
-            final var displayItem = XiaomiSystem.DisplayItem.newBuilder()
-                    .setCode(enabledScreen)
-                    .setName(labelsMap.get(enabledScreen))
-                    .setUnknown5(1);
+            final var displayItem = displayItemBuilder(enabledScreen, labelsMap, originalItems)
+                    .clearDisabled()
+                    .clearInMoreSection()
+                    .clearIsSettings();
 
             if (inMoreSection) {
                 displayItem.setInMoreSection(true);
@@ -601,15 +623,14 @@ public class XiaomiSystemService extends AbstractXiaomiService implements Xiaomi
         }
 
         for (final String screen : allScreens) {
-            if (enabledScreens.contains(screen)) {
+            // Band 10 must not receive the synthetic "more" UI separator as an app.
+            if (enabledScreens.contains(screen) || (isBand10 && screen.equals("more"))) {
                 continue;
             }
 
-            final var displayItem = XiaomiSystem.DisplayItem.newBuilder()
-                    .setCode(screen)
-                    .setName(labelsMap.get(screen))
-                    .setDisabled(true)
-                    .setUnknown5(1);
+            // Preserve Band 10 metadata, including the section of hidden apps.
+            final var displayItem = displayItemBuilder(screen, labelsMap, originalItems)
+                    .setDisabled(true);
 
             displayItems.addDisplayItem(displayItem);
         }
@@ -622,6 +643,20 @@ public class XiaomiSystemService extends AbstractXiaomiService implements Xiaomi
                         .setSystem(XiaomiSystem.System.newBuilder().setDisplayItems(displayItems))
                         .build()
         );
+    }
+
+    private XiaomiSystem.DisplayItem.Builder displayItemBuilder(
+            final String code,
+            final Map<String, String> labels,
+            final Map<String, XiaomiSystem.DisplayItem> originalItems) {
+        final XiaomiSystem.DisplayItem original = originalItems.get(code);
+        if (original != null) {
+            return original.toBuilder();
+        }
+        return XiaomiSystem.DisplayItem.newBuilder()
+                .setCode(code)
+                .setName(labels.get(code))
+                .setUnknown5(1);
     }
 
     private void handleDisplayItems(final XiaomiSystem.DisplayItems displayItems) {
@@ -667,6 +702,10 @@ public class XiaomiSystemService extends AbstractXiaomiService implements Xiaomi
                 .withPreference(DeviceSettingsUtils.getPrefPossibleValueLabelsKey(HuamiConst.PREF_DISPLAY_ITEMS_SORTABLE), allScreensLabelsPrefValue)
                 .withPreference(PREF_SETTINGS_DISPLAY_ITEM_CODE, settingsCode)
                 .withPreference(HuamiConst.PREF_DISPLAY_ITEMS_SORTABLE, prefValue);
+
+        if (getSupport().getDevice().getType() == DeviceType.MIBAND10) {
+            eventUpdatePreferences.withPreference(XiaomiPreferences.PREF_DISPLAY_ITEMS, GB.hexdump(displayItems.toByteArray()));
+        }
 
         getSupport().evaluateGBDeviceEvent(eventUpdatePreferences);
     }
