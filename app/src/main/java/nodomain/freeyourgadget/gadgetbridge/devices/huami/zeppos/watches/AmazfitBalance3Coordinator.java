@@ -29,12 +29,6 @@ import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
 
 public class AmazfitBalance3Coordinator extends ZeppOsCoordinator {
     @Override
-    public boolean isExperimental() {
-        // untested
-        return true;
-    }
-
-    @Override
     public ConnectionType getConnectionType() {
         // unconfirmed
         return ConnectionType.BOTH;

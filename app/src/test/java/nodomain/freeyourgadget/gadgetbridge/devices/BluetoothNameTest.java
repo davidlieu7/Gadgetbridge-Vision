@@ -25,6 +25,8 @@ public class BluetoothNameTest extends TestBase {
             put("UGREEN HiTune Max5c", DeviceType.UGREEN_HITUNE_MAX_5C);
             put("UGREEN HiTune Max 5c", DeviceType.UGREEN_HITUNE_MAX_5C);
             put("Active 2 NFC (Round)", DeviceType.AMAZFITACTIVE2NFC);
+            put("Amazfit Balance 3", DeviceType.AMAZFITBALANCE3); // #6895
+            put("Balance 3", DeviceType.AMAZFITBALANCE3); // #6895
             put("Amazfit Band 7", DeviceType.AMAZFITBAND7); // #2945
             put("Amazfit GTR 3 Pro", DeviceType.AMAZFITGTR3PRO); // #2442
             put("Amazfit GTS", DeviceType.AMAZFITGTS); // #5391
