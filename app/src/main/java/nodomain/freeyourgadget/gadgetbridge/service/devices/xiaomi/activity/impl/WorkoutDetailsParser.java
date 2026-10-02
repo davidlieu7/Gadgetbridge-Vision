@@ -42,6 +42,16 @@ import nodomain.freeyourgadget.gadgetbridge.util.GB;
 public class WorkoutDetailsParser extends XiaomiActivityParser {
     private static final Logger LOG = LoggerFactory.getLogger(WorkoutDetailsParser.class);
 
+    /** Bytes per field group of an outdoor run/walk record, in bitmap order. v5 records hold
+     *  groups 0-8 and v8 records all 13. The sizes reproduce the record size of every captured
+     *  bitmap: v5 FF CF F8 BF FF = 13 bytes, v5 EC CC C0 0C C0 = 8, v5 0C 0C 00 0C C0 = 5,
+     *  v8 FF CF F8 BF FB BB BF, FF CF FA BF FB BF FF and DF CB F8 BB FB BB BF = 21. */
+    private static final int[] RUN_WALK_GROUP_BYTES = {1, 1, 1, 1, 1, 4, 1, 1, 2, 2, 2, 2, 2};
+    private static final int RUN_WALK_GROUP_STEPS = 0;
+    private static final int RUN_WALK_GROUP_HR = 1;
+    private static final int RUN_WALK_GROUP_CADENCE = 7;
+    private static final int RUN_WALK_GROUP_PACE = 8;
+
     /** Known v8 data-valid bitmaps. The bitmap is not a fixed signature - it varies with the
      *  workout type (one nibble per field group) - but every known value shares the same
      *  27-byte header and 21-byte records, decoded as layout 108, verified against the
@@ -230,11 +240,122 @@ public class WorkoutDetailsParser extends XiaomiActivityParser {
         return null;
     }
 
+    /**
+     * Outdoor run/walk (subtype 0x16) v5 and v8. The fileId and padding are followed by a bitmap
+     * with one nibble per field group, as read by {@link XiaomiComplexActivityParser}: a group is
+     * in the record when bit 3 of its nibble is set. The record size follows from the bitmap,
+     * which varies with the band and the sport (a Mi Band 9 Active run carries 4 of the groups).
+     *
+     * Segment header, 17 bytes in v5 and 27 bytes in v8:
+     *   offset 4-7:  int32 record count
+     *   offset 8-11: int32 segment start, unix seconds
+     *
+     * Groups read, see {@link #RUN_WALK_GROUP_BYTES} for the sizes:
+     *   0: steps in the low nibble
+     *   1: HR (bpm)
+     *   7: cadence (steps/min)
+     *   8: pace (uint16, s/km). Validated on a Mi Band 9 Active run: HR min/avg/max, top cadence
+     *      and fastest/slowest pace equal the paired summary. The pace is smoothed: summing
+     *      1000 / pace over that run gives 83% of the summary distance, so it only feeds the
+     *      speed chart.
+     *
+     * Returns null when the segments do not consume the payload exactly.
+     */
+    @Nullable
+    private static List<WorkoutDetailRecord> parseRunWalkRecords(final XiaomiActivityFileId fileId, final byte[] bytes) {
+        final int version = fileId.getVersion();
+        final int bitmapSize = version == 5 ? 5 : 7;
+        final int groupCount = version == 5 ? 9 : RUN_WALK_GROUP_BYTES.length;
+        final int segmentHeaderSize = version == 5 ? 17 : 27;
+
+        if (bytes.length < 8 + bitmapSize + 4) {
+            LOG.warn("Run/walk v{} DETAILS too short: {} bytes", version, bytes.length);
+            return null;
+        }
+        final byte[] bitmap = Arrays.copyOfRange(bytes, 8, 8 + bitmapSize);
+
+        int recordSize = 0;
+        for (int group = 0; group < groupCount; group++) {
+            final int nibble = (group % 2 == 0 ? bitmap[group / 2] >> 4 : bitmap[group / 2]) & 0x0F;
+            if ((nibble & 8) != 0) {
+                recordSize += RUN_WALK_GROUP_BYTES[group];
+            }
+        }
+        if (recordSize == 0) {
+            LOG.warn("Run/walk v{} DETAILS bitmap {} has no field groups", version, GB.hexdump(bitmap));
+            return null;
+        }
+
+        final ByteBuffer buf = ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN);
+        buf.limit(buf.limit() - 4); // strip CRC32
+        buf.position(8 + bitmapSize);
+
+        final XiaomiComplexActivityParser groups = new XiaomiComplexActivityParser(bitmap, buf);
+        final List<WorkoutDetailRecord> records = new ArrayList<>();
+        while (buf.hasRemaining()) {
+            final int segmentStart = buf.position();
+            if (buf.remaining() < segmentHeaderSize) {
+                LOG.warn("Run/walk v{} DETAILS bitmap {}: {} trailing bytes at {}",
+                        version, GB.hexdump(bitmap), buf.remaining(), segmentStart);
+                return null;
+            }
+            final int nr = buf.getInt(segmentStart + 4);
+            int ts = buf.getInt(segmentStart + 8);
+            buf.position(segmentStart + segmentHeaderSize);
+            if (nr < 0 || (long) nr * recordSize > buf.remaining()) {
+                LOG.warn("Run/walk v{} DETAILS bitmap {}: segment at {} claims {} records of {} bytes, {} bytes remain",
+                        version, GB.hexdump(bitmap), segmentStart, nr, recordSize, buf.remaining());
+                return null;
+            }
+            LOG.debug("Segment: {} records of {} bytes starting at ts={}", nr, recordSize, ts);
+
+            for (int i = 0; i < nr; i++) {
+                groups.reset();
+                final WorkoutDetailRecord r = new WorkoutDetailRecord();
+                r.ts = ts++;
+                for (int group = 0; group < groupCount; group++) {
+                    if (!groups.nextGroup(RUN_WALK_GROUP_BYTES[group] * 8)) {
+                        continue;
+                    }
+                    switch (group) {
+                        case RUN_WALK_GROUP_STEPS:
+                            r.steps = groups.get(4, 4);
+                            break;
+                        case RUN_WALK_GROUP_HR:
+                            if (groups.hasFirst()) {
+                                r.hr = groups.get(0, 8);
+                            }
+                            break;
+                        case RUN_WALK_GROUP_CADENCE:
+                            if (groups.hasFirst()) {
+                                r.cadence = groups.get(0, 8);
+                            }
+                            break;
+                        case RUN_WALK_GROUP_PACE:
+                            if (groups.hasFirst()) {
+                                final int pace = groups.get(0, 16);
+                                if (pace > 0) {
+                                    r.speedMps = 1000f / pace;
+                                }
+                            }
+                            break;
+                    }
+                }
+                records.add(r);
+            }
+        }
+
+        return records;
+    }
+
     @Nullable
     private static List<WorkoutDetailRecord> parseRecords(final XiaomiActivityFileId fileId, final byte[] bytes) {
         final int version = fileId.getVersion();
+        if (fileId.getSubtype() == XiaomiActivityFileId.Subtype.SPORTS_OUTDOOR_WALKING_V2 && version == 5) {
+            return parseRunWalkRecords(fileId, bytes);
+        }
         // Layout code keys the segment-header + record-read switches. Defaults to `version`,
-        // but signature-keyed sub-dispatch (e.g. v3 FFBB53, v5 FFCFF8BFFF) can override it
+        // but signature-keyed sub-dispatch (e.g. v3 FFBB, v5 DFCFFB) can override it
         // to a synthetic code (>= 100) so the record loop can read the variant layout.
         int layoutCode = version;
         final int segmentHeaderSize;
@@ -362,20 +483,6 @@ public class WorkoutDetailsParser extends XiaomiActivityParser {
                     recordSize = 8;
                     tsPosition = 8;
                     nrPosition = 4;
-                } else if (bytes.length >= 13
-                        && bytes[8] == (byte) 0xFF && bytes[9] == (byte) 0xCF && bytes[10] == (byte) 0xF8
-                        && bytes[11] == (byte) 0xBF && bytes[12] == (byte) 0xFF) {
-                    // Mi Band 8 SPORTS_OUTDOOR_WALKING_V2 v5: signature FF CF F8 BF FF.
-                    //   17-byte segment header: 4 pad | int32 nr | int32 ts | byte phase | int32 distance
-                    //   13-byte records: [unk][hr][steps_lo][steps_hi][events][cadence][?][?][calories][?][?][?][?]
-                    // Phase byte: 0x7F observed (short workouts), 0x81/0x82 across multi-segment runs.
-                    // Multi-segment workouts split into active/transition phases similar to v6 treadmill.
-                    expectedSignature = new byte[]{(byte) 0xFF, (byte) 0xCF, (byte) 0xF8, (byte) 0xBF, (byte) 0xFF};
-                    segmentHeaderSize = 17;
-                    recordSize = 13;
-                    tsPosition = 8;
-                    nrPosition = 4;
-                    layoutCode = 105; // synthetic: v5-walking record shape
                 } else if (bytes.length >= 13
                         && bytes[8] == (byte) 0xEC && bytes[9] == (byte) 0xCC && bytes[10] == (byte) 0x80
                         && bytes[11] == (byte) 0x28 && bytes[12] == (byte) 0x06) {
@@ -625,29 +732,6 @@ public class WorkoutDetailsParser extends XiaomiActivityParser {
                         buf.get(); // unknown
                         buf.get(); // unknown
                         break;
-                    case 105:
-                        // SPORTS_OUTDOOR_WALKING_V2 v5: 13-byte record.
-                        //   byte 0:    nibble-packed: high4=caloriesInc, low4=stepsInc
-                        //   byte 1:    HR (uint8 bpm)
-                        //   byte 2:    bit-packed: bit7=kmMarker, bit6=heightSign, bit0-5=heightChange
-                        //   byte 3:    distanceInc (uint8 dm)
-                        //   byte 4:    stride (uint8 cm)
-                        //   bytes 5-9: reserved (5 bytes)
-                        //   byte 10:   cadence (uint8 spm)
-                        //   bytes 11-12: pace (uint16 LE, s/km)
-                    {
-                        final int caloriesAndSteps = buf.get() & 0xFF;
-                        r.steps = caloriesAndSteps & 0x0F;
-                        r.hr = buf.get() & 0xFF;
-                        buf.get();     // bit-packed flags + heightChange
-                        buf.get();     // distanceInc
-                        buf.get();     // stride
-                        buf.getInt();
-                        buf.get();
-                        r.cadence = buf.get() & 0xFF;
-                        buf.getShort();// pace
-                        break;
-                    }
                     case 205:
                         // SPORTS_TREADMILL v5: 8-byte record.
                         buf.get();                       // reserved (1 byte)

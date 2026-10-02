@@ -1002,4 +1002,138 @@ public class WorkoutDetailsParserTest {
         assertEquals(1787401873, records.get(0).ts);
         assertEquals(1787401876, records.get(3).ts);
     }
+
+    // ---- outdoor run/walk (subtype 0x16) v5 and v8, records sized from the bitmap ----
+
+    private static final int SUBTYPE_OUTDOOR_WALKING_V2 = 0x16;
+
+    private static XiaomiActivityFileId makeFileId(final int subtype, final int version) {
+        return new XiaomiActivityFileId(new Date(1700000000000L), 0, TYPE_SPORTS, subtype, DETAIL_TYPE_DETAILS, version);
+    }
+
+    private static byte[] hex(final String s) {
+        final String[] parts = s.split(" ");
+        final byte[] out = new byte[parts.length];
+        for (int i = 0; i < parts.length; i++) {
+            out[i] = (byte) Integer.parseInt(parts[i], 16);
+        }
+        return out;
+    }
+
+    /// One segment of run/walk records: record count at header offset 4, start time at offset 8,
+    /// 17-byte header in v5 and 27-byte header in v8. {@code recordCount} lets a test claim more
+    /// records than it supplies.
+    private static byte[] buildRunWalkBytes(final int version, final String bitmap, final int startTs,
+                                            final int recordCount, final String... records) {
+        final byte[] bitmapBytes = hex(bitmap);
+        final int headerSize = version == 5 ? 17 : 27;
+        int dataSize = 7 + 1 + bitmapBytes.length + headerSize + 4;
+        for (final String record : records) {
+            dataSize += hex(record).length;
+        }
+        final ByteBuffer buf = ByteBuffer.allocate(dataSize).order(ByteOrder.LITTLE_ENDIAN);
+        buf.put(new byte[7]);
+        buf.put((byte) 0);
+        buf.put(bitmapBytes);
+        final byte[] header = new byte[headerSize];
+        final ByteBuffer headerBuf = ByteBuffer.wrap(header).order(ByteOrder.LITTLE_ENDIAN);
+        headerBuf.putInt(4, recordCount);
+        headerBuf.putInt(8, startTs);
+        header[12] = (byte) 0x7f;
+        buf.put(header);
+        for (final String record : records) {
+            buf.put(hex(record));
+        }
+        final byte[] arr = buf.array();
+        buf.putInt(CheckSums.getCRC32(arr, 0, arr.length - 4));
+        return buf.array();
+    }
+
+    /// Mi Band 9 Active outdoor run: the bitmap flags only HR, one reserved byte, cadence and
+    /// pace, so each record is 5 bytes. Records taken from the run in #6875.
+    @Test
+    public void testRunWalkV5MiBand9ActiveRun() {
+        final byte[] bytes = buildRunWalkBytes(5, "0C 0C 00 0C C0", 1790810050, 2,
+                "78 42 8D 0E 02",
+                "79 10 8D 0E 02");
+
+        final List<WorkoutDetailRecord> records = WorkoutDetailsParser.parseBytes(makeFileId(SUBTYPE_OUTDOOR_WALKING_V2, 5), bytes);
+
+        assertNotNull(records);
+        assertEquals(2, records.size());
+        assertEquals(1790810050, records.get(0).ts);
+        assertEquals(1790810051, records.get(1).ts);
+        assertEquals(120, records.get(0).hr);
+        assertEquals(121, records.get(1).hr);
+        assertEquals(Integer.valueOf(141), records.get(0).cadence);
+        // pace 0x020E = 526 s/km
+        assertEquals(1000f / 526, records.get(0).speedMps, 0.0001f);
+        assertNull(records.get(0).steps);
+    }
+
+    /// 13-byte walk records, two bitmaps that differ only in which values of a group are valid.
+    @Test
+    public void testRunWalkV5FullRecords() {
+        for (final String bitmap : new String[]{"FF CF F8 BF FF", "FF CF B8 BF FF"}) {
+            final byte[] bytes = buildRunWalkBytes(5, bitmap, 1738174692, 1,
+                    "12 68 00 0F 4D 00 00 00 00 00 7A 78 02");
+
+            final List<WorkoutDetailRecord> records = WorkoutDetailsParser.parseBytes(makeFileId(SUBTYPE_OUTDOOR_WALKING_V2, 5), bytes);
+
+            assertNotNull(bitmap, records);
+            assertEquals(bitmap, 1, records.size());
+            assertEquals(bitmap, 104, records.get(0).hr);
+            assertEquals(bitmap, Integer.valueOf(2), records.get(0).steps);
+            assertEquals(bitmap, Integer.valueOf(122), records.get(0).cadence);
+            // pace 0x0278 = 632 s/km
+            assertEquals(bitmap, 1000f / 632, records.get(0).speedMps, 0.0001f);
+        }
+    }
+
+    /// The cadence nibble of this bitmap has its present bit set but its first value flagged
+    /// invalid, so the byte is skipped and cadence stays unset. A zero pace leaves speed unset.
+    @Test
+    public void testRunWalkV5InvalidCadenceAndZeroPace() {
+        final byte[] bytes = buildRunWalkBytes(5, "DF CB B8 BB FF", 1747477626, 1,
+                "02 68 00 10 00 00 00 00 00 00 99 00 00");
+
+        final List<WorkoutDetailRecord> records = WorkoutDetailsParser.parseBytes(makeFileId(SUBTYPE_OUTDOOR_WALKING_V2, 5), bytes);
+
+        assertNotNull(records);
+        assertEquals(104, records.get(0).hr);
+        assertNull(records.get(0).cadence);
+        assertNull(records.get(0).speedMps);
+    }
+
+    /// 8-byte records: groups 5 and 6 absent.
+    @Test
+    public void testRunWalkV5WithoutReservedGroups() {
+        final byte[] bytes = buildRunWalkBytes(5, "EC CC C0 0C C0", 1700002000, 1,
+                "03 9B 00 08 62 AA 68 01");
+
+        final List<WorkoutDetailRecord> records = WorkoutDetailsParser.parseBytes(makeFileId(SUBTYPE_OUTDOOR_WALKING_V2, 5), bytes);
+
+        assertNotNull(records);
+        assertEquals(155, records.get(0).hr);
+        assertEquals(Integer.valueOf(170), records.get(0).cadence);
+        assertEquals(1000f / 360, records.get(0).speedMps, 0.0001f);
+    }
+
+    @Test
+    public void testRunWalkSegmentClaimingMoreRecordsThanPresentIsRejected() {
+        final byte[] bytes = buildRunWalkBytes(5, "0C 0C 00 0C C0", 1790810050, 3,
+                "78 42 8D 0E 02",
+                "79 10 8D 0E 02");
+
+        assertNull(WorkoutDetailsParser.parseBytes(makeFileId(SUBTYPE_OUTDOOR_WALKING_V2, 5), bytes));
+    }
+
+    @Test
+    public void testRunWalkTrailingBytesAreRejected() {
+        final byte[] bytes = buildRunWalkBytes(5, "0C 0C 00 0C C0", 1790810050, 1,
+                "78 42 8D 0E 02",
+                "79 10");
+
+        assertNull(WorkoutDetailsParser.parseBytes(makeFileId(SUBTYPE_OUTDOOR_WALKING_V2, 5), bytes));
+    }
 }
