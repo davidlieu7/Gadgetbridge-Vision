@@ -116,7 +116,7 @@ object WorkoutBatchUploader {
     }
 
     /** The known device [summary] was recorded by, or null when it is no longer set up. */
-    private fun deviceOf(summary: BaseActivitySummary, devices: List<GBDevice>): GBDevice? {
+    internal fun deviceOf(summary: BaseActivitySummary, devices: List<GBDevice>): GBDevice? {
         val identifier = try {
             summary.device?.identifier
         } catch (e: Exception) {

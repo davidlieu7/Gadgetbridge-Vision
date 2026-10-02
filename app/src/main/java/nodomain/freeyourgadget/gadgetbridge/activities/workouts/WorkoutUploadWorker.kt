@@ -210,18 +210,19 @@ class WorkoutUploadWorker(
         }
     }
 
-    private fun notifyFailure(context: Context, notificationId: Int, text: String) {
-        val notification = NotificationCompat.Builder(context, GB.NOTIFICATION_CHANNEL_ID)
-            .setContentTitle(context.getString(R.string.auto_upload_failed_notification_title))
-            .setContentText(text)
-            .setStyle(NotificationCompat.BigTextStyle().bigText(text))
-            .setSmallIcon(R.drawable.ic_notification)
-            .setAutoCancel(true)
-            .build()
-        GB.notify(notificationId, notification, context)
-    }
-
     companion object {
+        /** Posts [text] as the notification of a sync to a service that went wrong in the background. */
+        internal fun notifyFailure(context: Context, notificationId: Int, text: String) {
+            val notification = NotificationCompat.Builder(context, GB.NOTIFICATION_CHANNEL_ID)
+                .setContentTitle(context.getString(R.string.auto_upload_failed_notification_title))
+                .setContentText(text)
+                .setStyle(NotificationCompat.BigTextStyle().bigText(text))
+                .setSmallIcon(R.drawable.ic_notification)
+                .setAutoCancel(true)
+                .build()
+            GB.notify(notificationId, notification, context)
+        }
+
         const val INPUT_DEVICE_ADDRESS = "device_address"
         private const val WORK_NAME_PREFIX = "WorkoutUploadWorker_"
         private const val RECENT_WINDOW_MS = 14L * 24 * 60 * 60 * 1000

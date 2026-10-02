@@ -168,6 +168,33 @@ sealed interface RemoteSnapshot {
     data class Found(val carry: Any?, val losesUserContent: Boolean) : RemoteSnapshot
 }
 
+/**
+ * What a service that takes a file now and imports it later says has become of it, asked of an
+ * upload that was recorded without an activity id.
+ */
+sealed interface RemoteIdResolution {
+    /** The file is still waiting to be imported; the next run asks again. */
+    object Pending : RemoteIdResolution
+
+    /** The file became [remoteActivityId]. */
+    data class Resolved(val remoteActivityId: String) : RemoteIdResolution
+
+    /**
+     * The service took the file and made nothing of it, for [reason], a localized message. Sending
+     * the same file again would end the same way, so it is not retried on its own.
+     */
+    data class Rejected(val reason: String) : RemoteIdResolution
+
+    /**
+     * The service cannot tell. The workout counts as uploaded, with nothing to point a later change
+     * at, which is also what a service that never names its activities answers.
+     */
+    object Unknown : RemoteIdResolution
+
+    /** The service could not be asked this time; the next run retries. */
+    object Failed : RemoteIdResolution
+}
+
 /** Outcome of bringing the track of an already-uploaded activity in line with the local workout. */
 sealed interface TrackUpdateResult {
     /** The remote activity now carries the current track, under the id it already had. */
@@ -175,10 +202,12 @@ sealed interface TrackUpdateResult {
 
     /**
      * The service could only do it by re-creating the activity, so the caller stores the new ids.
-     * [photoRefusal] is as on [WorkoutUploader.UploadResult.photoRefusal].
+     * [remoteActivityId] is null for a service that names the replacement only once it has
+     * imported it; see [WorkoutUploadTarget.resolveRemoteId]. [photoRefusal] is as on
+     * [WorkoutUploader.UploadResult.photoRefusal].
      */
     data class Recreated(
-        val remoteActivityId: String,
+        val remoteActivityId: String?,
         val photoMediaRef: String?,
         val photoRefusal: String? = null
     ) : TrackUpdateResult
@@ -286,8 +315,21 @@ interface WorkoutUploadTarget : ExternalService {
     fun deleteRemote(context: Context, remoteActivityId: String): Boolean = false
 
     /**
+     * Finds the activity an upload became, for a service that takes the file and imports it later
+     * without naming the result. Called only for a row recorded without an activity id and without
+     * a source fingerprint, which is how [WorkoutUploader] records an upload that named no id.
+     * [row] is that upload. Blocking.
+     */
+    fun resolveRemoteId(
+        context: Context,
+        summary: BaseActivitySummary,
+        row: WorkoutUpload
+    ): RemoteIdResolution = RemoteIdResolution.Unknown
+
+    /**
      * Pushes the name and activity kind onto an activity that already exists remotely. Called only
-     * when [UploadCapabilities.editableMetadata].
+     * when [UploadCapabilities.editableMetadata]. An activity that no longer exists counts as
+     * updated, so it does not bring every later sync back.
      */
     fun updateMetadata(
         context: Context,

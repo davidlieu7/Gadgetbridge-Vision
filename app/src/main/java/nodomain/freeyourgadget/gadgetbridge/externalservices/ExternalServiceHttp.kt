@@ -71,9 +71,30 @@ object ExternalServiceHttp {
     }
 
     /**
-     * Posts [file] to [uri] and reads the id the service gave the new activity out of [idField].
-     * Only a 2xx counts as success; on anything else the service's own `message` is preferred over
-     * the generic network reason, since it is the one that says what was actually wrong.
+     * What to tell the user about a request that did not succeed: [unauthorizedMessage] for a 401
+     * when the caller has one, then the service's own `message`, which says what was actually
+     * wrong, then the network [reason], then the bare status.
+     */
+    fun failureMessage(
+        statusCode: Int?,
+        responseText: String?,
+        reason: String?,
+        unauthorizedMessage: String? = null,
+    ): String? {
+        if (statusCode == 401 && unauthorizedMessage != null) {
+            return unauthorizedMessage
+        }
+        val serverMessage = try {
+            responseText?.let { JSONObject(it).optString("message").takeIf { m -> m.isNotEmpty() } }
+        } catch (_: Exception) {
+            null
+        }
+        return serverMessage ?: reason ?: statusCode?.let { "HTTP $it" }
+    }
+
+    /**
+     * Posts [file] to [uri] as [fileName] and reads the id the service gave the new activity out
+     * of [idField]. Only a 2xx counts as success; see [failureMessage] for what a failure reports.
      */
     fun uploadFile(
         uri: Uri,
@@ -81,6 +102,8 @@ object ExternalServiceHttp {
         headers: Map<String, String>,
         method: String = "POST",
         idField: String = "id",
+        fileName: String = file.name,
+        unauthorizedMessage: String? = null,
     ): WorkoutUploader.UploadResult {
         return try {
             var result = WorkoutUploader.UploadResult(false, null, null)
@@ -89,17 +112,14 @@ object ExternalServiceHttp {
                 file = file,
                 requestHeaders = headers,
                 method = method,
+                fileName = fileName,
             ) { success, statusCode, responseText, reason ->
                 result = if (success && statusCode != null && statusCode in 200..299 && responseText != null) {
                     val json = JSONObject(responseText)
                     val id = if (json.has(idField)) json.get(idField).toString() else null
                     WorkoutUploader.UploadResult(true, id, null)
                 } else {
-                    val message = try {
-                        responseText?.let { JSONObject(it).getString("message") }
-                    } catch (_: Exception) {
-                        null
-                    } ?: reason ?: statusCode?.let { "HTTP $it" }
+                    val message = failureMessage(statusCode, responseText, reason, unauthorizedMessage)
                     LOG.error("Upload to {} failed: {}", uri, message)
                     WorkoutUploader.UploadResult(false, null, message)
                 }

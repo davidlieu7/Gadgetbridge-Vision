@@ -571,6 +571,9 @@ class WorkoutDetailsFragment : Fragment(), MenuProvider {
                     row?.status == WorkoutUploadStore.STATUS_SUCCESS && row.sourceHash == sourceHash ->
                         context.getString(R.string.workout_upload_status_uploaded)
 
+                    row != null && WorkoutUploader.isAwaitingRemoteId(row) ->
+                        context.getString(R.string.workout_upload_status_awaiting_import)
+
                     // The service holds it, but not as it now stands. Saying so is what tells a
                     // user who uploads by hand that this one is worth sending again.
                     row?.status == WorkoutUploadStore.STATUS_SUCCESS ->

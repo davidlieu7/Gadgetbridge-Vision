@@ -131,6 +131,17 @@ class WorkoutRecreateTest : TestBase() {
     }
 
     @Test
+    fun aReplacementTheServiceNamesLaterIsNotTreatedAsAFailure() {
+        val target = FakeTarget(
+            RecreateOrder.DELETE_THEN_CREATE,
+            RemoteSnapshot.Found(null, false),
+            uploadResult = WorkoutUploader.UploadResult(true, null, null)
+        )
+        assertEquals(TrackUpdateResult.Recreated(null, null), recreate(target))
+        assertEquals(listOf("snapshot old", "delete old", "upload"), target.calls)
+    }
+
+    @Test
     fun anUnreadableActivityIsRetriedLater() {
         val target = FakeTarget(RecreateOrder.CREATE_THEN_DELETE, RemoteSnapshot.Failed)
         assertEquals(TrackUpdateResult.Failed, recreate(target))

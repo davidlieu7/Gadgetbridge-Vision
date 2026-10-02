@@ -37,6 +37,9 @@ public class WorkoutSyncActionTest {
         upload.setSummaryId(1L);
         upload.setService(WorkoutUploadStore.SERVICE_ENDURAIN);
         upload.setStatus(status);
+        if (status == WorkoutUploadStore.STATUS_SUCCESS) {
+            upload.setRemoteActivityId("remote");
+        }
         upload.setSourceHash(sourceHash);
         upload.setLastError(lastError);
         return upload;
@@ -87,6 +90,16 @@ public class WorkoutSyncActionTest {
         assertEquals(
                 WorkoutUploader.SyncAction.RESYNC,
                 WorkoutUploader.syncActionFor(row(WorkoutUploadStore.STATUS_SUCCESS, null, null), HASH)
+        );
+    }
+
+    @Test
+    public void testAnUploadTheServiceHoldsNothingForIsSentAgain() {
+        final WorkoutUpload lost = row(WorkoutUploadStore.STATUS_SUCCESS, HASH, "import failed");
+        lost.setRemoteActivityId(null);
+        assertEquals(
+                WorkoutUploader.SyncAction.UPLOAD,
+                WorkoutUploader.syncActionFor(lost, HASH)
         );
     }
 }

@@ -30,8 +30,8 @@ import java.util.Date;
 import nodomain.freeyourgadget.gadgetbridge.GBApplication;
 import nodomain.freeyourgadget.gadgetbridge.entities.BaseActivitySummary;
 import nodomain.freeyourgadget.gadgetbridge.entities.WorkoutUpload;
-import nodomain.freeyourgadget.gadgetbridge.externalservices.dreeve.DreeveService;
 import nodomain.freeyourgadget.gadgetbridge.externalservices.endurain.EndurainService;
+import nodomain.freeyourgadget.gadgetbridge.externalservices.ridehub.RideHubService;
 import nodomain.freeyourgadget.gadgetbridge.externalservices.wanderer.WandererService;
 import nodomain.freeyourgadget.gadgetbridge.model.ActivityKind;
 import nodomain.freeyourgadget.gadgetbridge.test.TestBase;
@@ -121,12 +121,12 @@ public class TrackUpdateGateTest extends TestBase {
 
     @Test
     public void testAServiceThatCannotChangeAnActivityNeverPushes() throws Exception {
-        setSyncUpdates(DreeveService.INSTANCE.getSyncUpdatesPrefKey(), true);
+        setSyncUpdates(RideHubService.INSTANCE.getSyncUpdatesPrefKey(), true);
         try {
             assertFalse(WorkoutUploader.mayPushTrackUpdate(
-                    DreeveService.INSTANCE, summary(true), rowThatHadATrack(false)));
+                    RideHubService.INSTANCE, summary(true), rowThatHadATrack(false)));
         } finally {
-            clearSyncUpdates(DreeveService.INSTANCE.getSyncUpdatesPrefKey());
+            clearSyncUpdates(RideHubService.INSTANCE.getSyncUpdatesPrefKey());
         }
     }
 }

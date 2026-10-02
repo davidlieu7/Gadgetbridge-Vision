@@ -228,6 +228,7 @@ class InternetUtils {
             allowInsecure: Boolean = false,
             fileFieldName: String = "file",
             formFields: Map<String, String> = emptyMap(),
+            fileName: String = file.name,
             onComplete: (success: Boolean, statusCode: Int?, response: String?, reason: String?) -> Unit
         ) {
             var success = false
@@ -240,7 +241,6 @@ class InternetUtils {
                     LOG.error("File does not exist or cannot be read: ${file.path}")
                     reason = file.name
                 } else {
-                    val fileName = file.name
                     val mimeType = when (fileName.substringAfterLast('.', "").lowercase()) {
                         "gpx" -> "application/gpx+xml"
                         else -> "application/octet-stream"
