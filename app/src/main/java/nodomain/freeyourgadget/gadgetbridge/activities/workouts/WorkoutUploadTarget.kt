@@ -218,6 +218,12 @@ sealed interface TrackUpdateResult {
      */
     data class Refused(val message: String) : TrackUpdateResult
 
+    /**
+     * The activity was deleted on the service. It is not brought back on its own: the user is told
+     * once, and an upload they ask for sends the workout again.
+     */
+    object Gone : TrackUpdateResult
+
     /** It did not go through this time; the next run retries. */
     object Failed : TrackUpdateResult
 }

@@ -6343,6 +6343,7 @@
     <string name="service_upload_failed">%1$s upload error: %2$s</string>
     <string name="service_remote_edited">The workout changed, but the activity on %1$s was edited there and was left untouched</string>
     <string name="service_import_failed">%1$s accepted the file but could not import it</string>
+    <string name="service_remote_deleted">The activity was deleted on %1$s. Upload the workout again to restore it</string>
     <string name="service_setup_api_token_prefix_error">API token should start with %1$s</string>
     <string name="service_setup_title">%1$s setup</string>
     <string name="service_setup_server_hostname">Server hostname</string>

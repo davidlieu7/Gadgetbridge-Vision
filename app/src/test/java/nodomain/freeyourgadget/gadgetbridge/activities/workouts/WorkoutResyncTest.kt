@@ -27,6 +27,7 @@ import nodomain.freeyourgadget.gadgetbridge.externalservices.AuthStyle
 import nodomain.freeyourgadget.gadgetbridge.test.TestBase
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
+import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.io.File
 import java.util.Date
@@ -41,7 +42,8 @@ class WorkoutResyncTest : TestBase() {
     private class FakeTarget(
         private val metadataSucceeds: Boolean = true,
         private val photoResult: WorkoutUploader.PhotoSyncResult =
-            WorkoutUploader.PhotoSyncResult(true, "photo")
+            WorkoutUploader.PhotoSyncResult(true, "photo"),
+        private val trackResult: TrackUpdateResult = TrackUpdateResult.Updated
     ) : WorkoutUploadTarget {
         override val id = "fake"
         override val nameRes = R.string.service_name_fittrackee
@@ -49,7 +51,7 @@ class WorkoutResyncTest : TestBase() {
         override val service = 98
         override val capabilities = UploadCapabilities(
             listOf(WorkoutPayloadFormat.FIT),
-            setOf(RemoteOp.CREATE),
+            setOf(RemoteOp.CREATE, RemoteOp.UPDATE),
             setOf(RemoteOp.UPDATE),
             setOf(RemoteOp.CREATE, RemoteOp.REPLACE, RemoteOp.DELETE)
         )
@@ -64,6 +66,14 @@ class WorkoutResyncTest : TestBase() {
 
         override fun updateMetadata(context: Context, remoteActivityId: String, summary: BaseActivitySummary) =
             metadataSucceeds
+
+        override fun updateTrack(
+            context: Context,
+            remoteActivityId: String,
+            payload: File,
+            summary: BaseActivitySummary,
+            row: WorkoutUpload
+        ) = trackResult
 
         override fun syncPhoto(
             context: Context,
@@ -91,7 +101,8 @@ class WorkoutResyncTest : TestBase() {
         remoteActivityId = "remote"
         status = WorkoutUploadStore.STATUS_SUCCESS
         sourceHash = "old"
-        payloadHash = "track"
+        payloadHash = WorkoutUploader.payloadHashFor(target, summary(false))
+        hadTrack = false
     }
 
     private fun resync(target: FakeTarget, summary: BaseActivitySummary) = WorkoutUploader.resyncWorkout(
@@ -133,5 +144,26 @@ class WorkoutResyncTest : TestBase() {
         assertEquals(WorkoutUploader.SyncOutcome.Resynced(null), resync(target, summary(true)))
         assertEquals("old", storedRow(target).sourceHash)
         assertNull(storedRow(target).lastError)
+    }
+
+    @Test
+    fun aTrailDeletedOnTheServiceIsReportedOnceAndNotBroughtBack() {
+        val target = FakeTarget(trackResult = TrackUpdateResult.Gone)
+        val withTrack = summary(false).apply {
+            gpxTrack = File.createTempFile("track", ".gpx").apply {
+                writeText("<gpx/>")
+                deleteOnExit()
+            }.absolutePath
+        }
+        val outcome = resync(target, withTrack)
+        val row = storedRow(target)
+        val message = GBApplication.getContext().getString(
+            R.string.service_remote_deleted,
+            GBApplication.getContext().getString(target.nameRes)
+        )
+        assertEquals(WorkoutUploader.SyncOutcome.Resynced(message), outcome)
+        assertTrue(WorkoutUploader.isLost(row))
+        assertEquals("new", row.sourceHash)
+        assertEquals(message, row.lastError)
     }
 }

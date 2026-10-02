@@ -464,6 +464,17 @@ object WorkoutUploader {
                 // the user is told once rather than on every sync.
                 is TrackUpdateResult.Refused -> refusal = update.message
 
+                is TrackUpdateResult.Gone -> {
+                    val message = context.getString(
+                        R.string.service_remote_deleted,
+                        context.getString(target.nameRes)
+                    )
+                    LOG.info("Activity {} of summary {} is gone from service {}",
+                        remoteId, id, target.service)
+                    recordWithoutId(target, row, sourceHash, message)
+                    return SyncOutcome.Resynced(message)
+                }
+
                 is TrackUpdateResult.Failed -> {
                     // A transient failure: keep the old fingerprints so the next run retries.
                     LOG.warn("Track update to service {} failed for summary {}", target.service, id)

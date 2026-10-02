@@ -110,11 +110,9 @@ object WandererService : WorkoutUploadTarget {
                 .updateTrailFields(
                     remoteActivityId,
                     mapOf("name" to WorkoutUploader.nameFor(context, summary))
-                ) { ok, reason ->
-                    if (!ok) {
-                        LOG.warn("Wanderer metadata update failed for trail {}: {}", remoteActivityId, reason)
-                    }
-                    done(ok)
+                ) { result ->
+                    // A trail deleted on the server is not brought back for a rename.
+                    done(result !is WandererWriteResult.Failed)
                 }
         }
         return updated == true
@@ -128,16 +126,15 @@ object WandererService : WorkoutUploadTarget {
         row: WorkoutUpload
     ): TrackUpdateResult {
         val server = serverUrl() ?: return TrackUpdateResult.Failed
-        val updated = ExternalServiceCalls.await<Boolean>(WorkoutUploader.DEFAULT_UPLOAD_TIMEOUT_SECONDS) { done ->
+        val result = ExternalServiceCalls.await<WandererWriteResult>(WorkoutUploader.DEFAULT_UPLOAD_TIMEOUT_SECONDS) { done ->
             WandererApiClient(server, WandererTokenManager(context))
-                .updateActivityFile(remoteActivityId, payload, statsOf(summary)) { ok, reason ->
-                    if (!ok) {
-                        LOG.warn("Wanderer track update failed for trail {}: {}", remoteActivityId, reason)
-                    }
-                    done(ok)
-                }
+                .updateActivityFile(remoteActivityId, payload, statsOf(summary)) { done(it) }
         }
-        return if (updated == true) TrackUpdateResult.Updated else TrackUpdateResult.Failed
+        return when (result) {
+            is WandererWriteResult.Done -> TrackUpdateResult.Updated
+            is WandererWriteResult.Gone -> TrackUpdateResult.Gone
+            else -> TrackUpdateResult.Failed
+        }
     }
 
     override fun lookupRemote(context: Context, remoteActivityId: String): RemoteLookup {
@@ -150,12 +147,11 @@ object WandererService : WorkoutUploadTarget {
     }
 
     /**
-     * Trail statistics to send alongside a replacement track, since Wanderer stores the new file
-     * without re-deriving them. Values come from the workout summary, which is the authority on
-     * them anyway. Entries whose value the summary does not carry are left out, so the trail
-     * keeps what it had.
+     * Trail statistics to send alongside a replacement track; see
+     * [WandererApiClient.updateActivityFile]. Entries whose value the summary does not carry are
+     * left out, for the server to keep or derive.
      */
-    private fun statsOf(summary: BaseActivitySummary): Map<String, String> {
+    internal fun statsOf(summary: BaseActivitySummary): Map<String, String> {
         val data = summary.summaryData?.let {
             try {
                 ActivitySummaryData.fromJson(it)
