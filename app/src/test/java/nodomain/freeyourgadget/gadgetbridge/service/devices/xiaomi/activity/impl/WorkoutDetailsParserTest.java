@@ -1119,6 +1119,30 @@ public class WorkoutDetailsParserTest {
         assertEquals(1000f / 360, records.get(0).speedMps, 0.0001f);
     }
 
+    /// v8 adds four 2-byte groups. The walking, outdoor running and outdoor walking bitmaps all
+    /// flag every group present, so each gives 21-byte records.
+    @Test
+    public void testRunWalkV8() {
+        for (final String bitmap : new String[]{
+                "FF CF F8 BF FB BB BF",
+                "FF CF FA BF FB BF FF",
+                "DF CB F8 BB FB BB BF",
+        }) {
+            final byte[] bytes = buildRunWalkBytes(8, bitmap, 1767527042, 2,
+                    "02 63 00 0F 4D 00 00 00 00 00 7A 78 02 00 00 00 00 00 00 00 00",
+                    "03 67 00 10 4D 00 00 00 00 00 7B 70 02 00 00 00 00 00 00 00 00");
+
+            final List<WorkoutDetailRecord> records = WorkoutDetailsParser.parseBytes(makeFileId(SUBTYPE_OUTDOOR_WALKING_V2, 8), bytes);
+
+            assertNotNull(bitmap, records);
+            assertEquals(bitmap, 2, records.size());
+            assertEquals(bitmap, 99, records.get(0).hr);
+            assertEquals(bitmap, 103, records.get(1).hr);
+            assertEquals(bitmap, Integer.valueOf(3), records.get(1).steps);
+            assertEquals(bitmap, 1767527043, records.get(1).ts);
+        }
+    }
+
     @Test
     public void testRunWalkSegmentClaimingMoreRecordsThanPresentIsRejected() {
         final byte[] bytes = buildRunWalkBytes(5, "0C 0C 00 0C C0", 1790810050, 3,
