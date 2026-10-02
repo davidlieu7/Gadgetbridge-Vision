@@ -51,7 +51,9 @@ public class WorkoutDetailsParser extends XiaomiActivityParser {
     private static final int RUN_WALK_GROUP_HR = 1;
     private static final int RUN_WALK_GROUP_DISTANCE = 3;
     private static final int RUN_WALK_GROUP_CADENCE = 7;
-    /** Records averaged, centred on each record, to turn the per-second distance into speed. */
+    private static final int RUN_WALK_GROUP_PACE = 8;
+    /** Records averaged, centred on each record, to turn the per-second distance into speed
+     *  where no pace is available. */
     private static final int SPEED_WINDOW = 5;
 
     private static final byte[] FREESTYLE_V3_BITMAP = {(byte) 0xFF, (byte) 0xBB};
@@ -78,6 +80,9 @@ public class WorkoutDetailsParser extends XiaomiActivityParser {
         /** Distance covered during this record's second, in dm, for layouts that record it.
          *  Feeds {@link #speedMps} through {@link #setSpeedFromDistance}. */
         public Integer distanceDm;
+        /** Pace in s/km as the band displays it, 0 while stopped. Shapes {@link #speedMps}
+         *  in {@link #setSpeedFromDistance}. */
+        public Integer paceSecPerKm;
         /** True on the first record of each interval/segment, for layouts whose phase
          *  semantics are confirmed (currently rowing v4 only). Drives
          *  {@link ActivityTrack} segment boundaries → one FIT lap per interval. */
@@ -265,9 +270,11 @@ public class WorkoutDetailsParser extends XiaomiActivityParser {
      *   0: steps in the low nibble
      *   1: HR (bpm)
      *   3: distance covered in that second (uint8, dm). Summed over a segment it equals the
-     *      segment distance in the header on every capture. Speed comes from it, see
-     *      {@link #setSpeedFromDistance}.
+     *      segment distance in the header on every capture.
      *   7: cadence (steps/min)
+     *   8: pace (uint16, s/km). Smooth, and its extremes equal the summary fastest/slowest
+     *      pace, but it lags: integrated over a workout it gives 20% to 128% of the distance.
+     * Speed combines groups 3 and 8, see {@link #setSpeedFromDistance}.
      * HR min/avg/max and top cadence of a Mi Band 9 Active run equal the paired summary.
      *
      * Returns null when the segments do not consume the payload exactly.
@@ -342,6 +349,9 @@ public class WorkoutDetailsParser extends XiaomiActivityParser {
                         case RUN_WALK_GROUP_CADENCE:
                             r.cadence = groups.get(0, 8);
                             break;
+                        case RUN_WALK_GROUP_PACE:
+                            r.paceSecPerKm = groups.get(0, 16);
+                            break;
                     }
                 }
                 records.add(r);
@@ -352,26 +362,55 @@ public class WorkoutDetailsParser extends XiaomiActivityParser {
         return records;
     }
 
-    /** Sets {@link WorkoutDetailRecord#speedMps} on the records of one segment, from
-     *  {@code first} to the end of {@code records}, as their mean {@link WorkoutDetailRecord#distanceDm}
-     *  over {@link #SPEED_WINDOW} records centred on each one and clipped to the segment. The
-     *  per-second distance arrives in bursts (a 0 every few seconds, then a doubled value), which
-     *  the window evens out. Records are one second apart. No-op when the layout carries no
-     *  distance. */
+    /**
+     * Sets {@link WorkoutDetailRecord#speedMps} on the records of one segment, from
+     * {@code first} to the end of {@code records}, so that the speed integrates to the
+     * segment's {@link WorkoutDetailRecord#distanceDm}. Records are one second apart.
+     *
+     * The per-second distance is exact in total but arrives in bursts (a 0 every few seconds,
+     * then a doubled value). The pace is smooth but its level drifts from the distance. Records
+     * without a pace (stopped, or a layout without one) take their mean distance over
+     * {@link #SPEED_WINDOW} records centred on them, clipped to the segment. Records with a pace
+     * take their shape from {@code 1000 / pace}, scaled by one factor per segment so that they
+     * cover whatever distance of the segment the unpaced records did not.
+     *
+     * No-op when the layout carries no distance.
+     */
     private static void setSpeedFromDistance(final List<WorkoutDetailRecord> records, final int first) {
         final int last = records.size() - 1;
         if (first > last || records.get(first).distanceDm == null) {
             return;
         }
+
         final int half = SPEED_WINDOW / 2;
+        double remainingDistance = 0;
+        double pacedSpeedSum = 0;
         for (int i = first; i <= last; i++) {
+            final WorkoutDetailRecord r = records.get(i);
+            remainingDistance += r.distanceDm / 10.0;
+            if (r.paceSecPerKm != null && r.paceSecPerKm > 0) {
+                pacedSpeedSum += 1000.0 / r.paceSecPerKm;
+                continue;
+            }
             final int from = Math.max(first, i - half);
             final int to = Math.min(last, i + half);
             int sum = 0;
             for (int j = from; j <= to; j++) {
                 sum += records.get(j).distanceDm;
             }
-            records.get(i).speedMps = sum / 10f / (to - from + 1);
+            r.speedMps = sum / 10f / (to - from + 1);
+            remainingDistance -= r.speedMps;
+        }
+        if (pacedSpeedSum == 0) {
+            return;
+        }
+
+        final double scale = Math.max(0, remainingDistance) / pacedSpeedSum;
+        for (int i = first; i <= last; i++) {
+            final WorkoutDetailRecord r = records.get(i);
+            if (r.paceSecPerKm != null && r.paceSecPerKm > 0) {
+                r.speedMps = (float) (1000.0 / r.paceSecPerKm * scale);
+            }
         }
     }
 
@@ -714,8 +753,9 @@ public class WorkoutDetailsParser extends XiaomiActivityParser {
                         //   bytes 4-8:  reserved (5 bytes)
                         //   byte 9:     cadence (steps/min); its maximum equals summary max cadence
                         //   bytes 10-11: pace (uint16 LE, s/km); its fastest value equals the
-                        //               summary fastest pace, but it lags the distance, so speed
-                        //               comes from byte 2
+                        //               summary fastest pace, but integrated it gives 72% to 97%
+                        //               of the distance. Speed combines it with byte 2, see
+                        //               setSpeedFromDistance.
                         r.steps = buf.get() & 0x0F;
                         r.hr = buf.get() & 0xFF;
                         r.distanceDm = buf.get() & 0xFF;
@@ -723,7 +763,7 @@ public class WorkoutDetailsParser extends XiaomiActivityParser {
                         buf.getInt(); // reserved
                         buf.get();    // reserved
                         r.cadence = buf.get() & 0xFF;
-                        buf.getShort(); // pace
+                        r.paceSecPerKm = buf.getShort() & 0xFFFF;
                         break;
                     case 103:
                         // v3 FREESTYLE (Mi Band 8). 4-byte record: HR at byte 0, byte 1 events/flags,

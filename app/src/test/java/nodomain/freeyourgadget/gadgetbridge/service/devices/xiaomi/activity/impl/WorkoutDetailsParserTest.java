@@ -529,14 +529,16 @@ public class WorkoutDetailsParserTest {
         assertEquals(Integer.valueOf(3), records.get(0).steps);
         assertEquals(Integer.valueOf(164), records.get(0).cadence);
         assertEquals(Integer.valueOf(22), records.get(0).distanceDm);
-        // (22 + 24) dm over the 2-record segment
-        assertEquals(2.3f, records.get(0).speedMps, 0.0001f);
+        assertEquals(Integer.valueOf(430), records.get(0).paceSecPerKm);
+        // shaped by pace 430 / 425 s/km, scaled to the (22 + 24) dm the segment covers
+        assertEquals(2.2865f, records.get(0).speedMps, 0.0001f);
 
         assertEquals(startTs + 1, records.get(1).ts);
         assertEquals(167,         records.get(1).hr);
         assertEquals(Integer.valueOf(2), records.get(1).steps);
         assertEquals(Integer.valueOf(168), records.get(1).cadence);
-        assertEquals(2.3f, records.get(1).speedMps, 0.0001f);
+        assertEquals(2.3135f, records.get(1).speedMps, 0.0001f);
+        assertEquals(4.6f, records.get(0).speedMps + records.get(1).speedMps, 0.0001f);
     }
 
     @Test
@@ -558,12 +560,12 @@ public class WorkoutDetailsParserTest {
         assertEquals(170, points.get(0).getHeartRate());
         assertEquals(170, points.get(0).getCadence());
         assertNull(points.get(0).getLocation());
-        assertEquals(2.1f, points.get(0).getSpeed(), 0.001f);
+        assertEquals(2.0734f, points.get(0).getSpeed(), 0.001f);
 
         assertEquals((startTs + 1) * 1000L, points.get(1).getTime().getTime());
         assertEquals(172, points.get(1).getHeartRate());
         assertEquals(172, points.get(1).getCadence());
-        assertEquals(2.1f, points.get(1).getSpeed(), 0.001f);
+        assertEquals(2.1266f, points.get(1).getSpeed(), 0.001f);
     }
 
     /// A stopped belt covers no distance, which plots as zero speed.
@@ -1130,35 +1132,37 @@ public class WorkoutDetailsParserTest {
         assertEquals(1.6f, records.get(0).speedMps, 0.0001f);
     }
 
-    /// Speed is the mean distance over 5 records centred on each record, clipped at the segment
-    /// edges, so a 0 followed by a doubled value plots as a steady speed. The second segment
-    /// does not borrow records from the first.
+    /// A record without a pace takes the mean distance of the 5 records centred on it. Records
+    /// with a pace follow its shape, scaled once per segment so the segment's speeds add up to
+    /// its distance. The second segment gets its own scale.
     @Test
-    public void testRunWalkSpeedIsSmoothedWithinSegment() {
+    public void testRunWalkSpeedIsPaceScaledToDistanceWithinSegment() {
         final byte[] bytes = buildRunWalkSegments(5, "0C 0C 00 0C C0",
-                new RunWalkSegment(1790810050, 6,
-                        "78 1E 8D 0E 02",
-                        "78 1E 8D 0E 02",
-                        "78 00 8D 0E 02",
-                        "78 3C 8D 0E 02",
-                        "78 1E 8D 0E 02",
-                        "78 1E 8D 0E 02"),
+                new RunWalkSegment(1790810050, 5,
+                        "78 1E 8D 90 01",  // 30 dm, 400 s/km
+                        "78 1E 8D 90 01",  // 30 dm, 400 s/km
+                        "78 00 8D 00 00",  // 0 dm, no pace
+                        "78 3C 8D C8 00",  // 60 dm, 200 s/km
+                        "78 1E 8D 90 01"), // 30 dm, 400 s/km
                 new RunWalkSegment(1790810100, 2,
-                        "78 0A 8D 0E 02",
-                        "78 0A 8D 0E 02"));
+                        "78 0A 8D E8 03",  // 10 dm, 1000 s/km
+                        "78 0A 8D E8 03"));
 
         final List<WorkoutDetailRecord> records = WorkoutDetailsParser.parseBytes(makeFileId(SUBTYPE_OUTDOOR_WALKING_V2, 5), bytes);
 
         assertNotNull(records);
-        assertEquals(8, records.size());
-        // 30, 30, 0, 60, 30, 30 dm
-        assertEquals(2.0f, records.get(0).speedMps, 0.0001f);  // (30 + 30 + 0) / 3
-        assertEquals(3.0f, records.get(2).speedMps, 0.0001f);  // (30 + 30 + 0 + 60 + 30) / 5
-        assertEquals(3.0f, records.get(3).speedMps, 0.0001f);  // (30 + 0 + 60 + 30 + 30) / 5
-        assertEquals(4.0f, records.get(5).speedMps, 0.0001f);  // (60 + 30 + 30) / 3
+        assertEquals(7, records.size());
+        // (30 + 30 + 0 + 60 + 30) dm / 5
+        assertEquals(3.0f, records.get(2).speedMps, 0.0001f);
+        // the segment covers 15 m, 12 m of it left for the paced records, whose 1000 / pace
+        // sums to 12.5 m: scale 0.96
+        assertEquals(2.4f, records.get(0).speedMps, 0.0001f);
+        assertEquals(2.4f, records.get(1).speedMps, 0.0001f);
+        assertEquals(4.8f, records.get(3).speedMps, 0.0001f);
+        assertEquals(2.4f, records.get(4).speedMps, 0.0001f);
+        assertEquals(1.0f, records.get(5).speedMps, 0.0001f);
         assertEquals(1.0f, records.get(6).speedMps, 0.0001f);
-        assertEquals(1.0f, records.get(7).speedMps, 0.0001f);
-        assertEquals(1790810100, records.get(6).ts);
+        assertEquals(1790810100, records.get(5).ts);
     }
 
     /// 8-byte records: groups 5 and 6 absent.
@@ -1196,7 +1200,8 @@ public class WorkoutDetailsParserTest {
             assertEquals(bitmap, 103, records.get(1).hr);
             assertEquals(bitmap, Integer.valueOf(3), records.get(1).steps);
             assertEquals(bitmap, Integer.valueOf(123), records.get(1).cadence);
-            assertEquals(bitmap, 1.55f, records.get(1).speedMps, 0.0001f);
+            // pace 624 s/km, scaled so the two records cover their 15 + 16 dm
+            assertEquals(bitmap, 1.5599f, records.get(1).speedMps, 0.0001f);
             assertEquals(bitmap, 1767527043, records.get(1).ts);
         }
     }
@@ -1217,7 +1222,7 @@ public class WorkoutDetailsParserTest {
         assertEquals(2, records.size());
         assertEquals(88, records.get(0).hr);
         assertEquals(Integer.valueOf(140), records.get(0).cadence);
-        assertEquals(1.65f, records.get(0).speedMps, 0.0001f);
+        assertEquals(1.6436f, records.get(0).speedMps, 0.0001f);
 
         assertNull("other sports keep the exact bitmap", WorkoutDetailsParser.parseBytes(makeFileId(SUBTYPE_OUTDOOR_RUNNING, 6), bytes));
     }
