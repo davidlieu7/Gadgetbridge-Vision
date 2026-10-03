@@ -10,7 +10,9 @@ internal data class NxWearHeartRateReading(val timestampMillis: Long, val bpm: I
 
     companion object {
         fun parse(packet: NxWearPacket): List<NxWearHeartRateReading>? {
-            return packet.timedReadings(NxWearDataType.HEART_RATE)
+            if (packet.dataType !in setOf(NxWearDataType.HEART_RATE, NxWearDataType.ACTIVITY_08,
+                    NxWearDataType.EXERCISE_HEART_RATE)) return null
+            return packet.timedReadings(requireNotNull(packet.dataType))
                 ?.map { NxWearHeartRateReading(it.timestampMillis, it.value) }
         }
     }

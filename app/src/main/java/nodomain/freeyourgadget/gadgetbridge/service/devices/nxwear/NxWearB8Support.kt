@@ -54,9 +54,10 @@ class NxWearB8Support : AbstractBTLESingleDeviceSupport(LOG) {
     private var deviceSyncPayload: ByteArray? = null
     private var deviceSyncLength = 0
     private var sportPacket: NxWearPacket? = null
-    private var pendingStressSyncSequence: Int? = null
-    private var pendingStressSyncPages = 0
-    private var expectedStressSyncPages = 0
+    private var historyPacket: NxWearPacket? = null
+    private var pendingLogSequence: Int? = null
+    private var pendingLogPages = 0
+    private var expectedLogPages = 0
     private val heartRateTimeoutHandler = Handler(Looper.getMainLooper())
     private val heartRateTimeout = Runnable { stopManualHeartRate() }
     private val historyTimeoutHandler = Handler(Looper.getMainLooper())
@@ -86,9 +87,10 @@ class NxWearB8Support : AbstractBTLESingleDeviceSupport(LOG) {
         deviceSyncPayload = null
         deviceSyncLength = 0
         sportPacket = null
-        pendingStressSyncSequence = null
-        pendingStressSyncPages = 0
-        expectedStressSyncPages = 0
+        historyPacket = null
+        pendingLogSequence = null
+        pendingLogPages = 0
+        expectedLogPages = 0
         manualHeartRateActive = false
         continuousHeartRate = false
         heartRateTimeoutHandler.removeCallbacks(heartRateTimeout)
@@ -99,6 +101,7 @@ class NxWearB8Support : AbstractBTLESingleDeviceSupport(LOG) {
         builder.write(WRITE_CHARACTERISTIC, *encodeInitializationBootstrap(buildBootstrap()))
 
         builder.setDeviceState(GBDevice.State.INITIALIZED)
+        startHistoryFetch()
         return builder
     }
 
@@ -170,14 +173,19 @@ class NxWearB8Support : AbstractBTLESingleDeviceSupport(LOG) {
         expectedInitializationFragments = 0
         nextInitializationSequence = 1
         currentHistorySubtype = null
+        historyPacket = null
+        startHistoryFetch()
+        // The history stream advances only after a complete data frame is acknowledged.
+        createTransactionBuilder("Synchronize Nx Wear B8 history")
+            .write(WRITE_CHARACTERISTIC, *encodeInitializationBootstrap(buildBootstrap()))
+            .queue()
+    }
+
+    private fun startHistoryFetch() {
         historyFetchActive = true
         getDevice().setBusyTask(R.string.busy_task_fetch_activity_data, getContext())
         getDevice().sendDeviceUpdateIntent(getContext())
         historyTimeoutHandler.postDelayed(historyTimeout, HISTORY_TIMEOUT_MS)
-        // The captured history stream starts with a bootstrap; each 0x04 acknowledgement advances it.
-        createTransactionBuilder("Synchronize Nx Wear B8 history")
-            .write(WRITE_CHARACTERISTIC, *encodeInitializationBootstrap(buildBootstrap()))
-            .queue()
     }
 
     @Synchronized
@@ -191,9 +199,24 @@ class NxWearB8Support : AbstractBTLESingleDeviceSupport(LOG) {
         currentHistorySubtype = null
         deviceSyncPayload = null
         sportPacket = null
+        historyPacket = null
+        pendingLogSequence = null
+        pendingLogPages = 0
+        expectedLogPages = 0
         getDevice().unsetBusyTask()
         getDevice().sendDeviceUpdateIntent(getContext())
         GB.signalActivityDataFinish(getDevice())
+    }
+
+    override fun disconnect() {
+        finishHistoryFetch()
+        super.disconnect()
+    }
+
+    override fun dispose() {
+        heartRateTimeoutHandler.removeCallbacks(heartRateTimeout)
+        finishHistoryFetch()
+        super.dispose()
     }
 
     override fun onSetTime() {
@@ -300,14 +323,14 @@ class NxWearB8Support : AbstractBTLESingleDeviceSupport(LOG) {
                     LOG.debug("Nx Wear B8 acknowledged call state")
                 }
                 packet.kind == NxWearPacket.Kind.FRAMED && packet.command == 0x31 && packet.dataType == NxWearDataType.ACTIVITY_FA &&
-                    initializationStep == InitializationStep.COMPLETE -> handleStressSyncFrame(packet)
+                    initializationStep == InitializationStep.COMPLETE -> handleLogFrame(packet)
                 packet.kind == NxWearPacket.Kind.FRAMED && packet.command == 0x31 && packet.dataType == NxWearDataType.ACTIVITY_04 &&
                     initializationStep == InitializationStep.COMPLETE -> handleSportFrame(packet)
                 packet.kind == NxWearPacket.Kind.FRAMED && packet.command == 0x31 && packet.dataType != null && packet.dataType in ACTIVITY_SUBTYPES -> {
                     handleInitializationActivityFrame(packet)
                 }
                 packet.kind == NxWearPacket.Kind.CONTINUATION -> {
-                    if (pendingStressSyncSequence != null) handleStressSyncContinuation(packet)
+                    if (pendingLogSequence != null) handleLogContinuation(packet)
                     else if (sportPacket != null && initializationStep == InitializationStep.COMPLETE) handleSportContinuation(packet)
                     else handleInitializationContinuation(packet)
                 }
@@ -377,33 +400,33 @@ class NxWearB8Support : AbstractBTLESingleDeviceSupport(LOG) {
             .queue()
     }
 
-    private fun handleStressSyncFrame(packet: NxWearPacket) {
+    private fun handleLogFrame(packet: NxWearPacket) {
         val declaredLength = requireNotNull(packet.declaredLength)
-        pendingStressSyncSequence = packet.sequence
-        pendingStressSyncPages = packet.pagesPresent
-        expectedStressSyncPages = expectedActivityFragmentCount(declaredLength)
-        finishStressSyncIfComplete()
+        pendingLogSequence = packet.sequence
+        pendingLogPages = packet.pagesPresent
+        expectedLogPages = expectedActivityFragmentCount(declaredLength)
+        finishLogIfComplete()
     }
 
-    private fun handleStressSyncContinuation(packet: NxWearPacket) {
-        if (packet.continuationIndex != pendingStressSyncPages) return
-        pendingStressSyncPages += packet.pagesPresent
-        finishStressSyncIfComplete()
+    private fun handleLogContinuation(packet: NxWearPacket) {
+        if (packet.continuationIndex != pendingLogPages) return
+        pendingLogPages += packet.pagesPresent
+        finishLogIfComplete()
     }
 
-    private fun finishStressSyncIfComplete() {
-        if (pendingStressSyncPages < expectedStressSyncPages) return
-        val sequence = pendingStressSyncSequence ?: return
-        pendingStressSyncSequence = null
-        pendingStressSyncPages = 0
-        expectedStressSyncPages = 0
+    private fun finishLogIfComplete() {
+        if (pendingLogPages < expectedLogPages) return
+        val sequence = pendingLogSequence ?: return
+        pendingLogSequence = null
+        pendingLogPages = 0
+        expectedLogPages = 0
         acknowledgeMeasurementPacket(sequence, NxWearDataType.ACTIVITY_FA)
     }
 
-    private fun handleManualHeartRate(packet: NxWearPacket, acknowledge: Boolean = true) {
+    private fun handleManualHeartRate(packet: NxWearPacket, acknowledge: Boolean = true, realtime: Boolean = true) {
         val readings = requireNotNull(NxWearHeartRateReading.parse(packet))
         val sequence = requireNotNull(packet.sequence)
-        if (initializationStep != InitializationStep.COMPLETE) {
+        if (acknowledge && initializationStep != InitializationStep.COMPLETE) {
             nextInitializationSequence = (sequence + 1) and 0xff
         }
         if (acknowledge) {
@@ -426,6 +449,7 @@ class NxWearB8Support : AbstractBTLESingleDeviceSupport(LOG) {
                 LOG.error("Unable to save Nx Wear B8 heart rate reading", e)
             }
         }
+        if (!realtime) return
         for (reading in valid) {
             val intent = Intent(DeviceService.ACTION_REALTIME_SAMPLES)
                 .putExtra(GBDevice.EXTRA_DEVICE, getDevice())
@@ -448,6 +472,8 @@ class NxWearB8Support : AbstractBTLESingleDeviceSupport(LOG) {
             LOG.debug("Unexpected Nx Wear B8 activity subtype {} during initialization step {}", subtype, initializationStep)
             return
         }
+        historyTimeoutHandler.removeCallbacks(historyTimeout)
+        historyTimeoutHandler.postDelayed(historyTimeout, HISTORY_TIMEOUT_MS)
         currentHistorySubtype = subtype
         nextInitializationSequence = requireNotNull(packet.sequence)
         val declaredLength = packet.declaredLength
@@ -462,9 +488,7 @@ class NxWearB8Support : AbstractBTLESingleDeviceSupport(LOG) {
             deviceSyncLength = declaredLength
         }
         if (subtype == NxWearDataType.ACTIVITY_04) sportPacket = packet
-        if (subtype == NxWearDataType.HEART_RATE && packet.isComplete && NxWearHeartRateReading.parse(packet) != null) {
-            handleManualHeartRate(packet, acknowledge = false)
-        }
+        if (initializationStep == InitializationStep.WAIT_HISTORY_DATA) historyPacket = packet
         advanceInitializationWhenComplete()
     }
 
@@ -479,11 +503,7 @@ class NxWearB8Support : AbstractBTLESingleDeviceSupport(LOG) {
 
     private fun handleSportContinuation(continuation: NxWearPacket) {
         val first = sportPacket ?: return
-        if (continuation.continuationIndex != first.pagesPresent || first.declaredLength == null) return
-        val combined = (first.payload + continuation.payload).copyOf(minOf(
-            first.declaredLength, first.payload.size + continuation.payload.size,
-        ))
-        val complete = first.copy(payload = combined, pagesPresent = first.pagesPresent + continuation.pagesPresent)
+        val complete = first.append(continuation) ?: return
         sportPacket = complete
         if (complete.isComplete && initializationStep == InitializationStep.COMPLETE) {
             persistSportPacket(complete)
@@ -516,6 +536,11 @@ class NxWearB8Support : AbstractBTLESingleDeviceSupport(LOG) {
     private fun handleInitializationContinuation(packet: NxWearPacket) {
         if (initializationStep == InitializationStep.COMPLETE || initializationFragments == 0) return
         if (packet.continuationIndex != initializationFragments) return
+        if (initializationStep == InitializationStep.WAIT_HISTORY_DATA) {
+            historyPacket = historyPacket?.append(packet) ?: return
+        }
+        historyTimeoutHandler.removeCallbacks(historyTimeout)
+        historyTimeoutHandler.postDelayed(historyTimeout, HISTORY_TIMEOUT_MS)
         initializationFragments += packet.pagesPresent
         if (initializationStep == InitializationStep.WAIT_ACTIVITY_09) {
             val current = deviceSyncPayload
@@ -542,6 +567,15 @@ class NxWearB8Support : AbstractBTLESingleDeviceSupport(LOG) {
             sportPacket = null
         }
 
+        if (initializationStep == InitializationStep.WAIT_HISTORY_DATA) {
+            val packet = historyPacket?.takeIf { it.isComplete } ?: return
+            if (NxWearHeartRateReading.parse(packet) != null) {
+                handleManualHeartRate(packet, acknowledge = false, realtime = false)
+            } else if (packet.dataType == NxWearDataType.ACTIVITY_05) {
+                persistSportPacket(packet)
+            }
+            historyPacket = null
+        }
         initializationFragments = 0
         expectedInitializationFragments = 0
         val (nextStep, request) = when (initializationStep) {
@@ -549,7 +583,7 @@ class NxWearB8Support : AbstractBTLESingleDeviceSupport(LOG) {
             InitializationStep.WAIT_ACTIVITY_04 -> InitializationStep.WAIT_HISTORY_DATA to nextInitializationRead(NxWearDataType.ACTIVITY_04)
             InitializationStep.WAIT_HISTORY_DATA -> {
                 val subtype = currentHistorySubtype ?: return
-                (if (subtype == NxWearDataType.ACTIVITY_FA) InitializationStep.COMPLETE else InitializationStep.WAIT_HISTORY_DATA) to
+                InitializationStep.WAIT_HISTORY_DATA to
                     nextInitializationRead(subtype)
             }
             InitializationStep.COMPLETE -> return
@@ -563,7 +597,7 @@ class NxWearB8Support : AbstractBTLESingleDeviceSupport(LOG) {
             historyTimeoutHandler.removeCallbacks(historyTimeout)
             historyTimeoutHandler.postDelayed(
                 historyTimeout,
-                if (nextStep == InitializationStep.COMPLETE) HISTORY_QUIET_TIMEOUT_MS else HISTORY_TIMEOUT_MS,
+                historyTimeoutForSubtype(NxWearPacket.parse(request).dataType),
             )
         }
     }
@@ -741,10 +775,13 @@ class NxWearB8Support : AbstractBTLESingleDeviceSupport(LOG) {
         private const val HISTORY_QUIET_TIMEOUT_MS = 5_000L
         private val ACTIVITY_SUBTYPES = setOf(
             NxWearDataType.ACTIVITY_09, NxWearDataType.ACTIVITY_04, NxWearDataType.ACTIVITY_05,
-            NxWearDataType.HEART_RATE,
+            NxWearDataType.HEART_RATE, NxWearDataType.EXERCISE_HEART_RATE, NxWearDataType.HISTORY_TEMPERATURE,
             NxWearDataType.ACTIVITY_08, NxWearDataType.ACTIVITY_28, NxWearDataType.ACTIVITY_2A,
             NxWearDataType.ACTIVITY_FA,
         )
+        internal fun historyTimeoutForSubtype(dataType: Int?): Long =
+            if (dataType == NxWearDataType.ACTIVITY_FA) HISTORY_QUIET_TIMEOUT_MS else HISTORY_TIMEOUT_MS
+
         private val HISTORY_DATA_TYPES = ACTIVITY_SUBTYPES - setOf(NxWearDataType.ACTIVITY_09, NxWearDataType.ACTIVITY_04)
         internal fun isHistoryDataType(dataType: Int): Boolean = dataType in HISTORY_DATA_TYPES
         private fun Boolean.toWireByte(): Byte = compareTo(false).toByte()

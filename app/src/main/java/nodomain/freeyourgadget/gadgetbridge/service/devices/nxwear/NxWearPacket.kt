@@ -24,6 +24,17 @@ internal data class NxWearPacket(
     val isComplete: Boolean
         get() = kind == Kind.FRAMED && payload.size == declaredLength && pagesPresent == pageCount?.plus(1)
 
+    fun append(continuation: NxWearPacket): NxWearPacket? {
+        val length = declaredLength ?: return null
+        if (kind != Kind.FRAMED || isComplete || continuation.kind != Kind.CONTINUATION ||
+            continuation.continuationIndex != pagesPresent ||
+            pagesPresent + continuation.pagesPresent > requireNotNull(pageCount) + 1) return null
+        return copy(
+            payload = (payload + continuation.payload).copyOf(minOf(length, payload.size + continuation.payload.size)),
+            pagesPresent = pagesPresent + continuation.pagesPresent,
+        )
+    }
+
     fun timedReadings(expectedDataType: Int): List<TimedReading>? {
         if (kind != Kind.FRAMED || !isComplete || command != 0x31 || dataType != expectedDataType ||
             payload.size < 8 || (payload.size - 3) % 5 != 0) return null
@@ -164,6 +175,8 @@ internal object NxWearDataType {
     const val HEART_RATE = 0x07
     const val ACTIVITY_08 = 0x08
     const val ACTIVITY_09 = 0x09
+    const val EXERCISE_HEART_RATE = 0x11
+    const val HISTORY_TEMPERATURE = 0x2f
     const val SPO2 = 0x14
     const val HEART_RATE_CONTROL = 0x15
     const val MANUAL_HEART_RATE = 0x18

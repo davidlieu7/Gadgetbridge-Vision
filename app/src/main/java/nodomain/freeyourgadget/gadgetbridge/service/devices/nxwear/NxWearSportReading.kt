@@ -9,9 +9,9 @@ internal data class NxWearSportReading(
 ) {
     companion object {
         fun parse(packet: NxWearPacket): List<NxWearSportReading>? {
-            if (!packet.isComplete || packet.command != 0x31 || packet.dataType != NxWearDataType.ACTIVITY_04) return null
+            if (!packet.isComplete || packet.command != 0x31 || packet.dataType !in setOf(NxWearDataType.ACTIVITY_04, NxWearDataType.ACTIVITY_05)) return null
             val payload = packet.payload
-            if (payload.size < 3 || payload.le16(0) != 1 || payload.size != 3 + (payload[2].toInt() and 0xff) * 20) return null
+            if (payload.size < 3 || payload.le16(0) < (payload[2].toInt() and 0xff) || payload.size != 3 + (payload[2].toInt() and 0xff) * 20) return null
             return (3 until payload.size step 20).mapNotNull { offset ->
                 val timestamp = payload.le32(offset)
                 val steps = payload.le32(offset + 4)

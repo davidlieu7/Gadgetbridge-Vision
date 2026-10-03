@@ -11,6 +11,69 @@ class NxWearPacketTest {
     private fun bytes(hex: String) = hex.chunked(2).map { it.toInt(16).toByte() }.toByteArray()
 
     @Test
+    fun reassemblesExerciseHeartRateHistoryBeforeAcknowledging() {
+        val frames = listOf(
+            "000b0303311100003f000c000c03b7be6a5904b7",
+            "01be6a5904b7be6a5904b7be6a5805b7be6a5805",
+            "02b7be6a5805b7be6a5806b7be6a5806b7be6a58",
+            "0306b7be6a5807b7be6a5707b7be6a577f000001",
+        ).map { NxWearPacket.parse(bytes(it)) }
+        var packet = frames.first()
+        assertNull(NxWearHeartRateReading.parse(packet))
+        for (continuation in frames.drop(1)) packet = requireNotNull(packet.append(continuation))
+
+        val readings = NxWearHeartRateReading.parse(packet)
+        assertEquals(true, packet.isComplete)
+        assertEquals(12, readings?.size)
+        assertEquals(NxWearHeartRateReading(0x6abeb703L * 1000L, 89), readings?.first())
+        assertEquals(NxWearHeartRateReading(0x6abeb707L * 1000L, 87), readings?.last())
+        assertEquals(true, NxWearB8Support.isHistoryDataType(requireNotNull(packet.dataType)))
+        assertArrayEquals(bytes("000b000304110000010001000000000000000000"),
+            NxWearB8Support.encodeInitializationRead(requireNotNull(packet.sequence), requireNotNull(packet.dataType)))
+    }
+
+    @Test
+    fun parsesHistoricalSportRecordsFromFragmentedFrame() {
+        val frames = listOf(
+            "000b0205310500002b00020002b7d4be6a300900",
+            "010047060000f22801001f010000000000000000",
+            "02000000000000000000000000000068b9be6a4e",
+        ).map { NxWearPacket.parse(bytes(it)) }
+        var packet = frames.first()
+        for (continuation in frames.drop(1)) packet = requireNotNull(packet.append(continuation))
+
+        val readings = NxWearSportReading.parse(packet)
+        assertEquals(listOf(NxWearSportReading(0x6abed4b7L * 1000L, 2352, 1607, 76018, 287)), readings)
+        assertArrayEquals(bytes("000b000504050000010001000000000000000000"),
+            NxWearB8Support.encodeInitializationRead(requireNotNull(packet.sequence), requireNotNull(packet.dataType)))
+    }
+
+    @Test
+    fun recognizesTemperatureHistoryAndWaitsForEveryDiagnosticLogFrame() {
+        assertEquals(true, NxWearB8Support.isHistoryDataType(NxWearDataType.HISTORY_TEMPERATURE))
+        assertEquals(60_000L, NxWearB8Support.historyTimeoutForSubtype(NxWearDataType.HISTORY_TEMPERATURE))
+        assertEquals(5_000L, NxWearB8Support.historyTimeoutForSubtype(NxWearDataType.ACTIVITY_FA))
+        for (sequence in 6..0x49) {
+            val ack = NxWearPacket.parse(NxWearB8Support.encodeInitializationRead(sequence, NxWearDataType.ACTIVITY_FA))
+            assertEquals(sequence, ack.sequence)
+            assertEquals(0x04, ack.command)
+            assertEquals(NxWearDataType.ACTIVITY_FA, ack.dataType)
+        }
+    }
+
+    @Test
+    fun rejectsOutOfOrderAndExcessHistoryContinuations() {
+        val first = NxWearPacket.parse(bytes("000b010231040000170001000100000000000000"))
+        val next = NxWearPacket.parse(bytes("0100000000000000000000000000020b00800100"))
+        val wrong = next.copy(continuationIndex = 2)
+        assertNull(first.append(wrong))
+        assertNull(first.append(next.copy(pagesPresent = 2)))
+        val complete = requireNotNull(first.append(next))
+        assertEquals(true, complete.isComplete)
+        assertNull(complete.append(next))
+    }
+
+    @Test
     fun parsesWalkingRecordFromCompleteSportFrame() {
         val payload = bytes("010001e57fbe6a400000002d0000000a0a00002f000000")
         val packet = NxWearPacket.parse(NxWearPacket.frame(0x1d, 0x31, NxWearDataType.ACTIVITY_04, payload))
