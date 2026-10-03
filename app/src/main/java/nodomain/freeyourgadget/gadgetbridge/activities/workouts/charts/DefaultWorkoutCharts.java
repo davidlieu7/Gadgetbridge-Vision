@@ -136,19 +136,27 @@ public class DefaultWorkoutCharts {
                 hasElevationValues = hasElevationValues || (elevation != 0.0);
             }
 
+            // Speed, cadence and respiratory rate are instantaneous rates whose 0 means "paused /
+            // not reported" rather than a measurement, so those zeros are left out of the series and
+            // it gaps out instead of cliffing to the axis, same as HR above. Power keeps its zeros:
+            // a power meter reads a genuine 0 W whenever the rider coasts.
+
             // Speed
             final float speed = point.getSpeed();
-            if (speed >= 0.0f) {
+            if (speed > 0.0f) {
                 speedDataPoints.add(new Entry(tsShorten, speed));
-                hasSpeedValues = hasSpeedValues || (speed > 0.0f);
+                hasSpeedValues = true;
             }
 
             // Cadence
             final float cadence = point.getCadence();
+            // The average feeds the cadence chart's y-axis maximum, so it counts the zeros too.
             if (cadence >= 0.0f) {
-                cadenceDataPoints.add(new Entry(tsShorten, cadence));
                 cadenceAccumulator.add(cadence);
-                hasCadenceValues = hasCadenceValues || (cadence > 0.0f);
+            }
+            if (cadence > 0.0f) {
+                cadenceDataPoints.add(new Entry(tsShorten, cadence));
+                hasCadenceValues = true;
             }
 
             final float power = point.getPower();
@@ -158,9 +166,9 @@ public class DefaultWorkoutCharts {
             }
 
             final float respiratoryRate = point.getRespiratoryRate();
-            if (respiratoryRate >= 0.0f) {
+            if (respiratoryRate > 0.0f) {
                 respiratoryRatePoints.add(new Entry(tsShorten, respiratoryRate));
-                hasRespiratoryRateValues = hasRespiratoryRateValues || (respiratoryRate > 0.0f);
+                hasRespiratoryRateValues = true;
             }
 
             // Depth (diving activity)
