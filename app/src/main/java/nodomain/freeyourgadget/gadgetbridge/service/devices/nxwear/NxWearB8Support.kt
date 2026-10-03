@@ -59,7 +59,7 @@ class NxWearB8Support : AbstractBTLESingleDeviceSupport(LOG) {
     private var pendingLogPages = 0
     private var expectedLogPages = 0
     private val heartRateTimeoutHandler = Handler(Looper.getMainLooper())
-    private val heartRateTimeout = Runnable { stopManualHeartRate() }
+    private val heartRateTimeout = Runnable { onManualHeartRateTimeout() }
     private val historyTimeoutHandler = Handler(Looper.getMainLooper())
     private val historyTimeout = Runnable { finishHistoryFetch() }
     private var historyFetchActive = false
@@ -267,6 +267,16 @@ class NxWearB8Support : AbstractBTLESingleDeviceSupport(LOG) {
         createTransactionBuilder("Start Nx Wear B8 heart rate reading")
             .write(WRITE_CHARACTERISTIC, *encodeManualHeartRate(true))
             .queue()
+    }
+
+    @Synchronized
+    private fun onManualHeartRateTimeout() {
+        if (!manualHeartRateActive || continuousHeartRate) return
+        stopManualHeartRate()
+        val intent = Intent(DeviceService.ACTION_HEARTRATE_MEASUREMENT_ERROR)
+            .putExtra(GBDevice.EXTRA_DEVICE, getDevice())
+            .putExtra(DeviceService.EXTRA_MEASUREMENT_ERROR, getContext().getString(R.string.heart_rate_measurement_timeout))
+        LocalBroadcastManager.getInstance(getContext()).sendBroadcast(intent)
     }
 
     @Synchronized

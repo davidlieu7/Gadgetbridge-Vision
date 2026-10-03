@@ -73,6 +73,7 @@ public interface DeviceService extends EventHandler {
     String ACTION_SET_CONTACTS = PREFIX + ".action.set_contacts";
     String ACTION_ENABLE_REALTIME_STEPS = PREFIX + ".action.enable_realtime_steps";
     String ACTION_REALTIME_SAMPLES = PREFIX + ".action.realtime_samples";
+    String ACTION_HEARTRATE_MEASUREMENT_ERROR = PREFIX + ".action.heartrate_measurement_error";
     String ACTION_ENABLE_REALTIME_HEARTRATE_MEASUREMENT = PREFIX + ".action.realtime_hr_measurement";
     String ACTION_ENABLE_HEARTRATE_SLEEP_SUPPORT = PREFIX + ".action.enable_heartrate_sleep_support";
     String ACTION_SET_HEARTRATE_MEASUREMENT_INTERVAL = PREFIX + ".action.set_heartrate_measurement_intervarl";
@@ -139,6 +140,7 @@ public interface DeviceService extends EventHandler {
     String EXTRA_CAMERA_FILENAME = "filename";
 
     String EXTRA_REALTIME_SAMPLE = "realtime_sample";
+    String EXTRA_MEASUREMENT_ERROR = "measurement_error";
     String EXTRA_TIMESTAMP = "timestamp";
 
     String EXTRA_CALENDAREVENT_SPEC = "calendarevent_spec";
