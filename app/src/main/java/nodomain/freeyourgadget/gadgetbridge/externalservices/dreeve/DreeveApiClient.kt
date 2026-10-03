@@ -20,6 +20,7 @@ import android.net.Uri
 import androidx.core.net.toUri
 import nodomain.freeyourgadget.gadgetbridge.GBApplication
 import nodomain.freeyourgadget.gadgetbridge.R
+import nodomain.freeyourgadget.gadgetbridge.activities.workouts.MetadataUpdateResult
 import nodomain.freeyourgadget.gadgetbridge.activities.workouts.WorkoutUploader
 import nodomain.freeyourgadget.gadgetbridge.externalservices.ExternalServiceHttp
 import nodomain.freeyourgadget.gadgetbridge.util.InternetUtils
@@ -168,18 +169,26 @@ class DreeveApiClient(private val baseUrl: String, private val tokenManager: Dre
 
     /**
      * Sets the name of [activityId], and its sport when [sportType] is not null. Dreeve refuses a
-     * sport type it does not know with a 400, so that is retried once with the name alone. An
-     * activity that no longer exists has nothing left to update and counts as done.
+     * sport type it does not know with a 400, so that is retried once with the name alone.
      */
-    fun updateActivity(activityId: String, name: String, sportType: String?): Boolean {
+    fun updateActivity(activityId: String, name: String, sportType: String?): MetadataUpdateResult {
         val uri = url("/api/v1/activities/${Uri.encode(activityId)}")
         val body = JSONObject().put("name", name)
         sportType?.let { body.put("sportType", it) }
-        val status = request(uri, "PATCH", body).statusCode
-        if (status == 400 && sportType != null) {
+        val response = request(uri, "PATCH", body)
+        if (response.statusCode == 400 && sportType != null) {
             return updateActivity(activityId, name, null)
         }
-        return status in 200..299 || status == 404
+        return when (response.statusCode) {
+            in 200..299 -> MetadataUpdateResult.Updated
+            404 -> MetadataUpdateResult.Gone
+            else -> MetadataUpdateResult.Failed(
+                ExternalServiceHttp.failureMessage(
+                    response.statusCode, response.body, null,
+                    GBApplication.getContext().getString(R.string.toast_error_invalid_api_key)
+                )
+            )
+        }
     }
 
     /** Deletes [activityId]; one that is already gone counts as deleted. */

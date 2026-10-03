@@ -72,9 +72,13 @@ class WorkoutResolveRemoteIdTest : TestBase() {
             return resolution
         }
 
-        override fun updateMetadata(context: Context, remoteActivityId: String, summary: BaseActivitySummary): Boolean {
+        override fun updateMetadata(
+            context: Context,
+            remoteActivityId: String,
+            summary: BaseActivitySummary
+        ): MetadataUpdateResult {
             metadataPushedTo += remoteActivityId
-            return true
+            return MetadataUpdateResult.Updated
         }
     }
 
@@ -103,7 +107,7 @@ class WorkoutResolveRemoteIdTest : TestBase() {
     @Test
     fun aFileStillBeingImportedIsAskedAboutAgainNextTime() {
         val target = FakeTarget(RemoteIdResolution.Pending)
-        assertEquals(WorkoutUploader.SyncOutcome.AlreadyInStep, resync(target, awaitingRow(target)))
+        assertEquals(WorkoutUploader.SyncOutcome.AwaitingImport, resync(target, awaitingRow(target)))
         assertNull(storedRow(target))
     }
 

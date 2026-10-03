@@ -144,7 +144,7 @@ class WorkoutRecreateTest : TestBase() {
     @Test
     fun anUnreadableActivityIsRetriedLater() {
         val target = FakeTarget(RecreateOrder.CREATE_THEN_DELETE, RemoteSnapshot.Failed)
-        assertEquals(TrackUpdateResult.Failed, recreate(target))
+        assertEquals(TrackUpdateResult.Failed(), recreate(target))
         assertEquals(listOf("snapshot old"), target.calls)
     }
 
@@ -155,7 +155,7 @@ class WorkoutRecreateTest : TestBase() {
             RemoteSnapshot.Found(null, false),
             uploadResult = WorkoutUploader.UploadResult(false, null, "HTTP 500")
         )
-        assertEquals(TrackUpdateResult.Failed, recreate(target))
+        assertEquals(TrackUpdateResult.Failed("HTTP 500"), recreate(target))
         assertEquals(listOf("snapshot old", "upload"), target.calls)
     }
 

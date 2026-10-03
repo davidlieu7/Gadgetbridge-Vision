@@ -845,6 +845,12 @@ class WorkoutDetailsFragment : Fragment(), MenuProvider {
                     GB.INFO
                 )
 
+                is WorkoutUploader.SyncOutcome.AwaitingImport -> GB.toast(
+                    getString(R.string.workout_upload_toast_awaiting_import, serviceName),
+                    Toast.LENGTH_SHORT,
+                    GB.INFO
+                )
+
                 is WorkoutUploader.SyncOutcome.NotApplicable -> {
                     val message = if (!target.capabilities.appliesTo(workout.summary)) {
                         getString(R.string.no_activity_track_in_activity_toast)

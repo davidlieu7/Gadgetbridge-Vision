@@ -139,6 +139,12 @@ object WorkoutUploader {
         /** The service already holds the workout as it stands, so nothing was sent. */
         object AlreadyInStep : SyncOutcome
 
+        /**
+         * The service took the workout and has not imported it yet, so there is no activity to
+         * bring in line; see [WorkoutUploadTarget.resolveRemoteId].
+         */
+        object AwaitingImport : SyncOutcome
+
         /** The workout cannot be expressed in the format this service takes. */
         object NotApplicable : SyncOutcome
 
@@ -374,7 +380,7 @@ object WorkoutUploader {
                         return@run resolution.remoteActivityId
                     }
 
-                    is RemoteIdResolution.Pending -> return SyncOutcome.AlreadyInStep
+                    is RemoteIdResolution.Pending -> return SyncOutcome.AwaitingImport
                     is RemoteIdResolution.Failed -> return SyncOutcome.Failed(null)
                     is RemoteIdResolution.Rejected -> {
                         LOG.warn("Service {} did not import summary {}: {}",
@@ -464,21 +470,13 @@ object WorkoutUploader {
                 // the user is told once rather than on every sync.
                 is TrackUpdateResult.Refused -> refusal = update.message
 
-                is TrackUpdateResult.Gone -> {
-                    val message = context.getString(
-                        R.string.service_remote_deleted,
-                        context.getString(target.nameRes)
-                    )
-                    LOG.info("Activity {} of summary {} is gone from service {}",
-                        remoteId, id, target.service)
-                    recordWithoutId(target, row, sourceHash, message)
-                    return SyncOutcome.Resynced(message)
-                }
+                is TrackUpdateResult.Gone -> return recordGone(context, target, row, sourceHash, remoteId)
 
                 is TrackUpdateResult.Failed -> {
                     // A transient failure: keep the old fingerprints so the next run retries.
-                    LOG.warn("Track update to service {} failed for summary {}", target.service, id)
-                    return SyncOutcome.Failed(null)
+                    LOG.warn("Track update to service {} failed for summary {}: {}",
+                        target.service, id, update.reason)
+                    return SyncOutcome.Failed(update.reason)
                 }
             }
         }
@@ -513,10 +511,17 @@ object WorkoutUploader {
         }
 
         // A replacement activity is created with the right name and type already.
-        val metadataFailed = !recreated && target.capabilities.editableMetadata &&
-                !target.updateMetadata(context, remoteId, summary)
-        if (metadataFailed) {
-            LOG.warn("Metadata update to service {} failed for summary {}", target.service, id)
+        val metadata = if (!recreated && target.capabilities.editableMetadata) {
+            target.updateMetadata(context, remoteId, summary)
+        } else {
+            MetadataUpdateResult.Updated
+        }
+        if (metadata is MetadataUpdateResult.Gone) {
+            return recordGone(context, target, row, sourceHash, remoteId)
+        }
+        if (metadata is MetadataUpdateResult.Failed) {
+            LOG.warn("Metadata update to service {} failed for summary {}: {}",
+                target.service, id, metadata.reason)
             pending = true
         }
 
@@ -536,7 +541,29 @@ object WorkoutUploader {
         if (awaitingId) {
             scheduleRemoteIdCheck(context, target)
         }
-        return if (metadataFailed) SyncOutcome.Failed(null) else SyncOutcome.Resynced(refusal)
+        return if (metadata is MetadataUpdateResult.Failed) {
+            SyncOutcome.Failed(metadata.reason)
+        } else {
+            SyncOutcome.Resynced(refusal)
+        }
+    }
+
+    /**
+     * Records that [remoteActivityId] was deleted on [target]'s side. It is not brought back on its
+     * own: the user is told once, and an upload they ask for sends the workout again (see [isLost]).
+     */
+    private fun recordGone(
+        context: Context,
+        target: WorkoutUploadTarget,
+        row: WorkoutUpload,
+        sourceHash: String,
+        remoteActivityId: String
+    ): SyncOutcome {
+        val message = context.getString(R.string.service_remote_deleted, context.getString(target.nameRes))
+        LOG.info("Activity {} of summary {} is gone from service {}",
+            remoteActivityId, row.summaryId, target.service)
+        recordWithoutId(target, row, sourceHash, message)
+        return SyncOutcome.Resynced(message)
     }
 
     /**
@@ -571,7 +598,7 @@ object WorkoutUploader {
     ): TrackUpdateResult {
         val snapshot = target.snapshotRemote(context, remoteActivityId, row)
         val carry = when (snapshot) {
-            is RemoteSnapshot.Failed -> return TrackUpdateResult.Failed
+            is RemoteSnapshot.Failed -> return TrackUpdateResult.Failed()
             is RemoteSnapshot.Found -> {
                 if (snapshot.losesUserContent) {
                     LOG.info("Not re-creating {} on service {}, it carries edits made there",
@@ -590,7 +617,7 @@ object WorkoutUploader {
         if (stillThere && !createFirst && !target.deleteRemote(context, remoteActivityId)) {
             LOG.warn("Could not delete {} on service {}, leaving it as it was",
                 remoteActivityId, target.service)
-            return TrackUpdateResult.Failed
+            return TrackUpdateResult.Failed()
         }
         val result = target.upload(context, summary, payload, carry)
         val newId = result.remoteActivityId
@@ -601,7 +628,7 @@ object WorkoutUploader {
                 LOG.error("Re-upload of summary {} to service {} failed after {} was deleted",
                     summary.id, target.service, remoteActivityId)
             }
-            return TrackUpdateResult.Failed
+            return TrackUpdateResult.Failed(result.reason)
         }
         if (stillThere && createFirst && !target.deleteRemote(context, remoteActivityId)) {
             // The replacement is recorded all the same: a leftover duplicate can be removed by

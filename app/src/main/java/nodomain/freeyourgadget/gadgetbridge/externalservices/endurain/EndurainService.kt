@@ -23,6 +23,7 @@ import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import androidx.fragment.app.Fragment
 import nodomain.freeyourgadget.gadgetbridge.GBApplication
 import nodomain.freeyourgadget.gadgetbridge.R
+import nodomain.freeyourgadget.gadgetbridge.activities.workouts.MetadataUpdateResult
 import nodomain.freeyourgadget.gadgetbridge.activities.workouts.RemoteOp
 import nodomain.freeyourgadget.gadgetbridge.activities.workouts.RecreateOrder
 import nodomain.freeyourgadget.gadgetbridge.activities.workouts.RemoteSnapshot
@@ -194,15 +195,15 @@ object EndurainService : WorkoutUploadTarget {
         context: Context,
         remoteActivityId: String,
         summary: BaseActivitySummary
-    ): Boolean {
-        val activityId = remoteActivityId.toIntOrNull() ?: return false
-        val server = serverUrl() ?: return false
+    ): MetadataUpdateResult {
+        val activityId = remoteActivityId.toIntOrNull() ?: return MetadataUpdateResult.Failed()
+        val server = serverUrl() ?: return MetadataUpdateResult.Failed()
         val tokenManager = EndurainTokenManager(context)
         val apiClient = EndurainApiClient(server, tokenManager)
         val kind = ActivityKind.fromCode(summary.activityKind)
         val name = WorkoutUploader.nameFor(context, summary)
 
-        return ExternalServiceCalls.await<Boolean>(WorkoutUploader.DEFAULT_UPLOAD_TIMEOUT_SECONDS) { done ->
+        val edited = ExternalServiceCalls.await<Boolean>(WorkoutUploader.DEFAULT_UPLOAD_TIMEOUT_SECONDS) { done ->
             tokenManager.performTokenRefresh(server) {
                 Thread {
                     done(
@@ -215,7 +216,8 @@ object EndurainService : WorkoutUploadTarget {
                     )
                 }.start()
             }
-        } == true
+        }
+        return if (edited == true) MetadataUpdateResult.Updated else MetadataUpdateResult.Failed()
     }
 
     /**

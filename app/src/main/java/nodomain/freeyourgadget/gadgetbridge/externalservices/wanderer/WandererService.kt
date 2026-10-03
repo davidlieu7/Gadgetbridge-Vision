@@ -19,7 +19,7 @@ package nodomain.freeyourgadget.gadgetbridge.externalservices.wanderer
 import android.content.Context
 import androidx.fragment.app.Fragment
 import nodomain.freeyourgadget.gadgetbridge.R
-import nodomain.freeyourgadget.gadgetbridge.activities.workouts.RemoteLookup
+import nodomain.freeyourgadget.gadgetbridge.activities.workouts.MetadataUpdateResult
 import nodomain.freeyourgadget.gadgetbridge.activities.workouts.RemoteOp
 import nodomain.freeyourgadget.gadgetbridge.activities.workouts.TrackUpdateResult
 import nodomain.freeyourgadget.gadgetbridge.activities.workouts.UploadCapabilities
@@ -103,19 +103,21 @@ object WandererService : WorkoutUploadTarget {
         context: Context,
         remoteActivityId: String,
         summary: BaseActivitySummary
-    ): Boolean {
-        val server = serverUrl() ?: return false
-        val updated = ExternalServiceCalls.await<Boolean>(WorkoutUploader.DEFAULT_UPLOAD_TIMEOUT_SECONDS) { done ->
+    ): MetadataUpdateResult {
+        val server = serverUrl() ?: return MetadataUpdateResult.Failed()
+        val result = ExternalServiceCalls.await<WandererWriteResult>(WorkoutUploader.DEFAULT_UPLOAD_TIMEOUT_SECONDS) { done ->
             WandererApiClient(server, WandererTokenManager(context))
                 .updateTrailFields(
                     remoteActivityId,
                     mapOf("name" to WorkoutUploader.nameFor(context, summary))
-                ) { result ->
-                    // A trail deleted on the server is not brought back for a rename.
-                    done(result !is WandererWriteResult.Failed)
-                }
+                ) { done(it) }
         }
-        return updated == true
+        return when (result) {
+            is WandererWriteResult.Done -> MetadataUpdateResult.Updated
+            is WandererWriteResult.Gone -> MetadataUpdateResult.Gone
+            is WandererWriteResult.Failed -> MetadataUpdateResult.Failed(result.reason)
+            null -> MetadataUpdateResult.Failed()
+        }
     }
 
     override fun updateTrack(
@@ -125,7 +127,7 @@ object WandererService : WorkoutUploadTarget {
         summary: BaseActivitySummary,
         row: WorkoutUpload
     ): TrackUpdateResult {
-        val server = serverUrl() ?: return TrackUpdateResult.Failed
+        val server = serverUrl() ?: return TrackUpdateResult.Failed()
         val result = ExternalServiceCalls.await<WandererWriteResult>(WorkoutUploader.DEFAULT_UPLOAD_TIMEOUT_SECONDS) { done ->
             WandererApiClient(server, WandererTokenManager(context))
                 .updateActivityFile(remoteActivityId, payload, statsOf(summary)) { done(it) }
@@ -133,7 +135,8 @@ object WandererService : WorkoutUploadTarget {
         return when (result) {
             is WandererWriteResult.Done -> TrackUpdateResult.Updated
             is WandererWriteResult.Gone -> TrackUpdateResult.Gone
-            else -> TrackUpdateResult.Failed
+            is WandererWriteResult.Failed -> TrackUpdateResult.Failed(result.reason)
+            null -> TrackUpdateResult.Failed()
         }
     }
 

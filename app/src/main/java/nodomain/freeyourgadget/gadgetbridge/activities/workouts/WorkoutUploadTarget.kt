@@ -224,8 +224,22 @@ sealed interface TrackUpdateResult {
      */
     object Gone : TrackUpdateResult
 
-    /** It did not go through this time; the next run retries. */
-    object Failed : TrackUpdateResult
+    /**
+     * It did not go through this time; the next run retries. [reason] is a localized message for
+     * the user, null when the failure says nothing they could act on.
+     */
+    data class Failed(val reason: String? = null) : TrackUpdateResult
+}
+
+/** Outcome of pushing the name and activity kind onto an activity the service holds. */
+sealed interface MetadataUpdateResult {
+    object Updated : MetadataUpdateResult
+
+    /** The activity was deleted on the service; handled as [TrackUpdateResult.Gone]. */
+    object Gone : MetadataUpdateResult
+
+    /** As [TrackUpdateResult.Failed]. */
+    data class Failed(val reason: String? = null) : MetadataUpdateResult
 }
 
 /**
@@ -334,14 +348,13 @@ interface WorkoutUploadTarget : ExternalService {
 
     /**
      * Pushes the name and activity kind onto an activity that already exists remotely. Called only
-     * when [UploadCapabilities.editableMetadata]. An activity that no longer exists counts as
-     * updated, so it does not bring every later sync back.
+     * when [UploadCapabilities.editableMetadata].
      */
     fun updateMetadata(
         context: Context,
         remoteActivityId: String,
         summary: BaseActivitySummary
-    ): Boolean = false
+    ): MetadataUpdateResult = MetadataUpdateResult.Failed()
 
     /**
      * Writes [payload] as the new track of the remote activity, keeping its id. Called only when
@@ -355,7 +368,7 @@ interface WorkoutUploadTarget : ExternalService {
         payload: File,
         summary: BaseActivitySummary,
         row: WorkoutUpload
-    ): TrackUpdateResult = TrackUpdateResult.Failed
+    ): TrackUpdateResult = TrackUpdateResult.Failed()
 
     /**
      * Brings the header photo of an existing remote activity in line with the local workout, which

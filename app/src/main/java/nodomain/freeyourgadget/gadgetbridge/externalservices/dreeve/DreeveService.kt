@@ -19,6 +19,7 @@ package nodomain.freeyourgadget.gadgetbridge.externalservices.dreeve
 import android.content.Context
 import androidx.fragment.app.Fragment
 import nodomain.freeyourgadget.gadgetbridge.R
+import nodomain.freeyourgadget.gadgetbridge.activities.workouts.MetadataUpdateResult
 import nodomain.freeyourgadget.gadgetbridge.activities.workouts.RecreateOrder
 import nodomain.freeyourgadget.gadgetbridge.activities.workouts.RemoteIdResolution
 import nodomain.freeyourgadget.gadgetbridge.activities.workouts.RemoteOp
@@ -147,8 +148,8 @@ object DreeveService : WorkoutUploadTarget {
         context: Context,
         remoteActivityId: String,
         summary: BaseActivitySummary
-    ): Boolean {
-        val client = client(context) ?: return false
+    ): MetadataUpdateResult {
+        val client = client(context) ?: return MetadataUpdateResult.Failed()
         return client.updateActivity(
             remoteActivityId,
             WorkoutUploader.nameFor(context, summary),

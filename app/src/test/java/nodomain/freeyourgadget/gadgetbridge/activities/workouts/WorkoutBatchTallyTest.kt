@@ -45,6 +45,18 @@ class WorkoutBatchTallyTest {
     }
 
     @Test
+    fun aWorkoutNotImportedYetIsSentButNotUpToDate() {
+        val tally = WorkoutBatchTally(listOf(DreeveService))
+        tally.record(DreeveService, WorkoutUploader.SyncOutcome.AwaitingImport)
+        tally.record(DreeveService, WorkoutUploader.SyncOutcome.AlreadyInStep)
+
+        val dreeve = tally.byTarget.getValue(DreeveService)
+        assertEquals(1, dreeve.awaitingImport)
+        assertEquals(1, dreeve.inStep)
+        assertEquals(2, tally.sent)
+    }
+
+    @Test
     fun keepsTheFirstReasonGiven() {
         val tally = WorkoutBatchTally(listOf(WandererService))
         tally.record(WandererService, WorkoutUploader.SyncOutcome.Failed(null))

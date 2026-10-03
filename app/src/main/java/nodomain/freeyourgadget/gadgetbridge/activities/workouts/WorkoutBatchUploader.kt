@@ -146,6 +146,7 @@ class WorkoutBatchTally(targets: List<WorkoutUploadTarget>) {
         var uploaded = 0
         var updated = 0
         var inStep = 0
+        var awaitingImport = 0
         var notApplicable = 0
         var failed = 0
 
@@ -167,6 +168,7 @@ class WorkoutBatchTally(targets: List<WorkoutUploadTarget>) {
                 if (counts.reason == null) counts.reason = outcome.refusal
             }
             is WorkoutUploader.SyncOutcome.AlreadyInStep -> counts.inStep++
+            is WorkoutUploader.SyncOutcome.AwaitingImport -> counts.awaitingImport++
             is WorkoutUploader.SyncOutcome.NotApplicable -> counts.notApplicable++
             is WorkoutUploader.SyncOutcome.Failed -> {
                 counts.failed++
@@ -175,8 +177,11 @@ class WorkoutBatchTally(targets: List<WorkoutUploadTarget>) {
         }
     }
 
-    /** Syncs the service now holds, counting a workout it already held as it stands. */
-    val sent: Int get() = byTarget.values.sumOf { it.uploaded + it.updated + it.inStep }
+    /**
+     * Syncs the service now holds, counting a workout it already held as it stands and one it has
+     * yet to import.
+     */
+    val sent: Int get() = byTarget.values.sumOf { it.uploaded + it.updated + it.inStep + it.awaitingImport }
 
     val failed: Int get() = byTarget.values.sumOf { it.failed }
 
@@ -190,6 +195,7 @@ class WorkoutBatchTally(targets: List<WorkoutUploadTarget>) {
             R.plurals.workout_upload_batch_uploaded to counts.uploaded,
             R.plurals.workout_upload_batch_updated to counts.updated,
             R.plurals.workout_upload_batch_in_step to counts.inStep,
+            R.plurals.workout_upload_batch_awaiting_import to counts.awaitingImport,
             R.plurals.workout_upload_batch_not_applicable to counts.notApplicable,
             R.plurals.workout_upload_batch_failed to counts.failed
         ).filter { it.second > 0 }

@@ -22,6 +22,7 @@ import android.net.Uri
 import androidx.fragment.app.Fragment
 import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import nodomain.freeyourgadget.gadgetbridge.R
+import nodomain.freeyourgadget.gadgetbridge.activities.workouts.MetadataUpdateResult
 import nodomain.freeyourgadget.gadgetbridge.activities.workouts.RecreateOrder
 import nodomain.freeyourgadget.gadgetbridge.activities.workouts.RemoteOp
 import nodomain.freeyourgadget.gadgetbridge.activities.workouts.RemoteSnapshot
@@ -231,15 +232,16 @@ object FitTrackeeService : WorkoutUploadTarget {
         context: Context,
         remoteActivityId: String,
         summary: BaseActivitySummary
-    ): Boolean {
-        val server = serverUrl() ?: return false
+    ): MetadataUpdateResult {
+        val server = serverUrl() ?: return MetadataUpdateResult.Failed()
         val apiClient = FitTrackeeApiClient(server, FitTrackeeTokenManager(context))
-        val sportId = sportIdOf(apiClient, summary) ?: return false
-        return apiClient.updateWorkout(
+        val sportId = sportIdOf(apiClient, summary) ?: return MetadataUpdateResult.Failed()
+        val updated = apiClient.updateWorkout(
             remoteActivityId,
             WorkoutUploader.nameFor(context, summary).take(MAX_TITLE_LENGTH),
             sportId
         )
+        return if (updated) MetadataUpdateResult.Updated else MetadataUpdateResult.Failed()
     }
 
     /**

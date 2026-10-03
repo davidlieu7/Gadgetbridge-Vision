@@ -40,7 +40,7 @@ import java.util.Date
 class WorkoutResyncTest : TestBase() {
 
     private class FakeTarget(
-        private val metadataSucceeds: Boolean = true,
+        private val metadataResult: MetadataUpdateResult = MetadataUpdateResult.Updated,
         private val photoResult: WorkoutUploader.PhotoSyncResult =
             WorkoutUploader.PhotoSyncResult(true, "photo"),
         private val trackResult: TrackUpdateResult = TrackUpdateResult.Updated
@@ -65,7 +65,7 @@ class WorkoutResyncTest : TestBase() {
             throw AssertionError("a re-sync does not upload")
 
         override fun updateMetadata(context: Context, remoteActivityId: String, summary: BaseActivitySummary) =
-            metadataSucceeds
+            metadataResult
 
         override fun updateTrack(
             context: Context,
@@ -115,7 +115,7 @@ class WorkoutResyncTest : TestBase() {
 
     @Test
     fun aMetadataUpdateThatFailsIsReportedAndRetried() {
-        val target = FakeTarget(metadataSucceeds = false)
+        val target = FakeTarget(metadataResult = MetadataUpdateResult.Failed())
         assertEquals(WorkoutUploader.SyncOutcome.Failed(null), resync(target, summary(false)))
         assertEquals("old", storedRow(target).sourceHash)
     }
@@ -165,5 +165,35 @@ class WorkoutResyncTest : TestBase() {
         assertTrue(WorkoutUploader.isLost(row))
         assertEquals("new", row.sourceHash)
         assertEquals(message, row.lastError)
+    }
+
+    private fun goneMessage(target: FakeTarget) = GBApplication.getContext().getString(
+        R.string.service_remote_deleted,
+        GBApplication.getContext().getString(target.nameRes)
+    )
+
+    @Test
+    fun aRenameOfAnActivityDeletedOnTheServiceIsReportedOnceAndNotBroughtBack() {
+        val target = FakeTarget(metadataResult = MetadataUpdateResult.Gone)
+        assertEquals(WorkoutUploader.SyncOutcome.Resynced(goneMessage(target)), resync(target, summary(false)))
+        val row = storedRow(target)
+        assertTrue(WorkoutUploader.isLost(row))
+        assertEquals("new", row.sourceHash)
+    }
+
+    @Test
+    fun theReasonAChangeDidNotGoThroughReachesTheUser() {
+        val metadata = FakeTarget(metadataResult = MetadataUpdateResult.Failed("Invalid API key"))
+        assertEquals(WorkoutUploader.SyncOutcome.Failed("Invalid API key"), resync(metadata, summary(false)))
+        assertEquals("old", storedRow(metadata).sourceHash)
+
+        val track = FakeTarget(trackResult = TrackUpdateResult.Failed("Invalid API key"))
+        val withTrack = summary(false).apply {
+            gpxTrack = File.createTempFile("track", ".gpx").apply {
+                writeText("<gpx/>")
+                deleteOnExit()
+            }.absolutePath
+        }
+        assertEquals(WorkoutUploader.SyncOutcome.Failed("Invalid API key"), resync(track, withTrack))
     }
 }
