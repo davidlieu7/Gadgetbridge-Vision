@@ -298,17 +298,6 @@ data class DateSetting(
     val onSharedPreferenceChanged: ((String) -> Unit)? = null,
 ) : DeviceSetting()
 
-/** A 24-hour wall-clock time preference backed by a string in HH:mm format. */
-data class TimeSetting(
-    override val key: String,
-    @StringRes val title: Int,
-    @DrawableRes val icon: Int = 0,
-    val defaultValue: String = "00:00",
-    val dependency: String? = null,
-    override val visibleWhen: ((Prefs) -> Boolean)? = null,
-    override val connectedOnly: Boolean = true,
-) : DeviceSetting()
-
 /**
  * A preference that opens the system document picker, allowing several files to be selected.
  * The picked files are passed to [onPicked]. Nothing is stored under [key].

@@ -17,7 +17,6 @@
 package nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl
 
 import android.content.Context
-import android.app.TimePickerDialog
 import android.content.Intent
 import android.content.SharedPreferences
 import android.net.Uri
@@ -45,7 +44,6 @@ import nodomain.freeyourgadget.gadgetbridge.util.XTimePreference
 import nodomain.freeyourgadget.gadgetbridge.util.preferences.GBSimpleSummaryProvider
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
-import java.util.Locale
 import kotlin.math.roundToInt
 
 /**
@@ -644,38 +642,6 @@ object DeviceSettingRenderer {
                     }
                 }
 
-                is TimeSetting -> {
-                    Preference(context).apply {
-                        key = setting.key
-                        setTitle(setting.title)
-                        if (setting.icon != 0) setIcon(setting.icon)
-                        isPersistent = false
-                        summary = sp.getString(setting.key, setting.defaultValue) ?: setting.defaultValue
-                        val updateSummary = {
-                            summary = sp.getString(setting.key, setting.defaultValue) ?: setting.defaultValue
-                        }
-                        val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, changedKey ->
-                            if (changedKey == setting.key) mainHandler.post {
-                                updateSummary()
-                                handler.notifyPreferenceChanged(setting.key)
-                                postRefresh()
-                            }
-                        }
-                        spListeners.add(listener)
-                        sp.registerOnSharedPreferenceChangeListener(listener)
-                        setOnPreferenceClickListener {
-                            val parts = (sp.getString(setting.key, setting.defaultValue) ?: setting.defaultValue)
-                                .split(":")
-                            val hour = parts.getOrNull(0)?.toIntOrNull()?.coerceIn(0, 23) ?: 0
-                            val minute = parts.getOrNull(1)?.toIntOrNull()?.coerceIn(0, 59) ?: 0
-                            TimePickerDialog(context, { _, selectedHour, selectedMinute ->
-                                sp.edit().putString(setting.key, String.format(Locale.ROOT, "%02d:%02d", selectedHour, selectedMinute)).apply()
-                            }, hour, minute, true).show()
-                            true
-                        }
-                    }
-                }
-
                 is FilePickerSetting -> {
                     val mimeTypes = setting.mimeTypes.toTypedArray()
                     // The launcher must be registered before the fragment is started, so it is
@@ -755,7 +721,6 @@ object DeviceSettingRenderer {
                 is InfoSetting -> setting.dependency
                 is TimeSetting -> setting.dependency
                 is DateSetting -> setting.dependency
-                is TimeSetting -> setting.dependency
                 is FilePickerSetting -> setting.dependency
                 is FolderPickerSetting -> setting.dependency
             }
