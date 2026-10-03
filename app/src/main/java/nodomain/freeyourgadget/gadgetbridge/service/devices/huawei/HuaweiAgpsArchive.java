@@ -30,8 +30,6 @@ import java.util.Set;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipOutputStream;
 
-import nodomain.freeyourgadget.gadgetbridge.util.CheckSums;
-
 /** Assembles caller-supplied files for the existing Huawei ephemeris uploader. */
 public final class HuaweiAgpsArchive {
     private HuaweiAgpsArchive() {
@@ -107,9 +105,6 @@ public final class HuaweiAgpsArchive {
                     throw new IllegalArgumentException("File payload must not be empty");
                 }
                 byte[] data = file.getValue().clone();
-                if (CheckSums.getCRC16(data, 0x0000) == 0) {
-                    throw new IllegalArgumentException("The existing uploader rejects a zero file CRC16");
-                }
                 payloads.put(path, data);
                 files.add(file.getKey());
             }

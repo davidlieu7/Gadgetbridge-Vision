@@ -132,6 +132,7 @@ public class HuaweiSettingsCustomizer implements DeviceSpecificSettingsCustomize
         handler.addPreferenceHandlerFor(PREF_FORCE_ENABLE_HEARTRATE_SUPPORT);
         handler.addPreferenceHandlerFor(PREF_FORCE_ENABLE_SPO2_SUPPORT);
 
+        handler.addPreferenceHandlerFor(HuaweiConstants.PREF_HUAWEI_AGPS_AUTOMATIC);
         handler.addPreferenceHandlerFor(PREF_HUAWEI_WORKMODE);
         handler.addPreferenceHandlerFor(PREF_HUAWEI_TRUSLEEP);
         handler.addPreferenceHandlerFor(PREF_HUAWEI_SLEEP_BREATH);

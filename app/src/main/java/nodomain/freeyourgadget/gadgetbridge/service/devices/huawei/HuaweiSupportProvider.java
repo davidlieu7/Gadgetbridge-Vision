@@ -1318,6 +1318,10 @@ public class HuaweiSupportProvider {
     }
 
     public void onSendConfiguration(String config) {
+        if (HuaweiConstants.PREF_HUAWEI_AGPS_AUTOMATIC.equals(config)) {
+            huaweiEphemerisManager.onAutomaticUpdatesChanged();
+            return;
+        }
         try {
             switch (config) {
                 case DeviceSettingsPreferenceConst.PREF_DATEFORMAT:
@@ -2827,6 +2831,7 @@ public class HuaweiSupportProvider {
     }
 
     public void dispose() {
+        huaweiEphemerisManager.dispose();
         stopBatteryRunnerDelayed();
         huaweiFileDownloadManager.dispose();
         huaweiP2PManager.unregisterAllService();

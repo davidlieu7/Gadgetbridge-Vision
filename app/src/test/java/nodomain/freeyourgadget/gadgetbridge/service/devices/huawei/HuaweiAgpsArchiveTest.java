@@ -102,10 +102,6 @@ public class HuaweiAgpsArchiveTest {
                 List.of(new Dataset("tag", 3, "data", Map.of()))));
         assertThrows(IllegalArgumentException.class, () -> HuaweiAgpsArchive.generate(1,
                 List.of(dataset("file", new byte[0]))));
-        // A zero byte has a valid zero CRC16. The existing uploader cannot transfer it.
-        final IllegalArgumentException error = assertThrows(IllegalArgumentException.class,
-                () -> HuaweiAgpsArchive.generate(1, List.of(dataset("file", new byte[]{0}))));
-        assertEquals("The existing uploader rejects a zero file CRC16", error.getMessage());
     }
 
     private static Dataset dataset(final String name, final byte[] data) {

@@ -212,7 +212,7 @@ public final class HuaweiAgpsFileGenerator {
         }
     }
 
-    private static int crc24q(byte[] bytes, int offset, int length) {
+    static int crc24q(byte[] bytes, int offset, int length) {
         int crc = 0;
         for (int i = offset; i < offset + length; i++) {
             crc ^= (bytes[i] & 0xff) << 16;

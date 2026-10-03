@@ -21,6 +21,7 @@ import java.util.UUID;
 import static nodomain.freeyourgadget.gadgetbridge.service.btle.AbstractBTLEDeviceSupport.BASE_UUID;
 
 public final class HuaweiConstants {
+    public static final String PREF_HUAWEI_AGPS_AUTOMATIC = "pref_huawei_agps_automatic";
 
     public static final UUID UUID_SERVICE_HUAWEI_SERVICE = UUID.fromString(String.format(BASE_UUID, "FE86"));
     public static final UUID UUID_CHARACTERISTIC_HUAWEI_WRITE = UUID.fromString(String.format(BASE_UUID, "FE01"));

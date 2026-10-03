@@ -16,6 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 package nodomain.freeyourgadget.gadgetbridge.service.devices.huawei;
 
+import android.os.SystemClock;
 import android.text.TextUtils;
 
 import com.google.gson.JsonArray;
@@ -31,14 +32,21 @@ import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
 import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Enumeration;
+import java.util.HashMap;
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
+import java.util.function.LongSupplier;
 import java.util.zip.ZipEntry;
 import java.util.zip.ZipException;
 import java.util.zip.ZipFile;
 
+import nodomain.freeyourgadget.gadgetbridge.GBApplication;
+import nodomain.freeyourgadget.gadgetbridge.devices.huawei.HuaweiConstants;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.huawei.requests.SendEphemerisDataRequestResponse;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.huawei.requests.SendEphemerisFileConsultResponse;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.huawei.requests.SendEphemerisFileListResponse;
@@ -102,6 +110,7 @@ public class HuaweiEphemerisManager {
         private final int tagVersion;
         private final String tagUUID;
         private final List<String> tagFiles;
+        private final Map<String, byte[]> downloadedFiles;
 
         private byte[] currentFileData = null;
         private String currentFileName = null;
@@ -111,9 +120,14 @@ public class HuaweiEphemerisManager {
         private final List<String> processedFiles = new ArrayList<>();
 
         public RequestInfo(int tagVersion, String tagUUID, List<String> tagFiles) {
+            this(tagVersion, tagUUID, tagFiles, null);
+        }
+
+        private RequestInfo(int tagVersion, String tagUUID, List<String> tagFiles, Map<String, byte[]> downloadedFiles) {
             this.tagVersion = tagVersion;
             this.tagUUID = tagUUID;
             this.tagFiles = tagFiles;
+            this.downloadedFiles = downloadedFiles;
         }
 
         public int getTagVersion() {
@@ -163,17 +177,52 @@ public class HuaweiEphemerisManager {
         }
     }
 
+    // Retain the existing 30-minute retrieval policy. This is not satellite validity.
+    private static final long CACHE_MAX_AGE_MILLIS = 30 * 60 * 1000L;
     private final HuaweiSupportProvider support;
+    private final HuaweiAgpsDownloader downloader;
+    private final LongSupplier elapsedTime;
+    private final Map<String, CachedDataset> cachedDatasets = new HashMap<>();
+    private JsonObject availableDataConfig;
+    private RequestInfo currentRequest;
+    private long downloadGeneration;
+    private boolean disposed;
 
-
-    private JsonObject availableDataConfig = null;
-
-
-    private RequestInfo currentRequest = null;
-
+    private record CachedDataset(Map<String, byte[]> files, long fetchedAt) {
+    }
 
     public HuaweiEphemerisManager(HuaweiSupportProvider support) {
+        this(support, new HuaweiAgpsDownloader(), SystemClock::elapsedRealtime);
+    }
+
+    HuaweiEphemerisManager(HuaweiSupportProvider support, HuaweiAgpsDownloader downloader, LongSupplier elapsedTime) {
         this.support = support;
+        this.downloader = downloader;
+        this.elapsedTime = elapsedTime;
+    }
+
+    boolean automaticUpdatesEnabled() {
+        return GBApplication.getDevicePrefs(support.getDevice())
+                .getBoolean(HuaweiConstants.PREF_HUAWEI_AGPS_AUTOMATIC, false);
+    }
+
+    public synchronized void onAutomaticUpdatesChanged() {
+        if (!automaticUpdatesEnabled()) {
+            downloadGeneration++;
+            downloader.cancel();
+            cachedDatasets.clear();
+            if (currentRequest != null && currentRequest.downloadedFiles != null) {
+                currentRequest = null;
+            }
+        }
+    }
+
+    public synchronized void dispose() {
+        disposed = true;
+        downloadGeneration++;
+        downloader.dispose();
+        cachedDatasets.clear();
+        currentRequest = null;
     }
 
     private byte[] getZIPFileContent(File file, String name) {
@@ -231,12 +280,13 @@ public class HuaweiEphemerisManager {
         return false;
     }
 
-    public void handleOperatorRequest(byte operationInfo, int operationTime) {
+    public synchronized void handleOperatorRequest(byte operationInfo, int operationTime) {
         LOG.debug("handleOperatorRequest: operationInfo {} operationTime: {}", operationInfo, operationTime);
         //TODO:
         // 100007 - no network connection
-        if (operationInfo == 1) {
-            // NOTE: clear data on new request
+        if (operationInfo == 1 && !disposed) {
+            downloadGeneration++;
+            downloader.cancel();
             currentRequest = null;
 
             int responseCode = 100000;
@@ -265,8 +315,10 @@ public class HuaweiEphemerisManager {
             } catch (Exception e) {
                 LOG.info("Ephemeris exception file or config processing: {}", e.getMessage());
                 availableDataConfig = null;
-                //responseCode = 100007; //no network connection
-                return; // NOTE: just ignore request if something wrong with data.
+                if (!automaticUpdatesEnabled()) {
+                    return;
+                }
+                // Consult first. Automatic retrieval accepts only verified tags.
             }
 
             try {
@@ -291,8 +343,14 @@ public class HuaweiEphemerisManager {
         //   in the container 0x81
     }
 
-    public void handleParameterConsultResponse(int consultDeviceTime, byte downloadVersion, String downloadTag) {
+    public synchronized void handleParameterConsultResponse(int consultDeviceTime, byte downloadVersion, String downloadTag) {
         LOG.info("consultDeviceTime: {}, downloadVersion: {}, downloadTag: {}", consultDeviceTime, downloadVersion, downloadTag);
+        if (disposed) {
+            return;
+        }
+        final long generation = ++downloadGeneration;
+        downloader.cancel();
+        currentRequest = null;
         byte status = 0x3; // ready to download
 
         try {
@@ -349,21 +407,68 @@ public class HuaweiEphemerisManager {
             currentRequest = new RequestInfo(downloadVersion, uuid, files);
 
         } catch (Exception e) {
-            LOG.error("Ephemeris exception file or config processing", e);
-            availableDataConfig = null;
+            if (automaticUpdatesEnabled() && HuaweiAgpsDownloader.supports(downloadVersion, downloadTag)) {
+                downloadDataset(downloadTag, generation);
+                return;
+            }
+            LOG.warn("No local ephemeris dataset for requested tag and version", e);
             status = 0x5; //error or timeout
         }
 
+        sendFileStatus(status);
+    }
+
+    private void downloadDataset(String tag, long generation) {
+        final CachedDataset cached = cachedDatasets.get(tag);
+        if (cached != null) {
+            final long age = elapsedTime.getAsLong() - cached.fetchedAt();
+            if (age >= 0 && age < CACHE_MAX_AGE_MILLIS) {
+                useDownloadedDataset(cached.files());
+                return;
+            }
+            cachedDatasets.remove(tag);
+        }
+        downloader.download(tag, new HuaweiAgpsDownloader.DatasetCallback() {
+            @Override
+            public void onSuccess(Map<String, byte[]> files) {
+                synchronized (HuaweiEphemerisManager.this) {
+                    if (disposed || generation != downloadGeneration || !automaticUpdatesEnabled()) {
+                        return;
+                    }
+                    final Map<String, byte[]> snapshot = Collections.unmodifiableMap(new LinkedHashMap<>(files));
+                    cachedDatasets.put(tag, new CachedDataset(snapshot, elapsedTime.getAsLong()));
+                    useDownloadedDataset(snapshot);
+                }
+            }
+
+            @Override
+            public void onFailure(Exception error) {
+                synchronized (HuaweiEphemerisManager.this) {
+                    if (disposed || generation != downloadGeneration || !automaticUpdatesEnabled()) {
+                        return;
+                    }
+                    LOG.warn("Automatic Huawei AGPS retrieval failed", error);
+                    sendFileStatus((byte) 0x5);
+                }
+            }
+        });
+    }
+
+    private void useDownloadedDataset(Map<String, byte[]> files) {
+        currentRequest = new RequestInfo(3, "", new ArrayList<>(files.keySet()), files);
+        sendFileStatus((byte) 0x3);
+    }
+
+    void sendFileStatus(byte status) {
         try {
-            SendEphemerisFileStatusRequest sendEphemerisFileStatusRequest = new SendEphemerisFileStatusRequest(this.support, status);
-            sendEphemerisFileStatusRequest.doPerform();
+            new SendEphemerisFileStatusRequest(support, status).doPerform();
         } catch (IOException e) {
-            LOG.error("Error to send SendEphemerisFileStatusRequest");
+            LOG.error("Error sending ephemeris file status", e);
         }
     }
 
     //File transfer related
-    public void handleFileSendRequest(byte fileType, String productId) {
+    public synchronized void handleFileSendRequest(byte fileType, String productId) {
         if (currentRequest == null) {
             return;
         }
@@ -407,7 +512,7 @@ public class HuaweiEphemerisManager {
         }
     }
 
-    void handleFileConsultIncomingRequest(int responseCode, String protocolVersion, byte bitmapEnable, short transferSize, int maxDataSize, short timeOut, byte fileType) {
+    synchronized void handleFileConsultIncomingRequest(int responseCode, String protocolVersion, byte bitmapEnable, short transferSize, int maxDataSize, short timeOut, byte fileType) {
         if (currentRequest == null) {
             return;
         }
@@ -418,8 +523,8 @@ public class HuaweiEphemerisManager {
             return;
         }
 
-        if (transferSize == 0) {
-            LOG.error("transfer size is 0");
+        if (transferSize <= 0 || maxDataSize <= 0) {
+            LOG.error("Ephemeris transfer and chunk sizes must be positive");
             cleanupUpload(true);
             return;
         }
@@ -439,7 +544,7 @@ public class HuaweiEphemerisManager {
         }
     }
 
-    void handleSingleFileIncomingRequest(String filename) {
+    synchronized void handleSingleFileIncomingRequest(String filename) {
         if (currentRequest == null || currentRequest.getUploadParameters() == null) {
             cleanupUpload(true);
             return;
@@ -461,13 +566,14 @@ public class HuaweiEphemerisManager {
         int responseCode = 0;
         try {
 
-            File filesDir = support.getContext().getExternalFilesDir(null);
-            File file = new File(filesDir, "ephemeris.zip");
-            if (!file.exists()) {
-                throw new Exception("Ephemeris handleSingleFileIncomingRequest file does not exists");
+            byte[] currentFileData;
+            if (currentRequest.downloadedFiles != null) {
+                currentFileData = currentRequest.downloadedFiles.get(filename);
+            } else {
+                File filesDir = support.getContext().getExternalFilesDir(null);
+                File file = new File(filesDir, "ephemeris.zip");
+                currentFileData = getZIPFileContent(file, currentRequest.getTagUUID() + File.separator + filename);
             }
-
-            byte[] currentFileData = getZIPFileContent(file, currentRequest.getTagUUID() + File.separator + filename);
             if (currentFileData == null || currentFileData.length == 0) {
                 throw new Exception("Ephemeris handleSingleFileIncomingRequest file is empty");
             }
@@ -475,7 +581,7 @@ public class HuaweiEphemerisManager {
             currentRequest.setCurrentFileName(filename);
         } catch (Exception e) {
             LOG.error("Ephemeris exception handleSingleFileIncomingRequest processing", e);
-            cleanupUpload(true);
+            currentRequest.setCurrentFileData(null);
             responseCode = 100001;
         }
 
@@ -483,12 +589,12 @@ public class HuaweiEphemerisManager {
         if (currentRequest.getUploadParameters().getFileType() == 0) {
             //TODO: implement this type
             responseCode = 100001;
-        } else if (currentRequest.getUploadParameters().getFileType() == 1) {
+        } else if (currentRequest.getUploadParameters().getFileType() == 1 && currentRequest.getCurrentFileData() != null) {
             crc = (short) CheckSums.getCRC16(currentRequest.getCurrentFileData(), 0x0000);
         }
 
         int size = 0;
-        if (currentRequest.getCurrentFileData() == null || crc == 0) {
+        if (currentRequest.getCurrentFileData() == null) {
             responseCode = 100001;
         } else {
             size = currentRequest.getCurrentFileData().length;
@@ -499,6 +605,9 @@ public class HuaweiEphemerisManager {
             sendEphemerisSingleFileInfoResponse.doPerform();
         } catch (IOException e) {
             LOG.error("Error to send SendEphemerisSingleFileInfoResponse");
+        }
+        if (responseCode != 0) {
+            cleanupUpload(true);
         }
     }
 
@@ -518,18 +627,16 @@ public class HuaweiEphemerisManager {
         }
     }
 
-    void handleDataRequestIncomingRequest(int responseCode, String fileName, int offset, int len, byte bitmap) {
+    synchronized void handleDataRequestIncomingRequest(int responseCode, String fileName, int offset, int len, byte bitmap) {
         if (currentRequest == null || currentRequest.getUploadParameters() == null) {
             cleanupUpload(true);
             return;
         }
 
-        if (offset == -1 || fileName == null || fileName.isEmpty()) {
-            cleanupUpload(true);
-            return;
-        }
-
-        if (!currentRequest.getCurrentFileName().equals(fileName)) {
+        final byte[] fileData = currentRequest.getCurrentFileData();
+        final String selectedFileName = currentRequest.getCurrentFileName();
+        if (fileData == null || selectedFileName == null || fileName == null || fileName.isEmpty()
+                || !selectedFileName.equals(fileName) || offset < 0 || offset > fileData.length) {
             cleanupUpload(true);
             return;
         }
@@ -556,10 +663,10 @@ public class HuaweiEphemerisManager {
         }
 
         if (localResponseCode == 100000) {
-            int dataSize = Math.min(currentRequest.getCurrentFileData().length - offset, currentRequest.getUploadParameters().getMaxDataSize());
+            int dataSize = Math.min(fileData.length - offset, currentRequest.getUploadParameters().getMaxDataSize());
             int packetsCount = (int) Math.ceil((double) dataSize / currentRequest.getUploadParameters().getTransferSize());
             byte[] chunk = new byte[dataSize];
-            System.arraycopy(currentRequest.getCurrentFileData(), offset, chunk, 0, dataSize);
+            System.arraycopy(fileData, offset, chunk, 0, dataSize);
 
             try {
                 SendEphemerisFileUploadChunk sendEphemerisFileUploadChunk = new SendEphemerisFileUploadChunk(this.support, chunk, currentRequest.getUploadParameters().getTransferSize(), packetsCount);
@@ -570,14 +677,14 @@ public class HuaweiEphemerisManager {
         }
     }
 
-    void handleFileUploadResponse(int responseCode) {
+    synchronized void handleFileUploadResponse(int responseCode) {
         LOG.info("handleFileUploadResponse {}", responseCode);
         if (responseCode != 100000) {
             cleanupUpload(true);
         }
     }
 
-    void handleFileDoneRequest(byte uploadResult) {
+    synchronized void handleFileDoneRequest(byte uploadResult) {
         LOG.info("handleFileDoneRequest uploadResult: {}", uploadResult);
         cleanupUpload(false);
         try {
@@ -588,7 +695,11 @@ public class HuaweiEphemerisManager {
         }
     }
 
-    void cleanupUpload(boolean force) {
+    synchronized void cleanupUpload(boolean force) {
+        if (force) {
+            downloadGeneration++;
+            downloader.cancel();
+        }
         if (currentRequest != null) {
             currentRequest.setCurrentFileName(null);
             currentRequest.setCurrentFileData(null);
