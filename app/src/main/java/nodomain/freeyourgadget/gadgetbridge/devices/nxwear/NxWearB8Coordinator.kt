@@ -144,12 +144,12 @@ class NxWearB8Coordinator : AbstractBLEDeviceCoordinator() {
             screen(
                 key = "nx_wear_b8_display",
                 title = R.string.mi2_prefs_activate_display_on_lift,
-                icon = R.drawable.ic_brightness_medium,
+                icon = R.drawable.ic_arrow_upward,
             ) {
                 switchSetting(
                     key = PREF_LIFT_ENABLED,
                     title = R.string.mi2_prefs_activate_display_on_lift,
-                    icon = R.drawable.ic_brightness_medium,
+                    icon = R.drawable.ic_arrow_upward,
                     defaultValue = false,
                 )
                 list(
