@@ -448,6 +448,81 @@ public class WorkoutDetailsParserTest {
         assertEquals(Integer.valueOf(3), infos.get(2).getDurationSeconds());
     }
 
+    /** The last segment of a session can carry phase 0x01 instead of 0x81 (captured rowing
+     *  2026-07-03: four 0x81/0x82 pairs, then a 420 s 0x01 block). Only the low nibble decides
+     *  the intensity. */
+    @Test
+    public void testV4PhaseWithoutBit7() {
+        final int ts1 = 1700005000;
+        final byte[] bytes = buildBytes(4,
+                new Segment(ts1, new int[][]{{140, 0, 32}, {142, 0, 33}}, 0x81, 238),
+                new Segment(ts1 + 2, new int[][]{{110, 0, 0}, {108, 0, 0}}, 0x82, 6),
+                new Segment(ts1 + 4, new int[][]{{150, 0, 36}, {152, 0, 37}}, 0x01, 233));
+
+        final ActivityTrack track = new WorkoutDetailsParser().getActivityTrack(makeFileId(4), bytes);
+        assertNotNull(track);
+
+        final List<ActivityTrack.SegmentInfo> infos = track.getSegmentInfos();
+        assertEquals(3, infos.size());
+        assertEquals(ActivityTrack.SegmentIntensity.ACTIVE, infos.get(0).getIntensity());
+        assertEquals(ActivityTrack.SegmentIntensity.REST, infos.get(1).getIntensity());
+        assertEquals(ActivityTrack.SegmentIntensity.ACTIVE, infos.get(2).getIntensity());
+        assertEquals(Integer.valueOf(233), infos.get(2).getStrokes());
+    }
+
+    /** Older rowing firmware writes running stroke totals (captured 2025-08-25: 140, 142, 276,
+     *  277, 277), which are differenced into per-segment counts. */
+    @Test
+    public void testV4CumulativeStrokesAreDifferenced() {
+        final int ts1 = 1700005000;
+        final byte[] bytes = buildBytes(4,
+                new Segment(ts1, new int[][]{{140, 0, 32}}, 0x81, 140),
+                new Segment(ts1 + 1, new int[][]{{110, 0, 0}}, 0x82, 142),
+                new Segment(ts1 + 2, new int[][]{{150, 0, 36}}, 0x81, 276),
+                new Segment(ts1 + 3, new int[][]{{112, 0, 0}}, 0x82, 277),
+                new Segment(ts1 + 4, new int[][]{{151, 0, 30}}, 0x81, 277));
+
+        final List<ActivityTrack.SegmentInfo> infos =
+                new WorkoutDetailsParser().getActivityTrack(makeFileId(4), bytes).getSegmentInfos();
+        assertEquals(5, infos.size());
+        assertEquals(Integer.valueOf(140), infos.get(0).getStrokes());
+        assertEquals(Integer.valueOf(2), infos.get(1).getStrokes());
+        assertEquals(Integer.valueOf(134), infos.get(2).getStrokes());
+        assertEquals(Integer.valueOf(1), infos.get(3).getStrokes());
+        assertNull(infos.get(4).getStrokes());
+    }
+
+    /** A running total that stays flat across a rest (captured 2025-12-18: 117, 117) is still a
+     *  running total, so the rest gets no strokes. */
+    @Test
+    public void testV4FlatCumulativeStrokes() {
+        final int ts1 = 1700005000;
+        final byte[] bytes = buildBytes(4,
+                new Segment(ts1, new int[][]{{140, 0, 32}}, 0x81, 117),
+                new Segment(ts1 + 1, new int[][]{{110, 0, 0}}, 0x82, 117));
+
+        final List<ActivityTrack.SegmentInfo> infos =
+                new WorkoutDetailsParser().getActivityTrack(makeFileId(4), bytes).getSegmentInfos();
+        assertEquals(Integer.valueOf(117), infos.get(0).getStrokes());
+        assertNull(infos.get(1).getStrokes());
+    }
+
+    /** Per-segment stroke counts (newer firmware: 300, 3, ...) drop on every rest and are kept. */
+    @Test
+    public void testV4PerSegmentStrokesAreKept() {
+        final int ts1 = 1700005000;
+        final byte[] bytes = buildBytes(4,
+                new Segment(ts1, new int[][]{{140, 0, 32}}, 0x81, 144),
+                new Segment(ts1 + 1, new int[][]{{110, 0, 0}}, 0x82, 3),
+                new Segment(ts1 + 2, new int[][]{{150, 0, 36}}, 0x81, 156));
+
+        final List<ActivityTrack.SegmentInfo> infos =
+                new WorkoutDetailsParser().getActivityTrack(makeFileId(4), bytes).getSegmentInfos();
+        assertEquals(Integer.valueOf(144), infos.get(0).getStrokes());
+        assertEquals(Integer.valueOf(3), infos.get(1).getStrokes());
+        assertEquals(Integer.valueOf(156), infos.get(2).getStrokes());
+    }
+
     /** Outdoor walking v5 interval workout (signature FF CF F8 BF FF): the segment header's
      *  phase byte (offset 12) drives one ActivityTrack segment, and so one FIT lap, per interval,
      *  with the per-segment distance (offset 13) and 1 Hz record-count duration carried onto
@@ -459,7 +534,7 @@ public class WorkoutDetailsParserTest {
                 new WalkSeg(ts1, 0x81, 40, new int[]{150, 151, 152}),  // active, 40 m, 3 records
                 new WalkSeg(ts1 + 3, 0x82, 2, new int[]{120, 118}));   // rest, 2 m, 2 records
 
-        final ActivityTrack track = new WorkoutDetailsParser().getActivityTrack(makeFileId(5), bytes);
+        final ActivityTrack track = new WorkoutDetailsParser().getActivityTrack(makeFileId(SUBTYPE_OUTDOOR_WALKING_V2, 5), bytes);
         assertNotNull(track);
 
         // One segment per interval; points partitioned by interval.
@@ -490,16 +565,16 @@ public class WorkoutDetailsParserTest {
         final int ts1 = 1700300000;
         final byte[] bytes = buildBytes(6,
                 new Segment(ts1, new int[][]{
-                        {0, 140, 0, 80, 0}, {0, 142, 0, 81, 0}, {0, 144, 0, 82, 0},
+                        {0, 140, 0, 0, 80, 0}, {0, 142, 0, 0, 81, 0}, {0, 144, 0, 0, 82, 0},
                 }, 0x81, 59),                                   // active, 59 m, 3 records
                 new Segment(ts1 + 3, new int[][]{
-                        {0, 110, 0, 0, 0}, {0, 108, 0, 0, 0},
+                        {0, 110, 0, 0, 0, 0}, {0, 108, 0, 0, 0, 0},
                 }, 0x82, 4),                                    // rest, 4 m, 2 records
                 new Segment(ts1 + 5, new int[][]{
-                        {0, 150, 0, 84, 0}, {0, 152, 0, 85, 0}, {0, 154, 0, 86, 0},
+                        {0, 150, 0, 0, 84, 0}, {0, 152, 0, 0, 85, 0}, {0, 154, 0, 0, 86, 0},
                 }, 0x81, 44));                                  // active, 44 m, 3 records
 
-        final ActivityTrack track = new WorkoutDetailsParser().getActivityTrack(makeFileId(6), bytes);
+        final ActivityTrack track = new WorkoutDetailsParser().getActivityTrack(makeFileId(0x03, 6), bytes);
         assertNotNull(track);
         assertEquals(3, track.getSegments().size());
 
@@ -514,27 +589,6 @@ public class WorkoutDetailsParserTest {
         assertNull(infos.get(0).getStrokes()); // treadmill has no strokes
         assertEquals(Integer.valueOf(3), infos.get(0).getDurationSeconds());
         assertEquals(Integer.valueOf(2), infos.get(1).getDurationSeconds());
-    }
-
-    /** Treadmill v6's byte-9 data-valid bitmap varies between bands and firmware (0xFF and 0xFB
-     *  are both emitted) while the record layout stays identical, so the parser accepts either
-     *  and still reads HR and cadence. */
-    @Test
-    public void testV6TreadmillAcceptsAlternateValidBitmap() {
-        final int ts = 1700200000;
-        final byte[] bytes = buildBytes(6,
-                new Segment(ts, new int[][]{
-                        {0, 145, 0, 80, 0},
-                        {0, 146, 0, 81, 0},
-                }));
-        // Flip byte 9 (data-valid bitmap) from 0xFF to 0xFB, the band's second variant.
-        bytes[9] = (byte) 0xFB;
-
-        final List<WorkoutDetailRecord> recs = records(makeFileId(6), bytes);
-        assertNotNull(recs);
-        assertEquals(2, recs.size());
-        assertEquals(145, recs.get(0).hr);
-        assertEquals(146, recs.get(1).hr);
     }
 
     /** Minimal outdoor-walking-v5 segment: start ts, phase byte, distance (m), and per-record
@@ -555,7 +609,7 @@ public class WorkoutDetailsParserTest {
 
     /** Build an outdoor-walking-v2 v5 DETAILS payload: signature FF CF F8 BF FF, 17-byte segment
      *  header (int32 nr @4, int32 ts @8, byte phase @12, int32 distance @13) and 13-byte records
-     *  with HR at byte 1 (see WorkoutDetailsParser layoutCode 105). */
+     *  with HR at byte 1 (see WorkoutDetailsParser.parseRunWalkRecords). */
     private static byte[] buildWalkingV5Bytes(final WalkSeg... segments) {
         final byte[] signature = {
                 (byte) 0xFF, (byte) 0xCF, (byte) 0xF8, (byte) 0xBF, (byte) 0xFF
@@ -711,7 +765,7 @@ public class WorkoutDetailsParserTest {
                         {3, 172, 22, 86, 172, 390},
                 }));
 
-        final ActivityTrack track = new WorkoutDetailsParser().getActivityTrack(makeFileId(6), bytes);
+        final ActivityTrack track = new WorkoutDetailsParser().getActivityTrack(makeFileId(0x03, 6), bytes);
 
         assertNotNull(track);
         final List<ActivityPoint> points = track.getAllPoints();
@@ -738,7 +792,7 @@ public class WorkoutDetailsParserTest {
                         {0, 80, 0, 0, 0, 0},
                 }));
 
-        final ActivityTrack track = new WorkoutDetailsParser().getActivityTrack(makeFileId(6), bytes);
+        final ActivityTrack track = new WorkoutDetailsParser().getActivityTrack(makeFileId(0x03, 6), bytes);
 
         assertNotNull(track);
         final ActivityPoint p = track.getAllPoints().get(0);

@@ -87,9 +87,9 @@ public class WorkoutDetailsParser extends XiaomiActivityParser {
          *  segment header always carries an interval phase byte and record count. Drives
          *  {@link ActivityTrack} segment boundaries, and so one FIT lap per interval. */
         public boolean segmentStart;
-        /** Intensity of the segment this record opens: ACTIVE (phase 0x81) or REST (0x82).
-         *  Null for a single continuous segment (phase 0x7f / other) and when
-         *  {@link #segmentStart} is not set. */
+        /** Intensity of the segment this record opens: ACTIVE (phase low nibble 1, e.g. 0x81
+         *  or 0x01) or REST (low nibble 2). Null for a single continuous segment (phase 0x7f /
+         *  other) and when {@link #segmentStart} is not set. */
         public ActivityTrack.SegmentIntensity segmentIntensity;
         /** Per-segment strokes parsed directly from the segment header (rowing v4 only).
          *  Only set on a {@link #segmentStart} record; null when not encoded. */
@@ -285,6 +285,22 @@ public class WorkoutDetailsParser extends XiaomiActivityParser {
         return records;
     }
 
+    /** Intensity of the interval a segment header's phase byte opens. The low nibble is
+     *  1 = active, 2 = rest; bit 7 is a separate flag that the last segment of a session often
+     *  lacks (0x01 after a run of 0x81). Null for 0x7f and any other value, a single continuous
+     *  segment that is left unlabelled. */
+    @Nullable
+    private static ActivityTrack.SegmentIntensity intervalIntensity(final byte phase) {
+        switch (phase & 0x0F) {
+            case 1:
+                return ActivityTrack.SegmentIntensity.ACTIVE;
+            case 2:
+                return ActivityTrack.SegmentIntensity.REST;
+            default:
+                return null;
+        }
+    }
+
     /** True when the bitmap at offset 8 flags the same field groups present as {@code bitmap}:
      *  bit 3 of every nibble matches. The other three bits of a nibble mark which values of the
      *  group the band measured and vary between bands, without changing the record layout. */
@@ -321,6 +337,7 @@ public class WorkoutDetailsParser extends XiaomiActivityParser {
      * Segment header, 17 bytes in v5 and 27 bytes in v8:
      *   offset 4-7:   int32 record count
      *   offset 8-11:  int32 segment start, unix seconds
+     *   offset 12:    byte  interval phase, see {@link #intervalIntensity}
      *   offset 13-16: int32 segment distance, metres
      *
      * One record per second. Groups read, see {@link #RUN_WALK_GROUP_BYTES} for the sizes:
@@ -389,6 +406,13 @@ public class WorkoutDetailsParser extends XiaomiActivityParser {
                 groups.reset();
                 final WorkoutDetailRecord r = new WorkoutDetailRecord();
                 r.ts = ts++;
+                if (i == 0) {
+                    r.segmentStart = true;
+                    r.segmentIntensity = intervalIntensity(bytes[segmentStart + 12]);
+                    r.segmentDurationSeconds = nr;
+                    final int distance = buf.getInt(segmentStart + 13);
+                    r.segmentDistanceMeters = distance > 0 ? distance : null;
+                }
                 for (int group = 0; group < groupCount; group++) {
                     if (!groups.nextGroup(RUN_WALK_GROUP_BYTES[group] * 8)) {
                         continue;
@@ -737,9 +761,8 @@ public class WorkoutDetailsParser extends XiaomiActivityParser {
 
             // Per-segment interval metadata, uniform across every Xiaomi workout layout.
             // The byte immediately after the segment-start timestamp (offset tsPosition + 4)
-            // is the interval phase: 0x81 = active, 0x82 = rest; 0x7f / other = a single
-            // continuous segment (left unlabelled so a normal workout is not tagged with a
-            // spurious intensity). Records run at 1 Hz, so the header record count is the
+            // is the interval phase, see intervalIntensity. Records run at 1 Hz, so the header
+            // record count is the
             // interval length in seconds. The int32 that follows the phase byte, when the header
             // is long enough to hold it, is per-segment strokes for rowing (v4) and per-segment
             // distance in meters for every other layout (treadmill/cycling 13-byte headers @9,
@@ -752,16 +775,14 @@ public class WorkoutDetailsParser extends XiaomiActivityParser {
             Integer segmentDistanceMeters = null;
             Integer segmentDurationSeconds = null;
             if (segmentedLayout) {
-                final byte phase = segHdr.get(phaseOffset);
-                segmentIntensity = phase == (byte) 0x81 ? ActivityTrack.SegmentIntensity.ACTIVE
-                        : phase == (byte) 0x82 ? ActivityTrack.SegmentIntensity.REST
-                        : null;
+                segmentIntensity = intervalIntensity(segHdr.get(phaseOffset));
                 segmentDurationSeconds = nr > 0 ? nr : null;
                 final int trailingOffset = phaseOffset + 1;
                 if (trailingOffset + 4 <= segmentHeaderSize) {
                     final int trailing = segHdr.getInt(trailingOffset);
                     if (layoutCode == 4) {
-                        segmentStrokes = trailing > 0 ? trailing : null;
+                        // A zero is kept until deCumulateSegmentStrokes has read it as evidence.
+                        segmentStrokes = trailing >= 0 ? trailing : null;
                     } else {
                         segmentDistanceMeters = trailing > 0 ? trailing : null;
                     }
@@ -917,6 +938,43 @@ public class WorkoutDetailsParser extends XiaomiActivityParser {
             setSpeedFromDistance(records, segmentFirstRecord);
         }
 
+        deCumulateSegmentStrokes(records);
+
         return records;
+    }
+
+    /**
+     * Older rowing firmware writes each segment's stroke field as the running total since the
+     * start of the workout rather than the strokes of that segment alone. The two are told apart
+     * by the sequence itself: per-segment counts drop back down on every rest, so a sequence that
+     * never decreases is a running total and is differenced here into per-segment counts.
+     * Segments left with no strokes carry nothing worth showing.
+     */
+    private static void deCumulateSegmentStrokes(final List<WorkoutDetailRecord> records) {
+        final List<WorkoutDetailRecord> segmentStarts = new ArrayList<>();
+        for (final WorkoutDetailRecord record : records) {
+            if (record.segmentStart && record.segmentStrokes != null) {
+                segmentStarts.add(record);
+            }
+        }
+        boolean cumulative = segmentStarts.size() >= 2;
+        for (int i = 1; cumulative && i < segmentStarts.size(); i++) {
+            if (segmentStarts.get(i).segmentStrokes < segmentStarts.get(i - 1).segmentStrokes) {
+                cumulative = false;
+            }
+        }
+        if (cumulative) {
+            int previous = 0;
+            for (final WorkoutDetailRecord record : segmentStarts) {
+                final int total = record.segmentStrokes;
+                record.segmentStrokes = total - previous;
+                previous = total;
+            }
+        }
+        for (final WorkoutDetailRecord record : segmentStarts) {
+            if (record.segmentStrokes <= 0) {
+                record.segmentStrokes = null;
+            }
+        }
     }
 }
