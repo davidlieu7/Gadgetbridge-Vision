@@ -401,10 +401,10 @@ public class FitExporterReadmeRoundTripTest {
 
             // GPS — both lat & lon must round-trip. FIT semicircle scale is exact,
             // so equality is OK after both encodes use the same scale.
-            if (inRec.getLatitude() != null && inRec.getLongitude() != null) {
+            if (inRec.getPositionLat() != null && inRec.getPositionLong() != null) {
                 gpsTotal++;
-                if (inRec.getLatitude().equals(outRec.getLatitude())
-                        && inRec.getLongitude().equals(outRec.getLongitude())) {
+                if (inRec.getPositionLat().equals(outRec.getPositionLat())
+                        && inRec.getPositionLong().equals(outRec.getPositionLong())) {
                     gpsHits++;
                 }
             }
@@ -511,10 +511,10 @@ public class FitExporterReadmeRoundTripTest {
         }
         // HR. Skip when input avg=0 (no strap → sentinel; some devices record
         // record-level HR but never aggregate to session — exporter computes one).
-        if (in.getAverageHeartRate() != null && out.getAverageHeartRate() != null
-                && in.getAverageHeartRate() > 0
-                && !in.getAverageHeartRate().equals(out.getAverageHeartRate())) {
-            mismatches.add("avgHr in=" + in.getAverageHeartRate() + " out=" + out.getAverageHeartRate());
+        if (in.getAvgHeartRate() != null && out.getAvgHeartRate() != null
+                && in.getAvgHeartRate() > 0
+                && !in.getAvgHeartRate().equals(out.getAvgHeartRate())) {
+            mismatches.add("avgHr in=" + in.getAvgHeartRate() + " out=" + out.getAvgHeartRate());
         }
         // Avg speed: input scale is FIT m/s × 1000; we round-trip via Float.
         // Exporter intentionally re-derives avg_speed from distance/elapsed when the
@@ -652,9 +652,9 @@ public class FitExporterReadmeRoundTripTest {
                     session.getMaxSpeed(),
                     ActivitySummaryEntries.UNIT_METERS_PER_SECOND);
         }
-        if (session.getAverageHeartRate() != null) {
+        if (session.getAvgHeartRate() != null) {
             d.add(ActivitySummaryEntries.HR_AVG,
-                    session.getAverageHeartRate(),
+                    session.getAvgHeartRate(),
                     ActivitySummaryEntries.UNIT_BPM);
         }
         if (session.getMaxHeartRate() != null) {

@@ -18,6 +18,7 @@ package nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.compo
 
 import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
+import androidx.preference.Preference
 import nodomain.freeyourgadget.gadgetbridge.R
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsPreferenceConst
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSpecificSettingsScreen
@@ -57,6 +58,7 @@ inline fun <reified T> DeviceSettingsScope.enumList(
     connectedOnly: Boolean = true,
     noinline filter: ((T) -> Boolean)? = null,
     noinline visibleWhen: ((Prefs) -> Boolean)? = null,
+    noinline onValueChange: ((preference: Preference, oldValue: T, newValue: T) -> Unit)? = null,
 ) where T : Enum<T>, T : LabeledEntry {
     val all = enumValues<T>()
     val entries = (if (filter != null) all.filter(filter) else all.toList())
@@ -71,6 +73,15 @@ inline fun <reified T> DeviceSettingsScope.enumList(
             dependency = dependency,
             connectedOnly = connectedOnly,
             visibleWhen = visibleWhen,
+            onValueChange = onValueChange?.let { onChange ->
+                { preference: Preference, oldValue: String, newValue: String ->
+                    val oldEntry = all.firstOrNull { it.name.lowercase() == oldValue } ?: defaultValue
+                    val newEntry = all.firstOrNull { it.name.lowercase() == newValue }
+                    if (newEntry != null) {
+                        onChange(preference, oldEntry, newEntry)
+                    }
+                }
+            },
         )
     )
 }

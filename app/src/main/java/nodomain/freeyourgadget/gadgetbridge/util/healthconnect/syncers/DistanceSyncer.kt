@@ -31,15 +31,17 @@ internal object DistanceSyncer : AbstractActivitySampleSyncer<DistanceRecord>() 
     override val logger: Logger = LoggerFactory.getLogger(DistanceSyncer::class.java)
     override val recordClass: KClass<DistanceRecord> = DistanceRecord::class
 
-    override fun convertSample(
-        sample: ActivitySample,
+    override fun convertMinute(
+        endTs: Instant,
+        minuteSamples: List<ActivitySample>,
         offset: ZoneOffset,
         metadata: Metadata,
         deviceName: String,
         version: Long
     ): DistanceRecord? {
-        val distanceCm = sample.distanceCm
-        if (distanceCm <= 0 || distanceCm == ActivitySample.NOT_MEASURED) {
+        // Sum the minute's samples; NOT_MEASURED (-1) and 0 both mean "no distance" and contribute nothing.
+        val distanceCm = minuteSamples.sumOf { if (it.distanceCm > 0) it.distanceCm else 0 }
+        if (distanceCm <= 0) {
             return null
         }
         // HC's DistanceRecord caps distance at 1_000_000 m (= 1e8 cm).
@@ -48,7 +50,6 @@ internal object DistanceSyncer : AbstractActivitySampleSyncer<DistanceRecord>() 
             return null
         }
 
-        val endTs = Instant.ofEpochSecond(sample.timestamp.toLong())
         val startTs = endTs.minus(1, ChronoUnit.MINUTES)
 
         return DistanceRecord(

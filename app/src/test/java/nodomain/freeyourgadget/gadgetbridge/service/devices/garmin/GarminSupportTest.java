@@ -43,21 +43,18 @@ import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.deviceevents.
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.FieldDefinition;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.FitFile;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.FitLocalMessageBuilder;
-import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.NativeFITMessage;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.NativeFITMessages;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.RecordData;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.RecordDefinition;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.RecordHeader;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.baseTypes.BaseType;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.exception.FitParseException;
-import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.messages.FitCapabilities;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.messages.FitDeviceSettings;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.messages.FitFileId;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.messages.FitHsaBodyBatteryData;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.messages.FitNavigationAlert;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.messages.FitSport;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.messages.FitUserProfile;
-import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.messages.FitWeather;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.messages.FitDataMessage;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.messages.FitDefinitionMessage;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.messages.GFDIMessage;
@@ -131,7 +128,7 @@ public class GarminSupportTest extends TestBase {
     @Test
     public void testBaseFields() {
 
-        RecordDefinition recordDefinition = new RecordDefinition(new RecordHeader((byte) 6), ByteOrder.LITTLE_ENDIAN, NativeFITMessages.FIT_WEATHER(), null, null); //just some random data
+        RecordDefinition recordDefinition = new RecordDefinition(new RecordHeader((byte) 6), ByteOrder.LITTLE_ENDIAN, NativeFITMessages.FIT_WEATHER_CONDITIONS(), null, null); //just some random data
         List<FieldDefinition> fieldDefinitionList = new ArrayList<>();
         for (BaseType baseType :
                 BaseType.values()) {
@@ -382,7 +379,7 @@ public class GarminSupportTest extends TestBase {
     public void TestFitFileSettings2() throws FitParseException, IOException {
         //https://github.com/polyvertex/fitdecode/blob/48b6554d8a3baf33f8b5b9b2fd079fcbe9ac8ce2/tests/files/Settings2.fit
         byte[] fileContents = readBinaryResource("/TestFitFileSettings2.fit");
-        String expectedOutput = readTextResource("/TestFitFileSettings2.txt");
+        String expectedOutput = readTextResource("/TestFitFileSettings2.txt").trim();
 
         FitFile fitFile = FitFile.parseIncoming(fileContents);
         String actualOutput = fitFile.toString().replace("}, Fit", "},\nFit").replace("}, RecordData{", "},\nRecordData{");
@@ -394,7 +391,7 @@ public class GarminSupportTest extends TestBase {
     public void TestFitFileDevelopersField() throws FitParseException, IOException {
         //https://github.com/polyvertex/fitdecode/blob/48b6554d8a3baf33f8b5b9b2fd079fcbe9ac8ce2/tests/files/DeveloperData.fit
         byte[] fileContents = readBinaryResource("/TestFitFileDevelopersField.fit");
-        String expectedOutput = readTextResource("/TestFitFileDevelopersField.txt");
+        String expectedOutput = readTextResource("/TestFitFileDevelopersField.txt").trim();;
 
         FitFile fitFile = FitFile.parseIncoming(fileContents);
         String actualOutput = fitFile.toString().replace("}, Fit", "},\nFit").replace("}, RecordData{", "},\nRecordData{");
@@ -407,7 +404,7 @@ public class GarminSupportTest extends TestBase {
     @Test
     public void TestFitMessageTypeParsing() throws FitParseException, IOException {
         byte[] fileContents = readBinaryResource("/TestFitMessageTypeParsing.fit");
-        String expected = readTextResource("/TestFitMessageTypeParsing.txt");
+        String expected = readTextResource("/TestFitMessageTypeParsing.txt").trim();
 
         FitFile fitFile = FitFile.parseIncoming(fileContents);
         String actual = fitFile.toString().replace("}, Fit", "},\nFit").replace("}, RecordData{", "},\nRecordData{");

@@ -35,6 +35,7 @@ import static nodomain.freeyourgadget.gadgetbridge.model.DeviceService.EXTRA_NOT
 
 import android.Manifest;
 import android.app.ActivityManager;
+import android.app.ApplicationExitInfo;
 import android.app.Service;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
@@ -62,6 +63,7 @@ import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -379,6 +381,7 @@ public class DeviceCommunicationService extends Service implements SharedPrefere
     public void onCreate() {
         LOG.debug("DeviceCommunicationService is being created");
         super.onCreate();
+        logLastExitReason();
         mFactory = new DeviceSupportFactory(this);
         deviceReceiversManager = new DeviceReceiversManager(this);
 
@@ -397,6 +400,31 @@ public class DeviceCommunicationService extends Service implements SharedPrefere
 
             Intent scanServiceIntent = new Intent(this, BLEScanService.class);
             startService(scanServiceIntent);
+        }
+    }
+
+    /**
+     * A process killed by the system writes nothing to the log, so record why the previous one
+     * ended.
+     */
+    private void logLastExitReason() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
+            return;
+        }
+        final ActivityManager am = (ActivityManager) getSystemService(ACTIVITY_SERVICE);
+        if (am == null) {
+            return;
+        }
+        try {
+            final List<ApplicationExitInfo> exits = am.getHistoricalProcessExitReasons(getPackageName(), 0, 1);
+            if (!exits.isEmpty()) {
+                final ApplicationExitInfo exit = exits.get(0);
+                LOG.info("Previous process exit: reason={} status={} importance={} at {} ({})",
+                        exit.getReason(), exit.getStatus(), exit.getImportance(),
+                        new Date(exit.getTimestamp()), exit.getDescription());
+            }
+        } catch (final Exception e) {
+            LOG.warn("Failed to read the previous process exit reason", e);
         }
     }
 
@@ -594,7 +622,10 @@ public class DeviceCommunicationService extends Service implements SharedPrefere
     @Override
     public synchronized int onStartCommand(Intent intent, int flags, int startId) {
         if (intent == null) {
-            LOG.info("no intent");
+            // The system restarting the service after the process died: reconnect what was
+            // connected then, as the notification's reconnect action does.
+            LOG.info("no intent, reconnecting");
+            connectToDevice(null, false);
             return START_STICKY;
         }
 

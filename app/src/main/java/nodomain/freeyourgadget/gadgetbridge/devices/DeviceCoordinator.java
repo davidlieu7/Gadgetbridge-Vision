@@ -413,6 +413,11 @@ public interface DeviceCoordinator {
     boolean supportsWeightMeasurement(@NonNull final GBDevice device);
 
     /**
+     * Returns true if storing hydration entries is supported for the device.
+     */
+    boolean supportsHydration(@NonNull final GBDevice device);
+
+    /**
      * Returns the sample provider for the device being supported.
      */
     @Nullable
@@ -556,6 +561,12 @@ public interface DeviceCoordinator {
      */
     @Nullable
     TimeSampleProvider<? extends WeightSample> getWeightSampleProvider(@NonNull final GBDevice device, @NonNull final DaoSession session);
+
+    /**
+     * Returns the sample provider for hydration data, for the device being supported.
+     */
+    @Nullable
+    HydrationSampleProvider getHydrationSampleProvider(@NonNull final GBDevice device, @NonNull final DaoSession session);
 
     /// @deprecated see {@link #getMetricsSampleProvider(GBDevice, DaoSession)} and {@link MetricSample.Metric#GENERIC_RESTING_METABOLIC_RATE}
     @Deprecated

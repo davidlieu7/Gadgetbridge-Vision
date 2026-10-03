@@ -89,6 +89,9 @@ open class DefaultChartsProvider : DeviceChartsProvider {
         if (coordinator.supportsActiveCalories(device)) {
             supportedCharts.add("calories")
         }
+        if (coordinator.supportsHydration(device)) {
+            supportedCharts.add("hydration")
+        }
         if (coordinator.supportsRespiratoryRate(device)) {
             supportedCharts.add("respiratoryrate")
         }
@@ -137,6 +140,7 @@ open class DefaultChartsProvider : DeviceChartsProvider {
             "cycling" -> context.getString(R.string.title_cycling)
             "weight" -> context.getString(R.string.menuitem_weight)
             "calories" -> context.getString(R.string.calories)
+            "hydration" -> context.getString(R.string.pref_header_hydration)
             "respiratoryrate" -> context.getString(R.string.respiratoryrate)
             "load" -> context.getString(R.string.pref_header_training_load)
             "raceprediction" -> context.getString(R.string.menuitem_race_predictor)
@@ -176,6 +180,7 @@ open class DefaultChartsProvider : DeviceChartsProvider {
             "cycling" -> CyclingChartFragment()
             "weight" -> WeightChartFragment()
             "calories" -> CaloriesCollectionFragment.newInstance(allowSwipe)
+            "hydration" -> HydrationCollectionFragment.newInstance(allowSwipe)
             "respiratoryrate" -> RespiratoryRateCollectionFragment.newInstance(allowSwipe)
             else -> UnknownFragment()
         }

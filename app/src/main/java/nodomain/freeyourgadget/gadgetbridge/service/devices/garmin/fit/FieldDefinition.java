@@ -16,8 +16,6 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 package nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit;
 
-import static nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.GarminTimeUtils.GARMIN_TIME_EPOCH;
-
 import androidx.annotation.NonNull;
 
 import org.slf4j.Logger;
@@ -28,7 +26,7 @@ import java.util.Objects;
 
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.GarminByteBufferReader;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.baseTypes.BaseType;
-import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.fieldDefinitions.FieldDefinitionTimestamp;
+import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.fieldDefinitions.FieldDefinitionDateTime;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.messages.MessageWriter;
 import nodomain.freeyourgadget.gadgetbridge.util.GBToStringBuilder;
 
@@ -55,7 +53,7 @@ public class FieldDefinition implements FieldInterface {
         this(number, size, baseType, name, 1.0, 0);
     }
 
-    private static FieldDefinitionTimestamp TIMESTAMP_253;
+    private static FieldDefinitionDateTime TIMESTAMP_253;
 
     public static FieldDefinition parseIncoming(GarminByteBufferReader garminByteBufferReader, NativeFITMessage nativeFITMessage) {
         int number = garminByteBufferReader.readByte();
@@ -69,7 +67,7 @@ public class FieldDefinition implements FieldInterface {
 
         if (number == 253 && size == 4 && baseType.equals(BaseType.UINT32)) {
             if (TIMESTAMP_253 == null) {
-                TIMESTAMP_253 = new FieldDefinitionTimestamp(number, size, baseType, "253_timestamp");
+                TIMESTAMP_253 = new FieldDefinitionDateTime(number, size, baseType, "253_timestamp");
             }
             return TIMESTAMP_253;
         }

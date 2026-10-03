@@ -25,6 +25,7 @@ import android.widget.EditText
 import androidx.annotation.ArrayRes
 import androidx.annotation.DrawableRes
 import androidx.annotation.StringRes
+import androidx.preference.Preference
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSpecificSettingsScreen
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice
 import nodomain.freeyourgadget.gadgetbridge.util.Prefs
@@ -105,6 +106,8 @@ data class SwitchSetting(
  *    programmatic entries.
  *
  * If [summary] is set it overrides the default behaviour of showing the selected entry as summary.
+ *
+ * [onValueChange] receives the old and the new value before the new value is stored.
  */
 data class ListSetting(
     override val key: String,
@@ -119,6 +122,7 @@ data class ListSetting(
     val dependency: String? = null,
     override val visibleWhen: ((Prefs) -> Boolean)? = null,
     override val connectedOnly: Boolean = true,
+    val onValueChange: ((preference: Preference, oldValue: String, newValue: String) -> Unit)? = null,
 ) : DeviceSetting()
 
 /** A seek bar setting, equivalent to SeekBarPreference. */
@@ -258,6 +262,22 @@ data class SortableListSetting(
     val dependency: String? = null,
     override val visibleWhen: ((Prefs) -> Boolean)? = null,
     override val connectedOnly: Boolean = true,
+) : DeviceSetting()
+
+/**
+ * A time setting, backed by a custom DialogPreference (e.g. XTimePreference) that persists the
+ * value as a "HH:mm" string.
+ */
+data class TimeSetting(
+    override val key: String,
+    @StringRes val title: Int,
+    @StringRes val summary: Int = 0,
+    @DrawableRes val icon: Int = 0,
+    val defaultValue: String = "",
+    val dependency: String? = null,
+    override val visibleWhen: ((Prefs) -> Boolean)? = null,
+    override val connectedOnly: Boolean = true,
+    val onSharedPreferenceChanged: ((String) -> Unit)? = null,
 ) : DeviceSetting()
 
 /**

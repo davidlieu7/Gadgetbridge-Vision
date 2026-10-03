@@ -8,10 +8,10 @@
         {"num":1,"name":"manufacturer","base":"UINT16"},
         {"num":2,"name":"product","base":"UINT16"},
         {"num":3,"name":"serial_number","base":"UINT32Z"},
-        {"num":4,"name":"time_created","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"},
+        {"num":4,"name":"time_created","base":"UINT32","type":"DateTime","UOM":"SECONDS"},
         {"num":5,"name":"number","base":"UINT16"},
         {"num":6,"name":"manufacturer_partner","base":"UINT16"},
-        {"num":7,"name":"original_time_created","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"},
+        {"num":7,"name":"original_time_created","base":"UINT32","type":"DateTime","UOM":"SECONDS"},
         {"num":8,"name":"product_name","base":"STRING","stringLen":20},
         {"num":251,"name":"pad","base":"BYTE","arrayLen":0}
       ]
@@ -24,7 +24,7 @@
         {"num":1,"name":"sports","base":"UINT8Z","arrayLen":0},
         {"num":21,"name":"workouts_supported","base":"UINT32Z"},
         {"num":23,"name":"connectivity_supported","base":"UINT32Z"},
-        {"num":24,"name":"wifi","base":"ENUM"},
+        {"num":24,"name":"wifi","base":"ENUM","type":"Bool"},
         {"num":26,"name":"audio_prompts","base":"UINT32Z"}
       ]
     },
@@ -53,14 +53,14 @@
         {"num":28,"name":"alarms_enabled","base":"ENUM","arrayLen":0},
         {"num":30,"name":"map_auto_zoom","base":"ENUM"},
         {"num":35,"name":"start_of_week","base":"ENUM"},
-        {"num":36,"name":"activity_tracker_enabled","base":"ENUM"},
+        {"num":36,"name":"activity_tracker_enabled","base":"ENUM","type":"Bool"},
         {"num":38,"name":"wifi_auto_upload_enabled","base":"ENUM"},
-        {"num":39,"name":"clock_time","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"},
+        {"num":39,"name":"clock_time","base":"UINT32","type":"DateTime","UOM":"SECONDS"},
         {"num":40,"name":"pages_enabled","base":"UINT16","arrayLen":0},
         {"num":41,"name":"recovery_advice","base":"ENUM"},
         {"num":42,"name":"auto_max_hr","base":"ENUM"},
         {"num":45,"name":"auto_goal","base":"ENUM"},
-        {"num":46,"name":"move_alert_enabled","base":"ENUM"},
+        {"num":46,"name":"move_alert_enabled","base":"ENUM","type":"Bool"},
         {"num":47,"name":"date_mode","base":"ENUM"},
         {"num":48,"name":"recording_interval","base":"ENUM"},
         {"num":52,"name":"course_navigation","base":"ENUM"},
@@ -73,11 +73,11 @@
         {"num":75,"name":"course_segments","base":"ENUM"},
         {"num":76,"name":"map_show_track","base":"ENUM"},
         {"num":77,"name":"map_track_color","base":"ENUM"},
-        {"num":80,"name":"lactate_threshold_autodetect_enabled","base":"ENUM"},
+        {"num":80,"name":"lactate_threshold_autodetect_enabled","base":"ENUM","type":"Bool"},
         {"num":81,"name":"backlight_keys","base":"ENUM"},
         {"num":82,"name":"backlight_alerts","base":"ENUM"},
         {"num":83,"name":"backlight_gesture","base":"ENUM"},
-        {"num":86,"name":"ble_auto_upload_enabled","base":"ENUM"},
+        {"num":86,"name":"ble_auto_upload_enabled","base":"ENUM","type":"Bool"},
         {"num":87,"name":"do_not_distrub_sleep","base":"ENUM"},
         {"num":89,"name":"auto_sync_frequency","base":"ENUM"},
         {"num":90,"name":"auto_activity_detect","base":"UINT32"},
@@ -108,28 +108,39 @@
         {"num":144,"name":"activity_true_up","base":"ENUM"},
         {"num":148,"name":"map_show_contour","base":"ENUM"},
         {"num":151,"name":"low_spo2_alert","base":"ENUM"},
+        {"num":153,"name":"hydration_units","base":"ENUM"},
+        {"num":158,"name":"hydration_goal","base":"ENUM"},
         {"num":163,"name":"hr_low_alert","base":"ENUM"},
         {"num":164,"name":"hr_low_alert_limit","base":"UINT8","UOM":"BEATS_PER_MINUTE"},
+        {"num":167,"name":"map_theme","base":"STRING"},
+        {"num":171,"name":"swim_units","base":"ENUM"},
         {"num":174,"name":"tap_sensitivity","base":"ENUM"},
         {"num":176,"name":"airplane_mode","base":"ENUM"},
         {"num":177,"name":"sleep_backlight_brightness","base":"UINT8","UOM":"PERCENT"},
         {"num":178,"name":"sleep_backlight_timeout","base":"UINT8","UOM":"SECONDS"},
         {"num":179,"name":"sleep_backlight_mode","base":"ENUM"},
+        {"num":180,"name":"sleep_backlight_alerts","base":"ENUM"},
+        {"num":181,"name":"sleep_backlight_gesture","base":"ENUM"},
         {"num":186,"name":"always_on_display","base":"ENUM"},
         {"num":187,"name":"current_activity_always_on_display","base":"ENUM"},
+        {"num":188,"name":"sleep_always_on_display","base":"ENUM"},
         {"num":189,"name":"screen_brightness","base":"ENUM"},
         {"num":190,"name":"current_activity_screen_brightness","base":"ENUM"},
         {"num":191,"name":"sleep_screen_brightness","base":"ENUM"},
         {"num":192,"name":"touch_enabled","base":"ENUM"},
+        {"num":193,"name":"touch_enabled_activity","base":"ENUM"},
         {"num":194,"name":"touch_enabled_sleep","base":"ENUM"},
         {"num":196,"name":"battery_estimates","base":"UINT8Z"},
         {"num":198,"name":"haptics","base":"ENUM"},
         {"num":215,"name":"course_points","base":"ENUM"},
+        {"num":216,"name":"map_color","base":"ENUM"},
         {"num":217,"name":"gnss_default_mode","base":"ENUM"},
+        {"num":221,"name":"font_mode","base":"ENUM"},
         {"num":231,"name":"touch_type_general","base":"ENUM"},
         {"num":232,"name":"touch_type_activity","base":"ENUM"},
         {"num":235,"name":"map_relief","base":"ENUM"},
-        {"num":237,"name":"stress_alert","base":"ENUM"}
+        {"num":237,"name":"stress_alert","base":"ENUM"},
+        {"num":239,"name":"rest_notification","base":"ENUM"}
       ]
     },
     {
@@ -142,40 +153,40 @@
         {"num":3,"name":"height","base":"UINT8","UOM":"CENTIMETER"},
         {"num":4,"name":"weight","base":"UINT16","scale":10,"UOM":"KILOGRAM"},
         {"num":5,"name":"language","base":"ENUM","type":"Language"},
-        {"num":6,"name":"elev_setting","base":"ENUM","type":"MeasurementSystem"},
-        {"num":7,"name":"weight_setting","base":"ENUM","type":"MeasurementSystem"},
+        {"num":6,"name":"elev_setting","base":"ENUM","type":"DisplayMeasure"},
+        {"num":7,"name":"weight_setting","base":"ENUM","type":"DisplayMeasure"},
         {"num":8,"name":"resting_heart_rate","base":"UINT8","UOM":"BEATS_PER_MINUTE"},
         {"num":9,"name":"default_max_running_heart_rate","base":"UINT8","UOM":"BEATS_PER_MINUTE"},
         {"num":10,"name":"default_max_biking_heart_rate","base":"UINT8","UOM":"BEATS_PER_MINUTE"},
         {"num":11,"name":"default_max_heart_rate","base":"UINT8","UOM":"BEATS_PER_MINUTE"},
         {"num":12,"name":"hr_setting","base":"ENUM"},
-        {"num":13,"name":"speed_setting","base":"ENUM","type":"MeasurementSystem"},
-        {"num":14,"name":"dist_setting","base":"ENUM","type":"MeasurementSystem"},
+        {"num":13,"name":"speed_setting","base":"ENUM","type":"DisplayMeasure"},
+        {"num":14,"name":"dist_setting","base":"ENUM","type":"DisplayMeasure"},
         {"num":16,"name":"power_setting","base":"ENUM"},
         {"num":17,"name":"activity_class","base":"ENUM"},
         {"num":18,"name":"position_setting","base":"ENUM"},
-        {"num":21,"name":"temperature_setting","base":"ENUM","type":"MeasurementSystem"},
+        {"num":21,"name":"temperature_setting","base":"ENUM","type":"DisplayMeasure"},
         {"num":22,"name":"local_id","base":"UINT16"},
         {"num":23,"name":"global_id","base":"BYTE","arrayLen":6},
         {"num":24,"name":"year_of_birth","base":"UINT8","offset":-1900},
         {"num":26,"name":"pressure_setting","base":"ENUM"},
         {"num":28,"name":"wake_time","base":"UINT32"},
         {"num":29,"name":"sleep_time","base":"UINT32"},
-        {"num":30,"name":"height_setting","base":"ENUM","type":"MeasurementSystem"},
+        {"num":30,"name":"height_setting","base":"ENUM","type":"DisplayMeasure"},
         {"num":31,"name":"user_running_step_length","base":"UINT16"},
         {"num":32,"name":"user_walking_step_length","base":"UINT16"},
         {"num":34,"name":"recovery_time","base":"UINT16"},
-        {"num":35,"name":"recovery_time_start","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"},
+        {"num":35,"name":"recovery_time_start","base":"UINT32","type":"DateTime","UOM":"SECONDS"},
         {"num":37,"name":"lactate_threshold_speed","base":"UINT16","scale":10,"UOM":"KILOMETER_PER_HOUR"},
-        {"num":41,"name":"time_last_lthr_running","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"},
-        {"num":42,"name":"time_last_lthr_cycling","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"},
+        {"num":41,"name":"time_last_lthr_running","base":"UINT32","type":"DateTime","UOM":"SECONDS"},
+        {"num":42,"name":"time_last_lthr_cycling","base":"UINT32","type":"DateTime","UOM":"SECONDS"},
         {"num":44,"name":"birth_day","base":"UINT8"},
         {"num":45,"name":"birth_month","base":"UINT8Z"},
-        {"num":47,"name":"depth_setting","base":"ENUM","type":"MeasurementSystem"},
+        {"num":47,"name":"depth_setting","base":"ENUM","type":"DisplayMeasure"},
         {"num":49,"name":"dive_count","base":"UINT32"},
         {"num":53,"name":"moderate_activity","base":"UINT8"},
         {"num":54,"name":"vigorous_activity","base":"UINT8"},
-        {"num":58,"name":"golf_distance","base":"ENUM","type":"MeasurementSystem"},
+        {"num":58,"name":"golf_distance","base":"ENUM","type":"DisplayMeasure"},
         {"num":62,"name":"gender_x","base":"ENUM"},
         {"num":65,"name":"running_coach","base":"ENUM"},
         {"num":66,"name":"cycling_coach","base":"ENUM"},
@@ -187,9 +198,9 @@
       "num": 4,
       "name": "HRM_PROFILE",
       "fields": [
-        {"num":0,"name":"enabled","base":"ENUM","type":"BOOLEAN"},
+        {"num":0,"name":"enabled","base":"ENUM","type":"Bool"},
         {"num":1,"name":"hrm_ant_id","base":"UINT16Z"},
-        {"num":2,"name":"log_hrv","base":"ENUM"},
+        {"num":2,"name":"log_hrv","base":"ENUM","type":"Bool"},
         {"num":3,"name":"hrm_ant_id_trans_type","base":"UINT8Z"},
         {"num":254,"name":"message_index","base":"UINT16"}
       ]
@@ -198,11 +209,11 @@
       "num": 5,
       "name": "SDM_PROFILE",
       "fields": [
-        {"num":0,"name":"enabled","base":"ENUM","type":"BOOLEAN"},
+        {"num":0,"name":"enabled","base":"ENUM","type":"Bool"},
         {"num":1,"name":"sdm_ant_id","base":"UINT16Z"},
         {"num":2,"name":"sdm_cal_factor","base":"UINT16","scale":10,"UOM":"PERCENT"},
         {"num":3,"name":"odometer","base":"UINT32","scale":100,"UOM":"METER"},
-        {"num":4,"name":"speed_source","base":"ENUM"},
+        {"num":4,"name":"speed_source","base":"ENUM","type":"Bool"},
         {"num":5,"name":"sdm_ant_id_trans_type","base":"UINT8Z"},
         {"num":7,"name":"odometer_rollover","base":"UINT8"},
         {"num":254,"name":"message_index","base":"UINT16"}
@@ -224,15 +235,15 @@
         {"num":9,"name":"auto_wheelsize","base":"UINT16","scale":1000,"UOM":"METER"},
         {"num":10,"name":"bike_weight","base":"UINT16","scale":10,"UOM":"KILOGRAM"},
         {"num":11,"name":"power_cal_factor","base":"UINT16","scale":10,"UOM":"PERCENT"},
-        {"num":12,"name":"auto_wheel_cal","base":"ENUM","type":"BOOLEAN"},
-        {"num":13,"name":"auto_power_zero","base":"ENUM","type":"BOOLEAN"},
+        {"num":12,"name":"auto_wheel_cal","base":"ENUM","type":"Bool"},
+        {"num":13,"name":"auto_power_zero","base":"ENUM","type":"Bool"},
         {"num":14,"name":"id","base":"UINT8"},
-        {"num":15,"name":"spd_enabled","base":"ENUM","type":"BOOLEAN"},
-        {"num":16,"name":"cad_enabled","base":"ENUM","type":"BOOLEAN"},
-        {"num":17,"name":"spdcad_enabled","base":"ENUM","type":"BOOLEAN"},
-        {"num":18,"name":"power_enabled","base":"ENUM","type":"BOOLEAN"},
+        {"num":15,"name":"spd_enabled","base":"ENUM","type":"Bool"},
+        {"num":16,"name":"cad_enabled","base":"ENUM","type":"Bool"},
+        {"num":17,"name":"spdcad_enabled","base":"ENUM","type":"Bool"},
+        {"num":18,"name":"power_enabled","base":"ENUM","type":"Bool"},
         {"num":19,"name":"crank_length","base":"UINT8","scale":2,"offset":-110,"UOM":"MILLIMETER"},
-        {"num":20,"name":"enabled","base":"ENUM","type":"BOOLEAN"},
+        {"num":20,"name":"enabled","base":"ENUM","type":"Bool"},
         {"num":21,"name":"bike_spd_ant_id_trans_type","base":"UINT8Z"},
         {"num":22,"name":"bike_cad_ant_id_trans_type","base":"UINT8Z"},
         {"num":23,"name":"bike_spdcad_ant_id_trans_type","base":"UINT8Z"},
@@ -242,8 +253,8 @@
         {"num":39,"name":"front_gear","base":"UINT8Z","arrayLen":0},
         {"num":40,"name":"rear_gear_num","base":"UINT8Z"},
         {"num":41,"name":"rear_gear","base":"UINT8Z","arrayLen":0},
-        {"num":44,"name":"shimano_di2_enabled","base":"ENUM","type":"BOOLEAN"},
-        {"num":253,"name":"timestamp","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"},
+        {"num":44,"name":"shimano_di2_enabled","base":"ENUM","type":"Bool"},
+        {"num":253,"name":"timestamp","base":"UINT32","type":"DateTime","UOM":"SECONDS"},
         {"num":254,"name":"message_index","base":"UINT16"}
       ]
     },
@@ -256,7 +267,7 @@
         {"num":3,"name":"functional_threshold_power","base":"UINT16"},
         {"num":5,"name":"hr_calc_type","base":"ENUM"},
         {"num":7,"name":"pwr_calc_type","base":"ENUM"},
-        {"num":253,"name":"timestamp","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"},
+        {"num":253,"name":"timestamp","base":"UINT32","type":"DateTime","UOM":"SECONDS"},
         {"num":254,"name":"message_index","base":"UINT16"}
       ]
     },
@@ -295,16 +306,16 @@
         {"num":0,"name":"sport","base":"ENUM"},
         {"num":1,"name":"sub_sport","base":"ENUM"},
         {"num":3,"name":"name","base":"STRING","stringLen":24},
-        {"num":5,"name":"active","base":"ENUM"},
+        {"num":5,"name":"active","base":"ENUM","type":"Bool"},
         {"num":10,"name":"color","base":"UINT8","arrayLen":3},
-        {"num":11,"name":"high_contrast","base":"ENUM"},
-        {"num":15,"name":"popularity_routing","base":"ENUM"},
+        {"num":11,"name":"high_contrast","base":"ENUM","type":"Bool"},
+        {"num":15,"name":"popularity_routing","base":"ENUM","type":"Bool"},
         {"num":17,"name":"navigation_prompt","base":"ENUM"},
-        {"num":18,"name":"sharp_bend_warnings","base":"ENUM"},
-        {"num":21,"name":"workout_videos","base":"ENUM"},
-        {"num":22,"name":"high_traffic_road_warnings","base":"ENUM"},
-        {"num":23,"name":"road_hazard_warnings","base":"ENUM"},
-        {"num":24,"name":"unpaved_road_warnings","base":"ENUM"}
+        {"num":18,"name":"sharp_bend_warnings","base":"ENUM","type":"Bool"},
+        {"num":21,"name":"workout_videos","base":"ENUM","type":"Bool"},
+        {"num":22,"name":"high_traffic_road_warnings","base":"ENUM","type":"Bool"},
+        {"num":23,"name":"road_hazard_warnings","base":"ENUM","type":"Bool"},
+        {"num":24,"name":"unpaved_road_warnings","base":"ENUM","type":"Bool"}
       ]
     },
     {
@@ -316,60 +327,60 @@
         {"num":4,"name":"auto_lap_distance","base":"UINT32","scale":100,"UOM":"METER"},
         {"num":7,"name":"auto_pause","base":"ENUM"},
         {"num":8,"name":"auto_pause_threshold","base":"UINT16","scale":1000,"UOM":"METER_PER_SECOND"},
-        {"num":12,"name":"power_averaging","base":"ENUM"},
-        {"num":14,"name":"display_pace","base":"ENUM"},
+        {"num":12,"name":"power_averaging","base":"ENUM","type":"Bool"},
+        {"num":14,"name":"display_pace","base":"ENUM","type":"Bool"},
         {"num":15,"name":"auto_scroll","base":"ENUM"},
         {"num":18,"name":"timer_start_prompt","base":"ENUM"},
         {"num":22,"name":"pool_length","base":"UINT16","scale":100,"UOM":"METER"},
-        {"num":25,"name":"auto_sleep","base":"ENUM"},
+        {"num":25,"name":"auto_sleep","base":"ENUM","type":"Bool"},
         {"num":27,"name":"satellites","base":"ENUM"},
         {"num":31,"name":"target_distance","base":"UINT32","scale":100,"UOM":"METER"},
         {"num":32,"name":"target_speed","base":"UINT16","scale":1000,"UOM":"METER_PER_SECOND"},
         {"num":33,"name":"target_time","base":"UINT32","UOM":"SECONDS"},
-        {"num":35,"name":"speed_3_d","base":"ENUM"},
-        {"num":36,"name":"distance_3_d","base":"ENUM"},
-        {"num":37,"name":"auto_climb","base":"ENUM"},
-        {"num":40,"name":"auto_climb_invert_colors","base":"ENUM"},
+        {"num":35,"name":"speed_3_d","base":"ENUM","type":"Bool"},
+        {"num":36,"name":"distance_3_d","base":"ENUM","type":"Bool"},
+        {"num":37,"name":"auto_climb","base":"ENUM","type":"Bool"},
+        {"num":40,"name":"auto_climb_invert_colors","base":"ENUM","type":"Bool"},
         {"num":41,"name":"auto_climb_vertical_speed","base":"SINT32"},
         {"num":42,"name":"auto_climb_mode_switch","base":"UINT8","UOM":"SECONDS"},
-        {"num":46,"name":"lap_key","base":"ENUM"},
-        {"num":50,"name":"workout_target_alerts","base":"ENUM"},
-        {"num":51,"name":"timer_start_auto","base":"ENUM"},
+        {"num":46,"name":"lap_key","base":"ENUM","type":"Bool"},
+        {"num":50,"name":"workout_target_alerts","base":"ENUM","type":"Bool"},
+        {"num":51,"name":"timer_start_auto","base":"ENUM","type":"Bool"},
         {"num":52,"name":"timer_start_speed","base":"UINT16","scale":1000,"UOM":"METER_PER_SECOND"},
-        {"num":53,"name":"segment_alerts","base":"ENUM"},
-        {"num":55,"name":"proximity_alerts","base":"ENUM"},
-        {"num":57,"name":"countdown_start","base":"ENUM"},
-        {"num":63,"name":"climb_pro","base":"ENUM"},
-        {"num":67,"name":"track_consumption","base":"ENUM"},
+        {"num":53,"name":"segment_alerts","base":"ENUM","type":"Bool"},
+        {"num":55,"name":"proximity_alerts","base":"ENUM","type":"Bool"},
+        {"num":57,"name":"countdown_start","base":"ENUM","type":"Bool"},
+        {"num":63,"name":"climb_pro","base":"ENUM","type":"Bool"},
+        {"num":67,"name":"track_consumption","base":"ENUM","type":"Bool"},
         {"num":69,"name":"bottle_size","base":"UINT16","UOM":"MILLILITER"},
         {"num":70,"name":"volume","base":"ENUM"},
-        {"num":76,"name":"incident_detection_enabled","base":"ENUM"},
+        {"num":76,"name":"incident_detection_enabled","base":"ENUM","type":"Bool"},
         {"num":78,"name":"climb_pro_detection","base":"ENUM"},
-        {"num":79,"name":"breathwork_vibration","base":"ENUM"},
+        {"num":79,"name":"breathwork_vibration","base":"ENUM","type":"Bool"},
         {"num":80,"name":"minimum_ride_duration","base":"UINT16","UOM":"SECONDS"},
         {"num":86,"name":"lane_number","base":"UINT8"},
-        {"num":87,"name":"broadcast_heart_rate","base":"ENUM"},
+        {"num":87,"name":"broadcast_heart_rate","base":"ENUM","type":"Bool"},
         {"num":93,"name":"self_evaluation","base":"ENUM"},
         {"num":95,"name":"flashlight","base":"ENUM"},
         {"num":96,"name":"flashlight_mode","base":"ENUM"},
         {"num":97,"name":"flashlight_speed","base":"ENUM"},
         {"num":98,"name":"flashlight_color","base":"ENUM"},
-        {"num":102,"name":"speed_pro","base":"ENUM"},
+        {"num":102,"name":"speed_pro","base":"ENUM","type":"Bool"},
         {"num":103,"name":"touch","base":"ENUM"},
         {"num":105,"name":"autopause","base":"ENUM"},
-        {"num":106,"name":"record_temperature","base":"ENUM"},
+        {"num":106,"name":"record_temperature","base":"ENUM","type":"Bool"},
         {"num":107,"name":"distance_unit","base":"ENUM"},
         {"num":108,"name":"speed_unit","base":"ENUM"},
         {"num":109,"name":"running_power_mode","base":"ENUM"},
-        {"num":110,"name":"account_for_wind","base":"ENUM"},
+        {"num":110,"name":"account_for_wind","base":"ENUM","type":"Bool"},
         {"num":111,"name":"climb_pro_mode","base":"ENUM"},
         {"num":117,"name":"climb_detection","base":"ENUM"},
         {"num":119,"name":"climb_pro_terrain","base":"ENUM"},
-        {"num":122,"name":"big_numbers_mode","base":"ENUM"},
-        {"num":124,"name":"ask_pool_size","base":"ENUM"},
-        {"num":127,"name":"detect_track","base":"ENUM"},
+        {"num":122,"name":"big_numbers_mode","base":"ENUM","type":"Bool"},
+        {"num":124,"name":"ask_pool_size","base":"ENUM","type":"Bool"},
+        {"num":127,"name":"detect_track","base":"ENUM","type":"Bool"},
         {"num":128,"name":"pack_weight","base":"UINT16","scale":10,"UOM":"KILOGRAM"},
-        {"num":129,"name":"pack_mode","base":"ENUM"},
+        {"num":129,"name":"pack_mode","base":"ENUM","type":"Bool"},
         {"num":130,"name":"touch_lock","base":"ENUM"},
         {"num":131,"name":"audio_prompt_output","base":"ENUM"},
         {"num":153,"name":"precise_target_speed","base":"UINT32","scale":1000000,"UOM":"METER_PER_SECOND"},
@@ -380,29 +391,32 @@
       "num": 14,
       "name": "DATA_SCREEN",
       "fields": [
-        {"num":3,"name":"nr_fields","base":"UINT8"},
-        {"num":7,"name":"data_fields","base":"UINT16"},
+        {"num":1,"name":"enabled","base":"ENUM","type":"Bool"},
+        {"num":3,"name":"field_count","base":"UINT8"},
+        {"num":4,"name":"zone_fields","base":"UINT8","arrayLen":4},
+        {"num":7,"name":"data_fields","base":"UINT16","arrayLen":10},
         {"num":8,"name":"layout","base":"ENUM"},
         {"num":9,"name":"position","base":"UINT8"},
         {"num":10,"name":"screen_type","base":"ENUM"},
+        {"num":12,"name":"hidden","base":"ENUM","type":"Bool"},
         {"num":254,"name":"message_index","base":"UINT16"}
       ]
     },
     {
       "num": 15,
-      "name": "GOALS",
+      "name": "GOAL",
       "fields": [
         {"num":0,"name":"sport","base":"ENUM"},
         {"num":1,"name":"sub_sport","base":"ENUM"},
-        {"num":2,"name":"start_date","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"},
-        {"num":3,"name":"end_date","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"},
-        {"num":4,"name":"type","base":"ENUM","type":"GoalType"},
+        {"num":2,"name":"start_date","base":"UINT32","type":"DateTime","UOM":"SECONDS"},
+        {"num":3,"name":"end_date","base":"UINT32","type":"DateTime","UOM":"SECONDS"},
+        {"num":4,"name":"type","base":"ENUM","type":"Goal"},
         {"num":5,"name":"value","base":"UINT32"},
-        {"num":6,"name":"repeat","base":"ENUM"},
+        {"num":6,"name":"repeat","base":"ENUM","type":"Bool"},
         {"num":7,"name":"target_value","base":"UINT32"},
         {"num":8,"name":"recurrence","base":"ENUM"},
         {"num":9,"name":"recurrence_value","base":"UINT16"},
-        {"num":10,"name":"enabled","base":"ENUM"},
+        {"num":10,"name":"enabled","base":"ENUM","type":"Bool"},
         {"num":11,"name":"source","base":"ENUM","type":"GoalSource"},
         {"num":254,"name":"message_index","base":"UINT16"}
       ]
@@ -415,7 +429,8 @@
         {"num":2,"name":"value","base":"UINT32"},
         {"num":3,"name":"status","base":"ENUM"},
         {"num":4,"name":"message","base":"STRING"},
-        {"num":5,"name":"repeat","base":"ENUM"}
+        {"num":5,"name":"repeat","base":"ENUM","type":"Bool"},
+        {"num":254,"name":"message_index","base":"UINT16"}
       ]
     },
     {
@@ -426,7 +441,8 @@
         {"num":2,"name":"low_status","base":"ENUM"},
         {"num":3,"name":"low_value","base":"UINT16"},
         {"num":4,"name":"high_status","base":"ENUM"},
-        {"num":5,"name":"high_value","base":"UINT16"}
+        {"num":5,"name":"high_value","base":"UINT16"},
+        {"num":254,"name":"message_index","base":"UINT16"}
       ]
     },
     {
@@ -435,9 +451,9 @@
       "fields": [
         {"num":0,"name":"event","base":"ENUM","type":"Event"},
         {"num":1,"name":"event_type","base":"ENUM","type":"EventType"},
-        {"num":2,"name":"start_time","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"},
-        {"num":3,"name":"start_latitude","base":"SINT32","type":"COORDINATE","UOM":"SEMICIRCLES"},
-        {"num":4,"name":"start_longitude","base":"SINT32","type":"COORDINATE","UOM":"SEMICIRCLES"},
+        {"num":2,"name":"start_time","base":"UINT32","type":"DateTime","UOM":"SECONDS"},
+        {"num":3,"name":"start_position_lat","base":"SINT32","type":"COORDINATE","UOM":"SEMICIRCLES"},
+        {"num":4,"name":"start_position_long","base":"SINT32","type":"COORDINATE","UOM":"SEMICIRCLES"},
         {"num":5,"name":"sport","base":"ENUM"},
         {"num":6,"name":"sub_sport","base":"ENUM"},
         {"num":7,"name":"total_elapsed_time","base":"UINT32"},
@@ -448,7 +464,7 @@
         {"num":13,"name":"total_fat_calories","base":"UINT16","UOM":"KCAL"},
         {"num":14,"name":"avg_speed","base":"UINT16","scale":1000,"UOM":"METER_PER_SECOND"},
         {"num":15,"name":"max_speed","base":"UINT16","scale":1000,"UOM":"METER_PER_SECOND"},
-        {"num":16,"name":"average_heart_rate","base":"UINT8","UOM":"BEATS_PER_MINUTE"},
+        {"num":16,"name":"avg_heart_rate","base":"UINT8","UOM":"BEATS_PER_MINUTE"},
         {"num":17,"name":"max_heart_rate","base":"UINT8","UOM":"BEATS_PER_MINUTE"},
         {"num":18,"name":"avg_cadence","base":"UINT8","UOM":"REVOLUTIONS_PER_MINUTE"},
         {"num":19,"name":"max_cadence","base":"UINT8","UOM":"REVOLUTIONS_PER_MINUTE"},
@@ -461,17 +477,17 @@
         {"num":26,"name":"num_laps","base":"UINT16"},
         {"num":27,"name":"event_group","base":"UINT8"},
         {"num":28,"name":"trigger","base":"ENUM"},
-        {"num":29,"name":"nec_latitude","base":"SINT32","type":"COORDINATE","UOM":"SEMICIRCLES"},
-        {"num":30,"name":"nec_longitude","base":"SINT32","type":"COORDINATE","UOM":"SEMICIRCLES"},
-        {"num":31,"name":"swc_latitude","base":"SINT32","type":"COORDINATE","UOM":"SEMICIRCLES"},
-        {"num":32,"name":"swc_longitude","base":"SINT32","type":"COORDINATE","UOM":"SEMICIRCLES"},
+        {"num":29,"name":"nec_lat","base":"SINT32","type":"COORDINATE","UOM":"SEMICIRCLES"},
+        {"num":30,"name":"nec_long","base":"SINT32","type":"COORDINATE","UOM":"SEMICIRCLES"},
+        {"num":31,"name":"swc_lat","base":"SINT32","type":"COORDINATE","UOM":"SEMICIRCLES"},
+        {"num":32,"name":"swc_long","base":"SINT32","type":"COORDINATE","UOM":"SEMICIRCLES"},
         {"num":33,"name":"num_lengths","base":"UINT16","UOM":"LENGTHS"},
         {"num":34,"name":"normalized_power","base":"UINT16","UOM":"WATT"},
         {"num":35,"name":"training_stress_score","base":"UINT16","scale":10},
         {"num":36,"name":"intensity_factor","base":"UINT16","scale":1000},
         {"num":37,"name":"left_right_balance","base":"UINT16"},
-        {"num":38,"name":"end_latitude","base":"SINT32","type":"COORDINATE","UOM":"SEMICIRCLES"},
-        {"num":39,"name":"end_longitude","base":"SINT32","type":"COORDINATE","UOM":"SEMICIRCLES"},
+        {"num":38,"name":"end_position_lat","base":"SINT32","type":"COORDINATE","UOM":"SEMICIRCLES"},
+        {"num":39,"name":"end_position_long","base":"SINT32","type":"COORDINATE","UOM":"SEMICIRCLES"},
         {"num":41,"name":"avg_stroke_count","base":"UINT32"},
         {"num":42,"name":"avg_stroke_distance","base":"UINT16","scale":100,"UOM":"METER"},
         {"num":43,"name":"swim_stroke","base":"ENUM"},
@@ -504,7 +520,7 @@
         {"num":70,"name":"best_lap_index","base":"UINT16"},
         {"num":71,"name":"min_altitude","base":"UINT16","scale":5,"offset":500,"UOM":"METER"},
         {"num":78,"name":"active_time","base":"UINT32","scale":1000,"UOM":"SECONDS"},
-        {"num":79,"name":"avg_swim_cadence","base":"UINT16","scale":10,"UOM":"STROKES_PER_LENGTH"},
+        {"num":79,"name":"avg_strokes_per_length","base":"UINT16","scale":10,"UOM":"STROKES_PER_LENGTH"},
         {"num":80,"name":"avg_swolf","base":"UINT16"},
         {"num":82,"name":"player_score","base":"UINT16"},
         {"num":83,"name":"opponent_score","base":"UINT16"},
@@ -530,13 +546,13 @@
         {"num":103,"name":"avg_left_pedal_smoothness","base":"UINT8","scale":2,"UOM":"PERCENT"},
         {"num":104,"name":"avg_right_pedal_smoothness","base":"UINT8","scale":2,"UOM":"PERCENT"},
         {"num":105,"name":"avg_combined_pedal_smoothness","base":"UINT8","scale":2,"UOM":"PERCENT"},
-        {"num":106,"name":"segment_laps","base":"UINT16"},
-        {"num":107,"name":"front_shifts","base":"UINT16"},
-        {"num":108,"name":"rear_shifts","base":"UINT16"},
+        {"num":106,"name":"num_segment_laps","base":"UINT16"},
+        {"num":107,"name":"front_gear_shift_count","base":"UINT16"},
+        {"num":108,"name":"rear_gear_shift_count","base":"UINT16"},
         {"num":109,"name":"sport_profile_index","base":"UINT8"},
         {"num":110,"name":"sport_profile_name","base":"STRING","stringLen":64},
         {"num":111,"name":"sport_index","base":"UINT8"},
-        {"num":112,"name":"stand_time","base":"UINT32","scale":1000,"UOM":"SECONDS"},
+        {"num":112,"name":"time_standing","base":"UINT32","scale":1000,"UOM":"SECONDS"},
         {"num":113,"name":"stand_count","base":"UINT16"},
         {"num":114,"name":"avg_left_pco","base":"SINT8","UOM":"MILLIMETER"},
         {"num":115,"name":"avg_right_pco","base":"SINT8","UOM":"MILLIMETER"},
@@ -598,9 +614,9 @@
         {"num":193,"name":"workout_rpe","base":"UINT8"},
         {"num":194,"name":"avg_spo2","base":"UINT8","UOM":"PERCENT"},
         {"num":195,"name":"avg_stress","base":"UINT8","UOM":"PERCENT"},
-        {"num":196,"name":"resting_calories","base":"UINT16","UOM":"KCAL"},
-        {"num":197,"name":"hrv_sdrr","base":"UINT8","UOM":"MILLISECONDS"},
-        {"num":198,"name":"hrv_rmssd","base":"UINT8","UOM":"MILLISECONDS"},
+        {"num":196,"name":"metabolic_calories","base":"UINT16","UOM":"KCAL"},
+        {"num":197,"name":"sdrr_hrv","base":"UINT8","UOM":"MILLISECONDS"},
+        {"num":198,"name":"rmssd_hrv","base":"UINT8","UOM":"MILLISECONDS"},
         {"num":199,"name":"total_fractional_ascent","base":"UINT8","scale":100,"UOM":"METER"},
         {"num":200,"name":"total_fractional_descent","base":"UINT8","scale":100,"UOM":"METER"},
         {"num":201,"name":"max_stress","base":"UINT8"},
@@ -613,8 +629,8 @@
         {"num":208,"name":"avg_core_temperature","base":"UINT16","scale":100,"UOM":"CELSIUS"},
         {"num":209,"name":"min_core_temperature","base":"UINT16","scale":100,"UOM":"CELSIUS"},
         {"num":210,"name":"max_core_temperature","base":"UINT16","scale":100,"UOM":"CELSIUS"},
-        {"num":211,"name":"grade_adjusted_speed","base":"UINT32","scale":1000,"UOM":"METER_PER_SECOND"},
-        {"num":212,"name":"wind_data","base":"ENUM"},
+        {"num":211,"name":"avg_grade_adjusted_speed","base":"UINT32","scale":1000,"UOM":"METER_PER_SECOND"},
+        {"num":212,"name":"wind_data","base":"ENUM","type":"Bool"},
         {"num":215,"name":"beginning_body_battery","base":"UINT8"},
         {"num":216,"name":"ending_body_battery","base":"UINT8"},
         {"num":220,"name":"pack_weight","base":"UINT16","scale":10,"UOM":"KILOGRAM"},
@@ -624,7 +640,7 @@
         {"num":224,"name":"avg_force","base":"SINT32","scale":1000,"UOM":"NEWTON"},
         {"num":225,"name":"max_force","base":"SINT32","scale":1000,"UOM":"NEWTON"},
         {"num":226,"name":"normalized_force","base":"SINT32","scale":1000,"UOM":"NEWTON"},
-        {"num":253,"name":"timestamp","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"},
+        {"num":253,"name":"timestamp","base":"UINT32","type":"DateTime","UOM":"SECONDS"},
         {"num":254,"name":"message_index","base":"UINT16"}
       ]
     },
@@ -634,11 +650,11 @@
       "fields": [
         {"num":0,"name":"event","base":"ENUM","type":"Event"},
         {"num":1,"name":"event_type","base":"ENUM","type":"EventType"},
-        {"num":2,"name":"start_time","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"},
-        {"num":3,"name":"start_lat","base":"SINT32","type":"COORDINATE","UOM":"SEMICIRCLES"},
-        {"num":4,"name":"start_long","base":"SINT32","type":"COORDINATE","UOM":"SEMICIRCLES"},
-        {"num":5,"name":"end_lat","base":"SINT32","type":"COORDINATE","UOM":"SEMICIRCLES"},
-        {"num":6,"name":"end_long","base":"SINT32","type":"COORDINATE","UOM":"SEMICIRCLES"},
+        {"num":2,"name":"start_time","base":"UINT32","type":"DateTime","UOM":"SECONDS"},
+        {"num":3,"name":"start_position_lat","base":"SINT32","type":"COORDINATE","UOM":"SEMICIRCLES"},
+        {"num":4,"name":"start_position_long","base":"SINT32","type":"COORDINATE","UOM":"SEMICIRCLES"},
+        {"num":5,"name":"end_position_lat","base":"SINT32","type":"COORDINATE","UOM":"SEMICIRCLES"},
+        {"num":6,"name":"end_position_long","base":"SINT32","type":"COORDINATE","UOM":"SEMICIRCLES"},
         {"num":7,"name":"total_elapsed_time","base":"UINT32","scale":1000,"UOM":"SECONDS"},
         {"num":8,"name":"total_timer_time","base":"UINT32","scale":1000,"UOM":"SECONDS"},
         {"num":9,"name":"total_distance","base":"UINT32","scale":100,"UOM":"METER"},
@@ -668,7 +684,7 @@
         {"num":34,"name":"left_right_balance","base":"UINT16"},
         {"num":35,"name":"first_length_index","base":"UINT16"},
         {"num":37,"name":"avg_stroke_distance","base":"UINT16"},
-        {"num":38,"name":"swim_style","base":"ENUM","type":"SwimStyle"},
+        {"num":38,"name":"swim_stroke","base":"ENUM","type":"SwimStroke"},
         {"num":39,"name":"sub_sport","base":"ENUM"},
         {"num":40,"name":"num_active_lengths","base":"UINT16","UOM":"LENGTHS"},
         {"num":41,"name":"total_work","base":"UINT32","UOM":"JOULE"},
@@ -713,11 +729,14 @@
         {"num":87,"name":"avg_saturated_hemoglobin_percent","base":"UINT16","scale":10,"arrayLen":0,"UOM":"PERCENT"},
         {"num":88,"name":"min_saturated_hemoglobin_percent","base":"UINT16","scale":10,"arrayLen":0,"UOM":"PERCENT"},
         {"num":89,"name":"max_saturated_hemoglobin_percent","base":"UINT16","scale":10,"arrayLen":0,"UOM":"PERCENT"},
+        {"num":90,"name":"avg_strokes_per_length","base":"UINT16","scale":10},
         {"num":91,"name":"avg_left_torque_effectiveness","base":"UINT8","scale":2,"UOM":"PERCENT"},
         {"num":92,"name":"avg_right_torque_effectiveness","base":"UINT8","scale":2,"UOM":"PERCENT"},
         {"num":93,"name":"avg_left_pedal_smoothness","base":"UINT8","scale":2,"UOM":"PERCENT"},
         {"num":94,"name":"avg_right_pedal_smoothness","base":"UINT8","scale":2,"UOM":"PERCENT"},
         {"num":95,"name":"avg_combined_pedal_smoothness","base":"UINT8","scale":2,"UOM":"PERCENT"},
+        {"num":96,"name":"front_gear_shift_count","base":"UINT16"},
+        {"num":97,"name":"rear_gear_shift_count","base":"UINT16"},
         {"num":98,"name":"time_standing","base":"UINT32","scale":1000,"UOM":"SECONDS"},
         {"num":99,"name":"stand_count","base":"UINT16"},
         {"num":100,"name":"avg_left_pco","base":"SINT8","UOM":"MILLIMETER"},
@@ -758,20 +777,20 @@
         {"num":152,"name":"execution_score","base":"UINT8"},
         {"num":153,"name":"avg_grit","base":"FLOAT32","UOM":"KILO_GRIT"},
         {"num":154,"name":"avg_flow","base":"FLOAT32","UOM":"FLOW"},
-        {"num":155,"name":"calories","base":"UINT16","UOM":"KCAL"},
+        {"num":155,"name":"metabolic_calories","base":"UINT16","UOM":"KCAL"},
         {"num":156,"name":"total_fractional_ascent","base":"UINT8","scale":100,"UOM":"METER"},
         {"num":157,"name":"total_fractional_descent","base":"UINT8","scale":100,"UOM":"METER"},
         {"num":158,"name":"avg_core_temperature","base":"UINT16","scale":100,"UOM":"CELSIUS"},
         {"num":159,"name":"min_core_temperature","base":"UINT16","scale":100,"UOM":"CELSIUS"},
         {"num":160,"name":"max_core_temperature","base":"UINT16","scale":100,"UOM":"CELSIUS"},
-        {"num":161,"name":"grade_adjusted_speed","base":"UINT32","scale":1000,"UOM":"METER_PER_SECOND"},
+        {"num":161,"name":"avg_grade_adjusted_speed","base":"UINT32","scale":1000,"UOM":"METER_PER_SECOND"},
         {"num":163,"name":"unpaved","base":"UINT8","UOM":"PERCENT"},
         {"num":164,"name":"step_speed_loss_distance","base":"UINT16","scale":100,"UOM":"CENTIMETER_PER_SECOND"},
         {"num":165,"name":"step_speed_loss_percentage","base":"UINT16","scale":100,"UOM":"PERCENT"},
         {"num":166,"name":"avg_force","base":"SINT32","scale":1000,"UOM":"NEWTON"},
         {"num":167,"name":"max_force","base":"SINT32","scale":1000,"UOM":"NEWTON"},
         {"num":168,"name":"normalized_force","base":"SINT32","scale":1000,"UOM":"NEWTON"},
-        {"num":253,"name":"timestamp","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"},
+        {"num":253,"name":"timestamp","base":"UINT32","type":"DateTime","UOM":"SECONDS"},
         {"num":254,"name":"message_index","base":"UINT16"}
       ]
     },
@@ -779,8 +798,8 @@
       "num": 20,
       "name": "RECORD",
       "fields": [
-        {"num":0,"name":"latitude","base":"SINT32","type":"COORDINATE","UOM":"SEMICIRCLES"},
-        {"num":1,"name":"longitude","base":"SINT32","type":"COORDINATE","UOM":"SEMICIRCLES"},
+        {"num":0,"name":"position_lat","base":"SINT32","type":"COORDINATE","UOM":"SEMICIRCLES"},
+        {"num":1,"name":"position_long","base":"SINT32","type":"COORDINATE","UOM":"SEMICIRCLES"},
         {"num":2,"name":"altitude","base":"UINT16","scale":5,"offset":500,"UOM":"METER"},
         {"num":3,"name":"heart_rate","base":"UINT8","UOM":"BEATS_PER_MINUTE"},
         {"num":4,"name":"cadence","base":"UINT8","UOM":"REVOLUTIONS_PER_MINUTE"},
@@ -802,10 +821,10 @@
         {"num":31,"name":"gps_accuracy","base":"UINT8","UOM":"METER"},
         {"num":32,"name":"vertical_speed","base":"SINT16","scale":1000,"UOM":"METER_PER_SECOND"},
         {"num":33,"name":"calories","base":"UINT16","UOM":"KCAL"},
-        {"num":39,"name":"oscillation","base":"UINT16","scale":10,"UOM":"MILLIMETER"},
+        {"num":39,"name":"vertical_oscillation","base":"UINT16","scale":10,"UOM":"MILLIMETER"},
         {"num":40,"name":"stance_time_percent","base":"UINT16","scale":100,"UOM":"PERCENT"},
         {"num":41,"name":"stance_time","base":"UINT16","scale":10,"UOM":"MILLISECONDS"},
-        {"num":42,"name":"activity","base":"ENUM"},
+        {"num":42,"name":"activity_type","base":"ENUM"},
         {"num":43,"name":"left_torque_effectiveness","base":"UINT8","scale":2,"UOM":"PERCENT"},
         {"num":44,"name":"right_torque_effectiveness","base":"UINT8","scale":2,"UOM":"PERCENT"},
         {"num":45,"name":"left_pedal_smoothness","base":"UINT8","scale":2,"UOM":"PERCENT"},
@@ -817,12 +836,12 @@
         {"num":51,"name":"ball_speed","base":"UINT16","scale":100,"UOM":"METER_PER_SECOND"},
         {"num":52,"name":"cadence256","base":"UINT16","scale":256,"UOM":"REVOLUTIONS_PER_MINUTE"},
         {"num":53,"name":"fractional_cadence","base":"UINT8","scale":128,"UOM":"REVOLUTIONS_PER_MINUTE"},
-        {"num":54,"name":"avg_total_hemoglobin_conc","base":"UINT16","scale":100,"UOM":"GRAM_PER_DECILITER"},
-        {"num":55,"name":"min_total_hemoglobin_conc","base":"UINT16","scale":100,"UOM":"GRAM_PER_DECILITER"},
-        {"num":56,"name":"max_total_hemoglobin_conc","base":"UINT16","scale":100,"UOM":"GRAM_PER_DECILITER"},
-        {"num":57,"name":"avg_saturated_hemoglobin_percent","base":"UINT16","scale":10,"UOM":"PERCENT"},
-        {"num":58,"name":"min_saturated_hemoglobin_percent","base":"UINT16","scale":10,"UOM":"PERCENT"},
-        {"num":59,"name":"max_saturated_hemoglobin_percent","base":"UINT16","scale":10,"UOM":"PERCENT"},
+        {"num":54,"name":"total_hemoglobin_conc","base":"UINT16","scale":100,"UOM":"GRAM_PER_DECILITER"},
+        {"num":55,"name":"total_hemoglobin_conc_min","base":"UINT16","scale":100,"UOM":"GRAM_PER_DECILITER"},
+        {"num":56,"name":"total_hemoglobin_conc_max","base":"UINT16","scale":100,"UOM":"GRAM_PER_DECILITER"},
+        {"num":57,"name":"saturated_hemoglobin_percent","base":"UINT16","scale":10,"UOM":"PERCENT"},
+        {"num":58,"name":"saturated_hemoglobin_percent_min","base":"UINT16","scale":10,"UOM":"PERCENT"},
+        {"num":59,"name":"saturated_hemoglobin_percent_max","base":"UINT16","scale":10,"UOM":"PERCENT"},
         {"num":62,"name":"device_index","base":"UINT8"},
         {"num":67,"name":"left_pco","base":"SINT8","UOM":"MILLIMETER"},
         {"num":68,"name":"right_pco","base":"SINT8","UOM":"MILLIMETER"},
@@ -879,7 +898,7 @@
         {"num":146,"name":"step_speed_loss_distance","base":"UINT16","scale":100,"UOM":"CENTIMETER_PER_SECOND"},
         {"num":147,"name":"step_speed_loss_percentage","base":"UINT16","scale":100,"UOM":"PERCENT"},
         {"num":148,"name":"force","base":"SINT32","scale":1000,"UOM":"NEWTON"},
-        {"num":253,"name":"timestamp","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"}
+        {"num":253,"name":"timestamp","base":"UINT32","type":"DateTime","UOM":"SECONDS"}
       ]
     },
     {
@@ -899,12 +918,12 @@
         {"num":12,"name":"rear_gear","base":"UINT8Z"},
         {"num":13,"name":"device_index","base":"UINT8"},
         {"num":14,"name":"activity_type","base":"ENUM"},
-        {"num":15,"name":"start_timestamp","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"},
+        {"num":15,"name":"start_timestamp","base":"UINT32","type":"DateTime","UOM":"SECONDS"},
         {"num":21,"name":"radar_threat_level_max","base":"ENUM"},
         {"num":22,"name":"radar_threat_count","base":"UINT8"},
         {"num":23,"name":"radar_threat_avg_approach_speed","base":"UINT8","scale":10,"UOM":"METER_PER_SECOND"},
         {"num":24,"name":"radar_threat_max_approach_speed","base":"UINT8","scale":10,"UOM":"METER_PER_SECOND"},
-        {"num":253,"name":"timestamp","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"}
+        {"num":253,"name":"timestamp","base":"UINT32","type":"DateTime","UOM":"SECONDS"}
       ]
     },
     {
@@ -918,7 +937,7 @@
         {"num":4,"name":"heart_rate","base":"UINT8"},
         {"num":5,"name":"calorie","base":"ENUM"},
         {"num":6,"name":"power","base":"UINT8"},
-        {"num":253,"name":"timestamp","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"}
+        {"num":253,"name":"timestamp","base":"UINT32","type":"DateTime","UOM":"SECONDS"}
       ]
     },
     {
@@ -933,6 +952,7 @@
         {"num":5,"name":"software_version","base":"UINT16"},
         {"num":6,"name":"hardware_version","base":"UINT8"},
         {"num":7,"name":"cum_operating_time","base":"UINT32","UOM":"SECONDS"},
+        {"num":9,"name":"reception_quality","base":"UINT8","UOM":"PERCENT"},
         {"num":10,"name":"battery_voltage","base":"UINT16","scale":256,"UOM":"VOLT"},
         {"num":11,"name":"battery_status","base":"UINT8","type":"BatteryStatus"},
         {"num":18,"name":"sensor_position","base":"ENUM"},
@@ -946,7 +966,7 @@
         {"num":29,"name":"ble_address","base":"UINT8","arrayLen":6},
         {"num":32,"name":"battery_level","base":"UINT8","UOM":"PERCENT"},
         {"num":251,"name":"pad","base":"BYTE","arrayLen":0},
-        {"num":253,"name":"timestamp","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"},
+        {"num":253,"name":"timestamp","base":"UINT32","type":"DateTime","UOM":"SECONDS"},
         {"num":254,"name":"message_index","base":"UINT16"}
       ]
     },
@@ -957,15 +977,15 @@
         {"num":4,"name":"sport","base":"ENUM"},
         {"num":5,"name":"capabilities","base":"UINT32Z"},
         {"num":6,"name":"num_valid_steps","base":"UINT16"},
-        {"num":8,"name":"name","base":"STRING","stringLen":41},
+        {"num":8,"name":"wkt_name","base":"STRING","stringLen":41},
         {"num":9,"name":"duration_type","base":"ENUM"},
         {"num":10,"name":"duration_value","base":"UINT32"},
         {"num":11,"name":"sub_sport","base":"ENUM"},
         {"num":12,"name":"num_sessions","base":"UINT16"},
-        {"num":13,"name":"transitions","base":"ENUM"},
+        {"num":13,"name":"transitions","base":"ENUM","type":"Bool"},
         {"num":14,"name":"pool_length","base":"UINT16","scale":100,"UOM":"METER"},
         {"num":15,"name":"pool_length_unit","base":"ENUM"},
-        {"num":17,"name":"notes","base":"STRING","stringLen":201},
+        {"num":17,"name":"wkt_description","base":"STRING","stringLen":201},
         {"num":20,"name":"workout_index","base":"UINT16"},
         {"num":21,"name":"time","base":"UINT32","scale":1000,"UOM":"SECONDS"},
         {"num":22,"name":"distance","base":"UINT32","scale":100,"UOM":"METER"},
@@ -992,7 +1012,7 @@
         {"num":11,"name":"exercise_name","base":"UINT16"},
         {"num":12,"name":"exercise_weight","base":"UINT16","scale":100,"UOM":"KILOGRAM"},
         {"num":13,"name":"weight_display_unit","base":"UINT16","type":"FitBaseUnit"},
-        {"num":18,"name":"skip_last_recover","base":"ENUM"},
+        {"num":18,"name":"skip_last_recover","base":"ENUM","type":"Bool"},
         {"num":19,"name":"secondary_target_type","base":"ENUM","type":"WktStepTarget"},
         {"num":20,"name":"secondary_target_value","base":"UINT32"},
         {"num":21,"name":"secondary_custom_target_value_low","base":"UINT32"},
@@ -1011,8 +1031,8 @@
         {"num":0,"name":"manufacturer","base":"UINT16"},
         {"num":1,"name":"product","base":"UINT16"},
         {"num":2,"name":"serial_number","base":"UINT32Z"},
-        {"num":3,"name":"time_created","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"},
-        {"num":4,"name":"completed","base":"ENUM","type":"BOOLEAN"},
+        {"num":3,"name":"time_created","base":"UINT32","type":"DateTime","UOM":"SECONDS"},
+        {"num":4,"name":"completed","base":"ENUM","type":"Bool"},
         {"num":5,"name":"type","base":"ENUM"},
         {"num":6,"name":"scheduled_time","base":"UINT32"}
       ]
@@ -1028,7 +1048,7 @@
         {"num":4,"name":"altitude","base":"UINT16","scale":5,"offset":500,"UOM":"METER"},
         {"num":5,"name":"enhanced_altitude","base":"UINT16","UOM":"METER"},
         {"num":6,"name":"description","base":"STRING"},
-        {"num":253,"name":"timestamp","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"},
+        {"num":253,"name":"timestamp","base":"UINT32","type":"DateTime","UOM":"SECONDS"},
         {"num":254,"name":"message_index","base":"UINT16"}
       ]
     },
@@ -1049,7 +1069,7 @@
         {"num":11,"name":"visceral_fat_rating","base":"UINT8"},
         {"num":12,"name":"user_profile_index","base":"UINT16"},
         {"num":13,"name":"bmi","base":"UINT16","scale":10,"UOM":"KILOGRAM_PER_SQUARE_METER"},
-        {"num":253,"name":"timestamp","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"}
+        {"num":253,"name":"timestamp","base":"UINT32","type":"DateTime","UOM":"SECONDS"}
       ]
     },
     {
@@ -1066,13 +1086,13 @@
       "num": 32,
       "name": "COURSE_POINT",
       "fields": [
-        {"num":1,"name":"timestamp","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"},
+        {"num":1,"name":"timestamp","base":"UINT32","type":"DateTime","UOM":"SECONDS"},
         {"num":2,"name":"position_lat","base":"SINT32","type":"COORDINATE","UOM":"SEMICIRCLES"},
         {"num":3,"name":"position_long","base":"SINT32","type":"COORDINATE","UOM":"SEMICIRCLES"},
         {"num":4,"name":"distance","base":"UINT32","scale":100,"UOM":"METER"},
         {"num":5,"name":"type","base":"ENUM","type":"CoursePoint"},
         {"num":6,"name":"name","base":"STRING","stringLen":16},
-        {"num":8,"name":"favorite","base":"ENUM"},
+        {"num":8,"name":"favorite","base":"ENUM","type":"Bool"},
         {"num":11,"name":"label","base":"STRING"},
         {"num":15,"name":"rest_duration","base":"UINT32","scale":1000,"UOM":"SECONDS"},
         {"num":254,"name":"message_index","base":"UINT16"}
@@ -1091,7 +1111,7 @@
         {"num":6,"name":"active_time","base":"UINT32","UOM":"SECONDS"},
         {"num":9,"name":"sport_index","base":"UINT8"},
         {"num":10,"name":"activity_profile","base":"STRING"},
-        {"num":253,"name":"timestamp","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"},
+        {"num":253,"name":"timestamp","base":"UINT32","type":"DateTime","UOM":"SECONDS"},
         {"num":254,"name":"message_index","base":"UINT16"}
       ]
     },
@@ -1104,10 +1124,10 @@
         {"num":2,"name":"type","base":"ENUM"},
         {"num":3,"name":"event","base":"ENUM","type":"Event"},
         {"num":4,"name":"event_type","base":"ENUM","type":"EventType"},
-        {"num":5,"name":"local_timestamp","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"},
+        {"num":5,"name":"local_timestamp","base":"UINT32","type":"DateTime","UOM":"SECONDS"},
         {"num":6,"name":"event_group","base":"UINT8"},
         {"num":8,"name":"name","base":"STRING"},
-        {"num":253,"name":"timestamp","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"}
+        {"num":253,"name":"timestamp","base":"UINT32","type":"DateTime","UOM":"SECONDS"}
       ]
     },
     {
@@ -1138,8 +1158,7 @@
         {"num":0,"name":"file","base":"ENUM"},
         {"num":1,"name":"mesg_num","base":"UINT16"},
         {"num":2,"name":"count_type","base":"ENUM"},
-        {"num":3,"name":"max_count","base":"UINT16"},
-        {"num":4,"name":"count","base":"UINT16"},
+        {"num":3,"name":"count","base":"UINT16"},
         {"num":254,"name":"message_index","base":"UINT16"}
       ]
     },
@@ -1177,7 +1196,7 @@
         {"num":7,"name":"heart_rate_type","base":"ENUM"},
         {"num":8,"name":"status","base":"ENUM"},
         {"num":9,"name":"user_profile_index","base":"UINT16"},
-        {"num":253,"name":"timestamp","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"}
+        {"num":253,"name":"timestamp","base":"UINT32","type":"DateTime","UOM":"SECONDS"}
       ]
     },
     {
@@ -1204,7 +1223,7 @@
         {"num":8,"name":"distance_16","base":"UINT16","UOM":"100 * m"},
         {"num":9,"name":"cycles_16","base":"UINT16","UOM":"2 * cycles (steps)"},
         {"num":10,"name":"active_time_16","base":"UINT16","UOM":"SECONDS"},
-        {"num":11,"name":"local_timestamp","base":"UINT32"},
+        {"num":11,"name":"local_timestamp","base":"UINT32","type":"LocalDateTime","UOM":"SECONDS"},
         {"num":12,"name":"temperature","base":"SINT16","scale":100,"UOM":"CELSIUS"},
         {"num":14,"name":"temperature_min","base":"SINT16","scale":100,"UOM":"CELSIUS"},
         {"num":15,"name":"temperature_max","base":"SINT16","scale":100,"UOM":"CELSIUS"},
@@ -1225,8 +1244,9 @@
         {"num":36,"name":"total_descent","base":"UINT32","scale":1000,"UOM":"METER"},
         {"num":37,"name":"moderate_activity","base":"UINT16","UOM":"MINUTES"},
         {"num":38,"name":"vigorous_activity","base":"UINT16","UOM":"MINUTES"},
+        {"num":41,"name":"pushes","base":"UINT32"},
         {"num":251,"name":"pad","base":"BYTE","arrayLen":0},
-        {"num":253,"name":"timestamp","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"},
+        {"num":253,"name":"timestamp","base":"UINT32","type":"DateTime","UOM":"SECONDS"},
         {"num":254,"name":"message_index","base":"UINT16"}
       ]
     },
@@ -1234,22 +1254,25 @@
       "num": 70,
       "name": "MAP_LAYER",
       "fields": [
+        {"num":1,"name":"details","base":"ENUM"},
         {"num":2,"name":"relief_shading","base":"ENUM"},
         {"num":11,"name":"orientation","base":"ENUM"},
-        {"num":13,"name":"user_locations","base":"ENUM"},
-        {"num":14,"name":"auto_zoom","base":"ENUM"},
+        {"num":13,"name":"user_locations","base":"ENUM","type":"Bool"},
+        {"num":14,"name":"auto_zoom","base":"ENUM","type":"Bool"},
         {"num":15,"name":"guide_text","base":"ENUM"},
-        {"num":16,"name":"track_log","base":"ENUM"},
+        {"num":16,"name":"track_log","base":"ENUM","type":"Bool"},
         {"num":18,"name":"map_track_color","base":"ENUM"},
-        {"num":20,"name":"courses","base":"ENUM"},
+        {"num":20,"name":"courses","base":"ENUM","type":"Bool"},
         {"num":22,"name":"marine_chart_mode","base":"ENUM"},
-        {"num":23,"name":"spot_soundings","base":"ENUM"},
+        {"num":23,"name":"spot_soundings","base":"ENUM","type":"Bool"},
         {"num":24,"name":"light_sectors","base":"ENUM"},
         {"num":25,"name":"marine_symbol_set","base":"ENUM"},
-        {"num":27,"name":"segments","base":"ENUM"},
-        {"num":28,"name":"contours","base":"ENUM"},
-        {"num":31,"name":"popularity","base":"ENUM"},
-        {"num":253,"name":"timestamp","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"}
+        {"num":27,"name":"segments","base":"ENUM","type":"Bool"},
+        {"num":28,"name":"contours","base":"ENUM","type":"Bool"},
+        {"num":29,"name":"map_theme","base":"STRING"},
+        {"num":31,"name":"popularity","base":"ENUM","type":"Bool"},
+        {"num":33,"name":"map_color","base":"ENUM"},
+        {"num":254,"name":"message_index","base":"UINT16"}
       ]
     },
     {
@@ -1258,11 +1281,12 @@
       "fields": [
         {"num":0,"name":"routing_mode","base":"ENUM"},
         {"num":1,"name":"calculation_method","base":"ENUM"},
-        {"num":2,"name":"lock_on_road","base":"ENUM"},
+        {"num":2,"name":"lock_on_road","base":"ENUM","type":"Bool"},
         {"num":3,"name":"avoidances","base":"UINT16"},
         {"num":4,"name":"route_recalculation","base":"ENUM"},
         {"num":5,"name":"type","base":"ENUM"},
-        {"num":7,"name":"course_recalculation","base":"ENUM"}
+        {"num":7,"name":"course_recalculation","base":"ENUM"},
+        {"num":254,"name":"message_index","base":"UINT16"}
       ]
     },
     {
@@ -1273,8 +1297,8 @@
         {"num":1,"name":"manufacturer","base":"UINT16"},
         {"num":2,"name":"product","base":"UINT16"},
         {"num":3,"name":"serial_number","base":"UINT32Z"},
-        {"num":4,"name":"time_created","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"},
-        {"num":253,"name":"timestamp","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"}
+        {"num":4,"name":"time_created","base":"UINT32","type":"DateTime","UOM":"SECONDS"},
+        {"num":253,"name":"timestamp","base":"UINT32","type":"DateTime","UOM":"SECONDS"}
       ]
     },
     {
@@ -1314,11 +1338,11 @@
         {"num":33,"name":"recovery_minutes","base":"UINT16","UOM":"MINUTES"},
         {"num":35,"name":"end_of_previous_activity","base":"UINT32"},
         {"num":38,"name":"sleep_need","base":"UINT16","UOM":"MINUTES"},
-        {"num":39,"name":"wake_up_time","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"},
-        {"num":40,"name":"wheelchair","base":"ENUM"},
+        {"num":39,"name":"wake_up_time","base":"UINT32","type":"DateTime","UOM":"SECONDS"},
+        {"num":40,"name":"wheelchair","base":"ENUM","type":"Bool"},
         {"num":44,"name":"sport","base":"ENUM"},
         {"num":251,"name":"pad","base":"BYTE","arrayLen":0},
-        {"num":253,"name":"timestamp","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"},
+        {"num":253,"name":"timestamp","base":"UINT32","type":"DateTime","UOM":"SECONDS"},
         {"num":254,"name":"message_index","base":"UINT16"}
       ]
     },
@@ -1331,7 +1355,7 @@
         {"num":2,"name":"mesg_data","base":"BYTE","arrayLen":0},
         {"num":3,"name":"channel_number","base":"UINT8"},
         {"num":4,"name":"data","base":"BYTE","arrayLen":0},
-        {"num":253,"name":"timestamp","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"}
+        {"num":253,"name":"timestamp","base":"UINT32","type":"DateTime","UOM":"SECONDS"}
       ]
     },
     {
@@ -1343,7 +1367,7 @@
         {"num":2,"name":"mesg_data","base":"BYTE","arrayLen":0},
         {"num":3,"name":"channel_number","base":"UINT8"},
         {"num":4,"name":"data","base":"BYTE","arrayLen":0},
-        {"num":253,"name":"timestamp","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"}
+        {"num":253,"name":"timestamp","base":"UINT32","type":"DateTime","UOM":"SECONDS"}
       ]
     },
     {
@@ -1364,7 +1388,7 @@
         {"num":0,"name":"event_type","base":"ENUM"},
         {"num":1,"name":"fractional_timestamp","base":"UINT16","scale":32768,"UOM":"SECONDS"},
         {"num":5,"name":"swim_stroke","base":"UINT32"},
-        {"num":253,"name":"timestamp","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"}
+        {"num":253,"name":"timestamp","base":"UINT32","type":"DateTime","UOM":"SECONDS"}
       ]
     },
     {
@@ -1373,7 +1397,7 @@
       "fields": [
         {"num":0,"name":"event","base":"ENUM","type":"Event"},
         {"num":1,"name":"event_type","base":"ENUM","type":"EventType"},
-        {"num":2,"name":"start_time","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"},
+        {"num":2,"name":"start_time","base":"UINT32","type":"DateTime","UOM":"SECONDS"},
         {"num":3,"name":"total_elapsed_time","base":"UINT32","scale":1000,"UOM":"SECONDS"},
         {"num":4,"name":"total_timer_time","base":"UINT32","scale":1000,"UOM":"SECONDS"},
         {"num":5,"name":"total_strokes","base":"UINT16","UOM":"STROKES"},
@@ -1391,7 +1415,8 @@
         {"num":23,"name":"enhanced_max_respiration_rate","base":"UINT16","scale":1000},
         {"num":24,"name":"avg_respiration_rate","base":"UINT8"},
         {"num":25,"name":"max_respiration_rate","base":"UINT8"},
-        {"num":253,"name":"timestamp","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"},
+        {"num":26,"name":"metabolic_calories","base":"UINT16"},
+        {"num":253,"name":"timestamp","base":"UINT32","type":"DateTime","UOM":"SECONDS"},
         {"num":254,"name":"message_index","base":"UINT16"}
       ]
     },
@@ -1399,24 +1424,24 @@
       "num": 103,
       "name": "MONITORING_INFO",
       "fields": [
-        {"num":0,"name":"local_timestamp","base":"UINT32","UOM":"SECONDS"},
+        {"num":0,"name":"local_timestamp","base":"UINT32","type":"LocalDateTime","UOM":"SECONDS"},
         {"num":1,"name":"activity_type","base":"ENUM","arrayLen":0},
-        {"num":3,"name":"steps_to_distance","base":"UINT16","scale":5000,"arrayLen":0,"UOM":"METER_PER_CYCLE"},
-        {"num":4,"name":"steps_to_calories","base":"UINT16","scale":5000,"arrayLen":0,"UOM":"KCAL_PER_CYCLE"},
+        {"num":3,"name":"cycles_to_distance","base":"UINT16","scale":5000,"arrayLen":0,"UOM":"METER_PER_CYCLE"},
+        {"num":4,"name":"cycles_to_calories","base":"UINT16","scale":5000,"arrayLen":0,"UOM":"KCAL_PER_CYCLE"},
         {"num":5,"name":"resting_metabolic_rate","base":"UINT16","UOM":"KCAL_PER_DAY"},
         {"num":7,"name":"cycles_goal","base":"UINT32","scale":2,"UOM":"CYCLES"},
-        {"num":253,"name":"timestamp","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"},
+        {"num":253,"name":"timestamp","base":"UINT32","type":"DateTime","UOM":"SECONDS"},
         {"num":254,"name":"message_index","base":"UINT16"}
       ]
     },
     {
       "num": 104,
-      "name": "DEVICE_STATUS",
+      "name": "BATTERY",
       "fields": [
         {"num":0,"name":"battery_voltage","base":"UINT16","scale":1000},
-        {"num":2,"name":"battery_level","base":"UINT8","UOM":"PERCENT"},
+        {"num":2,"name":"capacity","base":"UINT8","UOM":"PERCENT"},
         {"num":3,"name":"temperature","base":"SINT8","UOM":"CELSIUS"},
-        {"num":253,"name":"timestamp","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"}
+        {"num":253,"name":"timestamp","base":"UINT32","type":"DateTime","UOM":"SECONDS"}
       ]
     },
     {
@@ -1439,9 +1464,9 @@
         {"num":1,"name":"sport","base":"ENUM"},
         {"num":2,"name":"distance","base":"UINT32","scale":100},
         {"num":3,"name":"time","base":"UINT32","scale":1000},
-        {"num":4,"name":"start_time","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"},
-        {"num":5,"name":"personal_record","base":"ENUM"},
-        {"num":253,"name":"timestamp","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"}
+        {"num":4,"name":"start_time","base":"UINT32","type":"DateTime","UOM":"SECONDS"},
+        {"num":5,"name":"personal_record","base":"ENUM","type":"Bool"},
+        {"num":253,"name":"timestamp","base":"UINT32","type":"DateTime","UOM":"SECONDS"}
       ]
     },
     {
@@ -1452,7 +1477,7 @@
         {"num":1,"name":"sport","base":"ENUM"},
         {"num":2,"name":"distance","base":"UINT32","scale":100},
         {"num":5,"name":"record","base":"UINT32"},
-        {"num":253,"name":"timestamp","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"},
+        {"num":253,"name":"timestamp","base":"UINT32","type":"DateTime","UOM":"SECONDS"},
         {"num":254,"name":"message_index","base":"UINT16"}
       ]
     },
@@ -1460,45 +1485,45 @@
       "num": 127,
       "name": "CONNECTIVITY",
       "fields": [
-        {"num":0,"name":"bluetooth_enabled","base":"ENUM"},
-        {"num":1,"name":"bluetooth_le_enabled","base":"ENUM"},
-        {"num":2,"name":"ant_enabled","base":"ENUM"},
+        {"num":0,"name":"bluetooth_enabled","base":"ENUM","type":"Bool"},
+        {"num":1,"name":"bluetooth_le_enabled","base":"ENUM","type":"Bool"},
+        {"num":2,"name":"ant_enabled","base":"ENUM","type":"Bool"},
         {"num":3,"name":"name","base":"STRING","stringLen":20},
-        {"num":4,"name":"live_tracking_enabled","base":"ENUM"},
-        {"num":5,"name":"weather_conditions_enabled","base":"ENUM"},
-        {"num":6,"name":"weather_alerts_enabled","base":"ENUM"},
-        {"num":7,"name":"auto_activity_upload_enabled","base":"ENUM"},
-        {"num":8,"name":"course_download_enabled","base":"ENUM"},
-        {"num":9,"name":"workout_download_enabled","base":"ENUM"},
-        {"num":10,"name":"gps_ephemeris_download_enabled","base":"ENUM"},
-        {"num":11,"name":"incident_detection_enabled","base":"ENUM"},
-        {"num":12,"name":"grouptrack_enabled","base":"ENUM"}
+        {"num":4,"name":"live_tracking_enabled","base":"ENUM","type":"Bool"},
+        {"num":5,"name":"weather_conditions_enabled","base":"ENUM","type":"Bool"},
+        {"num":6,"name":"weather_alerts_enabled","base":"ENUM","type":"Bool"},
+        {"num":7,"name":"auto_activity_upload_enabled","base":"ENUM","type":"Bool"},
+        {"num":8,"name":"course_download_enabled","base":"ENUM","type":"Bool"},
+        {"num":9,"name":"workout_download_enabled","base":"ENUM","type":"Bool"},
+        {"num":10,"name":"gps_ephemeris_download_enabled","base":"ENUM","type":"Bool"},
+        {"num":11,"name":"incident_detection_enabled","base":"ENUM","type":"Bool"},
+        {"num":12,"name":"grouptrack_enabled","base":"ENUM","type":"Bool"}
       ]
     },
     {
       "num": 128,
-      "name": "WEATHER",
+      "name": "WEATHER_CONDITIONS",
       "fields": [
         {"num":0,"name":"weather_report","base":"ENUM","type":"WeatherReport"},
         {"num":1,"name":"temperature","base":"SINT8","type":"TEMPERATURE","UOM":"CELSIUS"},
-        {"num":2,"name":"condition","base":"ENUM","type":"WeatherCondition"},
+        {"num":2,"name":"condition","base":"ENUM","type":"WeatherStatus"},
         {"num":3,"name":"wind_direction","base":"UINT16","UOM":"DEGREES"},
         {"num":4,"name":"wind_speed","base":"UINT16","UOM":"MILLIMETER_PER_SECOND"},
         {"num":5,"name":"precipitation_probability","base":"UINT8"},
         {"num":6,"name":"temperature_feels_like","base":"SINT8","type":"TEMPERATURE","UOM":"CELSIUS"},
         {"num":7,"name":"relative_humidity","base":"UINT8"},
         {"num":8,"name":"location","base":"STRING","stringLen":15},
-        {"num":9,"name":"observed_at_time","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"},
+        {"num":9,"name":"observed_at_time","base":"UINT32","type":"DateTime","UOM":"SECONDS"},
         {"num":10,"name":"observed_location_lat","base":"SINT32","type":"COORDINATE","UOM":"SEMICIRCLES"},
         {"num":11,"name":"observed_location_long","base":"SINT32","type":"COORDINATE","UOM":"SEMICIRCLES"},
-        {"num":12,"name":"day_of_week","base":"ENUM","type":"DAY_OF_WEEK"},
+        {"num":12,"name":"day_of_week","base":"ENUM","type":"DayOfWeek"},
         {"num":13,"name":"high_temperature","base":"SINT8","type":"TEMPERATURE","UOM":"CELSIUS"},
         {"num":14,"name":"low_temperature","base":"SINT8","type":"TEMPERATURE","UOM":"CELSIUS"},
         {"num":15,"name":"dew_point","base":"SINT8","type":"TEMPERATURE"},
         {"num":16,"name":"uv_index","base":"FLOAT32"},
         {"num":17,"name":"air_quality","base":"ENUM","type":"WeatherAqi"},
         {"num":18,"name":"atmospheric_pressure","base":"UINT32","UOM":"PASCAL"},
-        {"num":253,"name":"timestamp","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"}
+        {"num":253,"name":"timestamp","base":"UINT32","type":"DateTime","UOM":"SECONDS"}
       ]
     },
     {
@@ -1506,13 +1531,13 @@
       "name": "WEATHER_ALERT",
       "fields": [
         {"num":0,"name":"report_id","base":"STRING"},
-        {"num":1,"name":"issue_time","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"},
-        {"num":2,"name":"expire_time","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"},
+        {"num":1,"name":"issue_time","base":"UINT32","type":"DateTime","UOM":"SECONDS"},
+        {"num":2,"name":"expire_time","base":"UINT32","type":"DateTime","UOM":"SECONDS"},
         {"num":3,"name":"severity","base":"ENUM"},
         {"num":4,"name":"type","base":"ENUM"},
         {"num":5,"name":"position_lat","base":"SINT32","type":"COORDINATE","UOM":"SEMICIRCLES"},
         {"num":6,"name":"position_long","base":"SINT32","type":"COORDINATE","UOM":"SEMICIRCLES"},
-        {"num":253,"name":"timestamp","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"}
+        {"num":253,"name":"timestamp","base":"UINT32","type":"DateTime","UOM":"SECONDS"}
       ]
     },
     {
@@ -1533,7 +1558,7 @@
         {"num":6,"name":"filtered_bpm","base":"UINT8","arrayLen":0,"UOM":"BEATS_PER_MINUTE"},
         {"num":9,"name":"event_timestamp","base":"UINT32","scale":1024,"arrayLen":0,"UOM":"SECONDS"},
         {"num":10,"name":"event_timestamp_12","base":"BYTE","arrayLen":0},
-        {"num":253,"name":"timestamp","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"}
+        {"num":253,"name":"timestamp","base":"UINT32","type":"DateTime","UOM":"SECONDS"}
       ]
     },
     {
@@ -1575,7 +1600,7 @@
         {"num":35,"name":"total_elapsed_time","base":"UINT32","scale":1000,"UOM":"SECONDS"},
         {"num":36,"name":"total_distance","base":"UINT32","scale":100,"UOM":"METER"},
         {"num":41,"name":"primary_benefit","base":"ENUM"},
-        {"num":48,"name":"local_timestamp","base":"UINT32"},
+        {"num":48,"name":"local_timestamp","base":"UINT32","type":"LocalDateTime","UOM":"SECONDS"},
         {"num":49,"name":"ending_load_stamina","base":"UINT8","UOM":"PERCENT"},
         {"num":50,"name":"ending_distance_stamina","base":"UINT8","UOM":"PERCENT"},
         {"num":53,"name":"hr_max","base":"UINT8","UOM":"BEATS_PER_MINUTE"},
@@ -1590,7 +1615,7 @@
         {"num":70,"name":"time_10k","base":"UINT16","UOM":"SECONDS"},
         {"num":71,"name":"time_half_marathon","base":"UINT16","UOM":"SECONDS"},
         {"num":72,"name":"time_full_marathon","base":"UINT16","UOM":"SECONDS"},
-        {"num":253,"name":"timestamp","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"}
+        {"num":253,"name":"timestamp","base":"UINT32","type":"DateTime","UOM":"SECONDS"}
       ]
     },
     {
@@ -1598,9 +1623,9 @@
       "name": "EPO_STATUS",
       "fields": [
         {"num":0,"name":"status","base":"ENUM"},
-        {"num":1,"name":"start_time","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"},
-        {"num":2,"name":"end_time","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"},
-        {"num":253,"name":"timestamp","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"}
+        {"num":1,"name":"start_time","base":"UINT32","type":"DateTime","UOM":"SECONDS"},
+        {"num":2,"name":"end_time","base":"UINT32","type":"DateTime","UOM":"SECONDS"},
+        {"num":253,"name":"timestamp","base":"UINT32","type":"DateTime","UOM":"SECONDS"}
       ]
     },
     {
@@ -1609,7 +1634,7 @@
       "fields": [
         {"num":0,"name":"event","base":"ENUM","type":"Event"},
         {"num":1,"name":"event_type","base":"ENUM","type":"EventType"},
-        {"num":2,"name":"start_time","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"},
+        {"num":2,"name":"start_time","base":"UINT32","type":"DateTime","UOM":"SECONDS"},
         {"num":3,"name":"start_position_lat","base":"SINT32","type":"COORDINATE","UOM":"SEMICIRCLES"},
         {"num":4,"name":"start_position_long","base":"SINT32","type":"COORDINATE","UOM":"SEMICIRCLES"},
         {"num":5,"name":"end_position_lat","base":"SINT32","type":"COORDINATE","UOM":"SEMICIRCLES"},
@@ -1695,13 +1720,13 @@
         {"num":85,"name":"total_flow","base":"FLOAT32","UOM":"FLOW"},
         {"num":86,"name":"avg_grit","base":"FLOAT32","UOM":"KILO_GRIT"},
         {"num":87,"name":"avg_flow","base":"FLOAT32","UOM":"FLOW"},
-        {"num":88,"name":"calories","base":"UINT16","UOM":"KCAL"},
+        {"num":88,"name":"metabolic_calories","base":"UINT16","UOM":"KCAL"},
         {"num":89,"name":"total_fractional_ascent","base":"UINT8","scale":100,"UOM":"METER"},
         {"num":90,"name":"total_fractional_descent","base":"UINT8","scale":100,"UOM":"METER"},
         {"num":91,"name":"enhanced_avg_altitude","base":"UINT32","scale":5,"offset":500,"UOM":"METER"},
         {"num":92,"name":"enhanced_max_altitude","base":"UINT32","scale":5,"offset":500,"UOM":"METER"},
         {"num":93,"name":"enhanced_min_altitude","base":"UINT32","scale":5,"offset":500,"UOM":"METER"},
-        {"num":253,"name":"timestamp","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"},
+        {"num":253,"name":"timestamp","base":"UINT32","type":"DateTime","UOM":"SECONDS"},
         {"num":254,"name":"message_index","base":"UINT16"}
       ]
     },
@@ -1710,15 +1735,15 @@
       "name": "MULTISPORT_SETTINGS",
       "fields": [
         {"num":0,"name":"name","base":"STRING"},
-        {"num":1,"name":"transitions","base":"ENUM"},
+        {"num":1,"name":"transitions","base":"ENUM","type":"Bool"},
         {"num":2,"name":"number_of_activities","base":"UINT8"},
-        {"num":3,"name":"auto_pause","base":"ENUM"},
-        {"num":4,"name":"alerts","base":"ENUM"},
-        {"num":5,"name":"auto_lap","base":"ENUM"},
-        {"num":6,"name":"power_save_timeout","base":"ENUM"},
-        {"num":7,"name":"auto_scroll","base":"ENUM"},
-        {"num":8,"name":"repeat","base":"ENUM"},
-        {"num":10,"name":"sport_change","base":"ENUM"}
+        {"num":3,"name":"auto_pause","base":"ENUM","type":"Bool"},
+        {"num":4,"name":"alerts","base":"ENUM","type":"Bool"},
+        {"num":5,"name":"auto_lap","base":"ENUM","type":"Bool"},
+        {"num":6,"name":"power_save_timeout","base":"ENUM","type":"Bool"},
+        {"num":7,"name":"auto_scroll","base":"ENUM","type":"Bool"},
+        {"num":8,"name":"repeat","base":"ENUM","type":"Bool"},
+        {"num":10,"name":"sport_change","base":"ENUM","type":"Bool"}
       ]
     },
     {
@@ -1765,9 +1790,11 @@
         {"num":32,"name":"product","base":"UINT16"},
         {"num":33,"name":"manufacturer","base":"UINT16"},
         {"num":34,"name":"firmware_version","base":"UINT16"},
+        {"num":41,"name":"cycling_beam_focus","base":"UINT8","arrayLen":7},
         {"num":43,"name":"cycling_dynamics","base":"ENUM"},
         {"num":45,"name":"use_for_speed","base":"ENUM"},
         {"num":46,"name":"use_for_distance","base":"ENUM"},
+        {"num":49,"name":"cycling_beam_intensity","base":"UINT8"},
         {"num":50,"name":"bluetooth_address","base":"UINT8","arrayLen":6},
         {"num":51,"name":"connection_type","base":"ENUM"},
         {"num":52,"name":"sensor_type","base":"ENUM"},
@@ -1793,7 +1820,7 @@
         {"num":0,"name":"name","base":"STRING","stringLen":50},
         {"num":1,"name":"uuid","base":"STRING","stringLen":33},
         {"num":2,"name":"sport","base":"ENUM"},
-        {"num":3,"name":"enabled","base":"ENUM"},
+        {"num":3,"name":"enabled","base":"ENUM","type":"Bool"},
         {"num":4,"name":"user_profile_primary_key","base":"UINT32"},
         {"num":5,"name":"device_id","base":"UINT32"},
         {"num":6,"name":"default_race_leader","base":"UINT8"},
@@ -1832,7 +1859,7 @@
       "name": "SEGMENT_FILE",
       "fields": [
         {"num":1,"name":"file_uuid","base":"STRING"},
-        {"num":3,"name":"enabled","base":"ENUM"},
+        {"num":3,"name":"enabled","base":"ENUM","type":"Bool"},
         {"num":4,"name":"user_profile_primary_key","base":"UINT32"},
         {"num":7,"name":"leader_type","base":"ENUM","arrayLen":0},
         {"num":8,"name":"leader_group_primary_key","base":"UINT32","arrayLen":0},
@@ -1846,10 +1873,11 @@
       "num": 152,
       "name": "METRONOME",
       "fields": [
-        {"num":0,"name":"enabled","base":"ENUM"},
+        {"num":0,"name":"enabled","base":"ENUM","type":"Bool"},
         {"num":1,"name":"beats_per_minute","base":"UINT8"},
         {"num":2,"name":"alert_frequency","base":"UINT8"},
-        {"num":3,"name":"sound_and_vibe","base":"ENUM"}
+        {"num":3,"name":"sound_and_vibe","base":"ENUM"},
+        {"num":254,"name":"message_index","base":"UINT16"}
       ]
     },
     {
@@ -1885,9 +1913,9 @@
         {"num":3,"name":"enhanced_altitude","base":"UINT32","scale":5,"offset":500,"UOM":"METER"},
         {"num":4,"name":"enhanced_speed","base":"UINT32","scale":1000,"UOM":"METER_PER_SECOND"},
         {"num":5,"name":"heading","base":"UINT16","scale":100,"UOM":"DEGREES"},
-        {"num":6,"name":"utc_timestamp","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"},
+        {"num":6,"name":"utc_timestamp","base":"UINT32","type":"DateTime","UOM":"SECONDS"},
         {"num":7,"name":"velocity","base":"SINT16","scale":100,"arrayLen":3,"UOM":"METER_PER_SECOND"},
-        {"num":253,"name":"timestamp","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"}
+        {"num":253,"name":"timestamp","base":"UINT32","type":"DateTime","UOM":"SECONDS"}
       ]
     },
     {
@@ -1898,7 +1926,7 @@
         {"num":1,"name":"camera_event_type","base":"ENUM"},
         {"num":2,"name":"camera_file_uuid","base":"STRING"},
         {"num":3,"name":"camera_orientation","base":"ENUM"},
-        {"num":253,"name":"timestamp","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"}
+        {"num":253,"name":"timestamp","base":"UINT32","type":"DateTime","UOM":"SECONDS"}
       ]
     },
     {
@@ -1906,12 +1934,12 @@
       "name": "TIMESTAMP_CORRELATION",
       "fields": [
         {"num":0,"name":"fractional_timestamp","base":"UINT16","scale":32768,"UOM":"SECONDS"},
-        {"num":1,"name":"system_timestamp","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"},
+        {"num":1,"name":"system_timestamp","base":"UINT32","type":"DateTime","UOM":"SECONDS"},
         {"num":2,"name":"fractional_system_timestamp","base":"UINT16","scale":32768,"UOM":"SECONDS"},
-        {"num":3,"name":"local_timestamp","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"},
+        {"num":3,"name":"local_timestamp","base":"UINT32","type":"DateTime","UOM":"SECONDS"},
         {"num":4,"name":"timestamp_ms","base":"UINT16","UOM":"MILLISECONDS"},
         {"num":5,"name":"system_timestamp_ms","base":"UINT16","UOM":"MILLISECONDS"},
-        {"num":253,"name":"timestamp","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"}
+        {"num":253,"name":"timestamp","base":"UINT32","type":"DateTime","UOM":"SECONDS"}
       ]
     },
     {
@@ -1926,7 +1954,7 @@
         {"num":5,"name":"calibrated_gyro_x","base":"FLOAT32","arrayLen":0,"UOM":"DEGREES_PER_SECOND"},
         {"num":6,"name":"calibrated_gyro_y","base":"FLOAT32","arrayLen":0,"UOM":"DEGREES_PER_SECOND"},
         {"num":7,"name":"calibrated_gyro_z","base":"FLOAT32","arrayLen":0,"UOM":"DEGREES_PER_SECOND"},
-        {"num":253,"name":"timestamp","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"}
+        {"num":253,"name":"timestamp","base":"UINT32","type":"DateTime","UOM":"SECONDS"}
       ]
     },
     {
@@ -1944,7 +1972,7 @@
         {"num":8,"name":"compressed_calibrated_accel_x","base":"SINT16","arrayLen":0,"UOM":"MILLIGRAVITY"},
         {"num":9,"name":"compressed_calibrated_accel_y","base":"SINT16","arrayLen":0,"UOM":"MILLIGRAVITY"},
         {"num":10,"name":"compressed_calibrated_accel_z","base":"SINT16","arrayLen":0,"UOM":"MILLIGRAVITY"},
-        {"num":253,"name":"timestamp","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"}
+        {"num":253,"name":"timestamp","base":"UINT32","type":"DateTime","UOM":"SECONDS"}
       ]
     },
     {
@@ -1957,7 +1985,7 @@
         {"num":3,"name":"level_shift","base":"UINT32"},
         {"num":4,"name":"offset_cal","base":"SINT32","arrayLen":3},
         {"num":5,"name":"orientation_matrix","base":"SINT32","scale":65535,"arrayLen":9},
-        {"num":253,"name":"timestamp","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"}
+        {"num":253,"name":"timestamp","base":"UINT32","type":"DateTime","UOM":"SECONDS"}
       ]
     },
     {
@@ -1966,7 +1994,7 @@
       "fields": [
         {"num":0,"name":"timestamp_ms","base":"UINT16","UOM":"MILLISECONDS"},
         {"num":1,"name":"frame_number","base":"UINT32"},
-        {"num":253,"name":"timestamp","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"}
+        {"num":253,"name":"timestamp","base":"UINT32","type":"DateTime","UOM":"SECONDS"}
       ]
     },
     {
@@ -1999,9 +2027,9 @@
         {"num":3,"name":"raw_data","base":"BYTE","arrayLen":0},
         {"num":4,"name":"pid_data_size","base":"UINT8","arrayLen":0},
         {"num":5,"name":"system_time","base":"UINT32","arrayLen":0},
-        {"num":6,"name":"start_timestamp","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"},
+        {"num":6,"name":"start_timestamp","base":"UINT32","type":"DateTime","UOM":"SECONDS"},
         {"num":7,"name":"start_timestamp_ms","base":"UINT16","UOM":"MILLISECONDS"},
-        {"num":253,"name":"timestamp","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"}
+        {"num":253,"name":"timestamp","base":"UINT32","type":"DateTime","UOM":"SECONDS"}
       ]
     },
     {
@@ -2010,7 +2038,7 @@
       "fields": [
         {"num":0,"name":"timestamp_ms","base":"UINT16","UOM":"MILLISECONDS"},
         {"num":1,"name":"sentence","base":"STRING"},
-        {"num":253,"name":"timestamp","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"}
+        {"num":253,"name":"timestamp","base":"UINT32","type":"DateTime","UOM":"SECONDS"}
       ]
     },
     {
@@ -2028,7 +2056,7 @@
         {"num":8,"name":"attitude_stage_complete","base":"UINT8","arrayLen":0,"UOM":"PERCENT"},
         {"num":9,"name":"track","base":"UINT16","arrayLen":0},
         {"num":10,"name":"validity","base":"UINT16","arrayLen":0},
-        {"num":253,"name":"timestamp","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"}
+        {"num":253,"name":"timestamp","base":"UINT32","type":"DateTime","UOM":"SECONDS"}
       ]
     },
     {
@@ -2063,9 +2091,9 @@
       "name": "VIDEO_CLIP",
       "fields": [
         {"num":0,"name":"clip_number","base":"UINT16"},
-        {"num":1,"name":"start_timestamp","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"},
+        {"num":1,"name":"start_timestamp","base":"UINT32","type":"DateTime","UOM":"SECONDS"},
         {"num":2,"name":"start_timestamp_ms","base":"UINT16"},
-        {"num":3,"name":"end_timestamp","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"},
+        {"num":3,"name":"end_timestamp","base":"UINT32","type":"DateTime","UOM":"SECONDS"},
         {"num":4,"name":"end_timestamp_ms","base":"UINT16"},
         {"num":6,"name":"clip_start","base":"UINT32","UOM":"MILLISECONDS"},
         {"num":7,"name":"clip_end","base":"UINT32","UOM":"MILLISECONDS"}
@@ -2077,10 +2105,10 @@
       "fields": [
         {"num":0,"name":"enabled","base":"ENUM"},
         {"num":1,"name":"sampling_rate","base":"UINT16"},
-        {"num":2,"name":"transmit_hr","base":"ENUM"},
+        {"num":2,"name":"transmit_hr","base":"ENUM","type":"Bool"},
         {"num":3,"name":"transmit_hr_activity","base":"ENUM"},
         {"num":4,"name":"swimming","base":"ENUM"},
-        {"num":253,"name":"timestamp","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"}
+        {"num":253,"name":"timestamp","base":"UINT32","type":"DateTime","UOM":"SECONDS"}
       ]
     },
     {
@@ -2097,15 +2125,15 @@
         {"num":0,"name":"course_id","base":"UINT32"},
         {"num":1,"name":"name","base":"STRING"},
         {"num":2,"name":"local_time","base":"UINT32","UOM":"SECONDS"},
-        {"num":3,"name":"start_time","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"},
-        {"num":4,"name":"end_time","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"},
+        {"num":3,"name":"start_time","base":"UINT32","type":"DateTime","UOM":"SECONDS"},
+        {"num":4,"name":"end_time","base":"UINT32","type":"DateTime","UOM":"SECONDS"},
         {"num":8,"name":"out","base":"UINT8"},
         {"num":9,"name":"in","base":"UINT8"},
         {"num":10,"name":"total","base":"UINT8"},
         {"num":11,"name":"tee","base":"STRING"},
         {"num":12,"name":"slope","base":"UINT8"},
         {"num":21,"name":"rating","base":"FLOAT32"},
-        {"num":253,"name":"timestamp","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"}
+        {"num":253,"name":"timestamp","base":"UINT32","type":"DateTime","UOM":"SECONDS"}
       ]
     },
     {
@@ -2119,7 +2147,7 @@
         {"num":7,"name":"fairway_hit","base":"UINT8"},
         {"num":8,"name":"gir","base":"UINT8"},
         {"num":9,"name":"putts","base":"UINT8"},
-        {"num":253,"name":"timestamp","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"}
+        {"num":253,"name":"timestamp","base":"UINT32","type":"DateTime","UOM":"SECONDS"}
       ]
     },
     {
@@ -2130,7 +2158,7 @@
         {"num":2,"name":"score","base":"SINT8"},
         {"num":5,"name":"putts","base":"SINT8"},
         {"num":6,"name":"fairway","base":"ENUM"},
-        {"num":253,"name":"timestamp","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"}
+        {"num":253,"name":"timestamp","base":"UINT32","type":"DateTime","UOM":"SECONDS"}
       ]
     },
     {
@@ -2143,7 +2171,7 @@
         {"num":3,"name":"handicap","base":"UINT8"},
         {"num":4,"name":"position_lat","base":"SINT32","type":"COORDINATE","UOM":"SEMICIRCLES"},
         {"num":5,"name":"position_long","base":"SINT32","type":"COORDINATE","UOM":"SEMICIRCLES"},
-        {"num":253,"name":"timestamp","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"}
+        {"num":253,"name":"timestamp","base":"UINT32","type":"DateTime","UOM":"SECONDS"}
       ]
     },
     {
@@ -2156,7 +2184,7 @@
         {"num":4,"name":"end_position_lat","base":"SINT32","type":"COORDINATE","UOM":"SEMICIRCLES"},
         {"num":5,"name":"end_position_long","base":"SINT32","type":"COORDINATE","UOM":"SEMICIRCLES"},
         {"num":7,"name":"club_type","base":"UINT32"},
-        {"num":253,"name":"timestamp","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"}
+        {"num":253,"name":"timestamp","base":"UINT32","type":"DateTime","UOM":"SECONDS"}
       ]
     },
     {
@@ -2165,7 +2193,7 @@
       "fields": [
         {"num":0,"name":"latitude","base":"SINT32","type":"COORDINATE","UOM":"SEMICIRCLES"},
         {"num":1,"name":"longitude","base":"SINT32","type":"COORDINATE","UOM":"SEMICIRCLES"},
-        {"num":253,"name":"timestamp","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"},
+        {"num":253,"name":"timestamp","base":"UINT32","type":"DateTime","UOM":"SECONDS"},
         {"num":254,"name":"message_index","base":"UINT16"}
       ]
     },
@@ -2173,7 +2201,7 @@
       "num": 198,
       "name": "TRUE_UP",
       "fields": [
-        {"num":0,"name":"snapshot_timestamp","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"},
+        {"num":0,"name":"snapshot_timestamp","base":"UINT32","type":"DateTime","UOM":"SECONDS"},
         {"num":1,"name":"calories","base":"UINT16","UOM":"CALORIES"},
         {"num":2,"name":"distance","base":"UINT32","UOM":"CENTIMETER"},
         {"num":3,"name":"steps","base":"UINT32"},
@@ -2184,10 +2212,10 @@
         {"num":8,"name":"unk_8","base":"UINT16"},
         {"num":9,"name":"unk_9","base":"UINT16"},
         {"num":10,"name":"resting_calories","base":"UINT16","UOM":"CALORIES"},
-        {"num":11,"name":"snapshot_local_timestamp","base":"UINT32","UOM":"SECONDS"},
+        {"num":11,"name":"snapshot_local_timestamp","base":"UINT32","type":"LocalDateTime","UOM":"SECONDS"},
         {"num":12,"name":"unk_12","base":"UINT16"},
         {"num":13,"name":"unk_13","base":"UINT16"},
-        {"num":14,"name":"resting_heart_rate_today_timestamp","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"},
+        {"num":14,"name":"resting_heart_rate_today_timestamp","base":"UINT32","type":"DateTime","UOM":"SECONDS"},
         {"num":15,"name":"resting_heart_rate","base":"UINT8","UOM":"BEATS_PER_MINUTE"},
         {"num":16,"name":"resting_heart_rate_today","base":"UINT8","UOM":"BEATS_PER_MINUTE"},
         {"num":17,"name":"unk_17","base":"ENUM"},
@@ -2205,7 +2233,7 @@
         {"num":37,"name":"unk_37","base":"ENUM"},
         {"num":38,"name":"unk_38","base":"UINT16"},
         {"num":39,"name":"unk_39","base":"UINT16"},
-        {"num":253,"name":"timestamp","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"},
+        {"num":253,"name":"timestamp","base":"UINT32","type":"DateTime","UOM":"SECONDS"},
         {"num":254,"name":"message_index","base":"UINT16"}
       ]
     },
@@ -2216,7 +2244,7 @@
         {"num":0,"name":"screen_index","base":"UINT8"},
         {"num":1,"name":"field_count","base":"UINT8"},
         {"num":2,"name":"layout","base":"ENUM"},
-        {"num":3,"name":"screen_enabled","base":"ENUM","type":"BOOLEAN"}
+        {"num":3,"name":"screen_enabled","base":"ENUM","type":"Bool"}
       ]
     },
     {
@@ -2238,14 +2266,14 @@
         {"num":0,"name":"screen_index","base":"UINT8"},
         {"num":1,"name":"concept_field","base":"BYTE"},
         {"num":2,"name":"field_id","base":"UINT8"},
-        {"num":3,"name":"concept_count","base":"UINT8"},
+        {"num":3,"name":"concept_index","base":"UINT8"},
         {"num":4,"name":"data_page","base":"UINT8"},
         {"num":5,"name":"concept_key","base":"UINT8"},
         {"num":6,"name":"scaling","base":"UINT8"},
         {"num":8,"name":"data_units","base":"ENUM"},
         {"num":9,"name":"qualifier","base":"ENUM"},
         {"num":10,"name":"descriptor","base":"ENUM"},
-        {"num":11,"name":"is_signed","base":"ENUM","type":"BOOLEAN"}
+        {"num":11,"name":"is_signed","base":"ENUM","type":"Bool"}
       ]
     },
     {
@@ -2270,7 +2298,7 @@
     },
     {
       "num": 207,
-      "name": "DEVELOPER_DATA",
+      "name": "DEVELOPER_DATA_ID",
       "fields": [
         {"num":0,"name":"developer_id","base":"BYTE","arrayLen":16},
         {"num":1,"name":"application_id","base":"BYTE","arrayLen":16},
@@ -2291,7 +2319,7 @@
         {"num":5,"name":"calibrated_mag_x","base":"FLOAT32","arrayLen":0,"UOM":"GAUSS"},
         {"num":6,"name":"calibrated_mag_y","base":"FLOAT32","arrayLen":0,"UOM":"GAUSS"},
         {"num":7,"name":"calibrated_mag_z","base":"FLOAT32","arrayLen":0,"UOM":"GAUSS"},
-        {"num":253,"name":"timestamp","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"}
+        {"num":253,"name":"timestamp","base":"UINT32","type":"DateTime","UOM":"SECONDS"}
       ]
     },
     {
@@ -2301,7 +2329,8 @@
         {"num":0,"name":"timestamp_ms","base":"UINT16","UOM":"MILLISECONDS"},
         {"num":1,"name":"sample_time_offset","base":"UINT16","arrayLen":0,"UOM":"MILLISECONDS"},
         {"num":2,"name":"baro_pres","base":"UINT32","arrayLen":0,"UOM":"PASCAL"},
-        {"num":253,"name":"timestamp","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"}
+        {"num":3,"name":"enhanced_altitude","base":"UINT32","scale":5,"offset":500,"arrayLen":0},
+        {"num":253,"name":"timestamp","base":"UINT32","type":"DateTime","UOM":"SECONDS"}
       ]
     },
     {
@@ -2313,7 +2342,7 @@
         {"num":2,"name":"calibration_divisor","base":"UINT32","UOM":"COUNT"},
         {"num":3,"name":"level_shift","base":"UINT32"},
         {"num":4,"name":"offset_cal","base":"SINT32"},
-        {"num":253,"name":"timestamp","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"}
+        {"num":253,"name":"timestamp","base":"UINT32","type":"DateTime","UOM":"SECONDS"}
       ]
     },
     {
@@ -2322,16 +2351,16 @@
       "fields": [
         {"num":0,"name":"resting_heart_rate","base":"UINT8","UOM":"BEATS_PER_MINUTE"},
         {"num":1,"name":"current_day_resting_heart_rate","base":"UINT8","UOM":"BEATS_PER_MINUTE"},
-        {"num":253,"name":"timestamp","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"}
+        {"num":253,"name":"timestamp","base":"UINT32","type":"DateTime","UOM":"SECONDS"}
       ]
     },
     {
       "num": 216,
       "name": "TIME_IN_ZONE",
       "fields": [
-        {"num":0,"name":"reference_message","base":"UINT16"},
+        {"num":0,"name":"reference_mesg","base":"UINT16"},
         {"num":1,"name":"reference_index","base":"UINT16"},
-        {"num":2,"name":"time_in_zone","base":"UINT32","scale":1000,"arrayLen":0,"UOM":"SECONDS"},
+        {"num":2,"name":"time_in_hr_zone","base":"UINT32","scale":1000,"arrayLen":0,"UOM":"SECONDS"},
         {"num":3,"name":"time_in_speed_zone","base":"UINT32","scale":1000,"arrayLen":0,"UOM":"SECONDS"},
         {"num":4,"name":"time_in_cadence_zone","base":"UINT32","scale":1000,"arrayLen":0,"UOM":"SECONDS"},
         {"num":5,"name":"time_in_power_zone","base":"UINT32","scale":1000,"arrayLen":0,"UOM":"SECONDS"},
@@ -2345,7 +2374,7 @@
         {"num":13,"name":"threshold_heart_rate","base":"UINT8"},
         {"num":14,"name":"pwr_calc_type","base":"ENUM"},
         {"num":15,"name":"functional_threshold_power","base":"UINT16"},
-        {"num":253,"name":"timestamp","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"}
+        {"num":253,"name":"timestamp","base":"UINT32","type":"DateTime","UOM":"SECONDS"}
       ]
     },
     {
@@ -2354,7 +2383,7 @@
       "fields": [
         {"num":0,"name":"message_number","base":"UINT16"},
         {"num":2,"name":"field_number","base":"UINT8"},
-        {"num":253,"name":"timestamp","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"}
+        {"num":253,"name":"timestamp","base":"UINT32","type":"DateTime","UOM":"SECONDS"}
       ]
     },
     {
@@ -2363,15 +2392,15 @@
       "fields": [
         {"num":0,"name":"time","base":"UINT16","type":"ALARM"},
         {"num":1,"name":"repeat","base":"UINT32Z"},
-        {"num":2,"name":"enabled","base":"ENUM","type":"BOOLEAN"},
+        {"num":2,"name":"enabled","base":"ENUM","type":"Bool"},
         {"num":3,"name":"sound","base":"ENUM","type":"Tone"},
-        {"num":4,"name":"backlight","base":"ENUM","type":"BOOLEAN"},
-        {"num":5,"name":"time_created","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"},
+        {"num":4,"name":"backlight","base":"ENUM","type":"Bool"},
+        {"num":5,"name":"time_created","base":"UINT32","type":"DateTime","UOM":"SECONDS"},
         {"num":6,"name":"message","base":"STRING"},
         {"num":7,"name":"snooze","base":"UINT8"},
         {"num":8,"name":"label","base":"ENUM","type":"AlarmLabel"},
-        {"num":11,"name":"time_updated","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"},
-        {"num":12,"name":"smart_wake","base":"ENUM","type":"BOOLEAN"},
+        {"num":11,"name":"time_updated","base":"UINT32","type":"DateTime","UOM":"SECONDS"},
+        {"num":12,"name":"smart_wake","base":"ENUM","type":"Bool"},
         {"num":254,"name":"message_index","base":"UINT16"}
       ]
     },
@@ -2383,13 +2412,13 @@
         {"num":3,"name":"repetitions","base":"UINT16"},
         {"num":4,"name":"weight","base":"UINT16","scale":16,"UOM":"KILOGRAM"},
         {"num":5,"name":"set_type","base":"UINT8"},
-        {"num":6,"name":"start_time","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"},
+        {"num":6,"name":"start_time","base":"UINT32","type":"DateTime","UOM":"SECONDS"},
         {"num":7,"name":"category","base":"UINT16","type":"ExerciseCategory"},
         {"num":8,"name":"category_subtype","base":"UINT16","arrayLen":0},
         {"num":9,"name":"weight_display_unit","base":"UINT16"},
         {"num":10,"name":"message_index","base":"UINT16"},
         {"num":11,"name":"wkt_step_index","base":"UINT16"},
-        {"num":254,"name":"timestamp","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"}
+        {"num":254,"name":"timestamp","base":"UINT32","type":"DateTime","UOM":"SECONDS"}
       ]
     },
     {
@@ -2397,7 +2426,7 @@
       "name": "STRESS_LEVEL",
       "fields": [
         {"num":0,"name":"stress_level_value","base":"SINT16"},
-        {"num":1,"name":"stress_level_time","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"},
+        {"num":1,"name":"stress_level_time","base":"UINT32","type":"DateTime","UOM":"SECONDS"},
         {"num":2,"name":"average_stress","base":"SINT8"},
         {"num":3,"name":"body_energy","base":"SINT8"}
       ]
@@ -2406,13 +2435,13 @@
       "num": 229,
       "name": "MAX_MET_DATA",
       "fields": [
-        {"num":0,"name":"update_time","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"},
+        {"num":0,"name":"update_time","base":"UINT32","type":"DateTime","UOM":"SECONDS"},
         {"num":2,"name":"vo2_max","base":"UINT16","scale":10,"UOM":"ML_KG_MIN"},
         {"num":3,"name":"fitness_age","base":"SINT8","UOM":"YEARS"},
         {"num":5,"name":"sport","base":"ENUM"},
         {"num":6,"name":"sub_sport","base":"ENUM"},
         {"num":8,"name":"max_met_category","base":"ENUM"},
-        {"num":9,"name":"calibrated_data","base":"ENUM"},
+        {"num":9,"name":"calibrated_data","base":"ENUM","type":"Bool"},
         {"num":12,"name":"hr_source","base":"ENUM"},
         {"num":13,"name":"speed_source","base":"ENUM"}
       ]
@@ -2423,16 +2452,26 @@
       "fields": [
         {"num":0,"name":"distance","base":"FLOAT32","arrayLen":0},
         {"num":1,"name":"time","base":"SINT32","arrayLen":0},
-        {"num":2,"name":"status","base":"ENUM","arrayLen":0},
+        {"num":2,"name":"status","base":"ENUM","type":"Bool","arrayLen":0},
         {"num":3,"name":"alert","base":"ENUM","arrayLen":0}
+      ]
+    },
+    {
+      "num": 232,
+      "name": "LOAD_HISTORY",
+      "fields": [
+        {"num":5,"name":"weekly_load","base":"UINT16"},
+        {"num":6,"name":"target_load_min","base":"UINT16"},
+        {"num":7,"name":"target_load_max","base":"UINT16"},
+        {"num":253,"name":"timestamp","base":"UINT32","type":"DateTime","UOM":"SECONDS"}
       ]
     },
     {
       "num": 241,
       "name": "METRICS_TIME",
       "fields": [
-        {"num":0,"name":"local_timestamp","base":"UINT32","UOM":"SECONDS"},
-        {"num":253,"name":"timestamp","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"},
+        {"num":0,"name":"local_timestamp","base":"UINT32","type":"LocalDateTime","UOM":"SECONDS"},
+        {"num":253,"name":"timestamp","base":"UINT32","type":"DateTime","UOM":"SECONDS"},
         {"num":254,"name":"message_index","base":"UINT16"}
       ]
     },
@@ -2440,7 +2479,7 @@
       "num": 243,
       "name": "MUSIC_INFO",
       "fields": [
-        {"num":0,"name":"start_time","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"},
+        {"num":0,"name":"start_time","base":"UINT32","type":"DateTime","UOM":"SECONDS"},
         {"num":2,"name":"title","base":"STRING"},
         {"num":3,"name":"artist","base":"STRING"},
         {"num":4,"name":"genre","base":"STRING"},
@@ -2460,10 +2499,10 @@
         {"num":6,"name":"po2_warn","base":"UINT8","scale":100,"UOM":"PERCENT"},
         {"num":7,"name":"po2_critical","base":"UINT8","scale":100,"UOM":"PERCENT"},
         {"num":8,"name":"po2_deco","base":"UINT8","scale":100,"UOM":"PERCENT"},
-        {"num":9,"name":"safety_stop_enabled","base":"ENUM"},
+        {"num":9,"name":"safety_stop_enabled","base":"ENUM","type":"Bool"},
         {"num":10,"name":"bottom_depth","base":"FLOAT32"},
         {"num":11,"name":"bottom_time","base":"UINT32"},
-        {"num":12,"name":"apnea_countdown_enabled","base":"ENUM"},
+        {"num":12,"name":"apnea_countdown_enabled","base":"ENUM","type":"Bool"},
         {"num":13,"name":"apnea_countdown_time","base":"UINT32"},
         {"num":14,"name":"backlight_mode","base":"ENUM"},
         {"num":15,"name":"backlight_brightness","base":"UINT8"},
@@ -2480,13 +2519,13 @@
         {"num":26,"name":"ccr_high_setpoint","base":"UINT8","scale":100,"UOM":"PERCENT"},
         {"num":27,"name":"ccr_high_setpoint_depth","base":"UINT32","scale":1000,"UOM":"METER"},
         {"num":29,"name":"gas_consumption_display","base":"ENUM"},
-        {"num":30,"name":"up_key_enabled","base":"ENUM"},
-        {"num":31,"name":"compass","base":"ENUM"},
+        {"num":30,"name":"up_key_enabled","base":"ENUM","type":"Bool"},
+        {"num":31,"name":"compass","base":"ENUM","type":"Bool"},
         {"num":35,"name":"dive_sounds","base":"ENUM"},
         {"num":36,"name":"last_stop_multiple","base":"UINT8","scale":10},
         {"num":37,"name":"no_fly_time_mode","base":"ENUM"},
-        {"num":38,"name":"subwave_location","base":"ENUM"},
-        {"num":39,"name":"subwave_messaging","base":"ENUM"},
+        {"num":38,"name":"subwave_location","base":"ENUM","type":"Bool"},
+        {"num":39,"name":"subwave_messaging","base":"ENUM","type":"Bool"},
         {"num":41,"name":"hot_key_1","base":"ENUM"},
         {"num":42,"name":"hot_key_2","base":"ENUM"},
         {"num":43,"name":"hot_key_3","base":"ENUM"},
@@ -2500,9 +2539,9 @@
         {"num":53,"name":"always_on_display_brightness","base":"ENUM"},
         {"num":55,"name":"pool_length","base":"UINT16"},
         {"num":56,"name":"pool_unit","base":"ENUM"},
-        {"num":57,"name":"deco_lockout","base":"ENUM"},
+        {"num":57,"name":"deco_lockout","base":"ENUM","type":"Bool"},
         {"num":60,"name":"subwave_favorites","base":"ENUM","arrayLen":30},
-        {"num":253,"name":"timestamp","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"},
+        {"num":253,"name":"timestamp","base":"UINT32","type":"DateTime","UOM":"SECONDS"},
         {"num":254,"name":"message_index","base":"UINT16"}
       ]
     },
@@ -2525,7 +2564,7 @@
         {"num":1,"name":"latitude","base":"SINT32","type":"COORDINATE","UOM":"SEMICIRCLES"},
         {"num":2,"name":"longitude","base":"SINT32","type":"COORDINATE","UOM":"SEMICIRCLES"},
         {"num":3,"name":"data","base":"UINT32"},
-        {"num":253,"name":"timestamp","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"}
+        {"num":253,"name":"timestamp","base":"UINT32","type":"DateTime","UOM":"SECONDS"}
       ]
     },
     {
@@ -2534,15 +2573,15 @@
       "fields": [
         {"num":0,"name":"depth","base":"UINT32","scale":1000,"UOM":"METER"},
         {"num":1,"name":"time","base":"SINT32","UOM":"SECONDS"},
-        {"num":2,"name":"enabled","base":"ENUM","type":"BOOLEAN"},
+        {"num":2,"name":"enabled","base":"ENUM","type":"Bool"},
         {"num":3,"name":"alarm_type","base":"ENUM"},
         {"num":4,"name":"sound","base":"ENUM"},
         {"num":5,"name":"dive_types","base":"ENUM","arrayLen":0},
         {"num":6,"name":"id","base":"UINT32"},
-        {"num":7,"name":"popup_enabled","base":"ENUM","type":"BOOLEAN"},
-        {"num":8,"name":"trigger_on_descent","base":"ENUM","type":"BOOLEAN"},
-        {"num":9,"name":"trigger_on_ascent","base":"ENUM","type":"BOOLEAN"},
-        {"num":10,"name":"repeating","base":"ENUM","type":"BOOLEAN"},
+        {"num":7,"name":"popup_enabled","base":"ENUM","type":"Bool"},
+        {"num":8,"name":"trigger_on_descent","base":"ENUM","type":"Bool"},
+        {"num":9,"name":"trigger_on_ascent","base":"ENUM","type":"Bool"},
+        {"num":10,"name":"repeating","base":"ENUM","type":"Bool"},
         {"num":11,"name":"speed","base":"SINT32","scale":1000,"UOM":"MILES_PER_SECOND"},
         {"num":13,"name":"intensity","base":"ENUM"},
         {"num":254,"name":"message_index","base":"UINT16"}
@@ -2562,10 +2601,10 @@
       "num": 266,
       "name": "AUDIO_PROMPTS",
       "fields": [
-        {"num":1,"name":"lap_alerts","base":"ENUM"},
+        {"num":1,"name":"lap_alerts","base":"ENUM","type":"Bool"},
         {"num":10,"name":"dialect","base":"ENUM"},
-        {"num":12,"name":"activity_alerts","base":"ENUM"},
-        {"num":18,"name":"workout_alerts","base":"ENUM"}
+        {"num":12,"name":"activity_alerts","base":"ENUM","type":"Bool"},
+        {"num":18,"name":"workout_alerts","base":"ENUM","type":"Bool"}
       ]
     },
     {
@@ -2594,17 +2633,17 @@
         {"num":23,"name":"max_ascent_rate","base":"UINT32","scale":1000,"UOM":"METER_PER_SECOND"},
         {"num":24,"name":"max_descent_rate","base":"UINT32","scale":1000,"UOM":"METER_PER_SECOND"},
         {"num":25,"name":"hang_time","base":"UINT32","scale":1000,"UOM":"SECONDS"},
-        {"num":253,"name":"timestamp","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"}
+        {"num":253,"name":"timestamp","base":"UINT32","type":"DateTime","UOM":"SECONDS"}
       ]
     },
     {
       "num": 269,
-      "name": "SPO2",
+      "name": "SPO2_DATA",
       "fields": [
         {"num":0,"name":"reading_spo2","base":"UINT8","UOM":"PERCENT"},
         {"num":1,"name":"reading_confidence","base":"UINT8"},
         {"num":2,"name":"mode","base":"ENUM"},
-        {"num":253,"name":"timestamp","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"}
+        {"num":253,"name":"timestamp","base":"UINT32","type":"DateTime","UOM":"SECONDS"}
       ]
     },
     {
@@ -2613,10 +2652,10 @@
       "fields": [
         {"num":0,"name":"unk0","base":"UINT8"},
         {"num":1,"name":"sample_length","base":"UINT16","UOM":"SECONDS"},
-        {"num":2,"name":"local_timestamp","base":"UINT32","UOM":"SECONDS"},
+        {"num":2,"name":"local_timestamp","base":"UINT32","type":"LocalDateTime","UOM":"SECONDS"},
         {"num":3,"name":"unk3","base":"ENUM"},
         {"num":4,"name":"version","base":"STRING"},
-        {"num":253,"name":"timestamp","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"}
+        {"num":253,"name":"timestamp","base":"UINT32","type":"DateTime","UOM":"SECONDS"}
       ]
     },
     {
@@ -2628,10 +2667,10 @@
     },
     {
       "num": 275,
-      "name": "SLEEP_STAGE",
+      "name": "SLEEP_LEVEL",
       "fields": [
-        {"num":0,"name":"sleep_stage","base":"ENUM","type":"SleepStage"},
-        {"num":253,"name":"timestamp","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"}
+        {"num":0,"name":"sleep_level","base":"ENUM","type":"SleepLevel"},
+        {"num":253,"name":"timestamp","base":"UINT32","type":"DateTime","UOM":"SECONDS"}
       ]
     },
     {
@@ -2639,7 +2678,7 @@
       "name": "MONITORING_ALTITUDE",
       "fields": [
         {"num":0,"name":"altitude","base":"UINT32","scale":5,"offset":500,"UOM":"METER"},
-        {"num":253,"name":"timestamp","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"}
+        {"num":253,"name":"timestamp","base":"UINT32","type":"DateTime","UOM":"SECONDS"}
       ]
     },
     {
@@ -2648,7 +2687,7 @@
       "fields": [
         {"num":4,"name":"acclimatization_altitude","base":"UINT16"},
         {"num":11,"name":"altitude","base":"UINT16"},
-        {"num":253,"name":"timestamp","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"}
+        {"num":253,"name":"timestamp","base":"UINT32","type":"DateTime","UOM":"SECONDS"}
       ]
     },
     {
@@ -2656,7 +2695,7 @@
       "name": "DAILY_ALTITUDE",
       "fields": [
         {"num":1,"name":"altitude","base":"SINT32","scale":65536},
-        {"num":253,"name":"timestamp","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"},
+        {"num":253,"name":"timestamp","base":"UINT32","type":"DateTime","UOM":"SECONDS"},
         {"num":254,"name":"message_index","base":"UINT16"}
       ]
     },
@@ -2665,7 +2704,7 @@
       "name": "METRIC_RECOVERY",
       "fields": [
         {"num":0,"name":"recovery_minutes","base":"UINT16","UOM":"MINUTES"},
-        {"num":1,"name":"recovery_start","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"}
+        {"num":1,"name":"recovery_start","base":"UINT32","type":"DateTime","UOM":"SECONDS"}
       ]
     },
     {
@@ -2673,7 +2712,7 @@
       "name": "JUMP",
       "fields": [
         {"num":0,"name":"distance","base":"FLOAT32","UOM":"METER"},
-        {"num":1,"name":"heigh","base":"FLOAT32","UOM":"METER"},
+        {"num":1,"name":"height","base":"FLOAT32","UOM":"METER"},
         {"num":2,"name":"rotations","base":"UINT8"},
         {"num":3,"name":"hang_time","base":"FLOAT32","UOM":"SECONDS"},
         {"num":4,"name":"score","base":"FLOAT32"},
@@ -2681,7 +2720,7 @@
         {"num":6,"name":"position_long","base":"SINT32","type":"COORDINATE","UOM":"SEMICIRCLES"},
         {"num":7,"name":"speed","base":"UINT16","scale":1000,"UOM":"METER_PER_SECOND"},
         {"num":8,"name":"enhanced_speed","base":"UINT32","scale":1000,"UOM":"METER_PER_SECOND"},
-        {"num":253,"name":"timestamp","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"}
+        {"num":253,"name":"timestamp","base":"UINT32","type":"DateTime","UOM":"SECONDS"}
       ]
     },
     {
@@ -2690,7 +2729,7 @@
       "fields": [
         {"num":0,"name":"temperature","base":"SINT8","UOM":"CELSIUS"},
         {"num":1,"name":"humidity","base":"SINT8","UOM":"PERCENT"},
-        {"num":253,"name":"timestamp","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"},
+        {"num":253,"name":"timestamp","base":"UINT32","type":"DateTime","UOM":"SECONDS"},
         {"num":254,"name":"message_index","base":"UINT16"}
       ]
     },
@@ -2703,7 +2742,7 @@
         {"num":2,"name":"zero_cross_cnt","base":"UINT16"},
         {"num":3,"name":"instance","base":"UINT8"},
         {"num":4,"name":"time_above_threshold","base":"UINT16"},
-        {"num":253,"name":"timestamp","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"}
+        {"num":253,"name":"timestamp","base":"UINT32","type":"DateTime","UOM":"SECONDS"}
       ]
     },
     {
@@ -2712,7 +2751,7 @@
       "fields": [
         {"num":0,"name":"timestamp_ms","base":"UINT16","UOM":"MILLISECONDS"},
         {"num":1,"name":"time","base":"UINT16","arrayLen":0,"UOM":"MILLISECONDS"},
-        {"num":253,"name":"timestamp","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"}
+        {"num":253,"name":"timestamp","base":"UINT32","type":"DateTime","UOM":"SECONDS"}
       ]
     },
     {
@@ -2724,7 +2763,7 @@
         {"num":2,"name":"monthly_load_anaerobic","base":"SINT32","scale":65536},
         {"num":7,"name":"monthly_load_anaerobic_target_min","base":"UINT16"},
         {"num":8,"name":"monthly_load_anaerobic_target_max","base":"UINT16"},
-        {"num":253,"name":"timestamp","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"},
+        {"num":253,"name":"timestamp","base":"UINT32","type":"DateTime","UOM":"SECONDS"},
         {"num":254,"name":"message_index","base":"UINT16"}
       ]
     },
@@ -2733,7 +2772,7 @@
       "name": "RESPIRATION_RATE",
       "fields": [
         {"num":0,"name":"respiration_rate","base":"SINT16","scale":100,"UOM":"BREATHS_PER_MINUTE"},
-        {"num":253,"name":"timestamp","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"}
+        {"num":253,"name":"timestamp","base":"UINT32","type":"DateTime","UOM":"SECONDS"}
       ]
     },
     {
@@ -2746,7 +2785,7 @@
         {"num":3,"name":"accel_y","base":"SINT16","arrayLen":0},
         {"num":4,"name":"accel_z","base":"SINT16","arrayLen":0},
         {"num":5,"name":"timestamp_32k","base":"UINT32"},
-        {"num":253,"name":"timestamp","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"}
+        {"num":253,"name":"timestamp","base":"UINT32","type":"DateTime","UOM":"SECONDS"}
       ]
     },
     {
@@ -2755,7 +2794,7 @@
       "fields": [
         {"num":0,"name":"processing_interval","base":"UINT16","UOM":"SECONDS"},
         {"num":1,"name":"steps","base":"UINT32","arrayLen":0,"UOM":"STEPS"},
-        {"num":253,"name":"timestamp","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"}
+        {"num":253,"name":"timestamp","base":"UINT32","type":"DateTime","UOM":"SECONDS"}
       ]
     },
     {
@@ -2765,7 +2804,7 @@
         {"num":0,"name":"processing_interval","base":"UINT16","UOM":"SECONDS"},
         {"num":1,"name":"reading_spo2","base":"UINT8","arrayLen":0,"UOM":"PERCENT"},
         {"num":2,"name":"confidence","base":"UINT8","arrayLen":0},
-        {"num":253,"name":"timestamp","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"}
+        {"num":253,"name":"timestamp","base":"UINT32","type":"DateTime","UOM":"SECONDS"}
       ]
     },
     {
@@ -2774,7 +2813,7 @@
       "fields": [
         {"num":0,"name":"processing_interval","base":"UINT16","UOM":"SECONDS"},
         {"num":1,"name":"stress_level","base":"SINT8","arrayLen":0,"UOM":"SECONDS"},
-        {"num":253,"name":"timestamp","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"}
+        {"num":253,"name":"timestamp","base":"UINT32","type":"DateTime","UOM":"SECONDS"}
       ]
     },
     {
@@ -2783,7 +2822,7 @@
       "fields": [
         {"num":0,"name":"processing_interval","base":"UINT16","UOM":"SECONDS"},
         {"num":1,"name":"respiration_rate","base":"SINT16","scale":100,"arrayLen":0,"UOM":"BREATHS_PER_MINUTE"},
-        {"num":253,"name":"timestamp","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"}
+        {"num":253,"name":"timestamp","base":"UINT32","type":"DateTime","UOM":"SECONDS"}
       ]
     },
     {
@@ -2793,15 +2832,15 @@
         {"num":0,"name":"processing_interval","base":"UINT16","UOM":"SECONDS"},
         {"num":1,"name":"status","base":"UINT8"},
         {"num":2,"name":"heart_rate","base":"UINT8","arrayLen":0,"UOM":"BEATS_PER_MINUTE"},
-        {"num":253,"name":"timestamp","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"}
+        {"num":253,"name":"timestamp","base":"UINT32","type":"DateTime","UOM":"SECONDS"}
       ]
     },
     {
       "num": 309,
       "name": "MTB_CX",
       "fields": [
-        {"num":1,"name":"grit_flow_jump_recording","base":"ENUM"},
-        {"num":2,"name":"jump_alerts","base":"ENUM"}
+        {"num":1,"name":"grit_flow_jump_recording","base":"ENUM","type":"Bool"},
+        {"num":2,"name":"jump_alerts","base":"ENUM","type":"Bool"}
       ]
     },
     {
@@ -2844,7 +2883,7 @@
         {"num":3,"name":"total_distance","base":"UINT32","scale":100,"UOM":"METER"},
         {"num":4,"name":"avg_speed","base":"UINT32","scale":1000,"UOM":"METER_PER_SECOND"},
         {"num":7,"name":"start_distance","base":"UINT32","UOM":"CENTIMETER"},
-        {"num":9,"name":"start_time","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"},
+        {"num":9,"name":"start_time","base":"UINT32","type":"DateTime","UOM":"SECONDS"},
         {"num":11,"name":"sport","base":"ENUM"},
         {"num":12,"name":"sub_sport","base":"ENUM"},
         {"num":13,"name":"total_ascent","base":"UINT16","UOM":"METER"},
@@ -2861,10 +2900,11 @@
         {"num":24,"name":"end_position_long","base":"SINT32","type":"COORDINATE","UOM":"SEMICIRCLES"},
         {"num":25,"name":"max_speed","base":"UINT32","scale":1000,"UOM":"METER_PER_SECOND"},
         {"num":26,"name":"avg_vert_speed","base":"SINT32","scale":1000,"UOM":"METER_PER_SECOND"},
-        {"num":27,"name":"end_time","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"},
+        {"num":27,"name":"end_time","base":"UINT32","type":"DateTime","UOM":"SECONDS"},
         {"num":28,"name":"total_calories","base":"UINT32","UOM":"KCAL"},
         {"num":29,"name":"avg_cadence","base":"UINT16","scale":128,"UOM":"REVOLUTIONS_PER_MINUTE"},
         {"num":30,"name":"max_cadence","base":"UINT16","scale":128,"UOM":"REVOLUTIONS_PER_MINUTE"},
+        {"num":31,"name":"total_cycles","base":"UINT32"},
         {"num":32,"name":"avg_temperature","base":"SINT8","UOM":"CELSIUS"},
         {"num":33,"name":"max_temperature","base":"SINT8","UOM":"CELSIUS"},
         {"num":34,"name":"min_temperature","base":"SINT8","UOM":"CELSIUS"},
@@ -2877,14 +2917,34 @@
         {"num":41,"name":"max_power","base":"UINT16","UOM":"WATT"},
         {"num":42,"name":"normalized_power","base":"UINT16","UOM":"WATT"},
         {"num":43,"name":"left_right_balance","base":"UINT16"},
+        {"num":44,"name":"time_standing","base":"UINT32","scale":1000},
         {"num":45,"name":"avg_left_pco","base":"SINT8","UOM":"MILLIMETER"},
         {"num":46,"name":"avg_right_pco","base":"SINT8","UOM":"MILLIMETER"},
+        {"num":47,"name":"avg_left_power_phase","base":"UINT8","scale":0.7111111,"arrayLen":0},
+        {"num":48,"name":"avg_left_power_phase_peak","base":"UINT8","scale":0.7111111,"arrayLen":0},
+        {"num":49,"name":"avg_right_power_phase","base":"UINT8","scale":0.7111111,"arrayLen":0},
+        {"num":50,"name":"avg_right_power_phase_peak","base":"UINT8","scale":0.7111111,"arrayLen":0},
+        {"num":51,"name":"avg_power_position","base":"UINT16","arrayLen":0},
+        {"num":52,"name":"max_power_position","base":"UINT16","arrayLen":0},
         {"num":53,"name":"avg_left_torque_effectiveness","base":"UINT8","scale":2,"UOM":"PERCENT"},
         {"num":54,"name":"avg_right_torque_effectiveness","base":"UINT8","scale":2,"UOM":"PERCENT"},
         {"num":55,"name":"avg_left_pedal_smoothness","base":"UINT8","scale":2,"UOM":"PERCENT"},
         {"num":56,"name":"avg_right_pedal_smoothness","base":"UINT8","scale":2,"UOM":"PERCENT"},
+        {"num":57,"name":"avg_combined_pedal_smoothness","base":"UINT8","scale":2},
+        {"num":58,"name":"avg_flow","base":"FLOAT32"},
+        {"num":59,"name":"total_grit","base":"FLOAT32"},
+        {"num":62,"name":"swim_stroke","base":"ENUM"},
+        {"num":63,"name":"num_active_lengths","base":"UINT16"},
+        {"num":64,"name":"avg_swolf","base":"UINT16"},
+        {"num":65,"name":"avg_stroke_distance","base":"UINT16","scale":100},
+        {"num":66,"name":"avg_strokes_per_length","base":"UINT16","scale":10},
         {"num":67,"name":"first_lap_index","base":"UINT16"},
         {"num":68,"name":"num_laps","base":"UINT16"},
+        {"num":69,"name":"climb_grading_scale","base":"ENUM"},
+        {"num":70,"name":"climb_grade_value","base":"UINT32"},
+        {"num":71,"name":"status","base":"ENUM"},
+        {"num":72,"name":"num_falls","base":"UINT16"},
+        {"num":73,"name":"climb_send","base":"ENUM","type":"Bool"},
         {"num":74,"name":"start_elevation","base":"UINT32","scale":5,"offset":500,"UOM":"METER"},
         {"num":78,"name":"active_time","base":"UINT32","scale":1000,"UOM":"SECONDS"},
         {"num":79,"name":"metabolic_calories","base":"UINT16","UOM":"KCAL"},
@@ -2897,12 +2957,22 @@
         {"num":94,"name":"avg_stress","base":"UINT16"},
         {"num":95,"name":"max_stress","base":"UINT16"},
         {"num":99,"name":"avg_vam","base":"UINT16","scale":1000,"UOM":"METER_PER_SECOND"},
+        {"num":104,"name":"jump_count","base":"UINT8"},
         {"num":107,"name":"stamina_potential_start","base":"UINT8","UOM":"PERCENT"},
         {"num":108,"name":"stamina_potential_end","base":"UINT8","UOM":"PERCENT"},
         {"num":109,"name":"stamina_available_minimum","base":"UINT8","UOM":"PERCENT"},
         {"num":110,"name":"total_moving_time","base":"UINT32","scale":1000,"UOM":"SECONDS"},
+        {"num":112,"name":"dive_section_type","base":"ENUM"},
+        {"num":113,"name":"avg_ascent_rate","base":"UINT32","scale":1000},
+        {"num":114,"name":"max_ascent_rate","base":"UINT32","scale":1000},
+        {"num":115,"name":"avg_descent_rate","base":"UINT32","scale":1000},
+        {"num":116,"name":"max_descent_rate","base":"UINT32","scale":1000},
         {"num":117,"name":"total_ascent_time","base":"UINT32","scale":1000,"UOM":"SECONDS"},
         {"num":118,"name":"total_descent_time","base":"UINT32","scale":1000,"UOM":"SECONDS"},
+        {"num":119,"name":"total_hang_time","base":"UINT32","scale":1000},
+        {"num":120,"name":"apnea_discipline","base":"ENUM"},
+        {"num":121,"name":"avg_depth","base":"UINT32","scale":1000},
+        {"num":122,"name":"max_depth","base":"UINT32","scale":1000},
         {"num":124,"name":"min_heart_rate","base":"UINT8","UOM":"BEATS_PER_MINUTE"},
         {"num":127,"name":"surface_interval","base":"UINT32","UOM":"SECONDS"},
         {"num":130,"name":"step_speed_loss","base":"UINT16","scale":100,"UOM":"CENTIMETER_PER_SECOND"},
@@ -2910,7 +2980,12 @@
         {"num":135,"name":"avg_force","base":"SINT32","scale":1000,"UOM":"NEWTON"},
         {"num":136,"name":"max_force","base":"SINT32","scale":1000,"UOM":"NEWTON"},
         {"num":140,"name":"normalized_force","base":"SINT32","scale":1000,"UOM":"NEWTON"},
-        {"num":253,"name":"timestamp","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"},
+        {"num":142,"name":"total_fractional_cycles","base":"UINT8","scale":128},
+        {"num":144,"name":"avg_stance_time_percent","base":"UINT16","scale":100},
+        {"num":168,"name":"total_anaerobic_training_effect","base":"UINT8","scale":10},
+        {"num":169,"name":"front_gear_shift_count","base":"UINT16"},
+        {"num":170,"name":"rear_gear_shift_count","base":"UINT16"},
+        {"num":253,"name":"timestamp","base":"UINT32","type":"DateTime","UOM":"SECONDS"},
         {"num":254,"name":"message_index","base":"UINT16"}
       ]
     },
@@ -2919,6 +2994,8 @@
       "name": "SPLIT_SUMMARY",
       "fields": [
         {"num":0,"name":"split_type","base":"ENUM"},
+        {"num":1,"name":"sport","base":"ENUM"},
+        {"num":2,"name":"sub_sport","base":"ENUM"},
         {"num":3,"name":"num_splits","base":"UINT16"},
         {"num":4,"name":"total_timer_time","base":"UINT32","scale":1000,"UOM":"SECONDS"},
         {"num":5,"name":"total_distance","base":"UINT32","scale":100,"UOM":"METER"},
@@ -2932,7 +3009,9 @@
         {"num":13,"name":"total_calories","base":"UINT32","UOM":"KCAL"},
         {"num":14,"name":"avg_cadence","base":"UINT16","scale":128,"UOM":"REVOLUTIONS_PER_MINUTE"},
         {"num":15,"name":"max_cadence","base":"UINT16","scale":128,"UOM":"REVOLUTIONS_PER_MINUTE"},
+        {"num":16,"name":"total_cycles","base":"UINT32"},
         {"num":17,"name":"avg_temperature","base":"SINT8","UOM":"CELSIUS"},
+        {"num":18,"name":"max_temperature","base":"SINT8"},
         {"num":19,"name":"min_temperature","base":"SINT8","UOM":"CELSIUS"},
         {"num":20,"name":"avg_vertical_oscillation","base":"UINT16","scale":10,"UOM":"MILLIMETER"},
         {"num":21,"name":"avg_vertical_ratio","base":"UINT16","scale":100,"UOM":"PERCENT"},
@@ -2942,10 +3021,35 @@
         {"num":25,"name":"avg_power","base":"UINT16","UOM":"WATT"},
         {"num":26,"name":"max_power","base":"UINT16","UOM":"WATT"},
         {"num":27,"name":"normalized_power","base":"UINT16","UOM":"WATT"},
+        {"num":28,"name":"left_right_balance","base":"UINT16"},
+        {"num":29,"name":"time_standing","base":"UINT32","scale":1000},
+        {"num":30,"name":"avg_left_pco","base":"SINT8"},
+        {"num":31,"name":"avg_right_pco","base":"SINT8"},
+        {"num":32,"name":"avg_left_power_phase","base":"UINT8","scale":0.7111111,"arrayLen":0},
+        {"num":33,"name":"avg_left_power_phase_peak","base":"UINT8","scale":0.7111111,"arrayLen":0},
+        {"num":34,"name":"avg_right_power_phase","base":"UINT8","scale":0.7111111,"arrayLen":0},
+        {"num":35,"name":"avg_right_power_phase_peak","base":"UINT8","scale":0.7111111,"arrayLen":0},
         {"num":36,"name":"avg_power_position","base":"UINT16","UOM":"WATT"},
         {"num":37,"name":"max_power_position","base":"UINT16","UOM":"WATT"},
+        {"num":38,"name":"avg_left_torque_effectiveness","base":"UINT8","scale":2},
+        {"num":39,"name":"avg_right_torque_effectiveness","base":"UINT8","scale":2},
+        {"num":40,"name":"avg_left_pedal_smoothness","base":"UINT8","scale":2},
+        {"num":41,"name":"avg_right_pedal_smoothness","base":"UINT8","scale":2},
+        {"num":42,"name":"avg_combined_pedal_smoothness","base":"UINT8","scale":2},
+        {"num":43,"name":"avg_flow","base":"FLOAT32"},
+        {"num":44,"name":"total_grit","base":"FLOAT32"},
+        {"num":47,"name":"swim_stroke","base":"ENUM"},
+        {"num":48,"name":"num_active_lengths","base":"UINT16"},
+        {"num":49,"name":"avg_swolf","base":"UINT16"},
+        {"num":50,"name":"avg_stroke_distance","base":"UINT16","scale":100},
+        {"num":51,"name":"avg_strokes_per_length","base":"UINT16","scale":10},
         {"num":52,"name":"avg_ascent","base":"UINT16","UOM":"METER"},
         {"num":53,"name":"max_ascent","base":"UINT16","UOM":"METER"},
+        {"num":54,"name":"climb_grading_scale","base":"ENUM"},
+        {"num":55,"name":"climb_max_grade_value","base":"UINT32"},
+        {"num":56,"name":"num_falls","base":"UINT16"},
+        {"num":58,"name":"num_climbs_attempted","base":"UINT16"},
+        {"num":59,"name":"num_climbs_completed","base":"UINT16"},
         {"num":60,"name":"max_distance","base":"UINT32","scale":100,"UOM":"METER"},
         {"num":64,"name":"metabolic_calories","base":"UINT16","UOM":"KCAL"},
         {"num":65,"name":"active_time","base":"UINT32","scale":1000,"UOM":"SECONDS"},
@@ -2958,10 +3062,13 @@
         {"num":73,"name":"max_stress","base":"UINT16"},
         {"num":76,"name":"split_score_card_index","base":"UINT16"},
         {"num":77,"name":"total_moving_time","base":"UINT32","scale":1000,"UOM":"SECONDS"},
-        {"num":79,"name":"start_time","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"},
+        {"num":79,"name":"start_time","base":"UINT32","type":"DateTime","UOM":"SECONDS"},
         {"num":83,"name":"step_speed_loss","base":"UINT16","scale":100,"UOM":"CENTIMETER_PER_SECOND"},
         {"num":84,"name":"step_speed_loss_percentage","base":"UINT16","scale":100,"UOM":"PERCENT"},
-        {"num":253,"name":"timestamp","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"},
+        {"num":87,"name":"min_heart_rate","base":"UINT8"},
+        {"num":91,"name":"avg_stance_time_percent","base":"UINT16","scale":100},
+        {"num":101,"name":"max_total_timer_time","base":"UINT32","scale":1000},
+        {"num":253,"name":"timestamp","base":"UINT32","type":"DateTime","UOM":"SECONDS"},
         {"num":254,"name":"message_index","base":"UINT16"}
       ]
     },
@@ -2973,7 +3080,7 @@
         {"num":1,"name":"level","base":"SINT8","arrayLen":0,"UOM":"PERCENT"},
         {"num":2,"name":"charged","base":"SINT16","arrayLen":0},
         {"num":3,"name":"uncharged","base":"SINT16","arrayLen":0},
-        {"num":253,"name":"timestamp","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"}
+        {"num":253,"name":"timestamp","base":"UINT32","type":"DateTime","UOM":"SECONDS"}
       ]
     },
     {
@@ -2981,7 +3088,7 @@
       "name": "HSA_EVENT",
       "fields": [
         {"num":0,"name":"event_id","base":"UINT8"},
-        {"num":253,"name":"timestamp","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"}
+        {"num":253,"name":"timestamp","base":"UINT32","type":"DateTime","UOM":"SECONDS"}
       ]
     },
     {
@@ -2994,7 +3101,7 @@
         {"num":3,"name":"climb_number","base":"UINT16"},
         {"num":4,"name":"climb_category","base":"UINT8"},
         {"num":5,"name":"current_dist","base":"FLOAT32","UOM":"METER"},
-        {"num":253,"name":"timestamp","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"}
+        {"num":253,"name":"timestamp","base":"UINT32","type":"DateTime","UOM":"SECONDS"}
       ]
     },
     {
@@ -3004,7 +3111,7 @@
         {"num":0,"name":"percent","base":"UINT16","scale":100},
         {"num":1,"name":"status","base":"UINT16"},
         {"num":3,"name":"gain","base":"UINT32","UOM":"MILLISECONDS"},
-        {"num":253,"name":"timestamp","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"}
+        {"num":253,"name":"timestamp","base":"UINT32","type":"DateTime","UOM":"SECONDS"}
       ]
     },
     {
@@ -3014,7 +3121,7 @@
         {"num":0,"name":"sensor","base":"UINT32Z"},
         {"num":1,"name":"pressure","base":"UINT16","scale":100,"UOM":"BAR"},
         {"num":2,"name":"depth","base":"UINT32","UOM":"MILLIMETER"},
-        {"num":253,"name":"timestamp","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"}
+        {"num":253,"name":"timestamp","base":"UINT32","type":"DateTime","UOM":"SECONDS"}
       ]
     },
     {
@@ -3034,7 +3141,7 @@
         {"num":1,"name":"start_pressure","base":"UINT16","scale":100,"UOM":"BAR"},
         {"num":2,"name":"end_pressure","base":"UINT16","scale":100,"UOM":"BAR"},
         {"num":3,"name":"volume_used","base":"UINT32","scale":100,"UOM":"LITER"},
-        {"num":253,"name":"timestamp","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"}
+        {"num":253,"name":"timestamp","base":"UINT32","type":"DateTime","UOM":"SECONDS"}
       ]
     },
     {
@@ -3043,7 +3150,7 @@
       "fields": [
         {"num":0,"name":"event_type","base":"UINT32"},
         {"num":1,"name":"data","base":"UINT32"},
-        {"num":253,"name":"timestamp","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"}
+        {"num":253,"name":"timestamp","base":"UINT32","type":"DateTime","UOM":"SECONDS"}
       ]
     },
     {
@@ -3054,7 +3161,7 @@
         {"num":1,"name":"position_long","base":"SINT32","type":"COORDINATE","UOM":"SEMICIRCLES"},
         {"num":2,"name":"age","base":"UINT32","UOM":"SECONDS"},
         {"num":4,"name":"altitude","base":"FLOAT32","UOM":"METER"},
-        {"num":253,"name":"timestamp","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"}
+        {"num":253,"name":"timestamp","base":"UINT32","type":"DateTime","UOM":"SECONDS"}
       ]
     },
     {
@@ -3065,7 +3172,7 @@
         {"num":1,"name":"categorization","base":"ENUM"},
         {"num":2,"name":"raw_sample_rate","base":"FLOAT32"},
         {"num":3,"name":"smooth_sample_rate","base":"FLOAT32"},
-        {"num":4,"name":"ecg_timestamp","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"},
+        {"num":4,"name":"ecg_timestamp","base":"UINT32","type":"DateTime","UOM":"SECONDS"},
         {"num":5,"name":"local_timestamp","base":"UINT32"},
         {"num":6,"name":"unknown_6","base":"ENUM"},
         {"num":7,"name":"average_heart_rate","base":"FLOAT32"},
@@ -3092,17 +3199,17 @@
       "num": 339,
       "name": "RACE_PREDICTION",
       "fields": [
-        {"num":0,"name":"local_timestamp","base":"UINT32","UOM":"SECONDS"},
+        {"num":0,"name":"local_timestamp","base":"UINT32","type":"LocalDateTime","UOM":"SECONDS"},
         {"num":1,"name":"time_5k","base":"UINT16","UOM":"SECONDS"},
         {"num":2,"name":"time_10k","base":"UINT16","UOM":"SECONDS"},
         {"num":3,"name":"time_half_marathon","base":"UINT16","UOM":"SECONDS"},
         {"num":4,"name":"time_full_marathon","base":"UINT16","UOM":"SECONDS"},
-        {"num":253,"name":"timestamp","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"}
+        {"num":253,"name":"timestamp","base":"UINT32","type":"DateTime","UOM":"SECONDS"}
       ]
     },
     {
       "num": 346,
-      "name": "SLEEP_STATS",
+      "name": "SLEEP_ASSESSMENT",
       "fields": [
         {"num":0,"name":"combined_awake_score","base":"UINT8"},
         {"num":1,"name":"awake_time_score","base":"UINT8"},
@@ -3129,7 +3236,7 @@
       "fields": [
         {"num":1,"name":"name","base":"STRING","stringLen":50},
         {"num":2,"name":"splits","base":"UINT16"},
-        {"num":4,"name":"created","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"},
+        {"num":4,"name":"created","base":"UINT32","type":"DateTime","UOM":"SECONDS"},
         {"num":7,"name":"effort_target","base":"FLOAT32"},
         {"num":8,"name":"air_factor","base":"FLOAT32"},
         {"num":9,"name":"rolling_resistance","base":"FLOAT32"},
@@ -3172,7 +3279,8 @@
       "num": 356,
       "name": "FUNCTIONAL_METRICS",
       "fields": [
-        {"num":0,"name":"unknown_0","base":"UINT8","UOM":"KCAL"},
+        {"num":0,"name":"unknown_0","base":"UINT8"},
+        {"num":1,"name":"unknown_1","base":"UINT8"},
         {"num":2,"name":"unknown_2","base":"UINT32"},
         {"num":3,"name":"unknown_3","base":"UINT32"},
         {"num":4,"name":"functional_threshold_power","base":"UINT16","UOM":"WATT"},
@@ -3182,19 +3290,19 @@
         {"num":8,"name":"running_lactate_threshold_hr","base":"UINT8","UOM":"BEATS_PER_MINUTE"},
         {"num":9,"name":"cycling_lactace_threshold_hr","base":"UINT8","UOM":"BEATS_PER_MINUTE"},
         {"num":10,"name":"unknown_10","base":"UINT16"},
-        {"num":11,"name":"unknown_11","base":"ENUM"},
-        {"num":12,"name":"unknown_12","base":"ENUM"},
-        {"num":253,"name":"timestamp","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"}
+        {"num":11,"name":"unknown_11","base":"ENUM","type":"Bool"},
+        {"num":12,"name":"unknown_12","base":"ENUM","type":"Bool"},
+        {"num":253,"name":"timestamp","base":"UINT32","type":"DateTime","UOM":"SECONDS"}
       ]
     },
     {
       "num": 357,
       "name": "TRUE_UP_RECOVERY",
       "fields": [
-        {"num":0,"name":"unk_0","base":"UINT8"},
-        {"num":1,"name":"unk_1","base":"UINT8"},
+        {"num":0,"name":"stamina_potential_load","base":"UINT8","UOM":"PERCENT"},
+        {"num":1,"name":"stamina_potential_distance","base":"UINT8","UOM":"PERCENT"},
         {"num":2,"name":"recovery_time","base":"UINT16","UOM":"MINUTES"},
-        {"num":253,"name":"timestamp","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"}
+        {"num":253,"name":"timestamp","base":"UINT32","type":"DateTime","UOM":"SECONDS"}
       ]
     },
     {
@@ -3202,7 +3310,7 @@
       "name": "RACE_EVENT",
       "fields": [
         {"num":1,"name":"event_id","base":"STRING"},
-        {"num":2,"name":"start_time","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"},
+        {"num":2,"name":"start_time","base":"UINT32","type":"DateTime","UOM":"SECONDS"},
         {"num":3,"name":"local_timestamp","base":"UINT32"},
         {"num":4,"name":"name","base":"STRING"},
         {"num":5,"name":"location","base":"STRING"},
@@ -3221,8 +3329,8 @@
       "name": "TRUE_UP_MOVEMENT",
       "fields": [
         {"num":0,"name":"unk_0","base":"UINT16"},
-        {"num":1,"name":"snapshot_timestamp","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"},
-        {"num":2,"name":"snapshot_local_timestamp","base":"UINT32","UOM":"SECONDS"},
+        {"num":1,"name":"snapshot_timestamp","base":"UINT32","type":"DateTime","UOM":"SECONDS"},
+        {"num":2,"name":"snapshot_local_timestamp","base":"UINT32","type":"LocalDateTime","UOM":"SECONDS"},
         {"num":3,"name":"steps","base":"UINT32"},
         {"num":4,"name":"ascent","base":"UINT32","UOM":"MILLIMETER"},
         {"num":5,"name":"descent","base":"UINT32","UOM":"MILLIMETER"},
@@ -3230,21 +3338,21 @@
         {"num":7,"name":"moderate_activity","base":"UINT16","UOM":"MINUTES"},
         {"num":8,"name":"vigorous_activity","base":"UINT16","UOM":"MINUTES"},
         {"num":9,"name":"active_calories","base":"UINT16"},
-        {"num":253,"name":"timestamp","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"}
+        {"num":253,"name":"timestamp","base":"UINT32","type":"DateTime","UOM":"SECONDS"}
       ]
     },
     {
       "num": 369,
       "name": "TRAINING_READINESS",
       "fields": [
-        {"num":0,"name":"training_readiness","base":"UINT8"},
+        {"num":0,"name":"training_readiness","base":"UINT8","UOM":"PERCENT"},
         {"num":1,"name":"level","base":"ENUM"},
         {"num":2,"name":"unknown_2","base":"ENUM"},
         {"num":3,"name":"unknown_3","base":"ENUM"},
         {"num":4,"name":"sleep_score","base":"UINT8"},
         {"num":5,"name":"unknown_5","base":"UINT8","UOM":"PERCENT"},
         {"num":6,"name":"unknown_6","base":"ENUM"},
-        {"num":7,"name":"unknown_7","base":"UINT16","UOM":"MINUTES"},
+        {"num":7,"name":"recovery_time","base":"UINT16","UOM":"MINUTES"},
         {"num":8,"name":"unknown_8","base":"UINT8","UOM":"PERCENT"},
         {"num":9,"name":"unknown_9","base":"ENUM"},
         {"num":10,"name":"unknown_10","base":"UINT8","UOM":"PERCENT"},
@@ -3255,7 +3363,7 @@
         {"num":15,"name":"unknown_15","base":"ENUM"},
         {"num":16,"name":"unknown_16","base":"UINT8","UOM":"PERCENT"},
         {"num":17,"name":"unknown_17","base":"ENUM"},
-        {"num":18,"name":"unknown_18","base":"ENUM"},
+        {"num":18,"name":"tracked_sleep","base":"ENUM","type":"Bool"},
         {"num":19,"name":"unknown_19","base":"ENUM"},
         {"num":20,"name":"local_timestamp","base":"UINT32","UOM":"SECONDS"},
         {"num":21,"name":"weekly_hrv_average","base":"UINT16","scale":128,"UOM":"MILLISECONDS"},
@@ -3266,12 +3374,12 @@
         {"num":28,"name":"unknown_28","base":"ENUM"},
         {"num":29,"name":"unknown_29","base":"ENUM"},
         {"num":30,"name":"unknown_30","base":"ENUM"},
-        {"num":253,"name":"timestamp","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"}
+        {"num":253,"name":"timestamp","base":"UINT32","type":"DateTime","UOM":"SECONDS"}
       ]
     },
     {
       "num": 370,
-      "name": "HRV_SUMMARY",
+      "name": "HRV_STATUS_SUMMARY",
       "fields": [
         {"num":0,"name":"weekly_average","base":"UINT16","scale":128,"UOM":"MILLISECONDS"},
         {"num":1,"name":"last_night_average","base":"UINT16","scale":128,"UOM":"MILLISECONDS"},
@@ -3280,7 +3388,7 @@
         {"num":4,"name":"baseline_balanced_lower","base":"UINT16","scale":128,"UOM":"MILLISECONDS"},
         {"num":5,"name":"baseline_balanced_upper","base":"UINT16","scale":128,"UOM":"MILLISECONDS"},
         {"num":6,"name":"status","base":"ENUM","type":"HrvStatus"},
-        {"num":253,"name":"timestamp","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"}
+        {"num":253,"name":"timestamp","base":"UINT32","type":"DateTime","UOM":"SECONDS"}
       ]
     },
     {
@@ -3288,7 +3396,7 @@
       "name": "HRV_VALUE",
       "fields": [
         {"num":0,"name":"value","base":"UINT16","scale":128,"UOM":"MILLISECONDS"},
-        {"num":253,"name":"timestamp","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"}
+        {"num":253,"name":"timestamp","base":"UINT32","type":"DateTime","UOM":"SECONDS"}
       ]
     },
     {
@@ -3300,7 +3408,7 @@
         {"num":2,"name":"time","base":"UINT16","arrayLen":0,"UOM":"MILLISECONDS"},
         {"num":3,"name":"quality","base":"UINT8","arrayLen":0},
         {"num":4,"name":"gap","base":"UINT8","arrayLen":0},
-        {"num":253,"name":"timestamp","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"}
+        {"num":253,"name":"timestamp","base":"UINT32","type":"DateTime","UOM":"SECONDS"}
       ]
     },
     {
@@ -3319,7 +3427,7 @@
         {"num":1,"name":"battery_voltage","base":"UINT16","scale":256,"UOM":"VOLT"},
         {"num":2,"name":"battery_status","base":"UINT8"},
         {"num":3,"name":"battery_identifier","base":"UINT8"},
-        {"num":253,"name":"timestamp","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"}
+        {"num":253,"name":"timestamp","base":"UINT32","type":"DateTime","UOM":"SECONDS"}
       ]
     },
     {
@@ -3332,7 +3440,7 @@
         {"num":3,"name":"gyro_y","base":"SINT16","arrayLen":0},
         {"num":4,"name":"gyro_z","base":"SINT16","arrayLen":0},
         {"num":5,"name":"timestamp_32k","base":"UINT32","UOM":"1/32768 s"},
-        {"num":253,"name":"timestamp","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"}
+        {"num":253,"name":"timestamp","base":"UINT32","type":"DateTime","UOM":"SECONDS"}
       ]
     },
     {
@@ -3343,7 +3451,7 @@
         {"num":3,"name":"training_load_acute","base":"UINT16"},
         {"num":4,"name":"training_load_chronic","base":"UINT16"},
         {"num":5,"name":"daily_acute_chronic_workload_ratio","base":"UINT8","scale":10},
-        {"num":253,"name":"timestamp","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"}
+        {"num":253,"name":"timestamp","base":"UINT32","type":"DateTime","UOM":"SECONDS"}
       ]
     },
     {
@@ -3370,16 +3478,16 @@
       "fields": [
         {"num":2,"name":"sleep_score","base":"UINT8","UOM":"PERCENT"},
         {"num":3,"name":"awake_duration","base":"UINT16","UOM":"MINUTES"},
-        {"num":8,"name":"local_timestamp","base":"UINT32","UOM":"SECONDS"},
-        {"num":9,"name":"sleep_start_time","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"},
+        {"num":8,"name":"local_timestamp","base":"UINT32","type":"LocalDateTime","UOM":"SECONDS"},
+        {"num":9,"name":"sleep_start_time","base":"UINT32","type":"DateTime","UOM":"SECONDS"},
         {"num":10,"name":"sleep_start_timezone_offset","base":"SINT16","UOM":"MINUTES"},
-        {"num":11,"name":"sleep_end_time","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"},
+        {"num":11,"name":"sleep_end_time","base":"UINT32","type":"DateTime","UOM":"SECONDS"},
         {"num":12,"name":"sleep_end_timezone_offset","base":"SINT16","UOM":"MINUTES"},
         {"num":14,"name":"sleep_start_body_battery","base":"UINT8"},
         {"num":16,"name":"sleep_end_body_battery","base":"UINT8"},
         {"num":22,"name":"sleep_presure","base":"SINT16"},
         {"num":24,"name":"sleep_awake_duration","base":"UINT16","UOM":"MINUTES"},
-        {"num":253,"name":"timestamp","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"},
+        {"num":253,"name":"timestamp","base":"UINT32","type":"DateTime","UOM":"SECONDS"},
         {"num":254,"name":"message_index","base":"UINT16"}
       ]
     },
@@ -3394,7 +3502,7 @@
         {"num":4,"name":"projectile_type","base":"ENUM"},
         {"num":5,"name":"grain_weight","base":"UINT32","scale":10,"UOM":"GRAIN"},
         {"num":6,"name":"standard_deviation","base":"UINT32","scale":1000,"UOM":"METER_PER_SECOND"},
-        {"num":253,"name":"timestamp","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"}
+        {"num":253,"name":"timestamp","base":"UINT32","type":"DateTime","UOM":"SECONDS"}
       ]
     },
     {
@@ -3403,7 +3511,7 @@
       "fields": [
         {"num":0,"name":"shot_speed","base":"UINT32","scale":1000,"UOM":"METER_PER_SECOND"},
         {"num":1,"name":"shot_num","base":"UINT16"},
-        {"num":253,"name":"timestamp","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"}
+        {"num":253,"name":"timestamp","base":"UINT32","type":"DateTime","UOM":"SECONDS"}
       ]
     },
     {
@@ -3412,7 +3520,7 @@
       "fields": [
         {"num":0,"name":"data","base":"BYTE","arrayLen":0},
         {"num":1,"name":"data_size","base":"UINT8"},
-        {"num":253,"name":"timestamp","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"}
+        {"num":253,"name":"timestamp","base":"UINT32","type":"DateTime","UOM":"SECONDS"}
       ]
     },
     {
@@ -3429,15 +3537,15 @@
       "fields": [
         {"num":0,"name":"depth","base":"UINT32","scale":1000,"UOM":"METER"},
         {"num":1,"name":"time","base":"SINT32","UOM":"SECONDS"},
-        {"num":2,"name":"enabled","base":"ENUM","type":"BOOLEAN"},
+        {"num":2,"name":"enabled","base":"ENUM","type":"Bool"},
         {"num":3,"name":"alarm_type","base":"ENUM"},
         {"num":4,"name":"sound","base":"ENUM"},
         {"num":5,"name":"dive_types","base":"ENUM","arrayLen":0},
         {"num":6,"name":"id","base":"UINT32"},
-        {"num":7,"name":"popup_enabled","base":"ENUM","type":"BOOLEAN"},
-        {"num":8,"name":"trigger_on_descent","base":"ENUM","type":"BOOLEAN"},
-        {"num":9,"name":"trigger_on_ascent","base":"ENUM","type":"BOOLEAN"},
-        {"num":10,"name":"repeating","base":"ENUM","type":"BOOLEAN"},
+        {"num":7,"name":"popup_enabled","base":"ENUM","type":"Bool"},
+        {"num":8,"name":"trigger_on_descent","base":"ENUM","type":"Bool"},
+        {"num":9,"name":"trigger_on_ascent","base":"ENUM","type":"Bool"},
+        {"num":10,"name":"repeating","base":"ENUM","type":"Bool"},
         {"num":11,"name":"speed","base":"SINT32","scale":1000,"UOM":"MILES_PER_SECOND"},
         {"num":254,"name":"message_index","base":"UINT16"}
       ]
@@ -3447,9 +3555,9 @@
       "name": "CPE_STATUS",
       "fields": [
         {"num":0,"name":"status","base":"ENUM"},
-        {"num":1,"name":"start_time","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"},
-        {"num":2,"name":"end_time","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"},
-        {"num":253,"name":"timestamp","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"}
+        {"num":1,"name":"start_time","base":"UINT32","type":"DateTime","UOM":"SECONDS"},
+        {"num":2,"name":"end_time","base":"UINT32","type":"DateTime","UOM":"SECONDS"},
+        {"num":253,"name":"timestamp","base":"UINT32","type":"DateTime","UOM":"SECONDS"}
       ]
     },
     {
@@ -3457,26 +3565,26 @@
       "name": "SKIN_TEMP_RAW",
       "fields": [
         {"num":1,"name":"deviation","base":"FLOAT32"},
-        {"num":253,"name":"timestamp","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"}
+        {"num":253,"name":"timestamp","base":"UINT32","type":"DateTime","UOM":"SECONDS"}
       ]
     },
     {
       "num": 398,
       "name": "SKIN_TEMP_OVERNIGHT",
       "fields": [
-        {"num":0,"name":"local_timestamp","base":"UINT32"},
+        {"num":0,"name":"local_timestamp","base":"UINT32","type":"LocalDateTime","UOM":"SECONDS"},
         {"num":1,"name":"average_deviation","base":"FLOAT32"},
         {"num":2,"name":"average_7_day_deviation","base":"FLOAT32"},
         {"num":3,"name":"calibrated_days","base":"UINT8"},
         {"num":4,"name":"nightly_value","base":"FLOAT32"},
-        {"num":253,"name":"timestamp","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"}
+        {"num":253,"name":"timestamp","base":"UINT32","type":"DateTime","UOM":"SECONDS"}
       ]
     },
     {
       "num": 401,
       "name": "HRV_STATS",
       "fields": [
-        {"num":0,"name":"local_timestamp","base":"UINT32","UOM":"SECONDS"},
+        {"num":0,"name":"local_timestamp","base":"UINT32","type":"LocalDateTime","UOM":"SECONDS"},
         {"num":2,"name":"sleep","base":"UINT16","UOM":"MILLISECONDS"},
         {"num":3,"name":"target_min","base":"UINT16","UOM":"MILLISECONDS"},
         {"num":4,"name":"target_max","base":"UINT16","UOM":"MILLISECONDS"}
@@ -3492,7 +3600,7 @@
         {"num":3,"name":"trend","base":"ENUM"},
         {"num":4,"name":"level","base":"ENUM"},
         {"num":5,"name":"unknown_5","base":"ENUM"},
-        {"num":253,"name":"timestamp","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"}
+        {"num":253,"name":"timestamp","base":"UINT32","type":"DateTime","UOM":"SECONDS"}
       ]
     },
     {
@@ -3510,7 +3618,7 @@
         {"num":8,"name":"lower_bound_elite","base":"UINT16"},
         {"num":9,"name":"gauge_lower_limit","base":"UINT16"},
         {"num":10,"name":"gauge_upper_limit","base":"UINT16"},
-        {"num":253,"name":"timestamp","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"}
+        {"num":253,"name":"timestamp","base":"UINT32","type":"DateTime","UOM":"SECONDS"}
       ]
     },
     {
@@ -3520,7 +3628,7 @@
         {"num":0,"name":"sport","base":"ENUM"},
         {"num":1,"name":"sub_sport","base":"ENUM"},
         {"num":3,"name":"contribution","base":"UINT16","scale":100},
-        {"num":253,"name":"timestamp","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"},
+        {"num":253,"name":"timestamp","base":"UINT32","type":"DateTime","UOM":"SECONDS"},
         {"num":254,"name":"message_index","base":"UINT16"}
       ]
     },
@@ -3530,7 +3638,7 @@
       "fields": [
         {"num":0,"name":"processing_interval","base":"UINT16","UOM":"SECONDS"},
         {"num":1,"name":"value","base":"UINT16","scale":1000,"arrayLen":0,"UOM":"CELSIUS"},
-        {"num":253,"name":"timestamp","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"}
+        {"num":253,"name":"timestamp","base":"UINT32","type":"DateTime","UOM":"SECONDS"}
       ]
     },
     {
@@ -3541,7 +3649,7 @@
         {"num":1,"name":"demand","base":"UINT16","UOM":"MINUTES"},
         {"num":7,"name":"start","base":"UINT16","UOM":"MINUTES"},
         {"num":8,"name":"end","base":"UINT16","UOM":"MINUTES"},
-        {"num":253,"name":"timestamp","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"}
+        {"num":253,"name":"timestamp","base":"UINT32","type":"DateTime","UOM":"SECONDS"}
       ]
     },
     {
@@ -3554,26 +3662,27 @@
         {"num":3,"name":"rem_duration","base":"UINT16","UOM":"MINUTES"},
         {"num":4,"name":"awake_duration","base":"UINT16","UOM":"MINUTES"},
         {"num":5,"name":"unmeasurable_duration","base":"UINT16","UOM":"MINUTES"},
-        {"num":7,"name":"sleep_end_timestamp_local","base":"UINT32"},
-        {"num":8,"name":"sleep_end_timestamp_utc","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"},
-        {"num":9,"name":"sleep_start_timestamp_local","base":"UINT32"},
-        {"num":10,"name":"sleep_start_timestamp_utc","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"},
-        {"num":253,"name":"timestamp","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"},
+        {"num":7,"name":"sleep_end_timestamp_local","base":"UINT32","type":"LocalDateTime","UOM":"SECONDS"},
+        {"num":8,"name":"sleep_end_timestamp_utc","base":"UINT32","type":"DateTime","UOM":"SECONDS"},
+        {"num":9,"name":"sleep_start_timestamp_local","base":"UINT32","type":"LocalDateTime","UOM":"SECONDS"},
+        {"num":10,"name":"sleep_start_timestamp_utc","base":"UINT32","type":"DateTime","UOM":"SECONDS"},
+        {"num":253,"name":"timestamp","base":"UINT32","type":"DateTime","UOM":"SECONDS"},
         {"num":254,"name":"message_index","base":"UINT16"}
       ]
     },
     {
       "num": 412,
-      "name": "NAP",
+      "name": "NAP_EVENT",
       "fields": [
-        {"num":0,"name":"start_timestamp","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"},
-        {"num":1,"name":"start_tz_offset","base":"SINT16","UOM":"MINUTES"},
-        {"num":2,"name":"end_timestamp","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"},
-        {"num":3,"name":"end_tz_offset","base":"SINT16","UOM":"MINUTES"},
+        {"num":0,"name":"start_time","base":"UINT32","type":"DateTime","UOM":"SECONDS"},
+        {"num":1,"name":"start_timezone_offset","base":"SINT16","UOM":"MINUTES"},
+        {"num":2,"name":"end_time","base":"UINT32","type":"DateTime","UOM":"SECONDS"},
+        {"num":3,"name":"end_timezone_offset","base":"SINT16","UOM":"MINUTES"},
         {"num":4,"name":"feedback","base":"ENUM"},
-        {"num":6,"name":"deleted","base":"ENUM","type":"BOOLEAN"},
-        {"num":7,"name":"updated_timestamp","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"},
-        {"num":253,"name":"timestamp","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"},
+        {"num":5,"name":"is_deleted","base":"ENUM","type":"Bool"},
+        {"num":6,"name":"source","base":"ENUM"},
+        {"num":7,"name":"update_timestamp","base":"UINT32","type":"DateTime","UOM":"SECONDS"},
+        {"num":253,"name":"timestamp","base":"UINT32","type":"DateTime","UOM":"SECONDS"},
         {"num":254,"name":"message_index","base":"UINT16"}
       ]
     },
@@ -3593,9 +3702,9 @@
       "num": 418,
       "name": "DIVE_READINESS",
       "fields": [
-        {"num":1,"name":"local_timestamp","base":"UINT32","UOM":"SECONDS"},
+        {"num":1,"name":"local_timestamp","base":"UINT32","type":"LocalDateTime","UOM":"SECONDS"},
         {"num":2,"name":"dive_readiness","base":"UINT8"},
-        {"num":253,"name":"timestamp","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"}
+        {"num":253,"name":"timestamp","base":"UINT32","type":"DateTime","UOM":"SECONDS"}
       ]
     },
     {
@@ -3606,7 +3715,7 @@
         {"num":1,"name":"region","base":"UINT8"},
         {"num":2,"name":"name","base":"STRING"},
         {"num":3,"name":"abbreviation","base":"STRING"},
-        {"num":4,"name":"favorite","base":"ENUM"},
+        {"num":4,"name":"favorite","base":"ENUM","type":"Bool"},
         {"num":254,"name":"message_index","base":"UINT16"}
       ]
     },
@@ -3619,7 +3728,7 @@
         {"num":3,"name":"sender","base":"STRING","stringLen":50},
         {"num":6,"name":"receiver","base":"STRING","stringLen":16},
         {"num":7,"name":"sender_ant","base":"UINT32Z"},
-        {"num":253,"name":"timestamp","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"}
+        {"num":253,"name":"timestamp","base":"UINT32","type":"DateTime","UOM":"SECONDS"}
       ]
     },
     {
@@ -3633,8 +3742,8 @@
         {"num":7,"name":"sport","base":"ENUM"},
         {"num":8,"name":"sub_sport","base":"ENUM"},
         {"num":9,"name":"duration","base":"UINT32","scale":1000},
-        {"num":10,"name":"local_timestamp","base":"UINT32"},
-        {"num":253,"name":"timestamp","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"}
+        {"num":10,"name":"local_timestamp","base":"UINT32","type":"LocalDateTime","UOM":"SECONDS"},
+        {"num":253,"name":"timestamp","base":"UINT32","type":"DateTime","UOM":"SECONDS"}
       ]
     },
     {
@@ -3647,10 +3756,10 @@
         {"num":3,"name":"unk_3","base":"SINT32"},
         {"num":4,"name":"unk_4","base":"UINT16"},
         {"num":5,"name":"unk_5","base":"UINT16"},
-        {"num":6,"name":"unk_timestamp","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"},
+        {"num":6,"name":"unk_timestamp","base":"UINT32","type":"DateTime","UOM":"SECONDS"},
         {"num":7,"name":"max_hr","base":"UINT8","UOM":"BEATS_PER_MINUTE"},
         {"num":8,"name":"max_hr_cycling","base":"UINT8","UOM":"BEATS_PER_MINUTE"},
-        {"num":253,"name":"timestamp","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"}
+        {"num":253,"name":"timestamp","base":"UINT32","type":"DateTime","UOM":"SECONDS"}
       ]
     },
     {
@@ -3658,9 +3767,9 @@
       "name": "HR_MINIMUM",
       "fields": [
         {"num":1,"name":"day","base":"UINT16"},
-        {"num":2,"name":"local_timestamp","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"},
+        {"num":2,"name":"local_timestamp","base":"UINT32","type":"LocalDateTime","UOM":"SECONDS"},
         {"num":3,"name":"hr_min","base":"UINT8","UOM":"BEATS_PER_MINUTE"},
-        {"num":253,"name":"timestamp","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"}
+        {"num":253,"name":"timestamp","base":"UINT32","type":"DateTime","UOM":"SECONDS"}
       ]
     },
     {
@@ -3676,13 +3785,13 @@
       "name": "TRUE_UP_BODY_BATTERY",
       "fields": [
         {"num":0,"name":"unk_0","base":"UINT16"},
-        {"num":1,"name":"snapshot_timestamp","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"},
-        {"num":2,"name":"snapshot_local_timestamp","base":"UINT32","UOM":"SECONDS"},
+        {"num":1,"name":"snapshot_timestamp","base":"UINT32","type":"DateTime","UOM":"SECONDS"},
+        {"num":2,"name":"snapshot_local_timestamp","base":"UINT32","type":"LocalDateTime","UOM":"SECONDS"},
         {"num":3,"name":"body_battery","base":"UINT8"},
         {"num":4,"name":"unk_4","base":"SINT8"},
         {"num":5,"name":"unk_5","base":"SINT16"},
         {"num":6,"name":"unk_6","base":"SINT8"},
-        {"num":253,"name":"timestamp","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"}
+        {"num":253,"name":"timestamp","base":"UINT32","type":"DateTime","UOM":"SECONDS"}
       ]
     },
     {
@@ -3692,7 +3801,7 @@
         {"num":1,"name":"latitudes","base":"SINT32","type":"COORDINATE","arrayLen":0,"UOM":"SEMICIRCLES"},
         {"num":2,"name":"longitudes","base":"SINT32","type":"COORDINATE","arrayLen":0,"UOM":"SEMICIRCLES"},
         {"num":4,"name":"time_offset","base":"UINT16","UOM":"MILLISECONDS"},
-        {"num":253,"name":"timestamp","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"}
+        {"num":253,"name":"timestamp","base":"UINT32","type":"DateTime","UOM":"SECONDS"}
       ]
     },
     {
@@ -3700,7 +3809,7 @@
       "name": "SLEEP_DISRUPTION_SEVERITY_PERIOD",
       "fields": [
         {"num":0,"name":"severity","base":"ENUM"},
-        {"num":253,"name":"timestamp","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"},
+        {"num":253,"name":"timestamp","base":"UINT32","type":"DateTime","UOM":"SECONDS"},
         {"num":254,"name":"message_index","base":"UINT16"}
       ]
     },
@@ -3709,18 +3818,18 @@
       "name": "SLEEP_DISRUPTION_OVERNIGHT_SEVERITY",
       "fields": [
         {"num":0,"name":"severity","base":"ENUM"},
-        {"num":253,"name":"timestamp","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"}
+        {"num":253,"name":"timestamp","base":"UINT32","type":"DateTime","UOM":"SECONDS"}
       ]
     },
     {
       "num": 493,
       "name": "METRIC_SUMMARY",
       "fields": [
-        {"num":0,"name":"start","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"},
-        {"num":1,"name":"end","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"},
+        {"num":0,"name":"start","base":"UINT32","type":"DateTime","UOM":"SECONDS"},
+        {"num":1,"name":"end","base":"UINT32","type":"DateTime","UOM":"SECONDS"},
         {"num":8,"name":"hr_min","base":"UINT8","UOM":"BEATS_PER_MINUTE"},
         {"num":10,"name":"daily_hr_min","base":"UINT8","UOM":"BEATS_PER_MINUTE"},
-        {"num":253,"name":"timestamp","base":"UINT32","type":"TIMESTAMP","UOM":"SECONDS"},
+        {"num":253,"name":"timestamp","base":"UINT32","type":"DateTime","UOM":"SECONDS"},
         {"num":254,"name":"message_index","base":"UINT16"}
       ]
     },
@@ -4371,6 +4480,14 @@
       ]
     },
     {
+      "name": "DisplayMeasure",
+      "entries": [
+        {"num":0,"name":"metric"},
+        {"num":1,"name":"imperial"},
+        {"num":2,"name":"nautical"}
+      ]
+    },
+    {
       "name": "EllipticalExerciseName",
       "entries": [
         {"num":0,"name":"ELLIPTICAL"}
@@ -4391,52 +4508,52 @@
         {"num":9,"name":"LAP"},
         {"num":10,"name":"COURSE_POINT"},
         {"num":11,"name":"BATTERY"},
-        {"num":12,"name":"VIRTUAL_PARTNER"},
-        {"num":13,"name":"HEARTRATE_HIGH"},
-        {"num":14,"name":"HEARTRATE_LOW"},
-        {"num":15,"name":"SPEED_HIGH"},
-        {"num":16,"name":"SPEED_LOW"},
-        {"num":17,"name":"CADENCE_HIGH"},
-        {"num":18,"name":"CADENCE_LOW"},
-        {"num":19,"name":"POWER_HIGH"},
-        {"num":20,"name":"POWER_LOW"},
-        {"num":21,"name":"HEARTRATE_RECOVERY"},
+        {"num":12,"name":"VIRTUAL_PARTNER_PACE"},
+        {"num":13,"name":"HR_HIGH_ALERT"},
+        {"num":14,"name":"HR_LOW_ALERT"},
+        {"num":15,"name":"SPEED_HIGH_ALERT"},
+        {"num":16,"name":"SPEED_LOW_ALERT"},
+        {"num":17,"name":"CAD_HIGH_ALERT"},
+        {"num":18,"name":"CAD_LOW_ALERT"},
+        {"num":19,"name":"POWER_HIGH_ALERT"},
+        {"num":20,"name":"POWER_LOW_ALERT"},
+        {"num":21,"name":"RECOVERY_HR"},
         {"num":22,"name":"BATTERY_LOW"},
-        {"num":23,"name":"DURATION_TIME"},
-        {"num":24,"name":"DURATION_DISTANCE"},
-        {"num":25,"name":"DURATION_CALORIE"},
+        {"num":23,"name":"TIME_DURATION_ALERT"},
+        {"num":24,"name":"DISTANCE_DURATION_ALERT"},
+        {"num":25,"name":"CALORIE_DURATION_ALERT"},
         {"num":26,"name":"ACTIVITY"},
-        {"num":27,"name":"Event_27"},
-        {"num":28,"name":"Event_28"},
+        {"num":27,"name":"FITNESS_EQUIPMENT"},
+        {"num":28,"name":"LENGTH"},
         {"num":29,"name":"Event_29"},
         {"num":30,"name":"Event_30"},
         {"num":31,"name":"Event_31"},
-        {"num":32,"name":"CUSTOM"},
-        {"num":33,"name":"Event_33"},
+        {"num":32,"name":"USER_MARKER"},
+        {"num":33,"name":"SPORT_POINT"},
         {"num":34,"name":"Event_34"},
         {"num":35,"name":"Event_35"},
-        {"num":36,"name":"Event_36"},
+        {"num":36,"name":"CALIBRATION"},
         {"num":37,"name":"Event_37"},
         {"num":38,"name":"Event_38"},
-        {"num":39,"name":"Event_39"},
+        {"num":39,"name":"PERFORMANCE_CONDITION_ALERT"},
         {"num":40,"name":"Event_40"},
         {"num":41,"name":"DETECT_INACTIVITY"},
-        {"num":42,"name":"FRONT_GEAR"},
-        {"num":43,"name":"REAR_GEAR"},
-        {"num":44,"name":"RIDER"},
-        {"num":45,"name":"ELEVATION_HIGH"},
-        {"num":46,"name":"ELEVATION_LOW"},
-        {"num":47,"name":"Event_47"},
+        {"num":42,"name":"FRONT_GEAR_CHANGE"},
+        {"num":43,"name":"REAR_GEAR_CHANGE"},
+        {"num":44,"name":"RIDER_POSITION_CHANGE"},
+        {"num":45,"name":"ELEV_HIGH_ALERT"},
+        {"num":46,"name":"ELEV_LOW_ALERT"},
+        {"num":47,"name":"COMM_TIMEOUT"},
         {"num":48,"name":"Event_48"},
         {"num":49,"name":"Event_49"},
         {"num":50,"name":"Event_50"},
         {"num":51,"name":"Event_51"},
         {"num":52,"name":"Event_52"},
         {"num":53,"name":"Event_53"},
-        {"num":54,"name":"DETECT_AUTO_ACTIVITY"},
+        {"num":54,"name":"AUTO_ACTIVITY_DETECT"},
         {"num":55,"name":"DETECT_INCIDENT"},
         {"num":56,"name":"DIVE_ALERT"},
-        {"num":57,"name":"DIVE_GAS_SWITCH"},
+        {"num":57,"name":"DIVE_GAS_SWITCHED"},
         {"num":58,"name":"Event_58"},
         {"num":59,"name":"Event_59"},
         {"num":60,"name":"Event_60"},
@@ -4450,18 +4567,18 @@
         {"num":68,"name":"Event_68"},
         {"num":69,"name":"Event_69"},
         {"num":70,"name":"Event_70"},
-        {"num":71,"name":"DIVE_TANK_RESERVE"},
-        {"num":72,"name":"DIVE_TANK_CRITICAL"},
-        {"num":73,"name":"DIVE_TANK_LOST"},
+        {"num":71,"name":"TANK_PRESSURE_RESERVE"},
+        {"num":72,"name":"TANK_PRESSURE_CRITICAL"},
+        {"num":73,"name":"TANK_LOST"},
         {"num":74,"name":"DETECT_SLEEP"},
-        {"num":75,"name":"RADAR"},
-        {"num":76,"name":"DIVE_TANK_BATTERY_LOW"},
+        {"num":75,"name":"RADAR_THREAT_ALERT"},
+        {"num":76,"name":"TANK_BATTERY_LOW"},
         {"num":77,"name":"Event_77"},
         {"num":78,"name":"Event_78"},
         {"num":79,"name":"Event_79"},
         {"num":80,"name":"Event_80"},
-        {"num":81,"name":"DIVE_TANK_CONNECT"},
-        {"num":82,"name":"DIVE_TANK_DICONNECT"},
+        {"num":81,"name":"TANK_POD_CONNECTED"},
+        {"num":82,"name":"TANK_POD_DISCONNECTED"},
         {"num":83,"name":"DIVE_NOTIFICATION"},
         {"num":84,"name":"Event_84"},
         {"num":85,"name":"Event_85"},
@@ -4641,13 +4758,13 @@
       "entries": [
         {"num":0,"name":"START"},
         {"num":1,"name":"STOP"},
-        {"num":2,"name":"EventType_2"},
+        {"num":2,"name":"CONSECUTIVE_DEPRECIATED"},
         {"num":3,"name":"MARKER"},
         {"num":4,"name":"STOP_ALL"},
-        {"num":5,"name":"EventType_5"},
-        {"num":6,"name":"EventType_6"},
-        {"num":7,"name":"EventType_7"},
-        {"num":8,"name":"EventType_8"},
+        {"num":5,"name":"BEGIN_DEPRECIATED"},
+        {"num":6,"name":"END_DEPRECIATED"},
+        {"num":7,"name":"END_ALL_DEPRECIATED"},
+        {"num":8,"name":"STOP_DISABLE"},
         {"num":9,"name":"STOP_DISABLE_ALL"},
         {"num":10,"name":"EventType_10"},
         {"num":11,"name":"EventType_11"},
@@ -4987,15 +5104,7 @@
       ]
     },
     {
-      "name": "GoalSource",
-      "entries": [
-        {"num":0,"name":"auto"},
-        {"num":1,"name":"community"},
-        {"num":2,"name":"manual"}
-      ]
-    },
-    {
-      "name": "GoalType",
+      "name": "Goal",
       "entries": [
         {"num":0,"name":"time"},
         {"num":1,"name":"distance"},
@@ -5006,6 +5115,14 @@
         {"num":6,"name":"active_minutes"},
         {"num":7,"name":"hydration"},
         {"num":8,"name":"weight"}
+      ]
+    },
+    {
+      "name": "GoalSource",
+      "entries": [
+        {"num":0,"name":"auto"},
+        {"num":1,"name":"community"},
+        {"num":2,"name":"manual"}
       ]
     },
     {
@@ -5576,14 +5693,6 @@
         {"num":90,"name":"WEIGHTED_SIDE_LUNGE_JUMP_OFF"},
         {"num":91,"name":"OVERHEAD_RUCK_LUNGE"},
         {"num":92,"name":"BACK_RUCK_LUNGE"}
-      ]
-    },
-    {
-      "name": "MeasurementSystem",
-      "entries": [
-        {"num":0,"name":"metric"},
-        {"num":1,"name":"imperial"},
-        {"num":2,"name":"nautical"}
       ]
     },
     {
@@ -6446,7 +6555,7 @@
       ]
     },
     {
-      "name": "SleepStage",
+      "name": "SleepLevel",
       "entries": [
         {"num":0,"name":"UNMEASURABLE"},
         {"num":1,"name":"AWAKE"},
@@ -6614,7 +6723,7 @@
       ]
     },
     {
-      "name": "SwimStyle",
+      "name": "SwimStroke",
       "entries": [
         {"num":0,"name":"FREESTYLE","label":"R.string.freestyle"},
         {"num":1,"name":"BACKSTROKE","label":"R.string.backstroke"},
@@ -6834,7 +6943,15 @@
       ]
     },
     {
-      "name": "WeatherCondition",
+      "name": "WeatherReport",
+      "entries": [
+        {"num":0,"name":"current"},
+        {"num":1,"name":"hourly_forecast"},
+        {"num":2,"name":"daily_forecast"}
+      ]
+    },
+    {
+      "name": "WeatherStatus",
       "entries": [
         {"num":0,"name":"CLEAR"},
         {"num":1,"name":"PARTLY_CLOUDY"},
@@ -6859,14 +6976,6 @@
         {"num":20,"name":"LIGHT_RAIN_SNOW"},
         {"num":21,"name":"HEAVY_RAIN_SNOW"},
         {"num":22,"name":"CLOUDY"}
-      ]
-    },
-    {
-      "name": "WeatherReport",
-      "entries": [
-        {"num":0,"name":"current"},
-        {"num":1,"name":"hourly_forecast"},
-        {"num":2,"name":"daily_forecast"}
       ]
     },
     {

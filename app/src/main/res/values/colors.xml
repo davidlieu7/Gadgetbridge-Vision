@@ -81,6 +81,7 @@
     <color name="steps_color" type="color">#00c9bf</color>
     <color name="calories_color" type="color">#fa4502</color>
     <color name="calories_resting_color" type="color">#1f49f2</color>
+    <color name="hydration_color" type="color">#29b6f6</color>
     <color name="respiratory_rate_color" type="color">#163ede</color>
     <color name="chart_temperature" type="color">#ff8f00</color>
     <color name="chart_temperature_average" type="color">#00acc1</color>

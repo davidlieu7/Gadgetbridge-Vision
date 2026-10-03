@@ -34,7 +34,7 @@ class GarminWorkoutFitEncoderTest : TestBase() {
     private fun assertEncodes(template: WorkoutTemplate, resourceName: String) {
         val fitFile = GarminWorkoutFitEncoder.encode(template, timestampSeconds = 0L)
         assertNotNull("Failed to encode $template", fitFile)
-        val expected = GarminSupportTest.readTextResource(resourceName)
+        val expected = GarminSupportTest.readTextResource(resourceName).trim()
         val actual = fitFile!!.toString().replace("}, Fit", "},\nFit").replace("}, RecordData{", "},\nRecordData{")
         assertEquals(expected, actual)
     }

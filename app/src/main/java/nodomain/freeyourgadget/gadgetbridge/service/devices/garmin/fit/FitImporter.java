@@ -100,35 +100,35 @@ import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.GarminUtils;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.enums.Event;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.enums.EventType;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.enums.HrvStatus;
-import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.enums.SleepStage;
+import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.enums.SleepLevel;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.exception.FitParseException;
-import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.messages.FitDeviceStatus;
+import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.messages.FitBattery;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.messages.FitDiveReadiness;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.messages.FitEnduranceScore;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.messages.FitEvent;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.messages.FitFileId;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.messages.FitFunctionalMetrics;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.messages.FitHillScore;
-import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.messages.FitHrvSummary;
+import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.messages.FitHrvStatusSummary;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.messages.FitHrvValue;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.messages.FitMaxMetData;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.messages.FitMetricRecovery;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.messages.FitMonitoring;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.messages.FitMonitoringHrData;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.messages.FitMonitoringInfo;
-import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.messages.FitNap;
+import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.messages.FitNapEvent;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.messages.FitPad;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.messages.FitPhysiologicalMetrics;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.messages.FitRacePrediction;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.messages.FitRecord;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.messages.FitRespirationRate;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.messages.FitSession;
+import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.messages.FitSleepAssessment;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.messages.FitSleepDataInfo;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.messages.FitSleepDataRaw;
+import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.messages.FitSleepLevel;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.messages.FitSleepRestlessMoments;
-import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.messages.FitSleepStage;
-import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.messages.FitSleepStats;
-import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.messages.FitSpo2;
+import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.messages.FitSpo2Data;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.messages.FitSport;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.messages.FitSolarCharge;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.messages.FitStressLevel;
@@ -246,34 +246,34 @@ public class FitImporter {
                     sample.setCount(fitSleepRestlessMoments.getRestlessMomentsCount());
                     sleepRestlessMomentsSamples.add(sample);
                 }
-            } else if (record instanceof FitSleepStats fitSleepStats) {
-                final Integer score = fitSleepStats.getOverallSleepScore();
+            } else if (record instanceof FitSleepAssessment fitSleepAssessment) {
+                final Integer score = fitSleepAssessment.getOverallSleepScore();
                 if (score == null) {
                     continue;
                 }
-                LOG.trace("Sleep stats at {}: {}", ts, fitSleepStats);
+                LOG.trace("Sleep stats at {}: {}", ts, fitSleepAssessment);
                 final GarminSleepStatsSample sample = new GarminSleepStatsSample();
                 sample.setTimestamp(ts * 1000L);
                 sample.setSleepScore(score);
                 sleepStatsSamples.add(sample);
-            } else if (record instanceof FitSleepStage fitSleepStage) {
-                final SleepStage stage = fitSleepStage.getSleepStage();
+            } else if (record instanceof FitSleepLevel fitSleepLevel) {
+                final SleepLevel stage = fitSleepLevel.getSleepLevel();
                 if (stage == null) {
                     continue;
                 }
-                LOG.trace("Sleep stage at {}: {}", ts, fitSleepStage);
+                LOG.trace("Sleep stage at {}: {}", ts, fitSleepLevel);
                 final GarminSleepStageSample sample = new GarminSleepStageSample();
                 sample.setTimestamp(ts * 1000L);
                 sample.setStage(stage.num);
                 sleepStageSamples.add(sample);
-            } else if (record instanceof FitNap nap) {
-                if (nap.getStartTimestamp() == null || nap.getEndTimestamp() == null) {
+            } else if (record instanceof FitNapEvent nap) {
+                if (nap.getStartTime() == null || nap.getEndTime() == null) {
                     continue;
                 }
-                LOG.trace("Nap at {}: from {} to {}", ts, nap.getStartTimestamp(), nap.getEndTimestamp());
+                LOG.trace("Nap at {}: from {} to {}", ts, nap.getStartTime(), nap.getEndTime());
                 final GarminNapSample sample = new GarminNapSample();
-                sample.setTimestamp(nap.getStartTimestamp() * 1000L);
-                sample.setEndTimestamp(nap.getEndTimestamp() * 1000L);
+                sample.setTimestamp(nap.getStartTime() * 1000L);
+                sample.setEndTimestamp(nap.getEndTime() * 1000L);
                 napSamples.add(sample);
             } else if (record instanceof FitMonitoring monitoringRecord) {
                 final Long currentMonitoringTimestamp = monitoringRecord.computeTimestamp(lastMonitoringTimestamp);
@@ -289,7 +289,7 @@ public class FitImporter {
                 lastMonitoringTimestamp = currentMonitoringTimestamp;
                 addMetric(currentMonitoringTimestamp, monitoringRecord.getTotalAscent(), MetricSample.Metric.DAILY_TOTAL_ASCENT);
                 addMetric(currentMonitoringTimestamp, monitoringRecord.getTotalDescent(), MetricSample.Metric.DAILY_TOTAL_DESCENT);
-            } else if (record instanceof FitSpo2 fitSpo2) {
+            } else if (record instanceof FitSpo2Data fitSpo2) {
                 final Integer spo2 = fitSpo2.getReadingSpo2();
                 if (spo2 == null || spo2 <= 0) {
                     continue;
@@ -353,7 +353,7 @@ public class FitImporter {
                 // handled in workout parser
             } else if (record instanceof FitUserProfile) {
                 // handled in workout parser
-            } else if (record instanceof FitHrvSummary hrvSummary) {
+            } else if (record instanceof FitHrvStatusSummary hrvSummary) {
                 LOG.trace("HRV summary at {}: {}", ts, hrvSummary);
                 final GarminHrvSummarySample sample = new GarminHrvSummarySample();
                 sample.setTimestamp(ts * 1000L);
@@ -434,13 +434,13 @@ public class FitImporter {
                     sample.setHeartRate(monitoringHrData.getRestingHeartRate());
                 }
                 restingHrSamples.add(sample);
-            } else if (record instanceof FitDeviceStatus deviceStatus) {
-                Integer level = deviceStatus.getBatteryLevel();
-                if (ts != null && level != null) {
+            } else if (record instanceof FitBattery fitBattery) {
+                Integer remainingCapacity = fitBattery.getCapacity();
+                if (ts != null && remainingCapacity != null) {
                     BatteryLevel batteryLevel = new BatteryLevel();
                     batteryLevel.setTimestamp(ts.intValue());
                     batteryLevel.setBatteryIndex(0);
-                    batteryLevel.setLevel(level);
+                    batteryLevel.setLevel(remainingCapacity);
                     batterySamples.add(batteryLevel);
                 }
             } else if (record instanceof FitHillScore fitHillScore) {

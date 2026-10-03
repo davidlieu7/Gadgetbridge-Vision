@@ -98,6 +98,9 @@ object DeviceSettingsIndexer {
                         item.summary, breadcrumbs, null
                     )
 
+                is TimeSetting ->
+                    indexSingle(context, searchConfiguration, item.key, title(context, item.title), 0, breadcrumbs, null)
+
                 is DateSetting ->
                     indexSingle(context, searchConfiguration, item.key, title(context, item.title), 0, breadcrumbs, null)
 

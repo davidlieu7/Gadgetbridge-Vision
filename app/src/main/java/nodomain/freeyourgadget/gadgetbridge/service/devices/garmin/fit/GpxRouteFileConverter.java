@@ -124,8 +124,8 @@ public class GpxRouteFileConverter {
 
             final FitRecord.Builder recordBuilder = new FitRecord.Builder();
             recordBuilder.setTimestamp(runningTs);
-            recordBuilder.setLatitude(point.getLatitude());
-            recordBuilder.setLongitude(point.getLongitude());
+            recordBuilder.setPositionLat(point.getLatitude());
+            recordBuilder.setPositionLong(point.getLongitude());
             recordBuilder.setDistance(totalDistance);
 
             if(point.hasAltitude()){
@@ -248,10 +248,10 @@ public class GpxRouteFileConverter {
         final GPSCoordinate last = gpxTrackPointList.get(gpxTrackPointList.size() - 1);
 
         final FitLap.Builder lapBuilder = new FitLap.Builder();
-        lapBuilder.setStartLat(first.getLatitude());
-        lapBuilder.setStartLong(first.getLongitude());
-        lapBuilder.setEndLat(last.getLatitude());
-        lapBuilder.setEndLong(last.getLongitude());
+        lapBuilder.setStartPositionLat(first.getLatitude());
+        lapBuilder.setStartPositionLong(first.getLongitude());
+        lapBuilder.setEndPositionLat(last.getLatitude());
+        lapBuilder.setEndPositionLong(last.getLongitude());
         lapBuilder.setTimestamp(timestamp);
         lapBuilder.setMessageIndex(0);
         lapBuilder.setStartTime(timestamp);

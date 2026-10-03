@@ -56,16 +56,16 @@ import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.AntGadget
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.FitFile;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.RecordData;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.enums.BatteryStatus;
+import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.enums.DisplayMeasure;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.enums.GarminSport;
-import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.enums.MeasurementSystem;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.enums.WaterType;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.exception.FitParseException;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.enums.ExerciseCategory;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.messages.FitActivity;
+import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.messages.FitBattery;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.messages.FitDeviceInfo;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.messages.FitFileCreator;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.messages.FitFileId;
-import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.messages.FitDeviceStatus;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.messages.FitDiveGas;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.messages.FitDiveSettings;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.messages.FitDiveSummary;
@@ -120,9 +120,9 @@ public class GarminWorkoutParser implements ActivitySummaryParser {
     private final List<FitWorkoutStep> workoutSteps = new ArrayList<>();
     private final Map<Integer, FitDeviceInfo> deviceInfos = new TreeMap<>();
     @Nullable
-    private FitDeviceStatus deviceStatusStart = null;
+    private FitBattery batteryStart = null;
     @Nullable
-    private FitDeviceStatus deviceStatusEnd = null;
+    private FitBattery batteryEnd = null;
     @Nullable
     private Number ebikeBatteryStart = null;
     @Nullable
@@ -236,8 +236,8 @@ public class GarminWorkoutParser implements ActivitySummaryParser {
         laps.clear();
         workoutSteps.clear();
         deviceInfos.clear();
-        deviceStatusStart = null;
-        deviceStatusEnd = null;
+        batteryStart = null;
+        batteryEnd = null;
         ebikeBatteryStart = null;
         ebikeBatteryEnd = null;
         workout = null;
@@ -361,11 +361,11 @@ public class GarminWorkoutParser implements ActivitySummaryParser {
             if (relevant) {
                 deviceInfos.put(deviceIndex, deviceInfo);
             }
-        } else if (record instanceof FitDeviceStatus deviceStatus) {
-            if (deviceStatusStart == null) {
-                deviceStatusStart = deviceStatus;
+        } else if (record instanceof FitBattery fitBattery) {
+            if (batteryStart == null) {
+                batteryStart = fitBattery;
             } else {
-                deviceStatusEnd = deviceStatus;
+                batteryEnd = fitBattery;
             }
             // FitImporter implements the main processing for these records
             return false;
@@ -422,7 +422,7 @@ public class GarminWorkoutParser implements ActivitySummaryParser {
                 workoutName = activity.getName();
             }
             if (StringUtils.isNullOrEmpty(workoutName) && workout != null) {
-                workoutName = workout.getName();
+                workoutName = workout.getWktName();
             }
             if (StringUtils.isNullOrEmpty(workoutName)) {
                 workoutName = session.getSportProfileName();
@@ -444,7 +444,7 @@ public class GarminWorkoutParser implements ActivitySummaryParser {
 
         final String weightUnit;
         if (userProfile != null && userProfile.getWeightSetting() != null) {
-            weightUnit = MeasurementSystem.metric.equals(userProfile.getWeightSetting()) ? UNIT_KG : UNIT_LB;
+            weightUnit = DisplayMeasure.metric.equals(userProfile.getWeightSetting()) ? UNIT_KG : UNIT_LB;
         } else {
             weightUnit = UNIT_KG;
         }
@@ -479,20 +479,20 @@ public class GarminWorkoutParser implements ActivitySummaryParser {
         if (session.getTotalCalories() != null) {
             summaryData.add(CALORIES_CONSUMED, session.getCaloriesConsumed(), UNIT_KCAL);
             summaryData.add(CALORIES_TOTAL, session.getTotalCalories(), UNIT_KCAL);
-            if (session.getRestingCalories() != null) {
-                summaryData.add(CALORIES_BURNT, session.getTotalCalories() - session.getRestingCalories(), UNIT_KCAL);
-                summaryData.add(CALORIES_RESTING, session.getRestingCalories(), UNIT_KCAL);
+            if (session.getMetabolicCalories() != null) {
+                summaryData.add(CALORIES_BURNT, session.getTotalCalories() - session.getMetabolicCalories(), UNIT_KCAL);
+                summaryData.add(CALORIES_RESTING, session.getMetabolicCalories(), UNIT_KCAL);
             }
         }
         summaryData.add(FLUID_CONSUMED, session.getFluidConsumed(), UNIT_ML);
         summaryData.add(ESTIMATED_SWEAT_LOSS, session.getEstimatedSweatLoss(), UNIT_ML);
         summaryData.add(HR_MIN, session.getMinHeartRate(), UNIT_BPM);
-        if (!summaryData.add(HR_AVG, session.getAverageHeartRate(), UNIT_BPM) && physiologicalMetrics != null) {
+        if (!summaryData.add(HR_AVG, session.getAvgHeartRate(), UNIT_BPM) && physiologicalMetrics != null) {
             summaryData.add(HR_AVG, physiologicalMetrics.getAverageHeartRate(), UNIT_BPM);
         }
         summaryData.add(HR_MAX, session.getMaxHeartRate(), UNIT_BPM);
-        summaryData.add(HRV_SDRR, session.getHrvSdrr(), UNIT_MILLISECONDS);
-        summaryData.add(HRV_RMSSD, session.getHrvRmssd(), UNIT_MILLISECONDS);
+        summaryData.add(HRV_SDRR, session.getSdrrHrv(), UNIT_MILLISECONDS);
+        summaryData.add(HRV_RMSSD, session.getRmssdHrv(), UNIT_MILLISECONDS);
         summaryData.add(SPO2_AVG, session.getAvgSpo2(), UNIT_PERCENTAGE);
 
         summaryData.add(RESPIRATION_MIN, UNIT_BREATHS_PER_MIN,
@@ -549,7 +549,7 @@ public class GarminWorkoutParser implements ActivitySummaryParser {
                 summaryData.add(AVERAGE_ASCENT_VELOCITY, session.getAvgVam() * 3600, UNIT_METERS_PER_HOUR);
             }
         }
-        summaryData.add(SWIM_AVG_CADENCE, session.getAvgSwimCadence(), UNIT_STROKES_PER_LENGTH);
+        summaryData.add(SWIM_AVG_CADENCE, session.getAvgStrokesPerLength(), UNIT_STROKES_PER_LENGTH);
 
         Number speedAvg = session.getEnhancedAvgSpeed();
         if (speedAvg == null) {
@@ -594,7 +594,7 @@ public class GarminWorkoutParser implements ActivitySummaryParser {
         summaryData.add(NORMALIZED_POWER, session.getNormalizedPower(), UNIT_WATT);
         summaryData.add(TOTAL_WORK, session.getTotalWork(), UNIT_JOULE);
 
-        summaryData.add(STANDING_TIME, session.getStandTime(), UNIT_SECONDS);
+        summaryData.add(STANDING_TIME, session.getTimeStanding(), UNIT_SECONDS);
         summaryData.add(STANDING_COUNT, session.getStandCount(), UNIT_NONE);
         summaryData.add(AVG_LEFT_PCO, session.getAvgLeftPco(), UNIT_MM);
         summaryData.add(AVG_RIGHT_PCO, session.getAvgRightPco(), UNIT_MM);
@@ -705,8 +705,8 @@ public class GarminWorkoutParser implements ActivitySummaryParser {
             summaryData.add(MAX_CADENCE_STANDING, maxCadencePosition[1], UNIT_RPM);
         }
 
-        summaryData.add(FRONT_GEAR_SHIFTS, session.getFrontShifts(), UNIT_NONE);
-        summaryData.add(REAR_GEAR_SHIFTS, session.getRearShifts(), UNIT_NONE);
+        summaryData.add(FRONT_GEAR_SHIFTS, session.getFrontGearShiftCount(), UNIT_NONE);
+        summaryData.add(REAR_GEAR_SHIFTS, session.getRearGearShiftCount(), UNIT_NONE);
 
         final Integer balance = session.getLeftRightBalance();
         if (balance != null) {
@@ -751,8 +751,8 @@ public class GarminWorkoutParser implements ActivitySummaryParser {
 
         for (final FitTimeInZone fitTimeInZone : timesInZone) {
             // Find the first time in zone for the session (assumes single-session)
-            if (fitTimeInZone.getReferenceMessage() != null && fitTimeInZone.getReferenceMessage() == 18) {
-                final Double[] timeInZones = fitTimeInZone.getTimeInZone();
+            if (fitTimeInZone.getReferenceMesg() != null && fitTimeInZone.getReferenceMesg() == 18) {
+                final Double[] timeInZones = fitTimeInZone.getTimeInHrZone();
                 if (timeInZones == null) {
                     continue;
                 }
@@ -1063,21 +1063,21 @@ public class GarminWorkoutParser implements ActivitySummaryParser {
             gearTableBuilder.addToSummaryData(summaryData);
         }
 
-        if (deviceStatusStart != null) {
-            Number batteryLevel = deviceStatusStart.getBatteryLevel();
+        if (batteryStart != null) {
+            Number batteryLevel = batteryStart.getCapacity();
             String batteryUom = UNIT_PERCENTAGE;
             if (batteryLevel == null) {
-                batteryLevel = deviceStatusStart.getBatteryVoltage();
+                batteryLevel = batteryStart.getBatteryVoltage();
                 batteryUom = UNIT_VOLT;
             }
             summaryData.add(BATTERY_LEVEL_START, batteryLevel, batteryUom);
         }
 
-        if (deviceStatusEnd != null) {
-            Number batteryLevel = deviceStatusEnd.getBatteryLevel();
+        if (batteryEnd != null) {
+            Number batteryLevel = batteryEnd.getCapacity();
             String batteryUom = UNIT_PERCENTAGE;
             if (batteryLevel == null) {
-                batteryLevel = deviceStatusEnd.getBatteryVoltage();
+                batteryLevel = batteryEnd.getBatteryVoltage();
                 batteryUom = UNIT_VOLT;
             }
             summaryData.add(BATTERY_LEVEL_END, batteryLevel, batteryUom);
@@ -1122,7 +1122,7 @@ public class GarminWorkoutParser implements ActivitySummaryParser {
                 .filter(lap -> (lap.getTotalTimerTime() != null && lap.getTotalTimerTime() != 0))
                 .count() > 1;
         final boolean anySwimmingLaps = laps.stream()
-                .anyMatch(lap -> lap.getSwimStyle() != null);
+                .anyMatch(lap -> lap.getSwimStroke() != null);
 
         if (activityKind == ActivityKind.STOP_WATCH) {
             // The start value encoded in the FIT file is shifted to a later time if the stop watch was paused.
@@ -1210,7 +1210,7 @@ public class GarminWorkoutParser implements ActivitySummaryParser {
                     row.add(new ActivitySummaryValue(i, UNIT_NONE));
                 }
                 if (anySwimmingLaps) {
-                    row.add(new ActivitySummaryValue(lap.getSwimStyle() != null ? context.getString(lap.getSwimStyle().label) : null, UNIT_NONE));
+                    row.add(new ActivitySummaryValue(lap.getSwimStroke() != null ? context.getString(lap.getSwimStroke().label) : null, UNIT_NONE));
                     row.add(new ActivitySummaryValue(lap.getTotalDistance(), UNIT_METERS));
                 } else {
                     row.add(new ActivitySummaryValue(lap.getTotalDistance(), UNIT_METERS));

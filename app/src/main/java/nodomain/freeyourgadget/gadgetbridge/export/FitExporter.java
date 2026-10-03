@@ -570,7 +570,7 @@ public class FitExporter {
 
     private RecordData buildWorkout(@NonNull final String name, final int sport, final int subSport) {
         return new FitWorkout.Builder()
-                .setName(name)
+                .setWktName(name)
                 .setSport(sport)
                 .setSubSport(subSport)
                 .setNumValidSteps(0)
@@ -655,8 +655,8 @@ public class FitExporter {
 
         final GPSCoordinate loc = p.getLocation();
         if (loc != null) {
-            b.setLatitude(loc.getLatitude());
-            b.setLongitude(loc.getLongitude());
+            b.setPositionLat(loc.getLatitude());
+            b.setPositionLong(loc.getLongitude());
             // gps_accuracy (field 31, UINT8 metres, scale 1 — the byte IS the accuracy in
             // metres, no proportionate scaling). GB stores horizontal accuracy in metres in
             // the GPSCoordinate hdop slot (documented UNIT_METERS in ActivityPoint.Builder),
@@ -758,7 +758,7 @@ public class FitExporter {
         // sports leave these unset on ActivityPoint, so the gates skip the field.
         final float verticalOscillation = p.getVerticalOscillation();
         if (Float.isFinite(verticalOscillation) && verticalOscillation >= 0f) {
-            b.setOscillation(verticalOscillation);
+            b.setVerticalOscillation(verticalOscillation);
         }
         final float stanceTimePercent = p.getStanceTimePercent();
         if (Float.isFinite(stanceTimePercent) && stanceTimePercent >= 0f) {
@@ -823,12 +823,12 @@ public class FitExporter {
         final GPSCoordinate first = agg.getFirstLocation();
         final GPSCoordinate last = agg.getLastLocation();
         if (first != null) {
-            b.setStartLat(first.getLatitude());
-            b.setStartLong(first.getLongitude());
+            b.setStartPositionLat(first.getLatitude());
+            b.setStartPositionLong(first.getLongitude());
         }
         if (last != null) {
-            b.setEndLat(last.getLatitude());
-            b.setEndLong(last.getLongitude());
+            b.setEndPositionLat(last.getLatitude());
+            b.setEndPositionLong(last.getLongitude());
         }
         // Bounding box — drives map preview in Strava / Garmin Connect / Endurain.
         // Note: codegen currently maps setNecLat to FIT field 25 and setNecLong to 26
@@ -1039,20 +1039,20 @@ public class FitExporter {
         final GPSCoordinate first = agg.getFirstLocation();
         final GPSCoordinate last = agg.getLastLocation();
         if (first != null) {
-            b.setStartLatitude(first.getLatitude());
-            b.setStartLongitude(first.getLongitude());
+            b.setStartPositionLat(first.getLatitude());
+            b.setStartPositionLong(first.getLongitude());
         }
         if (last != null) {
-            b.setEndLatitude(last.getLatitude());
-            b.setEndLongitude(last.getLongitude());
+            b.setEndPositionLat(last.getLatitude());
+            b.setEndPositionLong(last.getLongitude());
         }
         // Bounding box across the whole track. Codegen here is correct (29/30/31/32 per
         // FIT spec).
         if (agg.hasBoundingBox()) {
-            b.setNecLatitude(agg.getMaxLat());
-            b.setNecLongitude(agg.getMaxLong());
-            b.setSwcLatitude(agg.getMinLat());
-            b.setSwcLongitude(agg.getMinLong());
+            b.setNecLat(agg.getMaxLat());
+            b.setNecLong(agg.getMaxLong());
+            b.setSwcLat(agg.getMinLat());
+            b.setSwcLong(agg.getMinLong());
         }
         // num_lengths — gate via sportSupportsNumLengths. Endurain + Strava show this as
         // the session's "lengths" headline number.
@@ -1125,7 +1125,7 @@ public class FitExporter {
         }
         final Integer avgHr = readInt(data, ActivitySummaryEntries.HR_AVG, agg.getAvgHr());
         if (avgHr != null) {
-            b.setAverageHeartRate(avgHr);
+            b.setAvgHeartRate(avgHr);
         }
         final Integer maxHr = readInt(data, ActivitySummaryEntries.HR_MAX, agg.getMaxHr());
         if (maxHr != null) {
@@ -1256,11 +1256,11 @@ public class FitExporter {
         }
         final Integer hrvSdrr = readInt(data, ActivitySummaryEntries.HRV_SDRR, null);
         if (hrvSdrr != null) {
-            b.setHrvSdrr(hrvSdrr);
+            b.setSdrrHrv(hrvSdrr);
         }
         final Integer hrvRmssd = readInt(data, ActivitySummaryEntries.HRV_RMSSD, null);
         if (hrvRmssd != null) {
-            b.setHrvRmssd(hrvRmssd);
+            b.setRmssdHrv(hrvRmssd);
         }
         final Integer recoveryHr = readInt(data, ActivitySummaryEntries.RECOVERY_HR, null);
         if (recoveryHr != null) {
@@ -1322,7 +1322,7 @@ public class FitExporter {
         }
         final Integer restingCalories = readInt(data, ActivitySummaryEntries.CALORIES_RESTING, null);
         if (restingCalories != null) {
-            b.setRestingCalories(restingCalories);
+            b.setMetabolicCalories(restingCalories);
         }
 
         // ---- Running form ----
@@ -1387,15 +1387,15 @@ public class FitExporter {
         }
         final Integer frontShifts = readInt(data, ActivitySummaryEntries.FRONT_GEAR_SHIFTS, null);
         if (frontShifts != null) {
-            b.setFrontShifts(frontShifts);
+            b.setFrontGearShiftCount(frontShifts);
         }
         final Integer rearShifts = readInt(data, ActivitySummaryEntries.REAR_GEAR_SHIFTS, null);
         if (rearShifts != null) {
-            b.setRearShifts(rearShifts);
+            b.setRearGearShiftCount(rearShifts);
         }
         final Long standTime = readSeconds(data, ActivitySummaryEntries.STANDING_TIME);
         if (standTime != null) {
-            b.setStandTime((double) standTime);
+            b.setTimeStanding((double) standTime);
         }
         final Integer standCount = readInt(data, ActivitySummaryEntries.STANDING_COUNT, null);
         if (standCount != null) {
@@ -1423,7 +1423,7 @@ public class FitExporter {
         // unit=strokes/min. If a parser stores Hz (strokes/sec) we'd 60x-undershoot.
         final Float strokeRateAvg = readFloat(data, ActivitySummaryEntries.STROKE_RATE_AVG, null);
         if (strokeRateAvg != null) {
-            b.setAvgSwimCadence(strokeRateAvg);
+            b.setAvgStrokesPerLength(strokeRateAvg);
         }
         // Predominant stroke style → FIT session.swim_stroke (enum). Source codes are
         // device-specific; mapXiaomiSwimStyleToFit handles the convention used by Xiaomi

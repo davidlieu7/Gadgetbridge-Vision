@@ -17,7 +17,7 @@
 
 package nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.fieldDefinitions;
 
-import static nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.enums.WeatherCondition.*;
+import static nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.enums.WeatherStatus.*;
 
 import androidx.annotation.Nullable;
 
@@ -26,17 +26,17 @@ import java.nio.ByteBuffer;
 import nodomain.freeyourgadget.gadgetbridge.model.weather.OwmCondition;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.FieldDefinition;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.baseTypes.BaseType;
-import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.enums.WeatherCondition;
+import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.enums.WeatherStatus;
 
-public class FieldDefinitionWeatherCondition extends FieldDefinition {
+public class FieldDefinitionWeatherStatus extends FieldDefinition {
 
-    public FieldDefinitionWeatherCondition(int localNumber, int size, BaseType baseType, String name, double scale, int offset) {
+    public FieldDefinitionWeatherStatus(int localNumber, int size, BaseType baseType, String name, double scale, int offset) {
         super(localNumber, size, baseType, name, scale, offset);
     }
 
     @Nullable
-    public static WeatherCondition fromId(final int id) {
-        for (final WeatherCondition candidate : WeatherCondition.values()) {
+    public static WeatherStatus fromId(final int id) {
+        for (final WeatherStatus candidate : WeatherStatus.values()) {
             if (id == candidate.num) {
                 return candidate;
             }
@@ -46,7 +46,7 @@ public class FieldDefinitionWeatherCondition extends FieldDefinition {
 
     @Nullable
     @Override
-    public WeatherCondition decode(ByteBuffer byteBuffer) {
+    public WeatherStatus decode(ByteBuffer byteBuffer) {
         final Object rawObj = baseType.decode(byteBuffer, scale, offset);
         if (rawObj instanceof final Number raw) {
             int id = raw.intValue();
@@ -57,10 +57,10 @@ public class FieldDefinitionWeatherCondition extends FieldDefinition {
 
     @Override
     public void encode(ByteBuffer byteBuffer, Object o) {
-        if (o instanceof final WeatherCondition weatherCondition) {
+        if (o instanceof final WeatherStatus weatherCondition) {
             o = weatherCondition.num;
         } else if(o instanceof final Integer code) {
-            final WeatherCondition condition = openWeatherCodeToFitWeatherStatus(code);
+            final WeatherStatus condition = openWeatherCodeToFitWeatherStatus(code);
             o = condition != null ? condition.num : 255;
         } else {
             o = null;
@@ -69,7 +69,7 @@ public class FieldDefinitionWeatherCondition extends FieldDefinition {
     }
 
     @Nullable
-    public static WeatherCondition openWeatherCodeToFitWeatherStatus(int openWeatherCode) {
+    public static WeatherStatus openWeatherCodeToFitWeatherStatus(int openWeatherCode) {
         final OwmCondition openWeatherCondition = OwmCondition.Companion.fromCode(openWeatherCode);
         if (openWeatherCondition == null) {
             return null;

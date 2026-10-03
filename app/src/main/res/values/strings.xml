@@ -1460,6 +1460,7 @@
     <string name="activity_prefs_goal_standing_hours">Daily target: standing hours</string>
     <string name="activity_prefs_goal_standing_time_minutes">Daily target: standing time in minutes</string>
     <string name="activity_prefs_goal_fat_burn_time_minutes">Daily target: fat burn time in minutes</string>
+    <string name="activity_prefs_goal_hydration_ml">Daily target: water intake in milliliters</string>
     <string name="activity_prefs_goal_active_calories_burnt">Daily target: active calories burnt</string>
     <string name="active_time">Active time</string>
     <string name="standing_time">Standing time</string>
@@ -1528,6 +1529,22 @@
     <string name="pref_summary_setup_bt_pairing">Deactivate this if you have trouble connecting</string>
     <string name="unit_metric">Metric</string>
     <string name="unit_imperial">Imperial</string>
+    <string name="hydration_unit_milliliter">Milliliters</string>
+    <string name="hydration_unit_cup">Cups</string>
+    <string name="hydration_unit_ounce">Fluid ounces</string>
+    <string name="hydration_unit_milliliter_symbol">mL</string>
+    <string name="hydration_unit_cup_symbol">cups</string>
+    <string name="hydration_unit_ounce_symbol">fl oz</string>
+    <string name="pref_header_hydration">Hydration</string>
+    <string name="pref_hydration_container_i">Container %1$d</string>
+    <string name="pref_hydration_container_volume">Volume</string>
+    <string name="hydration_total">Total</string>
+    <string name="hydration_goal">Daily goal</string>
+    <string name="hydration_daily_average">Daily average</string>
+    <string name="hydration_add">Add</string>
+    <string name="hydration_add_increment">+%1$s</string>
+    <string name="hydration_add_title">Add water intake (%1$s)</string>
+    <string name="hydration_add_invalid_value">Invalid value</string>
     <string name="timeformat_24h">24H</string>
     <string name="timeformat_am_pm">AM/PM</string>
     <string name="dateformat_day_month">Day, Month</string>
@@ -4765,6 +4782,7 @@
     <string name="battery_full_threshold">Full battery threshold</string>
     <string name="default_percentage">Default (%1$d%%)</string>
     <string name="battery_percentage_str">%1$s%%</string>
+    <string name="body_energy_percentage">%1$d %%</string>
     <string name="pref_import_activity_files_title">Import activity files</string>
     <string name="pref_import_activity_files_summary">Manually import activity files from the phone storage</string>
     <string name="pref_reprocess_activity_files_title">Reprocess activity files</string>
@@ -5328,6 +5346,8 @@
     <string name="pref_huawei_arterial_stiffness_detection">Arterial stiffness detection</string>
     <string name="pref_huawei_arterial_stiffness_detection_enable_title">Enable arterial stiffness detection</string>
     <string name="pref_huawei_arterial_stiffness_detection_enable_summary">Activate arterial stiffness detection on the device</string>
+    <string name="pref_huawei_wheelchair_mode">Wheelchair mode</string>
+    <string name="pref_huawei_wheelchair_mode_enable_summary">Rolling workout will be available on the watch and Activity records will track daily activity, such as wheelchair pushes. Steps will not be counted.</string>
     <string name="movementConsistency">Consistency</string>
     <string name="movementStability">Stability</string>
     <string name="movementContinuity">Continuity</string>

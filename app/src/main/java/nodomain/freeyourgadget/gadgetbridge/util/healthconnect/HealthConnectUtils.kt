@@ -694,6 +694,14 @@ class HealthConnectUtils {
                     healthConnectClient, gbDevice, metadata, offset,
                     currentSliceStartTs, currentSliceEndTs, grantedPermissions
                 ))
+                HealthConnectPermissionManager.HealthConnectDataType.HYDRATION -> {
+                    if (gbDevice.deviceCoordinator.supportsHydration(gbDevice)) {
+                        sliceStats.add(HydrationSyncer.sync(
+                            healthConnectClient, gbDevice, metadata, offset,
+                            currentSliceStartTs, currentSliceEndTs, grantedPermissions
+                        ))
+                    }
+                }
                 HealthConnectPermissionManager.HealthConnectDataType.WORKOUTS -> {
                     // Sync explicitly recorded workouts from BaseActivitySummary
                     val coordinator = gbDevice.deviceCoordinator
@@ -837,6 +845,7 @@ class HealthConnectUtils {
                 // For SpO2 and Temperature, there might be a specific provider or fallback to general sample provider
                 HealthConnectPermissionManager.HealthConnectDataType.SPO2 -> coordinator.getSpo2SampleProvider(device, db.daoSession) // Potentially add fallback if needed: ?: coordinator.getSampleProvider(device, db.daoSession)
                 HealthConnectPermissionManager.HealthConnectDataType.TEMPERATURE -> coordinator.getTemperatureSampleProvider(device, db.daoSession) // Potentially add fallback: ?: coordinator.getSampleProvider(device, db.daoSession)
+                HealthConnectPermissionManager.HealthConnectDataType.HYDRATION -> coordinator.getHydrationSampleProvider(device, db.daoSession)
                 HealthConnectPermissionManager.HealthConnectDataType.WORKOUTS -> db.daoSession.baseActivitySummaryDao
             }
         }

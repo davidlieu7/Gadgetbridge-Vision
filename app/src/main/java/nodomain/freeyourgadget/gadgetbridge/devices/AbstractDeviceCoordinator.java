@@ -471,6 +471,12 @@ public abstract class AbstractDeviceCoordinator implements DeviceCoordinator {
     }
 
     @Override
+    @Nullable
+    public HydrationSampleProvider getHydrationSampleProvider(final GBDevice device, final DaoSession session) {
+        return null;
+    }
+
+    @Override
     public TimeSampleProvider<? extends RestingMetabolicRateSample> getRestingMetabolicRateProvider(final GBDevice device, final DaoSession session) {
         return new DefaultRestingMetabolicRateProvider(device, session);
     }
@@ -806,6 +812,7 @@ public abstract class AbstractDeviceCoordinator implements DeviceCoordinator {
                 supportsSpo2(device) ||
                 supportsTemperatureMeasurement(device) ||
                 supportsWeightMeasurement(device) ||
+                supportsHydration(device) ||
                 supportsActiveCalories(device) ||
                 supportsCyclingData(device) ||
                 supportsRespiratoryRate(device) ||
@@ -907,6 +914,11 @@ public abstract class AbstractDeviceCoordinator implements DeviceCoordinator {
 
     @Override
     public boolean supportsWeightMeasurement(@NonNull GBDevice device) {
+        return false;
+    }
+
+    @Override
+    public boolean supportsHydration(@NonNull GBDevice device) {
         return false;
     }
 

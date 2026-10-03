@@ -25,6 +25,8 @@ public class BluetoothNameTest extends TestBase {
             put("UGREEN HiTune Max5c", DeviceType.UGREEN_HITUNE_MAX_5C);
             put("UGREEN HiTune Max 5c", DeviceType.UGREEN_HITUNE_MAX_5C);
             put("Active 2 NFC (Round)", DeviceType.AMAZFITACTIVE2NFC);
+            put("Amazfit Balance 3", DeviceType.AMAZFITBALANCE3); // #6895
+            put("Balance 3", DeviceType.AMAZFITBALANCE3); // #6895
             put("Amazfit Band 7", DeviceType.AMAZFITBAND7); // #2945
             put("Amazfit GTR 3 Pro", DeviceType.AMAZFITGTR3PRO); // #2442
             put("Amazfit GTS", DeviceType.AMAZFITGTS); // #5391
@@ -53,6 +55,7 @@ public class BluetoothNameTest extends TestBase {
             put("L 70", DeviceType.L70);
             put("V73", DeviceType.COLMI_V73); // #5715
             put("R05_9805", DeviceType.YAWELL_R05); // #3896
+            put("H59MAX_8502", DeviceType.H59); // #6906
             put("Swiss Peak-BA93", DeviceType.GLORYFIT_SWISS_PEAK); //#6626
             put("FC1(ID-8309)", DeviceType.GRV_FC1); //#6531
             put("BT103(ID-AB01)", DeviceType.OUKITEL_BT103);

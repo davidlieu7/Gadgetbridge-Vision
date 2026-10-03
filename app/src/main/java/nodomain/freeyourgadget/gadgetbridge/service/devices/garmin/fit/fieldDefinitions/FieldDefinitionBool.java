@@ -23,9 +23,9 @@ import java.nio.ByteBuffer;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.FieldDefinition;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.baseTypes.BaseType;
 
-public class FieldDefinitionBoolean extends FieldDefinition {
+public class FieldDefinitionBool extends FieldDefinition {
 
-    public FieldDefinitionBoolean(int localNumber, int size, BaseType baseType, String name, double scale, int offset) {
+    public FieldDefinitionBool(int localNumber, int size, BaseType baseType, String name, double scale, int offset) {
         super(localNumber, size, baseType, name, scale, offset);
     }
 

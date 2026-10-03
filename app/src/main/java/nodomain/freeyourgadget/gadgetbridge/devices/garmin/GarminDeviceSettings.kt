@@ -2,13 +2,19 @@ package nodomain.freeyourgadget.gadgetbridge.devices.garmin
 
 import android.content.Context
 import android.net.Uri
+import android.text.InputType
 import android.widget.Toast
+import androidx.core.content.edit
+import androidx.preference.EditTextPreference
+import androidx.preference.Preference
 import nodomain.freeyourgadget.gadgetbridge.GBApplication
 import nodomain.freeyourgadget.gadgetbridge.R
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsPreferenceConst
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSpecificSettingsScreen
+import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.DeviceSettingsScope
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.DeviceSettingsSpec
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.deviceSettings
+import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.components.enumList
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.components.fetchUnknownFiles
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.components.highMtu
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.components.installUnsupportedFiles
@@ -21,6 +27,8 @@ import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.compon
 import nodomain.freeyourgadget.gadgetbridge.activities.workouts.templates.WorkoutTemplateListActivity
 import nodomain.freeyourgadget.gadgetbridge.devices.garmin.actions.GarminSendWaypointActivity
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice
+import nodomain.freeyourgadget.gadgetbridge.model.HydrationContainer
+import nodomain.freeyourgadget.gadgetbridge.model.HydrationUnit
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.FitAsyncProcessor
 import nodomain.freeyourgadget.gadgetbridge.util.FileUtils
 import nodomain.freeyourgadget.gadgetbridge.util.GB
@@ -29,6 +37,8 @@ import org.slf4j.LoggerFactory
 import java.io.File
 import java.io.IOException
 import java.util.concurrent.atomic.AtomicBoolean
+import kotlin.math.max
+import kotlin.math.roundToLong
 
 private val LOG = LoggerFactory.getLogger("GarminDeviceSettings")
 
@@ -53,6 +63,10 @@ fun garminDeviceSettings(
             icon = R.drawable.ic_activity_unknown_small,
             activityClass = WorkoutTemplateListActivity::class.java,
         )
+    }
+
+    if (coordinator.supportsHydration(device)) {
+        garminHydration()
     }
 
     if (coordinator.supportsCalendarEvents(device)) {
@@ -171,6 +185,89 @@ fun garminDeviceSettings(
         )
     }
 }
+
+private fun DeviceSettingsScope.garminHydration() {
+    screen(
+        key = "pref_screen_garmin_hydration",
+        title = R.string.pref_header_hydration,
+        icon = R.drawable.ic_drink,
+    ) {
+        enumList<HydrationUnit>(
+            key = DeviceSettingsPreferenceConst.PREF_HYDRATION_UNIT,
+            title = R.string.pref_title_unit_system,
+            icon = R.drawable.ic_straighten,
+            defaultValue = HydrationUnit.MILLILITER,
+            connectedOnly = false,
+        )
+
+        for (container in 1..HydrationContainer.COUNT) {
+            category(
+                key = "pref_header_hydration_container_$container",
+                titleText = GBApplication.getContext().getString(R.string.pref_hydration_container_i, container),
+                iconSpaceReserved = false,
+            ) {
+                text(
+                    key = HydrationContainer.volumeKey(container),
+                    title = R.string.pref_hydration_container_volume,
+                    icon = R.drawable.ic_drink,
+                    defaultValue = HydrationContainer.defaultVolume(container).toString(),
+                    inputType = InputType.TYPE_CLASS_NUMBER or InputType.TYPE_NUMBER_FLAG_DECIMAL,
+                    connectedOnly = false,
+                )
+
+                enumList<HydrationUnit>(
+                    key = HydrationContainer.unitKey(container),
+                    title = R.string.workout_field_unit,
+                    icon = R.drawable.ic_straighten,
+                    defaultValue = HydrationUnit.MILLILITER,
+                    connectedOnly = false,
+                    onValueChange = { preference, oldUnit, newUnit ->
+                        convertContainerVolume(preference, container, oldUnit, newUnit)
+                    },
+                )
+            }
+        }
+    }
+}
+
+private fun convertContainerVolume(
+    preference: Preference,
+    container: Int,
+    oldUnit: HydrationUnit,
+    newUnit: HydrationUnit
+) {
+    val volumePreference = preference.preferenceManager.findPreference<EditTextPreference>(
+        HydrationContainer.volumeKey(container)
+    ) ?: return
+    val volume = volumePreference.text?.toDoubleOrNull() ?: return
+    val sharedPreferences = preference.sharedPreferences ?: return
+
+    // The stored volume in mL is only valid if it still rounds to the current volume.
+    val storedMl = sharedPreferences.getString(HydrationContainer.volumeMlKey(container), null)?.toDoubleOrNull()
+    val volumeMl = if (storedMl != null && roundVolume(storedMl / oldUnit.ml) == volume) {
+        storedMl
+    } else {
+        volume * oldUnit.ml
+    }
+    val converted = roundVolume(volumeMl / newUnit.ml)
+
+    LOG.debug(
+        "Converting container {} volume from {} {} ({} mL) to {} {}",
+        container,
+        volume,
+        oldUnit,
+        volumeMl,
+        converted,
+        newUnit
+    )
+
+    sharedPreferences.edit {
+        putString(HydrationContainer.volumeMlKey(container), volumeMl.toString())
+    }
+    volumePreference.text = converted.toLong().toString()
+}
+
+private fun roundVolume(volume: Double): Double = max(1.0, volume.roundToLong().toDouble())
 
 private fun importActivityFiles(context: Context, device: GBDevice, uris: List<Uri>) {
     LOG.info("Files to import: {}", uris)

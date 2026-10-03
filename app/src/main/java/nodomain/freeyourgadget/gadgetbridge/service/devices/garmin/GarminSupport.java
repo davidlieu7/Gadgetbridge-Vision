@@ -89,6 +89,7 @@ import nodomain.freeyourgadget.gadgetbridge.impl.GBDeviceApp;
 import nodomain.freeyourgadget.gadgetbridge.model.Alarm;
 import nodomain.freeyourgadget.gadgetbridge.model.CallSpec;
 import nodomain.freeyourgadget.gadgetbridge.model.CannedMessagesSpec;
+import nodomain.freeyourgadget.gadgetbridge.model.HydrationContainer;
 import nodomain.freeyourgadget.gadgetbridge.model.MusicSpec;
 import nodomain.freeyourgadget.gadgetbridge.model.MusicStateSpec;
 import nodomain.freeyourgadget.gadgetbridge.model.NotificationSpec;
@@ -133,7 +134,7 @@ import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.enums.Wea
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.messages.FitAlarmSettings;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.messages.FitDeviceSettings;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.messages.FitFileId;
-import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.messages.FitWeather;
+import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.messages.FitWeatherConditions;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.workouts.GarminWorkoutFitEncoder;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.messages.CurrentTimeRequestMessage;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.messages.DownloadRequestMessage;
@@ -158,8 +159,11 @@ import nodomain.freeyourgadget.gadgetbridge.util.notifications.GBProgressNotific
 import static nodomain.freeyourgadget.gadgetbridge.GBApplication.ACTION_APP_IS_IN_BACKGROUND;
 import static nodomain.freeyourgadget.gadgetbridge.GBApplication.ACTION_APP_IS_IN_FOREGROUND;
 import static nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsPreferenceConst.PREF_ALLOW_HIGH_MTU;
+import static nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsPreferenceConst.PREF_HYDRATION_SEND_TODAY;
+import static nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsPreferenceConst.PREF_HYDRATION_UNIT;
 import static nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsPreferenceConst.PREF_SEND_APP_NOTIFICATIONS;
 import static nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsPreferenceConst.PREF_TIME_SYNC;
+import static nodomain.freeyourgadget.gadgetbridge.model.ActivityUser.PREF_USER_GOAL_HYDRATION_ML;
 
 
 public class GarminSupport extends AbstractBTLESingleDeviceSupport implements ICommunicator.Callback {
@@ -780,7 +784,7 @@ public class GarminSupport extends AbstractBTLESingleDeviceSupport implements IC
 
         final FitLocalMessageBuilder weatherLocalMessage = new FitLocalMessageBuilder();
 
-        final FitWeather.Builder today = new FitWeather.Builder();
+        final FitWeatherConditions.Builder today = new FitWeatherConditions.Builder();
         today.setWeatherReport(WeatherReport.current);
         today.setTimestamp((long) weather.getTimestamp());
         today.setObservedAtTime((long) weather.getTimestamp());
@@ -804,7 +808,7 @@ public class GarminSupport extends AbstractBTLESingleDeviceSupport implements IC
         for (int hour = 0; hour <= 11; hour++) {
             if (hour < weather.getHourly().size()) {
                 WeatherSpec.Hourly hourly = weather.getHourly().get(hour);
-                final FitWeather.Builder weatherHourlyForecast = new FitWeather.Builder();
+                final FitWeatherConditions.Builder weatherHourlyForecast = new FitWeatherConditions.Builder();
                 weatherHourlyForecast.setWeatherReport(WeatherReport.hourly_forecast);
                 weatherHourlyForecast.setTimestamp((long) hourly.getTimestamp());
                 weatherHourlyForecast.weatherTemperature(hourly.getTemp());
@@ -827,7 +831,7 @@ public class GarminSupport extends AbstractBTLESingleDeviceSupport implements IC
         // since they share the same message type in the definition message
         final int dailyMessageType = weatherLocalMessage.getNextAvailableLocalMessageType();
 
-        final FitWeather.Builder todayDailyForecast = new FitWeather.Builder();
+        final FitWeatherConditions.Builder todayDailyForecast = new FitWeatherConditions.Builder();
         todayDailyForecast.setWeatherReport(WeatherReport.daily_forecast);
         todayDailyForecast.setTimestamp((long) weather.getTimestamp());
         todayDailyForecast.weatherLowTemperature(weather.getTodayMinTemp());
@@ -848,7 +852,7 @@ public class GarminSupport extends AbstractBTLESingleDeviceSupport implements IC
             if (day < weather.getForecasts().size()) {
                 WeatherSpec.Daily daily = weather.getForecasts().get(day);
                 int ts = weather.getTimestamp() + (day + 1) * 24 * 60 * 60;
-                final FitWeather.Builder weatherDailyForecast = new FitWeather.Builder();
+                final FitWeatherConditions.Builder weatherDailyForecast = new FitWeatherConditions.Builder();
                 weatherDailyForecast.setWeatherReport(WeatherReport.daily_forecast);
                 weatherDailyForecast.setTimestamp((long) weather.getTimestamp());
                 weatherDailyForecast.weatherLowTemperature(daily.getMinTemp());
@@ -914,14 +918,53 @@ public class GarminSupport extends AbstractBTLESingleDeviceSupport implements IC
             return;
         }
 
-        //noinspection SwitchStatementWithTooFewBranches
+        if (isHydrationContainerPref(config)) {
+            sendHydrationSettings();
+            return;
+        }
+
         switch (config) {
             case PREF_SEND_APP_NOTIFICATIONS:
                 NotificationSubscriptionDeviceEvent notificationSubscriptionDeviceEvent = new NotificationSubscriptionDeviceEvent();
                 notificationSubscriptionDeviceEvent.enable = true; // actual status is fetched from preferences
                 evaluateGBDeviceEvent(notificationSubscriptionDeviceEvent);
                 return;
+            case PREF_HYDRATION_UNIT:
+                sendHydrationSettings();
+                return;
+            case PREF_USER_GOAL_HYDRATION_ML:
+            case PREF_HYDRATION_SEND_TODAY:
+                sendHydrationUpdate();
+                return;
         }
+    }
+
+    private static boolean isHydrationContainerPref(final String config) {
+        for (int container = 1; container <= HydrationContainer.COUNT; container++) {
+            if (config.equals(HydrationContainer.volumeKey(container)) ||
+                    config.equals(HydrationContainer.unitKey(container))) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private void sendHydrationUpdate() {
+        if (!getCoordinator().supportsHydration(getDevice())) {
+            return;
+        }
+        try {
+            sendProtobufRequest("hydration update", protocolBufferHandler.getPushNotificationHandler().hydrationUpdate());
+        } catch (final Exception e) {
+            LOG.error("Failed to send hydration update", e);
+        }
+    }
+
+    private void sendHydrationSettings() {
+        if (!getCoordinator().supportsHydration(getDevice())) {
+            return;
+        }
+        sendProtobufRequest("hydration settings", protocolBufferHandler.getPushNotificationHandler().hydrationSettings());
     }
 
     private void resetFileSyncState() {
