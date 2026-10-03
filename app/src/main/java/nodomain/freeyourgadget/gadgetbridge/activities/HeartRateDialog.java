@@ -47,7 +47,6 @@ import nodomain.freeyourgadget.gadgetbridge.model.Spo2Sample;
 
 public class HeartRateDialog extends Dialog {
     private final GBDevice device;
-    private boolean resultReceived;
 
     protected static final Logger LOG = LoggerFactory.getLogger(HeartRateDialog.class);
     LinearLayout heart_rate_dialog_results_layout;
@@ -71,17 +70,6 @@ public class HeartRateDialog extends Dialog {
                     final GBDevice incomingDevice = intent.getParcelableExtra(GBDevice.EXTRA_DEVICE);
                     if (device.equals(incomingDevice)) {
                         setMeasurementResults(intent.getSerializableExtra(DeviceService.EXTRA_REALTIME_SAMPLE));
-                    }
-                    break;
-                case DeviceService.ACTION_HEARTRATE_MEASUREMENT_ERROR:
-                    if (measurement == Measurement.HEART_RATE && !resultReceived &&
-                            device.equals(intent.getParcelableExtra(GBDevice.EXTRA_DEVICE))) {
-                        final String error = intent.getStringExtra(DeviceService.EXTRA_MEASUREMENT_ERROR);
-                        if (error != null) {
-                            heart_rate_dialog_loading_layout.setVisibility(View.GONE);
-                            heart_rate_dialog_results_layout.setVisibility(View.GONE);
-                            heart_rate_dialog_label.setText(error);
-                        }
                     }
                     break;
                 default:
@@ -110,6 +98,10 @@ public class HeartRateDialog extends Dialog {
     }
 
     private void setMeasurementResults(Serializable result) {
+        heart_rate_dialog_results_layout.setVisibility(View.VISIBLE);
+        heart_rate_dialog_loading_layout.setVisibility(View.GONE);
+        heart_rate_dialog_label.setText(getContext().getString(R.string.heart_rate_result));
+
         int heartRate = 0;
         if (result instanceof ActivitySample) {
             ActivitySample sample = (ActivitySample) result;
@@ -119,17 +111,6 @@ public class HeartRateDialog extends Dialog {
             HeartRateSample sample = (HeartRateSample) result;
             heartRate = sample.getHeartRate();
         }
-        final boolean validHeartRate = HeartRateUtils.getInstance().isValidHeartRateValue(heartRate);
-        final boolean validSpo2 = result instanceof Spo2Sample && ((Spo2Sample) result).getSpo2() > 0;
-        if ((measurement == Measurement.HEART_RATE && !validHeartRate) ||
-                (measurement == Measurement.SPO2 && !validSpo2)) {
-            return;
-        }
-        resultReceived = true;
-        heart_rate_dialog_results_layout.setVisibility(View.VISIBLE);
-        heart_rate_dialog_loading_layout.setVisibility(View.GONE);
-        heart_rate_dialog_label.setText(getContext().getString(R.string.heart_rate_result));
-
         if (HeartRateUtils.getInstance().isValidHeartRateValue(heartRate)) {
             heart_rate_hr.setVisibility(View.VISIBLE);
             heart_rate_widget_hr_value.setText(String.valueOf(heartRate));
@@ -150,7 +131,6 @@ public class HeartRateDialog extends Dialog {
 
         IntentFilter filter = new IntentFilter();
         filter.addAction(DeviceService.ACTION_REALTIME_SAMPLES);
-        filter.addAction(DeviceService.ACTION_HEARTRATE_MEASUREMENT_ERROR);
         LocalBroadcastManager.getInstance(getContext()).registerReceiver(mReceiver, filter);
 
         setContentView(R.layout.heart_rate_dialog);
@@ -193,7 +173,7 @@ public class HeartRateDialog extends Dialog {
             GBApplication.deviceService(device).onEnableRealtimeHeartRateMeasurement(true);
         }
 
-        setOnDismissListener(dialogInterface -> {
+        setOnCancelListener(dialogInterface -> {
             if (device.getDeviceCoordinator().supportsLiveOnlyHeartRateDisplay(device)) {
                 GBApplication.deviceService(device).onEnableRealtimeHeartRateMeasurement(false);
             }

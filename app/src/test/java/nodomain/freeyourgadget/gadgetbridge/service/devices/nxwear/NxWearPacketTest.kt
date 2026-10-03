@@ -11,23 +11,6 @@ class NxWearPacketTest {
     private fun bytes(hex: String) = hex.chunked(2).map { it.toInt(16).toByte() }.toByteArray()
 
     @Test
-    fun manualHeartRateCaptureContainsOnlyAcknowledgementAndDiagnosticLog() {
-        val ack = NxWearPacket.parse(bytes("000b000034180000010001000000000000000000"))
-        val first = NxWearPacket.parse(bytes("000b010d31fa00000b0001000107000000000001"))
-        val continuation = NxWearPacket.parse(bytes("0120000000000000000000000000000b00800100"))
-        val log = requireNotNull(first.append(continuation))
-
-        assertEquals(NxWearDataType.MANUAL_HEART_RATE, ack.dataType)
-        assertEquals(0x34, ack.command)
-        assertNull(NxWearHeartRateReading.parse(ack))
-        assertEquals(true, log.isComplete)
-        assertEquals(NxWearDataType.ACTIVITY_FA, log.dataType)
-        assertNull(NxWearHeartRateReading.parse(log))
-        assertArrayEquals(bytes("000b000d04fa0000010001000000000000000000"),
-            NxWearB8Support.encodeMeasurementAck(requireNotNull(log.sequence), requireNotNull(log.dataType)))
-    }
-
-    @Test
     fun reassemblesExerciseHeartRateHistoryBeforeAcknowledging() {
         val frames = listOf(
             "000b0303311100003f000c000c03b7be6a5904b7",
