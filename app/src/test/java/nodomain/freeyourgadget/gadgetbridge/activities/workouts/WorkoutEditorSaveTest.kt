@@ -44,8 +44,9 @@ class WorkoutEditorSaveTest : TestBase() {
         WorkoutUploadStore.storedSummaryData(listOf(id))[id]
 
     @Test
-    fun aRenameKeepsTheStoredSummaryData() {
+    fun aRenameKeepsTheStoredSummaryDataAndTheTrackFingerprint() {
         val summary = stored("""{"stored":1}""")
+        val trackHash = WorkoutUploadStore.trackHashOf(summary)
 
         summary.summaryData = """{"reparsed":2}"""
         summary.name = "Renamed"
@@ -53,6 +54,7 @@ class WorkoutEditorSaveTest : TestBase() {
 
         assertEquals("""{"stored":1}""", storedSummaryData(summary.id!!))
         assertEquals("""{"reparsed":2}""", summary.summaryData)
+        assertEquals(trackHash, WorkoutUploadStore.trackHashOf(summary))
         val reloaded = GBApplication.acquireDbReadOnly().use {
             it.daoSession.baseActivitySummaryDao.queryBuilder().list().single { s -> s.id == summary.id }
         }

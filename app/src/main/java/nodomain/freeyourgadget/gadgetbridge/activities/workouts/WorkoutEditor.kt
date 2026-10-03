@@ -393,7 +393,7 @@ class WorkoutEditor(private val context: Context, resultCaller: ActivityResultCa
      * Writes the edit made to [workout]'s summary, leaving its `summaryData` as stored. Opening a
      * workout re-parses its raw details into the entity in memory, which is not a change the user
      * made: writing it back would rewrite the stored value, and with it the fingerprint that tells
-     * an upload service the workout changed (see [WorkoutUploadStore.storedSummaryData]).
+     * an upload service the track changed (see [WorkoutUploadStore.storedSummaryData]).
      */
     private fun save(workout: Workout) = saveKeepingStoredSummaryData(workout.summary)
 
