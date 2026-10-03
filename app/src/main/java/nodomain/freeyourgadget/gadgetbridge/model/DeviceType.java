@@ -631,6 +631,7 @@ import nodomain.freeyourgadget.gadgetbridge.devices.yawell.ring.ColmiR06Coordina
 import nodomain.freeyourgadget.gadgetbridge.devices.yawell.ring.ColmiR07Coordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.yawell.ring.ColmiR09Coordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.yawell.ring.ColmiR10Coordinator;
+import nodomain.freeyourgadget.gadgetbridge.devices.yawell.ring.ColmiR11Coordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.yawell.ring.ColmiR12Coordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.yawell.ring.H59Coordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.yawell.ring.YawellR05Coordinator;
@@ -1193,6 +1194,7 @@ public enum DeviceType {
     COLMI_R07(ColmiR07Coordinator.class),
     COLMI_R09(ColmiR09Coordinator.class),
     COLMI_R10(ColmiR10Coordinator.class),
+    COLMI_R11(ColmiR11Coordinator.class),
     COLMI_R12(ColmiR12Coordinator.class),
     H59(H59Coordinator.class),
     COLMI_I28_ULTRA(ColmiI28UltraCoordinator.class),

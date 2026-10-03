@@ -54,6 +54,7 @@ public class BluetoothNameTest extends TestBase {
             put("i31", DeviceType.COLMI_I31);
             put("L 70", DeviceType.L70);
             put("V73", DeviceType.COLMI_V73); // #5715
+            put("COLMI R11", DeviceType.COLMI_R11); // #6916
             put("R05_9805", DeviceType.YAWELL_R05); // #3896
             put("H59MAX_8502", DeviceType.H59); // #6906
             put("Swiss Peak-BA93", DeviceType.GLORYFIT_SWISS_PEAK); //#6626

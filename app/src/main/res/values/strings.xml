@@ -2444,6 +2444,7 @@
     <string name="devicetype_colmi_r07" translatable="false">Colmi R07</string>
     <string name="devicetype_colmi_r09" translatable="false">Colmi R09</string>
     <string name="devicetype_colmi_r10" translatable="false">Colmi R10</string>
+    <string name="devicetype_colmi_r11" translatable="false">Colmi R11</string>
     <string name="devicetype_colmi_r12" translatable="false">Colmi R12</string>
     <string name="devicetype_h59" translatable="false">H59</string>
     <string name="devicetype_c60" translatable="false">C60</string>
