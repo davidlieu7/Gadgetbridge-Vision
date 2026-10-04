@@ -1,5 +1,6 @@
 package nodomain.freeyourgadget.gadgetbridge.devices.nxwear
 
+import android.content.SharedPreferences
 import android.os.Handler
 import android.os.Looper
 import android.view.View
@@ -119,14 +120,6 @@ class NxWearB8Coordinator : AbstractBLEDeviceCoordinator() {
                     device != null
                 }
             }
-            text(
-                key = PREF_MEASUREMENT_RESULT,
-                title = R.string.nx_wear_b8_measurement_result,
-                visibleWhen = { false },
-                onSharedPreferenceChanged = { value ->
-                    if (value.isNotEmpty()) measurementDialog.showResult(value)
-                },
-            )
             screen(
                 key = "nx_wear_b8_exercise",
                 title = R.string.activity_type_exercise,
@@ -288,25 +281,16 @@ class NxWearB8Coordinator : AbstractBLEDeviceCoordinator() {
 }
 
 private class NxWearB8MeasurementDialog(
-    private val preferences: android.content.SharedPreferences,
+    private val preferences: SharedPreferences,
 ) {
     private var dialog: AlertDialog? = null
-    private var message: TextView? = null
-    private var progress: ProgressBar? = null
-    private var closeHandler: Handler? = null
     private val MEASUREMENT_RESULT_CLOSE_DELAY_MS = 5_000L
-    private val closeRunnable = Runnable {
-        dialog?.dismiss()
-        dialog = null
-        message = null
-        progress = null
-        closeHandler = null
-    }
 
     fun show(context: android.content.Context, title: Int, onCancel: () -> Unit) {
-        closeHandler?.removeCallbacks(closeRunnable)
         dialog?.dismiss()
-        preferences.edit().putString(NxWearB8Coordinator.PREF_MEASUREMENT_RESULT, "").apply()
+        // Results are transient: an EditTextPreference would restore its cached value when cleared.
+        // Observe only the active dialog, independently of settings-spec recreation.
+        preferences.edit().remove(NxWearB8Coordinator.PREF_MEASUREMENT_RESULT).apply()
 
         val padding = (16 * context.resources.displayMetrics.density).toInt()
         val messageView = TextView(context).apply {
@@ -314,35 +298,44 @@ private class NxWearB8MeasurementDialog(
             setPadding(padding, 0, 0, 0)
         }
         val progressView = ProgressBar(context).apply { isIndeterminate = true }
-        message = messageView
-        progress = progressView
-
         val content = LinearLayout(context).apply {
             orientation = LinearLayout.HORIZONTAL
             setPadding(padding, padding, padding, padding)
             addView(progressView)
             addView(messageView)
         }
-        dialog = MaterialAlertDialogBuilder(context)
+        val currentDialog = MaterialAlertDialogBuilder(context)
             .setTitle(title)
             .setView(content)
             .setCancelable(false)
-            .setNegativeButton(R.string.cancel) { _, _ ->
-                closeRunnable.run()
-                onCancel()
+            .setNegativeButton(R.string.cancel) { _, _ -> onCancel() }
+            .create()
+        val handler = Handler(Looper.getMainLooper())
+        val closeRunnable = Runnable { currentDialog.dismiss() }
+        var resultReceived = false
+        val listener = SharedPreferences.OnSharedPreferenceChangeListener { prefs, key ->
+            if (key == NxWearB8Coordinator.PREF_MEASUREMENT_RESULT) {
+                val value = prefs.getString(key, "").orEmpty()
+                if (value.isNotEmpty()) {
+                    handler.post {
+                        if (currentDialog.isShowing && !resultReceived) {
+                            resultReceived = true
+                            progressView.visibility = View.GONE
+                            messageView.text = value
+                            currentDialog.getButton(AlertDialog.BUTTON_NEGATIVE).visibility = View.GONE
+                            handler.postDelayed(closeRunnable, MEASUREMENT_RESULT_CLOSE_DELAY_MS)
+                        }
+                    }
+                }
             }
-            .show()
-        closeHandler = Handler(Looper.getMainLooper())
-    }
-
-    fun showResult(value: String) {
-        if (dialog == null) return
-        closeHandler?.removeCallbacks(closeRunnable)
-        progress?.visibility = View.GONE
-        message?.text = value
-        dialog?.getButton(androidx.appcompat.app.AlertDialog.BUTTON_NEGATIVE)?.visibility = View.GONE
-        closeHandler = Handler(Looper.getMainLooper()).also {
-            it.postDelayed(closeRunnable, MEASUREMENT_RESULT_CLOSE_DELAY_MS)
         }
+        currentDialog.setOnDismissListener {
+            preferences.unregisterOnSharedPreferenceChangeListener(listener)
+            handler.removeCallbacksAndMessages(null)
+            if (dialog === currentDialog) dialog = null
+        }
+        dialog = currentDialog
+        currentDialog.show()
+        preferences.registerOnSharedPreferenceChangeListener(listener)
     }
 }
