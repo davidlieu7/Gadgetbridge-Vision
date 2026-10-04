@@ -50,6 +50,6 @@ class NxWearSpo2ReadingTest {
                 NxWearPacket.frame(0, 0x31, NxWearDataType.HISTORY_SPO2, malformed))))
         }
         assertNull(NxWearSpo2Reading.parse(NxWearPacket.parse(
-            NxWearPacket.frame(0, 0x31, NxWearDataType.ACTIVITY_2A, payload))))
+            NxWearPacket.frame(0, 0x31, NxWearDataType.HISTORY_HRV, payload))))
     }
 }

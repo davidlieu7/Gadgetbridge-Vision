@@ -43,12 +43,12 @@ class NxWearSleepReadingTest {
     @Test
     fun readsCapturedAutomaticHeartRateAndLatestReading() {
         val payload = bytes("110011fb88c16a4f0390c16a5c0a97c16a47139ec16a471aa5c16a4d23acc16a452bb3c16a4133bac16a4e3bc1c16a5b43c8c16a3d4bcfc16a6153d6c16a395bddc16a4a63e4c16a4d6bebc16a4673f2c16a467bf9c16a49")
-        val packet = NxWearPacket.parse(NxWearPacket.frame(5, 0x31, NxWearDataType.ACTIVITY_08, payload))
+        val packet = NxWearPacket.parse(NxWearPacket.frame(5, 0x31, NxWearDataType.HISTORY_HEART_RATE, payload))
         val readings = requireNotNull(NxWearHeartRateReading.parse(packet))
         assertEquals(17, readings.size)
         assertEquals(57, readings.minOf { it.bpm })
         assertEquals(97, readings.maxOf { it.bpm })
-        val latest = NxWearPacket.parse(NxWearPacket.frame(6, 0x31, NxWearDataType.ACTIVITY_08, bytes("010001a800c26a4c")))
+        val latest = NxWearPacket.parse(NxWearPacket.frame(6, 0x31, NxWearDataType.HISTORY_HEART_RATE, bytes("010001a800c26a4c")))
         assertEquals(NxWearHeartRateReading(0x6ac200a8L * 1000L, 76), requireNotNull(NxWearHeartRateReading.parse(latest)).single())
     }
 }
