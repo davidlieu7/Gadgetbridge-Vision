@@ -71,7 +71,7 @@ class NxWearB8Support : AbstractBTLESingleDeviceSupport(LOG) {
     override fun getCoordinator(): NxWearB8Coordinator = super.getCoordinator() as NxWearB8Coordinator
 
     init {
-        addSupportedService(UUID.fromString("0000f618-0000-1000-8000-00805f9b34fb"))
+        addSupportedService(SERVICE_CHARACTERISTIC)
     }
 
     override fun useAutoConnect(): Boolean = true
@@ -133,34 +133,13 @@ class NxWearB8Support : AbstractBTLESingleDeviceSupport(LOG) {
         if (config !in CONFIG_KEYS) return
 
         when (config) {
-            ACTION_MEASURE_STRESS -> {
-                startMeasurement(NxWearDataType.STRESS)
-                return
-            }
-            ACTION_CANCEL_MEASURE_STRESS -> {
-                cancelMeasurement(NxWearDataType.STRESS)
-                return
-            }
-            ACTION_MEASURE_SPO2 -> {
-                startMeasurement(NxWearDataType.SPO2)
-                return
-            }
-            ACTION_CANCEL_MEASURE_SPO2 -> {
-                cancelMeasurement(NxWearDataType.SPO2)
-                return
-            }
-            NxWearB8Coordinator.ACTION_EXERCISE_START -> {
-                setExerciseRunning(true)
-                return
-            }
-            NxWearB8Coordinator.ACTION_EXERCISE_STOP -> {
-                setExerciseRunning(false)
-                return
-            }
-            NxWearB8Coordinator.PREF_SHAKE_TO_TAKE_PICTURE -> {
-                writeShakeCameraSettings()
-                return
-            }
+            ACTION_MEASURE_STRESS -> { startMeasurement(NxWearDataType.STRESS); return }
+            ACTION_CANCEL_MEASURE_STRESS -> { cancelMeasurement(NxWearDataType.STRESS); return }
+            ACTION_MEASURE_SPO2 -> { startMeasurement(NxWearDataType.SPO2); return }
+            ACTION_CANCEL_MEASURE_SPO2 -> { cancelMeasurement(NxWearDataType.SPO2); return }
+            NxWearB8Coordinator.ACTION_EXERCISE_START -> { setExerciseRunning(true); return }
+            NxWearB8Coordinator.ACTION_EXERCISE_STOP -> { setExerciseRunning(false); return }
+            NxWearB8Coordinator.PREF_SHAKE_TO_TAKE_PICTURE -> { writeShakeCameraSettings(); return }
         }
         val builder = createTransactionBuilder("Set Nx Wear B8 settings")
         if (config in HEALTH_CONFIG_KEYS) writeDetectionSettings(builder)
@@ -205,12 +184,11 @@ class NxWearB8Support : AbstractBTLESingleDeviceSupport(LOG) {
     }
 
     private fun writeShakeCameraSettings() {
-        if (isConnected()) {
-            val enabled = getDevicePrefs().getBoolean(NxWearB8Coordinator.PREF_SHAKE_TO_TAKE_PICTURE, false)
-            createTransactionBuilder("${if (enabled) "Enable" else "Disable"} Nx Wear B8 shake camera")
-                .write(WRITE_CHARACTERISTIC, *NxWearProtocol.encodeShakeCamera(enabled))
-                .queue()
-        }
+        if (!isConnected()) return
+        val enabled = getDevicePrefs().getBoolean(NxWearB8Coordinator.PREF_SHAKE_TO_TAKE_PICTURE, false)
+        createTransactionBuilder("${if (enabled) "Enable" else "Disable"} Nx Wear B8 shake camera")
+            .write(WRITE_CHARACTERISTIC, *NxWearProtocol.encodeShakeCamera(enabled))
+            .queue()
     }
 
     override fun onFetchRecordedData(dataTypes: Int) {
@@ -428,24 +406,19 @@ class NxWearB8Support : AbstractBTLESingleDeviceSupport(LOG) {
                         if (failed) reportMeasurementFailure()
                     }
                 }
-                packet.kind == NxWearPacket.Kind.FRAMED && packet.command == 0x34 && packet.dataType == NxWearDataType.SPO2 -> {
-                    LOG.debug("Nx Wear B8 acknowledged blood oxygen measurement command")
-                }
-                packet.kind == NxWearPacket.Kind.FRAMED && packet.command == 0x34 && packet.dataType == NxWearDataType.STRESS -> {
-                    LOG.debug("Nx Wear B8 acknowledged stress measurement command")
-                }
-                packet.kind == NxWearPacket.Kind.FRAMED && packet.command == 0x34 && packet.dataType == NxWearDataType.MANUAL_HEART_RATE -> {
-                    LOG.debug("Nx Wear B8 acknowledged heart rate reading command")
-                }
                 packet.kind == NxWearPacket.Kind.FRAMED && packet.command == 0x34 &&
-                    packet.dataType in setOf(NxWearDataType.MESSAGE_NOTICE, NxWearDataType.CALL_CONTROL) -> {
-                    LOG.debug("Nx Wear B8 acknowledged call state")
+                    packet.dataType in setOf(
+                        NxWearDataType.SPO2, NxWearDataType.STRESS, NxWearDataType.MANUAL_HEART_RATE,
+                        NxWearDataType.MESSAGE_NOTICE, NxWearDataType.CALL_CONTROL
+                    )
+                -> {
+                    LOG.debug("Nx Wear B8 acknowledged command: {}", packet.dataType)
                 }
                 packet.kind == NxWearPacket.Kind.FRAMED && packet.command == 0x31 && packet.dataType == NxWearDataType.DEVICE_LOG &&
                     historySync.isComplete -> handleLogFrame(packet)
                 packet.kind == NxWearPacket.Kind.FRAMED && packet.command == 0x31 && packet.dataType == NxWearDataType.REALTIME_SPORT &&
                     historySync.isComplete -> handleSportFrame(packet)
-                packet.kind == NxWearPacket.Kind.FRAMED && packet.command == 0x31 && packet.dataType != null && packet.dataType in NxWearProtocol.ACTIVITY_SUBTYPES -> {
+                packet.kind == NxWearPacket.Kind.FRAMED && packet.command == 0x31 && packet.dataType in NxWearProtocol.ACTIVITY_SUBTYPES -> {
                     handleInitializationActivityFrame(packet)
                 }
                 packet.kind == NxWearPacket.Kind.CONTINUATION -> {
@@ -776,6 +749,7 @@ class NxWearB8Support : AbstractBTLESingleDeviceSupport(LOG) {
     }
 
     companion object {
+        private val SERVICE_CHARACTERISTIC = UUID.fromString("0000f618-0000-1000-8000-00805f9b34fb")
         private val WRITE_CHARACTERISTIC = UUID.fromString("0000b002-0000-1000-8000-00805f9b34fb")
         private val RESPONSE_CHARACTERISTIC = UUID.fromString("0000b001-0000-1000-8000-00805f9b34fb")
         private val HEALTH_CONFIG_KEYS = setOf(
