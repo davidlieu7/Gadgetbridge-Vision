@@ -83,6 +83,8 @@ public class WorkoutDetailsParser extends XiaomiActivityParser {
         /** Pace in s/km as the band displays it, 0 while stopped. Shapes {@link #speedMps}
          *  in {@link #setSpeedFromDistance}. */
         public Integer paceSecPerKm;
+        /** Altitude in metres, for layouts that record the height change per second. */
+        public Float altitude;
         /** True on the first record of each interval/segment, for layouts whose phase
          *  semantics are confirmed (currently rowing v4 only). Drives
          *  {@link ActivityTrack} segment boundaries → one FIT lap per interval. */
@@ -145,6 +147,7 @@ public class WorkoutDetailsParser extends XiaomiActivityParser {
         if (r.cadence != null && r.cadence > 0) builder.setCadence(r.cadence);
         final Float speedMps = pointSpeedMps(version, r);
         if (speedMps != null) builder.setSpeed(speedMps);
+        if (r.altitude != null) builder.setAltitude(r.altitude);
     }
 
     /**
@@ -202,6 +205,7 @@ public class WorkoutDetailsParser extends XiaomiActivityParser {
         if (r.cadence != null && r.cadence > 0) p.setCadence(r.cadence);
         final Float speedMps = pointSpeedMps(version, r);
         if (speedMps != null) p.setSpeed(speedMps);
+        if (r.altitude != null) p.setAltitude(r.altitude);
     }
 
     /**
@@ -726,6 +730,8 @@ public class WorkoutDetailsParser extends XiaomiActivityParser {
             }
             boolean firstInSegment = true;
             final int segmentFirstRecord = records.size();
+            // v1: altitude at the segment start, which the per-record height changes add up from
+            float altitude = version == 1 ? segHdr.getFloat(0) : 0;
 
             final int segmentEnd = buf.position() + nr * recordSize;
             if (segmentEnd > buf.limit()) {
@@ -802,10 +808,11 @@ public class WorkoutDetailsParser extends XiaomiActivityParser {
                         // its min / avg / max. No speed - that comes from the GPS track.
                         //   byte 0: calories in this second
                         //   byte 1: HR (uint8 bpm)
-                        //   byte 2: height change - bit 6 set = up, bits 0-5 = change in dm
+                        //   byte 2: height change, see addHeightChange
                         buf.get();
                         r.hr = buf.get() & 0xFF;
-                        buf.get();
+                        altitude = addHeightChange(altitude, buf.get());
+                        r.altitude = altitude;
                         break;
                     case 102:
                         // SPORTS_OUTDOOR_WALKING_V1 v1: 4-byte record. Verified on two walks: steps,
@@ -813,13 +820,14 @@ public class WorkoutDetailsParser extends XiaomiActivityParser {
                         // reproduces its min / max.
                         //   byte 0: nibble-packed: high4=caloriesInc, low4=stepsInc
                         //   byte 1: HR (uint8 bpm)
-                        //   byte 2: height change - bit 6 set = up, bits 0-5 = change in dm
+                        //   byte 2: height change, see addHeightChange
                         //   byte 3: distanceInc (uint8 dm)
                     {
                         final int caloriesAndSteps = buf.get() & 0xFF;
                         r.steps = caloriesAndSteps & 0x0F;
                         r.hr = buf.get() & 0xFF;
-                        buf.get();
+                        altitude = addHeightChange(altitude, buf.get());
+                        r.altitude = altitude;
                         buf.get();
                         break;
                     }
@@ -900,5 +908,14 @@ public class WorkoutDetailsParser extends XiaomiActivityParser {
         }
 
         return records;
+    }
+
+    /**
+     * Applies the v1 height change byte of a record, as the official app does:
+     * bit 7 marks a whole kilometre, bit 6 set means up, bits 0-5 are the change in dm.
+     */
+    private static float addHeightChange(final float altitude, final byte heightChange) {
+        final float change = (heightChange & 0x3F) / 10f;
+        return (heightChange & 0x40) != 0 ? altitude + change : altitude - change;
     }
 }

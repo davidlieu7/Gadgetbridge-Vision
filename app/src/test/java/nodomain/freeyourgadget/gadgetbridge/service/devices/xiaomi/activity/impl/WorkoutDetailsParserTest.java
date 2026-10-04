@@ -29,6 +29,7 @@ import java.util.List;
 
 import nodomain.freeyourgadget.gadgetbridge.model.ActivityPoint;
 import nodomain.freeyourgadget.gadgetbridge.model.ActivityTrack;
+import nodomain.freeyourgadget.gadgetbridge.model.GPSCoordinate;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.xiaomi.activity.XiaomiActivityFileId;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.xiaomi.activity.impl.WorkoutDetailsParser.WorkoutDetailRecord;
 import nodomain.freeyourgadget.gadgetbridge.util.CheckSums;
@@ -1364,5 +1365,39 @@ public class WorkoutDetailsParserTest {
         assertEquals(90, records.get(1).hr);
         // low nibble = steps, high nibble = calories
         assertEquals(2, records.get(1).steps.intValue());
+    }
+
+    /// v1 records carry the height change per second: bit 6 set = up, bits 0-5 = dm, bit 7 a
+    /// whole kilometre. The altitude adds up from the segment header and restarts at the next
+    /// segment's header after a pause.
+    @Test
+    public void testV1Altitude() {
+        final byte[] bytes = buildV1Bytes(new byte[]{(byte) 0xCC, (byte) 0xF0}, 3,
+                new Segment(1791113889, new int[][]{{0, 120, 0x45}, {0, 121, 0x03}, {0, 122, 0xC1}}),
+                new Segment(1791116387, new int[][]{{0, 130, 0x0A}}));
+
+        final List<WorkoutDetailRecord> records = WorkoutDetailsParser.parseBytes(makeFileId(1), bytes);
+
+        assertNotNull(records);
+        assertEquals(4, records.size());
+        assertEquals(304.9f, records.get(0).altitude, 0.001f); // 304.4 + 0.5
+        assertEquals(304.6f, records.get(1).altitude, 0.001f); // - 0.3
+        assertEquals(304.7f, records.get(2).altitude, 0.001f); // + 0.1, kilometre bit ignored
+        assertEquals(303.4f, records.get(3).altitude, 0.001f); // new segment: 304.4 - 1.0
+    }
+
+    @Test
+    public void testV1AltitudeMergedOntoGpsTrack() {
+        final byte[] bytes = buildV1Bytes(new byte[]{(byte) 0xEC, (byte) 0xFC}, 4,
+                new Segment(1791041316, new int[][]{{0x02, 92, 0x45, 0x0d}}));
+        final ActivityTrack track = new ActivityTrack();
+        final ActivityPoint gpsPoint = new ActivityPoint(new Date(1791041316000L));
+        gpsPoint.setLocation(new GPSCoordinate(7.65, 47.66));
+        track.addTrackPoint(gpsPoint);
+
+        WorkoutDetailsParser.mergeOntoTrack(track, makeFileId(1), bytes);
+
+        assertEquals(304.9, gpsPoint.getAltitude(), 0.001);
+        assertEquals(92, gpsPoint.getHeartRate());
     }
 }
