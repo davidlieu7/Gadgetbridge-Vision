@@ -61,8 +61,7 @@ import androidx.core.content.res.ResourcesCompat;
 import androidx.localbroadcastmanager.content.LocalBroadcastManager;
 
 import net.e175.klaus.solarpositioning.DeltaT;
-import net.e175.klaus.solarpositioning.SPA;
-import net.e175.klaus.solarpositioning.SunriseResult;
+import net.e175.klaus.solarpositioning.SolarEvents;
 
 import org.json.JSONArray;
 import org.json.JSONException;
@@ -1509,15 +1508,16 @@ public class FossilHRWatchAdapter extends FossilWatchAdapter {
                 location = new CurrentPosition().getLastKnownLocation();
             }
             final ZonedDateTime now = ZonedDateTime.now();
-            final SunriseResult sunriseResult = SPA.calculateSunriseTransitSet(
-                    now,
+            final SolarEvents.Day solarDay = SolarEvents.spa().forDate(
+                    now.toLocalDate(),
+                    now.getZone(),
                     location.getLatitude(),
                     location.getLongitude(),
                     DeltaT.estimate(now.toLocalDate())
             );
-            if (sunriseResult instanceof SunriseResult.RegularDay regularDay) {
-                isNight = regularDay.sunrise().isAfter(now) || regularDay.sunset().isBefore(now);
-            } else if (sunriseResult instanceof SunriseResult.AllNight) {
+            if (!solarDay.rises().isEmpty() && !solarDay.sets().isEmpty()) {
+                isNight = solarDay.rises().get(0).isAfter(now) || solarDay.sets().get(0).isBefore(now);
+            } else if (solarDay.alwaysBelow()) {
                 isNight = true;
             }
         }

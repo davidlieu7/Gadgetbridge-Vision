@@ -13,9 +13,7 @@ import com.google.gson.JsonElement
 import com.google.gson.JsonNull
 import com.google.gson.JsonObject
 import com.google.gson.JsonPrimitive
-import net.e175.klaus.solarpositioning.DeltaT
-import net.e175.klaus.solarpositioning.SPA
-import net.e175.klaus.solarpositioning.SunriseResult
+import net.e175.klaus.solarpositioning.SolarEvents
 import nodomain.freeyourgadget.gadgetbridge.model.WeatherSpec
 import nodomain.freeyourgadget.gadgetbridge.model.weather.Weather.getWeatherSpec
 import nodomain.freeyourgadget.gadgetbridge.service.devices.huami.zeppos.ZeppOsWeatherHandler
@@ -316,19 +314,13 @@ object ZeppOsWeatherHandlerV6 {
                 val sunset = WeatherSpec.sunsetComputed(day.sunSet, calendar, location)
 
                 val civilTwilight = location?.let {
-                    val date = calendar.toZonedDateTime()
-                    SPA.calculateSunriseTransitSet(
-                        date,
-                        it.latitude,
-                        it.longitude,
-                        DeltaT.estimate(date.toLocalDate()),
-                        SPA.Horizon.CIVIL_TWILIGHT
-                    ) as? SunriseResult.RegularDay
-                }
+                    WeatherSpec.solarDay(calendar, it, SolarEvents.Horizon.CIVIL_TWILIGHT)
+                }?.takeIf { it.rises().isNotEmpty() && it.sets().isNotEmpty() }
 
-                val sunVisibility = when (location?.let { WeatherSpec.sunriseTransitSet(calendar, it) }) {
-                    is SunriseResult.AllDay -> "alwaysUp"
-                    is SunriseResult.AllNight -> "alwaysDown"
+                val solarDay = location?.let { WeatherSpec.solarDay(calendar, it) }
+                val sunVisibility = when {
+                    solarDay?.alwaysAbove() == true -> "alwaysUp"
+                    solarDay?.alwaysBelow() == true -> "alwaysDown"
                     else -> "normal"
                 }
 
@@ -363,8 +355,8 @@ object ZeppOsWeatherHandlerV6 {
                     moonset = if (day.moonSet > 0) toOffsetDateTime(Date(day.moonSet * 1000L)) else null,
                     sunrise = sunrise?.let { toOffsetDateTime(it) },
                     sunset = sunset?.let { toOffsetDateTime(it) },
-                    sunriseCivil = civilTwilight?.let { toOffsetDateTime(Date.from(it.sunrise().toInstant())) },
-                    sunsetCivil = civilTwilight?.let { toOffsetDateTime(Date.from(it.sunset().toInstant())) },
+                    sunriseCivil = civilTwilight?.let { toOffsetDateTime(Date.from(it.rises()[0].toInstant())) },
+                    sunsetCivil = civilTwilight?.let { toOffsetDateTime(Date.from(it.sets()[0].toInstant())) },
                     sunVisibility = sunVisibility,
                     moonVisibility = "normal", // TODO WeatherSpec does not support moon visibility
                     temperatureMax = day.maxTemp - 273f,

@@ -24,12 +24,12 @@ import android.content.Context;
 import android.content.Intent;
 
 import net.e175.klaus.solarpositioning.DeltaT;
-import net.e175.klaus.solarpositioning.SPA;
-import net.e175.klaus.solarpositioning.SunriseResult;
+import net.e175.klaus.solarpositioning.SolarEvents;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.time.ZonedDateTime;
 import java.util.Calendar;
 import java.util.GregorianCalendar;
 import java.util.TimeZone;
@@ -82,28 +82,30 @@ public class SunriseSunsetAlarmReceiver extends BroadcastReceiver {
         float longitude = longlat[0];
         float latitude = longlat[1];
 
-        final SunriseResult sunriseResultTomorrow = SPA.calculateSunriseTransitSet(
-                dateTimeTomorrow.toZonedDateTime(),
+        final ZonedDateTime zonedTomorrow = dateTimeTomorrow.toZonedDateTime();
+        final SolarEvents.Day solarDayTomorrow = SolarEvents.spa().forDate(
+                zonedTomorrow.toLocalDate(),
+                zonedTomorrow.getZone(),
                 latitude,
                 longitude,
-                DeltaT.estimate(dateTimeTomorrow.toZonedDateTime().toLocalDate())
+                DeltaT.estimate(zonedTomorrow.toLocalDate())
         );
 
         CalendarEventSpec calendarEventSpec = new CalendarEventSpec();
         calendarEventSpec.setDurationInSeconds(0);
         calendarEventSpec.setDescription(null);
 
-        if (sunriseResultTomorrow instanceof SunriseResult.RegularDay regularDayTomorrow) {
+        if (!solarDayTomorrow.rises().isEmpty() && !solarDayTomorrow.sets().isEmpty()) {
             calendarEventSpec.setType(CalendarEventSpec.TYPE_SUNRISE);
             calendarEventSpec.setTitle("Sunrise");
             calendarEventSpec.setId(id_tomorrow);
-            calendarEventSpec.setTimestamp((int) (regularDayTomorrow.sunrise().toInstant().getEpochSecond()));
+            calendarEventSpec.setTimestamp((int) solarDayTomorrow.rises().get(0).toEpochSecond());
             GBApplication.deviceService().onAddCalendarEvent(calendarEventSpec);
 
             calendarEventSpec.setType(CalendarEventSpec.TYPE_SUNSET);
             calendarEventSpec.setTitle("Sunset");
             calendarEventSpec.setId(id_tomorrow);
-            calendarEventSpec.setTimestamp((int) (regularDayTomorrow.sunset().toInstant().getEpochSecond()));
+            calendarEventSpec.setTimestamp((int) solarDayTomorrow.sets().get(0).toEpochSecond());
             GBApplication.deviceService().onAddCalendarEvent(calendarEventSpec);
         }
     }

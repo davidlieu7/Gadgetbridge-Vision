@@ -29,8 +29,7 @@ import android.webkit.WebViewClient;
 import androidx.annotation.NonNull;
 
 import net.e175.klaus.solarpositioning.DeltaT;
-import net.e175.klaus.solarpositioning.SPA;
-import net.e175.klaus.solarpositioning.SunriseResult;
+import net.e175.klaus.solarpositioning.SolarEvents;
 
 import org.apache.commons.lang3.StringUtils;
 import org.json.JSONArray;
@@ -42,7 +41,7 @@ import org.slf4j.LoggerFactory;
 import java.io.ByteArrayInputStream;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
-import java.time.ZonedDateTime;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
@@ -395,18 +394,20 @@ public class GBWebClient extends WebViewClient {
 
 
     private static JSONObject sysObject(CurrentPosition currentPosition) throws JSONException {
-        final SunriseResult sunriseResult = SPA.calculateSunriseTransitSet(
-                ZonedDateTime.now(),
+        final LocalDate today = LocalDate.now();
+        final SolarEvents.Day solarDay = SolarEvents.spa().forDate(
+                today,
+                ZoneId.systemDefault(),
                 currentPosition.getLatitude(),
                 currentPosition.getLongitude(),
-                DeltaT.estimate(LocalDate.now())
+                DeltaT.estimate(today)
         );
 
         long epochSunrise = 0;
         long epochSunset = 0;
-        if (sunriseResult instanceof SunriseResult.RegularDay regularDay) {
-            epochSunrise = regularDay.sunrise().toInstant().getEpochSecond();
-            epochSunset = regularDay.sunset().toInstant().getEpochSecond();
+        if (!solarDay.rises().isEmpty() && !solarDay.sets().isEmpty()) {
+            epochSunrise = solarDay.rises().get(0).toEpochSecond();
+            epochSunset = solarDay.sets().get(0).toEpochSecond();
         }
 
         JSONObject sys = new JSONObject();
