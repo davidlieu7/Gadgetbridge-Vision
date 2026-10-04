@@ -89,31 +89,31 @@ class NxWearB8Coordinator : AbstractBLEDeviceCoordinator() {
                     key = ACTION_MEASURE_STRESS,
                     title = R.string.nx_wear_b8_measure_stress,
                     icon = R.drawable.ic_stress,
-                ) { _, selectedDevice ->
-                    if (selectedDevice != null) {
-                        GBApplication.deviceService(selectedDevice).onSendConfiguration(ACTION_MEASURE_STRESS)
+                ) { _, device ->
+                    if (device != null) {
+                        GBApplication.deviceService(device).onSendConfiguration(ACTION_MEASURE_STRESS)
                     }
-                    selectedDevice != null
+                    device != null
                 }
                 action(
                     key = ACTION_MEASURE_SPO2,
                     title = R.string.nx_wear_b8_measure_spo2,
                     icon = R.drawable.ic_spo2,
-                ) { _, selectedDevice ->
-                    if (selectedDevice != null) {
-                        GBApplication.deviceService(selectedDevice).onSendConfiguration(ACTION_MEASURE_SPO2)
+                ) { _, device ->
+                    if (device != null) {
+                        GBApplication.deviceService(device).onSendConfiguration(ACTION_MEASURE_SPO2)
                     }
-                    selectedDevice != null
+                    device != null
                 }
             }
             screen(
                 key = "nx_wear_b8_exercise",
-                title = R.string.nx_wear_b8_exercise,
+                title = R.string.activity_type_exercise,
                 icon = R.drawable.ic_activity_free_training,
             ) {
                 list(
                     key = PREF_EXERCISE_SPORT,
-                    title = R.string.nx_wear_b8_exercise_sport,
+                    title = R.string.mi5_prefs_workout_activity_types,
                     icon = R.drawable.ic_activity_free_training,
                     entries = NxWearSportSession.SPORTS.map {
                         ListEntry.Res(it.type.toString(), it.activityKind.getLabel())
@@ -122,25 +122,25 @@ class NxWearB8Coordinator : AbstractBLEDeviceCoordinator() {
                 )
                 action(
                     key = ACTION_EXERCISE_START,
-                    title = R.string.nx_wear_b8_exercise_start,
+                    title = R.string.live_activity_start_your_activity,
                     icon = R.drawable.ic_play,
                     visibleWhen = { prefs -> !prefs.getBoolean(PREF_EXERCISE_RUNNING, false) },
-                ) { _, selectedDevice ->
-                    if (selectedDevice != null) {
-                        GBApplication.deviceService(selectedDevice).onSendConfiguration(ACTION_EXERCISE_START)
+                ) { context, device ->
+                    if (device != null) {
+                        GBApplication.deviceService(device).onSendConfiguration(ACTION_EXERCISE_START)
                     }
-                    selectedDevice != null
+                    device != null
                 }
                 action(
                     key = ACTION_EXERCISE_STOP,
-                    title = R.string.nx_wear_b8_exercise_stop,
+                    title = R.string.stop,
                     icon = R.drawable.ic_stop,
                     visibleWhen = { prefs -> prefs.getBoolean(PREF_EXERCISE_RUNNING, false) },
-                ) { _, selectedDevice ->
-                    if (selectedDevice != null) {
-                        GBApplication.deviceService(selectedDevice).onSendConfiguration(ACTION_EXERCISE_STOP)
+                ) { context, device ->
+                    if (device != null) {
+                        GBApplication.deviceService(device).onSendConfiguration(ACTION_EXERCISE_STOP)
                     }
-                    selectedDevice != null
+                    device != null
                 }
             }
             screen(
@@ -177,7 +177,7 @@ class NxWearB8Coordinator : AbstractBLEDeviceCoordinator() {
                 )
                 list(
                     key = DeviceSettingsPreferenceConst.PREF_NX_WEAR_B8_DISPLAY_ON_LIFT_DURATION,
-                    title = R.string.nx_wear_b8_wrist_wake_duration,
+                    title = R.string.prefs_screen_timeout,
                     icon = R.drawable.ic_timer,
                     entries = (3..10).map { ListEntry.Text(it.toString(), "$it s") },
                     defaultValue = "5",
