@@ -2,11 +2,14 @@ package nodomain.freeyourgadget.gadgetbridge.service.devices.nxwear
 
 import android.bluetooth.BluetoothGatt
 import android.bluetooth.BluetoothGattCharacteristic
+import android.bluetooth.BluetoothProfile
 import android.content.Intent
+import android.media.AudioManager
 import android.os.Handler
 import android.os.Looper
 import android.os.SystemClock
 import android.text.format.DateFormat
+import android.telecom.TelecomManager
 import android.widget.Toast
 import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import nodomain.freeyourgadget.gadgetbridge.GBApplication
@@ -49,6 +52,8 @@ class NxWearB8Support : AbstractBTLESingleDeviceSupport(LOG) {
         WAIT_DEVICE_SYNC, WAIT_REALTIME_SPORT, WAIT_HISTORY_DATA, COMPLETE,
     }
 
+    @Volatile
+    private var characteristics: Map<UUID, BluetoothGattCharacteristic> = emptyMap()
     private var initializationStep = InitializationStep.WAIT_DEVICE_SYNC
     private var initializationFragments = 0
     private var expectedInitializationFragments = 0
@@ -72,6 +77,7 @@ class NxWearB8Support : AbstractBTLESingleDeviceSupport(LOG) {
     private val historyTimeoutHandler = Handler(Looper.getMainLooper())
     private val historyTimeout = Runnable { finishHistoryFetch() }
     private var historyFetchActive = false
+    private var synchronizeCallStateAfterInitialization = false
     @Volatile
     private var manualHeartRateActive = false
     @Volatile
@@ -88,8 +94,43 @@ class NxWearB8Support : AbstractBTLESingleDeviceSupport(LOG) {
 
     override fun useAutoConnect(): Boolean = true
 
+    override fun getCharacteristic(uuid: UUID?): BluetoothGattCharacteristic? = uuid?.let { characteristics[it] }
+
+    override fun onConnectionStateChange(gatt: BluetoothGatt, status: Int, newState: Int) {
+        if (status != BluetoothGatt.GATT_SUCCESS || newState == BluetoothProfile.STATE_DISCONNECTED) {
+            characteristics = emptyMap()
+        }
+        super.onConnectionStateChange(gatt, status, newState)
+    }
+
+    override fun onServicesDiscovered(gatt: BluetoothGatt) {
+        // Handle discovery here because the base implementation lets the BLE Intent API
+        // subscribe to all discovered services. B8 uses only F618/B001 notifications.
+        // This bypasses the API's read/write lookup, but preserves notification forwarding.
+        characteristics = gatt.services
+            .filter { it.uuid in getSupportedServices() }
+            .flatMap { it.characteristics }
+            .associateBy { it.uuid }
+        if (getCharacteristic(RESPONSE_CHARACTERISTIC) == null || getCharacteristic(WRITE_CHARACTERISTIC) == null) {
+            LOG.error("Nx Wear B8 measurement service is missing its notification/write characteristics")
+            return
+        }
+        if (getDevice().state.compareTo(GBDevice.State.INITIALIZING) >= 0) return
+        val builder = createTransactionBuilder("Initialize Nx Wear B8")
+        initializeDevice(builder)
+        if (getCoordinator().supportsConnectionPriority()) {
+            builder.requestConnectionPriority(
+                if (getDevicePrefs().getConnectionPriorityLowPower()) BluetoothGatt.CONNECTION_PRIORITY_LOW_POWER
+                else BluetoothGatt.CONNECTION_PRIORITY_BALANCED,
+            )
+        }
+        builder.queue()
+    }
+
     override fun initializeDevice(builder: TransactionBuilder): TransactionBuilder {
+        synchronizeCallStateAfterInitialization = false
         finishHistoryFetch()
+        synchronizeCallStateAfterInitialization = true
         initializationStep = InitializationStep.WAIT_DEVICE_SYNC
         initializationFragments = 0
         expectedInitializationFragments = 0
@@ -235,19 +276,44 @@ class NxWearB8Support : AbstractBTLESingleDeviceSupport(LOG) {
         getDevice().unsetBusyTask()
         getDevice().sendDeviceUpdateIntent(getContext())
         GB.signalActivityDataFinish(getDevice())
+        if (synchronizeCallStateAfterInitialization) {
+            synchronizeCallStateAfterInitialization = false
+            synchronizeIdleCallState()
+        }
+    }
+
+    private fun synchronizeIdleCallState() {
+        if (!isConnected()) return
+        val audio = getContext().getSystemService(AudioManager::class.java) ?: return
+        if (audio.mode != AudioManager.MODE_NORMAL) return
+        val telecom = getContext().getSystemService(TelecomManager::class.java) ?: return
+        val isInCall = try {
+            telecom.isInCall
+        } catch (e: SecurityException) {
+            LOG.debug("Cannot synchronize Nx Wear B8 call state without phone state permission")
+            return
+        }
+        if (isInCall) return
+        createTransactionBuilder("Synchronize Nx Wear B8 idle call state")
+            .write(WRITE_CHARACTERISTIC, *encodeCallEnded())
+            .queue()
     }
 
     override fun disconnect() {
+        synchronizeCallStateAfterInitialization = false
         if (activeMeasurement != null && !measurementHasResult) reportMeasurementFailure()
         clearActiveMeasurement()
         finishHistoryFetch()
         super.disconnect()
+        characteristics = emptyMap()
     }
 
     override fun dispose() {
+        synchronizeCallStateAfterInitialization = false
         measurementTimeoutHandler.removeCallbacks(measurementTimeout)
         finishHistoryFetch()
         super.dispose()
+        characteristics = emptyMap()
     }
 
     override fun onSetTime() {
@@ -354,6 +420,7 @@ class NxWearB8Support : AbstractBTLESingleDeviceSupport(LOG) {
         value: ByteArray,
     ): Boolean {
         if (characteristic.uuid == RESPONSE_CHARACTERISTIC) {
+            super.onCharacteristicChanged(gatt, characteristic, value)
             val packet = NxWearPacket.parse(value)
             if (packet.raw.contentEquals(SETTINGS_ACK)) {
                 // This fixed response only acknowledges a settings write; it does not report stored settings.
