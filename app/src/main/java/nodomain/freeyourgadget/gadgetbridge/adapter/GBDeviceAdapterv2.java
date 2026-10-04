@@ -79,6 +79,7 @@ import com.github.mikephil.charting.data.PieEntry;
 import com.github.mikephil.charting.utils.MPPointF;
 import com.google.android.flexbox.FlexboxLayout;
 import com.google.android.material.card.MaterialCardView;
+import com.google.android.material.color.MaterialColors;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import com.google.android.material.snackbar.Snackbar;
 import com.jaredrummler.android.colorpicker.ColorPickerDialog;
@@ -261,7 +262,7 @@ public class GBDeviceAdapterv2 extends ListAdapter<GBDevice, GBDeviceAdapterv2.V
         Resources r = context.getResources();
         int widthDp = 8;
         if(!StringUtils.isNullOrEmpty(device.getParentFolder())){
-            widthDp = 16;
+            widthDp = 20;
         }
         float px = TypedValue.applyDimension(
                 TypedValue.COMPLEX_UNIT_DIP,
@@ -1551,12 +1552,12 @@ public class GBDeviceAdapterv2 extends ListAdapter<GBDevice, GBDeviceAdapterv2.V
         DashboardChart.setNoDataIconEnabled(false);
         DashboardChart.getLegend().setEnabled(false);
         DashboardChart.setDrawHoleEnabled(true);
-        DashboardChart.setHoleColor(Color.WHITE);
+        DashboardChart.setHoleColor(Color.TRANSPARENT);
         DashboardChart.getDescription().setText("");
-        DashboardChart.setTransparentCircleColor(Color.WHITE);
-        DashboardChart.setTransparentCircleAlpha(110);
-        DashboardChart.setHoleRadius(70f);
-        DashboardChart.setTransparentCircleRadius(75f);
+        DashboardChart.setTransparentCircleAlpha(0);
+        DashboardChart.setHoleRadius(82f);
+        DashboardChart.setTransparentCircleRadius(0f);
+        DashboardChart.setCenterTextColor(MaterialColors.getColor(DashboardChart, com.google.android.material.R.attr.colorOnSurface));
         DashboardChart.setDrawCenterTextEnabled(true);
         DashboardChart.setRotationEnabled(true);
         DashboardChart.setHighlightPerTapEnabled(true);
@@ -1586,7 +1587,7 @@ public class GBDeviceAdapterv2 extends ListAdapter<GBDevice, GBDeviceAdapterv2.V
         }
         dataSet.setSliceSpace(0f);
         dataSet.setSelectionShift(5f);
-        dataSet.setColors(chartColor, Color.LTGRAY);
+        dataSet.setColors(chartColor, MaterialColors.getColor(pieChart, com.google.android.material.R.attr.colorSurfaceContainerHighest));
 
         PieData data = new PieData(dataSet);
         data.setValueTextSize(0f);
