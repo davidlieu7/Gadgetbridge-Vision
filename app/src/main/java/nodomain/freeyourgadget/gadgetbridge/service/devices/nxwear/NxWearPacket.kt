@@ -172,6 +172,7 @@ internal object NxWearDataType {
     const val BATTERY = 0x03
     const val ACTIVITY_04 = 0x04
     const val ACTIVITY_05 = 0x05
+    const val SLEEP = 0x06
     const val HEART_RATE = 0x07
     const val ACTIVITY_08 = 0x08
     const val ACTIVITY_09 = 0x09

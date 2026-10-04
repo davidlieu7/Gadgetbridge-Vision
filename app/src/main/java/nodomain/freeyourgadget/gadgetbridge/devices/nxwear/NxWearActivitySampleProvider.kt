@@ -2,6 +2,7 @@ package nodomain.freeyourgadget.gadgetbridge.devices.nxwear
 
 import nodomain.freeyourgadget.gadgetbridge.database.DBHelper
 import nodomain.freeyourgadget.gadgetbridge.devices.generic_hr.GenericHeartRateActivitySampleProvider
+import nodomain.freeyourgadget.gadgetbridge.devices.GenericSleepStageSampleProvider
 import nodomain.freeyourgadget.gadgetbridge.entities.DaoSession
 import nodomain.freeyourgadget.gadgetbridge.entities.GenericActivitySample
 import nodomain.freeyourgadget.gadgetbridge.entities.NxWearSportSample
@@ -55,7 +56,30 @@ class NxWearActivitySampleProvider(private val device: GBDevice, private val ses
             sample.distanceCm = (distanceDelta.toLong() * 100L).coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
             sample.activeCalories = calorieDelta / 1000
         }
-        return samples.sortedBy { it.timestamp }.toMutableList()
+        val sleepProvider = GenericSleepStageSampleProvider(device, session)
+        val stages = sleepProvider.getAllSamples(timestampFrom.toLong() * 1000L, timestampTo.toLong() * 1000L).toMutableList()
+        sleepProvider.getLastSampleBefore(timestampFrom.toLong() * 1000L)?.let { stages.add(0, it) }
+        val byTimestamp = samples.associateBy { it.timestamp }.toMutableMap()
+        for (stage in stages) {
+            val start = (stage.timestamp / 1000L).toInt()
+            val end = start.toLong() + stage.duration * 60L
+            var timestamp = maxOf(start.toLong(), timestampFrom.toLong())
+            while (timestamp < end && timestamp <= timestampTo) {
+                val sample = byTimestamp.getOrPut(timestamp.toInt()) {
+                    GenericActivitySample().also {
+                        it.provider = this
+                        it.timestamp = timestamp.toInt()
+                    }
+                }
+                sample.rawKind = stage.stage
+                timestamp += 60
+            }
+            // Preserve heart-rate points with seconds offsets inside each sleep interval.
+            for (sample in samples) {
+                if (sample.timestamp.toLong() >= start && sample.timestamp.toLong() < end) sample.rawKind = stage.stage
+            }
+        }
+        return byTimestamp.values.sortedBy { it.timestamp }.toMutableList()
     }
 
     override fun getLatestActivitySample(): GenericActivitySample? =

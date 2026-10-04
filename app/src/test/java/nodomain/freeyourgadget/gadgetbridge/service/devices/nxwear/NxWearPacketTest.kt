@@ -214,11 +214,11 @@ class NxWearPacketTest {
             NxWearB8Support.encodeDetectionSettings(false, 60, false))
         assertArrayEquals(bytes("000b000001800000080001003c00000000000000"),
             NxWearB8Support.encodeDetectionSettings(true, 60, false))
-        assertArrayEquals(bytes("000b000001800000080001003c01000000000000"),
+        assertArrayEquals(bytes("000b000001800000080001003c00010000000000"),
             NxWearB8Support.encodeDetectionSettings(true, 60, true))
-        assertArrayEquals(bytes("000b000001800000080000003c01000000000000"),
+        assertArrayEquals(bytes("000b000001800000080000003c00010000000000"),
             NxWearB8Support.encodeDetectionSettings(false, 60, true))
-        assertArrayEquals(bytes("000b000001800000080001001e01000000000000"),
+        assertArrayEquals(bytes("000b000001800000080001001e00010000000000"),
             NxWearB8Support.encodeDetectionSettings(true, 30, true))
     }
 
@@ -298,6 +298,33 @@ class NxWearPacketTest {
         assertArrayEquals(start, NxWearB8Support.encodeManualHeartRate(true))
         assertArrayEquals(stop, NxWearB8Support.encodeManualHeartRate(false))
         assertArrayEquals(acknowledgement, NxWearB8Support.encodeHeartRateAck(9))
+    }
+
+    @Test
+    fun acknowledgesObservedManualHeartRateStreamWithMatchingSequences() {
+        // Consecutive notifications and phone acknowledgements from nx-wear-heart2.txt.
+        val frames = listOf(
+            "000b00053107000008000100011279c16a470000" to "000b000504070000010001000000000000000000",
+            "000b00063107000008000100011379c16a470000" to "000b000604070000010001000000000000000000",
+            "000b00073107000008000100011379c16a470000" to "000b000704070000010001000000000000000000",
+        )
+        for ((frame, acknowledgement) in frames) {
+            val packet = NxWearPacket.parse(bytes(frame))
+            val reading = requireNotNull(NxWearHeartRateReading.parse(packet)).single()
+
+            assertEquals(71, reading.bpm)
+            assertArrayEquals(bytes(acknowledgement), NxWearB8Support.encodeHeartRateAck(requireNotNull(packet.sequence)))
+        }
+    }
+
+    @Test
+    fun doesNotTreatManualHeartRateCommandAcknowledgementAsReading() {
+        val frame = bytes("000b000034180000010001000000000000000000")
+        val packet = NxWearPacket.parse(frame)
+
+        assertEquals(0x34, packet.command)
+        assertEquals(NxWearDataType.MANUAL_HEART_RATE, packet.dataType)
+        assertNull(NxWearHeartRateReading.parse(packet))
     }
 
     @Test

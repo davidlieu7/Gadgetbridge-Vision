@@ -16,6 +16,8 @@ import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSett
 import nodomain.freeyourgadget.gadgetbridge.capabilities.HeartRateCapability
 import nodomain.freeyourgadget.gadgetbridge.database.DBHelper
 import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEventBatteryInfo
+import nodomain.freeyourgadget.gadgetbridge.devices.GenericSleepStageSampleProvider
+import nodomain.freeyourgadget.gadgetbridge.entities.GenericSleepStageSample
 import nodomain.freeyourgadget.gadgetbridge.devices.GenericHeartRateSampleProvider
 import nodomain.freeyourgadget.gadgetbridge.devices.GenericSpo2SampleProvider
 import nodomain.freeyourgadget.gadgetbridge.devices.GenericStressSampleProvider
@@ -65,8 +67,6 @@ class NxWearB8Support : AbstractBTLESingleDeviceSupport(LOG) {
     private var historyFetchActive = false
     @Volatile
     private var manualHeartRateActive = false
-    @Volatile
-    private var continuousHeartRate = false
     private var exerciseStartedAt: Long? = null
     private var exerciseSportType = NxWearSportSession.OUTDOOR_RUNNING
     override fun getCoordinator(): NxWearB8Coordinator = super.getCoordinator() as NxWearB8Coordinator
@@ -92,7 +92,6 @@ class NxWearB8Support : AbstractBTLESingleDeviceSupport(LOG) {
         pendingLogPages = 0
         expectedLogPages = 0
         manualHeartRateActive = false
-        continuousHeartRate = false
         heartRateTimeoutHandler.removeCallbacks(heartRateTimeout)
         builder.setDeviceState(GBDevice.State.INITIALIZING)
         builder.requestMtu(getCoordinator().getMtu())
@@ -256,7 +255,6 @@ class NxWearB8Support : AbstractBTLESingleDeviceSupport(LOG) {
     @Synchronized
     private fun startManualHeartRate(continuous: Boolean) {
         if (!isConnected()) return
-        continuousHeartRate = continuous
         heartRateTimeoutHandler.removeCallbacks(heartRateTimeout)
         if (manualHeartRateActive) {
             if (!continuous) heartRateTimeoutHandler.postDelayed(heartRateTimeout, HEART_RATE_TIMEOUT_MS)
@@ -273,7 +271,6 @@ class NxWearB8Support : AbstractBTLESingleDeviceSupport(LOG) {
     private fun stopManualHeartRate() {
         if (!manualHeartRateActive) return
         manualHeartRateActive = false
-        continuousHeartRate = false
         heartRateTimeoutHandler.removeCallbacks(heartRateTimeout)
         if (!isConnected()) return
         createTransactionBuilder("Stop Nx Wear B8 heart rate reading")
@@ -431,7 +428,7 @@ class NxWearB8Support : AbstractBTLESingleDeviceSupport(LOG) {
         }
         if (acknowledge) {
             createTransactionBuilder("Acknowledge Nx Wear B8 heart rate reading")
-                .write(WRITE_CHARACTERISTIC, *encodeHeartRateAck(sequence))
+                .write(WRITE_CHARACTERISTIC, *encodeMeasurementAck(sequence, requireNotNull(packet.dataType)))
                 .queue()
         }
         val valid = readings.filter { HeartRateUtils.getInstance().isValidHeartRateValue(it.bpm) }
@@ -449,14 +446,15 @@ class NxWearB8Support : AbstractBTLESingleDeviceSupport(LOG) {
                 LOG.error("Unable to save Nx Wear B8 heart rate reading", e)
             }
         }
-        if (!realtime) return
+        if (!realtime || packet.dataType != NxWearDataType.HEART_RATE) return
+        // These notifications stream throughout the measurement; they are not completion events.
+        // Keep the sensor running until the one-shot timeout or an explicit realtime stop.
         for (reading in valid) {
             val intent = Intent(DeviceService.ACTION_REALTIME_SAMPLES)
                 .putExtra(GBDevice.EXTRA_DEVICE, getDevice())
                 .putExtra(DeviceService.EXTRA_REALTIME_SAMPLE, reading as java.io.Serializable)
                 .putExtra(DeviceService.EXTRA_TIMESTAMP, reading.timestampMillis)
             LocalBroadcastManager.getInstance(getContext()).sendBroadcast(intent)
-            if (manualHeartRateActive && !continuousHeartRate) stopManualHeartRate()
         }
     }
 
@@ -533,6 +531,24 @@ class NxWearB8Support : AbstractBTLESingleDeviceSupport(LOG) {
         }
     }
 
+    private fun persistSleepPacket(packet: NxWearPacket) {
+        val readings = NxWearSleepReading.parse(packet) ?: return
+        if (readings.isEmpty()) return
+        try {
+            GBApplication.acquireDB().use { db ->
+                val session = db.daoSession
+                val deviceId = requireNotNull(DBHelper.getDevice(getDevice(), session).id)
+                val userId = requireNotNull(DBHelper.getUser(session).id)
+                val samples = readings.map {
+                    GenericSleepStageSample(it.timestampMillis, deviceId, userId, it.durationMinutes, it.kind.code)
+                }
+                GenericSleepStageSampleProvider(getDevice(), session).addSamples(samples)
+            }
+        } catch (e: Exception) {
+            LOG.error("Unable to save Nx Wear B8 sleep history", e)
+        }
+    }
+
     private fun handleInitializationContinuation(packet: NxWearPacket) {
         if (initializationStep == InitializationStep.COMPLETE || initializationFragments == 0) return
         if (packet.continuationIndex != initializationFragments) return
@@ -571,6 +587,8 @@ class NxWearB8Support : AbstractBTLESingleDeviceSupport(LOG) {
             val packet = historyPacket?.takeIf { it.isComplete } ?: return
             if (NxWearHeartRateReading.parse(packet) != null) {
                 handleManualHeartRate(packet, acknowledge = false, realtime = false)
+            } else if (packet.dataType == NxWearDataType.SLEEP) {
+                persistSleepPacket(packet)
             } else if (packet.dataType == NxWearDataType.ACTIVITY_05) {
                 persistSportPacket(packet)
             }
@@ -774,7 +792,7 @@ class NxWearB8Support : AbstractBTLESingleDeviceSupport(LOG) {
         private const val HISTORY_TIMEOUT_MS = 60_000L
         private const val HISTORY_QUIET_TIMEOUT_MS = 5_000L
         private val ACTIVITY_SUBTYPES = setOf(
-            NxWearDataType.ACTIVITY_09, NxWearDataType.ACTIVITY_04, NxWearDataType.ACTIVITY_05,
+            NxWearDataType.ACTIVITY_09, NxWearDataType.ACTIVITY_04, NxWearDataType.ACTIVITY_05, NxWearDataType.SLEEP,
             NxWearDataType.HEART_RATE, NxWearDataType.EXERCISE_HEART_RATE, NxWearDataType.HISTORY_TEMPERATURE,
             NxWearDataType.ACTIVITY_08, NxWearDataType.ACTIVITY_28, NxWearDataType.ACTIVITY_2A,
             NxWearDataType.ACTIVITY_FA,

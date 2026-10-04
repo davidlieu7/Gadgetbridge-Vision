@@ -210,6 +210,8 @@ class NxWearB8Coordinator : AbstractBLEDeviceCoordinator() {
 
     override fun supportsDataFetching(device: GBDevice): Boolean = true
 
+    override fun supportsSleepMeasurement(device: GBDevice): Boolean = true
+
     override fun supportsActivityTracking(device: GBDevice): Boolean = true
 
     override fun supportsActivityDistance(device: GBDevice): Boolean = true
@@ -231,6 +233,7 @@ class NxWearB8Coordinator : AbstractBLEDeviceCoordinator() {
 
     override fun getAllDeviceDao(session: DaoSession): MutableMap<AbstractDao<*, *>, Property> =
         mutableMapOf<AbstractDao<*, *>, Property>(
+            session.genericSleepStageSampleDao to nodomain.freeyourgadget.gadgetbridge.entities.GenericSleepStageSampleDao.Properties.DeviceId,
             session.genericHeartRateSampleDao to GenericHeartRateSampleDao.Properties.DeviceId,
             session.genericSpo2SampleDao to GenericSpo2SampleDao.Properties.DeviceId,
             session.genericStressSampleDao to GenericStressSampleDao.Properties.DeviceId,
