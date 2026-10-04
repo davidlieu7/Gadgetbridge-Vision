@@ -180,6 +180,13 @@ class NxWearB8Support : AbstractBTLESingleDeviceSupport(LOG) {
             .queue()
     }
 
+    override fun onFactoryReset() {
+        if (!isConnected()) return
+        createTransactionBuilder("Factory reset Nx Wear B8")
+            .write(WRITE_CHARACTERISTIC, *encodeFactoryReset())
+            .queue()
+    }
+
     private fun startHistoryFetch() {
         historyFetchActive = true
         getDevice().setBusyTask(R.string.busy_task_fetch_activity_data, getContext())
@@ -834,6 +841,8 @@ class NxWearB8Support : AbstractBTLESingleDeviceSupport(LOG) {
         private val POWER_OFF_ACK = NxWearPacket.frame(0, 0x34, NxWearDataType.POWER_OFF, byteArrayOf(1))
 
         internal fun encodePowerOff(): ByteArray = NxWearPacket.frame(0, 0x01, NxWearDataType.POWER_OFF, byteArrayOf(0))
+
+        internal fun encodeFactoryReset(): ByteArray = NxWearPacket.frame(0, 0x01, NxWearDataType.FACTORY_RESET, byteArrayOf(0))
 
         internal fun encodeIncomingCall(timeMillis: Long, name: String?, number: String?): ByteArray {
             val seconds = timeMillis / 1000L

@@ -177,15 +177,16 @@ internal object NxWearDataType {
     const val HISTORY_HEART_RATE = 0x08
     const val DEVICE_SYNC = 0x09
     const val EXERCISE_HEART_RATE = 0x11
-    const val HISTORY_TEMPERATURE = 0x2f
     const val SPO2 = 0x14
     const val HEART_RATE_CONTROL = 0x15
     const val MANUAL_HEART_RATE = 0x18
     const val HISTORY_SPO2 = 0x28
     const val HISTORY_HRV = 0x2a
     const val STRESS = 0x2d
+    const val HISTORY_TEMPERATURE = 0x2f
     const val CLOCK = 0x68
     const val MESSAGE_NOTICE = 0x6b
+    const val FACTORY_RESET = 0x6d
     const val BOOTSTRAP = 0x6e
     const val CALL_CONTROL = 0x75
     const val POWER_OFF = 0x77
