@@ -31,7 +31,7 @@ class NxWearPacketTest {
         assertArrayEquals(bytes("000b000001740000010001000000000000000000"), NxWearProtocol.encodeShakeCamera(true))
         assertArrayEquals(bytes("000b000001740000010000000000000000000000"), NxWearProtocol.encodeShakeCamera(false))
 
-        val event = NxWearPacket.parse(bytes("000b000031740000010001004ac9b7028020c26a00000000"))
+        val event = NxWearPacket.parse(bytes("000b000031740000010001004ac9b7028020c26a"))
         assertEquals(true, NxWearProtocol.isShakeCameraEvent(event))
         assertEquals(false, NxWearProtocol.isShakeCameraEvent(event.copy(command = 0x34)))
         assertArrayEquals(
