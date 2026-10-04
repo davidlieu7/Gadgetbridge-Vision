@@ -4,15 +4,15 @@
     android:viewportWidth="30"
     android:viewportHeight="30">
     <path
-        android:fillColor="#6cb8f7"
+        android:fillColor="?attr/deviceIconBackgroundDark"
         android:pathData="M3.612 2.619h19.7a0.854 0.854 0 0 1 0.854 0.854v18.94a0.854 0.854 0 0 1-0.855 0.855h-19.7a0.854 0.854 0 0 1-0.854-0.854V3.473a0.854 0.854 0 0 1 0.855-0.854z"
         android:strokeWidth="0.99516809" />
     <path
-        android:fillColor="#0c84e3"
+        android:fillColor="?attr/deviceIconBackgroundLight"
         android:pathData="M3.61 3.393h19.7a0.854 0.854 0 0 1 0.855 0.854v18.941a0.854 0.854 0 0 1-0.854 0.854H3.61a0.854 0.854 0 0 1-0.854-0.854V4.248A0.854 0.854 0 0 1 3.61 3.392z"
         android:strokeWidth="0.99516809" />
     <path
-        android:fillColor="?attr/deviceIconPrimary"
+        android:fillColor="?attr/deviceIconBackground"
         android:pathData="M3.61 3.024h19.7a0.854 0.854 0 0 1 0.854 0.854v18.94a0.854 0.854 0 0 1-0.854 0.854H3.61a0.854 0.854 0 0 1-0.854-0.854V3.878A0.854 0.854 0 0 1 3.61 3.024z"
         android:strokeWidth="0.99516809" />
     <path

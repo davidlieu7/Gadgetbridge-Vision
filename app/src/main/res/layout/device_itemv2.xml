@@ -63,8 +63,11 @@
                     android:contentDescription="@string/candidate_item_device_image"
                     android:focusable="true"
                     android:longClickable="true"
-                    android:padding="6dp"
+                    android:paddingLeft="2dp"
+                    android:paddingTop="2dp"
                     android:scaleType="fitCenter"
+                    android:theme="@style/ThemeOverlay.App.DeviceCardIcon"
+                    tools:ignore="RtlHardcoded"
                     android:tooltipText="@string/candidate_item_device_image"
                     app:srcCompat="@drawable/ic_device_pebble" />
 

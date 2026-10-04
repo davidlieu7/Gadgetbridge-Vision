@@ -90,6 +90,9 @@
         <item name="deviceIconOnPrimary">#ffffff</item>
         <item name="deviceIconLight">#1f7fdb</item>
         <item name="deviceIconDark">#4dabf5</item>
+        <item name="deviceIconBackground">?attr/deviceIconPrimary</item>
+        <item name="deviceIconBackgroundLight">?attr/deviceIconLight</item>
+        <item name="deviceIconBackgroundDark">?attr/deviceIconDark</item>
 
         <item name="android:windowBackground">@color/window_background_light</item>
         <item name="android:colorBackground">@color/window_background_light</item>
@@ -195,6 +198,9 @@
         <item name="deviceIconOnPrimary">#ffffff</item>
         <item name="deviceIconLight">#1f7fdb</item>
         <item name="deviceIconDark">#4dabf5</item>
+        <item name="deviceIconBackground">?attr/deviceIconPrimary</item>
+        <item name="deviceIconBackgroundLight">?attr/deviceIconLight</item>
+        <item name="deviceIconBackgroundDark">?attr/deviceIconDark</item>
 
         <item name="android:windowBackground">@color/window_background_dark</item>
         <item name="android:colorBackground">@color/window_background_dark</item>
@@ -243,6 +249,9 @@
         <item name="deviceIconOnPrimary">?attr/colorOnPrimary</item>
         <item name="deviceIconLight">?attr/colorPrimaryVariant</item>
         <item name="deviceIconDark">?attr/colorPrimaryDark</item>
+        <item name="deviceIconBackground">?attr/deviceIconPrimary</item>
+        <item name="deviceIconBackgroundLight">?attr/deviceIconLight</item>
+        <item name="deviceIconBackgroundDark">?attr/deviceIconDark</item>
         <item name="spo2_avg_color">@color/spo2_avg_color_light</item>
         <item name="training_acute_load">@color/training_load</item>
 
@@ -303,6 +312,9 @@
         <item name="deviceIconOnPrimary">?attr/colorOnPrimary</item>
         <item name="deviceIconLight">?attr/colorPrimaryVariant</item>
         <item name="deviceIconDark">?attr/colorPrimaryDark</item>
+        <item name="deviceIconBackground">?attr/deviceIconPrimary</item>
+        <item name="deviceIconBackgroundLight">?attr/deviceIconLight</item>
+        <item name="deviceIconBackgroundDark">?attr/deviceIconDark</item>
         <item name="spo2_avg_color">@color/spo2_avg_color_dark</item>
         <item name="training_acute_load">@color/training_load_dark</item>
 
@@ -396,6 +408,15 @@
     </style>
 
     <!-- device list: device cards -->
+    <style name="ThemeOverlay.App.DeviceCardIcon" parent="">
+        <item name="deviceIconPrimary">?attr/colorSurfaceContainerHighest</item>
+        <item name="deviceIconLight">?attr/colorSurfaceContainerHighest</item>
+        <item name="deviceIconDark">?attr/colorSurfaceContainerHighest</item>
+        <item name="deviceIconOnPrimary">?attr/colorPrimary</item>
+        <item name="deviceIconBackground">@android:color/transparent</item>
+        <item name="deviceIconBackgroundLight">@android:color/transparent</item>
+        <item name="deviceIconBackgroundDark">@android:color/transparent</item>
+    </style>
     <style name="DeviceCardActionIcon">
         <item name="android:layout_width">40dp</item>
         <item name="android:layout_height">40dp</item>
