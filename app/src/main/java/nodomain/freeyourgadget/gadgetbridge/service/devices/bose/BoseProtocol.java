@@ -183,7 +183,7 @@ public final class BoseProtocol {
         if (mode < AUDIO_MODE_QUIET || mode > AUDIO_MODE_IMMERSION) {
             throw new IllegalArgumentException("Unsupported audio mode");
         }
-        // START, not SETGET. The second byte requests the spoken mode announcement.
+        // Mode selection uses START; the trailing byte was 0x01 in all observed requests.
         return frame(BLOCK_AUDIO_MODES, FUNCTION_AUDIO_MODE, OP_START, (byte) mode, (byte) 1);
     }
 

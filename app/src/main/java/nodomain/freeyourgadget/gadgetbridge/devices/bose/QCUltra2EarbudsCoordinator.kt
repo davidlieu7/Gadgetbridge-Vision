@@ -34,6 +34,9 @@ import java.util.regex.Pattern
 class QCUltra2EarbudsCoordinator : AbstractBLClassicDeviceCoordinator() {
     override fun getSupportedDeviceName(): Pattern = Pattern.compile("(LE-)?Bose QC Ultra 2 Earbuds")
 
+    // BMAP uses the existing Android Bluetooth bond, including when added for the first time.
+    override fun suggestUnbindBeforePair(): Boolean = false
+
     override fun getManufacturer(): String = "Bose"
 
     override fun getDeviceNameResource(): Int = R.string.devicetype_bose_qc_ultra2_earbuds
