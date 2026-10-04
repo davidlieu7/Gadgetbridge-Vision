@@ -17,11 +17,7 @@
         android:strokeWidth="3.57115173" />
     <path
         android:fillColor="?attr/deviceIconOnPrimary"
-        android:pathData="M9.388 13.204h9.841a1.094 1.094 0 0 1 1.094 1.094v0.228a1.094 1.094 0 0 1-1.094 1.094H9.39a1.094 1.094 0 0 1-1.095-1.094v-0.228a1.094 1.094 0 0 1 1.094-1.094z"
-        android:strokeWidth="2.22514033"
-        android:strokeColor="?attr/deviceIconOnPrimary" />
-    <path
-        android:fillColor="?attr/deviceIconPrimary"
-        android:pathData="M11.468 14.392a0.458 0.458 0 1 1 0.916 0 0.458 0.458 0 1 1-0.916 0m2.437 0.008a0.458 0.458 0 1 1 0.916 0 0.458 0.458 0 1 1-0.916 0m2.385-0.01a0.458 0.458 0 1 1 0.916 0 0.458 0.458 0 1 1-0.916 0"
-        android:strokeWidth="1.34653521" />
+        android:fillType="evenOdd"
+        android:pathData="M9.388 12.091H19.229a2.2066 2.2066 0 0 1 2.2066 2.2066v0.228a2.2066 2.2066 0 0 1-2.2066 2.2066H9.388a2.2066 2.2066 0 0 1-2.2066-2.2066v-0.228a2.2066 2.2066 0 0 1 2.2066-2.2066z M11.468 14.392a0.458 0.458 0 1 1 0.916 0 0.458 0.458 0 1 1-0.916 0m2.437 0.008a0.458 0.458 0 1 1 0.916 0 0.458 0.458 0 1 1-0.916 0m2.385-0.01a0.458 0.458 0 1 1 0.916 0 0.458 0.458 0 1 1-0.916 0"
+        android:strokeWidth="2.22514033" />
 </vector>

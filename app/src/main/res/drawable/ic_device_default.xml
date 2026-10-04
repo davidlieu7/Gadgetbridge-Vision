@@ -17,8 +17,6 @@
         android:strokeWidth="3.57" />
     <path
         android:fillColor="?attr/deviceIconOnPrimary"
-        android:pathData="M12 9.955h4.575a0.507 0.567 0 0 1 0.507 0.567v7.836a0.507 0.567 0 0 1-0.507 0.567h-4.577a0.507 0.567 0 0 1-0.507-0.567v-7.836a0.507 0.567 0 0 1 0.507-0.567zm0.581 9.735h3.382v1.45h-3.382zM12.554 7.693h3.382v1.45h-3.382z" />
-    <path
-        android:fillColor="?attr/deviceIconPrimary"
-        android:pathData="M12.363 10.948h3.907v6.978h-3.907z" />
+        android:fillType="evenOdd"
+        android:pathData="M12 9.955h4.575a0.507 0.567 0 0 1 0.507 0.567v7.836a0.507 0.567 0 0 1-0.507 0.567h-4.577a0.507 0.567 0 0 1-0.507-0.567v-7.836a0.507 0.567 0 0 1 0.507-0.567zm0.581 9.735h3.382v1.45h-3.382zM12.554 7.693h3.382v1.45h-3.382z M12.363 10.948h3.907v6.978h-3.907z" />
 </vector>

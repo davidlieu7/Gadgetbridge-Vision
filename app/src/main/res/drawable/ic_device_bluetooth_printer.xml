@@ -20,7 +20,6 @@
         android:strokeWidth="3.57115" />
 
     <path
-        android:fillColor="?attr/deviceIconPrimary"
         android:pathData="M10.068,4.87L18.673,4.87A5.729,5.729 0,0 1,24.401 10.599L24.401,18.141A5.729,5.729 0,0 1,18.673 23.87L10.068,23.87A5.729,5.729 0,0 1,4.339 18.141L4.339,10.599A5.729,5.729 0,0 1,10.068 4.87z"
         android:strokeWidth="1.2"
         android:strokeColor="?attr/deviceIconOnPrimary"
@@ -28,8 +27,6 @@
         android:strokeLineJoin="round" />
 
     <path
-        android:fillColor="?attr/deviceIconPrimary"
-        android:fillType="evenOdd"
         android:pathData="M4.284,14.928H24.456"
         android:strokeWidth="0.524934"
         android:strokeColor="?attr/deviceIconOnPrimary"
@@ -37,8 +34,6 @@
         android:strokeLineJoin="miter" />
 
     <path
-        android:fillAlpha="0.846154"
-        android:fillColor="?attr/deviceIconPrimary"
         android:pathData="M14.37,19.524m-2.254,0a2.254,2.254 0,1 1,4.507 0a2.254,2.254 0,1 1,-4.507 0"
         android:strokeWidth="1.04987"
         android:strokeColor="?attr/deviceIconOnPrimary"

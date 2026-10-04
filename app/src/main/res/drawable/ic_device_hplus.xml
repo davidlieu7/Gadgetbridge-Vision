@@ -21,12 +21,9 @@
         android:strokeWidth="3.5" />
     <path
         android:fillColor="?attr/deviceIconOnPrimary"
-        android:pathData="M9.848 7.218h8.986a1.142 1.142 0 0 1 1.142 1.142v12.123a1.142 1.142 0 0 1-1.142 1.142H9.848a1.142 1.142 0 0 1-1.142-1.142V8.36a1.142 1.142 0 0 1 1.142-1.142z"
+        android:fillType="evenOdd"
+        android:pathData="M9.848 7.218h8.986a1.142 1.142 0 0 1 1.142 1.142v12.123a1.142 1.142 0 0 1-1.142 1.142H9.848a1.142 1.142 0 0 1-1.142-1.142V8.36a1.142 1.142 0 0 1 1.142-1.142z M10.076 9.295h8.441V19.37h-8.44z"
         android:strokeWidth="3.46226358" />
-    <path
-        android:fillColor="?attr/deviceIconPrimary"
-        android:pathData="M10.076 9.295h8.441V19.37h-8.44z"
-        android:strokeWidth="3.5" />
     <path
         android:fillColor="?attr/deviceIconOnPrimary"
         android:pathData="M11.225 10.62h6.276v7.514h-6.276z"
