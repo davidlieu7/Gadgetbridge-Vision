@@ -62,6 +62,9 @@ public class GBPrefs extends Prefs {
     public static boolean AUTO_RECONNECT_DEFAULT = true;
     public static final String PREF_ALLOW_INTENT_API = "prefs_key_allow_bluetooth_intent_api";
 
+    public static final String SLEEP_AS_ANDROID_ENABLED = "pref_key_sleepasandroid_enable";
+    public static final String SLEEP_AS_ANDROID_DEVICE = "sleepasandroid_device";
+
     public static final String PREF_AUTO_FETCH_ENABLED = "auto_fetch_enabled";
     public static final String PREF_AUTO_FETCH_INTERVAL_LIMIT = "auto_fetch_interval_limit";
 

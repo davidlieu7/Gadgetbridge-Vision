@@ -4139,9 +4139,11 @@ public abstract class HuamiSupport extends AbstractBTLESingleDeviceSupport
                 sleepAsAndroidSender.confirmConnected();
                 break;
             case SleepAsAndroidAction.START_TRACKING:
-                onEnableRealtimeHeartRateMeasurement(true);
+                sleepAsAndroidSender.startTracking(extras);
+                if (sleepAsAndroidSender.isHeartRateRequested()) {
+                    onEnableRealtimeHeartRateMeasurement(true);
+                }
                 setRawSensor(true);
-                sleepAsAndroidSender.startTracking();
                 break;
             case SleepAsAndroidAction.STOP_TRACKING:
                 onEnableRealtimeHeartRateMeasurement(false);
