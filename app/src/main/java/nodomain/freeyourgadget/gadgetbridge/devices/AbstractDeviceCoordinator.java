@@ -68,6 +68,8 @@ import nodomain.freeyourgadget.gadgetbridge.capabilities.loyaltycards.BarcodeFor
 import nodomain.freeyourgadget.gadgetbridge.capabilities.password.PasswordCapabilityImpl;
 import nodomain.freeyourgadget.gadgetbridge.capabilities.widgets.WidgetManager;
 import nodomain.freeyourgadget.gadgetbridge.database.DBHandler;
+import nodomain.freeyourgadget.gadgetbridge.devices.cards.DefaultDeviceCardItems;
+import nodomain.freeyourgadget.gadgetbridge.devices.cards.DeviceCardItem;
 import nodomain.freeyourgadget.gadgetbridge.database.DBHelper;
 import nodomain.freeyourgadget.gadgetbridge.database.repository.WorkoutTemplateRepository;
 import nodomain.freeyourgadget.gadgetbridge.entities.AlarmDao;
@@ -1344,6 +1346,11 @@ public abstract class AbstractDeviceCoordinator implements DeviceCoordinator {
     @Override
     public List<DeviceCardAction> getCustomActions() {
         return Collections.emptyList();
+    }
+
+    @Override
+    public List<DeviceCardItem> getCardItems(@NonNull final GBDevice device) {
+        return DefaultDeviceCardItems.build(this, device);
     }
 
     @Override

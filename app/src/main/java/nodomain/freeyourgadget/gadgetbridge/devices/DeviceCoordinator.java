@@ -47,6 +47,7 @@ import nodomain.freeyourgadget.gadgetbridge.capabilities.HeartRateCapability;
 import nodomain.freeyourgadget.gadgetbridge.capabilities.loyaltycards.BarcodeFormat;
 import nodomain.freeyourgadget.gadgetbridge.capabilities.password.PasswordCapabilityImpl;
 import nodomain.freeyourgadget.gadgetbridge.capabilities.widgets.WidgetManager;
+import nodomain.freeyourgadget.gadgetbridge.devices.cards.DeviceCardItem;
 import nodomain.freeyourgadget.gadgetbridge.entities.BaseActivitySummary;
 import nodomain.freeyourgadget.gadgetbridge.entities.CyclingSample;
 import nodomain.freeyourgadget.gadgetbridge.entities.DaoSession;
@@ -1170,7 +1171,18 @@ public interface DeviceCoordinator {
     @StringRes
     int getSecondaryAuthKeyHint();
 
+    /**
+     * @deprecated for new implementations, prefer adding an {@link nodomain.freeyourgadget.gadgetbridge.devices.cards.ActionCardItem}
+     * to {@link #getCardItems}.
+     */
+    @Deprecated
     List<DeviceCardAction> getCustomActions();
+
+    /**
+     * Returns the items to render in the device list card's icon row, in display order. The preset
+     * items are built from the capabilities, and then appended {@link #getCustomActions()}.
+     */
+    List<DeviceCardItem> getCardItems(@NonNull final GBDevice device);
 
     DeviceKind getDeviceKind(@NonNull final GBDevice device);
 
