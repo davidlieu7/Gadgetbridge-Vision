@@ -489,7 +489,7 @@ public class FitExporter {
             sumLapStrokes += s.longValue();
         }
         records.add(buildSession(summaryData, totalAgg, sport, subSport, startSeconds, elapsedSeconds, emittedLaps, sumLapStrokes,
-                track != null ? track.getLengths().size() : 0, summary.getName()));
+                track != null ? track.getLengths().size() : 0, predominantSwimStroke(track), summary.getName()));
         records.add(buildActivity(endSeconds, elapsedSeconds, utcOffsetSeconds));
 
         final FitFile fitFile = new FitFile(records);
@@ -1018,6 +1018,7 @@ public class FitExporter {
                                     final int numLaps,
                                     @Nullable final Long lapStrokesFallback,
                                     final int numLengths,
+                                    @Nullable final Integer swimStrokeFallback,
                                     @Nullable final String workoutName) {
         final FitSession.Builder b = new FitSession.Builder();
         b.setMessageIndex(0);
@@ -1411,11 +1412,20 @@ public class FitExporter {
         }
 
         // ---- Swimming ----
-        final Double poolLength = readMeters(data, ActivitySummaryEntries.POOL_LENGTH);
+        // POOL_LENGTH is what Xiaomi and Garmin write; ZeppOS calls the same value
+        // LANE_LENGTH, so accept either rather than dropping pool_length for those devices.
+        final Double poolLength = first(
+                readMeters(data, ActivitySummaryEntries.POOL_LENGTH),
+                readMeters(data, ActivitySummaryEntries.LANE_LENGTH)
+        );
         if (poolLength != null) {
             b.setPoolLength(poolLength.floatValue());
         }
-        final Integer swolfAvg = readInt(data, ActivitySummaryEntries.SWOLF_AVG, null);
+        // Likewise SWOLF_INDEX is the ZeppOS/Huami spelling of the average SWOLF.
+        final Integer swolfAvg = first(
+                readInt(data, ActivitySummaryEntries.SWOLF_AVG, null),
+                readInt(data, ActivitySummaryEntries.SWOLF_INDEX, null)
+        );
         if (swolfAvg != null) {
             b.setAvgSwolf(swolfAvg);
         }
@@ -1429,8 +1439,10 @@ public class FitExporter {
         // device-specific; mapXiaomiSwimStyleToFit handles the convention used by Xiaomi
         // band firmware (0=free,1=back,2=breast,3=fly,4=mixed). Unknown sources whose
         // codes already match the FIT enum will pass through unchanged for 0-3.
+        // Some parsers (ZeppOS) store SWIM_STYLE as a localised label rather than a code;
+        // for those, the predominant stroke computed from the per-length records is used.
         final Integer swimStyleRaw = readInt(data, ActivitySummaryEntries.SWIM_STYLE, null);
-        final Integer swimStroke = mapXiaomiSwimStyleToFit(swimStyleRaw);
+        final Integer swimStroke = first(mapXiaomiSwimStyleToFit(swimStyleRaw), swimStrokeFallback);
         if (swimStroke != null) {
             b.setSwimStroke(swimStroke);
         }
@@ -1721,6 +1733,29 @@ public class FitExporter {
         return v != null ? v.doubleValue() : 0.0;
     }
 
+    /// The most frequent swim_stroke across the track's length records, used for
+    /// session.swim_stroke when summaryData does not carry a numeric SWIM_STYLE. Returns
+    /// null when the track has no lengths, or none of them names a stroke. A tie is broken
+    /// by the first stroke to reach the winning count, i.e. the earliest in the workout.
+    @Nullable
+    private static Integer predominantSwimStroke(@Nullable final ActivityTrack track) {
+        if (track == null || track.getLengths().isEmpty()) return null;
+        final java.util.Map<Integer, Integer> counts = new java.util.LinkedHashMap<>();
+        for (final ActivityTrack.LengthInfo li : track.getLengths()) {
+            if (li.swimStroke == null) continue;
+            counts.merge(li.swimStroke, 1, Integer::sum);
+        }
+        Integer best = null;
+        int bestCount = 0;
+        for (final java.util.Map.Entry<Integer, Integer> e : counts.entrySet()) {
+            if (e.getValue() > bestCount) {
+                best = e.getKey();
+                bestCount = e.getValue();
+            }
+        }
+        return best;
+    }
+
     /// Maps a Xiaomi-band SWIM_STYLE byte to the FIT swim_stroke enum.
     /// Xiaomi convention (empirical): 0=freestyle, 1=backstroke, 2=breaststroke,
     /// 3=butterfly, 4=mixed. FIT enum: 0=freestyle, 1=backstroke, 2=breaststroke,
@@ -1831,7 +1866,7 @@ public class FitExporter {
         return mm == null ? null : Math.round(mm);
     }
 
-    /// Reads a length and converts to metres (mm/cm/m/km accepted).
+    /// Reads a length and converts to metres (mm/cm/m/km/yd accepted).
     @Nullable
     private static Double readMeters(@Nullable final ActivitySummaryData data,
                                      @NonNull final String key) {
@@ -1845,6 +1880,8 @@ public class FitExporter {
             case ActivitySummaryEntries.UNIT_KILOMETERS -> v * 1000.0;
             case ActivitySummaryEntries.UNIT_CM -> v / 100.0;
             case ActivitySummaryEntries.UNIT_MM -> v / 1000.0;
+            // ZeppOS reports the pool size in yards when the watch is set to imperial units.
+            case ActivitySummaryEntries.UNIT_YARD -> v * 0.9144;
             default -> {
                 LOG.warn("Unknown length unit '{}' for key {}, assuming m", unit, key);
                 yield v;
