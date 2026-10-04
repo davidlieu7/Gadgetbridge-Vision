@@ -29,6 +29,18 @@ class NxWearProtocolTest {
     }
 
     @Test
+    fun packetAckSupportsDataAndFixedReplyCommandIds() {
+        assertArrayEquals(
+            NxWearPacket.frame(3, 0x04, NxWearDataType.REALTIME_SPORT, byteArrayOf(1)),
+            NxWearPacket.ack(3, NxWearDataType.REALTIME_SPORT),
+        )
+        assertArrayEquals(
+            NxWearPacket.frame(0, 0x34, NxWearDataType.BOOTSTRAP, byteArrayOf(1)),
+            NxWearPacket.ack(0, NxWearDataType.BOOTSTRAP, commandId = 0x34),
+        )
+    }
+
+    @Test
     fun measurementDispatchPreservesEachCommandPayload() {
         for (enabled in listOf(false, true)) {
             assertArrayEquals(NxWearProtocol.encodeManualHeartRate(enabled),
@@ -60,7 +72,7 @@ class NxWearProtocolTest {
 
     @Test
     fun candidateSettingsReplyRemainsAnAckNotASettingsReadback() {
-        val packet = NxWearPacket.parse(NxWearProtocol.encodeAck(3, NxWearDataType.REALTIME_SPORT))
+        val packet = NxWearPacket.parse(NxWearPacket.ack(3, NxWearDataType.REALTIME_SPORT))
         assertTrue(NxWearProtocol.isCandidateSettingsReply(packet))
         assertFalse(NxWearProtocol.isCandidateSettingsReply(packet.copy(command = 0x31)))
         assertFalse(NxWearProtocol.isCandidateSettingsReply(packet.copy(payload = byteArrayOf(0))))

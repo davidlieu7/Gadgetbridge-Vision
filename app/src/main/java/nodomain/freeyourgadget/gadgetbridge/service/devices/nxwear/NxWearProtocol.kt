@@ -29,9 +29,9 @@ internal object NxWearProtocol {
 
     fun encodeInitializationBootstrap(settings: NxWearBootstrap): ByteArray = settings.encode()
 
-    val SETTINGS_ACK = NxWearPacket.frame(0, 0x34, NxWearDataType.DETECTION_SETTINGS, byteArrayOf(1))
-    val INITIALIZATION_ACK = NxWearPacket.frame(0, 0x34, NxWearDataType.BOOTSTRAP, byteArrayOf(1))
-    val POWER_OFF_ACK = NxWearPacket.frame(0, 0x34, NxWearDataType.POWER_OFF, byteArrayOf(1))
+    val SETTINGS_ACK = NxWearPacket.ack(0, NxWearDataType.DETECTION_SETTINGS, commandId = 0x34)
+    val INITIALIZATION_ACK = NxWearPacket.ack(0, NxWearDataType.BOOTSTRAP, commandId = 0x34)
+    val POWER_OFF_ACK = NxWearPacket.ack(0, NxWearDataType.POWER_OFF, commandId = 0x34)
 
     fun encodePowerOff(): ByteArray = NxWearPacket.command(NxWearDataType.POWER_OFF, 0)
 
@@ -75,9 +75,6 @@ internal object NxWearProtocol {
 
     fun encodeSpo2Measurement(enabled: Boolean): ByteArray =
         NxWearPacket.command(NxWearDataType.SPO2, byteArrayOf(if (enabled) 1 else 0, 0, 0, 0, 0))
-
-    fun encodeAck(sequence: Int, dataType: Int): ByteArray =
-        NxWearPacket.frame(sequence, 0x04, dataType, byteArrayOf(1))
 
     fun encodeDetectionSettings(heartRateEnabled: Boolean, intervalMinutes: Int, spo2Enabled: Boolean): ByteArray {
         require(intervalMinutes == 30 || intervalMinutes == 60) { "Unsupported detection interval: $intervalMinutes" }

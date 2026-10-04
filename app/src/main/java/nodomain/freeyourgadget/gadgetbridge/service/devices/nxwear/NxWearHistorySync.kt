@@ -138,7 +138,7 @@ internal class NxWearHistorySync {
         currentSubtype = null
         val sequence = nextSequence
         nextSequence = (sequence + 1) and 0xff
-        return CompletedFrame(completedSync, completedSport, completedHistory, subtype, NxWearProtocol.encodeAck(sequence, subtype))
+        return CompletedFrame(completedSync, completedSport, completedHistory, subtype, NxWearPacket.ack(sequence, subtype))
     }
 
     fun acceptLogFrame(packet: NxWearPacket): Int? {

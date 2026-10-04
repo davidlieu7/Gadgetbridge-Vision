@@ -84,6 +84,9 @@ internal data class NxWearPacket(
             return result
         }
 
+        fun ack(sequence: Int, dataType: Int, commandId: Int = 0x04): ByteArray =
+            frame(sequence, commandId, dataType, byteArrayOf(1))
+
         fun command(dataType: Int, enabled: Boolean): ByteArray {
             return frame(0, 0x01, dataType, byteArrayOf(if (enabled) 1 else 0))
         }

@@ -491,7 +491,7 @@ class NxWearB8Support : AbstractBTLESingleDeviceSupport(LOG) {
             refreshHistoryTimeout(NxWearProtocol.historyTimeoutForSubtype(dataType))
         }
         createTransactionBuilder("Acknowledge Nx Wear B8 measurement data")
-            .write(WRITE_CHARACTERISTIC, *NxWearProtocol.encodeAck(sequence, dataType))
+            .write(WRITE_CHARACTERISTIC, *NxWearPacket.ack(sequence, dataType))
             .queue()
     }
 

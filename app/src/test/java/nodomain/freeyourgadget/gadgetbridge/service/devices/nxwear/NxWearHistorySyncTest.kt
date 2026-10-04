@@ -189,6 +189,6 @@ class NxWearHistorySyncTest {
 
     private fun assertRequest(completed: NxWearHistorySync.CompletedFrame, sequence: Int, subtype: Int) {
         assertEquals(subtype, completed.acknowledgedType)
-        assertArrayEquals(NxWearProtocol.encodeAck(sequence, subtype), completed.request)
+        assertArrayEquals(NxWearPacket.ack(sequence, subtype), completed.request)
     }
 }

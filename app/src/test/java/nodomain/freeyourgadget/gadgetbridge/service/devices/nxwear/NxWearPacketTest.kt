@@ -20,7 +20,7 @@ class NxWearPacketTest {
         assertEquals(false, NxWearProtocol.isShakeCameraEvent(event.copy(command = 0x34)))
         assertArrayEquals(
             bytes("000b000021740000010001000000000000000000"),
-            NxWearProtocol.encodeAck(requireNotNull(event.sequence), NxWearDataType.SHAKE_CAMERA),
+            NxWearPacket.ack(requireNotNull(event.sequence), NxWearDataType.SHAKE_CAMERA),
         )
     }
 
@@ -43,7 +43,7 @@ class NxWearPacketTest {
         assertEquals(NxWearHeartRateReading(0x6abeb707L * 1000L, 87), readings?.last())
         assertEquals(true, NxWearProtocol.isHistoryDataType(requireNotNull(packet.dataType)))
         assertArrayEquals(bytes("000b000304110000010001000000000000000000"),
-            NxWearProtocol.encodeAck(requireNotNull(packet.sequence), requireNotNull(packet.dataType)))
+            NxWearPacket.ack(requireNotNull(packet.sequence), requireNotNull(packet.dataType)))
     }
 
     @Test
@@ -59,7 +59,7 @@ class NxWearPacketTest {
         val readings = NxWearSportReading.parse(packet)
         assertEquals(listOf(NxWearSportReading(0x6abed4b7L * 1000L, 2352, 1607, 76018, 287)), readings)
         assertArrayEquals(bytes("000b000504050000010001000000000000000000"),
-            NxWearProtocol.encodeAck(requireNotNull(packet.sequence), requireNotNull(packet.dataType)))
+            NxWearPacket.ack(requireNotNull(packet.sequence), requireNotNull(packet.dataType)))
     }
 
     @Test
@@ -68,7 +68,7 @@ class NxWearPacketTest {
         assertEquals(60_000L, NxWearProtocol.historyTimeoutForSubtype(NxWearDataType.HISTORY_TEMPERATURE))
         assertEquals(5_000L, NxWearProtocol.historyTimeoutForSubtype(NxWearDataType.DEVICE_LOG))
         for (sequence in 6..0x49) {
-            val ack = NxWearPacket.parse(NxWearProtocol.encodeAck(sequence, NxWearDataType.DEVICE_LOG))
+            val ack = NxWearPacket.parse(NxWearPacket.ack(sequence, NxWearDataType.DEVICE_LOG))
             assertEquals(sequence, ack.sequence)
             assertEquals(0x04, ack.command)
             assertEquals(NxWearDataType.DEVICE_LOG, ack.dataType)
@@ -121,7 +121,7 @@ class NxWearPacketTest {
         assertEquals(1, continuation.continuationIndex)
         assertEquals(true, NxWearProtocol.isHistoryDataType(requireNotNull(historyFrame.dataType)))
         assertEquals(true, NxWearProtocol.isHistoryDataType(NxWearDataType.DEVICE_LOG))
-        assertArrayEquals(historyAck, NxWearProtocol.encodeAck(3, NxWearDataType.HISTORY_SPORT))
+        assertArrayEquals(historyAck, NxWearPacket.ack(3, NxWearDataType.HISTORY_SPORT))
         assertEquals(listOf(0x4a, 0x00), unplugged.payload.map { it.toInt() and 0xff })
         assertEquals(listOf(0x4a, 0x01), charging.payload.map { it.toInt() and 0xff })
     }
@@ -256,7 +256,7 @@ class NxWearPacketTest {
     @Test
     fun buildsObservedAcknowledgementPackets() {
         assertArrayEquals(bytes("000b000034800000010001000000000000000000"), NxWearPacket.frame(0, 0x34, 0x80, bytes("01")))
-        assertArrayEquals(bytes("000b001104030000010001000000000000000000"), NxWearProtocol.encodeAck(0x0011, NxWearDataType.BATTERY))
+        assertArrayEquals(bytes("000b001104030000010001000000000000000000"), NxWearPacket.ack(0x0011, NxWearDataType.BATTERY))
     }
 
     @Test
@@ -311,7 +311,7 @@ class NxWearPacketTest {
 
         assertArrayEquals(start, NxWearProtocol.encodeManualHeartRate(true))
         assertArrayEquals(stop, NxWearProtocol.encodeManualHeartRate(false))
-        assertArrayEquals(acknowledgement, NxWearProtocol.encodeAck(9, NxWearDataType.HEART_RATE))
+        assertArrayEquals(acknowledgement, NxWearPacket.ack(9, NxWearDataType.HEART_RATE))
     }
 
     @Test
@@ -327,7 +327,7 @@ class NxWearPacketTest {
             val reading = requireNotNull(NxWearHeartRateReading.parse(packet)).single()
 
             assertEquals(71, reading.bpm)
-            assertArrayEquals(bytes(acknowledgement), NxWearProtocol.encodeAck(requireNotNull(packet.sequence), NxWearDataType.HEART_RATE))
+            assertArrayEquals(bytes(acknowledgement), NxWearPacket.ack(requireNotNull(packet.sequence), NxWearDataType.HEART_RATE))
         }
     }
 
@@ -380,9 +380,9 @@ class NxWearPacketTest {
         val syncAck = bytes("000b005604fa0000010001000000000000000000")
 
         assertArrayEquals(start, NxWearProtocol.encodeStressMeasurement(true))
-        assertArrayEquals(controlAck, NxWearProtocol.encodeAck(0x54, NxWearDataType.HEART_RATE_CONTROL))
-        assertArrayEquals(readingAck, NxWearProtocol.encodeAck(0x55, NxWearDataType.STRESS))
-        assertArrayEquals(syncAck, NxWearProtocol.encodeAck(0x56, NxWearDataType.DEVICE_LOG))
+        assertArrayEquals(controlAck, NxWearPacket.ack(0x54, NxWearDataType.HEART_RATE_CONTROL))
+        assertArrayEquals(readingAck, NxWearPacket.ack(0x55, NxWearDataType.STRESS))
+        assertArrayEquals(syncAck, NxWearPacket.ack(0x56, NxWearDataType.DEVICE_LOG))
     }
 
     @Test
@@ -392,8 +392,8 @@ class NxWearPacketTest {
         val readingAck = bytes("000b000a04140000010001000000000000000000")
 
         assertArrayEquals(start, NxWearProtocol.encodeSpo2Measurement(true))
-        assertArrayEquals(controlAck, NxWearProtocol.encodeAck(9, NxWearDataType.HEART_RATE_CONTROL))
-        assertArrayEquals(readingAck, NxWearProtocol.encodeAck(10, NxWearDataType.SPO2))
+        assertArrayEquals(controlAck, NxWearPacket.ack(9, NxWearDataType.HEART_RATE_CONTROL))
+        assertArrayEquals(readingAck, NxWearPacket.ack(10, NxWearDataType.SPO2))
     }
 
     @Test
@@ -553,10 +553,10 @@ class NxWearPacketTest {
         )
         for ((index, frame) in captured.withIndex()) {
             val dataType = NxWearPacket.parse(bytes(frame)).dataType!!
-            assertArrayEquals(bytes(frame), NxWearProtocol.encodeAck(index + 1, dataType))
+            assertArrayEquals(bytes(frame), NxWearPacket.ack(index + 1, dataType))
         }
         assertArrayEquals(bytes("000b000b04090000010001000000000000000000"),
-            NxWearProtocol.encodeAck(0x0b, NxWearDataType.DEVICE_SYNC))
+            NxWearPacket.ack(0x0b, NxWearDataType.DEVICE_SYNC))
     }
 
     @Test
