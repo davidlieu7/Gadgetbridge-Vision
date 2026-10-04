@@ -200,7 +200,7 @@ public class GarminWorkoutParser implements ActivitySummaryParser {
 
         final List<WorkoutChart> charts = new LinkedList<>();
         if (!this.activityPoints.isEmpty()) {
-            charts.addAll(DefaultWorkoutCharts.buildDefaultCharts(context, activityPoints, activityKind));
+            charts.addAll(DefaultWorkoutCharts.buildDefaultCharts(context, activityPoints, activityKind, activitySummaryData));
         }
 
         final long nanoEnd = System.nanoTime();
@@ -784,6 +784,19 @@ public class GarminWorkoutParser implements ActivitySummaryParser {
                                     zoneColors[i]
                             )
                     );
+                }
+                // hrZoneHighBoundary[i] is the upper bpm bound of zone i (index 0 = N/A), so
+                // boundary[0..4] are the lower entries of zones 1..5. These are the user's configured
+                // (per-activity) zones, so the HR chart can match the watch rather than 220 minus age.
+                final Integer[] zoneHighs = fitTimeInZone.getHrZoneHighBoundary();
+                if (zoneHighs != null && zoneHighs.length >= 5
+                        && zoneHighs[0] != null && zoneHighs[1] != null && zoneHighs[2] != null
+                        && zoneHighs[3] != null && zoneHighs[4] != null) {
+                    summaryData.add(HR_ZONE_BOUND_1, zoneHighs[0], UNIT_BPM);
+                    summaryData.add(HR_ZONE_BOUND_2, zoneHighs[1], UNIT_BPM);
+                    summaryData.add(HR_ZONE_BOUND_3, zoneHighs[2], UNIT_BPM);
+                    summaryData.add(HR_ZONE_BOUND_4, zoneHighs[3], UNIT_BPM);
+                    summaryData.add(HR_ZONE_BOUND_5, zoneHighs[4], UNIT_BPM);
                 }
                 break;
             }

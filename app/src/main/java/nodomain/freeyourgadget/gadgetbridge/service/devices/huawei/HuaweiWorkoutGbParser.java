@@ -319,7 +319,7 @@ public class HuaweiWorkoutGbParser implements ActivitySummaryParser {
             final ActivityKind activityKind = ActivityKind.fromCode(summary.getActivityKind());
             final List<WorkoutChart> charts = new LinkedList<>();
             if (!activityPoints.isEmpty()) {
-                charts.addAll(DefaultWorkoutCharts.buildDefaultCharts(context, activityPoints, activityKind));
+                charts.addAll(DefaultWorkoutCharts.buildDefaultCharts(context, activityPoints, activityKind, activitySummaryData));
                 charts.addAll(buildHuaweiCharts(context, activityPoints));
             }
             byte[] recoveryHR = huaweiSummaries.get(0).getRecoveryHeartRates();

@@ -51,13 +51,20 @@ import java.util.List;
 
 import nodomain.freeyourgadget.gadgetbridge.GBApplication;
 import nodomain.freeyourgadget.gadgetbridge.R;
+import nodomain.freeyourgadget.gadgetbridge.activities.HeartRateUtils;
 import nodomain.freeyourgadget.gadgetbridge.activities.charts.DecimalValueFormatter;
+import nodomain.freeyourgadget.gadgetbridge.activities.charts.HeartRateZoneChartUtils;
 import nodomain.freeyourgadget.gadgetbridge.activities.charts.SpeedYLabelFormatter;
 import nodomain.freeyourgadget.gadgetbridge.activities.charts.TimestampTranslation;
+import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
 import nodomain.freeyourgadget.gadgetbridge.model.ActivityKind;
 import nodomain.freeyourgadget.gadgetbridge.model.ActivityPoint;
+import nodomain.freeyourgadget.gadgetbridge.model.ActivitySummaryData;
 import nodomain.freeyourgadget.gadgetbridge.model.ActivitySummaryEntries;
+import nodomain.freeyourgadget.gadgetbridge.model.ActivityUser;
 import nodomain.freeyourgadget.gadgetbridge.model.GPSCoordinate;
+import nodomain.freeyourgadget.gadgetbridge.model.heartratezones.HeartRateZones;
+import nodomain.freeyourgadget.gadgetbridge.model.heartratezones.HeartRateZonesResolver;
 import nodomain.freeyourgadget.gadgetbridge.model.workout.WorkoutChart;
 import nodomain.freeyourgadget.gadgetbridge.util.Accumulator;
 
@@ -65,6 +72,27 @@ public class DefaultWorkoutCharts {
     public static List<WorkoutChart> buildDefaultCharts(final Context context,
                                                         final List<? extends ActivityPoint> activityPoints,
                                                         final ActivityKind activityKind) {
+        return buildDefaultCharts(context, activityPoints, activityKind, null, null);
+    }
+
+    public static List<WorkoutChart> buildDefaultCharts(final Context context,
+                                                        final List<? extends ActivityPoint> activityPoints,
+                                                        final ActivityKind activityKind,
+                                                        final ActivitySummaryData summary) {
+        return buildDefaultCharts(context, activityPoints, activityKind, summary, null);
+    }
+
+    /**
+     * @param device the workout's device when the caller has one, so heart-rate zones configured on
+     *               it can be used. Parsers that build charts while importing a file have no device
+     *               in hand and pass null, which falls back to the zones in the summary or to the
+     *               age-based default.
+     */
+    public static List<WorkoutChart> buildDefaultCharts(final Context context,
+                                                        final List<? extends ActivityPoint> activityPoints,
+                                                        final ActivityKind activityKind,
+                                                        final ActivitySummaryData summary,
+                                                        final GBDevice device) {
         final ActivityKind.CycleUnit cycleUnit = ActivityKind.getCycleUnit(activityKind);
         final List<WorkoutChart> charts = new LinkedList<>();
         final TimestampTranslation tsTranslation = new TimestampTranslation();
@@ -272,7 +300,7 @@ public class DefaultWorkoutCharts {
         }
 
         if (!heartRateDataPoints.isEmpty()) {
-            charts.add(createHeartRateChart(context, heartRateDataPoints));
+            charts.add(createHeartRateChart(context, heartRateDataPoints, summary, device));
         }
 
         if (hasSpeedValues && !speedDataPoints.isEmpty()) {
@@ -464,16 +492,32 @@ public class DefaultWorkoutCharts {
     }
 
     private static WorkoutChart createHeartRateChart(final Context context,
-                                                     final List<Entry> heartRateDataPoints) {
+                                                     final List<Entry> heartRateDataPoints,
+                                                     final ActivitySummaryData summary,
+                                                     final GBDevice device) {
         final String label = String.format("%s(%s)", context.getString(R.string.heart_rate), getUnitString(context, UNIT_BPM));
-        final LineData lineData = createGappedLineData(context, heartRateDataPoints, label, ContextCompat.getColor(context, R.color.chart_line_heart_rate));
+        final LineData hrLineData = createGappedLineData(context, heartRateDataPoints, label, ContextCompat.getColor(context, R.color.chart_line_heart_rate));
         final ValueFormatter integerFormatter = new ValueFormatter() {
             @Override
             public String getFormattedValue(float value) {
                 return String.valueOf((int) value);
             }
         };
-        return new WorkoutChart(
+
+        final HeartRateZones zones = HeartRateZonesResolver.resolve(summary, device, new ActivityUser());
+        final int chartMax = Math.max(HeartRateUtils.getInstance().getMaxHeartRate(), zones.getZone5() + 1);
+        // Workout entries use x in milliseconds (tsTranslation.shorten on point.getTime().getTime()),
+        // so gap and unit conversions are millisecond-based.
+        final HeartRateZoneChartUtils.ZoneAnalysis analysis = HeartRateZoneChartUtils.analyze(
+                heartRateDataPoints, zones, gapThreshold(heartRateDataPoints), 1000f);
+
+        // Datasets draw in order, so the bands go first to stay behind the HR line.
+        final List<ILineDataSet> dataSets = new ArrayList<>(
+                HeartRateZoneChartUtils.buildZoneAreas(context, zones, heartRateDataPoints, chartMax, YAxis.AxisDependency.RIGHT));
+        dataSets.addAll(hrLineData.getDataSets());
+        final LineData lineData = new LineData(dataSets);
+
+        final WorkoutChart chart = new WorkoutChart(
                 "heart_rate",
                 context.getString(R.string.heart_rate),
                 ActivitySummaryEntries.GROUP_HEART_RATE,
@@ -481,6 +525,9 @@ public class DefaultWorkoutCharts {
                 integerFormatter,
                 getUnitString(context, UNIT_BPM)
         );
+        chart.setSecondsInZone(analysis.secondsInZone);
+        chart.setZoneThresholds(zones);
+        return chart;
     }
 
     private static WorkoutChart createSpeedChart(final Context context,
@@ -986,6 +1033,25 @@ public class DefaultWorkoutCharts {
     }
 
     /**
+     * The spacing above which two consecutive samples count as interrupted rather than continuous,
+     * in the series' own x units: {@link #GAP_THRESHOLD_FACTOR} times its median sample gap. Returns
+     * 0 for a series too short or too irregular to have a meaningful spacing, meaning "never a gap".
+     * Time-in-zone uses the same threshold as the chart, so a stretch the chart draws as a gap is
+     * also a stretch that accumulates no zone time.
+     */
+    static float gapThreshold(final List<Entry> entries) {
+        if (entries.size() < 3) {
+            return 0f;
+        }
+        final float medianGap = median(sampleGaps(entries));
+        if (medianGap <= 0) {
+            // Duplicate timestamps, so there is nothing to compare a gap against.
+            return 0f;
+        }
+        return medianGap * GAP_THRESHOLD_FACTOR;
+    }
+
+    /**
      * Splits a chronological entry list into segments, starting a new segment after any gap that is
      * larger than to the series' own median sample gap (e.g. a paused workout, or a sensor dropout).
      * Each segment is later rendered as its own {@link LineDataSet}, so the chart does not draw a
@@ -996,20 +1062,13 @@ public class DefaultWorkoutCharts {
         if (entries.isEmpty()) {
             return segments;
         }
-        if (entries.size() < 3) {
+        final float gapThreshold = gapThreshold(entries);
+        if (gapThreshold <= 0) {
             segments.add(entries);
             return segments;
         }
 
         final float[] gaps = sampleGaps(entries);
-        final float medianGap = median(gaps);
-        if (medianGap <= 0) {
-            // Should never happen? No meaningful gap to compare against (e.g. duplicate timestamps), keep as one segment.
-            segments.add(entries);
-            return segments;
-        }
-
-        final float gapThreshold = medianGap * GAP_THRESHOLD_FACTOR;
         List<Entry> currentSegment = new LinkedList<>();
         currentSegment.add(entries.get(0));
         for (int i = 1; i < entries.size(); i++) {

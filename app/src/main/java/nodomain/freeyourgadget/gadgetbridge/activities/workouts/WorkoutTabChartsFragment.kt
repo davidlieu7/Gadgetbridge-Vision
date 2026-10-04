@@ -14,6 +14,7 @@ import androidx.lifecycle.distinctUntilChanged
 import com.github.mikephil.charting.charts.BarLineChartBase
 import com.github.mikephil.charting.charts.LineChart
 import com.github.mikephil.charting.charts.ScatterChart
+import com.github.mikephil.charting.components.LimitLine
 import com.github.mikephil.charting.components.XAxis
 import com.github.mikephil.charting.data.LineData
 import com.github.mikephil.charting.data.ScatterData
@@ -23,6 +24,7 @@ import nodomain.freeyourgadget.gadgetbridge.GBApplication
 import nodomain.freeyourgadget.gadgetbridge.R
 import nodomain.freeyourgadget.gadgetbridge.activities.ActivitySummariesChartFragment
 import nodomain.freeyourgadget.gadgetbridge.activities.charts.DurationXLabelFormatter
+import nodomain.freeyourgadget.gadgetbridge.activities.charts.HeartRateZoneChartUtils
 import nodomain.freeyourgadget.gadgetbridge.activities.workouts.charts.ChartDataRepository
 import nodomain.freeyourgadget.gadgetbridge.activities.workouts.charts.WorkoutChartsActivity
 import nodomain.freeyourgadget.gadgetbridge.activities.workouts.entries.ActivitySummaryEntry
@@ -33,6 +35,7 @@ import nodomain.freeyourgadget.gadgetbridge.entities.Device
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice
 import nodomain.freeyourgadget.gadgetbridge.model.ActivityKind
 import nodomain.freeyourgadget.gadgetbridge.model.ActivitySummaryEntries
+import nodomain.freeyourgadget.gadgetbridge.model.heartratezones.HeartRateZonesResolver
 import nodomain.freeyourgadget.gadgetbridge.model.workout.Workout
 import nodomain.freeyourgadget.gadgetbridge.model.workout.WorkoutChart
 import nodomain.freeyourgadget.gadgetbridge.model.workout.WorkoutViewModel
@@ -97,7 +100,7 @@ class WorkoutTabChartsFragment : Fragment(), WorkoutTabScreenshotProvider {
         isFirstChartHeader = true
         val groupedEntries = ActivitySummaryGroup.buildGroupedList(workout.data)
         workout.charts.forEach { chart ->
-            addChart(binding.dynamicCharts, true, chart, workout.charts, groupedEntries)
+            addChart(binding.dynamicCharts, true, chart, workout, groupedEntries)
         }
         updateHeartRateFallback(workout)
     }
@@ -141,7 +144,7 @@ class WorkoutTabChartsFragment : Fragment(), WorkoutTabScreenshotProvider {
         chartsLayout: LinearLayout,
         includeHeader: Boolean,
         chart: WorkoutChart,
-        allChartsData: List<WorkoutChart>,
+        workout: Workout,
         groupedEntries: Map<String, List<Pair<String, ActivitySummaryEntry>>>
     ) {
         if (includeHeader) {
@@ -211,6 +214,17 @@ class WorkoutTabChartsFragment : Fragment(), WorkoutTabScreenshotProvider {
         lineChart.axisRight.apply {
             isEnabled = false
         }
+        chart.zoneThresholds?.let { zones ->
+            lineChart.axisLeft.setDrawLimitLinesBehindData(true)
+            for ((zoneIdx, hr) in listOf(2 to zones.zone2, 3 to zones.zone3, 4 to zones.zone4, 5 to zones.zone5)) {
+                if (hr <= 0) continue
+                lineChart.axisLeft.addLimitLine(LimitLine(hr.toFloat()).apply {
+                    lineColor = HeartRateZonesResolver.colorForZone(requireContext(), zoneIdx)
+                    lineWidth = 0.7f
+                    enableDashedLine(6f, 6f, 0f)
+                })
+            }
+        }
         chart.lineChart(lineChart);
         when {
             lineChart is LineChart && chart.chartData is LineData -> {
@@ -226,7 +240,7 @@ class WorkoutTabChartsFragment : Fragment(), WorkoutTabScreenshotProvider {
             override fun onChartGestureStart(me: MotionEvent?, lastPerformedGesture: ChartTouchListener.ChartGesture?) {}
             override fun onChartGestureEnd(me: MotionEvent?, lastPerformedGesture: ChartTouchListener.ChartGesture?) {}
             override fun onChartSingleTapped(me: MotionEvent?) {
-                ChartDataRepository.chartData = allChartsData
+                ChartDataRepository.chartData = workout.charts
                 val intent = Intent(requireContext(), WorkoutChartsActivity::class.java).apply {
                     putExtra(WorkoutChartsActivity.INIT_CHART_ID, chart.id)
                     workoutLabel()?.let {
@@ -248,10 +262,17 @@ class WorkoutTabChartsFragment : Fragment(), WorkoutTabScreenshotProvider {
         // Heart rate zones go directly under the heart rate chart.
         if (chart.group == ActivitySummaryEntries.GROUP_HEART_RATE) {
             val zoneEntries = groupedEntries[ActivitySummaryEntries.GROUP_HEART_RATE_ZONES].orEmpty()
+            val zoneSeconds = chart.secondsInZone
+            val zoneThresholds = chart.zoneThresholds
             if (zoneEntries.isNotEmpty()) {
                 addSectionHeader(chartsLayout, requireContext(), getString(R.string.workout_time_in_zones), showDivider = !isFirstChartHeader)
                 isFirstChartHeader = false
                 addStatRow(chartsLayout, zoneEntries)
+            } else if (zoneSeconds != null && zoneThresholds != null && (1..5).sumOf { zoneSeconds[it] } > 0) {
+                // The device reported no time in zones, so show the split computed from the HR samples.
+                addSectionHeader(chartsLayout, requireContext(), getString(R.string.workout_time_in_zones), showDivider = !isFirstChartHeader)
+                isFirstChartHeader = false
+                HeartRateZoneChartUtils.populateZoneSummary(requireContext(), chartsLayout, zoneSeconds, zoneThresholds)
             }
         }
     }
