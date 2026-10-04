@@ -4108,10 +4108,6 @@
     <string name="devicetype_bose_qc35" translatable="false">Bose QC35</string>
     <string name="devicetype_bose_nc700" translatable="false">Bose NC 700</string>
     <string name="devicetype_bose_qc_ultra2_earbuds" translatable="false">Bose QuietComfort Ultra Earbuds (2nd Gen)</string>
-    <string name="bose_audio_mode_quiet">Quiet</string>
-    <string name="bose_audio_mode_aware">Aware</string>
-    <string name="bose_audio_mode_immersion">Immersion</string>
-    <string name="bose_audio_mode_other">Other mode</string>
     <string name="devicetype_jabra_evolve_65" translatable="false">Jabra Evolve 65</string>
     <string name="devicetype_jabra_evolve2_55" translatable="false">Jabra Evolve2 55</string>
     <string name="devicetype_jabra_evolve2_65" translatable="false">Jabra Evolve2 65</string>
@@ -6037,4 +6033,9 @@
     <string name="datestep_next_week">Next week</string>
     <string name="datestep_prev_month">Previous month</string>
     <string name="datestep_next_month">Next month</string>
+
+    <string name="bose_audio_mode_quiet">Quiet</string>
+    <string name="bose_audio_mode_aware">Aware</string>
+    <string name="bose_audio_mode_immersion">Immersion</string>
+    <string name="bose_audio_mode_other">Other mode</string>
 </resources>
