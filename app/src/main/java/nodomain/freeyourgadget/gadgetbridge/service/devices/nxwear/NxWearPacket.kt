@@ -92,6 +92,7 @@ internal data class NxWearPacket(
         }
 
         fun command(dataType: Int, payload: Int): ByteArray {
+            require(payload in 0..0xff) { "Command payload must fit in one byte: $payload" }
             return frame(0, 0x01, dataType, byteArrayOf(payload.toByte()))
         }
 

@@ -19,7 +19,7 @@ class NxWearPacketTest {
         assertEquals(true, NxWearProtocol.isShakeCameraEvent(event))
         assertEquals(false, NxWearProtocol.isShakeCameraEvent(event.copy(command = 0x34)))
         assertArrayEquals(
-            bytes("000b000021740000010001000000000000000000"),
+            NxWearPacket.frame(0, 0x04, NxWearDataType.SHAKE_CAMERA, byteArrayOf(1)),
             NxWearPacket.ack(requireNotNull(event.sequence), NxWearDataType.SHAKE_CAMERA),
         )
     }
