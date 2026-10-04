@@ -658,7 +658,7 @@ class NxWearB8Support : AbstractBTLESingleDeviceSupport(LOG) {
         }
         sync.wristWakeStart?.let { editor.putString(DeviceSettingsPreferenceConst.PREF_DISPLAY_ON_LIFT_START, it) }
         sync.wristWakeEnd?.let { editor.putString(DeviceSettingsPreferenceConst.PREF_DISPLAY_ON_LIFT_END, it) }
-        sync.wristWakeDurationSeconds?.let { editor.putString(DeviceSettingsPreferenceConst.PREF_NX_WEAR_B8_DISPLAY_ON_LIFT_DURATION, it.toString()) }
+        sync.wristWakeDurationSeconds?.let { editor.putString(DeviceSettingsPreferenceConst.PREF_SCREEN_TIMEOUT, it.toString()) }
         editor.apply()
     }
 
@@ -742,7 +742,7 @@ class NxWearB8Support : AbstractBTLESingleDeviceSupport(LOG) {
             DeviceSettingsPreferenceConst.PREF_DISPLAY_ON_LIFT_END, "23:59",
         ) ?: "00:00"
         val duration = prefs.getString(
-            DeviceSettingsPreferenceConst.PREF_NX_WEAR_B8_DISPLAY_ON_LIFT_DURATION, "5",
+            DeviceSettingsPreferenceConst.PREF_SCREEN_TIMEOUT, "5",
         )?.toIntOrNull()?.takeIf { it in 3..10 } ?: 5
 
         builder.write(WRITE_CHARACTERISTIC, *NxWearProtocol.encodeWristWakeSettings(enabled, start, end, duration))
@@ -762,7 +762,7 @@ class NxWearB8Support : AbstractBTLESingleDeviceSupport(LOG) {
             NxWearB8Coordinator.PREF_LIFT_ENABLED,
             DeviceSettingsPreferenceConst.PREF_DISPLAY_ON_LIFT_START,
             DeviceSettingsPreferenceConst.PREF_DISPLAY_ON_LIFT_END,
-            DeviceSettingsPreferenceConst.PREF_NX_WEAR_B8_DISPLAY_ON_LIFT_DURATION,
+            DeviceSettingsPreferenceConst.PREF_SCREEN_TIMEOUT,
         )
 
         private val CONFIG_KEYS = HEALTH_CONFIG_KEYS + setOf(

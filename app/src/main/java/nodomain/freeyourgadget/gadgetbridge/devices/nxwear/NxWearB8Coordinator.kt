@@ -190,7 +190,7 @@ class NxWearB8Coordinator : AbstractBLEDeviceCoordinator() {
                     dependency = PREF_LIFT_ENABLED,
                 )
                 list(
-                    key = DeviceSettingsPreferenceConst.PREF_NX_WEAR_B8_DISPLAY_ON_LIFT_DURATION,
+                    key = DeviceSettingsPreferenceConst.PREF_SCREEN_TIMEOUT,
                     title = R.string.prefs_screen_timeout,
                     icon = R.drawable.ic_timer,
                     entries = (3..10).map { ListEntry.Text(it.toString(), "$it s") },
