@@ -300,7 +300,9 @@ class NxWearB8Support : AbstractBTLESingleDeviceSupport(LOG) {
                 }
                 NxWearHeartRateReading.parse(packet) != null &&
                     initializationStep == InitializationStep.COMPLETE -> handleManualHeartRate(packet)
-                packet.timedReadings(NxWearDataType.SPO2) != null -> handleSpo2Reading(packet)
+                NxWearSpo2Reading.parse(packet) != null &&
+                    initializationStep == InitializationStep.COMPLETE ->
+                    handleSpo2Reading(packet, notifyResult = packet.dataType == NxWearDataType.SPO2)
                 NxWearStressReading.parse(packet) != null -> handleStressReading(packet)
                 packet.kind == NxWearPacket.Kind.FRAMED && packet.command == 0x31 && packet.dataType == NxWearDataType.HEART_RATE_CONTROL &&
                     packet.isComplete && packet.payload.size == 1 -> {
@@ -362,9 +364,9 @@ class NxWearB8Support : AbstractBTLESingleDeviceSupport(LOG) {
         }
     }
 
-    private fun handleSpo2Reading(packet: NxWearPacket) {
-        val readings = requireNotNull(packet.timedReadings(NxWearDataType.SPO2))
-        acknowledgeMeasurementPacket(requireNotNull(packet.sequence), NxWearDataType.SPO2)
+    private fun handleSpo2Reading(packet: NxWearPacket, acknowledge: Boolean = true, notifyResult: Boolean = true) {
+        val readings = requireNotNull(NxWearSpo2Reading.parse(packet))
+        if (acknowledge) acknowledgeMeasurementPacket(requireNotNull(packet.sequence), requireNotNull(packet.dataType))
         val valid = readings.filter { it.value in 1..100 }
         if (valid.isEmpty()) return
         try {
@@ -376,8 +378,10 @@ class NxWearB8Support : AbstractBTLESingleDeviceSupport(LOG) {
                 GenericSpo2SampleProvider(getDevice(), session).addSamples(samples)
             }
             GB.signalActivityDataFinish(getDevice())
-            GB.toast(getContext(), getContext().getString(R.string.nx_wear_b8_spo2_result, valid.last().value),
-                Toast.LENGTH_LONG, GB.INFO)
+            if (notifyResult) {
+                GB.toast(getContext(), getContext().getString(R.string.nx_wear_b8_spo2_result, valid.last().value),
+                    Toast.LENGTH_LONG, GB.INFO)
+            }
         } catch (e: Exception) {
             LOG.error("Unable to save Nx Wear B8 blood oxygen reading", e)
         }
@@ -587,6 +591,8 @@ class NxWearB8Support : AbstractBTLESingleDeviceSupport(LOG) {
             val packet = historyPacket?.takeIf { it.isComplete } ?: return
             if (NxWearHeartRateReading.parse(packet) != null) {
                 handleManualHeartRate(packet, acknowledge = false, realtime = false)
+            } else if (NxWearSpo2Reading.parse(packet) != null) {
+                handleSpo2Reading(packet, acknowledge = false, notifyResult = false)
             } else if (packet.dataType == NxWearDataType.SLEEP) {
                 persistSleepPacket(packet)
             } else if (packet.dataType == NxWearDataType.ACTIVITY_05) {
@@ -794,7 +800,7 @@ class NxWearB8Support : AbstractBTLESingleDeviceSupport(LOG) {
         private val ACTIVITY_SUBTYPES = setOf(
             NxWearDataType.ACTIVITY_09, NxWearDataType.ACTIVITY_04, NxWearDataType.ACTIVITY_05, NxWearDataType.SLEEP,
             NxWearDataType.HEART_RATE, NxWearDataType.EXERCISE_HEART_RATE, NxWearDataType.HISTORY_TEMPERATURE,
-            NxWearDataType.ACTIVITY_08, NxWearDataType.ACTIVITY_28, NxWearDataType.ACTIVITY_2A,
+            NxWearDataType.ACTIVITY_08, NxWearDataType.HISTORY_SPO2, NxWearDataType.SPO2, NxWearDataType.ACTIVITY_2A,
             NxWearDataType.ACTIVITY_FA,
         )
         internal fun historyTimeoutForSubtype(dataType: Int?): Long =

@@ -181,7 +181,7 @@ internal object NxWearDataType {
     const val SPO2 = 0x14
     const val HEART_RATE_CONTROL = 0x15
     const val MANUAL_HEART_RATE = 0x18
-    const val ACTIVITY_28 = 0x28
+    const val HISTORY_SPO2 = 0x28
     const val ACTIVITY_2A = 0x2a
     const val STRESS = 0x2d
     const val CLOCK = 0x68
