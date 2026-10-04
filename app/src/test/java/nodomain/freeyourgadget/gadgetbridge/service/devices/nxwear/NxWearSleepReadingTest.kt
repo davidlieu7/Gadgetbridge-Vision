@@ -57,6 +57,27 @@ class NxWearSleepReadingTest {
     }
 
     @Test
+    fun mapsInteriorWakeIntervalsButDoesNotEmitTerminalWakeMarker() {
+        fun record(type: Int, timestampSeconds: Int) = byteArrayOf(
+            type.toByte(),
+            timestampSeconds.toByte(),
+            (timestampSeconds shr 8).toByte(),
+            (timestampSeconds shr 16).toByte(),
+            (timestampSeconds shr 24).toByte(),
+        )
+        val payload = listOf(
+            record(1, 0), record(2, 60), record(4, 120), record(3, 180), record(4, 240),
+        ).fold(byteArrayOf(0, 0, 1, 5)) { result, item -> result + item }
+        val packet = NxWearPacket.parse(NxWearPacket.frame(3, 0x31, NxWearDataType.SLEEP, payload))
+
+        val readings = requireNotNull(NxWearSleepReading.parse(packet))
+
+        assertEquals(1, readings.count { it.kind == ActivityKind.AWAKE_SLEEP })
+        assertEquals(1, readings.count { it.kind == ActivityKind.DEEP_SLEEP })
+        assertEquals(2, readings.count { it.kind == ActivityKind.LIGHT_SLEEP })
+    }
+
+    @Test
     fun readsCapturedAutomaticHeartRateAndLatestReading() {
         val payload = bytes("110011fb88c16a4f0390c16a5c0a97c16a47139ec16a471aa5c16a4d23acc16a452bb3c16a4133bac16a4e3bc1c16a5b43c8c16a3d4bcfc16a6153d6c16a395bddc16a4a63e4c16a4d6bebc16a4673f2c16a467bf9c16a49")
         val packet = NxWearPacket.parse(NxWearPacket.frame(5, 0x31, NxWearDataType.HISTORY_HEART_RATE, payload))

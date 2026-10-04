@@ -36,12 +36,12 @@ internal data class NxWearSleepReading(val timestampMillis: Long, val durationMi
                 records.zipWithNext().any { (start, end) -> end.second < start.second }) return null
             return records.zipWithNext().mapNotNull { (start, end) ->
                 val duration = end.second - start.second
-                if (duration == 0L || start.first == 4) return@mapNotNull null
+                if (duration == 0L) return@mapNotNull null
                 if (duration % 60L != 0L || duration / 60L > Int.MAX_VALUE) return null
                 val kind = when (start.first) {
-                    // The captured initial interval is light sleep (including it reproduces 192 min).
                     1, 3 -> ActivityKind.LIGHT_SLEEP
                     2 -> ActivityKind.DEEP_SLEEP
+                    4 -> ActivityKind.AWAKE_SLEEP
                     5 -> ActivityKind.REM_SLEEP
                     else -> return null
                 }
