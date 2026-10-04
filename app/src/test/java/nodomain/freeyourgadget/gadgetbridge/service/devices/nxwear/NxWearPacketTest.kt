@@ -111,9 +111,9 @@ class NxWearPacketTest {
         val readings = NxWearSportReading.parse(packet)
         assertEquals(1, readings?.size)
         assertEquals(64, readings?.single()?.steps)
-        assertEquals(45, readings?.single()?.distanceMeters)
-        assertEquals(2570, readings?.single()?.caloriesMilliKcal)
-        assertEquals(47, readings?.single()?.durationSeconds)
+        assertEquals(45, readings?.single()?.distance) // meters
+        assertEquals(2570, readings?.single()?.calories) // milli-kcal
+        assertEquals(47, readings?.single()?.duration) // seconds
     }
 
     @Test

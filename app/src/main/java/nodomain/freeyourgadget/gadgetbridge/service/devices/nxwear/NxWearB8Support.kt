@@ -596,8 +596,8 @@ class NxWearB8Support : AbstractBTLESingleDeviceSupport(LOG) {
             withSampleIdentity { session, deviceId, userId ->
                 for (reading in readings) {
                     session.nxWearSportSampleDao.insertOrReplace(NxWearSportSample(
-                        reading.timestampMillis, deviceId, userId, reading.steps, reading.distanceMeters,
-                        reading.caloriesMilliKcal, reading.durationSeconds,
+                        reading.timestampMillis, deviceId, userId, reading.steps, reading.distance,
+                        reading.calories, reading.duration,
                     ))
                 }
             }

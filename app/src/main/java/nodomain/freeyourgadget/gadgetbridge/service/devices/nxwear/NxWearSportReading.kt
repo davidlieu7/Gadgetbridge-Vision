@@ -19,9 +19,9 @@ package nodomain.freeyourgadget.gadgetbridge.service.devices.nxwear
 internal data class NxWearSportReading(
     val timestampMillis: Long,
     val steps: Int,
-    val distanceMeters: Int,
-    val caloriesMilliKcal: Int,
-    val durationSeconds: Int,
+    val distance: Int, // meters
+    val calories: Int, // milli-kcal
+    val duration: Int, // seconds
 ) {
     companion object {
         fun parse(packet: NxWearPacket): List<NxWearSportReading>? {

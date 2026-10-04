@@ -52,12 +52,12 @@ class NxWearActivitySampleProvider(private val device: GBDevice, private val ses
             val calendar = Calendar.getInstance().apply { timeInMillis = record.timestamp }
             val day = calendar.get(Calendar.YEAR).toLong() * 1000L + calendar.get(Calendar.DAY_OF_YEAR)
             val baseline = previous?.takeIf { previousDay == day &&
-                record.cumulativeSteps >= it.cumulativeSteps &&
-                record.cumulativeDistanceMeters >= it.cumulativeDistanceMeters &&
-                record.cumulativeCaloriesMilliKcal >= it.cumulativeCaloriesMilliKcal }
-            val stepDelta = (record.cumulativeSteps - (baseline?.cumulativeSteps ?: 0)).coerceAtLeast(0)
-            val distanceDelta = (record.cumulativeDistanceMeters - (baseline?.cumulativeDistanceMeters ?: 0)).coerceAtLeast(0)
-            val calorieDelta = (record.cumulativeCaloriesMilliKcal - (baseline?.cumulativeCaloriesMilliKcal ?: 0)).coerceAtLeast(0)
+                record.steps >= it.steps &&
+                record.distance >= it.distance &&
+                record.calories >= it.calories }
+            val stepDelta = (record.steps - (baseline?.steps ?: 0)).coerceAtLeast(0)
+            val distanceDelta = (record.distance - (baseline?.distance ?: 0)).coerceAtLeast(0)
+            val calorieDelta = (record.calories - (baseline?.calories ?: 0)).coerceAtLeast(0)
             previous = record
             previousDay = day
             val timestamp = (record.timestamp / 1000L).toInt()

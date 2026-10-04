@@ -1164,10 +1164,10 @@ public class GBDaoGenerator {
     private static Entity addNxWearSportSample(Schema schema, Entity user, Entity device) {
         Entity sample = addEntity(schema, "NxWearSportSample");
         addCommonTimeSampleProperties("AbstractTimeSample", sample, user, device);
-        sample.addIntProperty("cumulativeSteps").notNull();
-        sample.addIntProperty("cumulativeDistanceMeters").notNull();
-        sample.addIntProperty("cumulativeCaloriesMilliKcal").notNull();
-        sample.addIntProperty("durationSeconds").notNull();
+        sample.addIntProperty(SAMPLE_STEPS).notNull();
+        sample.addIntProperty("distance").notNull();
+        sample.addIntProperty("calories").notNull();
+        sample.addIntProperty("duration").notNull();
         return sample;
     }
 
