@@ -330,4 +330,74 @@ public class BoseProtocolTest {
     public void testFrameRejectsPayloadsLongerThanOneByteLength() {
         BoseProtocol.frame(0x04, 0x04, 0x03, new byte[BoseProtocol.MAX_FRAME_LENGTH + 1]);
     }
+    @Test
+    public void testUltra2EarbudsCapturedAudioModeCommands() {
+        assertHexEquals(hex("1f030100"), BoseProtocol.getAudioMode());
+        assertHexEquals(hex("1f0305020001"), BoseProtocol.setAudioMode(BoseProtocol.AUDIO_MODE_QUIET));
+        assertHexEquals(hex("1f0305020101"), BoseProtocol.setAudioMode(BoseProtocol.AUDIO_MODE_AWARE));
+        assertHexEquals(hex("1f0305020201"), BoseProtocol.setAudioMode(BoseProtocol.AUDIO_MODE_IMMERSION));
+        Assert.assertThrows(IllegalArgumentException.class, () -> BoseProtocol.setAudioMode(-1));
+        Assert.assertThrows(IllegalArgumentException.class, () -> BoseProtocol.setAudioMode(3));
+    }
+
+    @Test
+    public void testUltra2EarbudsNotificationsIncludeBlock31() {
+        assertHexEquals(hex("090202050180000005"),
+                BoseProtocol.enableNotificationsForFunctionBlocks(BoseProtocol.BLOCK_PRODUCT_INFO,
+                        BoseProtocol.BLOCK_STATUS, BoseProtocol.BLOCK_AUDIO_MODES));
+        // Full subscription observed in the Bose app capture.
+        assertHexEquals(hex("090202050180040237"),
+                BoseProtocol.enableNotificationsForFunctionBlocks(0, 1, 2, 4, 5, 9, 18, 31));
+    }
+
+    @Test
+    public void testAudioModeDoesNotDefaultUnknownOrMalformedResponsesToQuiet() {
+        Assert.assertEquals(0, BoseProtocol.decodeAudioMode(hex("00")));
+        Assert.assertEquals(1, BoseProtocol.decodeAudioMode(hex("01")));
+        Assert.assertEquals(2, BoseProtocol.decodeAudioMode(hex("02")));
+        Assert.assertEquals(3, BoseProtocol.decodeAudioMode(hex("03")));
+        Assert.assertEquals(-1, BoseProtocol.decodeAudioMode(hex("")));
+        Assert.assertEquals(-1, BoseProtocol.decodeAudioMode(hex("0001")));
+    }
+
+    @Test
+    public void testUltra2EarbudsCapturedBatteryStatus() {
+        final List<BoseProtocol.EarbudBattery> batteries = BoseProtocol.decodeEarbudBatteries(
+                hex("5affff015affff025affff045affff03"));
+        Assert.assertEquals(3, batteries.size());
+        Assert.assertEquals(1, batteries.get(0).component);
+        Assert.assertEquals(2, batteries.get(1).component);
+        Assert.assertEquals(3, batteries.get(2).component);
+        for (final BoseProtocol.EarbudBattery battery : batteries) {
+            Assert.assertEquals(90, battery.level);
+        }
+    }
+
+    @Test
+    public void testEarbudBatteriesUseComponentIdsNotRecordOrder() {
+        final List<BoseProtocol.EarbudBattery> batteries = BoseProtocol.decodeEarbudBatteries(
+                hex("50ffff033cffff0446ffff023cffff01"));
+        Assert.assertEquals(3, batteries.size());
+        Assert.assertEquals(3, batteries.get(0).component);
+        Assert.assertEquals(80, batteries.get(0).level);
+        Assert.assertEquals(2, batteries.get(1).component);
+        Assert.assertEquals(70, batteries.get(1).level);
+        Assert.assertEquals(1, batteries.get(2).component);
+        Assert.assertEquals(60, batteries.get(2).level);
+    }
+
+    @Test
+    public void testEarbudBatteriesRejectInvalidRecordsAndPreserveUnknown() {
+        Assert.assertTrue(BoseProtocol.decodeEarbudBatteries(hex("5affff015a")).isEmpty());
+        Assert.assertTrue(BoseProtocol.decodeEarbudBatteries(hex("")).isEmpty());
+        Assert.assertTrue(BoseProtocol.decodeEarbudBatteries(hex("65ffff01")).isEmpty());
+        Assert.assertTrue(BoseProtocol.decodeEarbudBatteries(hex("5affff00")).isEmpty());
+        Assert.assertTrue(BoseProtocol.decodeEarbudBatteries(hex("5affff04")).isEmpty());
+        final List<BoseProtocol.EarbudBattery> batteries = BoseProtocol.decodeEarbudBatteries(
+                hex("ffffff0364ffff0100ffff02"));
+        Assert.assertEquals(-1, batteries.get(0).level);
+        Assert.assertEquals(100, batteries.get(1).level);
+        Assert.assertEquals(0, batteries.get(2).level);
+    }
+
 }

@@ -516,6 +516,7 @@ import nodomain.freeyourgadget.gadgetbridge.devices.polar.PolarH10DeviceCoordina
 import nodomain.freeyourgadget.gadgetbridge.devices.polar.PolarH9DeviceCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.bose.NC700Coordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.bose.QC35Coordinator;
+import nodomain.freeyourgadget.gadgetbridge.devices.bose.QCUltra2EarbudsCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.qhybrid.QHybridCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.qnscale.QnScaleCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.realme.RealmeBudsAir5ProCoordinator;
@@ -1085,6 +1086,7 @@ public enum DeviceType {
     MOONDROP_SPACE_TRAVEL_2_ULTRA(MoondropSpaceTravel2UltraCoordinator.class),
     BOSE_QC35(QC35Coordinator.class),
     BOSE_NC700(NC700Coordinator.class),
+    BOSE_QC_ULTRA2_EARBUDS(QCUltra2EarbudsCoordinator.class),
     JABRA_EVOLVE_65(JabraEvolve65Coordinator.class),
     JABRA_EVOLVE2_55(JabraEvolve255Coordinator.class),
     JABRA_EVOLVE2_65(JabraEvolve265Coordinator.class),

@@ -679,6 +679,7 @@ public class DeviceSettingsPreferenceConst {
     public static final String PREF_MIJIA_LYWSD_COMFORT_HUMIDITY_LOWER = "pref_mijia_lywsd_comfort_humidity_lower";
     public static final String PREF_MIJIA_LYWSD_COMFORT_HUMIDITY_UPPER = "pref_mijia_lywsd_comfort_humidity_upper";
 
+    public static final String PREF_BOSE_AUDIO_MODE = "bose_audio_mode";
     public static final String PREF_BOSE_CNC_LEVEL = "bose_cnc_level";
     public static final String PREF_BOSE_ANR_LEVEL = "bose_anr_level";
 

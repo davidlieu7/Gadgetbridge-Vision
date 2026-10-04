@@ -33,6 +33,15 @@ public final class BoseProtocol {
     public static final int BLOCK_AUDIO_MANAGEMENT = 0x05;
     public static final int BLOCK_NOTIFICATION = 0x09;
 
+    public static final int BLOCK_AUDIO_MODES = 0x1f;
+
+    // Audio modes functions
+    public static final int FUNCTION_AUDIO_MODE = 0x03;
+
+    public static final int AUDIO_MODE_QUIET = 0;
+    public static final int AUDIO_MODE_AWARE = 1;
+    public static final int AUDIO_MODE_IMMERSION = 2;
+
     // Operators
     public static final int OP_GET = 0x01;
     public static final int OP_SETGET = 0x02;
@@ -164,6 +173,49 @@ public final class BoseProtocol {
         payload[0] = 0x01;
         System.arraycopy(bitset, 0, payload, 1, bitset.length);
         return frame(BLOCK_NOTIFICATION, FUNCTION_NOTIFICATION_BY_FUNCTION_BLOCK, OP_SETGET, payload);
+    }
+
+    public static byte[] getAudioMode() {
+        return frame(BLOCK_AUDIO_MODES, FUNCTION_AUDIO_MODE, OP_GET);
+    }
+
+    public static byte[] setAudioMode(final int mode) {
+        if (mode < AUDIO_MODE_QUIET || mode > AUDIO_MODE_IMMERSION) {
+            throw new IllegalArgumentException("Unsupported audio mode");
+        }
+        // START, not SETGET. The second byte requests the spoken mode announcement.
+        return frame(BLOCK_AUDIO_MODES, FUNCTION_AUDIO_MODE, OP_START, (byte) mode, (byte) 1);
+    }
+
+    public static int decodeAudioMode(final byte[] payload) {
+        // Preserve other preset IDs; never report an unrecognized mode as Quiet.
+        return payload.length == 1 ? payload[0] & 0xff : -1;
+    }
+
+    public static final class EarbudBattery {
+        public final int component;
+        public final int level;
+
+        private EarbudBattery(final int component, final int level) {
+            this.component = component;
+            this.level = level;
+        }
+    }
+
+    /** Component IDs: 1 = right, 2 = left, 3 = case, 4 = combined earbuds. */
+    public static List<EarbudBattery> decodeEarbudBatteries(final byte[] payload) {
+        final List<EarbudBattery> batteries = new ArrayList<>();
+        if (payload.length % 4 != 0) {
+            return batteries;
+        }
+        for (int i = 0; i < payload.length; i += 4) {
+            final int level = payload[i] & 0xff;
+            final int component = payload[i + 3] & 0xff;
+            if (component >= 1 && component <= 3 && (level <= 100 || level == 0xff)) {
+                batteries.add(new EarbudBattery(component, level == 0xff ? -1 : level));
+            }
+        }
+        return batteries;
     }
 
     public static byte[] getFirmwareVersion() {
