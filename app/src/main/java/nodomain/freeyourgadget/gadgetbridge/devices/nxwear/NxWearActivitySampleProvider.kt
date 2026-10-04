@@ -70,7 +70,9 @@ class NxWearActivitySampleProvider(private val device: GBDevice, private val ses
             sample.rawKind = ActivityKind.ACTIVITY.code
             sample.steps = stepDelta
             sample.distanceCm = (distanceDelta.toLong() * 100L).coerceAtMost(Int.MAX_VALUE.toLong()).toInt()
-            sample.activeCalories = calorieDelta / 1000
+            // ActivitySample calories are milli-kcal; ActivityAnalysis converts the accumulated
+            // value to kcal for the Calories chart. Keep the wire's milli-kcal precision here.
+            sample.activeCalories = calorieDelta
         }
         val sleepProvider = GenericSleepStageSampleProvider(device, session)
         val stages = sleepProvider.getAllSamples(timestampFrom.toLong() * 1000L, timestampTo.toLong() * 1000L).toMutableList()
