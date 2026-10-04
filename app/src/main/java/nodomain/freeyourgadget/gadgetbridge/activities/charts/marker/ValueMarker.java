@@ -41,16 +41,25 @@ public class ValueMarker extends MarkerView {
     public void refreshContent(Entry e, Highlight highlight) {
         float xVal = e.getX();
         final StringBuilder content = new StringBuilder();
-        // A metric split into several gapped segments contributes multiple datasets sharing one
-        // label - only the segment that actually covers xVal will have a matching entry.
+        // A metric split into gapped segments contributes consecutive datasets of which only the
+        // first carries the label; the unlabelled ones that follow belong to the same series. Only
+        // a segment whose x range covers xVal reports, since getEntryForXValue returns the closest
+        // entry even when it lies far outside the segment.
         final Set<String> reportedLabels = new HashSet<>();
+        String seriesLabel = null;
         for (int i = 0; i < lineData.getDataSetCount(); i++) {
             final IBarLineScatterCandleBubbleDataSet<?> dataSet = lineData.getDataSetByIndex(i);
-            if (dataSet == null || !dataSet.isVisible()) {
+            if (dataSet == null) {
                 continue;
             }
-            final String label = dataSet.getLabel();
-            if (label != null && reportedLabels.contains(label)) {
+            if (dataSet.getLabel() != null) {
+                seriesLabel = dataSet.getLabel();
+            }
+            final String label = seriesLabel;
+            if (!dataSet.isVisible() || (label != null && reportedLabels.contains(label))) {
+                continue;
+            }
+            if (xVal < dataSet.getXMin() || xVal > dataSet.getXMax()) {
                 continue;
             }
             Entry entryForX = dataSet.getEntryForXValue(xVal, Float.NaN);

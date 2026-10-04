@@ -3257,6 +3257,7 @@
     <string name="minutes_100m">min/100m</string>
     <string name="minutes_100yd">min/100yd</string>
     <string name="minutes_500m">min/500m</string>
+    <string name="seconds_500m">sec/500m</string>
     <string name="Pace">Pace</string>
     <!-- activity summary groups-->
     <string name="Strokes">Strokes</string>

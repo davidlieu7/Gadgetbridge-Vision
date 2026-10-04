@@ -279,8 +279,12 @@ public class DefaultWorkoutCharts {
             charts.add(createSpeedChart(context, activityKind, speedDataPoints));
         }
 
-        if (hasCadenceValues && !cadenceDataPoints.isEmpty()) {
-            charts.add(createCadenceChart(context, cycleUnit, cadenceDataPoints, cadenceAccumulator));
+        // Step cadence is drawn as dots, which stay readable at walking rates but not at the denser
+        // cadence of running and treadmill activities: those rely on the pace chart instead.
+        final boolean stepsCadenceHidden = cycleUnit == ActivityKind.CycleUnit.STEPS
+                && (activityKind.name().contains("RUN") || activityKind.name().contains("TREADMILL"));
+        if (hasCadenceValues && !cadenceDataPoints.isEmpty() && !stepsCadenceHidden) {
+            charts.add(createCadenceChart(context, activityKind, cycleUnit, cadenceDataPoints, cadenceAccumulator));
         }
 
         if (hasElevationValues && !elevationDataPoints.isEmpty()) {
@@ -540,29 +544,54 @@ public class DefaultWorkoutCharts {
     }
 
     private static WorkoutChart createCadenceChart(final Context context,
+                                                   final ActivityKind activityKind,
                                                    final ActivityKind.CycleUnit cycleUnit,
                                                    final List<Entry> cadenceDataPoints,
                                                    final Accumulator cadenceAccumulator) {
-        final String label = String.format("%s (%s)", context.getString(R.string.workout_cadence), getUnitString(context, getCadenceUnit(cycleUnit)));
-        final ScatterDataSet dataset = createScatterDataSet(context, cadenceDataPoints, label, ContextCompat.getColor(context, R.color.chart_cadence_circle));
+        final String cadenceUnit = getCadenceUnit(cycleUnit);
+        final String label = String.format("%s (%s)", context.getString(R.string.workout_cadence), getUnitString(context, cadenceUnit));
         final ValueFormatter integerFormatter = new ValueFormatter() {
             @Override
             public String getFormattedValue(float value) {
                 return String.valueOf((int) value);
             }
         };
-        float xAxisMaximum = Math.max(
-                (float) (cadenceAccumulator.getMax() + 30),
-                (float) cadenceAccumulator.getAverage() * 2
+        final float xAxisMaximum = (float) Math.max(
+                cadenceAccumulator.getMax() + 30,
+                cadenceAccumulator.getAverage() * 2
         );
 
+        final int color = ContextCompat.getColor(context, R.color.chart_cadence_circle);
+        if (ActivityKind.isRowingActivity(activityKind)) {
+            // Rowing stroke rate is a continuous signal, rendered as a line rather than dots.
+            final LineData lineData = createGappedLineData(context, cadenceDataPoints, label, color);
+            return new WorkoutChart(
+                    "cadence",
+                    context.getString(R.string.workout_cadence),
+                    ActivitySummaryEntries.GROUP_CADENCE,
+                    lineData,
+                    integerFormatter,
+                    getUnitString(context, cadenceUnit),
+                    lineChart -> {
+                        YAxis yAxisLeft = lineChart.getAxisLeft();
+                        yAxisLeft.setAxisMinimum(0);
+                        yAxisLeft.setAxisMaximum(xAxisMaximum);
+                        YAxis yAxisRight = lineChart.getAxisRight();
+                        yAxisRight.setAxisMinimum(0);
+                        yAxisRight.setAxisMaximum(xAxisMaximum);
+                        return kotlin.Unit.INSTANCE;
+                    }
+            );
+        }
+
+        final ScatterDataSet dataset = createScatterDataSet(context, cadenceDataPoints, label, color);
         return new WorkoutChart(
                 "cadence",
                 context.getString(R.string.workout_cadence),
                 ActivitySummaryEntries.GROUP_CADENCE,
                 new ScatterData(dataset),
                 integerFormatter,
-                getUnitString(context, UNIT_SPM),
+                getUnitString(context, cadenceUnit),
                 lineChart -> {
                     YAxis yAxisLeft = lineChart.getAxisLeft();
                     yAxisLeft.setAxisMinimum(0);
