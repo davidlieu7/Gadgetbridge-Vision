@@ -168,6 +168,8 @@ public class XiaomiHealthService extends AbstractXiaomiService {
     private static final int WORKOUT_RESUMED = 2;
     private static final int WORKOUT_FINISHED = 3;
 
+    // Guarded by itself: consumers are added and released from the handler thread and from the
+    // Bluetooth callback thread.
     private final Set<RealtimeConsumer> realtimeConsumers = EnumSet.noneOf(RealtimeConsumer.class);
     private int previousSteps = -1;
 
@@ -280,7 +282,9 @@ public class XiaomiHealthService extends AbstractXiaomiService {
         gpsStarted = false;
         gpsFixAcquired = false;
         workoutStarted = false;
-        realtimeConsumers.clear();
+        synchronized (realtimeConsumers) {
+            realtimeConsumers.clear();
+        }
         saaRawSensorActive = false;
         gpsTimeoutHandler.removeCallbacksAndMessages(null);
 
@@ -301,7 +305,9 @@ public class XiaomiHealthService extends AbstractXiaomiService {
         gpsFixAcquired = false;
         workoutStarted = false;
         stopWorkoutStatsTicker();
-        realtimeConsumers.clear();
+        synchronized (realtimeConsumers) {
+            realtimeConsumers.clear();
+        }
         saaRawSensorActive = false;
         activityFetcher.dispose();
     }
@@ -1018,14 +1024,18 @@ public class XiaomiHealthService extends AbstractXiaomiService {
     private void setRealtimeConsumer(final RealtimeConsumer consumer, final boolean enable) {
         LOG.debug("Realtime stats consumer {}: {}", consumer, enable);
 
-        final boolean wasStreaming = !realtimeConsumers.isEmpty();
-        final boolean changed = enable ? realtimeConsumers.add(consumer) : realtimeConsumers.remove(consumer);
-        if (!changed || wasStreaming == !realtimeConsumers.isEmpty()) {
-            return;
+        final boolean streaming;
+        synchronized (realtimeConsumers) {
+            final boolean wasStreaming = !realtimeConsumers.isEmpty();
+            final boolean changed = enable ? realtimeConsumers.add(consumer) : realtimeConsumers.remove(consumer);
+            streaming = !realtimeConsumers.isEmpty();
+            if (!changed || wasStreaming == streaming) {
+                return;
+            }
         }
 
         previousSteps = -1;
-        sendRealtimeStats(!realtimeConsumers.isEmpty());
+        sendRealtimeStats(streaming);
     }
 
     private void sendRealtimeStats(final boolean enable) {
@@ -1041,13 +1051,20 @@ public class XiaomiHealthService extends AbstractXiaomiService {
     private void handleRealtimeStats(final RealTimeStats realTimeStats) {
         LOG.debug("Got realtime stats");
 
-        if (realtimeConsumers.isEmpty()) {
+        final boolean noConsumers;
+        final boolean oneShot;
+        synchronized (realtimeConsumers) {
+            noConsumers = realtimeConsumers.isEmpty();
+            oneShot = realtimeConsumers.contains(RealtimeConsumer.ONE_SHOT);
+        }
+
+        if (noConsumers) {
             // Failsafe in case it gets out of sync, stop it
             sendRealtimeStats(false);
             return;
         }
 
-        if (realtimeConsumers.contains(RealtimeConsumer.ONE_SHOT)) {
+        if (oneShot) {
             if (realTimeStats.getHeartRate() <= 10) {
                 return;
             }
