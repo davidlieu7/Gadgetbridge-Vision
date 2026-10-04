@@ -118,6 +118,32 @@ public class GPXExporterTest extends TestBase {
         Assert.assertEquals(2, countOccurrences(gpx, "<name>Morning run</name>"));
     }
 
+    /// Some devices record the altitude apart from the GPS location (e.g. the Xiaomi workout
+    /// details), so the point altitude is exported when the location has none.
+    @Test
+    public void pointAltitudeIsExported() throws Exception {
+        final Date startTime = Date.from(Instant.parse("2026-10-04T11:38:09Z"));
+        final List<ActivityPoint> points = new ArrayList<>();
+        final ActivityPoint withAltitude = new ActivityPoint(startTime);
+        withAltitude.setLocation(new GPSCoordinate(7.651, 47.667));
+        withAltitude.setAltitude(312.5);
+        points.add(withAltitude);
+        final ActivityPoint withoutAltitude = new ActivityPoint(new Date(startTime.getTime() + 1000));
+        withoutAltitude.setLocation(new GPSCoordinate(7.652, 47.668));
+        points.add(withoutAltitude);
+
+        final File tempFile = File.createTempFile("gpx-exporter-test-altitude", ".gpx");
+        tempFile.deleteOnExit();
+        final GPXExporter gpxExporter = new GPXExporter();
+        gpxExporter.setCreator("Gadgetbridge Test");
+        gpxExporter.performExport(createTestTrack(points, startTime), tempFile, null);
+
+        final String gpx = new String(Files.readAllBytes(tempFile.toPath()), StandardCharsets.UTF_8);
+        Assert.assertEquals(1, countOccurrences(gpx, "<ele>312.5</ele>"));
+        Assert.assertEquals(1, countOccurrences(gpx, "<ele>"));
+        validateGpxFile(tempFile);
+    }
+
     private String exportWith(String trackName, ActivityKind activityKind) throws Exception {
         return exportWith(trackName, activityKind, Date.from(Instant.parse("2025-10-17T21:00:00Z")));
     }

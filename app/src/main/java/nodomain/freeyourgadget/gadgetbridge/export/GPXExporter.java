@@ -237,8 +237,11 @@ public class GPXExporter implements ActivityTrackExporter {
         // lon and lat attributes do not have an explicit namespace
         ser.attribute(null, "lon", formatLocation(location.getLongitude()));
         ser.attribute(null, "lat", formatLocation(location.getLatitude()));
-        if (location.hasAltitude()) {
-            ser.startTag(NS_GPX_URI, "ele").text(formatDouble(location.getAltitude())).endTag(NS_GPX_URI, "ele");
+        // The point altitude falls back to the location's, but may also come from a non-GPS
+        // source when the location has none
+        final double altitude = point.getAltitude();
+        if (altitude > GPSCoordinate.UNKNOWN_ALTITUDE) {
+            ser.startTag(NS_GPX_URI, "ele").text(formatDouble(altitude)).endTag(NS_GPX_URI, "ele");
         }
         Date time = point.getTime();
         if (time != null) {
