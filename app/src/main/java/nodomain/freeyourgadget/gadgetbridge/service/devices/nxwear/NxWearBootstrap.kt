@@ -19,6 +19,16 @@ package nodomain.freeyourgadget.gadgetbridge.service.devices.nxwear
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 
+private enum class NxWearBootstrapRecordType(val id: Int) {
+    USER_INFO(0x66),
+    TIME_SYNC(0x68),
+    LANGUAGE_SETTING(0x67),
+    NOTIFICATION_SETTINGS(0x7c),
+    ACTIVITY_GOALS(0x6f),
+    UNKNOWN_0x6D(0x6d),
+    UNKNOWN_0x78(0x78),
+}
+
 internal data class NxWearBootstrap(
     val userId: Int,
     val isMale: Boolean,
@@ -37,30 +47,33 @@ internal data class NxWearBootstrap(
     fun encode(): ByteArray {
         require(epochSeconds in 0..0xffff_ffffL)
         val records = listOf(
-            record(0x66, le32(userId) + byteArrayOf(
+            record(NxWearBootstrapRecordType.USER_INFO, le32(userId) + byteArrayOf(
                 (if (isMale) 0 else 1).toByte(),
                 age.coerceIn(1, 255).toByte(),
                 heightCm.coerceIn(1, 255).toByte(),
                 weightKg.coerceIn(1, 255).toByte(),
                 0,
             )),
-            record(0x68, le32(epochSeconds.toInt()) + le32(timezoneOffsetSeconds) +
+            record(NxWearBootstrapRecordType.TIME_SYNC, le32(epochSeconds.toInt()) + le32(timezoneOffsetSeconds) +
                 byteArrayOf((if (is24Hour) 1 else 0).toByte())),
-            record(0x7c, byteArrayOf(1, -1, -1, 0, 0)),
-            record(0x67, byteArrayOf(0)),
-            record(0x6d, byteArrayOf(1)),
-            record(0x6f, le32(stepsGoal.coerceAtLeast(0)) + le32(distanceGoalMeters.coerceAtLeast(0)) +
-                le32(caloriesGoal.coerceAtLeast(0)) + le16(sleepGoalSeconds.coerceIn(0, 0xffff)) +
+            record(NxWearBootstrapRecordType.NOTIFICATION_SETTINGS, byteArrayOf(1, -1, -1, 0, 0)),
+            record(NxWearBootstrapRecordType.LANGUAGE_SETTING, byteArrayOf(0)),
+            record(NxWearBootstrapRecordType.UNKNOWN_0x6D, byteArrayOf(1)),
+            record(NxWearBootstrapRecordType.ACTIVITY_GOALS,
+                le32(stepsGoal.coerceAtLeast(0)) +
+                le32(distanceGoalMeters.coerceAtLeast(0)) +
+                le32(caloriesGoal.coerceAtLeast(0)) +
+                le16(sleepGoalSeconds.coerceIn(0, 0xffff)) +
                 le16(activeTimeGoalSeconds.coerceIn(0, 0xffff))),
-            record(0x78, byteArrayOf(0, 0)),
+            record(NxWearBootstrapRecordType.UNKNOWN_0x78, byteArrayOf(0, 0)),
         )
         val recordBytes = records.fold(byteArrayOf()) { result, record -> result + record }
         val payload = le16(recordBytes.size + 1) + byteArrayOf(records.size.toByte()) + recordBytes
         return NxWearPacket.frame(0, 0x01, NxWearDataType.BOOTSTRAP, payload, deviceType = 0x01)
     }
 
-    private fun record(type: Int, data: ByteArray): ByteArray =
-        le16(data.size + 3) + byteArrayOf(type.toByte()) + data
+    private fun record(type: NxWearBootstrapRecordType, data: ByteArray): ByteArray =
+        le16(data.size + 3) + byteArrayOf(type.id.toByte()) + data
 
     private fun le16(value: Int): ByteArray = byteArrayOf(value.toByte(), (value shr 8).toByte())
 
