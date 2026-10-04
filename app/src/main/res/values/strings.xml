@@ -5952,6 +5952,7 @@
     <string name="nx_wear_b8_exercise_stop">Stop exercise</string>
     <string name="nx_wear_b8_spo2_result">Blood oxygen: %1$d%%</string>
     <string name="nx_wear_b8_wrist_wake_duration">Wake screen duration</string>
+    <string name="nx_wear_b8_shake_to_take_picture">Shake to take a picture</string>
 
     <string name="workout_exercise_picker_title">Choose an exercise</string>
     <string name="workout_exercise_picker_search_hint">Search exercises</string>

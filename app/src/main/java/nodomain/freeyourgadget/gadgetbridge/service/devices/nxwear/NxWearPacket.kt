@@ -188,6 +188,7 @@ internal object NxWearDataType {
     const val MESSAGE_NOTICE = 0x6b
     const val FACTORY_RESET = 0x6d
     const val BOOTSTRAP = 0x6e
+    const val SHAKE_CAMERA = 0x74
     const val CALL_CONTROL = 0x75
     const val POWER_OFF = 0x77
     const val WRIST_WAKE = 0x7f

@@ -8,9 +8,11 @@ import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSett
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.DeviceSettingsSpec
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.ListEntry
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.deviceSettings
+import nodomain.freeyourgadget.gadgetbridge.activities.CameraActivity
 import nodomain.freeyourgadget.gadgetbridge.capabilities.HeartRateCapability
 import nodomain.freeyourgadget.gadgetbridge.devices.AbstractBLEDeviceCoordinator
 import nodomain.freeyourgadget.gadgetbridge.devices.DeviceCoordinator
+import nodomain.freeyourgadget.gadgetbridge.devices.DeviceCardAction
 import nodomain.freeyourgadget.gadgetbridge.devices.SampleProvider
 import nodomain.freeyourgadget.gadgetbridge.devices.GenericSpo2SampleProvider
 import nodomain.freeyourgadget.gadgetbridge.devices.GenericStressSampleProvider
@@ -182,6 +184,12 @@ class NxWearB8Coordinator : AbstractBLEDeviceCoordinator() {
                     dependency = PREF_LIFT_ENABLED,
                 )
             }
+            switchSetting(
+                key = PREF_SHAKE_TO_TAKE_PICTURE,
+                title = R.string.nx_wear_b8_shake_to_take_picture,
+                icon = R.drawable.ic_camera_remote,
+                defaultValue = false,
+            )
             list(
                 key = DeviceSettingsPreferenceConst.PREF_TIMEFORMAT,
                 title = R.string.pref_title_timeformat,
@@ -242,6 +250,7 @@ class NxWearB8Coordinator : AbstractBLEDeviceCoordinator() {
 
     companion object {
         const val PREF_LIFT_ENABLED = "nx_wear_b8_lift_enabled"
+        const val PREF_SHAKE_TO_TAKE_PICTURE = "nx_wear_b8_shake_to_take_picture"
         private const val ACTION_MEASURE_STRESS = "nx_wear_b8_measure_stress"
         private const val ACTION_MEASURE_SPO2 = "nx_wear_b8_measure_spo2"
         const val PREF_EXERCISE_SPORT = "nx_wear_b8_exercise_sport"

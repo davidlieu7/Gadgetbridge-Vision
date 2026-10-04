@@ -16,6 +16,7 @@ import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSett
 import nodomain.freeyourgadget.gadgetbridge.capabilities.HeartRateCapability
 import nodomain.freeyourgadget.gadgetbridge.database.DBHelper
 import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEventBatteryInfo
+import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEventCameraRemote
 import nodomain.freeyourgadget.gadgetbridge.devices.GenericSleepStageSampleProvider
 import nodomain.freeyourgadget.gadgetbridge.entities.GenericSleepStageSample
 import nodomain.freeyourgadget.gadgetbridge.devices.GenericHeartRateSampleProvider
@@ -144,6 +145,15 @@ class NxWearB8Support : AbstractBTLESingleDeviceSupport(LOG) {
             if (!starting) {
                 exerciseStartedAt = null
                 prefs.edit().putBoolean(NxWearB8Coordinator.PREF_EXERCISE_RUNNING, false).apply()
+            }
+            return
+        }
+        if (config == NxWearB8Coordinator.PREF_SHAKE_TO_TAKE_PICTURE) {
+            if (isConnected()) {
+                val enabled = getDevicePrefs().getBoolean(NxWearB8Coordinator.PREF_SHAKE_TO_TAKE_PICTURE, false)
+                createTransactionBuilder("${if (enabled) "Enable" else "Disable"} Nx Wear B8 shake camera")
+                    .write(WRITE_CHARACTERISTIC, *encodeShakeCamera(enabled))
+                    .queue()
             }
             return
         }
@@ -304,6 +314,18 @@ class NxWearB8Support : AbstractBTLESingleDeviceSupport(LOG) {
                 isBatteryNotification(packet) -> {
                     handleBatteryNotification(packet)
                     acknowledgeBatteryNotification(packet)
+                }
+                isShakeCameraEvent(packet) -> {
+                    if (!getDevicePrefs().getBoolean(NxWearB8Coordinator.PREF_SHAKE_TO_TAKE_PICTURE, false)) {
+                        LOG.debug("Ignoring Nx Wear B8 shake-to-camera event while disabled")
+                        return true
+                    }
+                    LOG.debug("Received Nx Wear B8 shake-to-camera event")
+                    acknowledgeMeasurementPacket(requireNotNull(packet.sequence), NxWearDataType.SHAKE_CAMERA)
+                    val event = GBDeviceEventCameraRemote().apply {
+                        this.event = GBDeviceEventCameraRemote.Event.TAKE_PICTURE
+                    }
+                    evaluateGBDeviceEvent(event)
                 }
                 NxWearHeartRateReading.parse(packet) != null &&
                     initializationStep == InitializationStep.COMPLETE -> handleManualHeartRate(packet)
@@ -793,6 +815,7 @@ class NxWearB8Support : AbstractBTLESingleDeviceSupport(LOG) {
 
         private val CONFIG_KEYS = HEALTH_CONFIG_KEYS + setOf(
             DeviceSettingsPreferenceConst.PREF_TIMEFORMAT,
+            NxWearB8Coordinator.PREF_SHAKE_TO_TAKE_PICTURE,
             ACTION_MEASURE_STRESS,
             ACTION_MEASURE_SPO2,
             NxWearB8Coordinator.ACTION_EXERCISE_START,
@@ -843,6 +866,13 @@ class NxWearB8Support : AbstractBTLESingleDeviceSupport(LOG) {
         internal fun encodePowerOff(): ByteArray = NxWearPacket.frame(0, 0x01, NxWearDataType.POWER_OFF, byteArrayOf(0))
 
         internal fun encodeFactoryReset(): ByteArray = NxWearPacket.frame(0, 0x01, NxWearDataType.FACTORY_RESET, byteArrayOf(0))
+
+        internal fun encodeShakeCamera(enabled: Boolean): ByteArray =
+            NxWearPacket.frame(0, 0x01, NxWearDataType.SHAKE_CAMERA, byteArrayOf(if (enabled) 1 else 0))
+
+        internal fun isShakeCameraEvent(packet: NxWearPacket): Boolean =
+            packet.kind == NxWearPacket.Kind.FRAMED && packet.command == 0x31 &&
+                packet.dataType == NxWearDataType.SHAKE_CAMERA && packet.isComplete
 
         internal fun encodeIncomingCall(timeMillis: Long, name: String?, number: String?): ByteArray {
             val seconds = timeMillis / 1000L

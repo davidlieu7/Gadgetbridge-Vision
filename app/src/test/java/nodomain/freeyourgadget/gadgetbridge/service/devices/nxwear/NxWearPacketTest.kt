@@ -11,6 +11,20 @@ class NxWearPacketTest {
     private fun bytes(hex: String) = hex.chunked(2).map { it.toInt(16).toByte() }.toByteArray()
 
     @Test
+    fun shakeCameraControlMatchesCaptureAndRecognizesWatchEvents() {
+        assertArrayEquals(bytes("000b000001740000010001000000000000000000"), NxWearB8Support.encodeShakeCamera(true))
+        assertArrayEquals(bytes("000b000001740000010000000000000000000000"), NxWearB8Support.encodeShakeCamera(false))
+
+        val event = NxWearPacket.parse(bytes("000b000031740000010001004ac9b7028020c26a00000000"))
+        assertEquals(true, NxWearB8Support.isShakeCameraEvent(event))
+        assertEquals(false, NxWearB8Support.isShakeCameraEvent(event.copy(command = 0x34)))
+        assertArrayEquals(
+            bytes("000b000021740000010001000000000000000000"),
+            NxWearB8Support.encodeMeasurementAck(requireNotNull(event.sequence), NxWearDataType.SHAKE_CAMERA),
+        )
+    }
+
+    @Test
     fun reassemblesExerciseHeartRateHistoryBeforeAcknowledging() {
         val frames = listOf(
             "000b0303311100003f000c000c03b7be6a5904b7",
