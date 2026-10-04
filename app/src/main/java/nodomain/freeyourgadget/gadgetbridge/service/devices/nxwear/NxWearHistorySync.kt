@@ -45,6 +45,12 @@ internal class NxWearHistorySync {
     val isComplete: Boolean get() = step == Step.COMPLETE
     val hasPendingLog: Boolean get() = logSequence != null
 
+    fun handlesLiveActivity(dataType: Int?): Boolean = when (dataType) {
+        NxWearDataType.REALTIME_SPORT -> isComplete || step == Step.WAIT_HISTORY_DATA
+        NxWearDataType.EXERCISE_HEART_RATE -> isComplete
+        else -> false
+    }
+
     fun resetForInitialization() {
         finish()
         deviceSyncLength = 0

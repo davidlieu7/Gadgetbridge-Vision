@@ -16,6 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 package nodomain.freeyourgadget.gadgetbridge.devices.nxwear
 
+import android.content.Context
 import android.content.SharedPreferences
 import android.os.Handler
 import android.os.Looper
@@ -46,6 +47,7 @@ import nodomain.freeyourgadget.gadgetbridge.entities.GenericHeartRateSampleDao
 import nodomain.freeyourgadget.gadgetbridge.entities.GenericSpo2SampleDao
 import nodomain.freeyourgadget.gadgetbridge.entities.GenericStressSampleDao
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice
+import nodomain.freeyourgadget.gadgetbridge.model.ActivityTrackProvider
 import nodomain.freeyourgadget.gadgetbridge.model.StressSample
 import nodomain.freeyourgadget.gadgetbridge.model.Spo2Sample
 import nodomain.freeyourgadget.gadgetbridge.service.DeviceSupport
@@ -249,6 +251,8 @@ class NxWearB8Coordinator : AbstractBLEDeviceCoordinator() {
     override fun supportsDataFetching(device: GBDevice): Boolean = true
 
     override fun supportsSleepMeasurement(device: GBDevice): Boolean = true
+
+    override fun getActivityTrackProvider(device: GBDevice, context: Context): ActivityTrackProvider = NxWearActivityTrackProvider(device)
 
     override fun supportsActivityTracking(device: GBDevice): Boolean = true
 

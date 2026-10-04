@@ -193,6 +193,48 @@ class NxWearHistorySyncTest {
         assertRequest(requireNotNull(sync.takeCompletedFrame()), 1, NxWearDataType.DEVICE_SYNC)
     }
 
+    @Test
+    fun routesInterleavedDailyTotalsOutsideHistoryReassembly() {
+        val sync = NxWearHistorySync()
+        assertFalse(sync.handlesLiveActivity(NxWearDataType.REALTIME_SPORT))
+        sync.acceptFrame(frame(1, NxWearDataType.DEVICE_SYNC))
+        sync.takeCompletedFrame()
+        assertFalse(sync.handlesLiveActivity(NxWearDataType.REALTIME_SPORT))
+        sync.acceptFrame(frame(2, NxWearDataType.REALTIME_SPORT))
+        sync.takeCompletedFrame()
+        assertTrue(sync.handlesLiveActivity(NxWearDataType.REALTIME_SPORT))
+        assertFalse(sync.handlesLiveActivity(NxWearDataType.EXERCISE_HEART_RATE))
+        // An interleaved live ACK must not end or advance the stored-data state machine.
+        sync.acknowledge(3)
+        assertEquals(NxWearHistorySync.Step.WAIT_HISTORY_DATA, sync.step)
+        assertTrue(sync.acceptFrame(frame(4, NxWearDataType.EXERCISE_HEART_RATE)))
+        assertRequest(requireNotNull(sync.takeCompletedFrame()), 4, NxWearDataType.EXERCISE_HEART_RATE)
+        sync.finish()
+        assertTrue(sync.handlesLiveActivity(NxWearDataType.REALTIME_SPORT))
+        assertTrue(sync.handlesLiveActivity(NxWearDataType.EXERCISE_HEART_RATE))
+        assertFalse(sync.handlesLiveActivity(NxWearDataType.DEVICE_LOG))
+        assertFalse(sync.handlesLiveActivity(null))
+    }
+
+    @Test
+    fun routesCapturedBasketballHeartRatePagesAfterHistoryWaitEnds() {
+        val sync = historyStream()
+        sync.finish()
+        fun packet(hex: String) = NxWearPacket.parse(hex.chunked(2).map { it.toInt(16).toByte() }.toByteArray())
+        val first = packet("000b0108311100001c000500051286c26a681286")
+        assertTrue(sync.handlesLiveActivity(first.dataType))
+        assertNull(NxWearHeartRateReading.parse(first))
+        val complete = requireNotNull(first.append(packet("01c26a681386c26a681386c26a681386c26a680b")))
+        val readings = requireNotNull(NxWearHeartRateReading.parse(complete))
+        assertEquals(5, readings.size)
+        assertEquals(complete.payload.le32(3) * 1000L, readings.first().timestampMillis)
+        assertTrue(readings.all { it.bpm == 104 })
+        assertArrayEquals(
+            packet("000b000804110000010001000000000000000000").raw,
+            NxWearPacket.ack(requireNotNull(complete.sequence), requireNotNull(complete.dataType)),
+        )
+    }
+
     private fun historyStream(): NxWearHistorySync = NxWearHistorySync().apply {
         acceptFrame(frame(1, NxWearDataType.DEVICE_SYNC))
         takeCompletedFrame()

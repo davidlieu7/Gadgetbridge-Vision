@@ -23,7 +23,6 @@ import android.content.Intent
 import android.media.AudioManager
 import android.os.Handler
 import android.os.Looper
-import android.os.SystemClock
 import android.text.format.DateFormat
 import android.telecom.TelecomManager
 import android.widget.Toast
@@ -65,7 +64,7 @@ class NxWearB8Support : AbstractBTLESingleDeviceSupport(LOG) {
     @Volatile
     private var characteristics: Map<UUID, BluetoothGattCharacteristic> = emptyMap()
     private val historySync = NxWearHistorySync()
-    private var sportPacket: NxWearPacket? = null
+    private var liveActivityPacket: NxWearPacket? = null
     private val measurementTimeoutHandler = Handler(Looper.getMainLooper())
     private val measurementTimeout = Runnable {
         activeMeasurement?.let {
@@ -82,8 +81,7 @@ class NxWearB8Support : AbstractBTLESingleDeviceSupport(LOG) {
     private var activeMeasurement: Int? = null
     @Volatile
     private var measurementHasResult = false
-    private var exerciseStartedAt: Long? = null
-    private var exerciseSportType = NxWearSportSession.OUTDOOR_RUNNING
+    private var fetchAfterHistory = false
     override fun getCoordinator(): NxWearB8Coordinator = super.getCoordinator() as NxWearB8Coordinator
 
     init {
@@ -127,10 +125,12 @@ class NxWearB8Support : AbstractBTLESingleDeviceSupport(LOG) {
 
     override fun initializeDevice(builder: TransactionBuilder): TransactionBuilder {
         synchronizeCallStateAfterInitialization = false
+        fetchAfterHistory = false
         finishHistoryFetch()
+        restoreExerciseState()
         synchronizeCallStateAfterInitialization = true
         historySync.resetForInitialization()
-        sportPacket = null
+        liveActivityPacket = null
         activeMeasurement = null
         measurementTimeoutHandler.removeCallbacks(measurementTimeout)
         builder.setDeviceState(GBDevice.State.INITIALIZING)
@@ -174,28 +174,70 @@ class NxWearB8Support : AbstractBTLESingleDeviceSupport(LOG) {
         builder.queue()
     }
 
+    @Synchronized
     private fun setExerciseRunning(starting: Boolean) {
         if (!isConnected()) return
-        val prefs = getDevicePrefs().preferences
-        if (starting) {
-            exerciseSportType = getDevicePrefs()
-                .getString(NxWearB8Coordinator.PREF_EXERCISE_SPORT, NxWearSportSession.OUTDOOR_RUNNING.toString())
-                ?.toIntOrNull()
-                ?.takeIf { selectedType -> NxWearSportSession.SPORTS.any { it.type == selectedType } }
-                ?: NxWearSportSession.OUTDOOR_RUNNING
-            exerciseStartedAt = SystemClock.elapsedRealtime()
-            prefs.edit().putBoolean(NxWearB8Coordinator.PREF_EXERCISE_RUNNING, true).apply()
+        try {
+            val store = NxWearWorkoutStore(getDevice())
+            val now = System.currentTimeMillis()
+            val workout = if (starting) {
+                val type = getDevicePrefs()
+                    .getString(NxWearB8Coordinator.PREF_EXERCISE_SPORT, NxWearSportSession.OUTDOOR_RUNNING.toString())
+                    ?.toIntOrNull()
+                    ?.takeIf { selected -> NxWearSportSession.SPORTS.any { it.type == selected } }
+                    ?: NxWearSportSession.OUTDOOR_RUNNING
+                store.start(type, now)
+            } else {
+                store.stop(now)
+            }
+            if (workout == null) {
+                restoreExerciseState()
+                return
+            }
+            getDevicePrefs().preferences.edit()
+                .putBoolean(NxWearB8Coordinator.PREF_EXERCISE_RUNNING, starting).apply()
+            // Persist the immutable session before sending a command: support recreation must not
+            // replace its type with a later settings selection or lose its original start time.
+            createTransactionBuilder(if (starting) "Start Nx Wear B8 exercise" else "Stop Nx Wear B8 exercise")
+                .write(
+                    WRITE_CHARACTERISTIC,
+                    *NxWearSportSession.encode(workout.sportType,
+                        if (starting) NxWearSportSession.START else NxWearSportSession.STOP,
+                        workout.durationSeconds?.coerceAtMost(0xffff_ffffL) ?: 0L),
+                ).queue()
+            GB.signalActivityDataFinish(getDevice())
+            if (!starting) {
+                enrichWorkouts()
+                if (historyFetchActive) fetchAfterHistory = true
+                else onFetchRecordedData(RecordedDataTypes.TYPE_ACTIVITY)
+            }
+        } catch (e: Exception) {
+            LOG.error("Unable to update Nx Wear B8 workout session", e)
         }
-        val elapsed = if (starting) 0L else exerciseStartedAt?.let { (SystemClock.elapsedRealtime() - it) / 1000L } ?: 0L
-        createTransactionBuilder(if (starting) "Start Nx Wear B8 exercise" else "Stop Nx Wear B8 exercise")
-            .write(
-                WRITE_CHARACTERISTIC,
-                *NxWearSportSession.encode(exerciseSportType, if (starting) NxWearSportSession.START else NxWearSportSession.STOP, elapsed),
-            )
-            .queue()
-        if (!starting) {
-            exerciseStartedAt = null
-            prefs.edit().putBoolean(NxWearB8Coordinator.PREF_EXERCISE_RUNNING, false).apply()
+    }
+
+    private fun restoreExerciseState() {
+        try {
+            val running = NxWearWorkoutStore(getDevice()).active() != null
+            getDevicePrefs().preferences.edit()
+                .putBoolean(NxWearB8Coordinator.PREF_EXERCISE_RUNNING, running).apply()
+        } catch (e: Exception) {
+            LOG.error("Unable to recover Nx Wear B8 workout session", e)
+        }
+    }
+
+    private fun enrichWorkouts(packet: NxWearPacket? = null) {
+        try {
+            val timestamps = packet?.let {
+                NxWearSportReading.parse(it)?.map { reading -> reading.timestampMillis }
+                    ?: NxWearHeartRateReading.parse(it)?.map { reading -> reading.timestampMillis }
+            }
+            if (packet != null && timestamps.isNullOrEmpty()) return
+            NxWearWorkoutStore(getDevice()).enrich(timestamps?.minOrNull() ?: 0,
+                timestamps?.maxOrNull() ?: Long.MAX_VALUE)
+            GB.signalActivityDataFinish(getDevice())
+        } catch (e: Exception) {
+            LOG.error("Unable to enrich Nx Wear B8 workouts", e)
         }
     }
 
@@ -210,6 +252,7 @@ class NxWearB8Support : AbstractBTLESingleDeviceSupport(LOG) {
     override fun onFetchRecordedData(dataTypes: Int) {
         if (!isConnected() || dataTypes and RecordedDataTypes.TYPE_ACTIVITY == 0 ||
             !historySync.isComplete || historyFetchActive) return
+        liveActivityPacket = null
         historySync.beginFetch()
         startHistoryFetch()
         // The history stream advances only after a complete data frame is acknowledged.
@@ -238,13 +281,18 @@ class NxWearB8Support : AbstractBTLESingleDeviceSupport(LOG) {
         if (!historyFetchActive) return
         historyFetchActive = false
         historySync.finish()
-        sportPacket = null
+        liveActivityPacket = null
         getDevice().unsetBusyTask()
         getDevice().sendDeviceUpdateIntent(getContext())
         GB.signalActivityDataFinish(getDevice())
+        enrichWorkouts()
         if (synchronizeCallStateAfterInitialization) {
             synchronizeCallStateAfterInitialization = false
             synchronizeIdleCallState()
+        }
+        if (fetchAfterHistory && isConnected()) {
+            fetchAfterHistory = false
+            onFetchRecordedData(RecordedDataTypes.TYPE_ACTIVITY)
         }
     }
 
@@ -266,6 +314,7 @@ class NxWearB8Support : AbstractBTLESingleDeviceSupport(LOG) {
     }
 
     override fun disconnect() {
+        fetchAfterHistory = false
         synchronizeCallStateAfterInitialization = false
         if (activeMeasurement != null && !measurementHasResult) reportMeasurementFailure()
         clearActiveMeasurement()
@@ -275,6 +324,7 @@ class NxWearB8Support : AbstractBTLESingleDeviceSupport(LOG) {
     }
 
     override fun dispose() {
+        fetchAfterHistory = false
         synchronizeCallStateAfterInitialization = false
         measurementTimeoutHandler.removeCallbacks(measurementTimeout)
         finishHistoryFetch()
@@ -407,7 +457,10 @@ class NxWearB8Support : AbstractBTLESingleDeviceSupport(LOG) {
                     evaluateGBDeviceEvent(event)
                 }
                 heartRate != null &&
-                    historySync.isComplete -> handleManualHeartRate(packet, heartRate)
+                    historySync.isComplete -> {
+                        handleManualHeartRate(packet, heartRate)
+                        if (packet.dataType == NxWearDataType.EXERCISE_HEART_RATE) enrichWorkouts(packet)
+                    }
                 spo2 != null &&
                     historySync.isComplete ->
                     handleSpo2Reading(packet, spo2, notifyResult = packet.dataType == NxWearDataType.SPO2)
@@ -432,14 +485,13 @@ class NxWearB8Support : AbstractBTLESingleDeviceSupport(LOG) {
                 }
                 packet.kind == NxWearPacket.Kind.FRAMED && packet.command == 0x31 && packet.dataType == NxWearDataType.DEVICE_LOG &&
                     historySync.isComplete -> handleLogFrame(packet)
-                packet.kind == NxWearPacket.Kind.FRAMED && packet.command == 0x31 && packet.dataType == NxWearDataType.REALTIME_SPORT &&
-                    historySync.isComplete -> handleSportFrame(packet)
+                packet.kind == NxWearPacket.Kind.FRAMED && packet.command == 0x31 && historySync.handlesLiveActivity(packet.dataType) -> handleLiveActivityFrame(packet)
                 packet.kind == NxWearPacket.Kind.FRAMED && packet.command == 0x31 && packet.dataType in NxWearProtocol.ACTIVITY_SUBTYPES -> {
                     handleInitializationActivityFrame(packet)
                 }
                 packet.kind == NxWearPacket.Kind.CONTINUATION -> {
                     if (historySync.hasPendingLog) handleLogContinuation(packet)
-                    else if (sportPacket != null && historySync.isComplete) handleSportContinuation(packet)
+                    else if (liveActivityPacket != null) handleLiveActivityContinuation(packet)
                     else handleInitializationContinuation(packet)
                 }
                 NxWearProtocol.isCandidateSettingsReply(packet) -> {
@@ -560,24 +612,31 @@ class NxWearB8Support : AbstractBTLESingleDeviceSupport(LOG) {
         advanceInitializationWhenComplete()
     }
 
-    private fun handleSportFrame(packet: NxWearPacket) {
-        sportPacket = packet
-        if (packet.isComplete) {
-            persistSportPacket(packet)
-            sportPacket = null
-            acknowledgeMeasurementPacket(requireNotNull(packet.sequence), NxWearDataType.REALTIME_SPORT)
-        }
+    private fun handleLiveActivityFrame(packet: NxWearPacket) {
+        // Daily totals continue between history records. ACK them without extending the history
+        // timeout: these live updates are not evidence that more stored records are pending.
+        liveActivityPacket = packet
+        if (packet.isComplete) completeLiveActivityPacket(packet)
     }
 
-    private fun handleSportContinuation(continuation: NxWearPacket) {
-        val first = sportPacket ?: return
+    private fun handleLiveActivityContinuation(continuation: NxWearPacket) {
+        val first = liveActivityPacket ?: return
         val complete = first.append(continuation) ?: return
-        sportPacket = complete
-        if (complete.isComplete && historySync.isComplete) {
-            persistSportPacket(complete)
-            sportPacket = null
-            acknowledgeMeasurementPacket(requireNotNull(complete.sequence), NxWearDataType.REALTIME_SPORT)
+        liveActivityPacket = complete
+        if (complete.isComplete) completeLiveActivityPacket(complete)
+    }
+
+    private fun completeLiveActivityPacket(packet: NxWearPacket) {
+        liveActivityPacket = null
+        if (packet.dataType == NxWearDataType.EXERCISE_HEART_RATE) {
+            NxWearHeartRateReading.parse(packet)?.let {
+                handleManualHeartRate(packet, it, acknowledge = false, realtime = false)
+            }
+        } else {
+            persistSportPacket(packet)
         }
+        acknowledgeMeasurementPacket(requireNotNull(packet.sequence), requireNotNull(packet.dataType))
+        if (historySync.isComplete) enrichWorkouts(packet)
     }
 
     private fun withSampleIdentity(block: (DaoSession, Long, Long) -> Unit) {
