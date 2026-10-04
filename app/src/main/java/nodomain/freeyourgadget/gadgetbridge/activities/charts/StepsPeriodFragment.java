@@ -16,7 +16,7 @@ import com.github.mikephil.charting.components.YAxis;
 import com.github.mikephil.charting.data.BarData;
 import com.github.mikephil.charting.data.BarDataSet;
 import com.github.mikephil.charting.data.BarEntry;
-import com.github.mikephil.charting.formatter.ValueFormatter;
+import com.github.mikephil.charting.formatter.IAxisValueFormatter;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -107,26 +107,26 @@ public class StepsPeriodFragment extends StepsFragment<StepsPeriodFragment.Steps
         stepsChart.getDescription().setEnabled(false);
         if (TOTAL_DAYS <= 7) {
             stepsChart.setTouchEnabled(false);
-            stepsChart.setPinchZoom(false);
+            stepsChart.setPinchZoomEnabled(false);
         }
         stepsChart.setDoubleTapToZoomEnabled(false);
         stepsChart.getLegend().setEnabled(false);
 
         final XAxis xAxisBottom = stepsChart.getXAxis();
         xAxisBottom.setPosition(XAxis.XAxisPosition.BOTTOM);
-        xAxisBottom.setDrawLabels(true);
-        xAxisBottom.setDrawGridLines(false);
+        xAxisBottom.setDrawLabelsEnabled(true);
+        xAxisBottom.setDrawGridLinesEnabled(false);
         xAxisBottom.setEnabled(true);
-        xAxisBottom.setDrawLimitLinesBehindData(true);
+        xAxisBottom.setDrawLimitLinesBehindDataEnabled(true);
         xAxisBottom.setTextColor(CHART_TEXT_COLOR);
 
         final YAxis yAxisLeft = stepsChart.getAxisLeft();
-        yAxisLeft.setDrawGridLines(true);
-        yAxisLeft.setDrawTopYLabelEntry(true);
+        yAxisLeft.setDrawGridLinesEnabled(true);
+        yAxisLeft.setDrawTopYLabelEntryEnabled(true);
         yAxisLeft.setEnabled(true);
         yAxisLeft.setTextColor(CHART_TEXT_COLOR);
         yAxisLeft.setAxisMinimum(0f);
-        final LimitLine goalLine = new LimitLine(STEPS_GOAL);
+        final LimitLine goalLine = new LimitLine(STEPS_GOAL, "");
         goalLine.setLineColor(getResources().getColor(R.color.steps_color));
         goalLine.setLineWidth(1.5f);
         goalLine.enableDashedLine(15f, 10f, 0f);
@@ -134,9 +134,9 @@ public class StepsPeriodFragment extends StepsFragment<StepsPeriodFragment.Steps
 
         final YAxis yAxisRight = stepsChart.getAxisRight();
         yAxisRight.setEnabled(true);
-        yAxisRight.setDrawLabels(false);
-        yAxisRight.setDrawGridLines(false);
-        yAxisRight.setDrawAxisLine(true);
+        yAxisRight.setDrawLabelsEnabled(false);
+        yAxisRight.setDrawGridLinesEnabled(false);
+        yAxisRight.setDrawAxisLineEnabled(true);
     }
 
     @Override
@@ -169,11 +169,11 @@ public class StepsPeriodFragment extends StepsFragment<StepsPeriodFragment.Steps
         List<BarEntry> entries = new ArrayList<>();
         int counter = 0;
         for (StepsDay day : stepsData.days) {
-            entries.add(new BarEntry(counter, day.steps));
+            entries.add(new BarEntry<>(counter, day.steps, null, null));
             counter++;
         }
         BarDataSet set = new BarDataSet(entries, "Steps");
-        set.setDrawValues(true);
+        set.setDrawValuesEnabled(true);
         set.setColors(getResources().getColor(R.color.steps_color));
         final XAxis x = stepsChart.getXAxis();
         x.setValueFormatter(getStepsChartDayValueFormatter(stepsData));
@@ -198,15 +198,12 @@ public class StepsPeriodFragment extends StepsFragment<StepsPeriodFragment.Steps
         mBalanceView.setText(stepsData.getBalanceMessage(getContext(), STEPS_GOAL));
     }
 
-    ValueFormatter getStepsChartDayValueFormatter(StepsPeriodFragment.StepsData stepsData) {
-        return new ValueFormatter() {
-            @Override
-            public String getFormattedValue(float value) {
-                StepsPeriodFragment.StepsDay day = stepsData.days.get((int) value);
-                String pattern = TOTAL_DAYS > 7 ? "dd" : "EEE";
-                SimpleDateFormat formatLetterDay = new SimpleDateFormat(pattern, Locale.getDefault());
-                return formatLetterDay.format(new Date(day.day.getTimeInMillis()));
-            }
+    IAxisValueFormatter getStepsChartDayValueFormatter(StepsPeriodFragment.StepsData stepsData) {
+        return (value, axis) -> {
+            StepsPeriodFragment.StepsDay day = stepsData.days.get((int) value);
+            String pattern = TOTAL_DAYS > 7 ? "dd" : "EEE";
+            SimpleDateFormat formatLetterDay = new SimpleDateFormat(pattern, Locale.getDefault());
+            return formatLetterDay.format(new Date(day.day.getTimeInMillis()));
         };
     }
 

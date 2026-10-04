@@ -435,7 +435,7 @@ public class SleepDailyFragment extends SleepFragment<SleepDailyFragment.MyChart
 
         binding.sleepchart.setData(null); // workaround for https://github.com/PhilJay/MPAndroidChart/issues/2317
         binding.sleepchart.getXAxis().setValueFormatter(mcd.getChartsData().getXValueFormatter());
-        binding.sleepchart.getAxisLeft().setDrawLabels(false);
+        binding.sleepchart.getAxisLeft().setDrawLabelsEnabled(false);
 
         binding.sleepchart.setData(mcd.getChartsData().getData());
         int heartRateMin = mcd.getHeartRateAxisMin();
@@ -482,7 +482,7 @@ public class SleepDailyFragment extends SleepFragment<SleepDailyFragment.MyChart
                 binding.sleepchart.getAxisRight().setAxisMaximum(mcd.getHeartRateAxisMax() + (mcd.getHeartRateAxisMin() / 2f));
                 binding.sleepchart.getAxisRight().setAxisMinimum(mcd.getHeartRateAxisMin() / 2f);
             }
-            LimitLine hrAverage_line = new LimitLine(mcd.getHeartRateAverage());
+            LimitLine hrAverage_line = new LimitLine(mcd.getHeartRateAverage(), "");
             hrAverage_line.setLineColor(Color.RED);
             hrAverage_line.setLineWidth(1.5f);
             hrAverage_line.enableDashedLine(15f, 10f, 0f);
@@ -658,25 +658,25 @@ public class SleepDailyFragment extends SleepFragment<SleepDailyFragment.MyChart
         configureBarLineChartDefaults(binding.sleepchart);
 
         XAxis x = binding.sleepchart.getXAxis();
-        x.setDrawLabels(true);
-        x.setDrawGridLines(false);
+        x.setDrawLabelsEnabled(true);
+        x.setDrawGridLinesEnabled(false);
         x.setEnabled(true);
         x.setTextColor(CHART_TEXT_COLOR);
-        x.setDrawLimitLinesBehindData(true);
+        x.setDrawLimitLinesBehindDataEnabled(true);
 
         YAxis y = binding.sleepchart.getAxisLeft();
-        y.setDrawGridLines(false);
+        y.setDrawGridLinesEnabled(false);
         y.setAxisMaximum(1f);
         y.setAxisMinimum(0);
-        y.setDrawTopYLabelEntry(false);
+        y.setDrawTopYLabelEntryEnabled(false);
         y.setTextColor(CHART_TEXT_COLOR);
         y.setEnabled(true);
 
         YAxis yAxisRight = binding.sleepchart.getAxisRight();
-        yAxisRight.setDrawGridLines(false);
+        yAxisRight.setDrawGridLinesEnabled(false);
         yAxisRight.setEnabled(supportsHeartrate(getChartsHost().getDevice()));
-        yAxisRight.setDrawLabels(true);
-        yAxisRight.setDrawTopYLabelEntry(true);
+        yAxisRight.setDrawLabelsEnabled(true);
+        yAxisRight.setDrawTopYLabelEntryEnabled(true);
         yAxisRight.setTextColor(CHART_TEXT_COLOR);
         yAxisRight.setAxisMaximum(HeartRateUtils.getInstance().getMaxHeartRate());
         yAxisRight.setAxisMinimum(HeartRateUtils.getInstance().getMinHeartRate());
@@ -688,23 +688,23 @@ public class SleepDailyFragment extends SleepFragment<SleepDailyFragment.MyChart
 
         if (supportsHeartrate(getChartsHost().getDevice())) {
             LegendEntry hrEntry = new LegendEntry();
-            hrEntry.label = HEARTRATE_LABEL;
-            hrEntry.formColor = HEARTRATE_COLOR;
+            hrEntry.setLabel(HEARTRATE_LABEL);
+            hrEntry.setFormColor(HEARTRATE_COLOR);
             legendEntries.add(hrEntry);
             if (SHOW_CHARTS_AVERAGE) {
                 LegendEntry hrAverageEntry = new LegendEntry();
-                hrAverageEntry.label = HEARTRATE_AVERAGE_LABEL;
-                hrAverageEntry.formColor = Color.RED;
+                hrAverageEntry.setLabel(HEARTRATE_AVERAGE_LABEL);
+                hrAverageEntry.setFormColor(Color.RED);
                 legendEntries.add(hrAverageEntry);
             }
         }
-        chart.getLegend().setCustom(legendEntries);
+        chart.getLegend().setEntries(legendEntries);
         chart.getLegend().setTextColor(LEGEND_TEXT_COLOR);
     }
 
     @Override
     protected void renderCharts() {
-        binding.sleepchart.animateX(ANIM_TIME, Easing.EaseInOutQuart);
+        binding.sleepchart.animateX(ANIM_TIME, Easing.INSTANCE.getEaseInOutQuart());
     }
 
     protected static class MySleepChartsData extends ChartsData {

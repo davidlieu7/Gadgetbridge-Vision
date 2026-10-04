@@ -17,7 +17,6 @@
 package nodomain.freeyourgadget.gadgetbridge.activities.workouts.charts;
 
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertNull;
 
 import com.github.mikephil.charting.components.Legend;
 import com.github.mikephil.charting.data.Entry;
@@ -37,7 +36,7 @@ public class GappedLineDataLegendTest extends TestBase {
         final List<Entry> entries = new ArrayList<>();
         for (final int start : new int[]{0, 100, 200}) {
             for (int i = 0; i < 10; i++) {
-                entries.add(new Entry(start + i, 5));
+                entries.add(new Entry<>(start + i, 5, null, null));
             }
         }
 
@@ -45,7 +44,7 @@ public class GappedLineDataLegendTest extends TestBase {
 
         assertEquals(3, data.getDataSetCount());
         assertEquals("Power", data.getDataSetByIndex(0).getLabel());
-        assertNull(data.getDataSetByIndex(1).getLabel());
+        assertEquals("", data.getDataSetByIndex(1).getLabel());
         assertEquals(Legend.LegendForm.NONE, data.getDataSetByIndex(1).getForm());
         assertEquals(Legend.LegendForm.NONE, data.getDataSetByIndex(2).getForm());
     }

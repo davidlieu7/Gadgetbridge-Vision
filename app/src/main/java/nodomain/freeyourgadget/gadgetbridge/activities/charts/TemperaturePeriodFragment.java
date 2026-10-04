@@ -41,7 +41,7 @@ import com.github.mikephil.charting.data.CombinedData;
 import com.github.mikephil.charting.data.Entry;
 import com.github.mikephil.charting.data.ScatterData;
 import com.github.mikephil.charting.data.ScatterDataSet;
-import com.github.mikephil.charting.formatter.ValueFormatter;
+import com.github.mikephil.charting.formatter.IAxisValueFormatter;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -49,6 +49,7 @@ import org.slf4j.LoggerFactory;
 import java.text.DecimalFormat;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
@@ -201,11 +202,11 @@ public class TemperaturePeriodFragment extends AbstractChartFragment<Temperature
             if (hasData(dayData.minimum) && hasData(dayData.maximum)) {
                 minAccumulator.add(dayData.minimum);
                 maxAccumulator.add(dayData.maximum);
-                candleEntries.add(new CandleEntry(i, dayData.maximum, dayData.minimum, dayData.minimum, dayData.maximum));
+                candleEntries.add(new CandleEntry<>(i, dayData.maximum, dayData.minimum, dayData.minimum, dayData.maximum, null, null));
             }
             if (hasData(dayData.average)) {
                 avgAccumulator.add(dayData.average);
-                avgEntries.add(new Entry(i, dayData.average));
+                avgEntries.add(new Entry<>(i, dayData.average, null, null));
             }
         }
 
@@ -228,8 +229,8 @@ public class TemperaturePeriodFragment extends AbstractChartFragment<Temperature
 
         if (!candleEntries.isEmpty()) {
             final CandleDataSet candleDataSet = new CandleDataSet(candleEntries, getString(R.string.menuitem_temperature));
-            candleDataSet.setDrawValues(false);
-            candleDataSet.setDrawIcons(false);
+            candleDataSet.setDrawValuesEnabled(false);
+            candleDataSet.setDrawIconsEnabled(false);
             candleDataSet.setAxisDependency(YAxis.AxisDependency.LEFT);
             candleDataSet.setShadowColor(TEMPERATURE_COLOR);
             candleDataSet.setShadowWidth(2f);
@@ -240,17 +241,17 @@ public class TemperaturePeriodFragment extends AbstractChartFragment<Temperature
             candleDataSet.setNeutralColor(TEMPERATURE_COLOR);
             candleDataSet.setBarSpace(0.15f);
             candleDataSet.setShowCandleBar(true);
-            combinedData.setData(new CandleData(candleDataSet));
+            combinedData.setCandleData(new CandleData(candleDataSet));
         }
 
         if (!avgEntries.isEmpty()) {
             final ScatterDataSet scatterDataSet = new ScatterDataSet(avgEntries, getString(R.string.hr_average));
             scatterDataSet.setScatterShape(ScatterChart.ScatterShape.CIRCLE);
-            scatterDataSet.setScatterShapeSize(15f);
+            scatterDataSet.setScatterShapeSize(7.5f);
             scatterDataSet.setColor(TEMPERATURE_AVG_COLOR);
-            scatterDataSet.setDrawValues(false);
+            scatterDataSet.setDrawValuesEnabled(false);
             scatterDataSet.setAxisDependency(YAxis.AxisDependency.LEFT);
-            combinedData.setData(new ScatterData(scatterDataSet));
+            combinedData.setScatterData(new ScatterData(scatterDataSet));
         }
 
         if (candleEntries.isEmpty() && avgEntries.isEmpty()) {
@@ -260,42 +261,39 @@ public class TemperaturePeriodFragment extends AbstractChartFragment<Temperature
         }
     }
 
-    private ValueFormatter createDayFormatter(final int startTs) {
+    private IAxisValueFormatter createDayFormatter(final int startTs) {
         final String format = totalDays == 7 ? "EEE" : "dd";
         final SimpleDateFormat formatDay = new SimpleDateFormat(format, Locale.getDefault());
-        return new ValueFormatter() {
-            @Override
-            public String getFormattedValue(final float value) {
-                final int dayIndex = Math.round(value);
-                if (dayIndex < 0 || dayIndex >= totalDays) {
-                    return "";
-                }
-                final int ts = startTs + SEC_PER_DAY * dayIndex;
-                return formatDay.format(new Date(ts * 1000L));
+        return (value, axis) -> {
+            final int dayIndex = Math.round(value);
+            if (dayIndex < 0 || dayIndex >= totalDays) {
+                return "";
             }
+            final int ts = startTs + SEC_PER_DAY * dayIndex;
+            return formatDay.format(new Date(ts * 1000L));
         };
     }
 
     private void setupChart() {
         temperatureChart.setBackgroundColor(BACKGROUND_COLOR);
         temperatureChart.getDescription().setEnabled(false);
-        temperatureChart.setDrawOrder(new CombinedChart.DrawOrder[]{
+        temperatureChart.setDrawOrder(Arrays.asList(
                 CombinedChart.DrawOrder.CANDLE,
                 CombinedChart.DrawOrder.SCATTER
-        });
+        ));
 
         if (totalDays <= 7) {
             temperatureChart.setTouchEnabled(false);
-            temperatureChart.setPinchZoom(false);
+            temperatureChart.setPinchZoomEnabled(false);
         }
         temperatureChart.setDoubleTapToZoomEnabled(false);
 
         final XAxis xAxisBottom = temperatureChart.getXAxis();
         xAxisBottom.setPosition(XAxis.XAxisPosition.BOTTOM);
-        xAxisBottom.setDrawLabels(true);
-        xAxisBottom.setDrawGridLines(false);
+        xAxisBottom.setDrawLabelsEnabled(true);
+        xAxisBottom.setDrawGridLinesEnabled(false);
         xAxisBottom.setEnabled(true);
-        xAxisBottom.setDrawLimitLinesBehindData(true);
+        xAxisBottom.setDrawLimitLinesBehindDataEnabled(true);
         xAxisBottom.setTextColor(CHART_TEXT_COLOR);
         xAxisBottom.setGranularity(1f);
         xAxisBottom.setGranularityEnabled(true);
@@ -303,8 +301,8 @@ public class TemperaturePeriodFragment extends AbstractChartFragment<Temperature
         xAxisBottom.setAxisMaximum(totalDays - 0.5f);
 
         final YAxis yAxisLeft = temperatureChart.getAxisLeft();
-        yAxisLeft.setDrawGridLines(true);
-        yAxisLeft.setDrawTopYLabelEntry(true);
+        yAxisLeft.setDrawGridLinesEnabled(true);
+        yAxisLeft.setDrawTopYLabelEntryEnabled(true);
         yAxisLeft.setTextColor(CHART_TEXT_COLOR);
         yAxisLeft.setEnabled(true);
         yAxisLeft.setGranularity(1f);
@@ -314,9 +312,9 @@ public class TemperaturePeriodFragment extends AbstractChartFragment<Temperature
 
         final YAxis yAxisRight = temperatureChart.getAxisRight();
         yAxisRight.setEnabled(true);
-        yAxisRight.setDrawLabels(false);
-        yAxisRight.setDrawGridLines(false);
-        yAxisRight.setDrawAxisLine(true);
+        yAxisRight.setDrawLabelsEnabled(false);
+        yAxisRight.setDrawGridLinesEnabled(false);
+        yAxisRight.setDrawAxisLineEnabled(true);
     }
 
     private void configureYAxis(final float minimum, final float maximum) {
@@ -337,17 +335,17 @@ public class TemperaturePeriodFragment extends AbstractChartFragment<Temperature
         final List<LegendEntry> legendEntries = new ArrayList<>(2);
 
         final LegendEntry rangeEntry = new LegendEntry();
-        rangeEntry.label = getString(R.string.menuitem_temperature);
-        rangeEntry.formColor = TEMPERATURE_COLOR;
+        rangeEntry.setLabel(getString(R.string.menuitem_temperature));
+        rangeEntry.setFormColor(TEMPERATURE_COLOR);
         legendEntries.add(rangeEntry);
 
         final LegendEntry avgEntry = new LegendEntry();
-        avgEntry.label = getString(R.string.hr_average);
-        avgEntry.formColor = TEMPERATURE_AVG_COLOR;
-        avgEntry.form = Legend.LegendForm.CIRCLE;
+        avgEntry.setLabel(getString(R.string.hr_average));
+        avgEntry.setFormColor(TEMPERATURE_AVG_COLOR);
+        avgEntry.setForm(Legend.LegendForm.CIRCLE);
         legendEntries.add(avgEntry);
 
-        temperatureChart.getLegend().setCustom(legendEntries);
+        temperatureChart.getLegend().setEntries(legendEntries);
         temperatureChart.getLegend().setTextColor(LEGEND_TEXT_COLOR);
         temperatureChart.getLegend().setWordWrapEnabled(true);
     }

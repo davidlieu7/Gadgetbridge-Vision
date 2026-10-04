@@ -1,16 +1,17 @@
 package nodomain.freeyourgadget.gadgetbridge.activities.charts;
 
-import com.github.mikephil.charting.formatter.ValueFormatter;
+import com.github.mikephil.charting.components.AxisBase;
+import com.github.mikephil.charting.formatter.IAxisValueFormatter;
 
 import java.util.Locale;
 
-public class DurationXLabelFormatter extends ValueFormatter {
+public class DurationXLabelFormatter implements IAxisValueFormatter {
     public DurationXLabelFormatter() {
     }
 
     // TODO: this does not work. Cannot use precomputed labels
     @Override
-    public String getFormattedValue(final float value) {
+    public String getFormattedValue(final float value, final AxisBase axis) {
         final long shortenSeconds = Math.round(value / 1000);
         final long hours = shortenSeconds / 3600;
         final long minutes = (shortenSeconds % 3600) / 60;

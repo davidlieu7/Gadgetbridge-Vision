@@ -18,7 +18,6 @@ import com.github.mikephil.charting.components.LimitLine
 import com.github.mikephil.charting.components.XAxis
 import com.github.mikephil.charting.data.LineData
 import com.github.mikephil.charting.data.ScatterData
-import com.github.mikephil.charting.listener.ChartTouchListener
 import com.github.mikephil.charting.listener.OnChartGestureListener
 import nodomain.freeyourgadget.gadgetbridge.GBApplication
 import nodomain.freeyourgadget.gadgetbridge.R
@@ -194,28 +193,26 @@ class WorkoutTabChartsFragment : Fragment(), WorkoutTabScreenshotProvider {
             isDragEnabled = false
         }
         lineChart.xAxis.apply {
-            setDrawLabels(true)
-            setDrawGridLines(false)
-            setDrawLimitLinesBehindData(true)
+            isDrawLabelsEnabled = true
+            isDrawGridLinesEnabled = false
+            isDrawLimitLinesBehindDataEnabled = true
             isEnabled = true
             textColor = chartTextColor
             position = XAxis.XAxisPosition.BOTTOM
             valueFormatter = DurationXLabelFormatter()
         }
         lineChart.axisLeft.apply {
-            setDrawGridLines(false)
-            setDrawTopYLabelEntry(true)
+            isDrawGridLinesEnabled = false
+            isDrawTopYLabelEntryEnabled = true
             textColor = chartTextColor
             isEnabled = true
-            if (chart.chartYLabelFormatter != null) {
-                valueFormatter = chart.chartYLabelFormatter;
-            }
+            chart.chartYLabelFormatter?.let { valueFormatter = it }
         }
         lineChart.axisRight.apply {
             isEnabled = false
         }
         chart.zoneThresholds?.let { zones ->
-            lineChart.axisLeft.setDrawLimitLinesBehindData(true)
+            lineChart.axisLeft.isDrawLimitLinesBehindDataEnabled = true
             for ((zoneIdx, hr) in listOf(2 to zones.zone2, 3 to zones.zone3, 4 to zones.zone4, 5 to zones.zone5)) {
                 if (hr <= 0) continue
                 lineChart.axisLeft.addLimitLine(LimitLine(hr.toFloat()).apply {
@@ -236,10 +233,7 @@ class WorkoutTabChartsFragment : Fragment(), WorkoutTabScreenshotProvider {
         }
         lineChart.description.isEnabled = false;
         lineChart.onChartGestureListener = object : OnChartGestureListener {
-            override fun onChartLongPressed(me: MotionEvent?) {}
-            override fun onChartGestureStart(me: MotionEvent?, lastPerformedGesture: ChartTouchListener.ChartGesture?) {}
-            override fun onChartGestureEnd(me: MotionEvent?, lastPerformedGesture: ChartTouchListener.ChartGesture?) {}
-            override fun onChartSingleTapped(me: MotionEvent?) {
+            override fun onChartSingleTapped(me: MotionEvent) {
                 ChartDataRepository.chartData = workout.charts
                 val intent = Intent(requireContext(), WorkoutChartsActivity::class.java).apply {
                     putExtra(WorkoutChartsActivity.INIT_CHART_ID, chart.id)
@@ -249,10 +243,6 @@ class WorkoutTabChartsFragment : Fragment(), WorkoutTabScreenshotProvider {
                 }
                 startActivity(intent)
             }
-            override fun onChartDoubleTapped(me: MotionEvent?) {}
-            override fun onChartFling(me1: MotionEvent?, me2: MotionEvent?, velocityX: Float, velocityY: Float) {}
-            override fun onChartScale(me: MotionEvent?, scaleX: Float, scaleY: Float) {}
-            override fun onChartTranslate(me: MotionEvent?, dX: Float, dY: Float) {}
         }
         lineChart.invalidate()
         chartsFragmentHolder.addView(lineChart)

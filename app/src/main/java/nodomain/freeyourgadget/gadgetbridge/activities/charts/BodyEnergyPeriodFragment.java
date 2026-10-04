@@ -19,7 +19,7 @@ import com.github.mikephil.charting.components.YAxis;
 import com.github.mikephil.charting.data.CandleData;
 import com.github.mikephil.charting.data.CandleDataSet;
 import com.github.mikephil.charting.data.CandleEntry;
-import com.github.mikephil.charting.formatter.ValueFormatter;
+import com.github.mikephil.charting.formatter.IAxisValueFormatter;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -169,7 +169,7 @@ public class BodyEnergyPeriodFragment extends AbstractChartFragment<BodyEnergyPe
             if (dayData.minimum > 0 && dayData.maximum > 0) {
                 minAccumulator.add(dayData.minimum);
                 maxAccumulator.add(dayData.maximum);
-                candleEntries.add(new CandleEntry(i, dayData.maximum, dayData.minimum, dayData.minimum, dayData.maximum));
+                candleEntries.add(new CandleEntry<>(i, dayData.maximum, dayData.minimum, dayData.minimum, dayData.maximum, null, null));
             }
         }
 
@@ -185,23 +185,20 @@ public class BodyEnergyPeriodFragment extends AbstractChartFragment<BodyEnergyPe
 
         final String fmt = TOTAL_DAYS == 7 ? "EEE" : "dd";
         SimpleDateFormat formatDay = new SimpleDateFormat(fmt, Locale.getDefault());
-        ValueFormatter formatter = new ValueFormatter() {
-            @Override
-            public String getFormattedValue(float value) {
-                int dayIndex = Math.round(value);
-                if (dayIndex < 0 || dayIndex >= TOTAL_DAYS) {
-                    return "";
-                }
-                int ts = startTs + SEC_PER_DAY * dayIndex;
-                return formatDay.format(new Date(ts * 1000L));
+        IAxisValueFormatter formatter = (value, axis) -> {
+            int dayIndex = Math.round(value);
+            if (dayIndex < 0 || dayIndex >= TOTAL_DAYS) {
+                return "";
             }
+            int ts = startTs + SEC_PER_DAY * dayIndex;
+            return formatDay.format(new Date(ts * 1000L));
         };
         bodyEnergyChart.getXAxis().setValueFormatter(formatter);
 
         if (!candleEntries.isEmpty()) {
             CandleDataSet candleDataSet = new CandleDataSet(candleEntries, getString(R.string.body_energy));
-            candleDataSet.setDrawValues(false);
-            candleDataSet.setDrawIcons(false);
+            candleDataSet.setDrawValuesEnabled(false);
+            candleDataSet.setDrawIconsEnabled(false);
             candleDataSet.setAxisDependency(YAxis.AxisDependency.LEFT);
             candleDataSet.setShadowColor(BODY_ENERGY_COLOR);
             candleDataSet.setShadowWidth(2f);
@@ -227,16 +224,16 @@ public class BodyEnergyPeriodFragment extends AbstractChartFragment<BodyEnergyPe
 
         if (TOTAL_DAYS <= 7) {
             bodyEnergyChart.setTouchEnabled(false);
-            bodyEnergyChart.setPinchZoom(false);
+            bodyEnergyChart.setPinchZoomEnabled(false);
         }
         bodyEnergyChart.setDoubleTapToZoomEnabled(false);
 
         final XAxis xAxisBottom = bodyEnergyChart.getXAxis();
         xAxisBottom.setPosition(XAxis.XAxisPosition.BOTTOM);
-        xAxisBottom.setDrawLabels(true);
-        xAxisBottom.setDrawGridLines(false);
+        xAxisBottom.setDrawLabelsEnabled(true);
+        xAxisBottom.setDrawGridLinesEnabled(false);
         xAxisBottom.setEnabled(true);
-        xAxisBottom.setDrawLimitLinesBehindData(true);
+        xAxisBottom.setDrawLimitLinesBehindDataEnabled(true);
         xAxisBottom.setTextColor(CHART_TEXT_COLOR);
         xAxisBottom.setGranularity(1f);
         xAxisBottom.setGranularityEnabled(true);
@@ -244,10 +241,10 @@ public class BodyEnergyPeriodFragment extends AbstractChartFragment<BodyEnergyPe
         xAxisBottom.setAxisMaximum(TOTAL_DAYS - 0.5f);
 
         final YAxis yAxisLeft = bodyEnergyChart.getAxisLeft();
-        yAxisLeft.setDrawGridLines(true);
+        yAxisLeft.setDrawGridLinesEnabled(true);
         yAxisLeft.setAxisMaximum(100f);
         yAxisLeft.setAxisMinimum(0f);
-        yAxisLeft.setDrawTopYLabelEntry(true);
+        yAxisLeft.setDrawTopYLabelEntryEnabled(true);
         yAxisLeft.setTextColor(CHART_TEXT_COLOR);
         yAxisLeft.setEnabled(true);
         yAxisLeft.setGranularity(10f);
@@ -255,9 +252,9 @@ public class BodyEnergyPeriodFragment extends AbstractChartFragment<BodyEnergyPe
 
         final YAxis yAxisRight = bodyEnergyChart.getAxisRight();
         yAxisRight.setEnabled(true);
-        yAxisRight.setDrawLabels(false);
-        yAxisRight.setDrawGridLines(false);
-        yAxisRight.setDrawAxisLine(true);
+        yAxisRight.setDrawLabelsEnabled(false);
+        yAxisRight.setDrawGridLinesEnabled(false);
+        yAxisRight.setDrawAxisLineEnabled(true);
     }
 
     @Override
@@ -265,11 +262,11 @@ public class BodyEnergyPeriodFragment extends AbstractChartFragment<BodyEnergyPe
         List<LegendEntry> legendEntries = new ArrayList<>(1);
 
         LegendEntry rangeEntry = new LegendEntry();
-        rangeEntry.label = getString(R.string.body_energy);
-        rangeEntry.formColor = BODY_ENERGY_COLOR;
+        rangeEntry.setLabel(getString(R.string.body_energy));
+        rangeEntry.setFormColor(BODY_ENERGY_COLOR);
         legendEntries.add(rangeEntry);
 
-        bodyEnergyChart.getLegend().setCustom(legendEntries);
+        bodyEnergyChart.getLegend().setEntries(legendEntries);
         bodyEnergyChart.getLegend().setTextColor(LEGEND_TEXT_COLOR);
         bodyEnergyChart.getLegend().setWordWrapEnabled(true);
     }

@@ -251,13 +251,13 @@ public class HuaweiWorkoutGbParser implements ActivitySummaryParser {
             final HuaweiActivityPoint point = activityPoints.get(i);
             final long tsShorten = tsTranslation.shorten((int) point.getTime().getTime());
             if (point.getSwolf() >= 0) {
-                swolfDataPoints.add(new Entry(tsShorten, point.getSwolf()));
+                swolfDataPoints.add(new Entry<>(tsShorten, point.getSwolf(), null, null));
             }
             if (point.getStrokeRate() >= 0) {
-                strokeRateDataPoints.add(new Entry(tsShorten, point.getStrokeRate()));
+                strokeRateDataPoints.add(new Entry<>(tsShorten, point.getStrokeRate(), null, null));
             }
             if (point.getFrequency() >= 0) {
-                frequencyDataPoints.add(new Entry(tsShorten, point.getFrequency()));
+                frequencyDataPoints.add(new Entry<>(tsShorten, point.getFrequency(), null, null));
             }
         }
         if (!swolfDataPoints.isEmpty()) {
@@ -328,7 +328,7 @@ public class HuaweiWorkoutGbParser implements ActivitySummaryParser {
                 byte[] recHR = StringUtils.hexToBytes(new String(recoveryHR));
                 final List<Entry> heartRateDataPoints = new ArrayList<>();
                 for (int i = 0; i < recHR.length; i++) {
-                    heartRateDataPoints.add(new Entry(i * 5000, recHR[i] & 0xFF));
+                    heartRateDataPoints.add(new Entry<>(i * 5000, recHR[i] & 0xFF, null, null));
                 }
                 charts.add(createRecoveryHeartRateChart(context, heartRateDataPoints));
             }

@@ -16,7 +16,7 @@ import com.github.mikephil.charting.components.YAxis;
 import com.github.mikephil.charting.data.BarData;
 import com.github.mikephil.charting.data.BarDataSet;
 import com.github.mikephil.charting.data.BarEntry;
-import com.github.mikephil.charting.formatter.ValueFormatter;
+import com.github.mikephil.charting.formatter.IAxisValueFormatter;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -97,26 +97,26 @@ public class CaloriesPeriodFragment extends CaloriesFragment<CaloriesPeriodFragm
         caloriesChart.getDescription().setEnabled(false);
         if (TOTAL_DAYS <= 7) {
             caloriesChart.setTouchEnabled(false);
-            caloriesChart.setPinchZoom(false);
+            caloriesChart.setPinchZoomEnabled(false);
         }
         caloriesChart.setDoubleTapToZoomEnabled(false);
         caloriesChart.getLegend().setEnabled(false);
 
         final XAxis xAxisBottom = caloriesChart.getXAxis();
         xAxisBottom.setPosition(XAxis.XAxisPosition.BOTTOM);
-        xAxisBottom.setDrawLabels(true);
-        xAxisBottom.setDrawGridLines(false);
+        xAxisBottom.setDrawLabelsEnabled(true);
+        xAxisBottom.setDrawGridLinesEnabled(false);
         xAxisBottom.setEnabled(true);
-        xAxisBottom.setDrawLimitLinesBehindData(true);
+        xAxisBottom.setDrawLimitLinesBehindDataEnabled(true);
         xAxisBottom.setTextColor(CHART_TEXT_COLOR);
 
         final YAxis yAxisLeft = caloriesChart.getAxisLeft();
-        yAxisLeft.setDrawGridLines(true);
-        yAxisLeft.setDrawTopYLabelEntry(true);
+        yAxisLeft.setDrawGridLinesEnabled(true);
+        yAxisLeft.setDrawTopYLabelEntryEnabled(true);
         yAxisLeft.setEnabled(true);
         yAxisLeft.setTextColor(CHART_TEXT_COLOR);
         yAxisLeft.setAxisMinimum(0f);
-        final LimitLine goalLine = new LimitLine(CALORIES_GOAL);
+        final LimitLine goalLine = new LimitLine(CALORIES_GOAL, "");
         goalLine.setLineColor(getResources().getColor(R.color.calories_color));
         goalLine.setLineWidth(1.5f);
         goalLine.enableDashedLine(15f, 10f, 0f);
@@ -124,9 +124,9 @@ public class CaloriesPeriodFragment extends CaloriesFragment<CaloriesPeriodFragm
 
         final YAxis yAxisRight = caloriesChart.getAxisRight();
         yAxisRight.setEnabled(true);
-        yAxisRight.setDrawLabels(false);
-        yAxisRight.setDrawGridLines(false);
-        yAxisRight.setDrawAxisLine(true);
+        yAxisRight.setDrawLabelsEnabled(false);
+        yAxisRight.setDrawGridLinesEnabled(false);
+        yAxisRight.setDrawAxisLineEnabled(true);
     }
 
     @Override
@@ -158,11 +158,11 @@ public class CaloriesPeriodFragment extends CaloriesFragment<CaloriesPeriodFragm
         List<BarEntry> entries = new ArrayList<>();
         int counter = 0;
         for (CaloriesDay day : caloriesData.days) {
-            entries.add(new BarEntry(counter, day.activeCalories));
+            entries.add(new BarEntry<>(counter, day.activeCalories, null, null));
             counter++;
         }
         BarDataSet set = new BarDataSet(entries, "Calories");
-        set.setDrawValues(true);
+        set.setDrawValuesEnabled(true);
         set.setColors(getResources().getColor(R.color.calories_color));
         final XAxis x = caloriesChart.getXAxis();
         x.setValueFormatter(getCaloriesChartDayValueFormatter(caloriesData));
@@ -187,15 +187,12 @@ public class CaloriesPeriodFragment extends CaloriesFragment<CaloriesPeriodFragm
         mBalanceView.setText(caloriesData.getBalanceMessage(getContext(), CALORIES_GOAL));
     }
 
-    ValueFormatter getCaloriesChartDayValueFormatter(CaloriesPeriodFragment.CaloriesData caloriesData) {
-        return new ValueFormatter() {
-            @Override
-            public String getFormattedValue(float value) {
-                CaloriesPeriodFragment.CaloriesDay day = caloriesData.days.get((int) value);
-                String pattern = TOTAL_DAYS > 7 ? "dd" : "EEE";
-                SimpleDateFormat formatLetterDay = new SimpleDateFormat(pattern, Locale.getDefault());
-                return formatLetterDay.format(new Date(day.day.getTimeInMillis()));
-            }
+    IAxisValueFormatter getCaloriesChartDayValueFormatter(CaloriesPeriodFragment.CaloriesData caloriesData) {
+        return (value, axis) -> {
+            CaloriesPeriodFragment.CaloriesDay day = caloriesData.days.get((int) value);
+            String pattern = TOTAL_DAYS > 7 ? "dd" : "EEE";
+            SimpleDateFormat formatLetterDay = new SimpleDateFormat(pattern, Locale.getDefault());
+            return formatLetterDay.format(new Date(day.day.getTimeInMillis()));
         };
     }
 

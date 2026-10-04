@@ -37,7 +37,7 @@ import com.github.mikephil.charting.components.YAxis;
 import com.github.mikephil.charting.data.Entry;
 import com.github.mikephil.charting.data.LineData;
 import com.github.mikephil.charting.data.LineDataSet;
-import com.github.mikephil.charting.formatter.ValueFormatter;
+import com.github.mikephil.charting.formatter.IAxisValueFormatter;
 import com.github.mikephil.charting.interfaces.datasets.ILineDataSet;
 
 import org.slf4j.Logger;
@@ -161,41 +161,41 @@ public class SolarChargingDailyFragment extends AbstractChartFragment<SolarCharg
                         if (i > 0) {
                             final SolarChargeSample previous = samples.get(i - 1);
                             final float prevX = (float) previous.getTimestamp() / 1000 - (float) referencedTimestamp / 1000;
-                            currentSegment.add(new Entry(prevX, 0f));
+                            currentSegment.add(new Entry<>(prevX, 0f, null, null));
                         }
                     }
-                    currentSegment.add(new Entry(x, sample.getPercent()));
+                    currentSegment.add(new Entry<>(x, sample.getPercent(), null, null));
                 } else {
                     if (currentSegment != null) {
                         // Anchor the segment's end at this zero reading, for the same reason.
-                        currentSegment.add(new Entry(x, 0f));
+                        currentSegment.add(new Entry<>(x, 0f, null, null));
                     }
                     currentSegment = null;
                 }
             }
         }
 
-        final List<ILineDataSet> lineDataSets = new ArrayList<>();
+        final List<ILineDataSet<?>> lineDataSets = new ArrayList<>();
         for (final List<Entry> segment : segments) {
             final LineDataSet lineDataSet = new LineDataSet(segment, getString(R.string.solar_charging_intensity_chart_label));
             lineDataSet.setColor(getResources().getColor(R.color.chart_solar_charging_color));
-            lineDataSet.setDrawCircles(false);
+            lineDataSet.setDrawCirclesEnabled(false);
             lineDataSet.setLineWidth(2f);
             lineDataSet.setAxisDependency(YAxis.AxisDependency.LEFT);
-            lineDataSet.setDrawValues(false);
+            lineDataSet.setDrawValuesEnabled(false);
             lineDataSet.setMode(LineDataSet.Mode.LINEAR);
-            lineDataSet.setDrawFilled(true);
+            lineDataSet.setDrawFilledEnabled(true);
             lineDataSet.setFillAlpha(255);
             lineDataSet.setFillColor(getResources().getColor(R.color.chart_solar_charging_color));
             lineDataSets.add(lineDataSet);
         }
 
         final LegendEntry legendEntry = new LegendEntry();
-        legendEntry.label = getString(R.string.solar_charging_intensity_chart_label);
-        legendEntry.formColor = getResources().getColor(R.color.chart_solar_charging_color);
+        legendEntry.setLabel(getString(R.string.solar_charging_intensity_chart_label));
+        legendEntry.setFormColor(getResources().getColor(R.color.chart_solar_charging_color));
 
         solarChargingChart.getLegend().setTextColor(LEGEND_TEXT_COLOR);
-        solarChargingChart.getLegend().setCustom(Collections.singletonList(legendEntry));
+        solarChargingChart.getLegend().setEntries(Collections.singletonList(legendEntry));
 
         solarChargingChart.setData(new LineData(lineDataSets));
 
@@ -237,47 +237,45 @@ public class SolarChargingDailyFragment extends AbstractChartFragment<SolarCharg
     private void setupSolarChargingChart() {
         solarChargingChart.getDescription().setEnabled(false);
         solarChargingChart.setTouchEnabled(false);
-        solarChargingChart.setPinchZoom(false);
+        solarChargingChart.setPinchZoomEnabled(false);
         solarChargingChart.setDoubleTapToZoomEnabled(false);
 
         final XAxis xAxisBottom = solarChargingChart.getXAxis();
         xAxisBottom.setPosition(XAxis.XAxisPosition.BOTTOM);
-        xAxisBottom.setDrawLabels(true);
-        xAxisBottom.setDrawGridLines(false);
+        xAxisBottom.setDrawLabelsEnabled(true);
+        xAxisBottom.setDrawGridLinesEnabled(false);
         xAxisBottom.setEnabled(true);
-        xAxisBottom.setDrawLimitLinesBehindData(true);
+        xAxisBottom.setDrawLimitLinesBehindDataEnabled(true);
         xAxisBottom.setTextColor(CHART_TEXT_COLOR);
         xAxisBottom.setAxisMinimum(0f);
         xAxisBottom.setAxisMaximum(86400f);
-        xAxisBottom.setLabelCount(7, true);
+        xAxisBottom.setLabelCount(7);
+        xAxisBottom.setForceLabelsEnabled(true);
         xAxisBottom.setValueFormatter(getSolarChargingChartXValueFormatter());
 
         final YAxis yAxisLeft = solarChargingChart.getAxisLeft();
-        yAxisLeft.setDrawGridLines(true);
+        yAxisLeft.setDrawGridLinesEnabled(true);
         yAxisLeft.setAxisMaximum(100);
         yAxisLeft.setAxisMinimum(0);
-        yAxisLeft.setDrawTopYLabelEntry(true);
+        yAxisLeft.setDrawTopYLabelEntryEnabled(true);
         yAxisLeft.setEnabled(true);
         yAxisLeft.setTextColor(CHART_TEXT_COLOR);
 
         final YAxis yAxisRight = solarChargingChart.getAxisRight();
         yAxisRight.setEnabled(true);
-        yAxisRight.setDrawLabels(false);
-        yAxisRight.setDrawGridLines(false);
-        yAxisRight.setDrawAxisLine(true);
+        yAxisRight.setDrawLabelsEnabled(false);
+        yAxisRight.setDrawGridLinesEnabled(false);
+        yAxisRight.setDrawAxisLineEnabled(true);
     }
 
-    ValueFormatter getSolarChargingChartXValueFormatter() {
-        return new ValueFormatter() {
-            @Override
-            public String getFormattedValue(float value) {
-                long timestamp = (long) (value * 1000);
-                Date date = new Date();
-                date.setTime(timestamp);
-                SimpleDateFormat df = new SimpleDateFormat("HH:mm", Locale.getDefault());
-                df.setTimeZone(TimeZone.getTimeZone("UTC"));
-                return df.format(date);
-            }
+    IAxisValueFormatter getSolarChargingChartXValueFormatter() {
+        return (value, axis) -> {
+            long timestamp = (long) (value * 1000);
+            Date date = new Date();
+            date.setTime(timestamp);
+            SimpleDateFormat df = new SimpleDateFormat("HH:mm", Locale.getDefault());
+            df.setTimeZone(TimeZone.getTimeZone("UTC"));
+            return df.format(date);
         };
     }
 

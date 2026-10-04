@@ -33,10 +33,10 @@ import com.github.mikephil.charting.components.YAxis;
 import com.github.mikephil.charting.data.Entry;
 import com.github.mikephil.charting.data.LineData;
 import com.github.mikephil.charting.data.LineDataSet;
-import com.github.mikephil.charting.formatter.ValueFormatter;
 import com.github.mikephil.charting.interfaces.datasets.ILineDataSet;
 import com.github.mikephil.charting.listener.ChartTouchListener;
 import com.github.mikephil.charting.listener.OnChartGestureListener;
+import com.github.mikephil.charting.utils.ViewPortHandler;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -216,7 +216,7 @@ public class VO2MaxPeriodFragment extends AbstractChartFragment<VO2MaxPeriodFrag
         final Accumulator accumulator = new Accumulator();
         vo2MaxData.records.forEach((record) -> {
             final int x = tsTranslation.shorten((int) record.timestamp);
-            Entry entry = new Entry(x, record.value);
+            Entry entry = new Entry<>(x, record.value, null, null);
             allEntries.add(entry);
             accumulator.add(record.value);
             switch (record.type) {
@@ -228,7 +228,7 @@ public class VO2MaxPeriodFragment extends AbstractChartFragment<VO2MaxPeriodFrag
                     break;
             }
         });
-        final List<ILineDataSet> lineDataSets = new ArrayList<>();
+        final List<ILineDataSet<?>> lineDataSets = new ArrayList<>();
         if (supportsVO2MultiSport(device)) {
             lineDataSets.add(createDataSet(runningEntries, getResources().getColor(R.color.vo2max_running_char_line_color), getString(R.string.vo2max_running)));
             lineDataSets.add(createDataSet(cyclingEntries, getResources().getColor(R.color.vo2max_cycling_char_line_color), getString(R.string.vo2max_cycling)));
@@ -298,7 +298,7 @@ public class VO2MaxPeriodFragment extends AbstractChartFragment<VO2MaxPeriodFrag
             highestVisibleX = vo2MaxChart.getHighestVisibleX();
         }
 
-        float contentWidthPx = vo2MaxChart.getViewPortHandler().contentWidth();
+        float contentWidthPx = vo2MaxChart.getViewPortHandler().getContentWidth();
         if (contentWidthPx <= 0) {
             // The view itself may also not have been laid out yet on a first load.
             contentWidthPx = getResources().getDisplayMetrics().widthPixels - ESTIMATED_Y_AXIS_WIDTH_DP * density;
@@ -339,20 +339,20 @@ public class VO2MaxPeriodFragment extends AbstractChartFragment<VO2MaxPeriodFrag
     protected LineDataSet createDataSet(final List<Entry> values, int color, String label) {
         final LineDataSet lineDataSet = new LineDataSet(values, label);
         lineDataSet.setColor(color);
-        lineDataSet.setDrawCircles(false);
+        lineDataSet.setDrawCirclesEnabled(false);
         lineDataSet.setLineWidth(2f);
         lineDataSet.setFillAlpha(255);
         lineDataSet.setCircleRadius(5f);
-        lineDataSet.setDrawCircles(true);
-        lineDataSet.setDrawCircleHole(false);
+        lineDataSet.setDrawCirclesEnabled(true);
+        lineDataSet.setDrawCircleHoleEnabled(false);
         lineDataSet.setCircleColor(color);
         lineDataSet.setAxisDependency(YAxis.AxisDependency.LEFT);
-        lineDataSet.setDrawValues(true);
+        lineDataSet.setDrawValuesEnabled(true);
         lineDataSet.setValueTextSize(10f);
         lineDataSet.setValueTextColor(TEXT_COLOR);
-        lineDataSet.setValueFormatter(new ValueFormatter() {
+        lineDataSet.setValueFormatter(new DataSetValueFormatter() {
             @Override
-            public String getPointLabel(final Entry entry) {
+            public String getFormattedValue(final float value, final Entry<?> entry, final int dataSetIndex, final ViewPortHandler viewPortHandler) {
                 // Blank out points that updateValueLabelVisibility() decided are too close to
                 // an already-labeled neighbor at the current zoom level.
                 return labeledEntries.contains(entry) ? formatVO2MaxValue(entry.getY()) : "";
@@ -385,27 +385,27 @@ public class VO2MaxPeriodFragment extends AbstractChartFragment<VO2MaxPeriodFrag
     private void setupVO2MaxChart() {
         final XAxis xAxisBottom = vo2MaxChart.getXAxis();
         xAxisBottom.setPosition(XAxis.XAxisPosition.BOTTOM);
-        xAxisBottom.setDrawLabels(true);
-        xAxisBottom.setDrawGridLines(false);
+        xAxisBottom.setDrawLabelsEnabled(true);
+        xAxisBottom.setDrawGridLinesEnabled(false);
         xAxisBottom.setEnabled(true);
-        xAxisBottom.setDrawLimitLinesBehindData(true);
+        xAxisBottom.setDrawLimitLinesBehindDataEnabled(true);
         xAxisBottom.setTextColor(CHART_TEXT_COLOR);
 
         final YAxis yAxisLeft = vo2MaxChart.getAxisLeft();
-        yAxisLeft.setDrawGridLines(true);
+        yAxisLeft.setDrawGridLinesEnabled(true);
         yAxisLeft.setAxisMaximum(100);
         yAxisLeft.setAxisMinimum(0);
-        yAxisLeft.setDrawTopYLabelEntry(true);
+        yAxisLeft.setDrawTopYLabelEntryEnabled(true);
         yAxisLeft.setEnabled(true);
         yAxisLeft.setTextColor(CHART_TEXT_COLOR);
 
         final YAxis yAxisRight = vo2MaxChart.getAxisRight();
         yAxisRight.setEnabled(true);
-        yAxisRight.setDrawLabels(false);
-        yAxisRight.setDrawGridLines(false);
-        yAxisRight.setDrawAxisLine(true);
+        yAxisRight.setDrawLabelsEnabled(false);
+        yAxisRight.setDrawGridLinesEnabled(false);
+        yAxisRight.setDrawAxisLineEnabled(true);
 
-        vo2MaxChart.setMaxVisibleValueCount(Integer.MAX_VALUE);
+        vo2MaxChart.setMaxVisibleCount(Integer.MAX_VALUE);
         vo2MaxChart.setScaleXEnabled(true);
         vo2MaxChart.setScaleYEnabled(false);
         vo2MaxChart.setDragEnabled(true);

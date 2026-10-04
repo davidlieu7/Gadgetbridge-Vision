@@ -41,7 +41,7 @@ import com.github.mikephil.charting.data.LineData;
 import com.github.mikephil.charting.data.LineDataSet;
 import com.github.mikephil.charting.data.ScatterData;
 import com.github.mikephil.charting.data.ScatterDataSet;
-import com.github.mikephil.charting.formatter.ValueFormatter;
+import com.github.mikephil.charting.formatter.IAxisValueFormatter;
 import com.github.mikephil.charting.interfaces.datasets.ILineDataSet;
 
 import java.util.ArrayList;
@@ -154,13 +154,13 @@ public class DefaultWorkoutCharts {
             // HR
             final int heartRate = point.getHeartRate();
             if (heartRate > 0) {
-                heartRateDataPoints.add(new Entry(tsShorten, heartRate));
+                heartRateDataPoints.add(new Entry<>(tsShorten, heartRate, null, null));
             }
 
             // Elevation
             final double elevation = point.getAltitude();
             if (elevation > GPSCoordinate.UNKNOWN_ALTITUDE) {
-                elevationDataPoints.add(new Entry(tsShorten, (float) elevation));
+                elevationDataPoints.add(new Entry<>(tsShorten, (float) elevation, null, null));
                 hasElevationValues = hasElevationValues || (elevation != 0.0);
             }
 
@@ -172,7 +172,7 @@ public class DefaultWorkoutCharts {
             // Speed
             final float speed = point.getSpeed();
             if (speed > 0.0f) {
-                speedDataPoints.add(new Entry(tsShorten, speed));
+                speedDataPoints.add(new Entry<>(tsShorten, speed, null, null));
                 hasSpeedValues = true;
             }
 
@@ -183,33 +183,33 @@ public class DefaultWorkoutCharts {
                 cadenceAccumulator.add(cadence);
             }
             if (cadence > 0.0f) {
-                cadenceDataPoints.add(new Entry(tsShorten, cadence));
+                cadenceDataPoints.add(new Entry<>(tsShorten, cadence, null, null));
                 hasCadenceValues = true;
             }
 
             final float power = point.getPower();
             if (power >= 0.0f) {
-                powerDataPoints.add(new Entry(tsShorten, power));
+                powerDataPoints.add(new Entry<>(tsShorten, power, null, null));
                 hasPowerValues = hasPowerValues || (power > 0.0f);
             }
 
             final float respiratoryRate = point.getRespiratoryRate();
             if (respiratoryRate > 0.0f) {
-                respiratoryRatePoints.add(new Entry(tsShorten, respiratoryRate));
+                respiratoryRatePoints.add(new Entry<>(tsShorten, respiratoryRate, null, null));
                 hasRespiratoryRateValues = true;
             }
 
             // Depth (diving activity)
             final double depth = point.getDepth();
             if (depth >= 0.0) {
-                depthDataPoints.add(new Entry(tsShorten, (float) -depth));
+                depthDataPoints.add(new Entry<>(tsShorten, (float) -depth, null, null));
                 hasDepthValues = hasDepthValues || (depth > 0.0);
             }
 
             // Temperature
             final double temperature = point.getTemperature();
             if (temperature > -273) {
-                temperatureDataPoints.add(new Entry(tsShorten, (float) temperature));
+                temperatureDataPoints.add(new Entry<>(tsShorten, (float) temperature, null, null));
                 temperatureAccumulator.add(temperature);
                 hasTemperatureValues = hasTemperatureValues || (temperature != 0.0);
             }
@@ -220,73 +220,73 @@ public class DefaultWorkoutCharts {
                 distance = derivedDistances[i];
             }
             if (distance >= 0.0) {
-                distancePoints.add(new Entry(tsShorten, (float) distance));
+                distancePoints.add(new Entry<>(tsShorten, (float) distance, null, null));
                 hasDistanceValues = hasDistanceValues || (distance > 0);
             }
 
             // Body Energy
             final float bodyEnergy = point.getBodyEnergy();
             if (bodyEnergy >= 0.0f) {
-                bodyEnergyPoints.add(new Entry(tsShorten, bodyEnergy));
+                bodyEnergyPoints.add(new Entry<>(tsShorten, bodyEnergy, null, null));
                 hasBodyEnergyValues = hasBodyEnergyValues || (bodyEnergy > 0.0f);
             }
 
             // Stamina
             final float stamina = point.getStamina();
             if (stamina >= 0.0f) {
-                staminaPoints.add(new Entry(tsShorten, stamina));
+                staminaPoints.add(new Entry<>(tsShorten, stamina, null, null));
                 hasStaminaValues = hasStaminaValues || (stamina > 0.0f);
             }
 
             // Step Length
             final int stepLength = point.getStepLength();
             if (stepLength >= 0) {
-                stepLengthPoints.add(new Entry(tsShorten, stepLength));
+                stepLengthPoints.add(new Entry<>(tsShorten, stepLength, null, null));
                 hasStepLengthValues = hasStepLengthValues || (stepLength > 0);
             }
 
             // CNS Toxicity
             final float cnsToxicity = point.getCnsToxicity();
             if (cnsToxicity >= 0.0f) {
-                cnsToxicityPoints.add(new Entry(tsShorten, cnsToxicity));
+                cnsToxicityPoints.add(new Entry<>(tsShorten, cnsToxicity, null, null));
                 hasCnsToxicityValues = hasCnsToxicityValues || (cnsToxicity > 0.0f);
             }
 
             // N2 Load
             final float n2Load = point.getN2Load();
             if (n2Load >= 0.0f) {
-                n2LoadPoints.add(new Entry(tsShorten, n2Load));
+                n2LoadPoints.add(new Entry<>(tsShorten, n2Load, null, null));
                 hasN2LoadValues = hasN2LoadValues || (n2Load > 0.0f);
             }
 
             // Running dynamics
             final float verticalOscillation = point.getVerticalOscillation();
             if (!Float.isNaN(verticalOscillation)) {
-                verticalOscillationPoints.add(new Entry(tsShorten, verticalOscillation));
+                verticalOscillationPoints.add(new Entry<>(tsShorten, verticalOscillation, null, null));
                 hasVerticalOscillationValues = hasVerticalOscillationValues || (verticalOscillation > 0.0f);
             }
 
             final float stanceTimePercent = point.getStanceTimePercent();
             if (!Float.isNaN(stanceTimePercent)) {
-                stanceTimePercentPoints.add(new Entry(tsShorten, stanceTimePercent));
+                stanceTimePercentPoints.add(new Entry<>(tsShorten, stanceTimePercent, null, null));
                 hasStanceTimePercentValues = hasStanceTimePercentValues || (stanceTimePercent > 0.0f);
             }
 
             final float stanceTime = point.getStanceTime();
             if (!Float.isNaN(stanceTime)) {
-                stanceTimePoints.add(new Entry(tsShorten, stanceTime));
+                stanceTimePoints.add(new Entry<>(tsShorten, stanceTime, null, null));
                 hasStanceTimeValues = hasStanceTimeValues || (stanceTime > 0.0f);
             }
 
             final float verticalRatio = point.getVerticalRatio();
             if (!Float.isNaN(verticalRatio)) {
-                verticalRatioPoints.add(new Entry(tsShorten, verticalRatio));
+                verticalRatioPoints.add(new Entry<>(tsShorten, verticalRatio, null, null));
                 hasVerticalRatioValues = hasVerticalRatioValues || (verticalRatio > 0.0f);
             }
 
             final float stanceTimeBalance = point.getStanceTimeBalance();
             if (!Float.isNaN(stanceTimeBalance)) {
-                stanceTimeBalancePoints.add(new Entry(tsShorten, stanceTimeBalance));
+                stanceTimeBalancePoints.add(new Entry<>(tsShorten, stanceTimeBalance, null, null));
                 hasStanceTimeBalanceValues = hasStanceTimeBalanceValues || (stanceTimeBalance > 0.0f);
             }
 
@@ -294,7 +294,7 @@ public class DefaultWorkoutCharts {
             if (performanceCondition > Integer.MIN_VALUE) {
                 // Integer.MIN_VALUE is the no-data sentinel; any other value is a valid
                 // reading, including negative ones (performance condition can be < 0).
-                performanceConditionPoints.add(new Entry(tsShorten, performanceCondition));
+                performanceConditionPoints.add(new Entry<>(tsShorten, performanceCondition, null, null));
                 hasPerformanceConditionValues = true;
             }
         }
@@ -497,12 +497,7 @@ public class DefaultWorkoutCharts {
                                                      final GBDevice device) {
         final String label = String.format("%s(%s)", context.getString(R.string.heart_rate), getUnitString(context, UNIT_BPM));
         final LineData hrLineData = createGappedLineData(context, heartRateDataPoints, label, ContextCompat.getColor(context, R.color.chart_line_heart_rate));
-        final ValueFormatter integerFormatter = new ValueFormatter() {
-            @Override
-            public String getFormattedValue(float value) {
-                return String.valueOf((int) value);
-            }
-        };
+        final IAxisValueFormatter integerFormatter = (value, axis) -> String.valueOf((int) value);
 
         final HeartRateZones zones = HeartRateZonesResolver.resolve(summary, device, new ActivityUser());
         final int chartMax = Math.max(HeartRateUtils.getInstance().getMaxHeartRate(), zones.getZone5() + 1);
@@ -512,7 +507,7 @@ public class DefaultWorkoutCharts {
                 heartRateDataPoints, zones, gapThreshold(heartRateDataPoints), 1000f);
 
         // Datasets draw in order, so the bands go first to stay behind the HR line.
-        final List<ILineDataSet> dataSets = new ArrayList<>(
+        final List<ILineDataSet<?>> dataSets = new ArrayList<>(
                 HeartRateZoneChartUtils.buildZoneAreas(context, zones, heartRateDataPoints, chartMax, YAxis.AxisDependency.RIGHT));
         dataSets.addAll(hrLineData.getDataSets());
         final LineData lineData = new LineData(dataSets);
@@ -592,15 +587,10 @@ public class DefaultWorkoutCharts {
                                                    final Accumulator cadenceAccumulator) {
         final String cadenceUnit = getCadenceUnit(cycleUnit);
         final String label = String.format("%s (%s)", context.getString(R.string.workout_cadence), getUnitString(context, cadenceUnit));
-        final ValueFormatter integerFormatter = new ValueFormatter() {
-            @Override
-            public String getFormattedValue(float value) {
-                return String.valueOf((int) value);
-            }
-        };
-        final float xAxisMaximum = (float) Math.max(
-                cadenceAccumulator.getMax() + 30,
-                cadenceAccumulator.getAverage() * 2
+        final IAxisValueFormatter integerFormatter = (value, axis) -> String.valueOf((int) value);
+        float xAxisMaximum = Math.max(
+                (float) (cadenceAccumulator.getMax() + 30),
+                (float) cadenceAccumulator.getAverage() * 2
         );
 
         final int color = ContextCompat.getColor(context, R.color.chart_cadence_circle);
@@ -651,12 +641,7 @@ public class DefaultWorkoutCharts {
                                                  final List<Entry> powerDataPoints) {
         final String label = String.format("%s (%s)", context.getString(R.string.workout_power), getUnitString(context, UNIT_WATT));
         final LineData lineData = createGappedLineData(context, powerDataPoints, label, ContextCompat.getColor(context, R.color.chart_line_power));
-        final ValueFormatter integerFormatter = new ValueFormatter() {
-            @Override
-            public String getFormattedValue(float value) {
-                return String.valueOf((int) value);
-            }
-        };
+        final IAxisValueFormatter integerFormatter = (value, axis) -> String.valueOf((int) value);
         return new WorkoutChart("power", context.getString(R.string.workout_power), ActivitySummaryEntries.GROUP_POWER, lineData, integerFormatter, getUnitString(context, UNIT_WATT));
     }
 
@@ -664,12 +649,7 @@ public class DefaultWorkoutCharts {
                                                            final List<Entry> powerDataPoints) {
         final String label = String.format("%s (%s)", context.getString(R.string.respiratoryrate), getUnitString(context, UNIT_BREATHS_PER_MIN));
         final LineData lineData = createGappedLineData(context, powerDataPoints, label, ContextCompat.getColor(context, R.color.respiratory_rate_color));
-        final ValueFormatter integerFormatter = new ValueFormatter() {
-            @Override
-            public String getFormattedValue(float value) {
-                return String.valueOf((int) value);
-            }
-        };
+        final IAxisValueFormatter integerFormatter = (value, axis) -> String.valueOf((int) value);
         return new WorkoutChart(
                 "respiratory_rate",
                 context.getString(R.string.respiratoryrate),
@@ -754,12 +734,7 @@ public class DefaultWorkoutCharts {
         // Body energy is a slowly-changing reserve metric, so it's safe to interpolate across
         // a gap rather than break the segment.
         final LineData lineData = createLineData(context, bodyEnergyPoints, label, ContextCompat.getColor(context, R.color.chart_line_body_energy));
-        final ValueFormatter valueFormatter = new ValueFormatter() {
-            @Override
-            public String getFormattedValue(float value) {
-                return String.valueOf((int) value);
-            }
-        };
+        final IAxisValueFormatter valueFormatter = (value, axis) -> String.valueOf((int) value);
         return new WorkoutChart(
                 "chart_body_energy",
                 context.getString(R.string.body_energy),
@@ -776,12 +751,7 @@ public class DefaultWorkoutCharts {
         // Stamina is a slowly draining/recovering reserve, so it's safe to interpolate across
         // a gap rather than break the segment.
         final LineData lineData = createLineData(context, staminaPoints, label, ContextCompat.getColor(context, R.color.chart_line_stamina));
-        final ValueFormatter valueFormatter = new ValueFormatter() {
-            @Override
-            public String getFormattedValue(float value) {
-                return String.valueOf((int) value);
-            }
-        };
+        final IAxisValueFormatter valueFormatter = (value, axis) -> String.valueOf((int) value);
         return new WorkoutChart(
                 "chart_stamina",
                 context.getString(R.string.stamina),
@@ -815,12 +785,7 @@ public class DefaultWorkoutCharts {
         // CNS toxicity decays continuously over time (even during a pause), so it's safe to
         // interpolate across a gap rather than break the segment.
         final LineData lineData = createLineData(context, cnsToxicityPoints, label, ContextCompat.getColor(context, R.color.chart_cns_toxicity));
-        final ValueFormatter valueFormatter = new ValueFormatter() {
-            @Override
-            public String getFormattedValue(float value) {
-                return String.valueOf((int) value);
-            }
-        };
+        final IAxisValueFormatter valueFormatter = (value, axis) -> String.valueOf((int) value);
         return new WorkoutChart(
                 "chart_cns_toxicity",
                 context.getString(R.string.diving_cns_toxicity),
@@ -837,12 +802,7 @@ public class DefaultWorkoutCharts {
         // N2 load changes continuously over time (even during a pause, as nitrogen off-gasses),
         // so it's safe to interpolate across a gap rather than break the segment.
         final LineData lineData = createLineData(context, n2LoadPoints, label, ContextCompat.getColor(context, R.color.chart_n2_load));
-        final ValueFormatter valueFormatter = new ValueFormatter() {
-            @Override
-            public String getFormattedValue(float value) {
-                return String.valueOf((int) value);
-            }
-        };
+        final IAxisValueFormatter valueFormatter = (value, axis) -> String.valueOf((int) value);
         return new WorkoutChart(
                 "chart_n2_load",
                 context.getString(R.string.diving_nitrogen_load),
@@ -857,12 +817,7 @@ public class DefaultWorkoutCharts {
                                                                final List<Entry> verticalOscillationPoints) {
         final String label = String.format("%s(%s)", context.getString(R.string.vertical_oscillation), getUnitString(context, UNIT_MM));
         final LineData lineData = createGappedLineData(context, verticalOscillationPoints, label, ContextCompat.getColor(context, R.color.chart_line_stride));
-        final ValueFormatter valueFormatter = new ValueFormatter() {
-            @Override
-            public String getFormattedValue(float value) {
-                return String.valueOf((int) value);
-            }
-        };
+        final IAxisValueFormatter valueFormatter = (value, axis) -> String.valueOf((int) value);
         return new WorkoutChart(
                 "chart_vertical_oscillation",
                 context.getString(R.string.vertical_oscillation),
@@ -877,12 +832,7 @@ public class DefaultWorkoutCharts {
                                                              final List<Entry> stanceTimePercentPoints) {
         final String label = String.format("%s(%s)", context.getString(R.string.stance_time_percent), getUnitString(context, UNIT_PERCENTAGE));
         final LineData lineData = createGappedLineData(context, stanceTimePercentPoints, label, ContextCompat.getColor(context, R.color.chart_line_swolf));
-        final ValueFormatter valueFormatter = new ValueFormatter() {
-            @Override
-            public String getFormattedValue(float value) {
-                return String.format(java.util.Locale.ROOT, "%.1f", value);
-            }
-        };
+        final IAxisValueFormatter valueFormatter = (value, axis) -> String.format(java.util.Locale.ROOT, "%.1f", value);
         return new WorkoutChart(
                 "chart_stance_time_percent",
                 context.getString(R.string.stance_time_percent),
@@ -897,12 +847,7 @@ public class DefaultWorkoutCharts {
                                                       final List<Entry> stanceTimePoints) {
         final String label = String.format("%s(%s)", context.getString(R.string.ground_contact_time), getUnitString(context, UNIT_MILLISECONDS));
         final LineData lineData = createGappedLineData(context, stanceTimePoints, label, ContextCompat.getColor(context, R.color.chart_line_step_length));
-        final ValueFormatter valueFormatter = new ValueFormatter() {
-            @Override
-            public String getFormattedValue(float value) {
-                return String.valueOf((int) value);
-            }
-        };
+        final IAxisValueFormatter valueFormatter = (value, axis) -> String.valueOf((int) value);
         return new WorkoutChart(
                 "chart_stance_time",
                 context.getString(R.string.ground_contact_time),
@@ -917,12 +862,7 @@ public class DefaultWorkoutCharts {
                                                          final List<Entry> verticalRatioPoints) {
         final String label = String.format("%s(%s)", context.getString(R.string.vertical_ratio), getUnitString(context, UNIT_PERCENTAGE));
         final LineData lineData = createGappedLineData(context, verticalRatioPoints, label, ContextCompat.getColor(context, R.color.chart_line_stamina));
-        final ValueFormatter valueFormatter = new ValueFormatter() {
-            @Override
-            public String getFormattedValue(float value) {
-                return String.format(java.util.Locale.ROOT, "%.1f", value);
-            }
-        };
+        final IAxisValueFormatter valueFormatter = (value, axis) -> String.format(java.util.Locale.ROOT, "%.1f", value);
         return new WorkoutChart(
                 "chart_vertical_ratio",
                 context.getString(R.string.vertical_ratio),
@@ -937,12 +877,7 @@ public class DefaultWorkoutCharts {
                                                              final List<Entry> stanceTimeBalancePoints) {
         final String label = String.format("%s(%s)", context.getString(R.string.ground_contact_time_balance), getUnitString(context, UNIT_PERCENTAGE));
         final LineData lineData = createGappedLineData(context, stanceTimeBalancePoints, label, ContextCompat.getColor(context, R.color.chart_line_body_energy));
-        final ValueFormatter valueFormatter = new ValueFormatter() {
-            @Override
-            public String getFormattedValue(float value) {
-                return String.format(java.util.Locale.ROOT, "%.1f", value);
-            }
-        };
+        final IAxisValueFormatter valueFormatter = (value, axis) -> String.format(java.util.Locale.ROOT, "%.1f", value);
         return new WorkoutChart(
                 "chart_stance_time_balance",
                 context.getString(R.string.ground_contact_time_balance),
@@ -957,12 +892,7 @@ public class DefaultWorkoutCharts {
                                                                 final List<Entry> performanceConditionPoints) {
         final String label = context.getString(R.string.performance_condition);
         final LineData lineData = createGappedLineData(context, performanceConditionPoints, label, ContextCompat.getColor(context, R.color.chart_line_elevation));
-        final ValueFormatter valueFormatter = new ValueFormatter() {
-            @Override
-            public String getFormattedValue(float value) {
-                return String.valueOf((int) value);
-            }
-        };
+        final IAxisValueFormatter valueFormatter = (value, axis) -> String.valueOf((int) value);
         return new WorkoutChart(
                 "chart_performance_condition",
                 context.getString(R.string.performance_condition),
@@ -998,7 +928,7 @@ public class DefaultWorkoutCharts {
                                              final WorkoutChartUnits.Quantity quantity) {
         final List<Entry> converted = new ArrayList<>(points.size());
         for (final Entry entry : points) {
-            converted.add(new Entry(entry.getX(), (float) units.convert(quantity, entry.getY())));
+            converted.add(new Entry<>(entry.getX(), (float) units.convert(quantity, entry.getY()), null, null));
         }
         return converted;
     }
@@ -1092,10 +1022,10 @@ public class DefaultWorkoutCharts {
                                          final List<Entry> entries,
                                          final String label,
                                          final int color) {
-        final List<ILineDataSet> dataSets = new ArrayList<>();
+        final List<ILineDataSet<?>> dataSets = new ArrayList<>();
         // Only the first segment carries the label, so the legend names the series once
         for (final List<Entry> segment : splitOnGaps(entries)) {
-            final LineDataSet dataSet = createLineDataSet(context, segment, dataSets.isEmpty() ? label : null, color);
+            final LineDataSet dataSet = createLineDataSet(context, segment, dataSets.isEmpty() ? label : "", color);
             if (!dataSets.isEmpty()) {
                 dataSet.setForm(Legend.LegendForm.NONE);
             }
@@ -1118,14 +1048,14 @@ public class DefaultWorkoutCharts {
         final LineDataSet dataSet = new LineDataSet(entities, label);
         dataSet.setMode(LineDataSet.Mode.HORIZONTAL_BEZIER);
         dataSet.setCubicIntensity(0.05f);
-        dataSet.setDrawCircles(false);
+        dataSet.setDrawCirclesEnabled(false);
         dataSet.setAxisDependency(YAxis.AxisDependency.RIGHT);
         dataSet.setColor(color);
         dataSet.setValueTextColor(GBApplication.getSecondaryTextColor(context));
         dataSet.setLineWidth(1.5f);
         dataSet.setHighlightLineWidth(2f);
-        dataSet.setDrawValues(false);
-        dataSet.setDrawHorizontalHighlightIndicator(false);
+        dataSet.setDrawValuesEnabled(false);
+        dataSet.setHorizontalHighlightIndicatorEnabled(false);
         return dataSet;
     }
 
@@ -1138,10 +1068,10 @@ public class DefaultWorkoutCharts {
         dataSet.setColor(color);
         dataSet.setValueTextColor(GBApplication.getSecondaryTextColor(context));
         dataSet.setHighlightLineWidth(2f);
-        dataSet.setDrawValues(false);
-        dataSet.setDrawHorizontalHighlightIndicator(false);
+        dataSet.setDrawValuesEnabled(false);
+        dataSet.setHorizontalHighlightIndicatorEnabled(false);
         dataSet.setScatterShape(ScatterChart.ScatterShape.CIRCLE);
-        dataSet.setScatterShapeSize(10f);
+        dataSet.setScatterShapeSize(5f);
         return dataSet;
     }
 

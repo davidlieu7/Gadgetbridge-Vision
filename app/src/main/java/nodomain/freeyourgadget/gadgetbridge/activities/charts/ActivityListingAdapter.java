@@ -78,12 +78,12 @@ public class ActivityListingAdapter extends AbstractActivityListingAdapter<Activ
 
     private void setChartsData(PieChart pieChart, float value, float target, String label, Context context) {
         ArrayList<PieEntry> entries = new ArrayList<>();
-        entries.add(new PieEntry(value, AppCompatResources.getDrawable(context, R.drawable.ic_star_gold)));
+        entries.add(new PieEntry<>(value, null, AppCompatResources.getDrawable(context, R.drawable.ic_star_gold), null));
 
-        Easing.EasingFunction animationEffect = Easing.EaseInOutSine;
+        Easing.EasingFunction animationEffect = Easing.INSTANCE.getEaseInOutSine();
 
         if (value < target) {
-            entries.add(new PieEntry(target - value));
+            entries.add(new PieEntry<>(target - value, null, null, null));
         }
 
         pieChart.setCenterText(String.format("%d%%\n%s", (int) (value * 100 / target), label));
@@ -91,11 +91,11 @@ public class ActivityListingAdapter extends AbstractActivityListingAdapter<Activ
         int chartColor = interpolateColor(Color.parseColor(CHART_COLOR_START), Color.parseColor(CHART_COLOR_END), colorValue);
 
         PieDataSet dataSet = new PieDataSet(entries, "");
-        dataSet.setDrawIcons(false);
+        dataSet.setDrawIconsEnabled(false);
         dataSet.setIconsOffset(new MPPointF(0, -66));
 
         if (colorValue == 1) {
-            dataSet.setDrawIcons(true);
+            dataSet.setDrawIconsEnabled(true);
         }
         dataSet.setSliceSpace(0f);
         dataSet.setSelectionShift(5f);
@@ -271,6 +271,7 @@ public class ActivityListingAdapter extends AbstractActivityListingAdapter<Activ
 
         private void setUpChart(PieChart DashboardChart) {
             DashboardChart.setNoDataText("");
+            DashboardChart.setNoDataIconEnabled(false);
             DashboardChart.getLegend().setEnabled(false);
             DashboardChart.setDrawHoleEnabled(true);
             DashboardChart.setHoleColor(Color.WHITE);
@@ -279,7 +280,7 @@ public class ActivityListingAdapter extends AbstractActivityListingAdapter<Activ
             DashboardChart.setTransparentCircleAlpha(110);
             DashboardChart.setHoleRadius(70f);
             DashboardChart.setTransparentCircleRadius(75f);
-            DashboardChart.setDrawCenterText(true);
+            DashboardChart.setDrawCenterTextEnabled(true);
             DashboardChart.setRotationEnabled(true);
             DashboardChart.setHighlightPerTapEnabled(true);
             DashboardChart.setCenterTextOffset(0, 0);

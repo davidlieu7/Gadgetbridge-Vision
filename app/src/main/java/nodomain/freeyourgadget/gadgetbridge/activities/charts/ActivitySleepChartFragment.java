@@ -75,29 +75,29 @@ public class ActivitySleepChartFragment extends AbstractActivityChartFragment<De
 
 
         XAxis x = mChart.getXAxis();
-        x.setDrawLabels(true);
-        x.setDrawGridLines(false);
+        x.setDrawLabelsEnabled(true);
+        x.setDrawGridLinesEnabled(false);
         x.setEnabled(true);
         x.setTextColor(CHART_TEXT_COLOR);
-        x.setDrawLimitLinesBehindData(true);
+        x.setDrawLimitLinesBehindDataEnabled(true);
 
         YAxis y = mChart.getAxisLeft();
-        y.setDrawGridLines(false);
+        y.setDrawGridLinesEnabled(false);
 //        y.setDrawLabels(false);
         // TODO: make fixed max value optional
         y.setAxisMaximum(1f);
         y.setAxisMinimum(0);
-        y.setDrawTopYLabelEntry(false);
+        y.setDrawTopYLabelEntryEnabled(false);
         y.setTextColor(CHART_TEXT_COLOR);
 
 //        y.setLabelCount(5);
         y.setEnabled(true);
 
         YAxis yAxisRight = mChart.getAxisRight();
-        yAxisRight.setDrawGridLines(false);
+        yAxisRight.setDrawGridLinesEnabled(false);
         yAxisRight.setEnabled(supportsHeartrate(getChartsHost().getDevice()));
-        yAxisRight.setDrawLabels(true);
-        yAxisRight.setDrawTopYLabelEntry(true);
+        yAxisRight.setDrawLabelsEnabled(true);
+        yAxisRight.setDrawTopYLabelEntryEnabled(true);
         yAxisRight.setTextColor(CHART_TEXT_COLOR);
         yAxisRight.setAxisMaximum(HeartRateUtils.getInstance().getMaxHeartRate());
         yAxisRight.setAxisMinimum(HeartRateUtils.getInstance().getMinHeartRate());
@@ -135,7 +135,7 @@ public class ActivitySleepChartFragment extends AbstractActivityChartFragment<De
 
     @Override
     protected void renderCharts() {
-        mChart.animateX(ANIM_TIME, Easing.EaseInOutQuart);
+        mChart.animateX(ANIM_TIME, Easing.INSTANCE.getEaseInOutQuart());
 //        mChart.invalidate();
     }
 
@@ -144,39 +144,39 @@ public class ActivitySleepChartFragment extends AbstractActivityChartFragment<De
         List<LegendEntry> legendEntries = new ArrayList<>(5);
 
         LegendEntry activityEntry = new LegendEntry();
-        activityEntry.label = akActivity.label;
-        activityEntry.formColor = akActivity.color;
+        activityEntry.setLabel(akActivity.label);
+        activityEntry.setFormColor(akActivity.color);
         legendEntries.add(activityEntry);
 
         LegendEntry lightSleepEntry = new LegendEntry();
-        lightSleepEntry.label = akLightSleep.label;
-        lightSleepEntry.formColor = akLightSleep.color;
+        lightSleepEntry.setLabel(akLightSleep.label);
+        lightSleepEntry.setFormColor(akLightSleep.color);
         legendEntries.add(lightSleepEntry);
 
         LegendEntry deepSleepEntry = new LegendEntry();
-        deepSleepEntry.label = akDeepSleep.label;
-        deepSleepEntry.formColor = akDeepSleep.color;
+        deepSleepEntry.setLabel(akDeepSleep.label);
+        deepSleepEntry.setFormColor(akDeepSleep.color);
         legendEntries.add(deepSleepEntry);
 
         if (supportsRemSleep(getChartsHost().getDevice())) {
             LegendEntry remSleepEntry = new LegendEntry();
-            remSleepEntry.label = akRemSleep.label;
-            remSleepEntry.formColor = akRemSleep.color;
+            remSleepEntry.setLabel(akRemSleep.label);
+            remSleepEntry.setFormColor(akRemSleep.color);
             legendEntries.add(remSleepEntry);
         }
 
         LegendEntry notWornEntry = new LegendEntry();
-        notWornEntry.label = akNotWorn.label;
-        notWornEntry.formColor = akNotWorn.color;
+        notWornEntry.setLabel(akNotWorn.label);
+        notWornEntry.setFormColor(akNotWorn.color);
         legendEntries.add(notWornEntry);
 
         if (supportsHeartrate(getChartsHost().getDevice())) {
             LegendEntry hrEntry = new LegendEntry();
-            hrEntry.label = HEARTRATE_LABEL;
-            hrEntry.formColor = HEARTRATE_COLOR;
+            hrEntry.setLabel(HEARTRATE_LABEL);
+            hrEntry.setFormColor(HEARTRATE_COLOR);
             legendEntries.add(hrEntry);
         }
-        chart.getLegend().setCustom(legendEntries);
+        chart.getLegend().setEntries(legendEntries);
         chart.getLegend().setWordWrapEnabled(true);
         chart.getLegend().setHorizontalAlignment(Legend.LegendHorizontalAlignment.CENTER);
     }

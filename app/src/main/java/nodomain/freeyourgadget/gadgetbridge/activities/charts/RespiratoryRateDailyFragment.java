@@ -109,13 +109,13 @@ public class RespiratoryRateDailyFragment extends RespiratoryRateFragment<Respir
         // Chart
         final List<LegendEntry> legendEntries = new ArrayList<>(1);
         final LegendEntry respiratoryRateEntry = new LegendEntry();
-        respiratoryRateEntry.label = getString(R.string.respiratoryrate);
-        respiratoryRateEntry.formColor = ContextCompat.getColor(requireContext(), R.color.respiratory_rate_color);
+        respiratoryRateEntry.setLabel(getString(R.string.respiratoryrate));
+        respiratoryRateEntry.setFormColor(ContextCompat.getColor(requireContext(), R.color.respiratory_rate_color));
         legendEntries.add(respiratoryRateEntry);
         respiratoryRateChart.getLegend().setTextColor(TEXT_COLOR);
-        respiratoryRateChart.getLegend().setCustom(legendEntries);
+        respiratoryRateChart.getLegend().setEntries(legendEntries);
 
-        final List<ILineDataSet> lineDataSets = new ArrayList<>();
+        final List<ILineDataSet<?>> lineDataSets = new ArrayList<>();
         List<Entry> lineEntries = new ArrayList<>();
         final TimestampTranslation tsTranslation = new TimestampTranslation();
         int lastTsShorten = 0;
@@ -123,7 +123,7 @@ public class RespiratoryRateDailyFragment extends RespiratoryRateFragment<Respir
             int ts = (int) (sample.getTimestamp() / 1000L);
             int tsShorten = tsTranslation.shorten(ts);
             if (lastTsShorten == 0 || (tsShorten - lastTsShorten) <= 300) {
-                lineEntries.add(new Entry(tsShorten, (int) sample.getRespiratoryRate()));
+                lineEntries.add(new Entry<>(tsShorten, (int) sample.getRespiratoryRate(), null, null));
             } else {
                 if (!lineEntries.isEmpty()) {
                     List<Entry> clone = new ArrayList<>(lineEntries.size());
@@ -133,7 +133,7 @@ public class RespiratoryRateDailyFragment extends RespiratoryRateFragment<Respir
                 }
             }
             lastTsShorten = tsShorten;
-            lineEntries.add(new Entry(tsShorten, (int) sample.getRespiratoryRate()));
+            lineEntries.add(new Entry<>(tsShorten, (int) sample.getRespiratoryRate(), null, null));
         }
 
         if (!lineEntries.isEmpty()) {
@@ -148,13 +148,13 @@ public class RespiratoryRateDailyFragment extends RespiratoryRateFragment<Respir
 
         final LineDataSet lineDataSet = new LineDataSet(lineEntries, getString(R.string.respiratoryrate));
         lineDataSet.setColor(ContextCompat.getColor(requireContext(), R.color.respiratory_rate_color));
-        lineDataSet.setDrawCircles(false);
+        lineDataSet.setDrawCirclesEnabled(false);
         lineDataSet.setLineWidth(2f);
         lineDataSet.setFillAlpha(255);
-        lineDataSet.setDrawCircles(false);
+        lineDataSet.setDrawCirclesEnabled(false);
         lineDataSet.setCircleColor(ContextCompat.getColor(requireContext(), R.color.respiratory_rate_color));
         lineDataSet.setAxisDependency(YAxis.AxisDependency.LEFT);
-        lineDataSet.setDrawValues(false);
+        lineDataSet.setDrawValuesEnabled(false);
         lineDataSet.setMode(LineDataSet.Mode.HORIZONTAL_BEZIER);
 
         lineDataSets.add(lineDataSet);
@@ -165,13 +165,13 @@ public class RespiratoryRateDailyFragment extends RespiratoryRateFragment<Respir
     protected LineDataSet createDataSet(final List<Entry> values) {
         final LineDataSet lineDataSet = new LineDataSet(values, getString(R.string.respiratoryrate));
         lineDataSet.setColor(ContextCompat.getColor(requireContext(), R.color.respiratory_rate_color));
-        lineDataSet.setDrawCircles(false);
+        lineDataSet.setDrawCirclesEnabled(false);
         lineDataSet.setLineWidth(2f);
         lineDataSet.setFillAlpha(255);
-        lineDataSet.setDrawCircles(false);
+        lineDataSet.setDrawCirclesEnabled(false);
         lineDataSet.setCircleColor(ContextCompat.getColor(requireContext(), R.color.respiratory_rate_color));
         lineDataSet.setAxisDependency(YAxis.AxisDependency.LEFT);
-        lineDataSet.setDrawValues(false);
+        lineDataSet.setDrawValuesEnabled(false);
         lineDataSet.setMode(LineDataSet.Mode.HORIZONTAL_BEZIER);
 
         return lineDataSet;
@@ -191,27 +191,28 @@ public class RespiratoryRateDailyFragment extends RespiratoryRateFragment<Respir
 
         final XAxis xAxisBottom = respiratoryRateChart.getXAxis();
         xAxisBottom.setPosition(XAxis.XAxisPosition.BOTTOM);
-        xAxisBottom.setDrawLabels(true);
-        xAxisBottom.setDrawGridLines(false);
+        xAxisBottom.setDrawLabelsEnabled(true);
+        xAxisBottom.setDrawGridLinesEnabled(false);
         xAxisBottom.setEnabled(true);
-        xAxisBottom.setDrawLimitLinesBehindData(true);
+        xAxisBottom.setDrawLimitLinesBehindDataEnabled(true);
         xAxisBottom.setTextColor(CHART_TEXT_COLOR);
         xAxisBottom.setAxisMinimum(0f);
         xAxisBottom.setAxisMaximum(86400f);
-        xAxisBottom.setLabelCount(7, true);
+        xAxisBottom.setLabelCount(7);
+        xAxisBottom.setForceLabelsEnabled(true);
 
         final YAxis yAxisLeft = respiratoryRateChart.getAxisLeft();
-        yAxisLeft.setDrawGridLines(true);
+        yAxisLeft.setDrawGridLinesEnabled(true);
         yAxisLeft.setAxisMinimum(0);
         yAxisLeft.setAxisMaximum(20);
-        yAxisLeft.setDrawTopYLabelEntry(true);
+        yAxisLeft.setDrawTopYLabelEntryEnabled(true);
         yAxisLeft.setEnabled(true);
         yAxisLeft.setTextColor(CHART_TEXT_COLOR);
 
         final YAxis yAxisRight = respiratoryRateChart.getAxisRight();
         yAxisRight.setEnabled(true);
-        yAxisRight.setDrawLabels(false);
-        yAxisRight.setDrawGridLines(false);
-        yAxisRight.setDrawAxisLine(true);
+        yAxisRight.setDrawLabelsEnabled(false);
+        yAxisRight.setDrawGridLinesEnabled(false);
+        yAxisRight.setDrawAxisLineEnabled(true);
     }
 }

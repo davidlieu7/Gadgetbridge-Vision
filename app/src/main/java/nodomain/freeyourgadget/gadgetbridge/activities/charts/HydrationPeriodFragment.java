@@ -16,7 +16,9 @@ import com.github.mikephil.charting.components.YAxis;
 import com.github.mikephil.charting.data.BarData;
 import com.github.mikephil.charting.data.BarDataSet;
 import com.github.mikephil.charting.data.BarEntry;
-import com.github.mikephil.charting.formatter.ValueFormatter;
+import com.github.mikephil.charting.data.Entry;
+import com.github.mikephil.charting.formatter.IAxisValueFormatter;
+import com.github.mikephil.charting.utils.ViewPortHandler;
 
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
@@ -84,31 +86,31 @@ public class HydrationPeriodFragment extends HydrationFragment<HydrationPeriodFr
         hydrationChart.getDescription().setEnabled(false);
         if (TOTAL_DAYS <= 7) {
             hydrationChart.setTouchEnabled(false);
-            hydrationChart.setPinchZoom(false);
+            hydrationChart.setPinchZoomEnabled(false);
         }
         hydrationChart.setDoubleTapToZoomEnabled(false);
         hydrationChart.getLegend().setEnabled(false);
 
         final XAxis xAxisBottom = hydrationChart.getXAxis();
         xAxisBottom.setPosition(XAxis.XAxisPosition.BOTTOM);
-        xAxisBottom.setDrawLabels(true);
-        xAxisBottom.setDrawGridLines(false);
+        xAxisBottom.setDrawLabelsEnabled(true);
+        xAxisBottom.setDrawGridLinesEnabled(false);
         xAxisBottom.setEnabled(true);
-        xAxisBottom.setDrawLimitLinesBehindData(true);
+        xAxisBottom.setDrawLimitLinesBehindDataEnabled(true);
         xAxisBottom.setTextColor(CHART_TEXT_COLOR);
 
         final YAxis yAxisLeft = hydrationChart.getAxisLeft();
-        yAxisLeft.setDrawGridLines(true);
-        yAxisLeft.setDrawTopYLabelEntry(true);
+        yAxisLeft.setDrawGridLinesEnabled(true);
+        yAxisLeft.setDrawTopYLabelEntryEnabled(true);
         yAxisLeft.setEnabled(true);
         yAxisLeft.setTextColor(CHART_TEXT_COLOR);
         yAxisLeft.setAxisMinimum(0f);
 
         final YAxis yAxisRight = hydrationChart.getAxisRight();
         yAxisRight.setEnabled(true);
-        yAxisRight.setDrawLabels(false);
-        yAxisRight.setDrawGridLines(false);
-        yAxisRight.setDrawAxisLine(true);
+        yAxisRight.setDrawLabelsEnabled(false);
+        yAxisRight.setDrawGridLinesEnabled(false);
+        yAxisRight.setDrawAxisLineEnabled(true);
     }
 
     @Override
@@ -142,16 +144,16 @@ public class HydrationPeriodFragment extends HydrationFragment<HydrationPeriodFr
         double totalMl = 0;
         for (int i = 0; i < data.days.size(); i++) {
             final HydrationDay day = data.days.get(i);
-            entries.add(new BarEntry(i, (float) unit.fromMl(day.totalMl)));
+            entries.add(new BarEntry<>(i, (float) unit.fromMl(day.totalMl), null, null));
             totalMl += day.totalMl;
         }
         final int color = ContextCompat.getColor(context, R.color.hydration_color);
         final BarDataSet set = new BarDataSet(entries, getTitle());
-        set.setDrawValues(true);
+        set.setDrawValuesEnabled(true);
         set.setColors(color);
-        set.setValueFormatter(new ValueFormatter() {
+        set.setValueFormatter(new DataSetValueFormatter() {
             @Override
-            public String getFormattedValue(final float value) {
+            public String getFormattedValue(final float value, final Entry<?> entry, final int dataSetIndex, final ViewPortHandler viewPortHandler) {
                 //noinspection MalformedFormatString
                 return String.format(Locale.getDefault(), "%." + unit.getDecimals() + "f", value);
             }
@@ -160,7 +162,7 @@ public class HydrationPeriodFragment extends HydrationFragment<HydrationPeriodFr
         final float goal = (float) unit.fromMl(data.goalMl);
         final YAxis yAxisLeft = hydrationChart.getAxisLeft();
         yAxisLeft.removeAllLimitLines();
-        final LimitLine goalLine = new LimitLine(goal);
+        final LimitLine goalLine = new LimitLine(goal, "");
         goalLine.setLineColor(color);
         goalLine.setLineWidth(1.5f);
         goalLine.enableDashedLine(15f, 10f, 0f);
@@ -181,17 +183,14 @@ public class HydrationPeriodFragment extends HydrationFragment<HydrationPeriodFr
         hydrationGoal.setText(unit.format(context, data.goalMl));
     }
 
-    private ValueFormatter getDayValueFormatter(final HydrationData data) {
+    private IAxisValueFormatter getDayValueFormatter(final HydrationData data) {
         final DateTimeFormatter formatter = DateTimeFormatter.ofPattern(TOTAL_DAYS > 7 ? "dd" : "EEE", Locale.getDefault());
-        return new ValueFormatter() {
-            @Override
-            public String getFormattedValue(float value) {
-                final int index = (int) value;
-                if (index < 0 || index >= data.days.size()) {
-                    return "";
-                }
-                return data.days.get(index).date.format(formatter);
+        return (value, axis) -> {
+            final int index = (int) value;
+            if (index < 0 || index >= data.days.size()) {
+                return "";
             }
+            return data.days.get(index).date.format(formatter);
         };
     }
 

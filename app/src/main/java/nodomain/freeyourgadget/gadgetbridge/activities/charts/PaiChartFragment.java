@@ -38,12 +38,14 @@ import com.github.mikephil.charting.data.BarData;
 import com.github.mikephil.charting.data.BarDataSet;
 import com.github.mikephil.charting.data.BarEntry;
 import com.github.mikephil.charting.data.ChartData;
-import com.github.mikephil.charting.formatter.ValueFormatter;
+import com.github.mikephil.charting.data.Entry;
+import com.github.mikephil.charting.utils.ViewPortHandler;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
@@ -150,34 +152,34 @@ public class PaiChartFragment extends AbstractChartFragment<PaiChartFragment.Pai
         mWeekChart.setBackgroundColor(BACKGROUND_COLOR);
         mWeekChart.getDescription().setTextColor(DESCRIPTION_COLOR);
         mWeekChart.getDescription().setText("");
-        mWeekChart.setFitBars(true);
+        mWeekChart.setFitBarsEnabled(true);
         configureBarLineChartDefaults(mWeekChart);
         mWeekChart.setTouchEnabled(false);
 
         final XAxis x = mWeekChart.getXAxis();
-        x.setDrawLabels(true);
-        x.setDrawGridLines(false);
+        x.setDrawLabelsEnabled(true);
+        x.setDrawGridLinesEnabled(false);
         x.setEnabled(true);
         x.setTextColor(CHART_TEXT_COLOR);
-        x.setDrawLimitLinesBehindData(true);
+        x.setDrawLimitLinesBehindDataEnabled(true);
         x.setPosition(XAxis.XAxisPosition.BOTTOM);
 
         final YAxis y = mWeekChart.getAxisLeft();
-        y.setDrawGridLines(true);
-        y.setDrawTopYLabelEntry(true);
+        y.setDrawGridLinesEnabled(true);
+        y.setDrawTopYLabelEntryEnabled(true);
         y.setTextColor(CHART_TEXT_COLOR);
-        y.setDrawZeroLine(true);
+        y.setDrawZeroLineEnabled(true);
         y.setSpaceBottom(0);
         y.setAxisMinimum(0);
         y.setAxisMaximum(getPaiTarget());
-        y.setValueFormatter(getRoundFormatter());
+        y.setValueFormatter((value, axis) -> String.valueOf(Math.round(value)));
         y.setEnabled(true);
 
         final YAxis yAxisRight = mWeekChart.getAxisRight();
-        yAxisRight.setDrawGridLines(false);
+        yAxisRight.setDrawGridLinesEnabled(false);
         yAxisRight.setEnabled(false);
-        yAxisRight.setDrawLabels(false);
-        yAxisRight.setDrawTopYLabelEntry(false);
+        yAxisRight.setDrawLabelsEnabled(false);
+        yAxisRight.setDrawTopYLabelEntryEnabled(false);
         yAxisRight.setTextColor(CHART_TEXT_COLOR);
     }
 
@@ -307,14 +309,14 @@ public class PaiChartFragment extends AbstractChartFragment<PaiChartFragment.Pai
                 final int paiTotal = Math.round(sample.getPaiTotal());
                 maxPai = Math.max(maxPai, paiTotal);
 
-                final float[] paiBar = new float[]{
-                        paiTotal - paiToday,
-                        paiToday
-                };
+                final List<Float> paiBar = Arrays.asList(
+                        (float) (paiTotal - paiToday),
+                        (float) paiToday
+                );
 
-                entries.add(new BarEntry(counter, paiBar));
+                entries.add(new BarEntry<>(counter, paiBar, null, null));
             } else {
-                entries.add(new BarEntry(counter, new float[]{0.0f, 0.0f}));
+                entries.add(new BarEntry<>(counter, Arrays.asList(0.0f, 0.0f), null, null));
             }
             labels.add(getWeeksChartsLabel(day));
             day.add(Calendar.DATE, 1);
@@ -376,10 +378,10 @@ public class PaiChartFragment extends AbstractChartFragment<PaiChartFragment.Pai
         return new DayData(day, segments, today, total, paiLow, paiModerate, paiHigh, minutesLow, minutesModerate, minutesHigh);
     }
 
-    protected ValueFormatter getRoundFormatter() {
-        return new ValueFormatter() {
+    protected DataSetValueFormatter getRoundFormatter() {
+        return new DataSetValueFormatter() {
             @Override
-            public String getFormattedValue(final float value) {
+            public String getFormattedValue(final float value, final Entry<?> entry, final int dataSetIndex, final ViewPortHandler viewPortHandler) {
                 return String.valueOf(Math.round(value));
             }
         };
@@ -390,16 +392,16 @@ public class PaiChartFragment extends AbstractChartFragment<PaiChartFragment.Pai
         List<LegendEntry> legendEntries = new ArrayList<>(2);
 
         LegendEntry lightSleepEntry = new LegendEntry();
-        lightSleepEntry.label = requireContext().getString(R.string.pai_total);
-        lightSleepEntry.formColor = PAI_TOTAL_COLOR;
+        lightSleepEntry.setLabel(requireContext().getString(R.string.pai_total));
+        lightSleepEntry.setFormColor(PAI_TOTAL_COLOR);
         legendEntries.add(lightSleepEntry);
 
         LegendEntry deepSleepEntry = new LegendEntry();
-        deepSleepEntry.label = requireContext().getString(R.string.pai_day);
-        deepSleepEntry.formColor = PAI_DAY_COLOR;
+        deepSleepEntry.setLabel(requireContext().getString(R.string.pai_day));
+        deepSleepEntry.setFormColor(PAI_DAY_COLOR);
         legendEntries.add(deepSleepEntry);
 
-        chart.getLegend().setCustom(legendEntries);
+        chart.getLegend().setEntries(legendEntries);
         chart.getLegend().setTextColor(LEGEND_TEXT_COLOR);
         chart.getLegend().setWordWrapEnabled(true);
         chart.getLegend().setHorizontalAlignment(Legend.LegendHorizontalAlignment.CENTER);

@@ -54,26 +54,26 @@ abstract class SleepFragment<D extends ChartsData> extends AbstractActivityChart
     protected List<LegendEntry> createLegendEntries(Chart<?> chart) {
         List<LegendEntry> legendEntries = new ArrayList<>(4);
         LegendEntry lightSleepEntry = new LegendEntry();
-        lightSleepEntry.label = getActivity().getString(R.string.sleep_colored_stats_light);
-        lightSleepEntry.formColor = akLightSleep.color;
+        lightSleepEntry.setLabel(getActivity().getString(R.string.sleep_colored_stats_light));
+        lightSleepEntry.setFormColor(akLightSleep.color);
         legendEntries.add(lightSleepEntry);
 
         LegendEntry deepSleepEntry = new LegendEntry();
-        deepSleepEntry.label = getActivity().getString(R.string.sleep_colored_stats_deep);
-        deepSleepEntry.formColor = akDeepSleep.color;
+        deepSleepEntry.setLabel(getActivity().getString(R.string.sleep_colored_stats_deep));
+        deepSleepEntry.setFormColor(akDeepSleep.color);
         legendEntries.add(deepSleepEntry);
 
         if (supportsRemSleep(getChartsHost().getDevice())) {
             LegendEntry remSleepEntry = new LegendEntry();
-            remSleepEntry.label = getActivity().getString(R.string.sleep_colored_stats_rem);
-            remSleepEntry.formColor = akRemSleep.color;
+            remSleepEntry.setLabel(getActivity().getString(R.string.sleep_colored_stats_rem));
+            remSleepEntry.setFormColor(akRemSleep.color);
             legendEntries.add(remSleepEntry);
         }
 
         if (supportsAwakeSleep(getChartsHost().getDevice())) {
             LegendEntry awakeSleepEntry = new LegendEntry();
-            awakeSleepEntry.label = getActivity().getString(R.string.abstract_chart_fragment_kind_awake_sleep);
-            awakeSleepEntry.formColor = akAwakeSleep.color;
+            awakeSleepEntry.setLabel(getActivity().getString(R.string.abstract_chart_fragment_kind_awake_sleep));
+            awakeSleepEntry.setFormColor(akAwakeSleep.color);
             legendEntries.add(awakeSleepEntry);
         }
 

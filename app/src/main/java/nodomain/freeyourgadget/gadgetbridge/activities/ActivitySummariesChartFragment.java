@@ -34,7 +34,7 @@ import com.github.mikephil.charting.components.XAxis;
 import com.github.mikephil.charting.components.YAxis;
 import com.github.mikephil.charting.data.Entry;
 import com.github.mikephil.charting.data.LineData;
-import com.github.mikephil.charting.formatter.ValueFormatter;
+import com.github.mikephil.charting.formatter.IAxisValueFormatter;
 import com.github.mikephil.charting.interfaces.datasets.ILineDataSet;
 
 import org.slf4j.Logger;
@@ -158,29 +158,29 @@ public class ActivitySummariesChartFragment extends AbstractActivityChartFragmen
         configureBarLineChartDefaults(mChart);
 
         XAxis x = mChart.getXAxis();
-        x.setDrawLabels(true);
-        x.setDrawGridLines(false);
+        x.setDrawLabelsEnabled(true);
+        x.setDrawGridLinesEnabled(false);
         x.setEnabled(true);
         x.setTextColor(CHART_TEXT_COLOR);
-        x.setDrawLimitLinesBehindData(true);
+        x.setDrawLimitLinesBehindDataEnabled(true);
 
         YAxis y = mChart.getAxisLeft();
-        y.setDrawGridLines(false);
+        y.setDrawGridLinesEnabled(false);
 //        y.setDrawLabels(false);
         // TODO: make fixed max value optional
         y.setAxisMaximum(1f);
         y.setAxisMinimum(0);
-        y.setDrawTopYLabelEntry(false);
+        y.setDrawTopYLabelEntryEnabled(false);
         y.setTextColor(CHART_TEXT_COLOR);
 
 //        y.setLabelCount(5);
         y.setEnabled(true);
 
         YAxis yAxisRight = mChart.getAxisRight();
-        yAxisRight.setDrawGridLines(false);
+        yAxisRight.setDrawGridLinesEnabled(false);
         yAxisRight.setEnabled(supportsHeartrate(gbDevice));
-        yAxisRight.setDrawLabels(true);
-        yAxisRight.setDrawTopYLabelEntry(true);
+        yAxisRight.setDrawLabelsEnabled(true);
+        yAxisRight.setDrawTopYLabelEntryEnabled(true);
         yAxisRight.setTextColor(CHART_TEXT_COLOR);
         yAxisRight.setAxisMaximum(HeartRateUtils.getInstance().getMaxHeartRate());
         yAxisRight.setAxisMinimum(HeartRateUtils.getInstance().getMinHeartRate());
@@ -203,18 +203,18 @@ public class ActivitySummariesChartFragment extends AbstractActivityChartFragmen
         List<LegendEntry> legendEntries = new ArrayList<>(5);
 
         LegendEntry activityEntry = new LegendEntry();
-        activityEntry.label = akActivity.label;
-        activityEntry.formColor = akActivity.color;
+        activityEntry.setLabel(akActivity.label);
+        activityEntry.setFormColor(akActivity.color);
         legendEntries.add(activityEntry);
 
         if (supportsHeartrate(gbDevice)) {
             LegendEntry hrEntry = new LegendEntry();
-            hrEntry.label = HEARTRATE_LABEL;
-            hrEntry.formColor = HEARTRATE_COLOR;
+            hrEntry.setLabel(HEARTRATE_LABEL);
+            hrEntry.setFormColor(HEARTRATE_COLOR);
             legendEntries.add(hrEntry);
         }
 
-        chart.getLegend().setCustom(legendEntries);
+        chart.getLegend().setEntries(legendEntries);
         chart.getLegend().setTextColor(LEGEND_TEXT_COLOR);
         chart.getLegend().setWordWrapEnabled(true);
         chart.getLegend().setHorizontalAlignment(Legend.LegendHorizontalAlignment.CENTER);
@@ -231,7 +231,7 @@ public class ActivitySummariesChartFragment extends AbstractActivityChartFragmen
 
     @Override
     protected Entry createLineEntry(float value, int xValue) {
-        return new Entry(xValue, value);
+        return new Entry<>(xValue, value, null, null);
     }
 
     @Override
@@ -305,7 +305,7 @@ public class ActivitySummariesChartFragment extends AbstractActivityChartFragmen
             // This is not ideal...
             final TimestampTranslation tsTranslation;
             if (activitySamplesData != null) {
-                final ValueFormatter xValueFormatter = activitySamplesData.getXValueFormatter();
+                final IAxisValueFormatter xValueFormatter = activitySamplesData.getXValueFormatter();
                 if (xValueFormatter instanceof SampleXLabelFormatter) {
                     tsTranslation = ((SampleXLabelFormatter) xValueFormatter).getTsTranslation();
                 } else {
@@ -317,12 +317,12 @@ public class ActivitySummariesChartFragment extends AbstractActivityChartFragmen
             }
 
             final List<Entry> heartRateEntries = new ArrayList<>(activityPoints.size());
-            final List<ILineDataSet> heartRateDataSets = new ArrayList<>();
+            final List<ILineDataSet<?>> heartRateDataSets = new ArrayList<>();
             int lastTsShorten = 0;
             for (final ActivityPoint activityPoint : activityPoints) {
                 int tsShorten = tsTranslation.shorten((int) (activityPoint.getTime().getTime() / 1000));
                 if (lastTsShorten == 0 || (tsShorten - lastTsShorten) <= 60 * gbDevice.getDeviceCoordinator().getMaxHeartRateMeasurementsGapMinutes(gbDevice)) {
-                    heartRateEntries.add(new Entry(tsShorten, activityPoint.getHeartRate()));
+                    heartRateEntries.add(new Entry<>(tsShorten, activityPoint.getHeartRate(), null, null));
                 } else {
                     if (!heartRateEntries.isEmpty()) {
                         List<Entry> clone = new ArrayList<>(heartRateEntries.size());
@@ -332,7 +332,7 @@ public class ActivitySummariesChartFragment extends AbstractActivityChartFragmen
                     }
                 }
                 lastTsShorten = tsShorten;
-                heartRateEntries.add(new Entry(tsShorten, activityPoint.getHeartRate()));
+                heartRateEntries.add(new Entry<>(tsShorten, activityPoint.getHeartRate(), null, null));
             }
             if (!heartRateEntries.isEmpty()) {
                 heartRateDataSets.add(createHeartrateSet(heartRateEntries, "Heart Rate"));
@@ -341,7 +341,7 @@ public class ActivitySummariesChartFragment extends AbstractActivityChartFragmen
             if (activitySamplesData != null) {
                 // if we have activity samples, replace the heart rate dataset
                 LineData data = activitySamplesData.getData();
-                List<ILineDataSet> dataSets = data.getDataSets();
+                List<ILineDataSet<?>> dataSets = data.getDataSets();
                 for (final ILineDataSet dataSet : dataSets) {
                     if ("Heart Rate".equals(dataSet.getLabel())) {
                         dataSets.remove(dataSet);
@@ -354,7 +354,7 @@ public class ActivitySummariesChartFragment extends AbstractActivityChartFragmen
                 return activitySamplesData;
             } else {
                 final LineData lineData = new LineData(heartRateDataSets);
-                final ValueFormatter xValueFormatter = new SampleXLabelFormatter(tsTranslation, "HH:mm");
+                final IAxisValueFormatter xValueFormatter = new SampleXLabelFormatter(tsTranslation, "HH:mm");
                 return new DefaultChartsData<>(lineData, xValueFormatter);
             }
         }

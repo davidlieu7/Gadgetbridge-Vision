@@ -50,7 +50,7 @@ import com.github.mikephil.charting.data.CombinedData;
 import com.github.mikephil.charting.data.Entry;
 import com.github.mikephil.charting.data.LineData;
 import com.github.mikephil.charting.data.LineDataSet;
-import com.github.mikephil.charting.formatter.ValueFormatter;
+import com.github.mikephil.charting.formatter.IAxisValueFormatter;
 import com.github.mikephil.charting.interfaces.datasets.ILineDataSet;
 import com.google.android.material.chip.Chip;
 import com.google.android.material.chip.ChipGroup;
@@ -64,6 +64,7 @@ import java.time.LocalTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Collections;
 import java.util.Date;
@@ -214,26 +215,26 @@ public class LoadFragment extends AbstractChartFragment<LoadFragment.LoadsData> 
     protected LineDataSet createDataSet(final List<Entry> values, String name, int color) {
         final LineDataSet lineDataSet = new LineDataSet(values, name);
         lineDataSet.setColor(color);
-        lineDataSet.setDrawCircles(false);
+        lineDataSet.setDrawCirclesEnabled(false);
         lineDataSet.setLineWidth(2f);
         lineDataSet.setFillAlpha(255);
         lineDataSet.setCircleRadius(5f);
-        lineDataSet.setDrawCircles(true);
-        lineDataSet.setDrawCircleHole(false);
+        lineDataSet.setDrawCirclesEnabled(true);
+        lineDataSet.setDrawCircleHoleEnabled(false);
         lineDataSet.setCircleHoleColor(Color.WHITE);
         lineDataSet.setCircleColor(color);
         lineDataSet.setAxisDependency(YAxis.AxisDependency.LEFT);
-        lineDataSet.setDrawValues(false);
+        lineDataSet.setDrawValuesEnabled(false);
         return lineDataSet;
     }
 
     protected BarDataSet createOptimalLoadRangeDataSet(final List<BarEntry> values) {
         final BarDataSet barDataSet = new BarDataSet(values, getString(R.string.training_optimal_load));
-        barDataSet.setDrawValues(false);
-        barDataSet.setDrawIcons(false);
+        barDataSet.setDrawValuesEnabled(false);
+        barDataSet.setDrawIconsEnabled(false);
         barDataSet.setAxisDependency(YAxis.AxisDependency.LEFT);
         barDataSet.setColors(0x00000000, OPTIMAL_LOAD_FILL_COLOR);
-        barDataSet.setHighLightAlpha(0);
+        barDataSet.setHighlightAlpha(0);
         barDataSet.setHighlightEnabled(false);
         return barDataSet;
     }
@@ -348,22 +349,22 @@ public class LoadFragment extends AbstractChartFragment<LoadFragment.LoadsData> 
         List<BarEntry> optimalLoadEntries = new ArrayList<>();
         data.getData().forEach((LoadData dayData) -> {
             if (dayData.acuteLoad > 0) {
-                acuteLoadEntries.add(new Entry(dayData.i, dayData.acuteLoad));
+                acuteLoadEntries.add(new Entry<>(dayData.i, dayData.acuteLoad, null, null));
             }
             if (dayData.chronicLoad > 0) {
-                chronicLoadEntries.add(new Entry(dayData.i, dayData.chronicLoad));
+                chronicLoadEntries.add(new Entry<>(dayData.i, dayData.chronicLoad, null, null));
                 float optimalLower = dayData.chronicLoad * OPTIMAL_LOAD_RATIO_LOWER;
                 float optimalUpper = dayData.chronicLoad * OPTIMAL_LOAD_RATIO_UPPER;
-                optimalLoadEntries.add(new BarEntry(dayData.i, new float[]{optimalLower, optimalUpper - optimalLower}));
+                optimalLoadEntries.add(new BarEntry<>(dayData.i, Arrays.asList(optimalLower, optimalUpper - optimalLower), null, null));
             }
             if (dayData.load > 0) {
-                dailyLoadEntries.add(new BarEntry(dayData.i, dayData.load));
+                dailyLoadEntries.add(new BarEntry<>(dayData.i, dayData.load, null, null));
             }
         });
 
         // Daily load chart.
         BarDataSet set = new BarDataSet(dailyLoadEntries, getString(R.string.training_daily_load));
-        set.setDrawValues(true);
+        set.setDrawValuesEnabled(true);
         set.setColors(LOAD_COLOR);
         final XAxis x = dailyLoadChart.getXAxis();
         x.setValueFormatter(getDailyLoadChartDayValueFormatter(data));
@@ -374,11 +375,11 @@ public class LoadFragment extends AbstractChartFragment<LoadFragment.LoadsData> 
         barData.setValueTextSize(10f);
 
         LegendEntry dailyLoadEntry = new LegendEntry();
-        dailyLoadEntry.label = getString(R.string.training_daily_load);
-        dailyLoadEntry.formColor = LOAD_COLOR;
-        dailyLoadEntry.form = Legend.LegendForm.SQUARE;
+        dailyLoadEntry.setLabel(getString(R.string.training_daily_load));
+        dailyLoadEntry.setFormColor(LOAD_COLOR);
+        dailyLoadEntry.setForm(Legend.LegendForm.SQUARE);
         dailyLoadChart.getLegend().setTextColor(LEGEND_TEXT_COLOR);
-        dailyLoadChart.getLegend().setCustom(Collections.singletonList(dailyLoadEntry));
+        dailyLoadChart.getLegend().setEntries(Collections.singletonList(dailyLoadEntry));
 
         dailyLoadChart.setData(barData);
 
@@ -386,30 +387,30 @@ public class LoadFragment extends AbstractChartFragment<LoadFragment.LoadsData> 
             List<LegendEntry> legendEntries = new ArrayList<>(3);
             if (showAcuteLoad) {
                 LegendEntry acuteLoadEntry = new LegendEntry();
-                acuteLoadEntry.label = getString(R.string.training_acute_load);
-                acuteLoadEntry.formColor = LOAD_COLOR;
-                acuteLoadEntry.form = Legend.LegendForm.CIRCLE;
+                acuteLoadEntry.setLabel(getString(R.string.training_acute_load));
+                acuteLoadEntry.setFormColor(LOAD_COLOR);
+                acuteLoadEntry.setForm(Legend.LegendForm.CIRCLE);
                 legendEntries.add(acuteLoadEntry);
             }
             if (showChronicLoad) {
                 LegendEntry chronicLoadEntry = new LegendEntry();
-                chronicLoadEntry.label = getString(R.string.training_chronic_load);
-                chronicLoadEntry.formColor = getResources().getColor(R.color.training_chronic_load);
-                chronicLoadEntry.form = Legend.LegendForm.CIRCLE;
+                chronicLoadEntry.setLabel(getString(R.string.training_chronic_load));
+                chronicLoadEntry.setFormColor(getResources().getColor(R.color.training_chronic_load));
+                chronicLoadEntry.setForm(Legend.LegendForm.CIRCLE);
                 legendEntries.add(chronicLoadEntry);
             }
             if (showChronicLoad && !optimalLoadEntries.isEmpty()) {
                 LegendEntry optimalLoadEntry = new LegendEntry();
-                optimalLoadEntry.label = getString(R.string.training_optimal_load);
-                optimalLoadEntry.formColor = OPTIMAL_LOAD_FILL_COLOR;
-                optimalLoadEntry.form = Legend.LegendForm.SQUARE;
+                optimalLoadEntry.setLabel(getString(R.string.training_optimal_load));
+                optimalLoadEntry.setFormColor(OPTIMAL_LOAD_FILL_COLOR);
+                optimalLoadEntry.setForm(Legend.LegendForm.SQUARE);
                 legendEntries.add(optimalLoadEntry);
             }
             acuteLoadChart.getLegend().setTextColor(LEGEND_TEXT_COLOR);
-            acuteLoadChart.getLegend().setCustom(legendEntries);
+            acuteLoadChart.getLegend().setEntries(legendEntries);
             acuteLoadChart.getXAxis().setValueFormatter(getDailyLoadChartDayValueFormatter(data));
 
-            final List<ILineDataSet> lineDataSets = new ArrayList<>();
+            final List<ILineDataSet<?>> lineDataSets = new ArrayList<>();
             if (showAcuteLoad) {
                 lineDataSets.add(createDataSet(acuteLoadEntries, getString(R.string.training_acute_load), LOAD_COLOR));
             }
@@ -423,10 +424,10 @@ public class LoadFragment extends AbstractChartFragment<LoadFragment.LoadsData> 
             if (showChronicLoad && !optimalLoadEntries.isEmpty()) {
                 final BarData optimalLoadBarData = new BarData(createOptimalLoadRangeDataSet(optimalLoadEntries));
                 optimalLoadBarData.setBarWidth(1f);
-                combinedData.setData(optimalLoadBarData);
+                combinedData.setBarData(optimalLoadBarData);
                 optimalLoadMax = optimalLoadBarData.getYMax();
             }
-            combinedData.setData(lineData);
+            combinedData.setLineData(lineData);
             acuteLoadChart.getAxisLeft().setAxisMaximum(Math.max(Math.max(lineData.getYMax(), optimalLoadMax), 200) + 100);
             acuteLoadChart.setData(combinedData);
 
@@ -630,36 +631,36 @@ public class LoadFragment extends AbstractChartFragment<LoadFragment.LoadsData> 
     private void setupAcuteLoadChart() {
         acuteLoadChart.getDescription().setEnabled(false);
         acuteLoadChart.setTouchEnabled(false);
-        acuteLoadChart.setPinchZoom(false);
+        acuteLoadChart.setPinchZoomEnabled(false);
         acuteLoadChart.setDoubleTapToZoomEnabled(false);
-        acuteLoadChart.setDrawOrder(new CombinedChart.DrawOrder[]{
+        acuteLoadChart.setDrawOrder(Arrays.asList(
                 CombinedChart.DrawOrder.BAR,
                 CombinedChart.DrawOrder.LINE
-        });
+        ));
 
         final XAxis xAxisBottom = acuteLoadChart.getXAxis();
         xAxisBottom.setPosition(XAxis.XAxisPosition.BOTTOM);
-        xAxisBottom.setDrawLabels(true);
-        xAxisBottom.setDrawGridLines(false);
+        xAxisBottom.setDrawLabelsEnabled(true);
+        xAxisBottom.setDrawGridLinesEnabled(false);
         xAxisBottom.setEnabled(true);
-        xAxisBottom.setDrawLimitLinesBehindData(true);
+        xAxisBottom.setDrawLimitLinesBehindDataEnabled(true);
         xAxisBottom.setAxisMaximum(29 + 0.5f);
         xAxisBottom.setAxisMinimum(0 - 0.5f);
         xAxisBottom.setTextColor(CHART_TEXT_COLOR);
 
         final YAxis yAxisLeft = acuteLoadChart.getAxisLeft();
-        yAxisLeft.setDrawGridLines(true);
+        yAxisLeft.setDrawGridLinesEnabled(true);
         yAxisLeft.setAxisMaximum(1000);
         yAxisLeft.setAxisMinimum(0);
-        yAxisLeft.setDrawTopYLabelEntry(false);
+        yAxisLeft.setDrawTopYLabelEntryEnabled(false);
         yAxisLeft.setEnabled(true);
         yAxisLeft.setTextColor(CHART_TEXT_COLOR);
 
         final YAxis yAxisRight = acuteLoadChart.getAxisRight();
         yAxisRight.setEnabled(true);
-        yAxisRight.setDrawLabels(false);
-        yAxisRight.setDrawGridLines(false);
-        yAxisRight.setDrawAxisLine(true);
+        yAxisRight.setDrawLabelsEnabled(false);
+        yAxisRight.setDrawGridLinesEnabled(false);
+        yAxisRight.setDrawAxisLineEnabled(true);
     }
 
     protected void setupDailyLoadChart() {
@@ -669,37 +670,34 @@ public class LoadFragment extends AbstractChartFragment<LoadFragment.LoadsData> 
 
         final XAxis xAxisBottom = dailyLoadChart.getXAxis();
         xAxisBottom.setPosition(XAxis.XAxisPosition.BOTTOM);
-        xAxisBottom.setDrawLabels(true);
-        xAxisBottom.setDrawGridLines(false);
+        xAxisBottom.setDrawLabelsEnabled(true);
+        xAxisBottom.setDrawGridLinesEnabled(false);
         xAxisBottom.setEnabled(true);
-        xAxisBottom.setDrawLimitLinesBehindData(true);
+        xAxisBottom.setDrawLimitLinesBehindDataEnabled(true);
         xAxisBottom.setTextColor(CHART_TEXT_COLOR);
         xAxisBottom.setAxisMaximum(29 + 0.5f);
         xAxisBottom.setAxisMinimum(0 - 0.5f);
 
         final YAxis yAxisLeft = dailyLoadChart.getAxisLeft();
-        yAxisLeft.setDrawGridLines(true);
-        yAxisLeft.setDrawTopYLabelEntry(true);
+        yAxisLeft.setDrawGridLinesEnabled(true);
+        yAxisLeft.setDrawTopYLabelEntryEnabled(true);
         yAxisLeft.setEnabled(true);
         yAxisLeft.setTextColor(CHART_TEXT_COLOR);
         yAxisLeft.setAxisMinimum(0f);
 
         final YAxis yAxisRight = dailyLoadChart.getAxisRight();
         yAxisRight.setEnabled(true);
-        yAxisRight.setDrawLabels(false);
-        yAxisRight.setDrawGridLines(false);
-        yAxisRight.setDrawAxisLine(true);
+        yAxisRight.setDrawLabelsEnabled(false);
+        yAxisRight.setDrawGridLinesEnabled(false);
+        yAxisRight.setDrawAxisLineEnabled(true);
     }
 
-    ValueFormatter getDailyLoadChartDayValueFormatter(LoadFragment.LoadsData data) {
-        return new ValueFormatter() {
-            @Override
-            public String getFormattedValue(float value) {
-                LoadFragment.LoadData day = data.getDay((int) value);
-                String pattern = TOTAL_DAYS > 7 ? "dd" : "EEE";
-                SimpleDateFormat formatLetterDay = new SimpleDateFormat(pattern, Locale.getDefault());
-                return formatLetterDay.format(new Date(day.day.getTimeInMillis()));
-            }
+    IAxisValueFormatter getDailyLoadChartDayValueFormatter(LoadFragment.LoadsData data) {
+        return (value, axis) -> {
+            LoadFragment.LoadData day = data.getDay((int) value);
+            String pattern = TOTAL_DAYS > 7 ? "dd" : "EEE";
+            SimpleDateFormat formatLetterDay = new SimpleDateFormat(pattern, Locale.getDefault());
+            return formatLetterDay.format(new Date(day.day.getTimeInMillis()));
         };
     }
 

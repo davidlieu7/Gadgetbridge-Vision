@@ -37,7 +37,7 @@ import com.github.mikephil.charting.components.YAxis;
 import com.github.mikephil.charting.data.BarData;
 import com.github.mikephil.charting.data.BarDataSet;
 import com.github.mikephil.charting.data.BarEntry;
-import com.github.mikephil.charting.formatter.ValueFormatter;
+import com.github.mikephil.charting.formatter.IAxisValueFormatter;
 import com.google.android.material.chip.Chip;
 import com.google.android.material.chip.ChipGroup;
 
@@ -246,7 +246,7 @@ public class SolarChargingPeriodFragment extends AbstractChartFragment<SolarChar
             final double value = selectedMetric == SolarMetric.LUX_HOURS
                     ? dayData.luxHours / 1000.0
                     : dayData.gainMinutes;
-            entries.add(new BarEntry(i, (float) value));
+            entries.add(new BarEntry<>(i, (float) value, null, null));
         }
 
         final WorkoutValueFormatter unitFormatter = new WorkoutValueFormatter();
@@ -262,22 +262,19 @@ public class SolarChargingPeriodFragment extends AbstractChartFragment<SolarChar
 
         final String fmt = TOTAL_DAYS <= 7 ? "EEE" : "dd";
         final SimpleDateFormat formatDay = new SimpleDateFormat(fmt, Locale.getDefault());
-        final ValueFormatter xFormatter = new ValueFormatter() {
-            @Override
-            public String getFormattedValue(final float value) {
-                final int dayIndex = Math.round(value);
-                if (dayIndex < 0 || dayIndex >= TOTAL_DAYS) {
-                    return "";
-                }
-                final int ts = startTs + SEC_PER_DAY * dayIndex;
-                return formatDay.format(new Date(ts * 1000L));
+        final IAxisValueFormatter xFormatter = (value, axis) -> {
+            final int dayIndex = Math.round(value);
+            if (dayIndex < 0 || dayIndex >= TOTAL_DAYS) {
+                return "";
             }
+            final int ts = startTs + SEC_PER_DAY * dayIndex;
+            return formatDay.format(new Date(ts * 1000L));
         };
         chart.getXAxis().setValueFormatter(xFormatter);
 
         final int color = getResources().getColor(R.color.chart_solar_charging_color);
         final BarDataSet set = new BarDataSet(entries, getString(selectedMetric.labelResId));
-        set.setDrawValues(false);
+        set.setDrawValuesEnabled(false);
         set.setColor(color);
         set.setAxisDependency(YAxis.AxisDependency.LEFT);
 
@@ -286,10 +283,10 @@ public class SolarChargingPeriodFragment extends AbstractChartFragment<SolarChar
         chart.getAxisLeft().setAxisMinimum(0f);
 
         final LegendEntry legendEntry = new LegendEntry();
-        legendEntry.label = getString(selectedMetric.labelResId) + " (" + selectedMetric.unit + ")";
-        legendEntry.formColor = color;
+        legendEntry.setLabel(getString(selectedMetric.labelResId) + " (" + selectedMetric.unit + ")");
+        legendEntry.setFormColor(color);
         chart.getLegend().setTextColor(LEGEND_TEXT_COLOR);
-        chart.getLegend().setCustom(Collections.singletonList(legendEntry));
+        chart.getLegend().setEntries(Collections.singletonList(legendEntry));
 
         chart.setData(new BarData(set));
     }
@@ -306,15 +303,15 @@ public class SolarChargingPeriodFragment extends AbstractChartFragment<SolarChar
     private void setupChart() {
         chart.getDescription().setEnabled(false);
         chart.setTouchEnabled(false);
-        chart.setPinchZoom(false);
+        chart.setPinchZoomEnabled(false);
         chart.setDoubleTapToZoomEnabled(false);
 
         final XAxis xAxisBottom = chart.getXAxis();
         xAxisBottom.setPosition(XAxis.XAxisPosition.BOTTOM);
-        xAxisBottom.setDrawLabels(true);
-        xAxisBottom.setDrawGridLines(false);
+        xAxisBottom.setDrawLabelsEnabled(true);
+        xAxisBottom.setDrawGridLinesEnabled(false);
         xAxisBottom.setEnabled(true);
-        xAxisBottom.setDrawLimitLinesBehindData(true);
+        xAxisBottom.setDrawLimitLinesBehindDataEnabled(true);
         xAxisBottom.setTextColor(CHART_TEXT_COLOR);
         xAxisBottom.setGranularity(1f);
         xAxisBottom.setGranularityEnabled(true);
@@ -322,17 +319,17 @@ public class SolarChargingPeriodFragment extends AbstractChartFragment<SolarChar
         xAxisBottom.setAxisMaximum(TOTAL_DAYS - 0.5f);
 
         final YAxis yAxisLeft = chart.getAxisLeft();
-        yAxisLeft.setDrawGridLines(true);
+        yAxisLeft.setDrawGridLinesEnabled(true);
         yAxisLeft.setAxisMinimum(0f);
-        yAxisLeft.setDrawTopYLabelEntry(true);
+        yAxisLeft.setDrawTopYLabelEntryEnabled(true);
         yAxisLeft.setEnabled(true);
         yAxisLeft.setTextColor(CHART_TEXT_COLOR);
 
         final YAxis yAxisRight = chart.getAxisRight();
         yAxisRight.setEnabled(true);
-        yAxisRight.setDrawLabels(false);
-        yAxisRight.setDrawGridLines(false);
-        yAxisRight.setDrawAxisLine(true);
+        yAxisRight.setDrawLabelsEnabled(false);
+        yAxisRight.setDrawGridLinesEnabled(false);
+        yAxisRight.setDrawAxisLineEnabled(true);
     }
 
     protected static class SolarChargingPeriodData extends ChartsData {

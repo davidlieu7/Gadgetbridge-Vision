@@ -342,7 +342,7 @@ public abstract class AbstractChartFragment<D extends ChartsData> extends Abstra
     protected void configureBarLineChartDefaults(BarLineChartBase<?> chart) {
         configureChartDefaults(chart);
         if (chart instanceof BarChart) {
-            ((BarChart) chart).setFitBars(true);
+            ((BarChart) chart).setFitBarsEnabled(true);
         }
 
         // enable scaling and dragging
@@ -352,7 +352,7 @@ public abstract class AbstractChartFragment<D extends ChartsData> extends Abstra
         // if disabled, scaling can be done on x- and y-axis separately
 //        chart.setPinchZoom(true);
 
-        chart.setDrawGridBackground(false);
+        chart.setDrawGridBackgroundEnabled(false);
     }
 
     /**

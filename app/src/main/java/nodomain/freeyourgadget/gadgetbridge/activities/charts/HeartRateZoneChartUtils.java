@@ -30,7 +30,6 @@ import com.github.mikephil.charting.components.Legend;
 import com.github.mikephil.charting.components.YAxis;
 import com.github.mikephil.charting.data.Entry;
 import com.github.mikephil.charting.data.LineDataSet;
-import com.github.mikephil.charting.formatter.IFillFormatter;
 import com.github.mikephil.charting.interfaces.datasets.ILineDataSet;
 
 import java.util.ArrayList;
@@ -53,7 +52,7 @@ public final class HeartRateZoneChartUtils {
     /** One HR-zone band. Drawn behind the HR line, never part of the legend or the value marker. */
     public static final class ZoneAreaDataSet extends LineDataSet {
         public ZoneAreaDataSet(final List<Entry> entries) {
-            super(entries, null);
+            super(entries, "");
         }
     }
 
@@ -116,17 +115,17 @@ public final class HeartRateZoneChartUtils {
      * The bands are {@link ZoneAreaDataSet}s with {@link Legend.LegendForm#NONE}; add them to the chart
      * before the HR line so they are drawn behind it.
      */
-    public static List<ILineDataSet> buildZoneAreas(Context ctx,
+    public static List<ILineDataSet<?>> buildZoneAreas(Context ctx,
                                                     HeartRateZones zones,
                                                     List<Entry> hrEntries,
                                                     int chartMax,
                                                     YAxis.AxisDependency axisDependency) {
-        final List<ILineDataSet> areas = new ArrayList<>(5);
+        final List<ILineDataSet<?>> areas = new ArrayList<>(5);
         if (zones == null || hrEntries.isEmpty()) {
             return areas;
         }
         float peak = Float.NEGATIVE_INFINITY;
-        for (final Entry hrEntry : hrEntries) {
+        for (final Entry<?> hrEntry : hrEntries) {
             peak = Math.max(peak, hrEntry.getY());
         }
         for (int z = 1; z <= 5; z++) {
@@ -144,21 +143,20 @@ public final class HeartRateZoneChartUtils {
             for (int i = 0; i < hrEntries.size(); i++) {
                 final Entry hrEntry = hrEntries.get(i);
                 final float clamped = Math.max(bottom, Math.min(hrEntry.getY(), top));
-                entries.add(new Entry(hrEntry.getX(), clamped));
+                entries.add(new Entry<>(hrEntry.getX(), clamped, null, null));
             }
             final ZoneAreaDataSet area = new ZoneAreaDataSet(entries);
             area.setForm(Legend.LegendForm.NONE);
             area.setAxisDependency(axisDependency);
-            area.setDrawCircles(false);
-            area.setDrawValues(false);
+            area.setDrawCirclesEnabled(false);
+            area.setDrawValuesEnabled(false);
             area.setLineWidth(0f);
             area.setColor(Color.TRANSPARENT);
             area.setMode(LineDataSet.Mode.LINEAR);
-            area.setDrawFilled(true);
+            area.setDrawFilledEnabled(true);
             area.setFillColor(HeartRateZonesResolver.colorForZone(ctx, z));
             area.setFillAlpha(0x40);
-            final float fillBottom = bottom;
-            area.setFillFormatter((IFillFormatter) (dataSet, dataProvider) -> fillBottom);
+            area.setFillFormatter((dataSet, dataProvider) -> (float) bottom);
             area.setHighlightEnabled(false);
             areas.add(area);
         }

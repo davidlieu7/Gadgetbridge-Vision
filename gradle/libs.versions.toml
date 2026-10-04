@@ -41,7 +41,7 @@ logback-android = "3.0.0"
 mapsforge = "0.30.0"
 material = "1.14.0"
 mockito = "5.24.0"
-mpandroidchart = "3.1.0"
+mpandroidchart = "v4.0.1"
 vico = "3.3.1"
 msgpack = "0.9.12"
 okhttp = "5.5.0"
@@ -114,7 +114,7 @@ mapsforge-map-reader = { group = "com.github.mapsforge.mapsforge", name = "mapsf
 mapsforge-themes = { group = "com.github.mapsforge.mapsforge", name = "mapsforge-themes", version.ref = "mapsforge" }
 material = { group = "com.google.android.material", name = "material", version.ref = "material" }
 mockito = { group = "org.mockito", name = "mockito-core", version.ref = "mockito" }
-mpandroidchart = { group = "com.github.PhilJay", name = "MPAndroidChart", version.ref = "mpandroidchart" }
+mpandroidchart = { group = "com.github.PhilJay.MPAndroidChart", name = "MPChartLib", version.ref = "mpandroidchart" }
 vico-compose = { group = "com.patrykandpatrick.vico", name = "compose", version.ref = "vico" }
 msgpack = { group = "org.msgpack", name = "msgpack-core", version.ref = "msgpack" }
 okhttp = { group = "com.squareup.okhttp3", name = "okhttp", version.ref = "okhttp" }

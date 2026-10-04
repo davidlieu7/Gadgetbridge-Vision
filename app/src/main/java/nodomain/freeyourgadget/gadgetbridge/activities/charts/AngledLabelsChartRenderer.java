@@ -17,8 +17,11 @@
 package nodomain.freeyourgadget.gadgetbridge.activities.charts;
 
 import android.graphics.Canvas;
+import android.graphics.Paint;
 
 import com.github.mikephil.charting.animation.ChartAnimator;
+import com.github.mikephil.charting.data.Entry;
+import com.github.mikephil.charting.formatter.IValueFormatter;
 import com.github.mikephil.charting.interfaces.dataprovider.BarDataProvider;
 import com.github.mikephil.charting.renderer.BarChartRenderer;
 import com.github.mikephil.charting.utils.ViewPortHandler;
@@ -29,14 +32,26 @@ public class AngledLabelsChartRenderer extends BarChartRenderer {
     }
 
     @Override
-    public void drawValue(Canvas canvas, String valueText, float x, float y, int color) {
-        mValuePaint.setColor(color);
+    public void drawValue(final Canvas canvas, final IValueFormatter formatter, final float value, final Entry<?> entry,
+                          final int dataSetIndex, final float x, final float y, final int color) {
+        drawAngledValue(canvas, formatter.getFormattedValue(value, entry, dataSetIndex, getViewPortHandler()), x, y, color);
+    }
+
+    @Override
+    public void drawValue(final Canvas canvas, final IValueFormatter formatter, final float value, final int stackIndex,
+                          final Entry<?> entry, final int dataSetIndex, final float x, final float y, final int color) {
+        drawAngledValue(canvas, formatter.getStackedFormattedValue(value, stackIndex, entry, dataSetIndex, getViewPortHandler()), x, y, color);
+    }
+
+    private void drawAngledValue(final Canvas canvas, final String valueText, float x, float y, final int color) {
+        final Paint valuePaint = getValuePaint();
+        valuePaint.setColor(color);
         //move position to the center of bar
         x = x + 8;
         y = y - 32;
         canvas.save();
         canvas.rotate(-90, x, y);
-        canvas.drawText(valueText, x, y, mValuePaint);
+        canvas.drawText(valueText, x, y, valuePaint);
         canvas.restore();
     }
 }

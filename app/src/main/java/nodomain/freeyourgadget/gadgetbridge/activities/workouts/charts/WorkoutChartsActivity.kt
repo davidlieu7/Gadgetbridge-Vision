@@ -23,7 +23,7 @@ import com.github.mikephil.charting.data.LineScatterCandleRadarDataSet
 import com.github.mikephil.charting.data.ScatterData
 import com.github.mikephil.charting.data.ScatterDataSet
 import com.github.mikephil.charting.formatter.DefaultAxisValueFormatter
-import com.github.mikephil.charting.formatter.ValueFormatter
+import com.github.mikephil.charting.formatter.IAxisValueFormatter
 import com.google.android.material.chip.Chip
 import com.google.android.material.chip.ChipGroup
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
@@ -66,23 +66,23 @@ class WorkoutChartsActivity : AbstractGBActivity(), MenuProvider {
 
         val chartTextColor = GBApplication.getSecondaryTextColor(context)
         binding.workoutDataChart.xAxis.apply {
-            setDrawLabels(true)
-            setDrawGridLines(false)
-            setDrawLimitLinesBehindData(true)
+            isDrawLabelsEnabled = true
+            isDrawGridLinesEnabled = false
+            isDrawLimitLinesBehindDataEnabled = true
             isEnabled = true
             textColor = chartTextColor
             position = XAxis.XAxisPosition.BOTTOM
             valueFormatter = DurationXLabelFormatter()
         }
         binding.workoutDataChart.axisLeft.apply {
-            setDrawGridLines(false)
-            setDrawTopYLabelEntry(true)
+            isDrawGridLinesEnabled = false
+            isDrawTopYLabelEntryEnabled = true
             textColor = chartTextColor
             isEnabled = true
         }
         binding.workoutDataChart.axisRight.apply {
-            setDrawGridLines(false)
-            setDrawTopYLabelEntry(true)
+            isDrawGridLinesEnabled = false
+            isDrawTopYLabelEntryEnabled = true
             textColor = chartTextColor
             isEnabled = true
         }
@@ -168,7 +168,7 @@ class WorkoutChartsActivity : AbstractGBActivity(), MenuProvider {
         val scatterData = ScatterData()
         // Keyed by dataset label rather than position: a metric split into several
         // segments contributes multiple datasets that all share one label.
-        val markerFormatters = mutableMapOf<String, ValueFormatter?>()
+        val markerFormatters = mutableMapOf<String, IAxisValueFormatter?>()
         val markerUnits = mutableMapOf<String, String?>()
         val legendEntries = mutableListOf<LegendEntry>()
         // Limit lines live on the axis objects and survive a data swap, so clear them before
@@ -180,7 +180,7 @@ class WorkoutChartsActivity : AbstractGBActivity(), MenuProvider {
         var hrAxis: YAxis.AxisDependency? = null
         // Metric lines are collected first, then added AFTER the zone bands so the bands stay in the
         // background and never hide the lines or the other overlays.
-        val metricLineSets = mutableListOf<LineDataSet>()
+        val metricLineSets = mutableListOf<LineDataSet<*>>()
         selectedCharts.forEach { selectedChart ->
             val workoutChart = chartData?.find { it.id == selectedChart } ?: return@forEach
             val axisDependency = if (leftY) YAxis.AxisDependency.LEFT else YAxis.AxisDependency.RIGHT
@@ -192,13 +192,13 @@ class WorkoutChartsActivity : AbstractGBActivity(), MenuProvider {
                 // Zone bands travel inside the HR chart's data; here they are an optional overlay,
                 // added below by addHrZoneOverlay.
                 if (rawDataSet is HeartRateZoneChartUtils.ZoneAreaDataSet) return@forEach
-                val dataSet = rawDataSet as? LineScatterCandleRadarDataSet<Entry> ?: return@forEach
-                dataSet.highLightColor = ContextCompat.getColor(context, R.color.chart_highline_dolor)
+                val dataSet = rawDataSet as? LineScatterCandleRadarDataSet<*> ?: return@forEach
+                dataSet.highlightColor = ContextCompat.getColor(context, R.color.chart_highline_dolor)
                 dataSet.highlightLineWidth = 1f
                 dataSet.axisDependency = axisDependency
                 when (dataSet) {
-                    is LineDataSet -> metricLineSets.add(dataSet)
-                    is ScatterDataSet -> scatterData.addDataSet(dataSet)
+                    is LineDataSet<*> -> metricLineSets.add(dataSet)
+                    is ScatterDataSet<*> -> scatterData.addDataSet(dataSet)
                     else -> return@forEach
                 }
                 // Only the first segment of a gapped series is labelled; ValueMarker resolves the
@@ -237,12 +237,12 @@ class WorkoutChartsActivity : AbstractGBActivity(), MenuProvider {
             val workoutChart = chartData?.find { it.id == selectedChartId } ?: return
             binding.workoutDataChart.axisRight.valueFormatter = workoutChart.chartYLabelFormatter ?: DefaultAxisValueFormatter(0)
         }
-        binding.workoutDataChart.legend.setCustom(legendEntries)
-        combinedData.setData(lineData)
-        combinedData.setData(scatterData)
+        binding.workoutDataChart.legend.entries = legendEntries
+        combinedData.lineData = lineData
+        combinedData.scatterData = scatterData
         binding.workoutDataChart.data = combinedData
         binding.workoutDataChart.marker = ValueMarker(this, combinedData, markerFormatters, markerUnits)
-        binding.workoutDataChart.highlightValues(null)
+        binding.workoutDataChart.highlightValues(emptyList())
         binding.workoutDataChart.invalidate()
     }
 
@@ -256,7 +256,7 @@ class WorkoutChartsActivity : AbstractGBActivity(), MenuProvider {
         val zones = hrChart.zoneThresholds ?: return
         // The HR line is split into one dataset per gap, and the same chart data also holds the
         // zone bands, so gather the entries of every HR segment.
-        val hrEntries = ArrayList<Entry>()
+        val hrEntries = ArrayList<Entry<*>>()
         for (hrDataSet in hrChart.chartData.dataSets) {
             if (hrDataSet is HeartRateZoneChartUtils.ZoneAreaDataSet) continue
             for (i in 0 until hrDataSet.entryCount) {
@@ -273,7 +273,7 @@ class WorkoutChartsActivity : AbstractGBActivity(), MenuProvider {
         } else {
             binding.workoutDataChart.axisRight
         }
-        axisObj.setDrawLimitLinesBehindData(true)
+        axisObj.isDrawLimitLinesBehindDataEnabled = true
         for ((zoneIdx, hr) in listOf(2 to zones.zone2, 3 to zones.zone3, 4 to zones.zone4, 5 to zones.zone5)) {
             if (hr <= 0) continue
             val limit = LimitLine(hr.toFloat())

@@ -16,11 +16,12 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 package nodomain.freeyourgadget.gadgetbridge.activities.charts;
 
-import com.github.mikephil.charting.formatter.ValueFormatter;
+import com.github.mikephil.charting.components.AxisBase;
+import com.github.mikephil.charting.formatter.IAxisValueFormatter;
 
 import java.util.ArrayList;
 
-class PreformattedXIndexLabelFormatter extends ValueFormatter {
+class PreformattedXIndexLabelFormatter implements IAxisValueFormatter {
     private final ArrayList<String> xLabels;
 
     public PreformattedXIndexLabelFormatter(ArrayList<String> xLabels) {
@@ -28,7 +29,7 @@ class PreformattedXIndexLabelFormatter extends ValueFormatter {
     }
 
     @Override
-    public String getFormattedValue(float value) {
+    public String getFormattedValue(final float value, final AxisBase axis) {
         int index = (int) value;
         if (xLabels == null || index >= xLabels.size()) {
             return String.valueOf(value);

@@ -40,8 +40,9 @@ import com.github.mikephil.charting.data.ChartData;
 import com.github.mikephil.charting.data.Entry;
 import com.github.mikephil.charting.data.LineData;
 import com.github.mikephil.charting.data.LineDataSet;
-import com.github.mikephil.charting.formatter.ValueFormatter;
+import com.github.mikephil.charting.formatter.IAxisValueFormatter;
 import com.github.mikephil.charting.interfaces.datasets.ILineDataSet;
+import com.github.mikephil.charting.utils.ViewPortHandler;
 
 import org.apache.commons.lang3.ArrayUtils;
 import org.slf4j.Logger;
@@ -112,15 +113,15 @@ public class SleepPeriodFragment extends SleepFragment<SleepPeriodFragment.MyCha
                 totalDaysForAverage++;
             }
 
-            float[] totalAmounts = getTotalsForActivityAmounts(amounts);
+            final List<Float> totalAmounts = getTotalsForActivityAmounts(amounts);
             int i = 0;
-            deepWeeklyTotal += (long) totalAmounts[i++];
-            lightWeeklyTotal += (long) totalAmounts[i++];
+            deepWeeklyTotal += totalAmounts.get(i++).longValue();
+            lightWeeklyTotal += totalAmounts.get(i++).longValue();
             if (supportsRemSleep(device)) {
-                remWeeklyTotal += (long) totalAmounts[i++];
+                remWeeklyTotal += totalAmounts.get(i++).longValue();
             }
             if (supportsAwakeSleep(device)) {
-                awakeWeeklyTotal += (long) totalAmounts[i++];
+                awakeWeeklyTotal += totalAmounts.get(i++).longValue();
             }
 
             day.add(Calendar.DATE, 1);
@@ -176,33 +177,33 @@ public class SleepPeriodFragment extends SleepFragment<SleepPeriodFragment.MyCha
         weekSleepChart.setBackgroundColor(BACKGROUND_COLOR);
         weekSleepChart.getDescription().setTextColor(DESCRIPTION_COLOR);
         weekSleepChart.getDescription().setText("");
-        weekSleepChart.setFitBars(true);
+        weekSleepChart.setFitBarsEnabled(true);
 
         configureBarLineChartDefaults(weekSleepChart);
 
         XAxis x = weekSleepChart.getXAxis();
-        x.setDrawLabels(true);
-        x.setDrawGridLines(false);
+        x.setDrawLabelsEnabled(true);
+        x.setDrawGridLinesEnabled(false);
         x.setEnabled(true);
         x.setTextColor(CHART_TEXT_COLOR);
-        x.setDrawLimitLinesBehindData(true);
+        x.setDrawLimitLinesBehindDataEnabled(true);
         x.setPosition(XAxis.XAxisPosition.BOTTOM);
 
         YAxis y = weekSleepChart.getAxisLeft();
-        y.setDrawGridLines(false);
-        y.setDrawTopYLabelEntry(false);
+        y.setDrawGridLinesEnabled(false);
+        y.setDrawTopYLabelEntryEnabled(false);
         y.setTextColor(CHART_TEXT_COLOR);
-        y.setDrawZeroLine(true);
+        y.setDrawZeroLineEnabled(true);
         y.setSpaceBottom(0);
         y.setAxisMinimum(0);
         y.setValueFormatter(getYAxisFormatter());
         y.setEnabled(true);
 
         YAxis yAxisRight = weekSleepChart.getAxisRight();
-        yAxisRight.setDrawGridLines(false);
+        yAxisRight.setDrawGridLinesEnabled(false);
         yAxisRight.setEnabled(false);
-        yAxisRight.setDrawLabels(false);
-        yAxisRight.setDrawTopYLabelEntry(false);
+        yAxisRight.setDrawLabelsEnabled(false);
+        yAxisRight.setDrawTopYLabelEntryEnabled(false);
         yAxisRight.setTextColor(CHART_TEXT_COLOR);
 
         if (TOTAL_DAYS > 7) {
@@ -238,7 +239,7 @@ public class SleepPeriodFragment extends SleepFragment<SleepPeriodFragment.MyCha
 
         // The last value is for awake time, which we do not want to include in the "total sleep time"
         final int barIgnoreLast = supportsAwakeSleep(getChartsHost().getDevice()) ? 1 : 0;
-        weekSleepChart.getBarData().setValueFormatter(new BarChartStackedTimeValueFormatter(false, "", 0, barIgnoreLast));
+        weekSleepChart.getBarData().setValueFormatter(new BarChartStackedTimeValueFormatter(barIgnoreLast));
 
         final MySleepWeeklyData sleepWeeklyData = mcd.getSleepWeeklyData();
         final int totalDaysForAverage = sleepWeeklyData.getTotalDaysForAverage();
@@ -300,7 +301,7 @@ public class SleepPeriodFragment extends SleepFragment<SleepPeriodFragment.MyCha
         int totalDaysForAverage = 0;
         List<Entry> sleepScoreEntities = new ArrayList<>();
         final Accumulator sleepScoreAccumulator = new Accumulator();
-        final List<ILineDataSet> sleepScoreDataSets = new ArrayList<>();
+        final List<ILineDataSet<?>> sleepScoreDataSets = new ArrayList<>();
         for (int counter = 0; counter < TOTAL_DAYS; counter++) {
             // Sleep stages
             ActivityAmounts amounts = getActivityAmountsForDay(db, day, device);
@@ -309,7 +310,7 @@ public class SleepPeriodFragment extends SleepFragment<SleepPeriodFragment.MyCha
                 totalDaysForAverage++;
             }
             balance += daily_balance;
-            entries.add(new BarEntry(counter, getTotalsForActivityAmounts(amounts)));
+            entries.add(new BarEntry<>(counter, getTotalsForActivityAmounts(amounts), null, null));
             labels.add(getWeeksChartsLabel(day));
             // Sleep score
             if (supportsSleepScore()) {
@@ -317,7 +318,7 @@ public class SleepPeriodFragment extends SleepFragment<SleepPeriodFragment.MyCha
                 if (!sleepScoreSamples.isEmpty() && sleepScoreSamples.get(sleepScoreSamples.size() - 1).getSleepScore() > 0) {
                     int sleepScore = sleepScoreSamples.get(sleepScoreSamples.size() - 1).getSleepScore();
                     sleepScoreAccumulator.add(sleepScore);
-                    sleepScoreEntities.add(new Entry(counter, sleepScore));
+                    sleepScoreEntities.add(new Entry<>(counter, sleepScore, null, null));
                 } else {
                     if (!sleepScoreEntities.isEmpty()) {
                         List<Entry> clone = new ArrayList<>(sleepScoreEntities.size());
@@ -371,7 +372,7 @@ public class SleepPeriodFragment extends SleepFragment<SleepPeriodFragment.MyCha
         yAxis.setAxisMaximum(Math.max(data.getData().getYMax(), mTargetValue) + 60);
         yAxis.removeAllLimitLines();
 
-        final LimitLine target = new LimitLine(mTargetValue);
+        final LimitLine target = new LimitLine(mTargetValue, "");
         target.setLineWidth(1.5f);
         target.enableDashedLine(15f, 10f, 0f);
         target.setLineColor(getResources().getColor(R.color.chart_deep_sleep_dark));
@@ -381,7 +382,7 @@ public class SleepPeriodFragment extends SleepFragment<SleepPeriodFragment.MyCha
             return;
         }
 
-        final LimitLine average = new LimitLine(data.getAverage());
+        final LimitLine average = new LimitLine(data.getAverage(), "");
         average.setLineWidth(1.5f);
         average.enableDashedLine(15f, 10f, 0f);
         average.setLabel(getString(R.string.average, getAverage(data.getAverage())));
@@ -407,16 +408,16 @@ public class SleepPeriodFragment extends SleepFragment<SleepPeriodFragment.MyCha
         lineDataSet.setLineWidth(2f);
         lineDataSet.setFillAlpha(255);
         lineDataSet.setCircleRadius(5f);
-        lineDataSet.setDrawCircles(true);
-        lineDataSet.setDrawCircleHole(false);
+        lineDataSet.setDrawCirclesEnabled(true);
+        lineDataSet.setDrawCircleHoleEnabled(false);
         lineDataSet.setCircleColor(getResources().getColor(R.color.chart_light_sleep_light));
         lineDataSet.setAxisDependency(YAxis.AxisDependency.LEFT);
-        lineDataSet.setDrawValues(true);
+        lineDataSet.setDrawValuesEnabled(true);
         lineDataSet.setValueTextSize(10f);
         lineDataSet.setValueTextColor(LEGEND_TEXT_COLOR);
-        lineDataSet.setValueFormatter(new ValueFormatter() {
+        lineDataSet.setValueFormatter(new DataSetValueFormatter() {
             @Override
-            public String getFormattedValue(float value) {
+            public String getFormattedValue(final float value, final Entry<?> entry, final int dataSetIndex, final ViewPortHandler viewPortHandler) {
                 return String.format(Locale.ROOT, "%d", (int) value);
             }
         });
@@ -426,10 +427,10 @@ public class SleepPeriodFragment extends SleepFragment<SleepPeriodFragment.MyCha
     private void setupSleepScoreChart() {
         final XAxis xAxisBottom = binding.sleepScoreChart.getXAxis();
         xAxisBottom.setPosition(XAxis.XAxisPosition.BOTTOM);
-        xAxisBottom.setDrawLabels(true);
-        xAxisBottom.setDrawGridLines(false);
+        xAxisBottom.setDrawLabelsEnabled(true);
+        xAxisBottom.setDrawGridLinesEnabled(false);
         xAxisBottom.setEnabled(true);
-        xAxisBottom.setDrawLimitLinesBehindData(true);
+        xAxisBottom.setDrawLimitLinesBehindDataEnabled(true);
         xAxisBottom.setTextColor(CHART_TEXT_COLOR);
         xAxisBottom.setAxisMinimum(0f);
         xAxisBottom.setAxisMaximum(TOTAL_DAYS - 1);
@@ -437,18 +438,18 @@ public class SleepPeriodFragment extends SleepFragment<SleepPeriodFragment.MyCha
         xAxisBottom.setGranularityEnabled(true);
 
         final YAxis yAxisLeft = binding.sleepScoreChart.getAxisLeft();
-        yAxisLeft.setDrawGridLines(true);
+        yAxisLeft.setDrawGridLinesEnabled(true);
         yAxisLeft.setAxisMaximum(100);
         yAxisLeft.setAxisMinimum(0);
-        yAxisLeft.setDrawTopYLabelEntry(true);
+        yAxisLeft.setDrawTopYLabelEntryEnabled(true);
         yAxisLeft.setEnabled(true);
         yAxisLeft.setTextColor(CHART_TEXT_COLOR);
 
         final YAxis yAxisRight = binding.sleepScoreChart.getAxisRight();
         yAxisRight.setEnabled(true);
-        yAxisRight.setDrawLabels(false);
-        yAxisRight.setDrawGridLines(false);
-        yAxisRight.setDrawAxisLine(true);
+        yAxisRight.setDrawLabelsEnabled(false);
+        yAxisRight.setDrawGridLinesEnabled(false);
+        yAxisRight.setDrawAxisLineEnabled(true);
 
         binding.sleepScoreChart.setDoubleTapToZoomEnabled(false);
         binding.sleepScoreChart.getDescription().setEnabled(false);
@@ -462,10 +463,10 @@ public class SleepPeriodFragment extends SleepFragment<SleepPeriodFragment.MyCha
     protected void setupSleepScoreLegend() {
         List<LegendEntry> legendEntries = new ArrayList<>(1);
         LegendEntry sleepScoreValue = new LegendEntry();
-        sleepScoreValue.label = getString(R.string.sleep_score);
-        sleepScoreValue.formColor = getResources().getColor(R.color.chart_light_sleep_light);
+        sleepScoreValue.setLabel(getString(R.string.sleep_score));
+        sleepScoreValue.setFormColor(getResources().getColor(R.color.chart_light_sleep_light));
         legendEntries.add(sleepScoreValue);
-        binding.sleepScoreChart.getLegend().setCustom(legendEntries);
+        binding.sleepScoreChart.getLegend().setEntries(legendEntries);
         binding.sleepScoreChart.getLegend().setTextColor(LEGEND_TEXT_COLOR);
         binding.sleepScoreChart.getLegend().setWordWrapEnabled(true);
         binding.sleepScoreChart.getLegend().setHorizontalAlignment(Legend.LegendHorizontalAlignment.CENTER);
@@ -523,7 +524,7 @@ public class SleepPeriodFragment extends SleepFragment<SleepPeriodFragment.MyCha
             return getString(R.string.no_data);
     }
 
-    float[] getTotalsForActivityAmounts(ActivityAmounts activityAmounts) {
+    List<Float> getTotalsForActivityAmounts(ActivityAmounts activityAmounts) {
         long totalSecondsDeepSleep = 0;
         long totalSecondsLightSleep = 0;
         long totalSecondsRemSleep = 0;
@@ -544,12 +545,14 @@ public class SleepPeriodFragment extends SleepFragment<SleepPeriodFragment.MyCha
         int totalMinutesRemSleep = (int) (totalSecondsRemSleep / 60);
         int totalMinutesAwakeSleep = (int) (totalSecondsAwakeSleep / 60);
 
-        float[] activityAmountsTotals = {totalMinutesDeepSleep, totalMinutesLightSleep};
+        final List<Float> activityAmountsTotals = new ArrayList<>(4);
+        activityAmountsTotals.add((float) totalMinutesDeepSleep);
+        activityAmountsTotals.add((float) totalMinutesLightSleep);
         if (supportsRemSleep(getChartsHost().getDevice())) {
-            activityAmountsTotals = ArrayUtils.add(activityAmountsTotals, totalMinutesRemSleep);
+            activityAmountsTotals.add((float) totalMinutesRemSleep);
         }
         if (supportsAwakeSleep(getChartsHost().getDevice())) {
-            activityAmountsTotals = ArrayUtils.add(activityAmountsTotals, totalMinutesAwakeSleep);
+            activityAmountsTotals.add((float) totalMinutesAwakeSleep);
         }
 
         return activityAmountsTotals;
@@ -573,31 +576,26 @@ public class SleepPeriodFragment extends SleepFragment<SleepPeriodFragment.MyCha
         return labels;
     }
 
-    ValueFormatter getPieValueFormatter() {
-        return new ValueFormatter() {
+    DataSetValueFormatter getPieValueFormatter() {
+        return new DataSetValueFormatter() {
             @Override
-            public String getFormattedValue(float value) {
+            public String getFormattedValue(final float value, final Entry<?> entry, final int dataSetIndex, final ViewPortHandler viewPortHandler) {
                 return formatPieValue((long) value);
             }
         };
     }
 
-    ValueFormatter getBarValueFormatter() {
-        return new ValueFormatter() {
+    DataSetValueFormatter getBarValueFormatter() {
+        return new DataSetValueFormatter() {
             @Override
-            public String getFormattedValue(float value) {
+            public String getFormattedValue(final float value, final Entry<?> entry, final int dataSetIndex, final ViewPortHandler viewPortHandler) {
                 return DateTimeUtils.minutesToHHMM((int) value);
             }
         };
     }
 
-    ValueFormatter getYAxisFormatter() {
-        return new ValueFormatter() {
-            @Override
-            public String getFormattedValue(float value) {
-                return DateTimeUtils.minutesToHHMM((int) value);
-            }
-        };
+    IAxisValueFormatter getYAxisFormatter() {
+        return (value, axis) -> DateTimeUtils.minutesToHHMM((int) value);
     }
 
     int[] getColors() {
@@ -614,7 +612,7 @@ public class SleepPeriodFragment extends SleepFragment<SleepPeriodFragment.MyCha
     @Override
     protected void setupLegend(Chart<?> chart) {
         List<LegendEntry> legendEntries = super.createLegendEntries(chart);
-        chart.getLegend().setCustom(legendEntries);
+        chart.getLegend().setEntries(legendEntries);
 
         chart.getLegend().setTextColor(LEGEND_TEXT_COLOR);
         chart.getLegend().setWordWrapEnabled(true);

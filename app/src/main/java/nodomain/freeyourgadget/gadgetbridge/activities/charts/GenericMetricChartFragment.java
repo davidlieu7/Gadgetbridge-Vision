@@ -39,7 +39,6 @@ import com.github.mikephil.charting.components.YAxis;
 import com.github.mikephil.charting.data.Entry;
 import com.github.mikephil.charting.data.LineData;
 import com.github.mikephil.charting.data.LineDataSet;
-import com.github.mikephil.charting.formatter.ValueFormatter;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -47,6 +46,8 @@ import java.util.Date;
 import java.util.List;
 import java.util.Set;
 
+import com.github.mikephil.charting.formatter.IAxisValueFormatter;
+import com.github.mikephil.charting.utils.ViewPortHandler;
 import com.google.android.material.color.MaterialColors;
 
 import nodomain.freeyourgadget.gadgetbridge.GBApplication;
@@ -131,7 +132,7 @@ public class GenericMetricChartFragment extends AbstractChartFragment<GenericMet
 
     @Override
     protected void renderCharts() {
-        chart.animateX(ANIM_TIME, Easing.EaseInOutQuart);
+        chart.animateX(ANIM_TIME, Easing.INSTANCE.getEaseInOutQuart());
     }
 
     @Override
@@ -299,13 +300,13 @@ public class GenericMetricChartFragment extends AbstractChartFragment<GenericMet
         final XAxis xAxis = chart.getXAxis();
         xAxis.setPosition(XAxis.XAxisPosition.BOTTOM);
         xAxis.setTextColor(chartTextColor);
-        xAxis.setDrawGridLines(false);
-        xAxis.setDrawLabels(true);
-        xAxis.setAvoidFirstLastClipping(true);
+        xAxis.setDrawGridLinesEnabled(false);
+        xAxis.setDrawLabelsEnabled(true);
+        xAxis.setAvoidFirstLastClippingEnabled(true);
 
         final YAxis yAxis = chart.getAxisLeft();
         yAxis.setTextColor(chartTextColor);
-        yAxis.setDrawGridLines(true);
+        yAxis.setDrawGridLinesEnabled(true);
         yAxis.setAxisMinimum(0f);
         yAxis.setAxisMaximum(1f);
     }
@@ -321,7 +322,7 @@ public class GenericMetricChartFragment extends AbstractChartFragment<GenericMet
         for (final MetricSample sample : samples) {
             final int tsSeconds = (int) (sample.getTimestamp() / 1000L);
             final float score = (float) sample.getMetricScore();
-            entries.add(new Entry(tsTranslation.shorten(tsSeconds), score));
+            entries.add(new Entry<>(tsTranslation.shorten(tsSeconds), score, null, null));
             yMin = Math.min(yMin, score);
             yMax = Math.max(yMax, score);
             totalValue += score;
@@ -365,16 +366,16 @@ public class GenericMetricChartFragment extends AbstractChartFragment<GenericMet
         dataSet.setAxisDependency(YAxis.AxisDependency.LEFT);
         dataSet.setColor(lineColor);
         dataSet.setCircleColor(lineColor);
-        dataSet.setDrawCircleHole(false);
+        dataSet.setDrawCircleHoleEnabled(false);
         dataSet.setCircleRadius(entries.size() > 30 ? 2.5f : 4f);
-        dataSet.setDrawCircles(entries.size() <= 60);
-        dataSet.setDrawValues(entries.size() <= 12);
+        dataSet.setDrawCirclesEnabled(entries.size() <= 60);
+        dataSet.setDrawValuesEnabled(entries.size() <= 12);
         dataSet.setLineWidth(2f);
         dataSet.setValueTextColor(textColor);
         dataSet.setValueTextSize(10f);
-        dataSet.setValueFormatter(new ValueFormatter() {
+        dataSet.setValueFormatter(new DataSetValueFormatter() {
             @Override
-            public String getPointLabel(final Entry entry) {
+            public String getFormattedValue(final float value, final Entry<?> entry, final int dataSetIndex, final ViewPortHandler viewPortHandler) {
                 return formatMetricValue(metric, entry.getY(), false);
             }
         });
@@ -410,7 +411,7 @@ public class GenericMetricChartFragment extends AbstractChartFragment<GenericMet
     protected static class GenericMetricChartsData extends ChartsData {
         private final MetricSample.Metric metric;
         private final LineData lineData;
-        private final ValueFormatter xValueFormatter;
+        private final IAxisValueFormatter xValueFormatter;
         private final float xMin;
         private final float xMax;
         private final float yMin;
@@ -418,7 +419,7 @@ public class GenericMetricChartFragment extends AbstractChartFragment<GenericMet
         private final float averageValue;
         private final int sampleCount;
 
-        private GenericMetricChartsData(final MetricSample.Metric metric, final LineData lineData, final ValueFormatter xValueFormatter, final float xMin, final float xMax, final float yMin, final float yMax, final float averageValue, final int sampleCount) {
+        private GenericMetricChartsData(final MetricSample.Metric metric, final LineData lineData, final IAxisValueFormatter xValueFormatter, final float xMin, final float xMax, final float yMin, final float yMax, final float averageValue, final int sampleCount) {
             this.metric = metric;
             this.lineData = lineData;
             this.xValueFormatter = xValueFormatter;

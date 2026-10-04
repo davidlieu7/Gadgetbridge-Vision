@@ -27,13 +27,15 @@ import androidx.annotation.Nullable;
 import com.github.mikephil.charting.animation.Easing;
 import com.github.mikephil.charting.charts.Chart;
 import com.github.mikephil.charting.charts.LineChart;
+import com.github.mikephil.charting.components.AxisBase;
 import com.github.mikephil.charting.components.LimitLine;
 import com.github.mikephil.charting.components.XAxis;
 import com.github.mikephil.charting.components.YAxis;
 import com.github.mikephil.charting.data.Entry;
 import com.github.mikephil.charting.data.LineData;
 import com.github.mikephil.charting.data.LineDataSet;
-import com.github.mikephil.charting.formatter.ValueFormatter;
+import com.github.mikephil.charting.formatter.IAxisValueFormatter;
+import com.github.mikephil.charting.utils.ViewPortHandler;
 
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -123,7 +125,7 @@ public class WeightChartFragment extends AbstractChartFragment<WeightChartFragme
 
     @Override
     protected void renderCharts() {
-        chart.animateX(ANIM_TIME, Easing.EaseInOutQuart);
+        chart.animateX(ANIM_TIME, Easing.INSTANCE.getEaseInOutQuart());
     }
 
     @Override
@@ -133,7 +135,7 @@ public class WeightChartFragment extends AbstractChartFragment<WeightChartFragme
     protected void updateChartsnUIThread(WeightChartsData chartsData) {
         chart.setData(null); // workaround for https://github.com/PhilJay/MPAndroidChart/issues/2317
         chart.getXAxis().setValueFormatter(chartsData.getXValueFormatter());
-        chart.getXAxis().setAvoidFirstLastClipping(true);
+        chart.getXAxis().setAvoidFirstLastClippingEnabled(true);
         chart.setData(chartsData.getData());
         textTimeSpan.setText(DateTimeUtils.formatDaysUntil(totalDays, getTSEnd()));
 
@@ -218,18 +220,18 @@ public class WeightChartFragment extends AbstractChartFragment<WeightChartFragme
         chart.getAxisRight().setEnabled(false);
         chart.setDoubleTapToZoomEnabled(false);
 
-        LimitLine targetLine = new LimitLine(weightFromKg(weightTargetKg));
+        LimitLine targetLine = new LimitLine(weightFromKg(weightTargetKg), "");
         targetLine.setTextColor(colorSecondaryText);
 
         XAxis xAxis = chart.getXAxis();
         xAxis.setTextColor(colorSecondaryText);
-        xAxis.setDrawLabels(true);
-        xAxis.setDrawLimitLinesBehindData(true);
+        xAxis.setDrawLabelsEnabled(true);
+        xAxis.setDrawLimitLinesBehindDataEnabled(true);
 
         YAxis yAxis = chart.getAxisLeft();
         yAxis.setTextColor(colorSecondaryText);
         yAxis.addLimitLine(targetLine);
-        yAxis.setDrawGridLines(true);
+        yAxis.setDrawGridLinesEnabled(true);
 
         refresh();
 
@@ -246,7 +248,7 @@ public class WeightChartFragment extends AbstractChartFragment<WeightChartFragme
             int tsSeconds = (int)(sample.getTimestamp() / 1000L);
             float weight = weightFromKg(sample.getWeightKg());
 
-            entries.add(new Entry(tsTranslation.shorten(tsSeconds), weight));
+            entries.add(new Entry<>(tsTranslation.shorten(tsSeconds), weight, null, null));
         }
 
         LineDataSet dataSet = new LineDataSet(entries, getString(R.string.menuitem_weight));
@@ -254,13 +256,13 @@ public class WeightChartFragment extends AbstractChartFragment<WeightChartFragme
         dataSet.setMode(LineDataSet.Mode.HORIZONTAL_BEZIER);
         dataSet.setCubicIntensity(0.1f);
         dataSet.setCircleRadius(5);
-        dataSet.setDrawCircleHole(false);
-        dataSet.setDrawValues(true);
+        dataSet.setDrawCircleHoleEnabled(false);
+        dataSet.setDrawValuesEnabled(true);
         dataSet.setValueTextSize(10);
         dataSet.setValueTextColor(colorSecondaryText);
-        dataSet.setValueFormatter(new ValueFormatter() {
+        dataSet.setValueFormatter(new DataSetValueFormatter() {
             @Override
-            public String getPointLabel(Entry entry) {
+            public String getFormattedValue(final float value, final Entry<?> entry, final int dataSetIndex, final ViewPortHandler viewPortHandler) {
                 return formatWeight(entry.getY());
             }
         });
@@ -304,7 +306,7 @@ public class WeightChartFragment extends AbstractChartFragment<WeightChartFragme
         }
     }
 
-    private static class DateFormatter extends ValueFormatter {
+    private static class DateFormatter implements IAxisValueFormatter {
         private TimestampTranslation translation;
         private SimpleDateFormat format = new SimpleDateFormat("dd.MM.");
         private Calendar calendar = GregorianCalendar.getInstance();
@@ -314,7 +316,7 @@ public class WeightChartFragment extends AbstractChartFragment<WeightChartFragme
         }
 
         @Override
-        public String getFormattedValue(float value) {
+        public String getFormattedValue(final float value, final AxisBase axis) {
             calendar.clear();
             calendar.setTimeInMillis(translation.toOriginalValue((int)value) * 1000L);
 

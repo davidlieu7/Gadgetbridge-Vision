@@ -42,13 +42,14 @@ import com.github.mikephil.charting.data.CombinedData;
 import com.github.mikephil.charting.data.Entry;
 import com.github.mikephil.charting.data.ScatterData;
 import com.github.mikephil.charting.data.ScatterDataSet;
-import com.github.mikephil.charting.formatter.ValueFormatter;
+import com.github.mikephil.charting.formatter.IAxisValueFormatter;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
@@ -201,9 +202,9 @@ public class Spo2PeriodFragment extends AbstractChartFragment<Spo2PeriodFragment
                 minAccumulator.add(dayData.minimum);
                 maxAccumulator.add(dayData.maximum);
                 // CandleEntry: x, shadowH (high), shadowL (low), open, close
-                candleEntries.add(new CandleEntry(i, dayData.maximum, dayData.minimum, dayData.minimum, dayData.maximum));
+                candleEntries.add(new CandleEntry<>(i, dayData.maximum, dayData.minimum, dayData.minimum, dayData.maximum, null, null));
                 // Scatter entry for daily average
-                avgEntries.add(new Entry(i, dayData.average));
+                avgEntries.add(new Entry<>(i, dayData.average, null, null));
             }
         }
 
@@ -230,16 +231,13 @@ public class Spo2PeriodFragment extends AbstractChartFragment<Spo2PeriodFragment
 
         final String fmt = TOTAL_DAYS == 7 ? "EEE" : "dd";
         SimpleDateFormat formatDay = new SimpleDateFormat(fmt, Locale.getDefault());
-        ValueFormatter formatter = new ValueFormatter() {
-            @Override
-            public String getFormattedValue(float value) {
-                int dayIndex = Math.round(value);
-                if (dayIndex < 0 || dayIndex >= TOTAL_DAYS) {
-                    return "";
-                }
-                int ts = startTs + SEC_PER_DAY * dayIndex;
-                return formatDay.format(new Date(ts * 1000L));
+        IAxisValueFormatter formatter = (value, axis) -> {
+            int dayIndex = Math.round(value);
+            if (dayIndex < 0 || dayIndex >= TOTAL_DAYS) {
+                return "";
             }
+            int ts = startTs + SEC_PER_DAY * dayIndex;
+            return formatDay.format(new Date(ts * 1000L));
         };
         spo2Chart.getXAxis().setValueFormatter(formatter);
 
@@ -252,8 +250,8 @@ public class Spo2PeriodFragment extends AbstractChartFragment<Spo2PeriodFragment
         // Candle data for range bars
         if (!candleEntries.isEmpty()) {
             CandleDataSet candleDataSet = new CandleDataSet(candleEntries, getString(R.string.pref_header_spo2));
-            candleDataSet.setDrawValues(false);
-            candleDataSet.setDrawIcons(false);
+            candleDataSet.setDrawValuesEnabled(false);
+            candleDataSet.setDrawIconsEnabled(false);
             candleDataSet.setAxisDependency(YAxis.AxisDependency.LEFT);
             candleDataSet.setShadowColor(SPO2_COLOR);
             candleDataSet.setShadowWidth(2f);
@@ -264,18 +262,18 @@ public class Spo2PeriodFragment extends AbstractChartFragment<Spo2PeriodFragment
             candleDataSet.setNeutralColor(SPO2_COLOR);
             candleDataSet.setBarSpace(0.15f);
             candleDataSet.setShowCandleBar(true);
-            combinedData.setData(new CandleData(candleDataSet));
+            combinedData.setCandleData(new CandleData(candleDataSet));
         }
 
         // Scatter data for daily average markers
         if (!avgEntries.isEmpty()) {
             ScatterDataSet scatterDataSet = new ScatterDataSet(avgEntries, getString(R.string.hr_average));
             scatterDataSet.setScatterShape(ScatterChart.ScatterShape.CIRCLE);
-            scatterDataSet.setScatterShapeSize(15f);
+            scatterDataSet.setScatterShapeSize(7.5f);
             scatterDataSet.setColor(SPO2_AVG_COLOR);
-            scatterDataSet.setDrawValues(false);
+            scatterDataSet.setDrawValuesEnabled(false);
             scatterDataSet.setAxisDependency(YAxis.AxisDependency.LEFT);
-            combinedData.setData(new ScatterData(scatterDataSet));
+            combinedData.setScatterData(new ScatterData(scatterDataSet));
         }
 
         spo2Chart.setData(combinedData);
@@ -284,23 +282,23 @@ public class Spo2PeriodFragment extends AbstractChartFragment<Spo2PeriodFragment
     private void setupChart() {
         spo2Chart.setBackgroundColor(BACKGROUND_COLOR);
         spo2Chart.getDescription().setEnabled(false);
-        spo2Chart.setDrawOrder(new CombinedChart.DrawOrder[]{
+        spo2Chart.setDrawOrder(Arrays.asList(
                 CombinedChart.DrawOrder.CANDLE,
                 CombinedChart.DrawOrder.SCATTER
-        });
+        ));
 
         if (TOTAL_DAYS <= 7) {
             spo2Chart.setTouchEnabled(false);
-            spo2Chart.setPinchZoom(false);
+            spo2Chart.setPinchZoomEnabled(false);
         }
         spo2Chart.setDoubleTapToZoomEnabled(false);
 
         final XAxis xAxisBottom = spo2Chart.getXAxis();
         xAxisBottom.setPosition(XAxis.XAxisPosition.BOTTOM);
-        xAxisBottom.setDrawLabels(true);
-        xAxisBottom.setDrawGridLines(false);
+        xAxisBottom.setDrawLabelsEnabled(true);
+        xAxisBottom.setDrawGridLinesEnabled(false);
         xAxisBottom.setEnabled(true);
-        xAxisBottom.setDrawLimitLinesBehindData(true);
+        xAxisBottom.setDrawLimitLinesBehindDataEnabled(true);
         xAxisBottom.setTextColor(CHART_TEXT_COLOR);
         xAxisBottom.setGranularity(1f);
         xAxisBottom.setGranularityEnabled(true);
@@ -308,10 +306,10 @@ public class Spo2PeriodFragment extends AbstractChartFragment<Spo2PeriodFragment
         xAxisBottom.setAxisMaximum(TOTAL_DAYS - 0.5f);
 
         final YAxis yAxisLeft = spo2Chart.getAxisLeft();
-        yAxisLeft.setDrawGridLines(true);
+        yAxisLeft.setDrawGridLinesEnabled(true);
         yAxisLeft.setAxisMaximum(100f);
         yAxisLeft.setAxisMinimum(85f);
-        yAxisLeft.setDrawTopYLabelEntry(true);
+        yAxisLeft.setDrawTopYLabelEntryEnabled(true);
         yAxisLeft.setTextColor(CHART_TEXT_COLOR);
         yAxisLeft.setEnabled(true);
         yAxisLeft.setGranularity(5f);
@@ -319,9 +317,9 @@ public class Spo2PeriodFragment extends AbstractChartFragment<Spo2PeriodFragment
 
         final YAxis yAxisRight = spo2Chart.getAxisRight();
         yAxisRight.setEnabled(true);
-        yAxisRight.setDrawLabels(false);
-        yAxisRight.setDrawGridLines(false);
-        yAxisRight.setDrawAxisLine(true);
+        yAxisRight.setDrawLabelsEnabled(false);
+        yAxisRight.setDrawGridLinesEnabled(false);
+        yAxisRight.setDrawAxisLineEnabled(true);
     }
 
     @Override
@@ -329,17 +327,17 @@ public class Spo2PeriodFragment extends AbstractChartFragment<Spo2PeriodFragment
         List<LegendEntry> legendEntries = new ArrayList<>(2);
 
         LegendEntry rangeEntry = new LegendEntry();
-        rangeEntry.label = getString(R.string.pref_header_spo2);
-        rangeEntry.formColor = SPO2_COLOR;
+        rangeEntry.setLabel(getString(R.string.pref_header_spo2));
+        rangeEntry.setFormColor(SPO2_COLOR);
         legendEntries.add(rangeEntry);
 
         LegendEntry avgEntry = new LegendEntry();
-        avgEntry.label = getString(R.string.hr_average);
-        avgEntry.formColor = SPO2_AVG_COLOR;
-        avgEntry.form = Legend.LegendForm.CIRCLE;
+        avgEntry.setLabel(getString(R.string.hr_average));
+        avgEntry.setFormColor(SPO2_AVG_COLOR);
+        avgEntry.setForm(Legend.LegendForm.CIRCLE);
         legendEntries.add(avgEntry);
 
-        spo2Chart.getLegend().setCustom(legendEntries);
+        spo2Chart.getLegend().setEntries(legendEntries);
         spo2Chart.getLegend().setTextColor(LEGEND_TEXT_COLOR);
         spo2Chart.getLegend().setWordWrapEnabled(true);
     }

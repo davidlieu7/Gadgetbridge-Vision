@@ -300,14 +300,14 @@ public class CaloriesDailyFragment extends AbstractChartFragment<CaloriesDailyFr
             final int startTs
     ) {
         final List<Entry> lineEntries = new ArrayList<>();
-        lineEntries.add(new Entry(0f, 0f));
+        lineEntries.add(new Entry<>(0f, 0f, null, null));
 
         int activeCalories = 0;
         for (final ActivitySample sample : samples) {
             if (sample.getActiveCalories() > 0) {
                 activeCalories += sample.getActiveCalories();
             }
-            lineEntries.add(new Entry(sample.getTimestamp() - startTs, activeCalories / 1000));
+            lineEntries.add(new Entry<>(sample.getTimestamp() - startTs, activeCalories / 1000, null, null));
         }
         return new ActiveCaloriesDailyData(activeCalories / 1000, lineEntries);
     }

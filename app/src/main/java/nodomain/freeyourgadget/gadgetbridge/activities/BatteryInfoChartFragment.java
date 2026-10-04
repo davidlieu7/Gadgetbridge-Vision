@@ -32,6 +32,7 @@ import androidx.annotation.NonNull;
 import androidx.core.content.ContextCompat;
 
 import com.github.mikephil.charting.animation.Easing;
+import com.github.mikephil.charting.components.AxisBase;
 import com.github.mikephil.charting.components.Legend;
 import com.github.mikephil.charting.components.XAxis;
 import com.github.mikephil.charting.components.YAxis;
@@ -39,7 +40,8 @@ import com.github.mikephil.charting.data.CombinedData;
 import com.github.mikephil.charting.data.Entry;
 import com.github.mikephil.charting.data.LineData;
 import com.github.mikephil.charting.data.LineDataSet;
-import com.github.mikephil.charting.formatter.ValueFormatter;
+import com.github.mikephil.charting.formatter.DefaultAxisValueFormatter;
+import com.github.mikephil.charting.formatter.IAxisValueFormatter;
 import com.google.android.material.chip.Chip;
 
 import org.slf4j.Logger;
@@ -162,24 +164,24 @@ public class BatteryInfoChartFragment extends AbstractGBFragment {
         binding.batteryChart.setTouchEnabled(true);
         binding.batteryChart.setDragEnabled(true);
         binding.batteryChart.setScaleEnabled(true);
-        binding.batteryChart.setDrawGridBackground(false);
+        binding.batteryChart.setDrawGridBackgroundEnabled(false);
         binding.batteryChart.setHighlightPerDragEnabled(false);
 
         final XAxis x = binding.batteryChart.getXAxis();
-        x.setDrawLabels(true);
-        x.setDrawGridLines(false);
+        x.setDrawLabelsEnabled(true);
+        x.setDrawGridLinesEnabled(false);
         x.setEnabled(true);
         x.setPosition(XAxis.XAxisPosition.BOTTOM);
         x.setTextColor(chartTextColor);
-        x.setAvoidFirstLastClipping(true);
+        x.setAvoidFirstLastClippingEnabled(true);
 
         final YAxis yAxisLeft = binding.batteryChart.getAxisLeft();
         yAxisLeft.setTextColor(chartTextColor);
-        yAxisLeft.setDrawGridLines(true);
+        yAxisLeft.setDrawGridLinesEnabled(true);
 
         final YAxis yAxisRight = binding.batteryChart.getAxisRight();
         yAxisRight.setTextColor(chartTextColor);
-        yAxisRight.setDrawGridLines(false);
+        yAxisRight.setDrawGridLinesEnabled(false);
         yAxisRight.setEnabled(false);
     }
 
@@ -326,12 +328,7 @@ public class BatteryInfoChartFragment extends AbstractGBFragment {
      */
     private void configureRealAxis(final YAxis axis, final BatteryMetric metric, final float min, final float max) {
         axis.setEnabled(true);
-        axis.setValueFormatter(new ValueFormatter() {
-            @Override
-            public String getFormattedValue(final float value) {
-                return formatMetricValue(metric, value, false);
-            }
-        });
+        axis.setValueFormatter((value, axisBase) -> formatMetricValue(metric, value, false));
 
         if (metric == BatteryMetric.LEVEL) {
             // keep the familiar fixed 0-100% range for battery level
@@ -398,7 +395,7 @@ public class BatteryInfoChartFragment extends AbstractGBFragment {
      * one hidden y-axis. This formatter converts a normalized value back to the real one before
      * formatting it, so the tap tooltip always shows real units.
      */
-    private class MetricValueFormatter extends ValueFormatter {
+    private class MetricValueFormatter implements IAxisValueFormatter {
         private final BatteryMetric metric;
         private final float min;
         private final float max;
@@ -412,7 +409,7 @@ public class BatteryInfoChartFragment extends AbstractGBFragment {
         }
 
         @Override
-        public String getFormattedValue(final float value) {
+        public String getFormattedValue(final float value, final AxisBase axis) {
             final float actual = normalized ? denormalize(value) : value;
             return formatMetricValue(metric, actual, false);
         }
@@ -507,7 +504,7 @@ public class BatteryInfoChartFragment extends AbstractGBFragment {
             final boolean normalized = orderedMetrics.size() >= 3;
 
             final List<LineDataSet> dataSets = new ArrayList<>();
-            final Map<String, ValueFormatter> markerFormatters = new HashMap<>();
+            final Map<String, IAxisValueFormatter> markerFormatters = new HashMap<>();
             final Map<String, String> markerUnits = new HashMap<>();
 
             BatteryMetric axisLeftMetric = null;
@@ -547,7 +544,7 @@ public class BatteryInfoChartFragment extends AbstractGBFragment {
                 for (final BatteryMetric.Sample sample : rawSamples) {
                     final float x = tsTranslation.shorten(sample.timestampSeconds());
                     final float y = normalized ? normalize(sample.value(), min, max) : sample.value();
-                    entries.add(new Entry(x, y));
+                    entries.add(new Entry<>(x, y, null, null));
                 }
 
                 final String label = getString(
@@ -561,16 +558,14 @@ public class BatteryInfoChartFragment extends AbstractGBFragment {
                 dataSet.setAxisDependency(axisDependency);
                 dataSet.setColor(metricColor);
                 dataSet.setCircleColor(metricColor);
-                dataSet.setDrawCircleHole(false);
+                dataSet.setDrawCircleHoleEnabled(false);
                 dataSet.setCircleRadius(entries.size() > 30 ? 2.5f : 4f);
-                dataSet.setDrawCircles(entries.size() <= 60);
-                dataSet.setDrawValues(false);
+                dataSet.setDrawCirclesEnabled(entries.size() <= 60);
+                dataSet.setDrawValuesEnabled(false);
                 dataSet.setLineWidth(2f);
                 dataSet.setValueTextColor(textColor);
-                final MetricValueFormatter formatter = new MetricValueFormatter(metric, min, max, normalized);
-                dataSet.setValueFormatter(formatter);
                 dataSets.add(dataSet);
-                markerFormatters.put(label, formatter);
+                markerFormatters.put(label, new MetricValueFormatter(metric, min, max, normalized));
                 markerUnits.put(label, null);
             }
 
@@ -594,7 +589,7 @@ public class BatteryInfoChartFragment extends AbstractGBFragment {
             final YAxis yAxisRight = binding.batteryChart.getAxisRight();
             if (normalized || !hasAnyData) {
                 yAxisLeft.setEnabled(!normalized);
-                yAxisLeft.setValueFormatter(null);
+                yAxisLeft.setValueFormatter(new DefaultAxisValueFormatter(0));
                 yAxisLeft.setAxisMinimum(normalized ? -5f : 0f);
                 yAxisLeft.setAxisMaximum(normalized ? 105f : 1f);
                 yAxisRight.setEnabled(false);
@@ -612,12 +607,12 @@ public class BatteryInfoChartFragment extends AbstractGBFragment {
                 lineData.addDataSet(dataSet);
             }
             final CombinedData combinedData = new CombinedData();
-            combinedData.setData(lineData);
+            combinedData.setLineData(lineData);
 
             binding.batteryChart.setData(null); // workaround for https://github.com/PhilJay/MPAndroidChart/issues/2317
             binding.batteryChart.setData(combinedData);
             binding.batteryChart.setMarker(new ValueMarker(requireContext(), combinedData, markerFormatters, markerUnits));
-            binding.batteryChart.animateX(500, Easing.EaseInOutQuart);
+            binding.batteryChart.animateX(500, Easing.INSTANCE.getEaseInOutQuart());
             binding.batteryChart.invalidate();
         }
 

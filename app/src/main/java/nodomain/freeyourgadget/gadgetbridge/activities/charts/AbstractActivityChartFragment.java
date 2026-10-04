@@ -25,7 +25,7 @@ import com.github.mikephil.charting.components.YAxis;
 import com.github.mikephil.charting.data.Entry;
 import com.github.mikephil.charting.data.LineData;
 import com.github.mikephil.charting.data.LineDataSet;
-import com.github.mikephil.charting.formatter.ValueFormatter;
+import com.github.mikephil.charting.formatter.IAxisValueFormatter;
 import com.github.mikephil.charting.interfaces.datasets.ILineDataSet;
 
 import org.apache.commons.lang3.NotImplementedException;
@@ -220,7 +220,7 @@ public abstract class AbstractActivityChartFragment<D extends ChartsData> extend
 
         if (samples.isEmpty()) {
             lineData = new LineData();
-            ValueFormatter xValueFormatter = new SampleXLabelFormatter(tsTranslation, "HH:mm");
+            IAxisValueFormatter xValueFormatter = new SampleXLabelFormatter(tsTranslation, "HH:mm");
             return new DefaultChartsData<>(lineData, xValueFormatter);
         }
 
@@ -274,7 +274,7 @@ public abstract class AbstractActivityChartFragment<D extends ChartsData> extend
 
         boolean hr = supportsHeartrate(gbDevice);
         final List<Entry> heartRateLineEntries = new ArrayList<>();
-        final List<ILineDataSet> heartRateDataSets = new ArrayList<>();
+        final List<ILineDataSet<?>> heartRateDataSets = new ArrayList<>();
         int lastTsShorten = 0;
         HeartRateUtils heartRateUtilsInstance = HeartRateUtils.getInstance();
 
@@ -284,7 +284,7 @@ public abstract class AbstractActivityChartFragment<D extends ChartsData> extend
                 if (sample.getKind() != ActivityKind.NOT_WORN && heartRateUtilsInstance.isValidHeartRateValue(sample.getHeartRate())) {
                     int tsShorten = tsTranslation.shorten(sample.getTimestamp());
                     if (lastTsShorten == 0 || (tsShorten - lastTsShorten) <= 60 * gbDevice.getDeviceCoordinator().getMaxHeartRateMeasurementsGapMinutes(gbDevice)) {
-                        heartRateLineEntries.add(new Entry(tsShorten, sample.getHeartRate()));
+                        heartRateLineEntries.add(new Entry<>(tsShorten, sample.getHeartRate(), null, null));
                     } else {
                         if (!heartRateLineEntries.isEmpty()) {
                             List<Entry> clone = new ArrayList<>(heartRateLineEntries.size());
@@ -294,7 +294,7 @@ public abstract class AbstractActivityChartFragment<D extends ChartsData> extend
                         }
                     }
                     lastTsShorten = tsShorten;
-                    heartRateLineEntries.add(new Entry(tsShorten, sample.getHeartRate()));
+                    heartRateLineEntries.add(new Entry<>(tsShorten, sample.getHeartRate(), null, null));
                 }
             }
         }
@@ -303,7 +303,7 @@ public abstract class AbstractActivityChartFragment<D extends ChartsData> extend
         }
 
         // convert Entry Lists to Datasets
-        List<ILineDataSet> lineDataSets = new ArrayList<>();
+        List<ILineDataSet<?>> lineDataSets = new ArrayList<>();
 
         lineDataSets.add(createDataSet(
                 entries.get(getIndexOfActivity(ActivityKind.ACTIVITY)), akActivity.color, "Activity"
@@ -334,7 +334,7 @@ public abstract class AbstractActivityChartFragment<D extends ChartsData> extend
 
         lineData = new LineData(lineDataSets);
 
-        ValueFormatter xValueFormatter = new SampleXLabelFormatter(tsTranslation, "HH:mm");
+        IAxisValueFormatter xValueFormatter = new SampleXLabelFormatter(tsTranslation, "HH:mm");
         return new DefaultChartsData<>(lineData, xValueFormatter);
     }
 
@@ -376,17 +376,17 @@ public abstract class AbstractActivityChartFragment<D extends ChartsData> extend
     }
 
     protected Entry createLineEntry(float value, int xValue) {
-        return new Entry(xValue, value);
+        return new Entry<>(xValue, value, null, null);
     }
 
     protected LineDataSet createDataSet(List<Entry> values, Integer color, String label) {
         LineDataSet set1 = new LineDataSet(values, label);
         set1.setColor(color);
-        set1.setDrawFilled(true);
-        set1.setDrawCircles(false);
+        set1.setDrawFilledEnabled(true);
+        set1.setDrawCirclesEnabled(false);
         set1.setFillColor(color);
         set1.setFillAlpha(255);
-        set1.setDrawValues(false);
+        set1.setDrawValuesEnabled(false);
         set1.setValueTextColor(CHART_TEXT_COLOR);
         set1.setAxisDependency(YAxis.AxisDependency.LEFT);
         return set1;
@@ -398,8 +398,8 @@ public abstract class AbstractActivityChartFragment<D extends ChartsData> extend
         set1.setColor(HEARTRATE_COLOR);
         set1.setMode(LineDataSet.Mode.HORIZONTAL_BEZIER);
         set1.setCubicIntensity(0.1f);
-        set1.setDrawCircles(false);
-        set1.setDrawValues(true);
+        set1.setDrawCirclesEnabled(false);
+        set1.setDrawValuesEnabled(true);
         set1.setValueTextColor(CHART_TEXT_COLOR);
         set1.setAxisDependency(YAxis.AxisDependency.RIGHT);
         return set1;

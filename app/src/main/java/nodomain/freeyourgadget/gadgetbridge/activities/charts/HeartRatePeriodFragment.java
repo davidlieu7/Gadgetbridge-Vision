@@ -22,7 +22,7 @@ import com.github.mikephil.charting.components.YAxis;
 import com.github.mikephil.charting.data.Entry;
 import com.github.mikephil.charting.data.LineData;
 import com.github.mikephil.charting.data.LineDataSet;
-import com.github.mikephil.charting.formatter.ValueFormatter;
+import com.github.mikephil.charting.formatter.IAxisValueFormatter;
 import com.github.mikephil.charting.interfaces.datasets.ILineDataSet;
 
 import org.apache.commons.lang3.tuple.Pair;
@@ -200,24 +200,24 @@ public class HeartRatePeriodFragment extends AbstractChartFragment<HeartRatePeri
         hrLineChart.getDescription().setEnabled(false);
 
         XAxis x = hrLineChart.getXAxis();
-        x.setDrawLabels(true);
-        x.setDrawGridLines(false);
+        x.setDrawLabelsEnabled(true);
+        x.setDrawGridLinesEnabled(false);
         x.setEnabled(true);
         x.setTextColor(CHART_TEXT_COLOR);
-        x.setDrawLimitLinesBehindData(true);
+        x.setDrawLimitLinesBehindDataEnabled(true);
         x.setPosition(XAxis.XAxisPosition.BOTTOM);
 
         YAxis yAxisLeft = hrLineChart.getAxisLeft();
         yAxisLeft.setEnabled(true);
         YAxis yAxisRight = hrLineChart.getAxisRight();
-        yAxisRight.setDrawLabels(true);
+        yAxisRight.setDrawLabelsEnabled(true);
 
         YAxis[] yAxisArr = {yAxisLeft, yAxisRight};
         for (YAxis y : yAxisArr) {
             y.setAxisMaximum(HeartRateUtils.getInstance().getMaxHeartRate());
             y.setAxisMinimum(HeartRateUtils.getInstance().getMinHeartRate());
-            y.setDrawGridLines(false);
-            y.setDrawTopYLabelEntry(true);
+            y.setDrawGridLinesEnabled(false);
+            y.setDrawTopYLabelEntryEnabled(true);
             y.setTextColor(CHART_TEXT_COLOR);
         }
 
@@ -230,38 +230,38 @@ public class HeartRatePeriodFragment extends AbstractChartFragment<HeartRatePeri
 
         if (TOTAL_DAYS == 1) {
             LegendEntry hrEntry = new LegendEntry();
-            hrEntry.label = getTitle();
-            hrEntry.formColor = HEARTRATE_COLOR;
+            hrEntry.setLabel(getTitle());
+            hrEntry.setFormColor(HEARTRATE_COLOR);
             legendEntries.add(hrEntry);
         } else {
             LegendEntry hrMinEntry = new LegendEntry();
-            hrMinEntry.label = getString(R.string.hr_minimum);
-            hrMinEntry.formColor = HEARTRATE_MIN_COLOR;
+            hrMinEntry.setLabel(getString(R.string.hr_minimum));
+            hrMinEntry.setFormColor(HEARTRATE_MIN_COLOR);
             legendEntries.add(hrMinEntry);
         }
 
         if (supportsHeartRateRestingMeasurement() && TOTAL_DAYS != 1) {
             LegendEntry hrRestingEntry = new LegendEntry();
-            hrRestingEntry.label = getString(R.string.hr_resting);
-            hrRestingEntry.formColor = HEARTRATE_RESTING_COLOR;
+            hrRestingEntry.setLabel(getString(R.string.hr_resting));
+            hrRestingEntry.setFormColor(HEARTRATE_RESTING_COLOR);
             legendEntries.add(hrRestingEntry);
         }
 
         if (GBApplication.getPrefs().getBoolean("charts_show_average", true)) {
             LegendEntry hrAverageEntry = new LegendEntry();
-            hrAverageEntry.label = getString(R.string.hr_average);
-            hrAverageEntry.formColor = TOTAL_DAYS != 1 ? HEARTRATE_COLOR : Color.RED;
+            hrAverageEntry.setLabel(getString(R.string.hr_average));
+            hrAverageEntry.setFormColor(TOTAL_DAYS != 1 ? HEARTRATE_COLOR : Color.RED);
             legendEntries.add(hrAverageEntry);
         }
 
         if (TOTAL_DAYS != 1) {
             LegendEntry hrMaxEntry = new LegendEntry();
-            hrMaxEntry.label = getString(R.string.hr_maximum);
-            hrMaxEntry.formColor = HEARTRATE_MAX_COLOR;
+            hrMaxEntry.setLabel(getString(R.string.hr_maximum));
+            hrMaxEntry.setFormColor(HEARTRATE_MAX_COLOR);
             legendEntries.add(hrMaxEntry);
         }
 
-        chart.getLegend().setCustom(legendEntries);
+        chart.getLegend().setEntries(legendEntries);
         chart.getLegend().setTextColor(LEGEND_TEXT_COLOR);
         chart.getLegend().setWordWrapEnabled(true);
     }
@@ -271,8 +271,8 @@ public class HeartRatePeriodFragment extends AbstractChartFragment<HeartRatePeri
         dataSet.setLineWidth(1.5f);
         dataSet.setMode(LineDataSet.Mode.HORIZONTAL_BEZIER);
         dataSet.setCubicIntensity(0.1f);
-        dataSet.setDrawCircles(false);
-        dataSet.setDrawValues(true);
+        dataSet.setDrawCirclesEnabled(false);
+        dataSet.setDrawValuesEnabled(true);
         dataSet.setAxisDependency(YAxis.AxisDependency.RIGHT);
         dataSet.setColor(color);
         dataSet.setValueTextColor(TEXT_COLOR);
@@ -362,7 +362,7 @@ public class HeartRatePeriodFragment extends AbstractChartFragment<HeartRatePeri
         final TimestampTranslation tsTranslation = new TimestampTranslation();
         tsTranslation.shorten(startTs);
 
-        final List<ILineDataSet> lineDataSets = new ArrayList<>();
+        final List<ILineDataSet<?>> lineDataSets = new ArrayList<>();
         int lastTs = 0;
         for (int i = 0; i < samples.size(); i++) {
             final ActivitySample sample = samples.get(i);
@@ -372,7 +372,7 @@ public class HeartRatePeriodFragment extends AbstractChartFragment<HeartRatePeri
             final int ts = sample.getTimestamp();
             final int shortTs = tsTranslation.shorten(ts);
             if (lastTs == 0 || (ts - lastTs) <= 60 * maxHRGapMinutes) {
-                lineEntries.add(new Entry(shortTs, sample.getHeartRate()));
+                lineEntries.add(new Entry<>(shortTs, sample.getHeartRate(), null, null));
             } else {
                 if (!lineEntries.isEmpty()) {
                     List<Entry> clone = new ArrayList<>(lineEntries.size());
@@ -380,7 +380,7 @@ public class HeartRatePeriodFragment extends AbstractChartFragment<HeartRatePeri
                     lineDataSets.add(createHeartRateDataSet(clone, HEARTRATE_COLOR));
                     lineEntries.clear();
                 }
-                lineEntries.add(new Entry(shortTs, sample.getHeartRate()));
+                lineEntries.add(new Entry<>(shortTs, sample.getHeartRate(), null, null));
             }
             lastTs = ts;
         }
@@ -395,7 +395,7 @@ public class HeartRatePeriodFragment extends AbstractChartFragment<HeartRatePeri
         hrLineChart.getAxisLeft().removeAllLimitLines();
 
         if (data.average > 0 && GBApplication.getPrefs().getBoolean("charts_show_average", true)) {
-            final LimitLine averageLine = new LimitLine(data.average);
+            final LimitLine averageLine = new LimitLine(data.average, "");
             averageLine.setLineWidth(1.5f);
             averageLine.enableDashedLine(15f, 10f, 0f);
             averageLine.setLineColor(Color.RED);
@@ -427,32 +427,29 @@ public class HeartRatePeriodFragment extends AbstractChartFragment<HeartRatePeri
             final HeartRateData hrData = samples.get(i);
             if (hrData.average > 0) {
                 avgAccumulator.add(hrData.average);
-                avgLineData.add(new Entry(i, hrData.average));
+                avgLineData.add(new Entry<>(i, hrData.average, null, null));
             }
             if (hrData.minimum > 0) {
                 minAccumulator.add(hrData.minimum);
-                minLineData.add(new Entry(i, hrData.minimum));
+                minLineData.add(new Entry<>(i, hrData.minimum, null, null));
             }
             if (hrData.maximum > 0) {
                 maxAccumulator.add(hrData.maximum);
-                maxLineData.add(new Entry(i, hrData.maximum));
+                maxLineData.add(new Entry<>(i, hrData.maximum, null, null));
             }
             if (hrData.restingHeartRate > 0) {
                 restingAccumulator.add(hrData.restingHeartRate);
-                restingLineData.add(new Entry(i, hrData.restingHeartRate));
+                restingLineData.add(new Entry<>(i, hrData.restingHeartRate, null, null));
             }
         }
 
         final String fmt = TOTAL_DAYS == 7 ? "EEE" : "dd";
         SimpleDateFormat formatDay = new SimpleDateFormat(fmt, Locale.getDefault());
-        ValueFormatter formatter = new ValueFormatter() {
-            @Override
-            public String getFormattedValue(float value) {
-                Calendar day = Calendar.getInstance();
-                day.setTimeInMillis(startTs * 1000L);
-                day.add(Calendar.DATE, (int) value);
-                return formatDay.format(day.getTime());
-            }
+        IAxisValueFormatter formatter = (value, axis) -> {
+            final Calendar day = Calendar.getInstance();
+            day.setTimeInMillis(startTs * 1000L);
+            day.add(Calendar.DATE, (int) value);
+            return formatDay.format(day.getTime());
         };
         hrLineChart.getXAxis().setValueFormatter(formatter);
 
@@ -462,7 +459,7 @@ public class HeartRatePeriodFragment extends AbstractChartFragment<HeartRatePeri
         final int restingAvg = restingAccumulator.getCount() > 0 ? (int) Math.round(restingAccumulator.getAverage()) : DATA_INVALID;
         setStatistics(average, minimum, maximum, restingAvg);
 
-        List<ILineDataSet> dataSets = new ArrayList<>();
+        List<ILineDataSet<?>> dataSets = new ArrayList<>();
         if (GBApplication.getPrefs().getBoolean("charts_show_average", true)) {
             dataSets.add(createHeartRateDataSet(avgLineData, HEARTRATE_COLOR));
         }

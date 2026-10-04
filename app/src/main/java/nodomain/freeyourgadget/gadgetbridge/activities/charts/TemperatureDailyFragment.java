@@ -132,11 +132,11 @@ public class TemperatureDailyFragment extends AbstractChartFragment<TemperatureD
 
 
         XAxis x = tempLineChart.getXAxis();
-        x.setDrawLabels(true);
-        x.setDrawGridLines(false);
+        x.setDrawLabelsEnabled(true);
+        x.setDrawGridLinesEnabled(false);
         x.setEnabled(true);
         x.setTextColor(CHART_TEXT_COLOR);
-        x.setDrawLimitLinesBehindData(true);
+        x.setDrawLimitLinesBehindDataEnabled(true);
         x.setPosition(XAxis.XAxisPosition.BOTTOM);
         x.setAxisMinimum(0f);
         x.setAxisMaximum(86400f);
@@ -146,17 +146,17 @@ public class TemperatureDailyFragment extends AbstractChartFragment<TemperatureD
         final float defaultAxisMaximum = isMetric ? 45f : (float) TemperatureUtils.celsiusToFahrenheit(45d);
 
         YAxis y = tempLineChart.getAxisLeft();
-        y.setDrawGridLines(false);
-        y.setDrawTopYLabelEntry(true);
+        y.setDrawGridLinesEnabled(false);
+        y.setDrawTopYLabelEntryEnabled(true);
         y.setTextColor(CHART_TEXT_COLOR);
         y.setEnabled(true);
         y.setAxisMaximum(defaultAxisMaximum);
         y.setAxisMinimum(defaultAxisMinimum);
 
         YAxis yAxisRight = tempLineChart.getAxisRight();
-        yAxisRight.setDrawGridLines(false);
-        yAxisRight.setDrawLabels(true);
-        yAxisRight.setDrawTopYLabelEntry(true);
+        yAxisRight.setDrawGridLinesEnabled(false);
+        yAxisRight.setDrawLabelsEnabled(true);
+        yAxisRight.setDrawTopYLabelEntryEnabled(true);
         yAxisRight.setTextColor(CHART_TEXT_COLOR);
         yAxisRight.setAxisMaximum(defaultAxisMaximum);
         yAxisRight.setAxisMinimum(defaultAxisMinimum);
@@ -168,18 +168,18 @@ public class TemperatureDailyFragment extends AbstractChartFragment<TemperatureD
     protected void setupLegend(Chart<?> chart) {
         List<LegendEntry> legendEntries = new ArrayList<>(1);
         LegendEntry dataEntry = new LegendEntry();
-        dataEntry.label = getTitle();
-        dataEntry.formColor = TEMPERATURE_COLOR;
+        dataEntry.setLabel(getTitle());
+        dataEntry.setFormColor(TEMPERATURE_COLOR);
         legendEntries.add(dataEntry);
 
         if (GBApplication.getPrefs().getBoolean("charts_show_average", true)) {
             LegendEntry dataAverageEntry = new LegendEntry();
-            dataAverageEntry.label = getString(R.string.hr_average);
-            dataAverageEntry.formColor = Color.CYAN;
+            dataAverageEntry.setLabel(getString(R.string.hr_average));
+            dataAverageEntry.setFormColor(Color.CYAN);
             legendEntries.add(dataAverageEntry);
         }
 
-        chart.getLegend().setCustom(legendEntries);
+        chart.getLegend().setEntries(legendEntries);
         chart.getLegend().setTextColor(LEGEND_TEXT_COLOR);
         chart.getLegend().setWordWrapEnabled(true);
     }
@@ -201,7 +201,7 @@ public class TemperatureDailyFragment extends AbstractChartFragment<TemperatureD
             final float temperatureValue = temperatureUnit == TemperatureUnit.CELSIUS ?
                     sample.getTemperature() :
                     (float) TemperatureUtils.celsiusToFahrenheit(sample.getTemperature());
-            lineEntries.add(new Entry(tsTranslation.shorten(timestamp_in_seconds), temperatureValue));
+            lineEntries.add(new Entry<>(tsTranslation.shorten(timestamp_in_seconds), temperatureValue, null, null));
             accumulator.add(temperatureValue);
         }
 
@@ -209,8 +209,8 @@ public class TemperatureDailyFragment extends AbstractChartFragment<TemperatureD
         dataSet.setLineWidth(1.5f);
         dataSet.setMode(LineDataSet.Mode.HORIZONTAL_BEZIER);
         dataSet.setCubicIntensity(0.1f);
-        dataSet.setDrawCircles(false);
-        dataSet.setDrawValues(true);
+        dataSet.setDrawCirclesEnabled(false);
+        dataSet.setDrawValuesEnabled(true);
         dataSet.setAxisDependency(YAxis.AxisDependency.RIGHT);
         dataSet.setColor(TEMPERATURE_COLOR);
         dataSet.setValueTextColor(CHART_TEXT_COLOR);
@@ -244,7 +244,7 @@ public class TemperatureDailyFragment extends AbstractChartFragment<TemperatureD
         tempLineChart.getAxisLeft().removeAllLimitLines();
 
         if (average > 0 && GBApplication.getPrefs().getBoolean("charts_show_average", true)) {
-            final LimitLine averageLine = new LimitLine((float) average);
+            final LimitLine averageLine = new LimitLine((float) average, "");
             averageLine.setLineWidth(1.5f);
             averageLine.enableDashedLine(15f, 10f, 0f);
             averageLine.setLineColor(Color.CYAN);

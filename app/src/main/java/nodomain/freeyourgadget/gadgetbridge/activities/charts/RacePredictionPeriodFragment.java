@@ -35,10 +35,11 @@ import com.github.mikephil.charting.components.YAxis;
 import com.github.mikephil.charting.data.Entry;
 import com.github.mikephil.charting.data.LineData;
 import com.github.mikephil.charting.data.LineDataSet;
-import com.github.mikephil.charting.formatter.ValueFormatter;
+import com.github.mikephil.charting.formatter.IAxisValueFormatter;
 import com.github.mikephil.charting.interfaces.datasets.ILineDataSet;
 import com.github.mikephil.charting.listener.ChartTouchListener;
 import com.github.mikephil.charting.listener.OnChartGestureListener;
+import com.github.mikephil.charting.utils.ViewPortHandler;
 import com.google.android.material.chip.Chip;
 import com.google.android.material.chip.ChipGroup;
 import com.google.android.material.color.MaterialColors;
@@ -193,7 +194,7 @@ public class RacePredictionPeriodFragment extends AbstractChartFragment<RacePred
     private void setupRaceChart() {
         raceChart.getDescription().setEnabled(false);
         raceChart.getLegend().setEnabled(false);
-        raceChart.setMaxVisibleValueCount(Integer.MAX_VALUE);
+        raceChart.setMaxVisibleCount(Integer.MAX_VALUE);
         raceChart.setScaleXEnabled(true);
         raceChart.setScaleYEnabled(false);
         raceChart.setDragEnabled(true);
@@ -238,19 +239,14 @@ public class RacePredictionPeriodFragment extends AbstractChartFragment<RacePred
 
         final XAxis xAxis = raceChart.getXAxis();
         xAxis.setPosition(XAxis.XAxisPosition.BOTTOM);
-        xAxis.setDrawGridLines(false);
+        xAxis.setDrawGridLinesEnabled(false);
         xAxis.setTextColor(CHART_TEXT_COLOR);
         xAxis.setGranularity(1f);
 
         final YAxis yAxisLeft = raceChart.getAxisLeft();
-        yAxisLeft.setDrawGridLines(true);
+        yAxisLeft.setDrawGridLinesEnabled(true);
         yAxisLeft.setTextColor(CHART_TEXT_COLOR);
-        yAxisLeft.setValueFormatter(new ValueFormatter() {
-            @Override
-            public String getFormattedValue(final float value) {
-                return formatSeconds(value);
-            }
-        });
+        yAxisLeft.setValueFormatter((value, axis) -> formatSeconds(value));
 
         final YAxis yAxisRight = raceChart.getAxisRight();
         yAxisRight.setEnabled(false);
@@ -317,7 +313,7 @@ public class RacePredictionPeriodFragment extends AbstractChartFragment<RacePred
         final List<Entry> entries = new ArrayList<>();
         for (final RacePredictionDay raceDay : data.days) {
             if (raceDay.value != null) {
-                entries.add(new Entry(raceDay.i, raceDay.value.floatValue()));
+                entries.add(new Entry<>(raceDay.i, raceDay.value.floatValue(), null, null));
             }
         }
 
@@ -384,16 +380,16 @@ public class RacePredictionPeriodFragment extends AbstractChartFragment<RacePred
         dataSet.setAxisDependency(YAxis.AxisDependency.LEFT);
         dataSet.setColor(LINE_COLOR);
         dataSet.setCircleColor(LINE_COLOR);
-        dataSet.setDrawCircleHole(false);
+        dataSet.setDrawCircleHoleEnabled(false);
         dataSet.setCircleRadius(4f);
-        dataSet.setDrawCircles(true);
+        dataSet.setDrawCirclesEnabled(true);
         dataSet.setLineWidth(2f);
         dataSet.setValueTextColor(TEXT_COLOR);
         dataSet.setValueTextSize(10f);
-        dataSet.setDrawValues(true);
-        dataSet.setValueFormatter(new ValueFormatter() {
+        dataSet.setDrawValuesEnabled(true);
+        dataSet.setValueFormatter(new DataSetValueFormatter() {
             @Override
-            public String getPointLabel(final Entry entry) {
+            public String getFormattedValue(final float value, final Entry<?> entry, final int dataSetIndex, final ViewPortHandler viewPortHandler) {
                 return labeledEntries.contains(entry) ? formatSeconds(entry.getY()) : "";
             }
         });
@@ -419,7 +415,7 @@ public class RacePredictionPeriodFragment extends AbstractChartFragment<RacePred
             highestVisibleX = raceChart.getHighestVisibleX();
         }
 
-        float contentWidthPx = raceChart.getViewPortHandler().contentWidth();
+        float contentWidthPx = raceChart.getViewPortHandler().getContentWidth();
         if (contentWidthPx <= 0) {
             // The view itself may also not have been laid out yet on a first load.
             contentWidthPx = getResources().getDisplayMetrics().widthPixels - ESTIMATED_Y_AXIS_WIDTH_DP * density;
@@ -468,15 +464,12 @@ public class RacePredictionPeriodFragment extends AbstractChartFragment<RacePred
         return String.format(Locale.ROOT, "%02d:%02d", minutes, secs);
     }
 
-    private ValueFormatter getDayValueFormatter(final RacePredictionData data) {
-        return new ValueFormatter() {
-            @Override
-            public String getFormattedValue(final float value) {
-                final RacePredictionDay raceDay = data.getDay((int) value);
-                final String pattern = totalDays > 7 ? "dd/MM" : "EEE";
-                final SimpleDateFormat format = new SimpleDateFormat(pattern, Locale.getDefault());
-                return format.format(new Date(raceDay.day.getTimeInMillis()));
-            }
+    private IAxisValueFormatter getDayValueFormatter(final RacePredictionData data) {
+        return (value, axis) -> {
+            final RacePredictionDay raceDay = data.getDay((int) value);
+            final String pattern = totalDays > 7 ? "dd/MM" : "EEE";
+            final SimpleDateFormat format = new SimpleDateFormat(pattern, Locale.getDefault());
+            return format.format(new Date(raceDay.day.getTimeInMillis()));
         };
     }
 

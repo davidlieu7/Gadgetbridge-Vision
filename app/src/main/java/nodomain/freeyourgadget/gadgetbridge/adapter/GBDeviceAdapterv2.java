@@ -1548,6 +1548,7 @@ public class GBDeviceAdapterv2 extends ListAdapter<GBDevice, GBDeviceAdapterv2.V
     private void setUpChart(PieChart DashboardChart) {
         DashboardChart.setTouchEnabled(false);
         DashboardChart.setNoDataText("");
+        DashboardChart.setNoDataIconEnabled(false);
         DashboardChart.getLegend().setEnabled(false);
         DashboardChart.setDrawHoleEnabled(true);
         DashboardChart.setHoleColor(Color.WHITE);
@@ -1556,7 +1557,7 @@ public class GBDeviceAdapterv2 extends ListAdapter<GBDevice, GBDeviceAdapterv2.V
         DashboardChart.setTransparentCircleAlpha(110);
         DashboardChart.setHoleRadius(70f);
         DashboardChart.setTransparentCircleRadius(75f);
-        DashboardChart.setDrawCenterText(true);
+        DashboardChart.setDrawCenterTextEnabled(true);
         DashboardChart.setRotationEnabled(true);
         DashboardChart.setHighlightPerTapEnabled(true);
         DashboardChart.setCenterTextOffset(0, 0);
@@ -1566,10 +1567,10 @@ public class GBDeviceAdapterv2 extends ListAdapter<GBDevice, GBDeviceAdapterv2.V
         final String CHART_COLOR_END = "#2ecc71";
 
         ArrayList<PieEntry> entries = new ArrayList<>();
-        entries.add(new PieEntry((float) value, context.getResources().getDrawable(R.drawable.ic_star_gold)));
+        entries.add(new PieEntry<>((float) value, null, context.getResources().getDrawable(R.drawable.ic_star_gold), null));
 
         if (value < target) {
-            entries.add(new PieEntry((float) (target - value)));
+            entries.add(new PieEntry<>((float) (target - value), null, null, null));
         }
 
         pieChart.setCenterText(String.format("%s\n%s", stringValue, label));
@@ -1577,11 +1578,11 @@ public class GBDeviceAdapterv2 extends ListAdapter<GBDevice, GBDeviceAdapterv2.V
         int chartColor = interpolateColor(Color.parseColor(CHART_COLOR_START), Color.parseColor(CHART_COLOR_END), colorValue);
 
         PieDataSet dataSet = new PieDataSet(entries, "");
-        dataSet.setDrawIcons(false);
+        dataSet.setDrawIconsEnabled(false);
         dataSet.setIconsOffset(new MPPointF(0, -66));
 
         if (colorValue == 1) {
-            dataSet.setDrawIcons(true);
+            dataSet.setDrawIconsEnabled(true);
         }
         dataSet.setSliceSpace(0f);
         dataSet.setSelectionShift(5f);
