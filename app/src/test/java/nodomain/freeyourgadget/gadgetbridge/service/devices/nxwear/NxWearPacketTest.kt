@@ -12,15 +12,15 @@ class NxWearPacketTest {
 
     @Test
     fun shakeCameraControlMatchesCaptureAndRecognizesWatchEvents() {
-        assertArrayEquals(bytes("000b000001740000010001000000000000000000"), NxWearB8Support.encodeShakeCamera(true))
-        assertArrayEquals(bytes("000b000001740000010000000000000000000000"), NxWearB8Support.encodeShakeCamera(false))
+        assertArrayEquals(bytes("000b000001740000010001000000000000000000"), NxWearProtocol.encodeShakeCamera(true))
+        assertArrayEquals(bytes("000b000001740000010000000000000000000000"), NxWearProtocol.encodeShakeCamera(false))
 
         val event = NxWearPacket.parse(bytes("000b000031740000010001004ac9b7028020c26a00000000"))
-        assertEquals(true, NxWearB8Support.isShakeCameraEvent(event))
-        assertEquals(false, NxWearB8Support.isShakeCameraEvent(event.copy(command = 0x34)))
+        assertEquals(true, NxWearProtocol.isShakeCameraEvent(event))
+        assertEquals(false, NxWearProtocol.isShakeCameraEvent(event.copy(command = 0x34)))
         assertArrayEquals(
             bytes("000b000021740000010001000000000000000000"),
-            NxWearB8Support.encodeMeasurementAck(requireNotNull(event.sequence), NxWearDataType.SHAKE_CAMERA),
+            NxWearProtocol.encodeAck(requireNotNull(event.sequence), NxWearDataType.SHAKE_CAMERA),
         )
     }
 
@@ -41,9 +41,9 @@ class NxWearPacketTest {
         assertEquals(12, readings?.size)
         assertEquals(NxWearHeartRateReading(0x6abeb703L * 1000L, 89), readings?.first())
         assertEquals(NxWearHeartRateReading(0x6abeb707L * 1000L, 87), readings?.last())
-        assertEquals(true, NxWearB8Support.isHistoryDataType(requireNotNull(packet.dataType)))
+        assertEquals(true, NxWearProtocol.isHistoryDataType(requireNotNull(packet.dataType)))
         assertArrayEquals(bytes("000b000304110000010001000000000000000000"),
-            NxWearB8Support.encodeInitializationRead(requireNotNull(packet.sequence), requireNotNull(packet.dataType)))
+            NxWearProtocol.encodeAck(requireNotNull(packet.sequence), requireNotNull(packet.dataType)))
     }
 
     @Test
@@ -59,16 +59,16 @@ class NxWearPacketTest {
         val readings = NxWearSportReading.parse(packet)
         assertEquals(listOf(NxWearSportReading(0x6abed4b7L * 1000L, 2352, 1607, 76018, 287)), readings)
         assertArrayEquals(bytes("000b000504050000010001000000000000000000"),
-            NxWearB8Support.encodeInitializationRead(requireNotNull(packet.sequence), requireNotNull(packet.dataType)))
+            NxWearProtocol.encodeAck(requireNotNull(packet.sequence), requireNotNull(packet.dataType)))
     }
 
     @Test
     fun recognizesTemperatureHistoryAndWaitsForEveryDiagnosticLogFrame() {
-        assertEquals(true, NxWearB8Support.isHistoryDataType(NxWearDataType.HISTORY_TEMPERATURE))
-        assertEquals(60_000L, NxWearB8Support.historyTimeoutForSubtype(NxWearDataType.HISTORY_TEMPERATURE))
-        assertEquals(5_000L, NxWearB8Support.historyTimeoutForSubtype(NxWearDataType.DEVICE_LOG))
+        assertEquals(true, NxWearProtocol.isHistoryDataType(NxWearDataType.HISTORY_TEMPERATURE))
+        assertEquals(60_000L, NxWearProtocol.historyTimeoutForSubtype(NxWearDataType.HISTORY_TEMPERATURE))
+        assertEquals(5_000L, NxWearProtocol.historyTimeoutForSubtype(NxWearDataType.DEVICE_LOG))
         for (sequence in 6..0x49) {
-            val ack = NxWearPacket.parse(NxWearB8Support.encodeInitializationRead(sequence, NxWearDataType.DEVICE_LOG))
+            val ack = NxWearPacket.parse(NxWearProtocol.encodeAck(sequence, NxWearDataType.DEVICE_LOG))
             assertEquals(sequence, ack.sequence)
             assertEquals(0x04, ack.command)
             assertEquals(NxWearDataType.DEVICE_LOG, ack.dataType)
@@ -102,10 +102,10 @@ class NxWearPacketTest {
 
     @Test
     fun mapsObservedBatteryStatusValues() {
-        assertEquals(BatteryState.BATTERY_NORMAL, NxWearB8Support.batteryStateForStatus(0x00))
-        assertEquals(BatteryState.BATTERY_CHARGING, NxWearB8Support.batteryStateForStatus(0x01))
-        assertEquals(BatteryState.BATTERY_CHARGING_FULL, NxWearB8Support.batteryStateForStatus(0x02))
-        assertEquals(BatteryState.UNKNOWN, NxWearB8Support.batteryStateForStatus(0xff))
+        assertEquals(BatteryState.BATTERY_NORMAL, NxWearProtocol.batteryStateForStatus(0x00))
+        assertEquals(BatteryState.BATTERY_CHARGING, NxWearProtocol.batteryStateForStatus(0x01))
+        assertEquals(BatteryState.BATTERY_CHARGING_FULL, NxWearProtocol.batteryStateForStatus(0x02))
+        assertEquals(BatteryState.UNKNOWN, NxWearProtocol.batteryStateForStatus(0xff))
     }
 
     @Test
@@ -117,11 +117,11 @@ class NxWearPacketTest {
         val charging = NxWearPacket.parse(bytes("000b00073103000002004a01000001000903ff00"))
 
         assertEquals(NxWearDataType.HISTORY_SPORT, historyFrame.dataType)
-        assertEquals(2, NxWearB8Support.expectedActivityFragmentCount(requireNotNull(historyFrame.declaredLength)))
+        assertEquals(2, NxWearPacket.expectedFragmentCount(requireNotNull(historyFrame.declaredLength)))
         assertEquals(1, continuation.continuationIndex)
-        assertEquals(true, NxWearB8Support.isHistoryDataType(requireNotNull(historyFrame.dataType)))
-        assertEquals(true, NxWearB8Support.isHistoryDataType(NxWearDataType.DEVICE_LOG))
-        assertArrayEquals(historyAck, NxWearB8Support.encodeInitializationRead(3, NxWearDataType.HISTORY_SPORT))
+        assertEquals(true, NxWearProtocol.isHistoryDataType(requireNotNull(historyFrame.dataType)))
+        assertEquals(true, NxWearProtocol.isHistoryDataType(NxWearDataType.DEVICE_LOG))
+        assertArrayEquals(historyAck, NxWearProtocol.encodeAck(3, NxWearDataType.HISTORY_SPORT))
         assertEquals(listOf(0x4a, 0x00), unplugged.payload.map { it.toInt() and 0xff })
         assertEquals(listOf(0x4a, 0x01), charging.payload.map { it.toInt() and 0xff })
     }
@@ -225,38 +225,38 @@ class NxWearPacketTest {
     @Test
     fun buildsObservedHealthDetectionPackets() {
         assertArrayEquals(bytes("000b000001800000080000003c00000000000000"),
-            NxWearB8Support.encodeDetectionSettings(false, 60, false))
+            NxWearProtocol.encodeDetectionSettings(false, 60, false))
         assertArrayEquals(bytes("000b000001800000080001003c00000000000000"),
-            NxWearB8Support.encodeDetectionSettings(true, 60, false))
+            NxWearProtocol.encodeDetectionSettings(true, 60, false))
         assertArrayEquals(bytes("000b000001800000080001003c00010000000000"),
-            NxWearB8Support.encodeDetectionSettings(true, 60, true))
+            NxWearProtocol.encodeDetectionSettings(true, 60, true))
         assertArrayEquals(bytes("000b000001800000080000003c00010000000000"),
-            NxWearB8Support.encodeDetectionSettings(false, 60, true))
+            NxWearProtocol.encodeDetectionSettings(false, 60, true))
         assertArrayEquals(bytes("000b000001800000080001001e00010000000000"),
-            NxWearB8Support.encodeDetectionSettings(true, 30, true))
+            NxWearProtocol.encodeDetectionSettings(true, 30, true))
     }
 
     @Test
     fun buildsObservedClockPacketsWithLittleEndianTimeFields() {
         val epochMillis = 0x6abe37ecL * 1000L
         assertArrayEquals(bytes("000b0000016800000900ec37be6a201c00000000"),
-            NxWearB8Support.encodeClockSettings(epochMillis, 7200, false))
+            NxWearProtocol.encodeClockSettings(epochMillis, 7200, false))
         assertArrayEquals(bytes("000b0000016800000900ec37be6a201c00000100"),
-            NxWearB8Support.encodeClockSettings(epochMillis, 7200, true))
+            NxWearProtocol.encodeClockSettings(epochMillis, 7200, true))
     }
 
     @Test
     fun buildsObservedWristWakePackets() {
         assertArrayEquals(bytes("000b0000017f00000600000001173b0500000000"),
-            NxWearB8Support.encodeWristWakeSettings(false, "00:01", "23:59", 5))
+            NxWearProtocol.encodeWristWakeSettings(false, "00:01", "23:59", 5))
         assertArrayEquals(bytes("000b0000017f00000600010c2215370800000000"),
-            NxWearB8Support.encodeWristWakeSettings(true, "12:34", "21:55", 8))
+            NxWearProtocol.encodeWristWakeSettings(true, "12:34", "21:55", 8))
     }
 
     @Test
     fun buildsObservedAcknowledgementPackets() {
         assertArrayEquals(bytes("000b000034800000010001000000000000000000"), NxWearPacket.frame(0, 0x34, 0x80, bytes("01")))
-        assertArrayEquals(bytes("000b001104030000010001000000000000000000"), NxWearB8Support.encodeBatteryAck(0x0011))
+        assertArrayEquals(bytes("000b001104030000010001000000000000000000"), NxWearProtocol.encodeAck(0x0011, NxWearDataType.BATTERY))
     }
 
     @Test
@@ -264,15 +264,15 @@ class NxWearPacketTest {
         val incoming = bytes("000b0100016b00001d005b7cbe6a01020107636f016e74616374020c2b3334363030313233343536")
         val ended = bytes("000b000001750000010002000000000000000000")
 
-        assertArrayEquals(incoming, NxWearB8Support.encodeIncomingCall(0x6abe7c5bL * 1000L, "contact", "+34600123456"))
-        assertArrayEquals(ended, NxWearB8Support.encodeCallEnded())
+        assertArrayEquals(incoming, NxWearProtocol.encodeIncomingCall(0x6abe7c5bL * 1000L, "contact", "+34600123456"))
+        assertArrayEquals(ended, NxWearProtocol.encodeCallEnded())
         assertEquals(NxWearDataType.MESSAGE_NOTICE, NxWearPacket.parse(incoming).dataType)
         assertEquals(29, NxWearPacket.parse(incoming).payload.size)
     }
 
     @Test
     fun boundsIncomingCallFieldsWithoutSplittingUtf8() {
-        val frame = NxWearB8Support.encodeIncomingCall(0x6abe7c5bL * 1000L, "é".repeat(100), "1".repeat(300))
+        val frame = NxWearProtocol.encodeIncomingCall(0x6abe7c5bL * 1000L, "é".repeat(100), "1".repeat(300))
         val packet = NxWearPacket.parse(frame)
 
         assertEquals(true, packet.isComplete)
@@ -283,8 +283,8 @@ class NxWearPacketTest {
 
     @Test
     fun includesCallerNameAndFallsBackToNumber() {
-        val named = NxWearPacket.parse(NxWearB8Support.encodeIncomingCall(0x6abe7c5bL * 1000L, "Alice", "123"))
-        val unnamed = NxWearPacket.parse(NxWearB8Support.encodeIncomingCall(0x6abe7c5bL * 1000L, null, "123"))
+        val named = NxWearPacket.parse(NxWearProtocol.encodeIncomingCall(0x6abe7c5bL * 1000L, "Alice", "123"))
+        val unnamed = NxWearPacket.parse(NxWearProtocol.encodeIncomingCall(0x6abe7c5bL * 1000L, null, "123"))
 
         assertArrayEquals(bytes("0105416c6963650203313233"), named.payload.copyOfRange(6, named.payload.size))
         assertArrayEquals(bytes("0107636f6e746163740203313233"), unnamed.payload.copyOfRange(6, unnamed.payload.size))
@@ -293,7 +293,7 @@ class NxWearPacketTest {
     @Test
     fun buildsObservedPowerOffPacket() {
         val frame = bytes("000b000001770000010000000000000000000000")
-        val packet = NxWearPacket.parse(NxWearB8Support.encodePowerOff())
+        val packet = NxWearPacket.parse(NxWearProtocol.encodePowerOff())
 
         assertArrayEquals(frame, packet.raw)
         assertEquals(NxWearPacket.Kind.FRAMED, packet.kind)
@@ -309,9 +309,9 @@ class NxWearPacketTest {
         val stop = bytes("000b000001180000010000000000000000000000")
         val acknowledgement = bytes("000b000904070000010001000000000000000000")
 
-        assertArrayEquals(start, NxWearB8Support.encodeManualHeartRate(true))
-        assertArrayEquals(stop, NxWearB8Support.encodeManualHeartRate(false))
-        assertArrayEquals(acknowledgement, NxWearB8Support.encodeHeartRateAck(9))
+        assertArrayEquals(start, NxWearProtocol.encodeManualHeartRate(true))
+        assertArrayEquals(stop, NxWearProtocol.encodeManualHeartRate(false))
+        assertArrayEquals(acknowledgement, NxWearProtocol.encodeAck(9, NxWearDataType.HEART_RATE))
     }
 
     @Test
@@ -327,7 +327,7 @@ class NxWearPacketTest {
             val reading = requireNotNull(NxWearHeartRateReading.parse(packet)).single()
 
             assertEquals(71, reading.bpm)
-            assertArrayEquals(bytes(acknowledgement), NxWearB8Support.encodeHeartRateAck(requireNotNull(packet.sequence)))
+            assertArrayEquals(bytes(acknowledgement), NxWearProtocol.encodeAck(requireNotNull(packet.sequence), NxWearDataType.HEART_RATE))
         }
     }
 
@@ -379,10 +379,10 @@ class NxWearPacketTest {
         val readingAck = bytes("000b0055042d0000010001000000000000000000")
         val syncAck = bytes("000b005604fa0000010001000000000000000000")
 
-        assertArrayEquals(start, NxWearB8Support.encodeStressMeasurementStart())
-        assertArrayEquals(controlAck, NxWearB8Support.encodeMeasurementAck(0x54, NxWearDataType.HEART_RATE_CONTROL))
-        assertArrayEquals(readingAck, NxWearB8Support.encodeMeasurementAck(0x55, NxWearDataType.STRESS))
-        assertArrayEquals(syncAck, NxWearB8Support.encodeMeasurementAck(0x56, NxWearDataType.DEVICE_LOG))
+        assertArrayEquals(start, NxWearProtocol.encodeStressMeasurement(true))
+        assertArrayEquals(controlAck, NxWearProtocol.encodeAck(0x54, NxWearDataType.HEART_RATE_CONTROL))
+        assertArrayEquals(readingAck, NxWearProtocol.encodeAck(0x55, NxWearDataType.STRESS))
+        assertArrayEquals(syncAck, NxWearProtocol.encodeAck(0x56, NxWearDataType.DEVICE_LOG))
     }
 
     @Test
@@ -391,9 +391,9 @@ class NxWearPacketTest {
         val controlAck = bytes("000b000904150000010001000000000000000000")
         val readingAck = bytes("000b000a04140000010001000000000000000000")
 
-        assertArrayEquals(start, NxWearB8Support.encodeSpo2MeasurementStart())
-        assertArrayEquals(controlAck, NxWearB8Support.encodeMeasurementAck(9, NxWearDataType.HEART_RATE_CONTROL))
-        assertArrayEquals(readingAck, NxWearB8Support.encodeMeasurementAck(10, NxWearDataType.SPO2))
+        assertArrayEquals(start, NxWearProtocol.encodeSpo2Measurement(true))
+        assertArrayEquals(controlAck, NxWearProtocol.encodeAck(9, NxWearDataType.HEART_RATE_CONTROL))
+        assertArrayEquals(readingAck, NxWearProtocol.encodeAck(10, NxWearDataType.SPO2))
     }
 
     @Test
@@ -490,7 +490,7 @@ class NxWearPacketTest {
         assertEquals(0x56, first.sequence)
         assertEquals(0xfa, first.dataType)
         assertEquals(11, first.declaredLength)
-        assertEquals(2, NxWearB8Support.expectedActivityFragmentCount(first.declaredLength!!))
+        assertEquals(2, NxWearPacket.expectedFragmentCount(first.declaredLength!!))
         assertEquals(1, continuation.continuationIndex)
         assertEquals(0x20, continuation.payload[0].toInt() and 0xff)
     }
@@ -513,14 +513,14 @@ class NxWearPacketTest {
             activeTimeGoalSeconds = 10800,
         )
         val captured = bytes("00010300016e000043004100070c0066bcb50b00010114aa32000c0068be53eb68201c0000010800027c01ffff00000400670004006d0113006f401f030000881300002c0100007869302a0500780000")
-        assertArrayEquals(captured, NxWearB8Support.encodeInitializationBootstrap(settings))
+        assertArrayEquals(captured, NxWearProtocol.encodeInitializationBootstrap(settings))
         val parsed = NxWearPacket.parse(captured)
         assertEquals(0x01, parsed.deviceType)
         assertEquals(0x6e, parsed.dataType)
         assertEquals(67, parsed.declaredLength)
         assertEquals(true, parsed.isComplete)
         assertArrayEquals(bytes("be53eb68"), parsed.payload.copyOfRange(18, 22))
-        val next = NxWearB8Support.encodeInitializationBootstrap(settings.copy(epochSeconds = 0x68eb53c0L))
+        val next = NxWearProtocol.encodeInitializationBootstrap(settings.copy(epochSeconds = 0x68eb53c0L))
         assertArrayEquals(bytes("68c053eb68"), next.copyOfRange(28, 33))
         assertEquals(0x01, next[20].toInt() and 0xff)
         assertEquals(0x02, next[40].toInt() and 0xff)
@@ -531,7 +531,7 @@ class NxWearPacketTest {
     fun buildsInitializationBootstrapFromProfileAndGoalValues() {
         val settings = NxWearBootstrap(0, true, 34, 182, 81, 0x12345678L, -3600,
             false, 12000, 6500, 450, 28800, 5400)
-        val packet = NxWearPacket.parse(NxWearB8Support.encodeInitializationBootstrap(settings))
+        val packet = NxWearPacket.parse(NxWearProtocol.encodeInitializationBootstrap(settings))
         val payload = packet.payload
 
         assertEquals(true, packet.isComplete)
@@ -553,23 +553,23 @@ class NxWearPacketTest {
         )
         for ((index, frame) in captured.withIndex()) {
             val dataType = NxWearPacket.parse(bytes(frame)).dataType!!
-            assertArrayEquals(bytes(frame), NxWearB8Support.encodeInitializationRead(index + 1, dataType))
+            assertArrayEquals(bytes(frame), NxWearProtocol.encodeAck(index + 1, dataType))
         }
         assertArrayEquals(bytes("000b000b04090000010001000000000000000000"),
-            NxWearB8Support.encodeInitializationRead(0x0b, NxWearDataType.DEVICE_SYNC))
+            NxWearProtocol.encodeAck(0x0b, NxWearDataType.DEVICE_SYNC))
     }
 
     @Test
     fun calculatesActivityFragmentCountsFromDeclaredDataLength() {
-        assertEquals(1, NxWearB8Support.expectedActivityFragmentCount(0))
-        assertEquals(1, NxWearB8Support.expectedActivityFragmentCount(10))
-        assertEquals(2, NxWearB8Support.expectedActivityFragmentCount(11))
-        assertEquals(2, NxWearB8Support.expectedActivityFragmentCount(29))
-        assertEquals(3, NxWearB8Support.expectedActivityFragmentCount(30))
-        assertEquals(5, NxWearB8Support.expectedActivityFragmentCount(70))
-        assertEquals(2, NxWearB8Support.expectedActivityFragmentCount(23))
-        assertEquals(4, NxWearB8Support.expectedActivityFragmentCount(59))
-        assertEquals(7, NxWearB8Support.expectedActivityFragmentCount(115))
+        assertEquals(1, NxWearPacket.expectedFragmentCount(0))
+        assertEquals(1, NxWearPacket.expectedFragmentCount(10))
+        assertEquals(2, NxWearPacket.expectedFragmentCount(11))
+        assertEquals(2, NxWearPacket.expectedFragmentCount(29))
+        assertEquals(3, NxWearPacket.expectedFragmentCount(30))
+        assertEquals(5, NxWearPacket.expectedFragmentCount(70))
+        assertEquals(2, NxWearPacket.expectedFragmentCount(23))
+        assertEquals(4, NxWearPacket.expectedFragmentCount(59))
+        assertEquals(7, NxWearPacket.expectedFragmentCount(115))
     }
 
     @Test

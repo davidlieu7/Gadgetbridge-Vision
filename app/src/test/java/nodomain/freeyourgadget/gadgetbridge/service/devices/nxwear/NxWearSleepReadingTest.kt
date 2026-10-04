@@ -18,7 +18,7 @@ class NxWearSleepReadingTest {
             for (offset in 20 until raw.size step 20) {
                 packet = requireNotNull(packet.append(NxWearPacket.parse(raw.copyOfRange(offset, offset + 20))))
             }
-            assertTrue(NxWearB8Support.isHistoryDataType(requireNotNull(packet.dataType)))
+            assertTrue(NxWearProtocol.isHistoryDataType(requireNotNull(packet.dataType)))
             requireNotNull(NxWearSleepReading.parse(packet))
         }
         assertEquals(0x6ac19340L * 1000L, readings.first().timestampMillis)

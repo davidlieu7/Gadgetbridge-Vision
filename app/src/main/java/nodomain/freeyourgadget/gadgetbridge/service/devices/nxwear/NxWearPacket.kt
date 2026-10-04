@@ -48,6 +48,12 @@ internal data class NxWearPacket(
         private const val FIRST_PAGE_HEADER_SIZE = 10
         private const val CONTINUATION_DATA_SIZE = PAGE_SIZE - 1
 
+        fun expectedFragmentCount(declaredLength: Int): Int {
+            require(declaredLength >= 0)
+            val continuationBytes = (declaredLength - (PAGE_SIZE - FIRST_PAGE_HEADER_SIZE)).coerceAtLeast(0)
+            return 1 + (continuationBytes + CONTINUATION_DATA_SIZE - 1) / CONTINUATION_DATA_SIZE
+        }
+
         fun frame(sequence: Int, command: Int, dataType: Int, payload: ByteArray, deviceType: Int = 0x0b): ByteArray {
             require(sequence in 0..0xff)
             require(command in 0..0xff)
@@ -55,8 +61,7 @@ internal data class NxWearPacket(
             require(deviceType in 0..0xff)
             require(payload.size <= 0xffff)
 
-            val pageCount = ((payload.size - (PAGE_SIZE - FIRST_PAGE_HEADER_SIZE)).coerceAtLeast(0) +
-                CONTINUATION_DATA_SIZE - 1) / CONTINUATION_DATA_SIZE
+            val pageCount = expectedFragmentCount(payload.size) - 1
             require(pageCount <= 0xff)
             val result = ByteArray(PAGE_SIZE * (pageCount + 1))
             result[1] = deviceType.toByte()
@@ -77,6 +82,18 @@ internal data class NxWearPacket(
                 copied = next
             }
             return result
+        }
+
+        fun command(dataType: Int, enabled: Boolean): ByteArray {
+            return frame(0, 0x01, dataType, byteArrayOf(if (enabled) 1 else 0))
+        }
+
+        fun command(dataType: Int, payload: Int): ByteArray {
+            return frame(0, 0x01, dataType, byteArrayOf(payload.toByte()))
+        }
+
+        fun command(dataType: Int, payload: ByteArray): ByteArray {
+            return frame(0, 0x01, dataType, payload)
         }
 
         fun parse(bytes: ByteArray): NxWearPacket {

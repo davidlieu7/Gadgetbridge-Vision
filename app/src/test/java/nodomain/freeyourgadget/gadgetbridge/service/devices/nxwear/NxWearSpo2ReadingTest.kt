@@ -25,9 +25,9 @@ class NxWearSpo2ReadingTest {
         assertEquals(99, readings.maxOf { it.value })
         assertEquals(NxWearPacket.TimedReading(0x6ac1891bL * 1000L, 98), readings.first())
         assertEquals(NxWearPacket.TimedReading(0x6ac1f980L * 1000L, 98), readings.last())
-        assertTrue(NxWearB8Support.isHistoryDataType(requireNotNull(packet.dataType)))
+        assertTrue(NxWearProtocol.isHistoryDataType(requireNotNull(packet.dataType)))
         assertArrayEquals(bytes("000b000604280000010001000000000000000000"),
-            NxWearB8Support.encodeInitializationRead(requireNotNull(packet.sequence), requireNotNull(packet.dataType)))
+            NxWearProtocol.encodeAck(requireNotNull(packet.sequence), requireNotNull(packet.dataType)))
     }
 
     @Test
@@ -35,10 +35,10 @@ class NxWearSpo2ReadingTest {
         val packet = NxWearPacket.parse(bytes("000b002d312800000800010001ad00c26a600001"))
         assertEquals(listOf(NxWearPacket.TimedReading(0x6ac200adL * 1000L, 96)), NxWearSpo2Reading.parse(packet))
         assertArrayEquals(bytes("000b002d04280000010001000000000000000000"),
-            NxWearB8Support.encodeInitializationRead(requireNotNull(packet.sequence), requireNotNull(packet.dataType)))
+            NxWearProtocol.encodeAck(requireNotNull(packet.sequence), requireNotNull(packet.dataType)))
         val manual = NxWearPacket.parse(NxWearPacket.frame(0, 0x31, NxWearDataType.SPO2, packet.payload))
         assertEquals(NxWearSpo2Reading.parse(packet), NxWearSpo2Reading.parse(manual))
-        assertTrue(NxWearB8Support.isHistoryDataType(NxWearDataType.SPO2))
+        assertTrue(NxWearProtocol.isHistoryDataType(NxWearDataType.SPO2))
     }
 
     @Test
