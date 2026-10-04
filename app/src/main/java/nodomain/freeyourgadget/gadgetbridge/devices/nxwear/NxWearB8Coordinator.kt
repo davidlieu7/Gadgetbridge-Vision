@@ -1,5 +1,13 @@
 package nodomain.freeyourgadget.gadgetbridge.devices.nxwear
 
+import android.os.Handler
+import android.os.Looper
+import android.view.View
+import android.widget.LinearLayout
+import android.widget.ProgressBar
+import android.widget.TextView
+import androidx.appcompat.app.AlertDialog
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import de.greenrobot.dao.AbstractDao
 import de.greenrobot.dao.Property
 import nodomain.freeyourgadget.gadgetbridge.R
@@ -8,11 +16,9 @@ import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSett
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.DeviceSettingsSpec
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.ListEntry
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.deviceSettings
-import nodomain.freeyourgadget.gadgetbridge.activities.CameraActivity
 import nodomain.freeyourgadget.gadgetbridge.capabilities.HeartRateCapability
 import nodomain.freeyourgadget.gadgetbridge.devices.AbstractBLEDeviceCoordinator
 import nodomain.freeyourgadget.gadgetbridge.devices.DeviceCoordinator
-import nodomain.freeyourgadget.gadgetbridge.devices.DeviceCardAction
 import nodomain.freeyourgadget.gadgetbridge.devices.SampleProvider
 import nodomain.freeyourgadget.gadgetbridge.devices.GenericSpo2SampleProvider
 import nodomain.freeyourgadget.gadgetbridge.devices.GenericStressSampleProvider
@@ -58,6 +64,7 @@ class NxWearB8Coordinator : AbstractBLEDeviceCoordinator() {
                 .putBoolean(PREF_LIFT_ENABLED, enabled)
                 .apply()
         }
+        val measurementDialog = NxWearB8MeasurementDialog(preferences)
         return deviceSettings {
             screen(
                 key = "nx_wear_b8_health",
@@ -89,8 +96,11 @@ class NxWearB8Coordinator : AbstractBLEDeviceCoordinator() {
                     key = ACTION_MEASURE_STRESS,
                     title = R.string.nx_wear_b8_measure_stress,
                     icon = R.drawable.ic_stress,
-                ) { _, device ->
+                ) { context, device ->
                     if (device != null) {
+                        measurementDialog.show(context, R.string.nx_wear_b8_measure_stress) {
+                            GBApplication.deviceService(device).onSendConfiguration(ACTION_CANCEL_MEASURE_STRESS)
+                        }
                         GBApplication.deviceService(device).onSendConfiguration(ACTION_MEASURE_STRESS)
                     }
                     device != null
@@ -99,13 +109,24 @@ class NxWearB8Coordinator : AbstractBLEDeviceCoordinator() {
                     key = ACTION_MEASURE_SPO2,
                     title = R.string.nx_wear_b8_measure_spo2,
                     icon = R.drawable.ic_spo2,
-                ) { _, device ->
+                ) { context, device ->
                     if (device != null) {
+                        measurementDialog.show(context, R.string.nx_wear_b8_measure_spo2) {
+                            GBApplication.deviceService(device).onSendConfiguration(ACTION_CANCEL_MEASURE_SPO2)
+                        }
                         GBApplication.deviceService(device).onSendConfiguration(ACTION_MEASURE_SPO2)
                     }
                     device != null
                 }
             }
+            text(
+                key = PREF_MEASUREMENT_RESULT,
+                title = R.string.nx_wear_b8_measurement_result,
+                visibleWhen = { false },
+                onSharedPreferenceChanged = { value ->
+                    if (value.isNotEmpty()) measurementDialog.showResult(value)
+                },
+            )
             screen(
                 key = "nx_wear_b8_exercise",
                 title = R.string.activity_type_exercise,
@@ -251,8 +272,11 @@ class NxWearB8Coordinator : AbstractBLEDeviceCoordinator() {
     companion object {
         const val PREF_LIFT_ENABLED = "nx_wear_b8_lift_enabled"
         const val PREF_SHAKE_TO_TAKE_PICTURE = "nx_wear_b8_shake_to_take_picture"
+        const val PREF_MEASUREMENT_RESULT = "nx_wear_b8_measurement_result"
         private const val ACTION_MEASURE_STRESS = "nx_wear_b8_measure_stress"
         private const val ACTION_MEASURE_SPO2 = "nx_wear_b8_measure_spo2"
+        private const val ACTION_CANCEL_MEASURE_STRESS = "nx_wear_b8_cancel_measure_stress"
+        private const val ACTION_CANCEL_MEASURE_SPO2 = "nx_wear_b8_cancel_measure_spo2"
         const val PREF_EXERCISE_SPORT = "nx_wear_b8_exercise_sport"
         const val ACTION_EXERCISE_START = "nx_wear_b8_exercise_start"
         const val ACTION_EXERCISE_STOP = "nx_wear_b8_exercise_stop"
@@ -261,4 +285,64 @@ class NxWearB8Coordinator : AbstractBLEDeviceCoordinator() {
     }
 
     override fun isExperimental(): Boolean = true
+}
+
+private class NxWearB8MeasurementDialog(
+    private val preferences: android.content.SharedPreferences,
+) {
+    private var dialog: AlertDialog? = null
+    private var message: TextView? = null
+    private var progress: ProgressBar? = null
+    private var closeHandler: Handler? = null
+    private val MEASUREMENT_RESULT_CLOSE_DELAY_MS = 5_000L
+    private val closeRunnable = Runnable {
+        dialog?.dismiss()
+        dialog = null
+        message = null
+        progress = null
+        closeHandler = null
+    }
+
+    fun show(context: android.content.Context, title: Int, onCancel: () -> Unit) {
+        closeHandler?.removeCallbacks(closeRunnable)
+        dialog?.dismiss()
+        preferences.edit().putString(NxWearB8Coordinator.PREF_MEASUREMENT_RESULT, "").apply()
+
+        val padding = (16 * context.resources.displayMetrics.density).toInt()
+        val messageView = TextView(context).apply {
+            text = context.getString(R.string.nx_wear_b8_measurement_in_progress)
+            setPadding(padding, 0, 0, 0)
+        }
+        val progressView = ProgressBar(context).apply { isIndeterminate = true }
+        message = messageView
+        progress = progressView
+
+        val content = LinearLayout(context).apply {
+            orientation = LinearLayout.HORIZONTAL
+            setPadding(padding, padding, padding, padding)
+            addView(progressView)
+            addView(messageView)
+        }
+        dialog = MaterialAlertDialogBuilder(context)
+            .setTitle(title)
+            .setView(content)
+            .setCancelable(false)
+            .setNegativeButton(R.string.cancel) { _, _ ->
+                closeRunnable.run()
+                onCancel()
+            }
+            .show()
+        closeHandler = Handler(Looper.getMainLooper())
+    }
+
+    fun showResult(value: String) {
+        if (dialog == null) return
+        closeHandler?.removeCallbacks(closeRunnable)
+        progress?.visibility = View.GONE
+        message?.text = value
+        dialog?.getButton(androidx.appcompat.app.AlertDialog.BUTTON_NEGATIVE)?.visibility = View.GONE
+        closeHandler = Handler(Looper.getMainLooper()).also {
+            it.postDelayed(closeRunnable, MEASUREMENT_RESULT_CLOSE_DELAY_MS)
+        }
+    }
 }

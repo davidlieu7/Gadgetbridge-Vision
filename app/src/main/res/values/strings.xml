@@ -5947,6 +5947,9 @@
     <string name="nx_wear_b8_stress_result">Stress: %1$d</string>
     <string name="nx_wear_b8_measure_spo2">Measure blood oxygen</string>
     <string name="nx_wear_b8_spo2_result">Blood oxygen: %1$d%%</string>
+    <string name="nx_wear_b8_measurement_in_progress">Measuring…</string>
+    <string name="nx_wear_b8_measurement_failed">Measurement failed. Wear the band securely and try again.</string>
+    <string name="nx_wear_b8_measurement_result">Measurement result</string>
     <string name="nx_wear_b8_shake_to_take_picture">Shake to take a picture</string>
 
     <string name="workout_exercise_picker_title">Choose an exercise</string>

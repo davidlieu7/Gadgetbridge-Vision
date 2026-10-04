@@ -61,13 +61,23 @@ class NxWearB8Support : AbstractBTLESingleDeviceSupport(LOG) {
     private var pendingLogSequence: Int? = null
     private var pendingLogPages = 0
     private var expectedLogPages = 0
-    private val heartRateTimeoutHandler = Handler(Looper.getMainLooper())
-    private val heartRateTimeout = Runnable { stopManualHeartRate() }
+    private val measurementTimeoutHandler = Handler(Looper.getMainLooper())
+    private val measurementTimeout = Runnable {
+        activeMeasurement?.let {
+            val failed = !measurementHasResult
+            cancelMeasurement(it)
+            if (failed) reportMeasurementFailure()
+        }
+    }
     private val historyTimeoutHandler = Handler(Looper.getMainLooper())
     private val historyTimeout = Runnable { finishHistoryFetch() }
     private var historyFetchActive = false
     @Volatile
     private var manualHeartRateActive = false
+    @Volatile
+    private var activeMeasurement: Int? = null
+    @Volatile
+    private var measurementHasResult = false
     private var exerciseStartedAt: Long? = null
     private var exerciseSportType = NxWearSportSession.OUTDOOR_RUNNING
     override fun getCoordinator(): NxWearB8Coordinator = super.getCoordinator() as NxWearB8Coordinator
@@ -93,7 +103,8 @@ class NxWearB8Support : AbstractBTLESingleDeviceSupport(LOG) {
         pendingLogPages = 0
         expectedLogPages = 0
         manualHeartRateActive = false
-        heartRateTimeoutHandler.removeCallbacks(heartRateTimeout)
+        activeMeasurement = null
+        measurementTimeoutHandler.removeCallbacks(measurementTimeout)
         builder.setDeviceState(GBDevice.State.INITIALIZING)
         builder.requestMtu(getCoordinator().getMtu())
         builder.notify(RESPONSE_CHARACTERISTIC, true)
@@ -109,21 +120,23 @@ class NxWearB8Support : AbstractBTLESingleDeviceSupport(LOG) {
         super.onSendConfiguration(config)
         if (config !in CONFIG_KEYS) return
 
-        if (config == ACTION_MEASURE_STRESS) {
-            if (isConnected()) {
-                createTransactionBuilder("Start Nx Wear B8 stress measurement")
-                    .write(WRITE_CHARACTERISTIC, *encodeStressMeasurementStart())
-                    .queue()
+        when (config) {
+            ACTION_MEASURE_STRESS -> {
+                startMeasurement(NxWearDataType.STRESS)
+                return
             }
-            return
-        }
-        if (config == ACTION_MEASURE_SPO2) {
-            if (isConnected()) {
-                createTransactionBuilder("Start Nx Wear B8 blood oxygen measurement")
-                    .write(WRITE_CHARACTERISTIC, *encodeSpo2MeasurementStart())
-                    .queue()
+            ACTION_CANCEL_MEASURE_STRESS -> {
+                cancelMeasurement(NxWearDataType.STRESS)
+                return
             }
-            return
+            ACTION_MEASURE_SPO2 -> {
+                startMeasurement(NxWearDataType.SPO2)
+                return
+            }
+            ACTION_CANCEL_MEASURE_SPO2 -> {
+                cancelMeasurement(NxWearDataType.SPO2)
+                return
+            }
         }
         if (config == NxWearB8Coordinator.ACTION_EXERCISE_START || config == NxWearB8Coordinator.ACTION_EXERCISE_STOP) {
             if (!isConnected()) return
@@ -225,12 +238,14 @@ class NxWearB8Support : AbstractBTLESingleDeviceSupport(LOG) {
     }
 
     override fun disconnect() {
+        if (activeMeasurement != null && !measurementHasResult) reportMeasurementFailure()
+        clearActiveMeasurement()
         finishHistoryFetch()
         super.disconnect()
     }
 
     override fun dispose() {
-        heartRateTimeoutHandler.removeCallbacks(heartRateTimeout)
+        measurementTimeoutHandler.removeCallbacks(measurementTimeout)
         finishHistoryFetch()
         super.dispose()
     }
@@ -271,28 +286,66 @@ class NxWearB8Support : AbstractBTLESingleDeviceSupport(LOG) {
 
     @Synchronized
     private fun startManualHeartRate(continuous: Boolean) {
-        if (!isConnected()) return
-        heartRateTimeoutHandler.removeCallbacks(heartRateTimeout)
-        if (manualHeartRateActive) {
-            if (!continuous) heartRateTimeoutHandler.postDelayed(heartRateTimeout, HEART_RATE_TIMEOUT_MS)
-            return
-        }
+        if (continuous && manualHeartRateActive) return
+        if (!startMeasurement(NxWearDataType.MANUAL_HEART_RATE)) return
         manualHeartRateActive = true
-        if (!continuous) heartRateTimeoutHandler.postDelayed(heartRateTimeout, HEART_RATE_TIMEOUT_MS)
-        createTransactionBuilder("Start Nx Wear B8 heart rate reading")
-            .write(WRITE_CHARACTERISTIC, *encodeManualHeartRate(true))
-            .queue()
+        if (!continuous) measurementTimeoutHandler.postDelayed(measurementTimeout, MEASUREMENT_TIMEOUT_MS)
     }
 
     @Synchronized
     private fun stopManualHeartRate() {
         if (!manualHeartRateActive) return
+        cancelMeasurement(NxWearDataType.MANUAL_HEART_RATE)
+    }
+
+    private fun measurementCommand(dataType: Int, enabled: Boolean): ByteArray = when (dataType) {
+        NxWearDataType.MANUAL_HEART_RATE -> encodeManualHeartRate(enabled)
+        NxWearDataType.SPO2 -> encodeSpo2Measurement(enabled)
+        NxWearDataType.STRESS -> encodeStressMeasurement(enabled)
+        else -> error("Unsupported measurement type: $dataType")
+    }
+
+    @Synchronized
+    private fun startMeasurement(dataType: Int): Boolean {
+        if (!isConnected()) {
+            reportMeasurementFailure()
+            return false
+        }
+        val builder = createTransactionBuilder("Start Nx Wear B8 measurement")
+        activeMeasurement?.let {
+            builder.write(WRITE_CHARACTERISTIC, *measurementCommand(it, false))
+        }
+        measurementTimeoutHandler.removeCallbacks(measurementTimeout)
         manualHeartRateActive = false
-        heartRateTimeoutHandler.removeCallbacks(heartRateTimeout)
+        activeMeasurement = dataType
+        measurementHasResult = false
+        builder.write(WRITE_CHARACTERISTIC, *measurementCommand(dataType, true)).queue()
+        if (dataType != NxWearDataType.MANUAL_HEART_RATE) {
+            measurementTimeoutHandler.postDelayed(measurementTimeout, MEASUREMENT_TIMEOUT_MS)
+        }
+        return true
+    }
+
+    @Synchronized
+    private fun cancelMeasurement(dataType: Int) {
+        if (activeMeasurement == dataType) clearActiveMeasurement()
         if (!isConnected()) return
-        createTransactionBuilder("Stop Nx Wear B8 heart rate reading")
-            .write(WRITE_CHARACTERISTIC, *encodeManualHeartRate(false))
+        createTransactionBuilder("Cancel Nx Wear B8 measurement")
+            .write(WRITE_CHARACTERISTIC, *measurementCommand(dataType, false))
             .queue()
+    }
+
+    @Synchronized
+    private fun clearActiveMeasurement() {
+        activeMeasurement = null
+        manualHeartRateActive = false
+        measurementTimeoutHandler.removeCallbacks(measurementTimeout)
+    }
+
+    private fun reportMeasurementFailure() {
+        val error = getContext().getString(R.string.nx_wear_b8_measurement_failed)
+        publishMeasurementResult(error)
+        GB.toast(getContext(), error, Toast.LENGTH_LONG, GB.WARN)
     }
 
     override fun onCharacteristicChanged(
@@ -336,6 +389,12 @@ class NxWearB8Support : AbstractBTLESingleDeviceSupport(LOG) {
                 packet.kind == NxWearPacket.Kind.FRAMED && packet.command == 0x31 && packet.dataType == NxWearDataType.HEART_RATE_CONTROL &&
                     packet.isComplete && packet.payload.size == 1 -> {
                     acknowledgeMeasurementPacket(requireNotNull(packet.sequence), NxWearDataType.HEART_RATE_CONTROL)
+                    // A null/closed control notification ends an unsuccessful measurement.
+                    if (packet.payload[0] == 0.toByte() && activeMeasurement != null) {
+                        val failed = !measurementHasResult
+                        clearActiveMeasurement()
+                        if (failed) reportMeasurementFailure()
+                    }
                 }
                 packet.kind == NxWearPacket.Kind.FRAMED && packet.command == 0x34 && packet.dataType == NxWearDataType.SPO2 -> {
                     LOG.debug("Nx Wear B8 acknowledged blood oxygen measurement command")
@@ -377,6 +436,10 @@ class NxWearB8Support : AbstractBTLESingleDeviceSupport(LOG) {
         acknowledgeMeasurementPacket(requireNotNull(packet.sequence), NxWearDataType.STRESS)
         val valid = readings.filter { it.stress in 1..100 }
         if (valid.isEmpty()) return
+        if (activeMeasurement == NxWearDataType.STRESS) {
+            clearActiveMeasurement()
+            publishMeasurementResult(getContext().getString(R.string.nx_wear_b8_stress_result, valid.last().stress))
+        }
         try {
             GBApplication.acquireDB().use { db ->
                 val session = db.daoSession
@@ -386,8 +449,6 @@ class NxWearB8Support : AbstractBTLESingleDeviceSupport(LOG) {
                 GenericStressSampleProvider(getDevice(), session).addSamples(samples)
             }
             GB.signalActivityDataFinish(getDevice())
-            GB.toast(getContext(), getContext().getString(R.string.nx_wear_b8_stress_result, valid.last().stress),
-                Toast.LENGTH_LONG, GB.INFO)
         } catch (e: Exception) {
             LOG.error("Unable to save Nx Wear B8 stress reading", e)
         }
@@ -398,6 +459,10 @@ class NxWearB8Support : AbstractBTLESingleDeviceSupport(LOG) {
         if (acknowledge) acknowledgeMeasurementPacket(requireNotNull(packet.sequence), requireNotNull(packet.dataType))
         val valid = readings.filter { it.value in 1..100 }
         if (valid.isEmpty()) return
+        if (notifyResult && activeMeasurement == NxWearDataType.SPO2) {
+            clearActiveMeasurement()
+            publishMeasurementResult(getContext().getString(R.string.nx_wear_b8_spo2_result, valid.last().value))
+        }
         try {
             GBApplication.acquireDB().use { db ->
                 val session = db.daoSession
@@ -407,13 +472,16 @@ class NxWearB8Support : AbstractBTLESingleDeviceSupport(LOG) {
                 GenericSpo2SampleProvider(getDevice(), session).addSamples(samples)
             }
             GB.signalActivityDataFinish(getDevice())
-            if (notifyResult) {
-                GB.toast(getContext(), getContext().getString(R.string.nx_wear_b8_spo2_result, valid.last().value),
-                    Toast.LENGTH_LONG, GB.INFO)
-            }
         } catch (e: Exception) {
             LOG.error("Unable to save Nx Wear B8 blood oxygen reading", e)
         }
+    }
+
+    private fun publishMeasurementResult(value: String) {
+        val prefs = getDevicePrefs().preferences
+        prefs.edit()
+            .putString(NxWearB8Coordinator.PREF_MEASUREMENT_RESULT, value)
+            .apply()
     }
 
     private fun acknowledgeMeasurementPacket(sequence: Int, dataType: Int) {
@@ -480,6 +548,9 @@ class NxWearB8Support : AbstractBTLESingleDeviceSupport(LOG) {
             }
         }
         if (!realtime || packet.dataType != NxWearDataType.HEART_RATE) return
+        if (valid.isNotEmpty() && activeMeasurement == NxWearDataType.MANUAL_HEART_RATE) {
+            measurementHasResult = true
+        }
         // These notifications stream throughout the measurement; they are not completion events.
         // Keep the sensor running until the one-shot timeout or an explicit realtime stop.
         for (reading in valid) {
@@ -818,13 +889,17 @@ class NxWearB8Support : AbstractBTLESingleDeviceSupport(LOG) {
             NxWearB8Coordinator.PREF_SHAKE_TO_TAKE_PICTURE,
             ACTION_MEASURE_STRESS,
             ACTION_MEASURE_SPO2,
+            ACTION_CANCEL_MEASURE_STRESS,
+            ACTION_CANCEL_MEASURE_SPO2,
             NxWearB8Coordinator.ACTION_EXERCISE_START,
             NxWearB8Coordinator.ACTION_EXERCISE_STOP,
         ) + WRIST_WAKE_CONFIG_KEYS
 
         private const val ACTION_MEASURE_STRESS = "nx_wear_b8_measure_stress"
         private const val ACTION_MEASURE_SPO2 = "nx_wear_b8_measure_spo2"
-        private const val HEART_RATE_TIMEOUT_MS = 60_000L
+        private const val ACTION_CANCEL_MEASURE_STRESS = "nx_wear_b8_cancel_measure_stress"
+        private const val ACTION_CANCEL_MEASURE_SPO2 = "nx_wear_b8_cancel_measure_spo2"
+        private const val MEASUREMENT_TIMEOUT_MS = 60_000L
         private const val HISTORY_TIMEOUT_MS = 60_000L
         private const val HISTORY_QUIET_TIMEOUT_MS = 5_000L
         private val ACTIVITY_SUBTYPES = setOf(
@@ -898,10 +973,15 @@ class NxWearB8Support : AbstractBTLESingleDeviceSupport(LOG) {
         internal fun encodeHeartRateAck(sequence: Int): ByteArray =
             NxWearPacket.frame(sequence, 0x04, NxWearDataType.HEART_RATE, byteArrayOf(1))
 
-        internal fun encodeStressMeasurementStart(): ByteArray = NxWearPacket.frame(0, 0x01, NxWearDataType.STRESS, byteArrayOf(1))
+        internal fun encodeStressMeasurement(enabled: Boolean): ByteArray =
+            NxWearPacket.frame(0, 0x01, NxWearDataType.STRESS, byteArrayOf(if (enabled) 1 else 0))
 
-        internal fun encodeSpo2MeasurementStart(): ByteArray =
-            NxWearPacket.frame(0, 0x01, NxWearDataType.SPO2, byteArrayOf(1, 0, 0, 0, 0))
+        internal fun encodeStressMeasurementStart(): ByteArray = encodeStressMeasurement(true)
+
+        internal fun encodeSpo2Measurement(enabled: Boolean): ByteArray =
+            NxWearPacket.frame(0, 0x01, NxWearDataType.SPO2, byteArrayOf(if (enabled) 1 else 0, 0, 0, 0, 0))
+
+        internal fun encodeSpo2MeasurementStart(): ByteArray = encodeSpo2Measurement(true)
 
         internal fun encodeMeasurementAck(sequence: Int, dataType: Int): ByteArray =
             NxWearPacket.frame(sequence, 0x04, dataType, byteArrayOf(1))
