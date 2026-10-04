@@ -19,6 +19,7 @@ package nodomain.freeyourgadget.gadgetbridge.service.devices.xiaomi.services;
 import android.content.Intent;
 import android.location.Location;
 import android.os.Handler;
+import android.os.SystemClock;
 
 import androidx.localbroadcastmanager.content.LocalBroadcastManager;
 
@@ -79,6 +80,7 @@ import nodomain.freeyourgadget.gadgetbridge.proto.xiaomi.WorkoutLocation;
 import nodomain.freeyourgadget.gadgetbridge.proto.xiaomi.WorkoutOpenReply;
 import nodomain.freeyourgadget.gadgetbridge.proto.xiaomi.WorkoutOpenWatch;
 import nodomain.freeyourgadget.gadgetbridge.proto.xiaomi.WorkoutStatsPhone;
+import nodomain.freeyourgadget.gadgetbridge.proto.xiaomi.WorkoutStatsWatch;
 import nodomain.freeyourgadget.gadgetbridge.proto.xiaomi.WorkoutStatusWatch;
 import nodomain.freeyourgadget.gadgetbridge.proto.xiaomi.WorkoutStatusWatchSport;
 import nodomain.freeyourgadget.gadgetbridge.proto.xiaomi.XiaomiProto;
@@ -122,12 +124,19 @@ public class XiaomiHealthService extends AbstractXiaomiService {
     private static final int CMD_REALTIME_STATS_EVENT = 47;
     // SaA synthetic workout raw-sensor channels (subtype names per AstroBox FitnessID enum)
     private static final int CMD_WORKOUT_STATS_PHONE = 49;  // FitnessID.PHONE_SPORT_DATA_V2A
-    private static final int CMD_WEAR_SPORT_DATA_V2A = 50;  // FitnessID.WEAR_SPORT_DATA_V2A — rich sport metrics; only forwarded to SaA today
+    // While a workout is open the watch pushes its own copy of the stats once a second, whatever
+    // rate the phone sends at.
+    private static final int CMD_WEAR_SPORT_DATA_V2A = 50;  // FitnessID.WEAR_SPORT_DATA_V2A
     private static final int CMD_RAW_SENSOR_BATCH = 53;     // FitnessID.WEAR_SENSOR_DATA
     // Synthetic-sport id used to mark the workout as hidden / non-persistent
     private static final int SAA_SYNTHETIC_SPORT = 810;     // AstroBox SportType.MOTION_SENSING_GAME
-    // The band blanks its workout screen unless the phone keeps pushing stats at this rate.
+    // The band renders these values on its workout screen and blanks it if the stream stops
+    // altogether. The full rate is only worth its radio traffic while the screen is likely to be
+    // on, which for a sleep session is the first few seconds; the rest of the night runs at the
+    // idle rate.
     private static final long WORKOUT_STATS_INTERVAL_MS = 1_000L;
+    private static final long WORKOUT_STATS_IDLE_INTERVAL_MS = 5_000L;
+    private static final long WORKOUT_STATS_ACTIVE_WINDOW_MS = 10_000L;
     // Reported to the band until a real reading arrives.
     private static final int HEART_RATE_UNKNOWN = 255;
 
@@ -156,6 +165,7 @@ public class XiaomiHealthService extends AbstractXiaomiService {
     private final Handler gpsTimeoutHandler = new Handler();
     private boolean saaRawSensorActive = false;
     private long saaWorkoutStartedMs = 0;
+    private long saaStatsActiveUntilMs = 0;
     private int lastHeartRate = HEART_RATE_UNKNOWN;
     private final Handler saaWorkoutStatsHandler = new Handler();
 
@@ -243,7 +253,7 @@ public class XiaomiHealthService extends AbstractXiaomiService {
                 handleRawSensorBatch(cmd.getHealth().getRawSensorBatch());
                 return;
             case CMD_WEAR_SPORT_DATA_V2A:
-                LOG.debug("Got wear sport data v2a, ignoring");
+                handleWorkoutStatsWatch(cmd.getHealth().getWorkoutStatsWatch());
                 return;
             case CMD_WORKOUT_STATS_PHONE:
                 LOG.debug("Got workout stats echo");
@@ -1083,7 +1093,8 @@ public class XiaomiHealthService extends AbstractXiaomiService {
      */
     public void startRawSensor() {
         saaRawSensorActive = true;
-        saaWorkoutStartedMs = System.currentTimeMillis();
+        saaWorkoutStartedMs = SystemClock.elapsedRealtime();
+        saaStatsActiveUntilMs = saaWorkoutStartedMs + WORKOUT_STATS_ACTIVE_WINDOW_MS;
         lastHeartRate = HEART_RATE_UNKNOWN;
 
         enableRealtimeStats(true);
@@ -1116,9 +1127,15 @@ public class XiaomiHealthService extends AbstractXiaomiService {
                     return;
                 }
                 sendWorkoutStats();
-                saaWorkoutStatsHandler.postDelayed(this, WORKOUT_STATS_INTERVAL_MS);
+                saaWorkoutStatsHandler.postDelayed(this, workoutStatsIntervalMs());
             }
         });
+    }
+
+    private long workoutStatsIntervalMs() {
+        return SystemClock.elapsedRealtime() < saaStatsActiveUntilMs
+                ? WORKOUT_STATS_INTERVAL_MS
+                : WORKOUT_STATS_IDLE_INTERVAL_MS;
     }
 
     private void stopWorkoutStatsTicker() {
@@ -1131,7 +1148,7 @@ public class XiaomiHealthService extends AbstractXiaomiService {
      * figures that were never measured.
      */
     private void sendWorkoutStats() {
-        final int elapsedSeconds = (int) ((System.currentTimeMillis() - saaWorkoutStartedMs) / 1000);
+        final int elapsedSeconds = (int) ((SystemClock.elapsedRealtime() - saaWorkoutStartedMs) / 1000);
 
         getSupport().sendCommand(
                 "saa workout stats",
@@ -1169,6 +1186,26 @@ public class XiaomiHealthService extends AbstractXiaomiService {
                         ))
                         .build()
         );
+    }
+
+    /**
+     * The stats the watch computes for itself while a workout is open, which it pushes whether the
+     * watch or the phone started that workout. Its calorie count is its own: it keeps climbing at a
+     * rate the sport type fixes, whatever the heart rate says and whatever the phone reports.
+     */
+    private void handleWorkoutStatsWatch(final WorkoutStatsWatch stats) {
+        LOG.debug("Got workout stats from watch: hr={} calories={} steps={} distance={}",
+                stats.getHeartRate(), stats.getCalories(), stats.getSteps(), stats.getDistance());
+
+        if (stats.getHeartRate() <= 0) {
+            return;
+        }
+
+        lastHeartRate = stats.getHeartRate();
+
+        if (saaRawSensorActive && sleepAsAndroidSender != null) {
+            sleepAsAndroidSender.onHrChanged(stats.getHeartRate(), 0);
+        }
     }
 
     private void handleRawSensorBatch(final RawSensorBatch batch) {
