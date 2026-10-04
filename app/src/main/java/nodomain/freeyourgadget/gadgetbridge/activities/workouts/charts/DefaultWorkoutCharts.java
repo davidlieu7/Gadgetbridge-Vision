@@ -279,12 +279,8 @@ public class DefaultWorkoutCharts {
             charts.add(createSpeedChart(context, activityKind, speedDataPoints));
         }
 
-        // Step cadence is drawn as dots, which stay readable at walking rates but not at the denser
-        // cadence of running and treadmill activities: those rely on the pace chart instead.
-        final boolean stepsCadenceHidden = cycleUnit == ActivityKind.CycleUnit.STEPS
-                && (activityKind.name().contains("RUN") || activityKind.name().contains("TREADMILL"));
-        if (hasCadenceValues && !cadenceDataPoints.isEmpty() && !stepsCadenceHidden) {
-            charts.add(createCadenceChart(context, activityKind, cycleUnit, cadenceDataPoints, cadenceAccumulator));
+        if (hasCadenceValues && !cadenceDataPoints.isEmpty()) {
+            charts.add(createCadenceChart(context, cycleUnit, cadenceDataPoints, cadenceAccumulator));
         }
 
         if (hasElevationValues && !elevationDataPoints.isEmpty()) {
@@ -544,7 +540,6 @@ public class DefaultWorkoutCharts {
     }
 
     private static WorkoutChart createCadenceChart(final Context context,
-                                                   final ActivityKind activityKind,
                                                    final ActivityKind.CycleUnit cycleUnit,
                                                    final List<Entry> cadenceDataPoints,
                                                    final Accumulator cadenceAccumulator) {
@@ -562,8 +557,9 @@ public class DefaultWorkoutCharts {
         );
 
         final int color = ContextCompat.getColor(context, R.color.chart_cadence_circle);
-        if (ActivityKind.isRowingActivity(activityKind)) {
-            // Rowing stroke rate is a continuous signal, rendered as a line rather than dots.
+        // Cadence sampled every couple of seconds or faster merges into a band as dots, so it is
+        // drawn as a line. Sparser series stay as dots.
+        if (isDenseSeries(cadenceDataPoints)) {
             final LineData lineData = createGappedLineData(context, cadenceDataPoints, label, color);
             return new WorkoutChart(
                     "cadence",
@@ -967,6 +963,28 @@ public class DefaultWorkoutCharts {
     // Failsafe for devices with noisy data / too many gaps.
     private static final int MAX_SEGMENTS = 50;
 
+    // Median sample gap, in ms, at or below which a cadence series is drawn as a line.
+    private static final float DENSE_SAMPLE_GAP_MS = 2000f;
+
+    private static float[] sampleGaps(final List<Entry> entries) {
+        final float[] gaps = new float[entries.size() - 1];
+        for (int i = 1; i < entries.size(); i++) {
+            gaps[i - 1] = entries.get(i).getX() - entries.get(i - 1).getX();
+        }
+        return gaps;
+    }
+
+    private static float median(final float[] values) {
+        final float[] sorted = values.clone();
+        Arrays.sort(sorted);
+        return sorted[sorted.length / 2];
+    }
+
+    @VisibleForTesting
+    static boolean isDenseSeries(final List<Entry> entries) {
+        return entries.size() >= 3 && median(sampleGaps(entries)) <= DENSE_SAMPLE_GAP_MS;
+    }
+
     /**
      * Splits a chronological entry list into segments, starting a new segment after any gap that is
      * larger than to the series' own median sample gap (e.g. a paused workout, or a sensor dropout).
@@ -983,13 +1001,8 @@ public class DefaultWorkoutCharts {
             return segments;
         }
 
-        final float[] gaps = new float[entries.size() - 1];
-        for (int i = 1; i < entries.size(); i++) {
-            gaps[i - 1] = entries.get(i).getX() - entries.get(i - 1).getX();
-        }
-        final float[] sortedGaps = gaps.clone();
-        Arrays.sort(sortedGaps);
-        final float medianGap = sortedGaps[sortedGaps.length / 2];
+        final float[] gaps = sampleGaps(entries);
+        final float medianGap = median(gaps);
         if (medianGap <= 0) {
             // Should never happen? No meaningful gap to compare against (e.g. duplicate timestamps), keep as one segment.
             segments.add(entries);
