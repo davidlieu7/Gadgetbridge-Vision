@@ -32,6 +32,9 @@ class NxWearActivitySampleProvider(private val device: GBDevice, private val ses
 
     override fun getAllActivitySamples(timestampFrom: Int, timestampTo: Int): MutableList<GenericActivitySample> {
         val samples = super.getAllActivitySamples(timestampFrom, timestampTo)
+        // Keep lookups by timestamp constant-time as daily sport records are merged with
+        // potentially high-resolution heart-rate samples.
+        val samplesByTimestamp = samples.associateBy { it.timestamp }.toMutableMap()
         val dbDevice = DBHelper.findDevice(device, session) ?: return samples
         val dayStart = Calendar.getInstance().apply {
             timeInMillis = timestampFrom.toLong() * 1000L
@@ -45,6 +48,7 @@ class NxWearActivitySampleProvider(private val device: GBDevice, private val ses
                 NxWearSportSampleDao.Properties.Timestamp.ge(dayStart),
                 NxWearSportSampleDao.Properties.Timestamp.le(timestampTo.toLong() * 1000L))
             .orderAsc(NxWearSportSampleDao.Properties.Timestamp)
+            .build()
             .list()
         var previous: NxWearSportSample? = null
         var previousDay = Long.MIN_VALUE
@@ -62,10 +66,11 @@ class NxWearActivitySampleProvider(private val device: GBDevice, private val ses
             previousDay = day
             val timestamp = (record.timestamp / 1000L).toInt()
             if (timestamp !in timestampFrom..timestampTo) continue
-            val sample = samples.firstOrNull { it.timestamp == timestamp } ?: GenericActivitySample().also {
+            val sample = samplesByTimestamp[timestamp] ?: GenericActivitySample().also {
                 it.provider = this
                 it.timestamp = timestamp
                 samples.add(it)
+                samplesByTimestamp[timestamp] = it
             }
             sample.rawKind = ActivityKind.ACTIVITY.code
             sample.steps = stepDelta
@@ -77,7 +82,7 @@ class NxWearActivitySampleProvider(private val device: GBDevice, private val ses
         val sleepProvider = GenericSleepStageSampleProvider(device, session)
         val stages = sleepProvider.getAllSamples(timestampFrom.toLong() * 1000L, timestampTo.toLong() * 1000L).toMutableList()
         sleepProvider.getLastSampleBefore(timestampFrom.toLong() * 1000L)?.let { stages.add(0, it) }
-        val byTimestamp = samples.associateBy { it.timestamp }.toMutableMap()
+        val byTimestamp = samplesByTimestamp
         for (stage in stages) {
             val start = (stage.timestamp / 1000L).toInt()
             val end = start.toLong() + stage.duration * 60L

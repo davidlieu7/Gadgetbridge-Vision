@@ -30,7 +30,7 @@ import java.util.Date
 
 /** The existing summary row is also the durable session journal; there is no separate pending queue. */
 internal class NxWearWorkoutStore(private val device: GBDevice) {
-    fun active(): NxWearWorkout? = GBApplication.acquireDB().use { db ->
+    fun active(): NxWearWorkout? = GBApplication.acquireDbReadOnly().use { db ->
         workouts(db.daoSession).firstOrNull { it.second.isRunning }?.second
     }
 

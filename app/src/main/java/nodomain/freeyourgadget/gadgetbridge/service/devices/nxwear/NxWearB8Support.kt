@@ -445,12 +445,12 @@ class NxWearB8Support : AbstractBTLESingleDeviceSupport(LOG) {
                     acknowledgeMeasurementPacket(requireNotNull(packet.sequence), NxWearDataType.BATTERY)
                 }
                 NxWearProtocol.isShakeCameraEvent(packet) -> {
+                    acknowledgeMeasurementPacket(requireNotNull(packet.sequence), NxWearDataType.SHAKE_CAMERA)
                     if (!getDevicePrefs().getBoolean(NxWearB8Coordinator.PREF_SHAKE_TO_TAKE_PICTURE, false)) {
                         LOG.debug("Ignoring Nx Wear B8 shake-to-camera event while disabled")
                         return true
                     }
                     LOG.debug("Received Nx Wear B8 shake-to-camera event")
-                    acknowledgeMeasurementPacket(requireNotNull(packet.sequence), NxWearDataType.SHAKE_CAMERA)
                     val event = GBDeviceEventCameraRemote().apply {
                         this.event = GBDeviceEventCameraRemote.Event.TAKE_PICTURE
                     }

@@ -33,7 +33,7 @@ internal class NxWearActivityTrackProvider(private val device: GBDevice) : Activ
         val workout = NxWearWorkout.decode(summary.rawSummaryData) ?: return null
         val end = workout.endMillis ?: return null
         return try {
-            GBApplication.acquireDB().use { db ->
+            GBApplication.acquireDbReadOnly().use { db ->
                 val samples = GenericHeartRateSampleProvider(device, db.daoSession)
                     .getAllSamples(workout.startMillis, end).filter { it.heartRate > 0 }
                 if (samples.isEmpty()) return null
