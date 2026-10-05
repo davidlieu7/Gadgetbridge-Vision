@@ -149,10 +149,10 @@ class NxWearB8Support : AbstractBTLESingleDeviceSupport(LOG) {
         if (config !in CONFIG_KEYS) return
 
         when (config) {
-            ACTION_MEASURE_STRESS -> { startMeasurement(NxWearDataType.STRESS); return }
-            ACTION_CANCEL_MEASURE_STRESS -> { cancelMeasurement(NxWearDataType.STRESS); return }
-            ACTION_MEASURE_SPO2 -> { startMeasurement(NxWearDataType.SPO2); return }
-            ACTION_CANCEL_MEASURE_SPO2 -> { cancelMeasurement(NxWearDataType.SPO2); return }
+            NxWearB8Coordinator.ACTION_MEASURE_STRESS -> { startMeasurement(NxWearDataType.STRESS); return }
+            NxWearB8Coordinator.ACTION_CANCEL_MEASURE_STRESS -> { cancelMeasurement(NxWearDataType.STRESS); return }
+            NxWearB8Coordinator.ACTION_MEASURE_SPO2 -> { startMeasurement(NxWearDataType.SPO2); return }
+            NxWearB8Coordinator.ACTION_CANCEL_MEASURE_SPO2 -> { cancelMeasurement(NxWearDataType.SPO2); return }
             NxWearB8Coordinator.ACTION_EXERCISE_START -> { setExerciseRunning(true); return }
             NxWearB8Coordinator.ACTION_EXERCISE_STOP -> { setExerciseRunning(false); return }
             NxWearB8Coordinator.PREF_SHAKE_TO_TAKE_PICTURE -> { writeShakeCameraSettings(); return }
@@ -843,18 +843,14 @@ class NxWearB8Support : AbstractBTLESingleDeviceSupport(LOG) {
         private val CONFIG_KEYS = HEALTH_CONFIG_KEYS + setOf(
             DeviceSettingsPreferenceConst.PREF_TIMEFORMAT,
             NxWearB8Coordinator.PREF_SHAKE_TO_TAKE_PICTURE,
-            ACTION_MEASURE_STRESS,
-            ACTION_MEASURE_SPO2,
-            ACTION_CANCEL_MEASURE_STRESS,
-            ACTION_CANCEL_MEASURE_SPO2,
+            NxWearB8Coordinator.ACTION_MEASURE_STRESS,
+            NxWearB8Coordinator.ACTION_MEASURE_SPO2,
+            NxWearB8Coordinator.ACTION_CANCEL_MEASURE_STRESS,
+            NxWearB8Coordinator.ACTION_CANCEL_MEASURE_SPO2,
             NxWearB8Coordinator.ACTION_EXERCISE_START,
             NxWearB8Coordinator.ACTION_EXERCISE_STOP,
         ) + WRIST_WAKE_CONFIG_KEYS
 
-        private const val ACTION_MEASURE_STRESS = "nx_wear_b8_measure_stress"
-        private const val ACTION_MEASURE_SPO2 = "nx_wear_b8_measure_spo2"
-        private const val ACTION_CANCEL_MEASURE_STRESS = "nx_wear_b8_cancel_measure_stress"
-        private const val ACTION_CANCEL_MEASURE_SPO2 = "nx_wear_b8_cancel_measure_spo2"
         private const val MEASUREMENT_TIMEOUT_MS = 60_000L
         private const val HISTORY_TIMEOUT_MS = 60_000L
         private val LOG = LoggerFactory.getLogger(NxWearB8Support::class.java)
