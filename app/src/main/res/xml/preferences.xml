@@ -346,13 +346,21 @@
                 android:layout="@layout/preference_checkbox"
                 android:title="@string/pref_title_whenscreenon"
                 app:iconSpaceReserved="false" />
-            <ListPreference
-                android:defaultValue="autodetect"
-                android:entries="@array/osmand_package_names"
-                android:entryValues="@array/osmand_package_names_values"
-                android:key="pref_key_osmand_packagename"
-                android:summary="@string/pref_summary_osmand_packagename"
-                android:title="@string/pref_title_osmand_packagename"
+            <SwitchPreferenceCompat
+                android:defaultValue="false"
+                android:dependency="navigation_forward"
+                android:key="navigation_allow_unsupported_devices"
+                android:layout="@layout/preference_checkbox"
+                android:summary="@string/pref_summary_navigation_allow_unsupported_devices"
+                android:title="@string/pref_title_allow_unsupported_devices"
+                app:iconSpaceReserved="false" />
+            <SwitchPreferenceCompat
+                android:defaultValue="true"
+                android:dependency="navigation_forward"
+                android:key="navigation_right_hand_traffic"
+                android:layout="@layout/preference_checkbox"
+                android:summary="@string/pref_description_navigation_right_hand_driving"
+                android:title="@string/pref_title_navigation_right_hand_driving"
                 app:iconSpaceReserved="false" />
             <PreferenceCategory
                 android:key="navigation_apps_selection"
@@ -363,6 +371,15 @@
                     android:key="navigation_app_osmand"
                     android:layout="@layout/preference_checkbox"
                     android:title="@string/pref_navigation_app_osmand"
+                    app:iconSpaceReserved="false" />
+                <ListPreference
+                    android:defaultValue="autodetect"
+                    android:dependency="navigation_app_osmand"
+                    android:entries="@array/osmand_package_names"
+                    android:entryValues="@array/osmand_package_names_values"
+                    android:key="pref_key_osmand_packagename"
+                    android:summary="@string/pref_summary_osmand_packagename"
+                    android:title="@string/pref_title_osmand_packagename"
                     app:iconSpaceReserved="false" />
                 <SwitchPreferenceCompat
                     android:defaultValue="true"
@@ -378,38 +395,6 @@
                     app:iconSpaceReserved="false" />
             </PreferenceCategory>
 
-            <PreferenceCategory
-                android:key="navigation_xiaomi_settings"
-                android:title="@string/pref_title_xiaomi_band_navigation_settings"
-                app:iconSpaceReserved="false">
-                <SwitchPreferenceCompat
-                    android:defaultValue="true"
-                    android:persistent="true"
-                    android:key="navigation_right_hand_driving"
-                    android:layout="@layout/preference_checkbox"
-                    android:title="@string/pref_title_navigation_right_hand_driving"
-                    android:summary="@string/pref_description_navigation_right_hand_driving"
-                    app:iconSpaceReserved="false" />
-
-                <SwitchPreferenceCompat
-                    android:defaultValue="true"
-                    android:persistent="true"
-                    android:key="xiaomi_navigation_continuous_updates"
-                    android:layout="@layout/preference_checkbox"
-                    android:title="@string/pref_title_navigation_continuous_updates"
-                    android:summary="@string/pref_description_navigation_continuous_updates"
-                    app:iconSpaceReserved="false" />
-
-                <EditTextPreference
-                    android:defaultValue="5000"
-                    android:persistent="true"
-                    android:inputType="number"
-                    android:dependency="xiaomi_navigation_continuous_updates"
-                    android:key="xiaomi_navigation_update_rate"
-                    android:title="@string/pref_title_navigation_update_rate"
-                    android:icon="@drawable/ic_sync"
-                    app:useSimpleSummaryProvider="true" />
-            </PreferenceCategory>
         </PreferenceScreen>
 
         <nodomain.freeyourgadget.gadgetbridge.util.preferences.SubtitleListPreference

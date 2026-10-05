@@ -1014,6 +1014,7 @@ public class DeviceCommunicationService extends Service implements SharedPrefere
                 allowBluetoothIntentApi = sharedPreferences.getBoolean(GBPrefs.PREF_ALLOW_INTENT_API, false);
                 LOG.info("allowBluetoothIntentApi changed to {}", allowBluetoothIntentApi);
             }
+            case GBPrefs.NAVIGATION_ALLOW_UNSUPPORTED_DEVICES -> updateReceiversState();
         }
 
         deviceReceiversManager.onSharedPreferenceChanged(sharedPreferences, key);

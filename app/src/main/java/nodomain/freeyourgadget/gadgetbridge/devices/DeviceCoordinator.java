@@ -1099,6 +1099,8 @@ public interface DeviceCoordinator {
 
     boolean supportsNavigation(@NonNull final GBDevice device);
 
+    boolean supportsNotifications(@NonNull final GBDevice device);
+
     int getOrderPriority();
 
     @NonNull

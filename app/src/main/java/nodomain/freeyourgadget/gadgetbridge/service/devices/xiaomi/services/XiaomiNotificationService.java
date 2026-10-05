@@ -17,7 +17,6 @@
 package nodomain.freeyourgadget.gadgetbridge.service.devices.xiaomi.services;
 
 import android.Manifest;
-import android.content.Context;
 import android.content.pm.PackageManager;
 import android.graphics.drawable.Drawable;
 
@@ -31,7 +30,6 @@ import java.util.Locale;
 import java.util.Queue;
 
 import nodomain.freeyourgadget.gadgetbridge.BuildConfig;
-import nodomain.freeyourgadget.gadgetbridge.R;
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsPreferenceConst;
 import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEventCallControl;
 import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEventNotificationControl;
@@ -58,9 +56,6 @@ import nodomain.freeyourgadget.gadgetbridge.util.StringUtils;
 
 import static nodomain.freeyourgadget.gadgetbridge.service.devices.xiaomi.XiaomiBitmapUtils.convertToPixelFormat;
 import static nodomain.freeyourgadget.gadgetbridge.service.devices.xiaomi.XiaomiBitmapUtils.getPixelFormatString;
-
-import androidx.annotation.Nullable;
-import androidx.core.content.res.ResourcesCompat;
 
 public class XiaomiNotificationService extends AbstractXiaomiService implements XiaomiDataUploadService.Callback {
     private static final Logger LOG = LoggerFactory.getLogger(XiaomiNotificationService.class);
@@ -448,53 +443,12 @@ public class XiaomiNotificationService extends AbstractXiaomiService implements 
         return getSupport().getContext().checkSelfPermission(Manifest.permission.SEND_SMS) == PackageManager.PERMISSION_GRANTED;
     }
 
-    @Nullable
-    private Drawable resolveNotificationIcon(final String packageName) {
-        final Context context = getSupport().getContext();
-
-        return switch (packageName) {
-            case "gadgetbridge.nav.iconv1.1" ->
-                    ResourcesCompat.getDrawable(context.getResources(), R.drawable.ic_turn_straight, context.getTheme());
-            case "gadgetbridge.nav.iconv1.2" ->
-                    ResourcesCompat.getDrawable(context.getResources(), R.drawable.ic_turn_left, context.getTheme());
-            case "gadgetbridge.nav.iconv1.3" ->
-                    ResourcesCompat.getDrawable(context.getResources(), R.drawable.ic_turn_left_slight, context.getTheme());
-            case "gadgetbridge.nav.iconv1.4" ->
-                    ResourcesCompat.getDrawable(context.getResources(), R.drawable.ic_turn_left_sharp, context.getTheme());
-            case "gadgetbridge.nav.iconv1.5" ->
-                    ResourcesCompat.getDrawable(context.getResources(), R.drawable.ic_turn_right, context.getTheme());
-            case "gadgetbridge.nav.iconv1.6" ->
-                    ResourcesCompat.getDrawable(context.getResources(), R.drawable.ic_turn_right_slight, context.getTheme());
-            case "gadgetbridge.nav.iconv1.7" ->
-                    ResourcesCompat.getDrawable(context.getResources(), R.drawable.ic_turn_right_sharp, context.getTheme());
-            case "gadgetbridge.nav.iconv1.10" ->
-                    ResourcesCompat.getDrawable(context.getResources(), R.drawable.ic_turn_uleft, context.getTheme());
-            case "gadgetbridge.nav.iconv1.11" ->
-                    ResourcesCompat.getDrawable(context.getResources(), R.drawable.ic_turn_uright, context.getTheme());
-            case "gadgetbridge.nav.iconv1.13", "gadgetbridge.nav.iconv1.14.LHD" ->
-                    // "roundabout left" in right-hand-driving is exit nr. 3; in l-d-h it's exit number 1
-                    ResourcesCompat.getDrawable(context.getResources(), R.drawable.ic_turn_round_left, context.getTheme());
-            case "gadgetbridge.nav.iconv1.13.LHD", "gadgetbridge.nav.iconv1.14" ->
-                    // "roundabout right" in right-hand-driving is exit nr. 1; in l-d-h it's exit number 3
-                    ResourcesCompat.getDrawable(context.getResources(), R.drawable.ic_turn_round_right, context.getTheme());
-            case "gadgetbridge.nav.iconv1.15" ->
-                    ResourcesCompat.getDrawable(context.getResources(), R.drawable.ic_turn_round_straight, context.getTheme());
-            case "gadgetbridge.nav.iconv1.16" ->
-                    ResourcesCompat.getDrawable(context.getResources(), R.drawable.ic_turn_round_uturn, context.getTheme());
-            case "gadgetbridge.nav.iconv1.17" ->
-                    ResourcesCompat.getDrawable(context.getResources(), R.drawable.ic_turn_finish, context.getTheme());
-            default -> NotificationUtils.getAppIcon(context, packageName);
-        };
-    }
-
     private void handleNotificationIconQuery(final NotificationIconPackage notificationIconPackage) {
         LOG.debug("Watch querying notification icon for {}", notificationIconPackage.getPackage());
 
         iconPackageName = notificationIconPackage.getPackage();
 
-        Drawable icon = resolveNotificationIcon(iconPackageName);
-
-        if (icon == null) {
+        if (NotificationUtils.getAppIcon(getSupport().getContext(), iconPackageName) == null) {
             // Attempt to find truncated package name
             for (final String fullPackage : mPackages) {
                 if (fullPackage.startsWith(iconPackageName)) {
@@ -589,7 +543,7 @@ public class XiaomiNotificationService extends AbstractXiaomiService implements 
             return;
         }
 
-        final Drawable icon = resolveNotificationIcon(iconPackageName);
+        final Drawable icon = NotificationUtils.getAppIcon(getSupport().getContext(), iconPackageName);
         if (icon == null) {
             // FIXME the packageName is sometimes truncated
             LOG.warn("Failed to get icon for {}", iconPackageName);

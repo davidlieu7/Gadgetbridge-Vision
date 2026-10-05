@@ -138,6 +138,8 @@ public class GBPrefs extends Prefs {
     public static final String HEALTH_CONNECT_PROMPT_FOR_FULL_DAO_RESET = "health_connect_prompt_for_full_dao_reset";
 
     public static final String NAVIGATION_APP_COMAPS = "navigation_app_comaps";
+    public static final String NAVIGATION_ALLOW_UNSUPPORTED_DEVICES = "navigation_allow_unsupported_devices";
+    public static final String NAVIGATION_RIGHT_HAND_TRAFFIC = "navigation_right_hand_traffic";
 
     // Online fitness trackers auto-upload (Endurain / Wanderer)
     public static final String ENDURAIN_AUTO_UPLOAD_ENABLED = "endurain_auto_upload_enabled";

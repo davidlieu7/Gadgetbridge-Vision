@@ -97,6 +97,9 @@ fun garminDeviceSettings(
     if (coordinator.getContactsSlotCount(device) > 0) {
         notifications.add(R.xml.devicesettings_contacts)
     }
+    if (coordinator.supportsNavigation(device)) {
+        notifications.add(R.xml.devicesettings_navigation_notifications)
+    }
     screen(
         DeviceSpecificSettingsScreen.CALLS_AND_NOTIFICATIONS,
         icon = R.drawable.ic_notifications,

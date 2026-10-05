@@ -57,6 +57,7 @@ import nodomain.freeyourgadget.gadgetbridge.model.NotificationSpec;
 import nodomain.freeyourgadget.gadgetbridge.model.Reminder;
 import nodomain.freeyourgadget.gadgetbridge.model.WorldClock;
 import nodomain.freeyourgadget.gadgetbridge.model.weather.Weather;
+import nodomain.freeyourgadget.gadgetbridge.service.navigation.NavigationNotificationSender;
 import nodomain.freeyourgadget.gadgetbridge.util.preferences.DevicePrefs;
 
 // TODO: support option for a single reminder notification when notifications could not be delivered?
@@ -73,6 +74,7 @@ public abstract class AbstractDeviceSupport implements DeviceSupport {
     protected GBDevice gbDevice;
     private Context context;
     private boolean autoReconnect, scanReconnect;
+    private NavigationNotificationSender navigationNotificationSender;
 
     /// an optional {@link Bundle} extra of type {@code byte[]} used to pass
     /// <u>small</u> transient data to {@link #onInstallApp(Uri, Bundle)}
@@ -641,8 +643,14 @@ public abstract class AbstractDeviceSupport implements DeviceSupport {
     }
 
     @Override
-    public void onSetNavigationInfo(NavigationInfoSpec navigationInfoSpec) {
-
+    public void onSetNavigationInfo(final NavigationInfoSpec navigationInfoSpec) {
+        if (!getCoordinator().supportsNavigation(getDevice())) {
+            return;
+        }
+        if (navigationNotificationSender == null) {
+            navigationNotificationSender = new NavigationNotificationSender(this);
+        }
+        navigationNotificationSender.onSetNavigationInfo(navigationInfoSpec);
     }
 
     @Override

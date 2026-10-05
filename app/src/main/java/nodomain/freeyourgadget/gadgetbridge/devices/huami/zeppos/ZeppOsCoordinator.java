@@ -498,6 +498,9 @@ public abstract class ZeppOsCoordinator extends HuamiCoordinator {
             if (getCannedRepliesSlotCount(device) > 0) {
                 notifications.add(R.xml.devicesettings_canned_reply_16);
             }
+            if (supportsNavigation(device)) {
+                notifications.add(R.xml.devicesettings_navigation_notifications);
+            }
             notifications.add(R.xml.devicesettings_transliteration);
         } else {
             // As of #6755 we support forwarding notifications
