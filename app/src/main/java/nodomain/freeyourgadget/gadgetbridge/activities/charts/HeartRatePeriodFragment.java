@@ -58,7 +58,6 @@ public class HeartRatePeriodFragment extends AbstractChartFragment<HeartRatePeri
 
     protected static final Logger LOG = LoggerFactory.getLogger(HeartRatePeriodFragment.class);
 
-    static int SEC_PER_DAY = 24 * 60 * 60;
     static int DATA_INVALID = -1;
 
     protected int HEARTRATE_COLOR;
@@ -143,7 +142,7 @@ public class HeartRatePeriodFragment extends AbstractChartFragment<HeartRatePeri
     }
 
     private HeartRateData fetchHeartRateDataForDay(DBHandler db, GBDevice device, int startTs) {
-        int endTs = startTs + SEC_PER_DAY - 1;
+        int endTs = toTimestamp(DateTimeUtils.shiftByDays(new Date(startTs * 1000L), 1)) - 1;
         List<? extends ActivitySample> samples = getActivitySamples(db, device, startTs, endTs);
         final HeartRateUtils heartRateUtilsInstance = HeartRateUtils.getInstance();
 
@@ -181,7 +180,10 @@ public class HeartRatePeriodFragment extends AbstractChartFragment<HeartRatePeri
 
         List<HeartRateData> result = new ArrayList<>();
         for (int i = 0; i < TOTAL_DAYS; i++) {
-            HeartRateData dayData = fetchHeartRateDataForDay(db, device, startTs + i * SEC_PER_DAY);
+            Calendar day = Calendar.getInstance();
+            day.setTimeInMillis(startTs * 1000L);
+            day.add(Calendar.DATE, i);
+            HeartRateData dayData = fetchHeartRateDataForDay(db, device, toTimestamp(day.getTime()));
             result.add(dayData);
         }
         return new HeartRatePeriodData(result);
@@ -279,15 +281,9 @@ public class HeartRatePeriodFragment extends AbstractChartFragment<HeartRatePeri
     }
 
     private Pair<Integer, Integer> getStartAndEndTS() {
-        Calendar day = Calendar.getInstance();
-        day.setTime(getEndDate());
-        day.add(Calendar.DATE, 0);
-        day.set(Calendar.HOUR_OF_DAY, 0);
-        day.set(Calendar.MINUTE, 0);
-        day.set(Calendar.SECOND, 0);
-        day.add(Calendar.HOUR, 0);
-        int startTs = (int) (day.getTimeInMillis() / 1000) - SEC_PER_DAY * (TOTAL_DAYS - 1);
-        int endTs = startTs + SEC_PER_DAY * TOTAL_DAYS - 1;
+        Date lastDay = DateTimeUtils.dayStart(getEndDate());
+        int startTs = toTimestamp(DateTimeUtils.shiftByDays(lastDay, -(TOTAL_DAYS - 1)));
+        int endTs = toTimestamp(DateTimeUtils.shiftByDays(lastDay, 1)) - 1;
         return Pair.of(startTs, endTs);
     }
 
@@ -341,9 +337,9 @@ public class HeartRatePeriodFragment extends AbstractChartFragment<HeartRatePeri
         mDateView.setText(DateTimeUtils.formatDaysUntil(TOTAL_DAYS, getTSEnd()));
         final XAxis x = hrLineChart.getXAxis();
         if (TOTAL_DAYS == 1) {
-            setOneDayData(data.samples.get(0), endTs);
+            setOneDayData(data.samples.get(0), startTs, endTs);
             x.setAxisMinimum(0f);
-            x.setAxisMaximum(86400f);
+            x.setAxisMaximum(endTs - startTs);
         } else {
             setMultipleDaysData(data, startTs, endTs);
             x.setAxisMinimum(0);
@@ -353,7 +349,7 @@ public class HeartRatePeriodFragment extends AbstractChartFragment<HeartRatePeri
         }
     }
 
-    private void setOneDayData(HeartRateData data, int endTs) {
+    private void setOneDayData(HeartRateData data, int startTs, int endTs) {
         Date date = new Date((long) endTs * 1000);
         String formattedDate = new SimpleDateFormat("E, MMM dd").format(date);
         mDateView.setText(formattedDate);
@@ -364,6 +360,7 @@ public class HeartRatePeriodFragment extends AbstractChartFragment<HeartRatePeri
         final List<Entry> lineEntries = new ArrayList<>();
         List<? extends ActivitySample> samples = data.samples;
         final TimestampTranslation tsTranslation = new TimestampTranslation();
+        tsTranslation.shorten(startTs);
 
         final List<ILineDataSet> lineDataSets = new ArrayList<>();
         int lastTs = 0;
@@ -451,8 +448,10 @@ public class HeartRatePeriodFragment extends AbstractChartFragment<HeartRatePeri
         ValueFormatter formatter = new ValueFormatter() {
             @Override
             public String getFormattedValue(float value) {
-                int ts = startTs + SEC_PER_DAY * (int) value;
-                return formatDay.format(new Date(ts * 1000L));
+                Calendar day = Calendar.getInstance();
+                day.setTimeInMillis(startTs * 1000L);
+                day.add(Calendar.DATE, (int) value);
+                return formatDay.format(day.getTime());
             }
         };
         hrLineChart.getXAxis().setValueFormatter(formatter);
