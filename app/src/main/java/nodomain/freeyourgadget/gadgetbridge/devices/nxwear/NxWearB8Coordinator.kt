@@ -298,8 +298,6 @@ class NxWearB8Coordinator : AbstractBLEDeviceCoordinator() {
         const val PREF_EXERCISE_RUNNING = "nx_wear_b8_exercise_running"
         private const val MTU = 517
     }
-
-    override fun isExperimental(): Boolean = true
 }
 
 private class NxWearB8MeasurementDialog(
