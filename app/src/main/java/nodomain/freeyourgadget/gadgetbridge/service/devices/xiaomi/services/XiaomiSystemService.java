@@ -930,6 +930,14 @@ public class XiaomiSystemService extends AbstractXiaomiService implements Xiaomi
         }
     }
 
+    /**
+     * Put a harmless command on the wire so an idle link is awake for whatever follows. The battery
+     * state is already polled on a timer, so asking for it again changes nothing on the watch.
+     */
+    public void wakeLink() {
+        getSupport().sendCommand("wake link", COMMAND_TYPE, CMD_BATTERY);
+    }
+
     public void onFindWatch(final boolean start) {
         LOG.debug("Find watch: {}", start);
 

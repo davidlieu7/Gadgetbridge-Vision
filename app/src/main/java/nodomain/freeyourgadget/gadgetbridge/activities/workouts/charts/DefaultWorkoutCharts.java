@@ -30,9 +30,11 @@ import static nodomain.freeyourgadget.gadgetbridge.model.ActivitySummaryEntries.
 
 import android.content.Context;
 
+import androidx.annotation.VisibleForTesting;
 import androidx.core.content.ContextCompat;
 
 import com.github.mikephil.charting.charts.ScatterChart;
+import com.github.mikephil.charting.components.Legend;
 import com.github.mikephil.charting.components.YAxis;
 import com.github.mikephil.charting.data.Entry;
 import com.github.mikephil.charting.data.LineData;
@@ -134,19 +136,27 @@ public class DefaultWorkoutCharts {
                 hasElevationValues = hasElevationValues || (elevation != 0.0);
             }
 
+            // Speed, cadence and respiratory rate are instantaneous rates whose 0 means "paused /
+            // not reported" rather than a measurement, so those zeros are left out of the series and
+            // it gaps out instead of cliffing to the axis, same as HR above. Power keeps its zeros:
+            // a power meter reads a genuine 0 W whenever the rider coasts.
+
             // Speed
             final float speed = point.getSpeed();
-            if (speed >= 0.0f) {
+            if (speed > 0.0f) {
                 speedDataPoints.add(new Entry(tsShorten, speed));
-                hasSpeedValues = hasSpeedValues || (speed > 0.0f);
+                hasSpeedValues = true;
             }
 
             // Cadence
             final float cadence = point.getCadence();
+            // The average feeds the cadence chart's y-axis maximum, so it counts the zeros too.
             if (cadence >= 0.0f) {
-                cadenceDataPoints.add(new Entry(tsShorten, cadence));
                 cadenceAccumulator.add(cadence);
-                hasCadenceValues = hasCadenceValues || (cadence > 0.0f);
+            }
+            if (cadence > 0.0f) {
+                cadenceDataPoints.add(new Entry(tsShorten, cadence));
+                hasCadenceValues = true;
             }
 
             final float power = point.getPower();
@@ -156,9 +166,9 @@ public class DefaultWorkoutCharts {
             }
 
             final float respiratoryRate = point.getRespiratoryRate();
-            if (respiratoryRate >= 0.0f) {
+            if (respiratoryRate > 0.0f) {
                 respiratoryRatePoints.add(new Entry(tsShorten, respiratoryRate));
-                hasRespiratoryRateValues = hasRespiratoryRateValues || (respiratoryRate > 0.0f);
+                hasRespiratoryRateValues = true;
             }
 
             // Depth (diving activity)
@@ -533,26 +543,51 @@ public class DefaultWorkoutCharts {
                                                    final ActivityKind.CycleUnit cycleUnit,
                                                    final List<Entry> cadenceDataPoints,
                                                    final Accumulator cadenceAccumulator) {
-        final String label = String.format("%s (%s)", context.getString(R.string.workout_cadence), getUnitString(context, getCadenceUnit(cycleUnit)));
-        final ScatterDataSet dataset = createScatterDataSet(context, cadenceDataPoints, label, ContextCompat.getColor(context, R.color.chart_cadence_circle));
+        final String cadenceUnit = getCadenceUnit(cycleUnit);
+        final String label = String.format("%s (%s)", context.getString(R.string.workout_cadence), getUnitString(context, cadenceUnit));
         final ValueFormatter integerFormatter = new ValueFormatter() {
             @Override
             public String getFormattedValue(float value) {
                 return String.valueOf((int) value);
             }
         };
-        float xAxisMaximum = Math.max(
-                (float) (cadenceAccumulator.getMax() + 30),
-                (float) cadenceAccumulator.getAverage() * 2
+        final float xAxisMaximum = (float) Math.max(
+                cadenceAccumulator.getMax() + 30,
+                cadenceAccumulator.getAverage() * 2
         );
 
+        final int color = ContextCompat.getColor(context, R.color.chart_cadence_circle);
+        // Cadence sampled every couple of seconds or faster merges into a band as dots, so it is
+        // drawn as a line. Sparser series stay as dots.
+        if (isDenseSeries(cadenceDataPoints)) {
+            final LineData lineData = createGappedLineData(context, cadenceDataPoints, label, color);
+            return new WorkoutChart(
+                    "cadence",
+                    context.getString(R.string.workout_cadence),
+                    ActivitySummaryEntries.GROUP_CADENCE,
+                    lineData,
+                    integerFormatter,
+                    getUnitString(context, cadenceUnit),
+                    lineChart -> {
+                        YAxis yAxisLeft = lineChart.getAxisLeft();
+                        yAxisLeft.setAxisMinimum(0);
+                        yAxisLeft.setAxisMaximum(xAxisMaximum);
+                        YAxis yAxisRight = lineChart.getAxisRight();
+                        yAxisRight.setAxisMinimum(0);
+                        yAxisRight.setAxisMaximum(xAxisMaximum);
+                        return kotlin.Unit.INSTANCE;
+                    }
+            );
+        }
+
+        final ScatterDataSet dataset = createScatterDataSet(context, cadenceDataPoints, label, color);
         return new WorkoutChart(
                 "cadence",
                 context.getString(R.string.workout_cadence),
                 ActivitySummaryEntries.GROUP_CADENCE,
                 new ScatterData(dataset),
                 integerFormatter,
-                getUnitString(context, UNIT_SPM),
+                getUnitString(context, cadenceUnit),
                 lineChart -> {
                     YAxis yAxisLeft = lineChart.getAxisLeft();
                     yAxisLeft.setAxisMinimum(0);
@@ -928,6 +963,28 @@ public class DefaultWorkoutCharts {
     // Failsafe for devices with noisy data / too many gaps.
     private static final int MAX_SEGMENTS = 50;
 
+    // Median sample gap, in ms, at or below which a cadence series is drawn as a line.
+    private static final float DENSE_SAMPLE_GAP_MS = 2000f;
+
+    private static float[] sampleGaps(final List<Entry> entries) {
+        final float[] gaps = new float[entries.size() - 1];
+        for (int i = 1; i < entries.size(); i++) {
+            gaps[i - 1] = entries.get(i).getX() - entries.get(i - 1).getX();
+        }
+        return gaps;
+    }
+
+    private static float median(final float[] values) {
+        final float[] sorted = values.clone();
+        Arrays.sort(sorted);
+        return sorted[sorted.length / 2];
+    }
+
+    @VisibleForTesting
+    static boolean isDenseSeries(final List<Entry> entries) {
+        return entries.size() >= 3 && median(sampleGaps(entries)) <= DENSE_SAMPLE_GAP_MS;
+    }
+
     /**
      * Splits a chronological entry list into segments, starting a new segment after any gap that is
      * larger than to the series' own median sample gap (e.g. a paused workout, or a sensor dropout).
@@ -944,13 +1001,8 @@ public class DefaultWorkoutCharts {
             return segments;
         }
 
-        final float[] gaps = new float[entries.size() - 1];
-        for (int i = 1; i < entries.size(); i++) {
-            gaps[i - 1] = entries.get(i).getX() - entries.get(i - 1).getX();
-        }
-        final float[] sortedGaps = gaps.clone();
-        Arrays.sort(sortedGaps);
-        final float medianGap = sortedGaps[sortedGaps.length / 2];
+        final float[] gaps = sampleGaps(entries);
+        final float medianGap = median(gaps);
         if (medianGap <= 0) {
             // Should never happen? No meaningful gap to compare against (e.g. duplicate timestamps), keep as one segment.
             segments.add(entries);
@@ -976,14 +1028,19 @@ public class DefaultWorkoutCharts {
         return segments;
     }
 
-    private static LineData createGappedLineData(final Context context,
-                                                 final List<Entry> entries,
-                                                 final String label,
-                                                 final int color) {
+    @VisibleForTesting
+    static LineData createGappedLineData(final Context context,
+                                         final List<Entry> entries,
+                                         final String label,
+                                         final int color) {
         final List<ILineDataSet> dataSets = new ArrayList<>();
-        // Every segment keeps the same label
+        // Only the first segment carries the label, so the legend names the series once
         for (final List<Entry> segment : splitOnGaps(entries)) {
-            dataSets.add(createLineDataSet(context, segment, label, color));
+            final LineDataSet dataSet = createLineDataSet(context, segment, dataSets.isEmpty() ? label : null, color);
+            if (!dataSets.isEmpty()) {
+                dataSet.setForm(Legend.LegendForm.NONE);
+            }
+            dataSets.add(dataSet);
         }
         return new LineData(dataSets);
     }

@@ -95,7 +95,7 @@ class WorkoutChartsActivity : AbstractGBActivity(), MenuProvider {
 
     fun setupChipGroup(chipGroup: ChipGroup, initChartId: String) {
         for (chart in chartData!!) {
-            val chip = Chip(this).apply {
+            val chip = (layoutInflater.inflate(R.layout.layout_chart_chip, chipGroup, false) as Chip).apply {
                 text = chart.title
                 isCheckable = true
                 isClickable = true

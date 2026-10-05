@@ -21,7 +21,10 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import nodomain.freeyourgadget.gadgetbridge.R
 import nodomain.freeyourgadget.gadgetbridge.activities.AbstractGBFragment
+import nodomain.freeyourgadget.gadgetbridge.activities.charts.ChartDataRange
 import nodomain.freeyourgadget.gadgetbridge.activities.charts.ChartsHost
+import nodomain.freeyourgadget.gadgetbridge.database.DBHandler
+import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice
 import nodomain.freeyourgadget.gadgetbridge.util.DateTimeUtils
 import org.slf4j.LoggerFactory
 import java.util.Date
@@ -72,6 +75,11 @@ abstract class AbstractVicoChartFragment<T> : AbstractGBFragment() {
      * Whether this chart shows data for a single day or a date range. Affects the date bar text.
      */
     protected open fun isSingleDay(): Boolean = true
+
+    /**
+     * Returns the time range of the available data for this chart, or null if it is not known.
+     */
+    open fun getAvailableDataRange(device: GBDevice, db: DBHandler): ChartDataRange? = null
 
     /**
      * Loads this chart's data. Runs on a background dispatcher, via [scope].

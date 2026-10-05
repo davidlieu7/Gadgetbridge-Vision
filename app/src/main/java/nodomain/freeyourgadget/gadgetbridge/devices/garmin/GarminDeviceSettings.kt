@@ -288,22 +288,16 @@ private fun importActivityFiles(context: Context, device: GBDevice, uris: List<U
         return
     }
 
-    var lastNotificationUpdateTs = System.currentTimeMillis()
+    val transferNotification = GBProgressNotification(context, GB.NOTIFICATION_CHANNEL_ID_TRANSFER)
+    transferNotification.start(R.string.busy_task_processing_files, 0, filesToProcess.size.toLong())
+
     FitAsyncProcessor(context, device).process(filesToProcess, false, object : FitAsyncProcessor.Callback {
         override fun onProgress(i: Int) {
-            val now = System.currentTimeMillis()
-            if (now - lastNotificationUpdateTs > 1500L) {
-                lastNotificationUpdateTs = now
-                GB.updateTransferNotification(
-                    "Parsing fit files", "File $i of ${filesToProcess.size}",
-                    true,
-                    (i * 100) / filesToProcess.size, context
-                )
-            }
+            transferNotification.setTotalProgress(i.toLong())
         }
 
         override fun onFinish() {
-            GB.updateTransferNotification("", "", false, 100, context)
+            transferNotification.finish()
             GB.toast("Parsed ${filesToProcess.size} files", Toast.LENGTH_SHORT, GB.INFO)
             device.sendDeviceUpdateIntent(context)
         }

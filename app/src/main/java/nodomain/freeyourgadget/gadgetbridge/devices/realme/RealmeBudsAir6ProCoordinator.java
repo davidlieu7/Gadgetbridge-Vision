@@ -24,6 +24,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
+import java.nio.ByteOrder;
 
 import nodomain.freeyourgadget.gadgetbridge.R;
 import nodomain.freeyourgadget.gadgetbridge.devices.oppo.OppoHeadphonesCoordinator;
@@ -66,6 +67,11 @@ public class RealmeBudsAir6ProCoordinator extends OppoHeadphonesCoordinator {
     @Override
     public OppoUuid ctrlUuid(@NonNull GBDevice device) {
         return OppoUuid.STANDARD_SPP;
+    }
+
+    @Override
+    public ByteOrder multipointMacOrder(@NonNull GBDevice device) {
+        return ByteOrder.LITTLE_ENDIAN;
     }
 
     @Override

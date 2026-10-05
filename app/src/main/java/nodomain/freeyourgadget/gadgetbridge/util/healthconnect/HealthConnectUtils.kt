@@ -317,7 +317,7 @@ class HealthConnectUtils {
                     totalDataTypesSkipped++
                     continue@dataTypeLoop
                 }
-                
+
                 var timestampToPersistForThisDataType = timestampRange.first
                 val currentDataTypeStartTsFromDb = timestampRange.first
                 val currentDataTypeEndTsFromDb = timestampRange.second
@@ -397,8 +397,8 @@ class HealthConnectUtils {
                     LOG.info("$HC_SYNC_TAG Querying Gadgetbridge DB for {}({}) from {} to {}", gbDevice.aliasOrName, dataType.name, queryStartTs, queryEndTs)
 
                     // Fetch activityBasedSamples under their own lock if needed for the current dataType
-                    val activityBasedSamples: List<ActivitySample>? = 
-                        if (dataType == HealthConnectPermissionManager.HealthConnectDataType.ACTIVITY || 
+                    val activityBasedSamples: List<ActivitySample>? =
+                        if (dataType == HealthConnectPermissionManager.HealthConnectDataType.ACTIVITY ||
                             dataType == HealthConnectPermissionManager.HealthConnectDataType.SLEEP) {
                             GBApplication.acquireDbReadOnly().use { db ->
                                 getActivitySamples(db, gbDevice, queryStartTs.epochSecond.toInt(), queryEndTs.epochSecond.toInt())
@@ -550,6 +550,31 @@ class HealthConnectUtils {
         private const val MIN_VALID_SAMPLE_SECONDS = 1420070400L // 2015-01-01T00:00:00Z
         private const val MIN_VALID_SAMPLE_MILLIS = MIN_VALID_SAMPLE_SECONDS * 1000
 
+        /**
+         * Deletes the sync state of [dataType] for [gbDevice].
+         */
+        @JvmStatic
+        fun resetSyncState(
+            gbDevice: GBDevice,
+            dataType: HealthConnectPermissionManager.HealthConnectDataType,
+        ) {
+            GBApplication.acquireDB().use { db ->
+                val deviceFromDb = DBHelper.findDevice(gbDevice, db.daoSession) ?: return
+                CompanionLogger.info(
+                    "$HC_SYNC_TAG Resetting sync state for {}({})",
+                    gbDevice.aliasOrName,
+                    dataType.name
+                )
+                db.daoSession.healthConnectSyncStateDao.queryBuilder()
+                    .where(
+                        HealthConnectSyncStateDao.Properties.DeviceId.eq(deviceFromDb.id),
+                        HealthConnectSyncStateDao.Properties.DataType.eq(dataType.name)
+                    )
+                    .buildDelete()
+                    .executeDeleteWithoutDetachingEntities()
+            }
+        }
+
         private fun getSyncTimestampRange(
             context: Context,
             gbDevice: GBDevice,
@@ -694,6 +719,10 @@ class HealthConnectUtils {
                     healthConnectClient, gbDevice, metadata, offset,
                     currentSliceStartTs, currentSliceEndTs, grantedPermissions
                 ))
+                HealthConnectPermissionManager.HealthConnectDataType.BLOOD_PRESSURE -> sliceStats.add(BloodPressureSyncer.sync(
+                    healthConnectClient, gbDevice, metadata, offset,
+                    currentSliceStartTs, currentSliceEndTs, grantedPermissions
+                ))
                 HealthConnectPermissionManager.HealthConnectDataType.HYDRATION -> {
                     if (gbDevice.deviceCoordinator.supportsHydration(gbDevice)) {
                         sliceStats.add(HydrationSyncer.sync(
@@ -720,7 +749,7 @@ class HealthConnectUtils {
 
         internal fun getActivitySamples(db: DBHandler, device: GBDevice, tsFrom: Int, tsTo: Int): List<ActivitySample> {
             val provider = device.deviceCoordinator.getSampleProvider(device, db.daoSession)
-            if (provider == null) { 
+            if (provider == null) {
                 CompanionLogger.error("getSampleProvider for ACTIVITY/SLEEP returned null for device {}", device.name)
                 return emptyList() // Return empty list on error
             }
@@ -841,6 +870,7 @@ class HealthConnectUtils {
                 HealthConnectPermissionManager.HealthConnectDataType.RESPIRATORY_RATE -> coordinator.getRespiratoryRateSampleProvider(device, db.daoSession)
                 HealthConnectPermissionManager.HealthConnectDataType.RESTING_HEART_RATE -> coordinator.getHeartRateRestingSampleProvider(device, db.daoSession)
                 HealthConnectPermissionManager.HealthConnectDataType.BLOOD_GLUCOSE -> GlucoseSampleProvider(device, db.daoSession)
+                HealthConnectPermissionManager.HealthConnectDataType.BLOOD_PRESSURE -> coordinator.getBloodPressureSampleProvider(device, db.daoSession)
                 HealthConnectPermissionManager.HealthConnectDataType.WEIGHT -> coordinator.getWeightSampleProvider(device, db.daoSession)
                 // For SpO2 and Temperature, there might be a specific provider or fallback to general sample provider
                 HealthConnectPermissionManager.HealthConnectDataType.SPO2 -> coordinator.getSpo2SampleProvider(device, db.daoSession) // Potentially add fallback if needed: ?: coordinator.getSampleProvider(device, db.daoSession)

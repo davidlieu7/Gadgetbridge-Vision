@@ -243,6 +243,7 @@ public class DeviceSettingsPreferenceConst {
 
     public static final String PREF_HEARTRATE_USE_FOR_SLEEP_DETECTION = "heartrate_sleep_detection";
     public static final String PREF_HEARTRATE_MEASUREMENT_INTERVAL = "heartrate_measurement_interval";
+    public static final String PREF_BLOOD_PRESSURE_ACTIVE_USER = "blood_pressure_active_user";
     public static final String PREF_HEARTRATE_ACTIVITY_MONITORING = "heartrate_activity_monitoring";
     public static final String PREF_HEARTRATE_ALERT_ENABLED = "heartrate_alert_enabled";
     public static final String PREF_HEARTRATE_ALERT_ACTIVE_HIGH_THRESHOLD = "heartrate_alert_active_high_threshold";

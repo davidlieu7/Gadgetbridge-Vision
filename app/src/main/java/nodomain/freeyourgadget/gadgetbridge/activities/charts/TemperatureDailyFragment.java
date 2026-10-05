@@ -21,8 +21,10 @@ import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.LinearLayout;
 import android.widget.TextView;
 
+import androidx.annotation.Nullable;
 import androidx.core.content.ContextCompat;
 
 import com.github.mikephil.charting.charts.Chart;
@@ -47,6 +49,8 @@ import java.util.Locale;
 import lineageos.weather.util.TemperatureUtils;
 import nodomain.freeyourgadget.gadgetbridge.GBApplication;
 import nodomain.freeyourgadget.gadgetbridge.R;
+import nodomain.freeyourgadget.gadgetbridge.activities.workouts.StatTileData;
+import nodomain.freeyourgadget.gadgetbridge.activities.workouts.StatTileGridUtilKt;
 import nodomain.freeyourgadget.gadgetbridge.database.DBHandler;
 import nodomain.freeyourgadget.gadgetbridge.devices.DeviceCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.TimeSampleProvider;
@@ -66,9 +70,7 @@ public class TemperatureDailyFragment extends AbstractChartFragment<TemperatureD
     protected int LEGEND_TEXT_COLOR;
 
     private TextView dateView;
-    private TextView tempAverage;
-    private TextView tempMinimum;
-    private TextView tempMaximum;
+    private LinearLayout statsContainer;
     private LineChart tempLineChart;
 
     private final TemperatureUnit temperatureUnit = GBApplication.getPrefs().getTemperatureUnit();
@@ -83,9 +85,7 @@ public class TemperatureDailyFragment extends AbstractChartFragment<TemperatureD
 
         dateView = rootView.findViewById(R.id.temp_date_view);
         tempLineChart = rootView.findViewById(R.id.temp_line_chart);
-        tempAverage = rootView.findViewById(R.id.temp_average);
-        tempMinimum = rootView.findViewById(R.id.temp_minimum);
-        tempMaximum = rootView.findViewById(R.id.temp_maximum);
+        statsContainer = rootView.findViewById(R.id.temp_stats_container);
 
         setupChart();
         refresh();
@@ -220,9 +220,12 @@ public class TemperatureDailyFragment extends AbstractChartFragment<TemperatureD
         final double maximum = accumulator.getCount() > 0 ? accumulator.getMax() : -1;
 
         final String unit = getString(temperatureUnit == TemperatureUnit.CELSIUS ? R.string.unit_celsius : R.string.unit_fahrenheit);
-        tempAverage.setText(average > 0 ? String.format(Locale.ROOT, "%.1f %s", average, unit) : "-");
-        tempMinimum.setText(minimum > 0 ? String.format(Locale.ROOT, "%.1f %s", minimum, unit) : "-");
-        tempMaximum.setText(maximum > 0 ? String.format(Locale.ROOT, "%.1f %s", maximum, unit) : "-");
+        final List<StatTileData> stats = new ArrayList<>();
+        stats.add(new StatTileData(formatTemperature(minimum, unit), getString(R.string.hr_minimum)));
+        stats.add(new StatTileData(formatTemperature(maximum, unit), getString(R.string.hr_maximum)));
+        stats.add(new StatTileData(formatTemperature(average, unit), getString(R.string.hr_average)));
+        statsContainer.removeAllViews();
+        StatTileGridUtilKt.addStatTileGrid(statsContainer, requireContext(), stats, 0);
 
         final int axisGap = (temperatureUnit == TemperatureUnit.CELSIUS ? 3 : 6);
         if (minimum > 0) {
@@ -250,11 +253,21 @@ public class TemperatureDailyFragment extends AbstractChartFragment<TemperatureD
 
     }
 
+    private String formatTemperature(final double value, final String unit) {
+        return value > 0 ? String.format(Locale.ROOT, "%.1f %s", value, unit) : getString(R.string.stats_empty_value);
+    }
+
     protected static class TemperatureChartData extends ChartsData {
         public List<? extends TemperatureSample> samples;
 
         protected TemperatureChartData(List<? extends TemperatureSample> samples) {
             this.samples = samples;
         }
+    }
+
+    @Nullable
+    @Override
+    public ChartDataRange getAvailableDataRange(final GBDevice device, final DBHandler db) {
+        return ChartDataRange.ofSamples(device.getDeviceCoordinator().getTemperatureSampleProvider(device, db.getDaoSession()));
     }
 }

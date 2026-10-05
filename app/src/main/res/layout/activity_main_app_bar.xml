@@ -19,7 +19,7 @@
             android:id="@+id/toolbar"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:background="?attr/colorPrimaryDark"
+            android:background="?attr/main_bar_bg"
             android:minHeight="?attr/actionBarSize" />
 
     </com.google.android.material.appbar.AppBarLayout>
@@ -37,12 +37,35 @@
             android:layout_height="match_parent" />
     </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
 
+    <View
+        android:id="@+id/toolbar_shade"
+        android:layout_width="0dp"
+        android:layout_height="8dp"
+        android:background="?attr/bar_shade"
+        android:visibility="gone"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/appbarlayout" />
+
+    <View
+        android:id="@+id/bottom_nav_shade"
+        android:layout_width="0dp"
+        android:layout_height="8dp"
+        android:background="?attr/bar_shade"
+        android:visibility="gone"
+        android:rotation="180"
+        app:layout_constraintStart_toStartOf="parent"
+        app:layout_constraintEnd_toEndOf="parent"
+        app:layout_constraintBottom_toTopOf="@id/bottom_nav_bar" />
+
     <com.google.android.material.bottomnavigation.BottomNavigationView
         android:id="@+id/bottom_nav_bar"
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_marginStart="0dp"
         android:layout_marginEnd="0dp"
+        android:background="?attr/main_bar_bg"
+        app:itemTextColor="?android:attr/textColorPrimary"
         app:layout_constraintBottom_toBottomOf="parent"
         app:menu="@menu/bottom_nav_menu" />
 

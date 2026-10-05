@@ -15,7 +15,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="15dp"
-            android:layout_marginBottom="20dp"
+            android:layout_marginBottom="@dimen/chart_section_spacing"
             android:gravity="center"
             android:textSize="20sp"
             android:textColor="?attr/textColorPrimary"
@@ -30,55 +30,15 @@
             android:scaleType="fitStart" />
 
 
-        <GridLayout
+        <LinearLayout
+            android:id="@+id/body_energy_stats_container"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="15dp"
+            android:layout_marginTop="@dimen/chart_section_spacing"
             android:layout_marginBottom="15dp"
-            android:background="@color/gauge_line_color"
-            android:columnCount="2">
-
-            <LinearLayout
-                style="@style/GridTile"
-                android:layout_marginTop="2dp"
-                android:layout_marginEnd="1dp">
-
-                <TextView
-                    android:id="@+id/body_energy_gained"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="+ 0"
-                    android:textColor="?attr/textColorPrimary"
-                    android:textSize="20sp" />
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/body_energy_gained"
-                    android:textSize="12sp" />
-            </LinearLayout>
-
-            <LinearLayout
-                style="@style/GridTile"
-                android:layout_marginTop="2dp"
-                android:layout_marginStart="1dp">
-
-                <TextView
-                    android:id="@+id/body_energy_lost"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="- 0"
-                    android:textColor="?attr/textColorPrimary"
-                    android:textSize="20sp" />
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/body_energy_lost"
-                    android:textSize="12sp" />
-            </LinearLayout>
-
-        </GridLayout>
+            android:layout_marginStart="15dp"
+            android:layout_marginEnd="15dp"
+            android:orientation="vertical" />
 
         <LinearLayout
             android:layout_width="match_parent"

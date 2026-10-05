@@ -18,13 +18,16 @@
 package nodomain.freeyourgadget.gadgetbridge.activities;
 
 
+import android.app.Activity;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.os.Bundle;
 import android.view.View;
+import android.view.ViewGroup;
 
+import androidx.annotation.Nullable;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.graphics.Insets;
 import androidx.core.view.ViewCompat;
@@ -36,10 +39,13 @@ import java.util.Locale;
 import nodomain.freeyourgadget.gadgetbridge.GBApplication;
 import nodomain.freeyourgadget.gadgetbridge.R;
 import nodomain.freeyourgadget.gadgetbridge.util.AndroidUtils;
+import nodomain.freeyourgadget.gadgetbridge.util.BarShade;
 
 
 public abstract class AbstractGBActivity extends AppCompatActivity implements GBActivity {
     private boolean isLanguageInvalid = false;
+    private BarShade.ScrollListener barShades;
+    private View actionBarShade;
 
     public static final int NONE = 0;
     public static final int NO_ACTIONBAR = 1;
@@ -117,6 +123,13 @@ public abstract class AbstractGBActivity extends AppCompatActivity implements GB
                 activity.setTheme(R.style.GadgetbridgeTheme);
             }
         }
+
+        // Dynamic Color already ties tab/button/chip colors to the wallpaper palette, so the
+        // user's chosen accent preset only applies to the static Light/Dark themes above.
+        if (!GBApplication.areDynamicColorsEnabled() && activity instanceof Activity) {
+            ((Activity) activity).getTheme().applyStyle(GBApplication.getAccentColorOverlay(), true);
+        }
+
         activity.setLanguage(GBApplication.getLanguage(), false);
     }
 
@@ -151,12 +164,54 @@ public abstract class AbstractGBActivity extends AppCompatActivity implements GB
     public void setContentView(final int layoutResID) {
         super.setContentView(layoutResID);
         applyEdgeToEdgeInsets();
+        applyShades();
     }
 
     @Override
     public void setContentView(final View view) {
         super.setContentView(view);
         applyEdgeToEdgeInsets();
+        applyShades();
+    }
+
+    /**
+     * Applies the shade below the action bar, and follows the content that scrolls under it.
+     */
+    private void applyShades() {
+        final ViewGroup content = findViewById(android.R.id.content);
+        if (actionBarShade != null) {
+            content.removeView(actionBarShade);
+            actionBarShade = null;
+        }
+        if (barShades != null) {
+            barShades.detach();
+        }
+        barShades = new BarShade.ScrollListener(content);
+        if (getSupportActionBar() == null) {
+            return;
+        }
+        actionBarShade = getLayoutInflater().inflate(R.layout.view_bar_shade, content, false);
+        content.addView(actionBarShade);
+        barShades.setTopShade(actionBarShade);
+    }
+
+    /**
+     * Shows {@code shade} instead of the shade below the action bar, for screens that have a top row
+     * of their own below the action bar.
+     */
+    public void setTopShade(@Nullable final View shade) {
+        if (actionBarShade != null) {
+            ((ViewGroup) actionBarShade.getParent()).removeView(actionBarShade);
+            actionBarShade = null;
+        }
+        barShades.setTopShade(shade);
+    }
+
+    /**
+     * Shows {@code shade} above a sticky bar at the bottom of the screen.
+     */
+    public void setBottomShade(@Nullable final View shade) {
+        barShades.setBottomShade(shade);
     }
 
     /**

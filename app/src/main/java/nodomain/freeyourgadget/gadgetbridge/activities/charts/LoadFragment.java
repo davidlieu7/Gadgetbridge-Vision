@@ -28,11 +28,12 @@ import android.util.TypedValue;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.GridLayout;
 import android.widget.ImageView;
+import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.annotation.Nullable;
 import androidx.core.content.ContextCompat;
 
 import com.github.mikephil.charting.charts.BarChart;
@@ -72,6 +73,8 @@ import java.util.Locale;
 import nodomain.freeyourgadget.gadgetbridge.GBApplication;
 import nodomain.freeyourgadget.gadgetbridge.R;
 import nodomain.freeyourgadget.gadgetbridge.activities.dashboard.GaugeDrawer;
+import nodomain.freeyourgadget.gadgetbridge.activities.workouts.StatTileData;
+import nodomain.freeyourgadget.gadgetbridge.activities.workouts.StatTileGridUtilKt;
 import nodomain.freeyourgadget.gadgetbridge.database.DBHandler;
 import nodomain.freeyourgadget.gadgetbridge.devices.DeviceCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.TimeSampleProvider;
@@ -106,10 +109,8 @@ public class LoadFragment extends AbstractChartFragment<LoadFragment.LoadsData> 
     private TextView acuteLoadRatioGaugeValue;
     private TextView acuteLoadRatioGaugeStatus;
 
-    private TextView acuteLoad;
-    private TextView chronicLoad;
-    private TextView thisWeekTotal;
-    private TextView lastWeekTotal;
+    private LinearLayout acuteChronicLoadStatsContainer;
+    private LinearLayout weeklyLoadStatsContainer;
     private TextView dateHeader;
     private CombinedChart acuteLoadChart;
     private BarChart dailyLoadChart;
@@ -135,8 +136,7 @@ public class LoadFragment extends AbstractChartFragment<LoadFragment.LoadsData> 
 
         dateHeader = rootView.findViewById(R.id.date_view);
         dailyLoadChart = rootView.findViewById(R.id.daily_load_chart);
-        thisWeekTotal = rootView.findViewById(R.id.this_week_total);
-        lastWeekTotal = rootView.findViewById(R.id.last_week_total);
+        weeklyLoadStatsContainer = rootView.findViewById(R.id.weekly_load_stats_container);
 
         metricTrainingLoad = GBApplication.getPrefs().experimentalMetrics()
                 && supportsMetrics(GENERIC_TRAINING_LOAD_ACUTE);
@@ -146,8 +146,7 @@ public class LoadFragment extends AbstractChartFragment<LoadFragment.LoadsData> 
 
         if (supportsTrainingLoad()) {
             acuteLoadChart = rootView.findViewById(R.id.acute_load_chart);
-            acuteLoad = rootView.findViewById(R.id.acute_load);
-            chronicLoad = rootView.findViewById(R.id.chronic_load);
+            acuteChronicLoadStatsContainer = rootView.findViewById(R.id.acute_chronic_load_stats_container);
             acuteLoadRatioGauge = rootView.findViewById(R.id.acute_load_ratio_gauge);
             acuteLoadRatioGaugeValue = rootView.findViewById(R.id.acute_load_ratio_gauge_value);
             acuteLoadRatioGaugeStatus = rootView.findViewById(R.id.acute_load_ratio_gauge_status);
@@ -155,7 +154,7 @@ public class LoadFragment extends AbstractChartFragment<LoadFragment.LoadsData> 
             gaugeDrawer = new GaugeDrawer();
             showChronicLoad = supportsTrainingLoadChronic();
             if (!showChronicLoad) {
-                relabelAsTrainingLoad(rootView);
+                ((TextView) rootView.findViewById(R.id.acute_load_header)).setText(R.string.pref_header_training_load);
             }
             setupLoadDataTypeChips(inflater);
             setupAcuteLoadChart();
@@ -179,20 +178,6 @@ public class LoadFragment extends AbstractChartFragment<LoadFragment.LoadsData> 
     public boolean supportsTrainingLoadChronic() {
         final GBDevice device = getChartsHost().getDevice();
         return device.getDeviceCoordinator().supportsTrainingLoadChronic(device);
-    }
-
-    /**
-     * Relabels the acute-load header and tile as a plain training load, hides the chronic-load tile
-     * and widens the remaining tile across both columns of the grid.
-     */
-    private void relabelAsTrainingLoad(final View rootView) {
-        ((TextView) rootView.findViewById(R.id.acute_load_header)).setText(R.string.pref_header_training_load);
-        ((TextView) rootView.findViewById(R.id.acute_load_label)).setText(R.string.pref_header_training_load);
-        rootView.findViewById(R.id.chronic_load_wrapper).setVisibility(View.GONE);
-        final View acuteLoadWrapper = rootView.findViewById(R.id.acute_load_wrapper);
-        final GridLayout.LayoutParams params = (GridLayout.LayoutParams) acuteLoadWrapper.getLayoutParams();
-        params.columnSpec = GridLayout.spec(0, 2, GridLayout.FILL, 1f);
-        acuteLoadWrapper.setLayoutParams(params);
     }
 
     @Override
@@ -348,8 +333,11 @@ public class LoadFragment extends AbstractChartFragment<LoadFragment.LoadsData> 
         }
         String formattedDate = new SimpleDateFormat("E, MMM dd").format(getEndDate());
         dateHeader.setText(formattedDate);
-        thisWeekTotal.setText(String.valueOf(data.getThisWeekLoad()));
-        lastWeekTotal.setText(String.valueOf(data.getLastWeekLoad()));
+        weeklyLoadStatsContainer.removeAllViews();
+        final List<StatTileData> weeklyLoadStats = new ArrayList<>();
+        weeklyLoadStats.add(new StatTileData(String.valueOf(data.getThisWeekLoad()), getString(R.string.this_week_total)));
+        weeklyLoadStats.add(new StatTileData(String.valueOf(data.getLastWeekLoad()), getString(R.string.last_week_total)));
+        StatTileGridUtilKt.addStatTileGrid(weeklyLoadStatsContainer, requireContext(), weeklyLoadStats, 0);
         dailyLoadChart.setData(null);
         acuteLoadChart.setData(null);
 
@@ -444,8 +432,16 @@ public class LoadFragment extends AbstractChartFragment<LoadFragment.LoadsData> 
             // Acute load ratio gauge
             int latestAcuteLoad = data.getLatestAcuteLoad();
             int latestChronicLoad = data.getLatestChronicLoad();
-            acuteLoad.setText(String.valueOf(latestAcuteLoad));
-            chronicLoad.setText(String.valueOf(latestChronicLoad));
+            acuteChronicLoadStatsContainer.removeAllViews();
+            final List<StatTileData> acuteChronicLoadStats = new ArrayList<>();
+            acuteChronicLoadStats.add(new StatTileData(
+                    String.valueOf(latestAcuteLoad),
+                    showChronicLoad ? getString(R.string.training_acute_load) : getString(R.string.pref_header_training_load)
+            ));
+            if (showChronicLoad) {
+                acuteChronicLoadStats.add(new StatTileData(String.valueOf(latestChronicLoad), getString(R.string.training_chronic_load)));
+            }
+            StatTileGridUtilKt.addStatTileGrid(acuteChronicLoadStatsContainer, requireContext(), acuteChronicLoadStats, 0);
             // Gauge
             acuteLoadRatioGaugeValue.setText(String.valueOf(latestAcuteLoad));
             float value;
@@ -790,5 +786,15 @@ public class LoadFragment extends AbstractChartFragment<LoadFragment.LoadsData> 
             this.day = day;
             this.i = i;
         }
+    }
+
+    @Nullable
+    @Override
+    public ChartDataRange getAvailableDataRange(final GBDevice device, final DBHandler db) {
+        return ChartDataRange.union(
+                ChartDataRange.ofSamples(device.getDeviceCoordinator().getWorkoutLoadSampleProvider(device, db.getDaoSession())),
+                ChartDataRange.ofSamples(device.getDeviceCoordinator().getTrainingAcuteLoadSampleProvider(device, db.getDaoSession())),
+                ChartDataRange.ofSamples(device.getDeviceCoordinator().getTrainingChronicLoadSampleProvider(device, db.getDaoSession()))
+        );
     }
 }

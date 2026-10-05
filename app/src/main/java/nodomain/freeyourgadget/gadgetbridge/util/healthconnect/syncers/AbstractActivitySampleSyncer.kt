@@ -31,6 +31,9 @@ import java.time.ZoneOffset
 import java.time.temporal.ChronoUnit
 import kotlin.reflect.KClass
 
+/** End of the per-minute record a sample at [timestamp] (epoch seconds) belongs to; see [AbstractActivitySampleSyncer.bucketByMinute]. */
+internal fun minuteBucketEnd(timestamp: Long): Long = ((timestamp + 59) / 60) * 60
+
 internal abstract class AbstractActivitySampleSyncer<TRecord : Record> : ActivitySampleSyncer {
     protected abstract val logger: Logger
     protected abstract val recordClass: KClass<TRecord>
@@ -62,7 +65,7 @@ internal abstract class AbstractActivitySampleSyncer<TRecord : Record> : Activit
     internal fun bucketByMinute(samples: List<ActivitySample>): List<Pair<Instant, List<ActivitySample>>> {
         val buckets = LinkedHashMap<Long, MutableList<ActivitySample>>()
         for (sample in samples) {
-            val minuteEnd = ((sample.timestamp.toLong() + 59) / 60) * 60
+            val minuteEnd = minuteBucketEnd(sample.timestamp.toLong())
             buckets.getOrPut(minuteEnd) { mutableListOf() }.add(sample)
         }
         return buckets.map { (minuteEnd, list) -> Instant.ofEpochSecond(minuteEnd) to list }

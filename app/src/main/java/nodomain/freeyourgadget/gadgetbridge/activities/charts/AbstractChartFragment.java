@@ -29,6 +29,7 @@ import android.os.Handler;
 import android.text.format.DateUtils;
 import android.view.View;
 
+import androidx.annotation.Nullable;
 import androidx.fragment.app.FragmentActivity;
 import androidx.localbroadcastmanager.content.LocalBroadcastManager;
 
@@ -123,6 +124,14 @@ public abstract class AbstractChartFragment<D extends ChartsData> extends Abstra
      * any UI access. #updateChartsInUIThread and #renderCharts will be automatically called after this method.
      */
     protected abstract D refreshInBackground(ChartsHost chartsHost, DBHandler db, GBDevice device);
+
+    /**
+     * Returns the time range of the available data for this chart, or null if it is not known.
+     */
+    @Nullable
+    public ChartDataRange getAvailableDataRange(final GBDevice device, final DBHandler db) {
+        return null;
+    }
 
     /**
      * Triggers the actual (re-) rendering of the chart.

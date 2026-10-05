@@ -25,8 +25,7 @@ import nodomain.freeyourgadget.gadgetbridge.util.gson.GsonSerialized
 import nodomain.freeyourgadget.gadgetbridge.util.kotlin.readListCompat
 import nodomain.freeyourgadget.gadgetbridge.util.kotlin.readParcelableCompat
 import net.e175.klaus.solarpositioning.DeltaT
-import net.e175.klaus.solarpositioning.SPA
-import net.e175.klaus.solarpositioning.SunriseResult
+import net.e175.klaus.solarpositioning.SolarEvents
 import java.util.Date
 import java.util.GregorianCalendar
 import kotlin.math.floor
@@ -143,7 +142,7 @@ class WeatherSpec() : Parcelable {
      * @return True if the weather timestamp was outside the sunrise-sunset interval
      */
     fun isNight(): Boolean {
-        return isTimeNight( this.timestamp * 1000L )
+        return isTimeNight(this.timestamp * 1000L)
     }
 
     /**
@@ -153,6 +152,7 @@ class WeatherSpec() : Parcelable {
     fun isPolarNight(): Boolean {
         return (this.sunSet == 0) // unix time instant of 0
     }
+
     /**
      * Abstraction for whether the sunrise/set information indicates "polar day" (sun never sets)
      * @return True if polar day, false otherwise
@@ -160,12 +160,13 @@ class WeatherSpec() : Parcelable {
     fun isPolarDay(): Boolean {
         return ((this.sunSet - this.sunRise) >= 86399) // sun is up every second of the day
     }
+
     /**
      * Determines whether the current time falls during a night period based on sunrise and sunset
      * @return True if the current time of day is outside the sunset-sunrise interval
      */
     fun isCurrentTimeNight(): Boolean {
-        return isTimeNight( System.currentTimeMillis() )
+        return isTimeNight(System.currentTimeMillis())
     }
 
     /**
@@ -181,7 +182,7 @@ class WeatherSpec() : Parcelable {
         // Compute where sunset falls relative to sunrise. We assume it's always after, thus giving a positive number.
         val lengthOfSolarDayInMillis = (this.sunSet - this.sunRise) * 1000L
         // Map the input time into positive time in a 24-hour solar cycle, and compare to sunset.
-        return ( millisAfterSunrise.mod(86400000) > lengthOfSolarDayInMillis )
+        return (millisAfterSunrise.mod(86400000) > lengthOfSolarDayInMillis)
     }
 
     fun getLocationObject(): Location? {
@@ -798,12 +799,19 @@ class WeatherSpec() : Parcelable {
             return floor((normalized / 360.0) * synodicMonth).toInt() + 1
         }
 
-        fun sunriseTransitSet(date: GregorianCalendar, location: Location): SunriseResult {
-            return SPA.calculateSunriseTransitSet(
-                date.toZonedDateTime(),
+        fun solarDay(
+            date: GregorianCalendar,
+            location: Location,
+            horizon: SolarEvents.Horizon = SolarEvents.Horizon.SUNRISE_SUNSET,
+        ): SolarEvents.Day {
+            val zonedDate = date.toZonedDateTime()
+            return SolarEvents.spa().forDate(
+                zonedDate.toLocalDate(),
+                zonedDate.zone,
                 location.latitude,
                 location.longitude,
-                DeltaT.estimate(date.toZonedDateTime().toLocalDate())
+                DeltaT.estimate(zonedDate.toLocalDate()),
+                horizon
             )
         }
 
@@ -814,9 +822,7 @@ class WeatherSpec() : Parcelable {
             if (location == null) {
                 return null
             }
-            return (sunriseTransitSet(date, location) as? SunriseResult.RegularDay)?.sunrise()?.let {
-                return Date.from(it.toInstant())
-            }
+            return solarDay(date, location).rises().firstOrNull()?.let { Date.from(it.toInstant()) }
         }
 
         fun sunsetComputed(sunSet: Int, date: GregorianCalendar, location: Location?): Date? {
@@ -826,9 +832,7 @@ class WeatherSpec() : Parcelable {
             if (location == null) {
                 return null
             }
-            return (sunriseTransitSet(date, location) as? SunriseResult.RegularDay)?.sunset()?.let {
-                return Date.from(it.toInstant())
-            }
+            return solarDay(date, location).sets().firstOrNull()?.let { Date.from(it.toInstant()) }
         }
 
         fun createTestWeather(): WeatherSpec {

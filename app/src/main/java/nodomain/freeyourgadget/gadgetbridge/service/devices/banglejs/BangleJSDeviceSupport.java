@@ -654,8 +654,8 @@ public class BangleJSDeviceSupport extends AbstractBTLESingleDeviceSupport {
                 break;
             // Received when the app starts sleep tracking
             case SleepAsAndroidAction.START_TRACKING:
+                sleepAsAndroidSender.startTracking(extras);
                 this.enableAccelSender(true);
-                sleepAsAndroidSender.startTracking();
                 break;
             // Received when the app stops sleep tracking
             case SleepAsAndroidAction.STOP_TRACKING:

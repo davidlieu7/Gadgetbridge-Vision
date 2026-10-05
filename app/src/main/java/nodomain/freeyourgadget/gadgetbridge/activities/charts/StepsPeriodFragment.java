@@ -5,6 +5,7 @@ import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.LinearLayout;
 import android.widget.TextView;
 
 import com.github.mikephil.charting.charts.BarChart;
@@ -30,6 +31,8 @@ import java.util.Locale;
 
 import nodomain.freeyourgadget.gadgetbridge.GBApplication;
 import nodomain.freeyourgadget.gadgetbridge.R;
+import nodomain.freeyourgadget.gadgetbridge.activities.workouts.StatTileData;
+import nodomain.freeyourgadget.gadgetbridge.activities.workouts.StatTileGridUtilKt;
 import nodomain.freeyourgadget.gadgetbridge.activities.workouts.WorkoutValueFormatter;
 import nodomain.freeyourgadget.gadgetbridge.database.DBHandler;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
@@ -40,10 +43,7 @@ public class StepsPeriodFragment extends StepsFragment<StepsPeriodFragment.Steps
     protected static final Logger LOG = LoggerFactory.getLogger(StepsPeriodFragment.class);
 
     private TextView mDateView;
-    private TextView stepsAvg;
-    private TextView stepsTotal;
-    private TextView distanceAvg;
-    private TextView distanceTotal;
+    private LinearLayout stepsPeriodStatsContainer;
     private BarChart stepsChart;
 
     private TextView mBalanceView;
@@ -85,10 +85,7 @@ public class StepsPeriodFragment extends StepsFragment<StepsPeriodFragment.Steps
 
         mDateView = rootView.findViewById(R.id.steps_date_view);
         stepsChart = rootView.findViewById(R.id.steps_chart);
-        stepsAvg = rootView.findViewById(R.id.steps_avg);
-        distanceAvg = rootView.findViewById(R.id.distance_avg);
-        stepsTotal = rootView.findViewById(R.id.steps_total);
-        distanceTotal = rootView.findViewById(R.id.distance_total);
+        stepsPeriodStatsContainer = rootView.findViewById(R.id.steps_period_stats_container);
         STEPS_GOAL = GBApplication.getPrefs().getInt(ActivityUser.PREF_USER_STEPS_GOAL, ActivityUser.defaultUserStepsGoal);
 
         mBalanceView = rootView.findViewById(R.id.balance);
@@ -189,11 +186,14 @@ public class StepsPeriodFragment extends StepsFragment<StepsPeriodFragment.Steps
             stepsChart.setRenderer(new AngledLabelsChartRenderer(stepsChart, stepsChart.getAnimator(), stepsChart.getViewPortHandler()));
         }
         stepsChart.setData(barData);
-        stepsAvg.setText(NumberFormat.getInstance().format(stepsData.stepsDailyAvg));
         final WorkoutValueFormatter valueFormatter = new WorkoutValueFormatter();
-        distanceAvg.setText(valueFormatter.formatValue(stepsData.distanceDailyAvg, "km"));
-        stepsTotal.setText(NumberFormat.getInstance().format(stepsData.totalSteps));
-        distanceTotal.setText(valueFormatter.formatValue(stepsData.totalDistance, "km"));
+        stepsPeriodStatsContainer.removeAllViews();
+        final List<StatTileData> stats = new ArrayList<>();
+        stats.add(new StatTileData(NumberFormat.getInstance().format(stepsData.stepsDailyAvg), getString(R.string.steps_avg)));
+        stats.add(new StatTileData(NumberFormat.getInstance().format(stepsData.totalSteps), getString(R.string.steps_total)));
+        stats.add(new StatTileData(valueFormatter.formatValue(stepsData.distanceDailyAvg, "km"), getString(R.string.distance_avg)));
+        stats.add(new StatTileData(valueFormatter.formatValue(stepsData.totalDistance, "km"), getString(R.string.distance_total)));
+        StatTileGridUtilKt.addStatTileGrid(stepsPeriodStatsContainer, requireContext(), stats, 0);
 
         mBalanceView.setText(stepsData.getBalanceMessage(getContext(), STEPS_GOAL));
     }

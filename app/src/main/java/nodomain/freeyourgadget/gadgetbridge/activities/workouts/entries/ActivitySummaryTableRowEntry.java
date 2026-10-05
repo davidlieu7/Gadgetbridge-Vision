@@ -1,16 +1,11 @@
 package nodomain.freeyourgadget.gadgetbridge.activities.workouts.entries;
 
-import android.graphics.Typeface;
-import android.view.Gravity;
-import android.view.ViewGroup;
 import android.widget.LinearLayout;
-import android.widget.TextView;
 
-import androidx.gridlayout.widget.GridLayout;
-
+import java.util.Collections;
 import java.util.List;
 
-import nodomain.freeyourgadget.gadgetbridge.GBApplication;
+import nodomain.freeyourgadget.gadgetbridge.activities.workouts.WorkoutTableRendererKt;
 import nodomain.freeyourgadget.gadgetbridge.activities.workouts.WorkoutValueFormatter;
 
 public class ActivitySummaryTableRowEntry extends ActivitySummaryEntry {
@@ -45,42 +40,19 @@ public class ActivitySummaryTableRowEntry extends ActivitySummaryEntry {
         return isHeader;
     }
 
+    /**
+     * Draws this row on its own, as if it were a whole table. Rows of a real table should be drawn
+     * with the {@link TableSpec} of the entire table instead, so the columns line up.
+     */
     @Override
     public void populate(final String key, final LinearLayout linearLayout, final WorkoutValueFormatter workoutValueFormatter) {
-        final GridLayout rowLayout = new GridLayout(linearLayout.getContext());
-        rowLayout.setColumnCount(columns.size());
-        rowLayout.setLayoutParams(new ViewGroup.LayoutParams(ViewGroup.LayoutParams.MATCH_PARENT, ViewGroup.LayoutParams.WRAP_CONTENT));
+        populate(linearLayout, workoutValueFormatter, TableSpec.from(Collections.singletonList(this)), true);
+    }
 
-        for (int i = 0; i < columns.size(); i++) {
-            final LinearLayout cellLayout = new LinearLayout(linearLayout.getContext());
-            final GridLayout.LayoutParams columnParams = new GridLayout.LayoutParams();
-            columnParams.columnSpec = GridLayout.spec(i, columns.size());
-            final GridLayout.LayoutParams layoutParams = new GridLayout.LayoutParams(
-                    GridLayout.spec(GridLayout.UNDEFINED, GridLayout.FILL, 1f),
-                    GridLayout.spec(GridLayout.UNDEFINED, 1, GridLayout.FILL, 1f)
-            );
-            layoutParams.width = 0;
-            cellLayout.setLayoutParams(layoutParams);
-            cellLayout.setOrientation(LinearLayout.VERTICAL);
-            cellLayout.setGravity(Gravity.CENTER);
-
-            final TextView columnTextView = new TextView(linearLayout.getContext());
-            columnTextView.setLayoutParams(new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT));
-            columnTextView.setText(columns.get(i).format(workoutValueFormatter));
-            columnTextView.setTextSize(12);
-            columnTextView.setGravity(Gravity.CENTER);
-            if (isHeader || (i == 0 && boldFirstColumn)) {
-                columnTextView.setTypeface(null, Typeface.BOLD);
-            } else {
-                // Data values (everything but the bold step/lap/# column) get the theme's
-                // primary text color, to stand out against the default/dimmer system color.
-                columnTextView.setTextColor(GBApplication.getTextColor(linearLayout.getContext()));
-            }
-
-            cellLayout.addView(columnTextView);
-            rowLayout.addView(cellLayout);
-        }
-
-        linearLayout.addView(rowLayout);
+    public void populate(final LinearLayout linearLayout,
+                         final WorkoutValueFormatter workoutValueFormatter,
+                         final TableSpec spec,
+                         final boolean isLastRow) {
+        WorkoutTableRendererKt.populateTableRow(this, linearLayout, workoutValueFormatter, spec, isLastRow);
     }
 }

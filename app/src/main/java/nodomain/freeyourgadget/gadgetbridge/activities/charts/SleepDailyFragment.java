@@ -60,6 +60,9 @@ import nodomain.freeyourgadget.gadgetbridge.GBApplication;
 import nodomain.freeyourgadget.gadgetbridge.R;
 import nodomain.freeyourgadget.gadgetbridge.activities.HeartRateUtils;
 import nodomain.freeyourgadget.gadgetbridge.activities.workouts.entries.ActivitySummarySimpleEntry;
+import nodomain.freeyourgadget.gadgetbridge.activities.workouts.StatTileData;
+import nodomain.freeyourgadget.gadgetbridge.activities.workouts.StatTileGridUtilKt;
+import nodomain.freeyourgadget.gadgetbridge.activities.workouts.WorkoutValueFormatter;
 import nodomain.freeyourgadget.gadgetbridge.activities.charts.SleepAnalysis.SleepSession;
 import nodomain.freeyourgadget.gadgetbridge.activities.charts.sleep.AbstractOverlayData;
 import nodomain.freeyourgadget.gadgetbridge.activities.charts.sleep.OverlayDataFloat;
@@ -82,7 +85,6 @@ import nodomain.freeyourgadget.gadgetbridge.model.TemperatureSample;
 import nodomain.freeyourgadget.gadgetbridge.model.TimeSample;
 import nodomain.freeyourgadget.gadgetbridge.util.Accumulator;
 import nodomain.freeyourgadget.gadgetbridge.util.DateTimeUtils;
-import nodomain.freeyourgadget.gadgetbridge.util.GridTableBuilder;
 import nodomain.freeyourgadget.gadgetbridge.util.Prefs;
 
 
@@ -393,6 +395,10 @@ public class SleepDailyFragment extends SleepFragment<SleepDailyFragment.MyChart
         return DateTimeUtils.formatDurationHoursMinutes(seconds, TimeUnit.SECONDS);
     }
 
+    private StatTileData buildSleepStageTile(final int colorRes, final int labelRes, final String value) {
+        return new StatTileData(value, getString(labelRes), null, null, null, null, ContextCompat.getColor(requireContext(), colorRes));
+    }
+
     @Override
     protected void updateChartsnUIThread(MyChartsData mcd) {
         MySleepChartsData pieData = mcd.getPieData();
@@ -408,23 +414,22 @@ public class SleepDailyFragment extends SleepFragment<SleepDailyFragment.MyChart
 
         sleepStagesGaugeUpdate(pieData);
 
-        if (!pieData.sleepSessions.isEmpty()) {
-            binding.sleepChartLegendAwakeTime.setText(timeStringFormat(pieData.getTotalAwake()));
-            binding.sleepChartLegendRemTime.setText(timeStringFormat(pieData.getTotalRem()));
-            binding.sleepChartLegendDeepTime.setText(timeStringFormat(pieData.getTotalDeep()));
-            binding.sleepChartLegendLightTime.setText(timeStringFormat(pieData.getTotalLight()));
-        } else {
-            binding.sleepChartLegendAwakeTime.setText("-");
-            binding.sleepChartLegendRemTime.setText("-");
-            binding.sleepChartLegendDeepTime.setText("-");
-            binding.sleepChartLegendLightTime.setText("-");
+        final boolean hasSleepSessions = !pieData.sleepSessions.isEmpty();
+        final List<StatTileData> legendStats = new ArrayList<>();
+        legendStats.add(buildSleepStageTile(R.color.chart_deep_sleep_dark, R.string.sleep_colored_stats_deep,
+                hasSleepSessions ? timeStringFormat(pieData.getTotalDeep()) : "-"));
+        legendStats.add(buildSleepStageTile(R.color.chart_light_sleep_dark, R.string.sleep_colored_stats_light,
+                hasSleepSessions ? timeStringFormat(pieData.getTotalLight()) : "-"));
+        if (supportsRemSleep(getChartsHost().getDevice())) {
+            legendStats.add(buildSleepStageTile(R.color.chart_rem_sleep_dark, R.string.sleep_colored_stats_rem,
+                    hasSleepSessions ? timeStringFormat(pieData.getTotalRem()) : "-"));
         }
-        if (!supportsRemSleep(getChartsHost().getDevice())) {
-            binding.sleepChartLegendRemTimeWrapper.setVisibility(View.GONE);
+        if (supportsAwakeSleep(getChartsHost().getDevice())) {
+            legendStats.add(buildSleepStageTile(R.color.chart_awake_sleep_dark, R.string.abstract_chart_fragment_kind_awake_sleep,
+                    hasSleepSessions ? timeStringFormat(pieData.getTotalAwake()) : "-"));
         }
-        if (!supportsAwakeSleep(getChartsHost().getDevice())) {
-            binding.sleepChartLegendAwakeTimeWrapper.setVisibility(View.GONE);
-        }
+        binding.sleepLegendStatsContainer.removeAllViews();
+        StatTileGridUtilKt.addStatTileGrid(binding.sleepLegendStatsContainer, requireContext(), legendStats, 0);
         binding.sleepchartInfo.setText(buildYouSleptText(pieData));
         binding.sleepchartInfo.setMovementMethod(new ScrollingMovementMethod());
 
@@ -440,35 +445,37 @@ public class SleepDailyFragment extends SleepFragment<SleepDailyFragment.MyChart
 
         // Build stats grid programmatically
         binding.sleepStatsContainer.removeAllViews();
-        final GridTableBuilder statsBuilder = new GridTableBuilder(requireContext());
+        final WorkoutValueFormatter workoutValueFormatter = new WorkoutValueFormatter();
+        final List<StatTileData> stats = new ArrayList<>();
 
-        statsBuilder.addEntry(
-                getString(R.string.minHR),
-                heartRateMin > 0 ? new ActivitySummarySimpleEntry(heartRateMin, UNIT_BPM) : null
-        );
+        stats.add(new StatTileData(
+                heartRateMin > 0 ? workoutValueFormatter.formatValue(heartRateMin, UNIT_BPM) : getString(R.string.stats_empty_value),
+                getString(R.string.minHR)
+        ));
 
-        statsBuilder.addEntry(
-                getString(R.string.maxHR),
-                heartRateMax > 0 ? new ActivitySummarySimpleEntry(heartRateMax, UNIT_BPM) : null
-        );
+        stats.add(new StatTileData(
+                heartRateMax > 0 ? workoutValueFormatter.formatValue(heartRateMax, UNIT_BPM) : getString(R.string.stats_empty_value),
+                getString(R.string.maxHR)
+        ));
 
-        statsBuilder.addEntry(
-                getString(R.string.averageHR),
-                heartRateAvg > 0 ? new ActivitySummarySimpleEntry(heartRateAvg, UNIT_BPM) : null
-        );
+        stats.add(new StatTileData(
+                heartRateAvg > 0 ? workoutValueFormatter.formatValue(heartRateAvg, UNIT_BPM) : getString(R.string.stats_empty_value),
+                getString(R.string.averageHR)
+        ));
 
         if (intensityTotal > 0) {
-            statsBuilder.addEntry(
-                    getString(R.string.movement_intensity),
-                    new ActivitySummarySimpleEntry(new DecimalFormat("###.#").format(intensityTotal), "string")
-            );
+            stats.add(new StatTileData(
+                    new DecimalFormat("###.#").format(intensityTotal),
+                    getString(R.string.movement_intensity)
+            ));
         }
 
         for (Map.Entry<String, ActivitySummarySimpleEntry> e : mcd.getCustomStats().entrySet()) {
-            statsBuilder.addEntry(e.getKey(), e.getValue());
+            final ActivitySummarySimpleEntry entry = e.getValue();
+            stats.add(new StatTileData(workoutValueFormatter.formatValue(entry.getValue(), entry.getUnit()), e.getKey()));
         }
 
-        binding.sleepStatsContainer.addView(statsBuilder.build());
+        StatTileGridUtilKt.addStatTileGrid(binding.sleepStatsContainer, requireContext(), stats, 0);
 
         if (supportsHeartrate(getChartsHost().getDevice()) && SHOW_CHARTS_AVERAGE) {
             if (mcd.getHeartRateAxisMax() != 0 || mcd.getHeartRateAxisMin() != 0) {

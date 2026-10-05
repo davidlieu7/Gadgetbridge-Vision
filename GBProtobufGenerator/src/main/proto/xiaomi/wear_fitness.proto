@@ -44,8 +44,10 @@ message Health {
 
   // 8, 53 -- raw sensor batches (SaA synthetic workout, ~100 Hz, watch -> phone)
   optional RawSensorBatch rawSensorBatch = 15;
-  // 8, 49 -- ack sent by phone after every ~10 batches
-  optional RawSensorAck rawSensorAck = 41;
+  // 8, 49 -- live workout stats, phone -> watch (AstroBox FitnessID.PHONE_SPORT_DATA_V2A)
+  optional WorkoutStatsPhone workoutStatsPhone = 41;
+  // 8, 50 -- live workout stats, watch -> phone (AstroBox FitnessID.WEAR_SPORT_DATA_V2A)
+  optional WorkoutStatsWatch workoutStatsWatch = 42;
 }
 
 message UserInfo {
@@ -148,7 +150,9 @@ message WorkoutStatusWatch {
 }
 
 message WorkoutStatusWatchSport {
-  optional uint32 type = 1; // 16 in SaA synthetic mode
+  // Local UTC offset in quarter-hour units, DST included. Zigzag encoded, like TimeZone in
+  // wear_common.proto.
+  optional sint32 tzOffsetQuarterHours = 1;
 }
 
 // The watch asks the phone to confirm a workout it is about to open.
@@ -235,9 +239,23 @@ message RawSensorBatch {
   repeated AxisSensor gyro = 6; // not consumed today
 }
 
-// Ack sent by phone every ~10 batches (subtype 49 = AstroBox FitnessID.PHONE_SPORT_DATA_V2A).
-message RawSensorAck {
-  optional uint32 counter = 1; // 1..N
-  optional uint32 unknown2 = 2; // 0
-  optional uint32 unknown3 = 3; // 0
+// Live workout stats pushed by the phone during a phone-driven workout (subtype 49 = AstroBox
+// FitnessID.PHONE_SPORT_DATA_V2A). The band renders these values on its workout screen; it never
+// computes them itself while the phone owns the session, and blanks the screen if the stream
+// stops altogether.
+// Tags beyond 4 exist on the wire but are not needed here.
+message WorkoutStatsPhone {
+  optional uint32 durationSeconds = 1;
+  optional uint32 heartRate = 2; // bpm, 255 when unknown
+  optional uint32 calories = 3; // kcal
+  optional uint32 distance = 4; // metres
+}
+
+// The watch's own copy of the stats, pushed once a second for as long as a workout is open,
+// whatever rate the phone sends at. Tags beyond 4 exist on the wire but are not consumed here.
+message WorkoutStatsWatch {
+  optional uint32 heartRate = 1; // bpm
+  optional uint32 calories = 2; // kcal, counted from the start of the workout
+  optional uint32 steps = 3;
+  optional uint32 distance = 4; // metres
 }

@@ -287,4 +287,10 @@ public class CyclingChartFragment extends AbstractChartFragment<CyclingChartFrag
             return annotationDateFormat.format(date);
         }
     }
+
+    @Nullable
+    @Override
+    public ChartDataRange getAvailableDataRange(final GBDevice device, final DBHandler db) {
+        return ChartDataRange.ofSamples(device.getDeviceCoordinator().getCyclingSampleProvider(device, db.getDaoSession()));
+    }
 }

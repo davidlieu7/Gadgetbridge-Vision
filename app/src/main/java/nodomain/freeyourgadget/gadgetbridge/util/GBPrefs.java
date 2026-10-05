@@ -62,6 +62,11 @@ public class GBPrefs extends Prefs {
     public static boolean AUTO_RECONNECT_DEFAULT = true;
     public static final String PREF_ALLOW_INTENT_API = "prefs_key_allow_bluetooth_intent_api";
 
+    public static final String SLEEP_AS_ANDROID_ENABLED = "pref_key_sleepasandroid_enable";
+    public static final String SLEEP_AS_ANDROID_DEVICE = "sleepasandroid_device";
+    public static final String SLEEP_AS_ANDROID_ALARM_SLOT = "sleepasandroid_alarm_slot";
+    public static final String SLEEP_AS_ANDROID_ALARM_MAX_MINUTES = "pref_key_sleepasandroid_alarm_max_minutes";
+
     public static final String PREF_AUTO_FETCH_ENABLED = "auto_fetch_enabled";
     public static final String PREF_AUTO_FETCH_INTERVAL_LIMIT = "auto_fetch_interval_limit";
 
@@ -127,6 +132,7 @@ public class GBPrefs extends Prefs {
     public static final String HEALTH_CONNECT_DETAILED_WORKOUT_SYNC = "health_connect_detailed_workout_sync";
     public static final String HEALTH_CONNECT_DEVICE_SELECTION = "health_connect_devices_multiselect";
     public static final String HEALTH_CONNECT_SETTINGS = "health_connect_settings";
+    public static final String HEALTH_CONNECT_REQUEST_PERMISSIONS = "health_connect_request_permissions";
     public static final String HEALTH_CONNECT_INITIAL_SYNC_START_TS = "health_connect_initial_sync_start_ts";
     public static final String HEALTH_CONNECT_LAST_GRANTED_PERMISSIONS = "health_connect_last_granted_permissions";
     public static final String HEALTH_CONNECT_PROMPT_FOR_FULL_DAO_RESET = "health_connect_prompt_for_full_dao_reset";

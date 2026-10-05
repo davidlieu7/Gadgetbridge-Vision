@@ -16,12 +16,18 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 package nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.components
 
+import nodomain.freeyourgadget.gadgetbridge.GBApplication
 import nodomain.freeyourgadget.gadgetbridge.R
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsPreferenceConst
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.DeviceSettingsScope
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.ListEntry
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.ListSetting
 import nodomain.freeyourgadget.gadgetbridge.capabilities.HeartRateCapability
+import nodomain.freeyourgadget.gadgetbridge.devices.GenericBloodPressureSampleProvider
+import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice
+import nodomain.freeyourgadget.gadgetbridge.service.btle.profiles.bloodpressure.BloodPressureProfile
+import nodomain.freeyourgadget.gadgetbridge.util.healthconnect.HealthConnectPermissionManager
+import nodomain.freeyourgadget.gadgetbridge.util.healthconnect.HealthConnectUtils
 
 /**
  * Adds a heart rate interval [ListSetting] with key [DeviceSettingsPreferenceConst.PREF_HEARTRATE_MEASUREMENT_INTERVAL].
@@ -37,6 +43,47 @@ fun DeviceSettingsScope.heartrateMeasurementInterval(supported: MutableList<Hear
             entries = intervals.map { ListEntry.Res(it!!.intervalSeconds.toString(), it.label) },
             defaultValue = "0",
             connectedOnly = true,
+        )
+    )
+}
+
+/**
+ * Adds a [ListSetting] with key [DeviceSettingsPreferenceConst.PREF_BLOOD_PRESSURE_ACTIVE_USER].
+ * The entries are the distinct user indexes in the blood pressure samples of [device].
+ */
+fun DeviceSettingsScope.bloodPressureActiveUser(device: GBDevice) {
+    items.add(
+        ListSetting(
+            key = DeviceSettingsPreferenceConst.PREF_BLOOD_PRESSURE_ACTIVE_USER,
+            title = R.string.f8_prefs_active_user_title,
+            icon = R.drawable.ic_person,
+            entriesProvider = {
+                val userIndexes = GBApplication.acquireDbReadOnly().use { db ->
+                    GenericBloodPressureSampleProvider(device, db.daoSession).userIndexes
+                }
+                val context = GBApplication.getContext()
+                listOf<ListEntry>(ListEntry.Res("-1", R.string.blood_pressure_all_users)) +
+                    userIndexes.map {
+                        if (it == BloodPressureProfile.USER_ID_UNKNOWN) {
+                            ListEntry.Res(it.toString(), R.string.blood_pressure_unknown_user)
+                        } else {
+                            ListEntry.Text(
+                                it.toString(),
+                                context.getString(R.string.blood_pressure_user_index, it)
+                            )
+                        }
+                    }
+            },
+            defaultValue = "-1",
+            connectedOnly = false,
+            onValueChange = { _, oldValue, newValue ->
+                if (oldValue != newValue) {
+                    HealthConnectUtils.resetSyncState(
+                        device,
+                        HealthConnectPermissionManager.HealthConnectDataType.BLOOD_PRESSURE
+                    )
+                }
+            },
         )
     )
 }

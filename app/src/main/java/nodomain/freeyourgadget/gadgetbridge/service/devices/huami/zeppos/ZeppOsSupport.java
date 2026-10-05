@@ -729,9 +729,11 @@ public class ZeppOsSupport extends AbstractBluetoothDeviceSupport
                 break;
             // Received when the app starts sleep tracking
             case SleepAsAndroidAction.START_TRACKING:
-                heartRateService.onEnableRealtimeHeartRateMeasurement(true);
+                sleepAsAndroidSender.startTracking(extras);
+                if (sleepAsAndroidSender.isHeartRateRequested()) {
+                    heartRateService.onEnableRealtimeHeartRateMeasurement(true);
+                }
                 enableRawSensor(true);
-                sleepAsAndroidSender.startTracking();
                 break;
             // Received when the app stops sleep tracking
             case SleepAsAndroidAction.STOP_TRACKING:

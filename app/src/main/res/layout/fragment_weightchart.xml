@@ -38,7 +38,7 @@
         <View
             android:layout_width="match_parent"
             android:layout_height="5px"
-            android:background="@color/value_line_color" />
+            android:background="?attr/value_line" />
 
         <TextView
             android:id="@+id/weight_latest_text"
@@ -69,7 +69,7 @@
         <View
             android:layout_width="match_parent"
             android:layout_height="5px"
-            android:background="@color/value_line_color" />
+            android:background="?attr/value_line" />
 
         <TextView
             android:id="@+id/weight_target_text"
@@ -100,7 +100,7 @@
         <View
             android:layout_width="match_parent"
             android:layout_height="5px"
-            android:background="@color/value_line_color" />
+            android:background="?attr/value_line" />
 
         <TextView
             android:id="@+id/weight_bmi_text"
@@ -132,7 +132,7 @@
         <View
             android:layout_width="match_parent"
             android:layout_height="5px"
-            android:background="@color/value_line_color" />
+            android:background="?attr/value_line" />
 
         <TextView
             android:id="@+id/weight_body_fat_text"
@@ -164,7 +164,7 @@
         <View
             android:layout_width="match_parent"
             android:layout_height="5px"
-            android:background="@color/value_line_color" />
+            android:background="?attr/value_line" />
 
         <TextView
             android:id="@+id/weight_body_water_text"
@@ -196,7 +196,7 @@
         <View
             android:layout_width="match_parent"
             android:layout_height="5px"
-            android:background="@color/value_line_color" />
+            android:background="?attr/value_line" />
 
         <TextView
             android:id="@+id/weight_muscle_mass_text"
@@ -228,7 +228,7 @@
         <View
             android:layout_width="match_parent"
             android:layout_height="5px"
-            android:background="@color/value_line_color" />
+            android:background="?attr/value_line" />
 
         <TextView
             android:id="@+id/weight_bone_mass_text"
@@ -260,7 +260,7 @@
         <View
             android:layout_width="match_parent"
             android:layout_height="5px"
-            android:background="@color/value_line_color" />
+            android:background="?attr/value_line" />
 
         <TextView
             android:id="@+id/weight_bmr_text"
@@ -292,7 +292,7 @@
         <View
             android:layout_width="match_parent"
             android:layout_height="5px"
-            android:background="@color/value_line_color" />
+            android:background="?attr/value_line" />
 
         <TextView
             android:id="@+id/weight_impedance_text"

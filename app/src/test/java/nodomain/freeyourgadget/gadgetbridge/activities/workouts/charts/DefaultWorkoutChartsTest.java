@@ -17,11 +17,15 @@
 package nodomain.freeyourgadget.gadgetbridge.activities.workouts.charts;
 
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
+import com.github.mikephil.charting.data.Entry;
+
 import org.junit.Test;
 
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Date;
 import java.util.List;
@@ -158,5 +162,38 @@ public class DefaultWorkoutChartsTest {
 
         assertEquals(0.0, d[0], 1e-9);
         assertEquals(78.6, d[1], 1.0); // ~78.6 m from the fixes, not 50 m/s * 1 s
+    }
+
+    private static List<Entry> entriesEvery(final long stepMs, final int count) {
+        final List<Entry> entries = new ArrayList<>();
+        for (int i = 0; i < count; i++) {
+            entries.add(new Entry(i * stepMs, 25));
+        }
+        return entries;
+    }
+
+    @Test
+    public void perSecondAndHalfSecondSeriesAreDense() {
+        assertTrue(DefaultWorkoutCharts.isDenseSeries(entriesEvery(1000, 60)));
+        assertTrue(DefaultWorkoutCharts.isDenseSeries(entriesEvery(500, 60)));
+    }
+
+    @Test
+    public void sparseSeriesIsNotDense() {
+        assertFalse(DefaultWorkoutCharts.isDenseSeries(entriesEvery(5000, 60)));
+    }
+
+    @Test
+    public void pauseDoesNotMakeDenseSeriesSparse() {
+        final List<Entry> entries = entriesEvery(1000, 30);
+        for (int i = 0; i < 30; i++) {
+            entries.add(new Entry(600_000 + i * 1000, 25));
+        }
+        assertTrue(DefaultWorkoutCharts.isDenseSeries(entries));
+    }
+
+    @Test
+    public void tooFewPointsAreNotDense() {
+        assertFalse(DefaultWorkoutCharts.isDenseSeries(entriesEvery(1000, 2)));
     }
 }

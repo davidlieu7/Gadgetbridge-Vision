@@ -20,6 +20,7 @@ package nodomain.freeyourgadget.gadgetbridge.devices.oppo
 import android.bluetooth.BluetoothClass
 import android.util.Pair
 import java.util.Locale
+import java.nio.ByteOrder
 import nodomain.freeyourgadget.gadgetbridge.R
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSpecificSettingsCustomizer
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSpecificSettingsScreen
@@ -28,6 +29,7 @@ import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.Device
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.components.enumList
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.components.multiEnumList
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.components.screen
+import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.components.multipointPairing
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.deviceSettings
 import nodomain.freeyourgadget.gadgetbridge.devices.AbstractBLClassicDeviceCoordinator
 import nodomain.freeyourgadget.gadgetbridge.devices.DeviceCoordinator
@@ -90,11 +92,7 @@ abstract class OppoHeadphonesCoordinator : AbstractBLClassicDeviceCoordinator() 
             )
         }
         if (supportsMultipoint(device)) {
-            switchSetting(
-                key = OppoHeadphonesPreferences.MULTIPOINT,
-                title = R.string.bluetooth_multipoint_pairing,
-                icon = R.drawable.ic_bluetooth_searching,
-            )
+            multipointPairing()
         }
         touchOptions(device)
         xmlScreen(
@@ -166,6 +164,7 @@ abstract class OppoHeadphonesCoordinator : AbstractBLClassicDeviceCoordinator() 
         DeviceCoordinator.DeviceKind.EARBUDS
 
     open fun ctrlUuid(device: GBDevice): OppoUuid = OppoUuid.VENDOR_RFCOMM
+    open fun multipointMacOrder(device: GBDevice): ByteOrder = ByteOrder.BIG_ENDIAN
     open fun supportsLdac(device: GBDevice): Boolean = false
     open fun supportsMultipoint(device: GBDevice): Boolean = false
     open fun supportsGameMode(device: GBDevice): Boolean = false

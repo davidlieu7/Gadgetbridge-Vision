@@ -708,6 +708,11 @@ public interface DeviceCoordinator {
      */
     boolean supportsHeartRateMeasurement(@NonNull final GBDevice device);
 
+    /** Maximum gap between heart-rate measurements that chart lines should bridge, in minutes. */
+    default int getMaxHeartRateMeasurementsGapMinutes(@NonNull final GBDevice device) {
+        return nodomain.freeyourgadget.gadgetbridge.activities.HeartRateUtils.MAX_HR_MEASUREMENTS_GAP_MINUTES;
+    }
+
     /**
      * Returns true if the given device supports resting heart rate measurements.
      */

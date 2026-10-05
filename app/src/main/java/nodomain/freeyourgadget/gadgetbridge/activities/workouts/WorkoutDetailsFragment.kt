@@ -46,6 +46,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import nodomain.freeyourgadget.gadgetbridge.GBApplication
 import nodomain.freeyourgadget.gadgetbridge.R
+import nodomain.freeyourgadget.gadgetbridge.activities.AbstractGBActivity
 import nodomain.freeyourgadget.gadgetbridge.activities.endurain.EndurainApiClient
 import nodomain.freeyourgadget.gadgetbridge.activities.endurain.EndurainSetupViewModel
 import nodomain.freeyourgadget.gadgetbridge.activities.endurain.WandererApiClient
@@ -65,6 +66,7 @@ import nodomain.freeyourgadget.gadgetbridge.model.workout.Workout
 import nodomain.freeyourgadget.gadgetbridge.model.workout.WorkoutViewModel
 import nodomain.freeyourgadget.gadgetbridge.util.ActivitySummaryUtils
 import nodomain.freeyourgadget.gadgetbridge.util.AndroidUtils
+import nodomain.freeyourgadget.gadgetbridge.util.BarShade
 import nodomain.freeyourgadget.gadgetbridge.util.DateTimeUtils
 import nodomain.freeyourgadget.gadgetbridge.util.FileUtils
 import nodomain.freeyourgadget.gadgetbridge.util.GB
@@ -116,6 +118,10 @@ class WorkoutDetailsFragment : Fragment(), MenuProvider {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+
+        if (BarShade.continuesToolbar(requireContext(), R.attr.tab_bar_bg)) {
+            (requireActivity() as AbstractGBActivity).setTopShade(binding.tabRowShade)
+        }
 
         // Attach workout tabs.
         val viewPager = binding.tabsViewPager
@@ -210,6 +216,7 @@ class WorkoutDetailsFragment : Fragment(), MenuProvider {
 
                 currentWorkout?.let { workout ->
                     workoutValueFormatter.setActivityKind(ActivityKind.fromCode(workout.summary.activityKind))
+                    updateActionBarTitle()
                     workoutViewModel.setWorkout(workout, workoutId)
                     tabsPagerAdapter.setOptionalTabs(hasCharts(workout), hasLaps(workout))
 

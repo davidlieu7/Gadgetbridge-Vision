@@ -27,6 +27,7 @@ import android.view.ViewGroup;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
+import androidx.annotation.Nullable;
 import androidx.appcompat.app.AlertDialog;
 import androidx.core.content.ContextCompat;
 
@@ -57,6 +58,8 @@ import java.util.Locale;
 import nodomain.freeyourgadget.gadgetbridge.GBApplication;
 import nodomain.freeyourgadget.gadgetbridge.R;
 import nodomain.freeyourgadget.gadgetbridge.activities.HeartRateUtils;
+import nodomain.freeyourgadget.gadgetbridge.activities.workouts.StatTileData;
+import nodomain.freeyourgadget.gadgetbridge.activities.workouts.StatTileGridUtilKt;
 import nodomain.freeyourgadget.gadgetbridge.database.DBHandler;
 import nodomain.freeyourgadget.gadgetbridge.devices.DeviceCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.TimeSampleProvider;
@@ -80,10 +83,7 @@ public class BloodPressureChartFragment extends AbstractChartFragment<BloodPress
 
     private TextView mDateView;
     private LineChart mChart;
-    private TextView mSystolicLast;
-    private TextView mDiastolicLast;
-    private TextView mAverage;
-    private TextView mMeasurementCount;
+    private LinearLayout mStatsContainer;
     private LinearLayout mManualMeasurements;
     private LinearLayout mManualMeasurementsList;
     private BloodPressureChartsData currentData;
@@ -103,10 +103,7 @@ public class BloodPressureChartFragment extends AbstractChartFragment<BloodPress
 
         mDateView = rootView.findViewById(R.id.date_view);
         mChart = rootView.findViewById(R.id.blood_pressure_line_chart);
-        mSystolicLast = rootView.findViewById(R.id.bp_systolic_last);
-        mDiastolicLast = rootView.findViewById(R.id.bp_diastolic_last);
-        mAverage = rootView.findViewById(R.id.bp_average);
-        mMeasurementCount = rootView.findViewById(R.id.bp_measurement_count);
+        mStatsContainer = rootView.findViewById(R.id.bp_stats_container);
         mManualMeasurements = rootView.findViewById(R.id.manualMeasurements);
         mManualMeasurementsList = rootView.findViewById(R.id.manualMeasurementsList);
 
@@ -171,14 +168,17 @@ public class BloodPressureChartFragment extends AbstractChartFragment<BloodPress
         mManualMeasurements.setVisibility(View.GONE);
 
         final String emptyValue = requireContext().getString(R.string.stats_empty_value);
-        mSystolicLast.setText(data.systolicLast > 0 ? String.valueOf(data.systolicLast) : emptyValue);
-        mDiastolicLast.setText(data.diastolicLast > 0 ? String.valueOf(data.diastolicLast) : emptyValue);
-        if (data.systolicAvg > 0 && data.diastolicAvg > 0) {
-            mAverage.setText(getString(R.string.blood_pressure_avg_format, data.systolicAvg, data.diastolicAvg));
-        } else {
-            mAverage.setText(emptyValue);
-        }
-        mMeasurementCount.setText(String.valueOf(data.measurementCount));
+        final String average = (data.systolicAvg > 0 && data.diastolicAvg > 0)
+                ? getString(R.string.blood_pressure_avg_format, data.systolicAvg, data.diastolicAvg)
+                : emptyValue;
+
+        final List<StatTileData> stats = new ArrayList<>();
+        stats.add(new StatTileData(data.systolicLast > 0 ? String.valueOf(data.systolicLast) : emptyValue, getString(R.string.blood_pressure_systolic)));
+        stats.add(new StatTileData(data.diastolicLast > 0 ? String.valueOf(data.diastolicLast) : emptyValue, getString(R.string.blood_pressure_diastolic)));
+        stats.add(new StatTileData(average, getString(R.string.hr_average)));
+        stats.add(new StatTileData(String.valueOf(data.measurementCount), getString(R.string.blood_pressure_measurement_count)));
+        mStatsContainer.removeAllViews();
+        StatTileGridUtilKt.addStatTileGrid(mStatsContainer, requireContext(), stats, 0);
 
         mChart.setData(null); // workaround for https://github.com/PhilJay/MPAndroidChart/issues/2317
         mChart.getAxisLeft().removeAllLimitLines();
@@ -414,5 +414,11 @@ public class BloodPressureChartFragment extends AbstractChartFragment<BloodPress
             this.diastolicLast = diastolicLast;
             this.measurementCount = measurementCount;
         }
+    }
+
+    @Nullable
+    @Override
+    public ChartDataRange getAvailableDataRange(final GBDevice device, final DBHandler db) {
+        return ChartDataRange.ofSamples(device.getDeviceCoordinator().getBloodPressureSampleProvider(device, db.getDaoSession()));
     }
 }

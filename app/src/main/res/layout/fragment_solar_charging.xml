@@ -14,86 +14,20 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="15dp"
-            android:layout_marginBottom="20dp"
+            android:layout_marginBottom="15dp"
             android:gravity="center"
             android:textSize="20sp"
             android:textColor="?attr/textColorPrimary"
             />
 
-        <GridLayout
+        <LinearLayout
+            android:id="@+id/solar_charging_stats_container"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="15dp"
             android:layout_marginBottom="15dp"
-            android:background="@color/gauge_line_color"
-            android:columnCount="2">
-
-            <LinearLayout
-                style="@style/GridTile"
-                android:layout_marginTop="2dp"
-                android:layout_marginEnd="1dp">
-
-                <TextView
-                    android:id="@+id/solar_charging_lux_hours"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="0.0K"
-                    android:textColor="?attr/textColorPrimary"
-                    android:textSize="20sp" />
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/solar_charging_lux_hours"
-                    android:textSize="12sp" />
-            </LinearLayout>
-
-            <LinearLayout
-                style="@style/GridTile"
-                android:layout_marginTop="2dp"
-                android:layout_marginStart="1dp">
-
-                <TextView
-                    android:id="@+id/solar_charging_battery_gain"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="+ 0 min"
-                    android:textColor="?attr/textColorPrimary"
-                    android:textSize="20sp" />
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/solar_charging_battery_gain"
-                    android:textSize="12sp" />
-            </LinearLayout>
-
-            <LinearLayout
-                style="@style/GridTile"
-                android:layout_marginTop="1dp"
-                android:layout_marginEnd="1dp">
-
-                <TextView
-                    android:id="@+id/solar_charging_peak_intensity"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="0%"
-                    android:textColor="?attr/textColorPrimary"
-                    android:textSize="20sp" />
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/solar_charging_peak_intensity"
-                    android:textSize="12sp" />
-            </LinearLayout>
-
-            <LinearLayout
-                style="@style/GridTile"
-                android:layout_marginTop="1dp"
-                android:layout_marginStart="1dp" />
-
-        </GridLayout>
+            android:layout_marginStart="15dp"
+            android:layout_marginEnd="15dp"
+            android:orientation="vertical" />
 
         <LinearLayout
             android:layout_width="match_parent"

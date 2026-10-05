@@ -23,6 +23,7 @@ public enum SubscriptionType {
     STATUS(0x02),
     ANC_SELECTOR(0x03),
     GAME_MODE(0x05),
+    MULTIPOINT(0x06),
     ;
 
     private final int code;

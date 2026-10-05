@@ -10,6 +10,7 @@ import android.view.ViewGroup;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
+import androidx.annotation.Nullable;
 import androidx.core.content.ContextCompat;
 
 import com.github.mikephil.charting.charts.Chart;
@@ -39,7 +40,9 @@ import java.util.Locale;
 import nodomain.freeyourgadget.gadgetbridge.GBApplication;
 import nodomain.freeyourgadget.gadgetbridge.R;
 import nodomain.freeyourgadget.gadgetbridge.activities.HeartRateUtils;
-import nodomain.freeyourgadget.gadgetbridge.activities.workouts.entries.ActivitySummarySimpleEntry;
+import nodomain.freeyourgadget.gadgetbridge.activities.workouts.StatTileData;
+import nodomain.freeyourgadget.gadgetbridge.activities.workouts.StatTileGridUtilKt;
+import nodomain.freeyourgadget.gadgetbridge.activities.workouts.WorkoutValueFormatter;
 import nodomain.freeyourgadget.gadgetbridge.database.DBHandler;
 import nodomain.freeyourgadget.gadgetbridge.devices.SampleProvider;
 import nodomain.freeyourgadget.gadgetbridge.entities.AbstractActivitySample;
@@ -48,7 +51,6 @@ import nodomain.freeyourgadget.gadgetbridge.model.ActivitySample;
 import nodomain.freeyourgadget.gadgetbridge.model.HeartRateSample;
 import nodomain.freeyourgadget.gadgetbridge.util.Accumulator;
 import nodomain.freeyourgadget.gadgetbridge.util.DateTimeUtils;
-import nodomain.freeyourgadget.gadgetbridge.util.GridTableBuilder;
 import nodomain.freeyourgadget.gadgetbridge.util.Prefs;
 import nodomain.freeyourgadget.gadgetbridge.util.TimeWeightedAverageAccumulator;
 
@@ -156,7 +158,8 @@ public class HeartRatePeriodFragment extends AbstractChartFragment<HeartRatePeri
                     .orElse(DATA_INVALID);
         }
 
-        final TimeWeightedAverageAccumulator accumulator = new TimeWeightedAverageAccumulator(60 * HeartRateUtils.MAX_HR_MEASUREMENTS_GAP_MINUTES, 60);
+        final int maxHRGapMinutes = device.getDeviceCoordinator().getMaxHeartRateMeasurementsGapMinutes(device);
+        final TimeWeightedAverageAccumulator accumulator = new TimeWeightedAverageAccumulator(60 * maxHRGapMinutes, 60);
         for (int i = 0; i < samples.size(); i++) {
             final ActivitySample sample = samples.get(i);
             if (heartRateUtilsInstance.isValidHeartRateValue(sample.getHeartRate())) {
@@ -291,31 +294,32 @@ public class HeartRatePeriodFragment extends AbstractChartFragment<HeartRatePeri
     private void setStatistics(int average, int minimum, int maximum, int resting) {
         hrStatsContainer.removeAllViews();
 
-        final GridTableBuilder builder = new GridTableBuilder(requireContext());
+        final WorkoutValueFormatter workoutValueFormatter = new WorkoutValueFormatter();
+        final List<StatTileData> stats = new ArrayList<>();
 
-        builder.addEntry(
-                getString(R.string.hr_minimum),
-                minimum > 0 ? new ActivitySummarySimpleEntry(minimum, UNIT_BPM) : null
-        );
+        stats.add(new StatTileData(
+                minimum > 0 ? workoutValueFormatter.formatValue(minimum, UNIT_BPM) : getString(R.string.stats_empty_value),
+                getString(R.string.hr_minimum)
+        ));
 
-        builder.addEntry(
-                getString(R.string.hr_maximum),
-                maximum > 0 ? new ActivitySummarySimpleEntry(maximum, UNIT_BPM) : null
-        );
+        stats.add(new StatTileData(
+                maximum > 0 ? workoutValueFormatter.formatValue(maximum, UNIT_BPM) : getString(R.string.stats_empty_value),
+                getString(R.string.hr_maximum)
+        ));
 
-        builder.addEntry(
-                getString(R.string.hr_average),
-                average > 0 ? new ActivitySummarySimpleEntry(average, UNIT_BPM) : null
-        );
+        stats.add(new StatTileData(
+                average > 0 ? workoutValueFormatter.formatValue(average, UNIT_BPM) : getString(R.string.stats_empty_value),
+                getString(R.string.hr_average)
+        ));
 
         if (supportsHeartRateRestingMeasurement()) {
-            builder.addEntry(
-                    getString(R.string.hr_resting),
-                    resting > 0 ? new ActivitySummarySimpleEntry(resting, UNIT_BPM) : null
-            );
+            stats.add(new StatTileData(
+                    resting > 0 ? workoutValueFormatter.formatValue(resting, UNIT_BPM) : getString(R.string.stats_empty_value),
+                    getString(R.string.hr_resting)
+            ));
         }
 
-        hrStatsContainer.addView(builder.build());
+        StatTileGridUtilKt.addStatTileGrid(hrStatsContainer, requireContext(), stats, 0);
 
         if (minimum > 0) {
             hrLineChart.getAxisLeft().setAxisMinimum(Math.max(minimum - 30, 0));
@@ -355,6 +359,8 @@ public class HeartRatePeriodFragment extends AbstractChartFragment<HeartRatePeri
         mDateView.setText(formattedDate);
 
         HeartRateUtils heartRateUtilsInstance = HeartRateUtils.getInstance();
+        final GBDevice device = getChartsHost().getDevice();
+        final int maxHRGapMinutes = device.getDeviceCoordinator().getMaxHeartRateMeasurementsGapMinutes(device);
         final List<Entry> lineEntries = new ArrayList<>();
         List<? extends ActivitySample> samples = data.samples;
         final TimestampTranslation tsTranslation = new TimestampTranslation();
@@ -368,7 +374,7 @@ public class HeartRatePeriodFragment extends AbstractChartFragment<HeartRatePeri
             }
             final int ts = sample.getTimestamp();
             final int shortTs = tsTranslation.shorten(ts);
-            if (lastTs == 0 || (ts - lastTs) <= 60 * HeartRateUtils.MAX_HR_MEASUREMENTS_GAP_MINUTES) {
+            if (lastTs == 0 || (ts - lastTs) <= 60 * maxHRGapMinutes) {
                 lineEntries.add(new Entry(shortTs, sample.getHeartRate()));
             } else {
                 if (!lineEntries.isEmpty()) {
@@ -490,5 +496,14 @@ public class HeartRatePeriodFragment extends AbstractChartFragment<HeartRatePeri
             this.minimum = minimum;
             this.maximum = maximum;
         }
+    }
+
+    @Nullable
+    @Override
+    public ChartDataRange getAvailableDataRange(final GBDevice device, final DBHandler db) {
+        return ChartDataRange.union(
+                ChartDataRange.ofActivitySamples(device.getDeviceCoordinator().getSampleProvider(device, db.getDaoSession())),
+                ChartDataRange.ofSamples(device.getDeviceCoordinator().getHeartRateRestingSampleProvider(device, db.getDaoSession()))
+        );
     }
 }

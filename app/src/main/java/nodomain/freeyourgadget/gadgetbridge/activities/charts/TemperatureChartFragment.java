@@ -16,6 +16,8 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>. */
 package nodomain.freeyourgadget.gadgetbridge.activities.charts;
 
+import androidx.annotation.Nullable;
+
 import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -247,5 +249,11 @@ public class TemperatureChartFragment extends AbstractChartFragment<TemperatureC
         public String getPointLabel(Entry entry) {
             return formatter.format(entry.getY());
         }
+    }
+
+    @Nullable
+    @Override
+    public ChartDataRange getAvailableDataRange(final GBDevice device, final DBHandler db) {
+        return ChartDataRange.ofSamples(device.getDeviceCoordinator().getTemperatureSampleProvider(device, db.getDaoSession()));
     }
 }

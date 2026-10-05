@@ -41,6 +41,10 @@ public enum OppoCommand {
     ANC_CONFIG_REQ(0x010c),
     ANC_CONFIG_ACK(0x8404),
     ANC_CONFIG_RET(0x810c),
+    MULTIPOINT_DEVICES_SET(0x040b),
+    MULTIPOINT_DEVICES_REQ(0x0112),
+    MULTIPOINT_DEVICES_ACK(0x840b),
+    MULTIPOINT_DEVICES_RET(0x8112),
     ;
 
     private final short code;

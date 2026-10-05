@@ -16,6 +16,8 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 package nodomain.freeyourgadget.gadgetbridge.activities.charts;
 
+import androidx.annotation.Nullable;
+
 import static nodomain.freeyourgadget.gadgetbridge.model.ActivitySummaryEntries.UNIT_LUX_HOURS_KILO;
 import static nodomain.freeyourgadget.gadgetbridge.model.ActivitySummaryEntries.UNIT_MINUTES;
 import static nodomain.freeyourgadget.gadgetbridge.model.ActivitySummaryEntries.UNIT_PERCENTAGE;
@@ -24,6 +26,7 @@ import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.LinearLayout;
 import android.widget.TextView;
 
 import com.github.mikephil.charting.charts.Chart;
@@ -51,6 +54,8 @@ import java.util.TimeZone;
 
 import nodomain.freeyourgadget.gadgetbridge.GBApplication;
 import nodomain.freeyourgadget.gadgetbridge.R;
+import nodomain.freeyourgadget.gadgetbridge.activities.workouts.StatTileData;
+import nodomain.freeyourgadget.gadgetbridge.activities.workouts.StatTileGridUtilKt;
 import nodomain.freeyourgadget.gadgetbridge.activities.workouts.WorkoutValueFormatter;
 import nodomain.freeyourgadget.gadgetbridge.database.DBHandler;
 import nodomain.freeyourgadget.gadgetbridge.devices.DeviceCoordinator;
@@ -62,9 +67,7 @@ public class SolarChargingDailyFragment extends AbstractChartFragment<SolarCharg
     protected static final Logger LOG = LoggerFactory.getLogger(SolarChargingDailyFragment.class);
 
     private TextView mDateView;
-    private TextView solarChargingLuxHours;
-    private TextView solarChargingPeakIntensity;
-    private TextView solarChargingBatteryGain;
+    private LinearLayout solarChargingStatsContainer;
     private LineChart solarChargingChart;
 
     protected int CHART_TEXT_COLOR;
@@ -79,9 +82,7 @@ public class SolarChargingDailyFragment extends AbstractChartFragment<SolarCharg
         });
 
         mDateView = rootView.findViewById(R.id.solar_charging_date_view);
-        solarChargingLuxHours = rootView.findViewById(R.id.solar_charging_lux_hours);
-        solarChargingPeakIntensity = rootView.findViewById(R.id.solar_charging_peak_intensity);
-        solarChargingBatteryGain = rootView.findViewById(R.id.solar_charging_battery_gain);
+        solarChargingStatsContainer = rootView.findViewById(R.id.solar_charging_stats_container);
         solarChargingChart = rootView.findViewById(R.id.solar_charging_chart);
         setupSolarChargingChart();
         refresh();
@@ -199,9 +200,12 @@ public class SolarChargingDailyFragment extends AbstractChartFragment<SolarCharg
         solarChargingChart.setData(new LineData(lineDataSets));
 
         final WorkoutValueFormatter unitFormatter = new WorkoutValueFormatter();
-        solarChargingLuxHours.setText(String.format(Locale.getDefault(), "%.1f%s", totalLuxHours / 1000.0, unitFormatter.getStringResourceByName(UNIT_LUX_HOURS_KILO)));
-        solarChargingPeakIntensity.setText(String.format(Locale.getDefault(), "%.0f%s", peakPercent, unitFormatter.getStringResourceByName(UNIT_PERCENTAGE)));
-        solarChargingBatteryGain.setText(String.format(Locale.getDefault(), "+ %d %s", totalGainMillis / 60000L, unitFormatter.getStringResourceByName(UNIT_MINUTES)));
+        solarChargingStatsContainer.removeAllViews();
+        final List<StatTileData> stats = new ArrayList<>();
+        stats.add(new StatTileData(String.format(Locale.getDefault(), "%.1f%s", totalLuxHours / 1000.0, unitFormatter.getStringResourceByName(UNIT_LUX_HOURS_KILO)), getString(R.string.solar_charging_lux_hours)));
+        stats.add(new StatTileData(String.format(Locale.getDefault(), "+ %d %s", totalGainMillis / 60000L, unitFormatter.getStringResourceByName(UNIT_MINUTES)), getString(R.string.solar_charging_battery_gain)));
+        stats.add(new StatTileData(String.format(Locale.getDefault(), "%.0f%s", peakPercent, unitFormatter.getStringResourceByName(UNIT_PERCENTAGE)), getString(R.string.solar_charging_peak_intensity)));
+        StatTileGridUtilKt.addStatTileGrid(solarChargingStatsContainer, requireContext(), stats, 0);
     }
 
     @Override
@@ -285,5 +289,11 @@ public class SolarChargingDailyFragment extends AbstractChartFragment<SolarCharg
             this.todaySamples = todaySamples;
             this.dayStartMillis = dayStartMillis;
         }
+    }
+
+    @Nullable
+    @Override
+    public ChartDataRange getAvailableDataRange(final GBDevice device, final DBHandler db) {
+        return ChartDataRange.ofSamples(device.getDeviceCoordinator().getSolarChargeSampleProvider(device, db.getDaoSession()));
     }
 }

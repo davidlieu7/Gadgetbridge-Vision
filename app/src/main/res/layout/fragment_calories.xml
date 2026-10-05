@@ -14,7 +14,7 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="15dp"
-            android:layout_marginBottom="20dp"
+            android:layout_marginBottom="@dimen/chart_section_spacing"
             android:gravity="center"
             android:textSize="20sp"
             android:textColor="?attr/textColorPrimary"
@@ -27,97 +27,16 @@
             android:layout_gravity="center"
             android:scaleType="fitStart" />
 
-        <GridLayout
-            android:id="@+id/calories_types_wrapper"
+        <LinearLayout
+            android:id="@+id/calories_stats_container"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="15dp"
+            android:orientation="vertical"
+            android:layout_marginTop="@dimen/chart_section_spacing"
             android:layout_marginBottom="15dp"
-            android:background="@color/gauge_line_color"
-            android:columnCount="2">
-
-            <LinearLayout
-                android:id="@+id/calories_active_wrapper"
-                style="@style/GridTile"
-                android:layout_marginTop="2dp"
-                android:layout_marginEnd="1dp">
-
-                <TextView
-                    android:id="@+id/calories_active"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/stats_empty_value"
-                    android:textColor="?attr/textColorPrimary"
-                    android:textSize="20sp" />
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/active_calories_short"
-                    android:textSize="12sp" />
-            </LinearLayout>
-
-            <LinearLayout
-                android:id="@+id/calories_resting_wrapper"
-                style="@style/GridTile"
-                android:layout_marginStart="1dp"
-                android:layout_marginTop="2dp">
-
-                <TextView
-                    android:id="@+id/calories_resting"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/stats_empty_value"
-                    android:textColor="?attr/textColorPrimary"
-                    android:textSize="20sp" />
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/hr_resting"
-                    android:textSize="12sp" />
-            </LinearLayout>
-
-            <LinearLayout
-                android:id="@+id/calories_active_goal_wrapper"
-                style="@style/GridTile"
-                android:layout_marginEnd="1dp">
-
-                <TextView
-                    android:id="@+id/calories_active_goal"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/stats_empty_value"
-                    android:textColor="?attr/textColorPrimary"
-                    android:textSize="20sp" />
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/active_calories_goal"
-                    android:textSize="12sp" />
-            </LinearLayout>
-
-            <LinearLayout
-                android:id="@+id/calories_resting_metabolic_rate_wrapper"
-                style="@style/GridTile"
-                android:layout_marginEnd="1dp">
-
-                <TextView
-                    android:id="@+id/calories_resting_metabolic_rate"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/stats_empty_value"
-                    android:textColor="?attr/textColorPrimary"
-                    android:textSize="20sp" />
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/metabolic_rate"
-                    android:textSize="12sp" />
-            </LinearLayout>
-        </GridLayout>
+            android:layout_marginStart="15dp"
+            android:layout_marginEnd="15dp"
+            />
 
         <LinearLayout
             android:layout_width="match_parent"

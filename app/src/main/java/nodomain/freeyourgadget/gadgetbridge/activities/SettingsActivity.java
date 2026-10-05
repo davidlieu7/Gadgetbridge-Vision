@@ -46,11 +46,14 @@ import androidx.preference.SwitchPreferenceCompat;
 import com.bytehamster.lib.preferencesearch.SearchPreferenceResult;
 import com.google.android.material.color.DynamicColors;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
+import com.jaredrummler.android.colorpicker.ColorPickerDialog;
+import com.jaredrummler.android.colorpicker.ColorPickerDialogListener;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
 import java.util.List;
@@ -134,6 +137,42 @@ public class SettingsActivity extends AbstractSettingsActivityV2 implements Acti
 
     public static class SettingsFragment extends AbstractPreferenceFragment {
         private static final Logger LOG = LoggerFactory.getLogger(SettingsActivity.class);
+
+        /** Must stay in sync with GBApplication#getAccentColorOverlay() and the ThemeOverlay.App.Accent.* styles. */
+        private static final String[] ACCENT_COLOR_KEYS = {
+                "red", "coral", "orange", "amber", "lime", "green",
+                "teal", "cyan", "blue", "indigo", "violet", "pink", "white",
+        };
+        private static final int[] ACCENT_COLOR_NAME_RES = {
+                R.string.accent_color_red, R.string.accent_color_coral, R.string.accent_color_orange,
+                R.string.accent_color_amber, R.string.accent_color_lime, R.string.accent_color_green,
+                R.string.accent_color_teal, R.string.accent_color_cyan, R.string.accent_color_blue,
+                R.string.accent_color_indigo, R.string.accent_color_violet, R.string.accent_color_pink,
+                R.string.accent_color_white,
+        };
+        /** The tab_pill value of each accent's Dark overlay - matches what dark theme users get. */
+        private static final int[] ACCENT_COLOR_SWATCHES_DARK = {
+                0xFFE02F00, 0xFFFF5A47, 0xFFF27C1A,
+                0xFFF5B800, 0xFFA8E02F, 0xFF2FD07A,
+                0xFF1DE9D0, 0xFF22C2F0, 0xFF2A6FE0,
+                0xFF5252E0, 0xFF8A3FE6, 0xFFD02866, 0xFFFFFFFF,
+        };
+        /** The tab_pill value of each accent's Light overlay - matches what light theme users get. */
+        private static final int[] ACCENT_COLOR_SWATCHES_LIGHT = {
+                0xFFE02F00, 0xFFD63A25, 0xFFC25400,
+                0xFF9A6F00, 0xFF4F7A00, 0xFF0F7A40,
+                0xFF00786E, 0xFF006E94, 0xFF2A6FE0,
+                0xFF5252E0, 0xFF8A3FE6, 0xFFD02866, 0xFFFFFFFF,
+        };
+
+        private static int[] accentColorSwatches() {
+            return GBApplication.isDarkThemeEnabled() ? ACCENT_COLOR_SWATCHES_DARK : ACCENT_COLOR_SWATCHES_LIGHT;
+        }
+
+        /** White needs a dark backdrop to read against, so it's only offered while using the dark theme. */
+        private static boolean isAccentColorAvailable(final String key) {
+            return !"white".equals(key) || GBApplication.isDarkThemeEnabled();
+        }
 
         @Override
         public void onCreatePreferences(final Bundle savedInstanceState, final String rootKey) {
@@ -492,6 +531,7 @@ public class SettingsActivity extends AbstractSettingsActivityV2 implements Acti
 
             final Preference theme = findPreference("pref_key_theme");
             final Preference amoled_black = findPreference("pref_key_theme_amoled_black");
+            final Preference accentColor = findPreference("pref_key_accent_color");
 
             if (amoled_black != null) {
                 String selectedTheme = prefs.getString("pref_key_theme", requireContext().getString(R.string.pref_theme_value_system));
@@ -508,6 +548,15 @@ public class SettingsActivity extends AbstractSettingsActivityV2 implements Acti
                 });
             }
 
+            if (accentColor != null) {
+                accentColor.setEnabled(!GBApplication.areDynamicColorsEnabled());
+                updateAccentColorSummary(accentColor);
+                accentColor.setOnPreferenceClickListener(preference -> {
+                    showAccentColorPicker(accentColor);
+                    return true;
+                });
+            }
+
             if (theme != null) {
                 theme.setOnPreferenceChangeListener(new Preference.OnPreferenceChangeListener() {
                     @Override
@@ -518,6 +567,15 @@ public class SettingsActivity extends AbstractSettingsActivityV2 implements Acti
                                 amoled_black.setEnabled(false);
                             else
                                 amoled_black.setEnabled(true);
+                        }
+                        if (accentColor != null) {
+                            accentColor.setEnabled(!val.equals(requireContext().getString(R.string.pref_theme_value_dynamic)));
+                            if (val.equals("light") && "white".equals(GBApplication.getPrefs().getString(GBApplication.PREF_ACCENT_COLOR, GBApplication.PREF_ACCENT_COLOR_DEFAULT))) {
+                                GBApplication.getPrefs().getPreferences().edit()
+                                        .putString(GBApplication.PREF_ACCENT_COLOR, GBApplication.PREF_ACCENT_COLOR_DEFAULT)
+                                        .apply();
+                            }
+                            updateAccentColorSummary(accentColor);
                         }
                         // Warn user if dynamic colors are not available
                         if (val.equals(requireContext().getString(R.string.pref_theme_value_dynamic)) && !DynamicColors.isDynamicColorAvailable()) {
@@ -633,6 +691,71 @@ public class SettingsActivity extends AbstractSettingsActivityV2 implements Acti
             Intent intent = new Intent();
             intent.setAction(GBApplication.ACTION_THEME_CHANGE);
             LocalBroadcastManager.getInstance(requireContext()).sendBroadcast(intent);
+        }
+
+        private void showAccentColorPicker(final Preference accentColor) {
+            final int[] allSwatches = accentColorSwatches();
+            final List<String> keys = new ArrayList<>();
+            final List<Integer> swatchList = new ArrayList<>();
+            for (int i = 0; i < ACCENT_COLOR_KEYS.length; i++) {
+                if (isAccentColorAvailable(ACCENT_COLOR_KEYS[i])) {
+                    keys.add(ACCENT_COLOR_KEYS[i]);
+                    swatchList.add(allSwatches[i]);
+                }
+            }
+            final int[] swatches = new int[swatchList.size()];
+            for (int i = 0; i < swatches.length; i++) {
+                swatches[i] = swatchList.get(i);
+            }
+            final int currentIndex = Math.max(0, keys.indexOf(
+                    GBApplication.getPrefs().getString(GBApplication.PREF_ACCENT_COLOR, GBApplication.PREF_ACCENT_COLOR_DEFAULT)
+            ));
+            final ColorPickerDialog.Builder builder = ColorPickerDialog.newBuilder();
+            builder.setDialogTitle(R.string.pref_title_accent_color);
+            builder.setColor(swatches[currentIndex]);
+            builder.setShowAlphaSlider(false);
+            builder.setShowColorShades(false);
+            builder.setAllowCustom(false);
+            builder.setAllowPresets(true);
+            builder.setPresets(swatches);
+
+            final ColorPickerDialog dialog = builder.create();
+            dialog.setColorPickerDialogListener(new ColorPickerDialogListener() {
+                @Override
+                public void onColorSelected(int dialogId, int color) {
+                    int index = -1;
+                    for (int i = 0; i < swatches.length; i++) {
+                        if (swatches[i] == color) {
+                            index = i;
+                            break;
+                        }
+                    }
+                    if (index == -1) {
+                        return;
+                    }
+                    GBApplication.getPrefs().getPreferences().edit()
+                            .putString(GBApplication.PREF_ACCENT_COLOR, keys.get(index))
+                            .apply();
+                    updateAccentColorSummary(accentColor);
+                    sendThemeChangeIntent();
+                }
+
+                @Override
+                public void onDialogDismissed(int dialogId) {
+                    // Nothing to do
+                }
+            });
+            dialog.show(getParentFragmentManager(), "accent-color-picker-dialog");
+        }
+
+        private void updateAccentColorSummary(final Preference accentColor) {
+            if (!accentColor.isEnabled()) {
+                accentColor.setSummary(R.string.pref_accent_color_dynamic_disabled_summary);
+                return;
+            }
+            final String selected = GBApplication.getPrefs().getString(GBApplication.PREF_ACCENT_COLOR, GBApplication.PREF_ACCENT_COLOR_DEFAULT);
+            final int index = Arrays.asList(ACCENT_COLOR_KEYS).indexOf(selected);
+            accentColor.setSummary(getString(ACCENT_COLOR_NAME_RES[index == -1 ? 0 : index]));
         }
     }
 }

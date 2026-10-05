@@ -39,6 +39,8 @@ import org.slf4j.LoggerFactory;
 import java.util.Calendar;
 import java.util.Date;
 
+import com.google.android.material.color.MaterialColors;
+
 import nodomain.freeyourgadget.gadgetbridge.GBApplication;
 import nodomain.freeyourgadget.gadgetbridge.R;
 import nodomain.freeyourgadget.gadgetbridge.devices.DeviceCoordinator;
@@ -208,7 +210,7 @@ public class BatteryInfoActivity extends AbstractGBActivity {
                 if (batteryConfig.getBatteryIcon() != GBDevice.BATTERY_ICON_DEFAULT) {
                     battery_status_device_icon.setImageResource(batteryConfig.getBatteryIcon());
                     if (gbDevice.isInitialized()) {
-                        battery_status_device_icon.setColorFilter(this.getResources().getColor(R.color.accent));
+                        battery_status_device_icon.setColorFilter(MaterialColors.getColor(battery_status_device_icon, R.attr.accent_color));
                     }
                 }
             }

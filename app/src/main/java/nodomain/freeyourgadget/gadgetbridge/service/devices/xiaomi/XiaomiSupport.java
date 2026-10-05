@@ -22,6 +22,8 @@ import android.content.Context;
 import android.location.Location;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -30,20 +32,17 @@ import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.sql.Timestamp;
 import java.util.ArrayList;
-import java.util.Calendar;
+import java.util.Date;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
 
 import nodomain.freeyourgadget.gadgetbridge.GBApplication;
 import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEventUpdatePreferences;
 import nodomain.freeyourgadget.gadgetbridge.devices.DeviceCoordinator;
+import nodomain.freeyourgadget.gadgetbridge.devices.SleepAsAndroidFeature;
 import nodomain.freeyourgadget.gadgetbridge.devices.xiaomi.XiaomiCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.xiaomi.XiaomiFWHelper;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
@@ -60,7 +59,9 @@ import nodomain.freeyourgadget.gadgetbridge.model.WorldClock;
 import nodomain.freeyourgadget.gadgetbridge.externalevents.sleepasandroid.SleepAsAndroidAction;
 import nodomain.freeyourgadget.gadgetbridge.proto.xiaomi.XiaomiProto;
 import nodomain.freeyourgadget.gadgetbridge.service.AbstractBluetoothDeviceSupport;
+import nodomain.freeyourgadget.gadgetbridge.service.SleepAsAndroidAlarmController;
 import nodomain.freeyourgadget.gadgetbridge.service.SleepAsAndroidSender;
+import nodomain.freeyourgadget.gadgetbridge.service.SleepAsAndroidVibration;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.xiaomi.services.AbstractXiaomiService;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.xiaomi.services.XiaomiCalendarService;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.xiaomi.services.XiaomiDataUploadService;
@@ -73,7 +74,6 @@ import nodomain.freeyourgadget.gadgetbridge.service.devices.xiaomi.services.Xiao
 import nodomain.freeyourgadget.gadgetbridge.service.devices.xiaomi.services.XiaomiSystemService;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.xiaomi.services.XiaomiWatchfaceService;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.xiaomi.services.XiaomiWeatherService;
-import nodomain.freeyourgadget.gadgetbridge.util.AlarmUtils;
 import nodomain.freeyourgadget.gadgetbridge.util.GB;
 import nodomain.freeyourgadget.gadgetbridge.util.Prefs;
 
@@ -97,8 +97,21 @@ public class XiaomiSupport extends AbstractBluetoothDeviceSupport {
     private String cachedFirmwareVersion = null;
     private XiaomiConnectionSupport connectionSupport = null;
     private SleepAsAndroidSender sleepAsAndroidSender;
-    private ScheduledExecutorService saaHintScheduler;
-    private ScheduledExecutorService saaAlarmScheduler;
+    private final SleepAsAndroidVibration.Toggle findDeviceToggle = new SleepAsAndroidVibration.Toggle() {
+        @Override
+        public void set(final boolean on) {
+            setFindWatchIfInitialized(on);
+        }
+
+        @Override
+        public void wake() {
+            if (gbDevice != null && gbDevice.getState().equalsOrHigherThan(GBDevice.State.INITIALIZED)) {
+                systemService.wakeLink();
+            }
+        }
+    };
+    private final SleepAsAndroidAlarmController saaAlarms = new SleepAsAndroidAlarmController(
+            Looper.getMainLooper(), findDeviceToggle);
 
     private final Map<Integer, AbstractXiaomiService> mServiceMap = new LinkedHashMap<>() {{
         put(XiaomiAuthService.COMMAND_TYPE, authService);
@@ -162,6 +175,8 @@ public class XiaomiSupport extends AbstractBluetoothDeviceSupport {
 
     @Override
     public void dispose() {
+        saaAlarms.cancel();
+
         for (final AbstractXiaomiService service : mServiceMap.values()) {
             service.dispose();
         }
@@ -206,6 +221,14 @@ public class XiaomiSupport extends AbstractBluetoothDeviceSupport {
 
     public void setCachedFirmwareVersion(String version) {
         this.cachedFirmwareVersion = version;
+    }
+
+    /**
+     * Called on every connection attempt, before the band is authenticated. A connection is also
+     * how a reconnect starts, and a reconnect keeps this instance and everything it has scheduled.
+     */
+    public void onInitializeDevice() {
+        saaAlarms.cancel();
     }
 
     public void onDisconnect() {
@@ -271,6 +294,9 @@ public class XiaomiSupport extends AbstractBluetoothDeviceSupport {
 
     @Override
     public void onFindDevice(final boolean start) {
+        // A Sleep as Android alarm drives find-device itself, and its next burst would override
+        // this within seconds.
+        saaAlarms.onFindDevice();
         systemService.onFindWatch(start);
     }
 
@@ -477,10 +503,19 @@ public class XiaomiSupport extends AbstractBluetoothDeviceSupport {
             LOG.warn("SaA sender not initialized, dropping {}", action);
             return;
         }
-        if (!gbDevice.isInitialized()) {
+        // Not isInitialized(), which also accepts SCANNED: a device sits in that state for seconds
+        // at a time while it is being scanned for, with no link to send anything over.
+        if (gbDevice == null || !gbDevice.getState().equalsOrHigherThan(GBDevice.State.INITIALIZED)) {
             LOG.warn("Device not initialized, dropping SaA action {}", action);
             return;
         }
+        // Ahead of validateAction, which gates STOP_TRACKING on the sensor features while gating
+        // START_ALARM on the alarm one, so a session with both sensors off could start an alarm
+        // that its own end was then not allowed to stop.
+        saaAlarms.onAction(action, extras,
+                SleepAsAndroidAlarmController.alarmMaxDurationMs(GBApplication.getPrefs()),
+                alarmsEnabled());
+
         try {
             sleepAsAndroidSender.validateAction(action);
         } catch (UnsupportedOperationException e) {
@@ -492,7 +527,7 @@ public class XiaomiSupport extends AbstractBluetoothDeviceSupport {
                 break;
             case SleepAsAndroidAction.START_TRACKING:
                 healthService.startRawSensor();
-                sleepAsAndroidSender.startTracking();
+                sleepAsAndroidSender.startTracking(extras);
                 break;
             case SleepAsAndroidAction.STOP_TRACKING:
                 healthService.stopRawSensor();
@@ -512,9 +547,6 @@ public class XiaomiSupport extends AbstractBluetoothDeviceSupport {
             case SleepAsAndroidAction.SET_BATCH_SIZE:
                 sleepAsAndroidSender.setBatchSize(extras.getLong("SIZE", 12L));
                 break;
-            case SleepAsAndroidAction.HINT:
-                triggerSleepAsAndroidHint(extras.getInt("REPEAT", 1));
-                break;
             case SleepAsAndroidAction.SHOW_NOTIFICATION: {
                 NotificationSpec spec = new NotificationSpec();
                 spec.setTitle(extras.getString("TITLE"));
@@ -523,13 +555,17 @@ public class XiaomiSupport extends AbstractBluetoothDeviceSupport {
                 break;
             }
             case SleepAsAndroidAction.UPDATE_ALARM:
-                setSleepAsAndroidAlarm(extras.getLong("TIMESTAMP"));
+                // The band rings through find-device on START_ALARM, which Sleep as Android also
+                // stops when the user dismisses or snoozes. An alarm written into a slot would ring
+                // outside that control, and stay there when the wake never happens.
+                LOG.debug("Ignoring Sleep as Android alarm update for {}", new Date(extras.getLong("TIMESTAMP")));
+                break;
+            case SleepAsAndroidAction.HINT:
+                saaAlarms.hint(extras.getInt("REPEAT", 1));
                 break;
             case SleepAsAndroidAction.START_ALARM:
-                scheduleSleepAsAndroidAlarmVibration(extras.getInt("DELAY", 60000));
-                break;
             case SleepAsAndroidAction.STOP_ALARM:
-                cancelSleepAsAndroidAlarmVibration();
+                // Handled by saaAlarms above.
                 break;
             default:
                 LOG.warn("Received unsupported SaA action: {}", action);
@@ -537,61 +573,23 @@ public class XiaomiSupport extends AbstractBluetoothDeviceSupport {
         }
     }
 
-    private void setSleepAsAndroidAlarm(long alarmTimestamp) {
-        Calendar calendar = Calendar.getInstance();
-        calendar.setTimeInMillis(new Timestamp(alarmTimestamp).getTime());
-        Alarm alarm = AlarmUtils.createSingleShot(SleepAsAndroidSender.getAlarmSlot(), false, false, calendar);
-        ArrayList<Alarm> alarms = new ArrayList<>(1);
-        alarms.add(alarm);
-        GBApplication.deviceService(gbDevice).onSetAlarms(alarms);
+    private boolean alarmsEnabled() {
+        return sleepAsAndroidSender.hasFeature(SleepAsAndroidFeature.ALARMS)
+                && sleepAsAndroidSender.isFeatureEnabled(SleepAsAndroidFeature.ALARMS);
     }
 
-    private void triggerSleepAsAndroidHint(int repeat) {
-        if (repeat <= 0) return;
-        if (saaHintScheduler != null) {
-            saaHintScheduler.shutdownNow();
+    /**
+     * A vibration runs on its own schedule for as long as Sleep as Android keeps its alarm up, and
+     * the band is reachable for only part of that, so the link is re-checked at every pulse rather
+     * than once when the alarm starts. Commands sent outside that window are lost and, before
+     * authentication, can disturb the handshake.
+     */
+    private void setFindWatchIfInitialized(final boolean on) {
+        if (gbDevice == null || !gbDevice.getState().equalsOrHigherThan(GBDevice.State.INITIALIZED)) {
+            LOG.debug("Skipping find watch {}, device is not initialized", on);
+            return;
         }
-        saaHintScheduler = Executors.newSingleThreadScheduledExecutor();
-        final int repeats = repeat;
-        saaHintScheduler.execute(new Runnable() {
-            @Override
-            public void run() {
-                try {
-                    for (int i = 0; i < repeats; i++) {
-                        systemService.onFindWatch(true);
-                        Thread.sleep(500);
-                        systemService.onFindWatch(false);
-                        if (i + 1 < repeats) Thread.sleep(300);
-                    }
-                } catch (InterruptedException ignored) {
-                    Thread.currentThread().interrupt();
-                }
-            }
-        });
-    }
-
-    private void scheduleSleepAsAndroidAlarmVibration(int delayMs) {
-        cancelSleepAsAndroidAlarmVibration();
-        if (delayMs == -1) return;
-        saaAlarmScheduler = Executors.newSingleThreadScheduledExecutor();
-        saaAlarmScheduler.schedule(new Runnable() {
-            @Override
-            public void run() {
-                triggerSleepAsAndroidHint(3);
-            }
-        }, Math.max(0, delayMs), TimeUnit.MILLISECONDS);
-    }
-
-    private void cancelSleepAsAndroidAlarmVibration() {
-        if (saaAlarmScheduler != null) {
-            saaAlarmScheduler.shutdownNow();
-            saaAlarmScheduler = null;
-        }
-        if (saaHintScheduler != null) {
-            saaHintScheduler.shutdownNow();
-            saaHintScheduler = null;
-        }
-        systemService.onFindWatch(false);
+        systemService.onFindWatch(on);
     }
 
     @Override

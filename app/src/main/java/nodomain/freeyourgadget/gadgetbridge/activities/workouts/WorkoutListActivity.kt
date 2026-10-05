@@ -36,6 +36,7 @@ import nodomain.freeyourgadget.gadgetbridge.model.RecordedDataTypes
 import nodomain.freeyourgadget.gadgetbridge.util.AndroidUtils
 import nodomain.freeyourgadget.gadgetbridge.util.GB
 import nodomain.freeyourgadget.gadgetbridge.util.WorkoutFilterUtils
+import nodomain.freeyourgadget.gadgetbridge.util.kotlin.applyAccentColors
 import nodomain.freeyourgadget.gadgetbridge.util.kotlin.getParcelableCompat
 import nodomain.freeyourgadget.gadgetbridge.util.kotlin.getSerializableCompat
 import kotlinx.coroutines.Dispatchers
@@ -237,6 +238,8 @@ class WorkoutListActivity : AbstractListActivity<BaseActivitySummary>() {
 
         val fab: FloatingActionButton = findViewById(R.id.fab)
         fab.setOnClickListener { fetchTrackData() }
+        // The FAB comes from the layout shared by every list screen, so it is only recolored here.
+        fab.applyAccentColors()
     }
 
     private fun setupViewModel() {
@@ -562,6 +565,16 @@ class WorkoutListActivity : AbstractListActivity<BaseActivitySummary>() {
     }
 
     private fun refresh(silent: Boolean) {
+        // The adapter only reads the kind and date filters to title the dashboard, so it has to
+        // be kept in sync here: the filter screen result only updates this activity's fields.
+        summariesAdapter?.let { adapter ->
+            adapter.setActivityKindFilter(activityFilter)
+            adapter.setDateFromFilter(dateFromFilter)
+            adapter.setDateToFilter(dateToFilter)
+            adapter.setNameContainsFilter(nameContainsFilter)
+            adapter.setItemsFilter(itemsFilter)
+            adapter.setDeviceFilter(deviceFilter)
+        }
         gbDevice?.let { device ->
             viewModel.loadSummaries(
                 device,

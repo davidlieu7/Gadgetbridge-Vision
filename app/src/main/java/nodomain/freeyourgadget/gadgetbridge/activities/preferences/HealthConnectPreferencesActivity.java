@@ -93,6 +93,7 @@ public class HealthConnectPreferencesActivity extends AbstractSettingsActivityV2
         private MultiSelectListPreference selectedDevicesPref;
         private Preference healthConnectManualSettings;
         private Preference healthConnectSettings;
+        private Preference healthConnectRequestPermissions;
         private boolean pendingHealthConnectPermissionRequest = false;
         private Runnable permissionCheckRunnable;
         private final android.os.Handler permissionCheckHandler = new android.os.Handler(android.os.Looper.getMainLooper());
@@ -112,6 +113,7 @@ public class HealthConnectPreferencesActivity extends AbstractSettingsActivityV2
             selectedDevicesPref = findPreference(GBPrefs.HEALTH_CONNECT_DEVICE_SELECTION);
             healthConnectManualSettings = findPreference(GBPrefs.HEALTH_CONNECT_MANUAL_SETTINGS);
             healthConnectSettings = findPreference(GBPrefs.HEALTH_CONNECT_SETTINGS);
+            healthConnectRequestPermissions = findPreference(GBPrefs.HEALTH_CONNECT_REQUEST_PERMISSIONS);
 
             requestPermissionLauncher = registerForActivityResult(
                     PermissionController.createRequestPermissionResultContract(),
@@ -139,6 +141,7 @@ public class HealthConnectPreferencesActivity extends AbstractSettingsActivityV2
             setupHealthConnectSwitch();
             setupManualSettingsLink();
             setupHealthConnectSettingsLink();
+            setupRequestPermissionsButton();
             setupDeviceMultiSelectList();
 
             checkInitialPermissionsAndUpdateUI();
@@ -411,6 +414,9 @@ public class HealthConnectPreferencesActivity extends AbstractSettingsActivityV2
                 healthConnectSyncStatus.setVisible(enabled);
             }
             if (healthConnectDisableNotice != null) healthConnectDisableNotice.setVisible(enabled);
+            if (healthConnectRequestPermissions != null && !enabled) {
+                healthConnectRequestPermissions.setVisible(false);
+            }
 
             // Keep these always enabled to prevent lockout when permission requests are denied
             if (selectedDevicesPref != null) {
@@ -518,6 +524,10 @@ public class HealthConnectPreferencesActivity extends AbstractSettingsActivityV2
             }
 
             updateHealthConnectUIState(hasPermissions);
+            if (healthConnectRequestPermissions != null) {
+                final boolean missingPermissions = !grantedPermissions.containsAll(HealthConnectPermissionManager.getRequiredHealthConnectPermissions());
+                healthConnectRequestPermissions.setVisible(hasPermissions && missingPermissions);
+            }
             if (!hasPermissions) {
                 WorkManager.getInstance(requireContext()).cancelAllWorkByTag(HEALTH_CONNECT_SYNC_WORKER_TAG);
             }
@@ -669,6 +679,16 @@ public class HealthConnectPreferencesActivity extends AbstractSettingsActivityV2
                     return true;
                 });
             }
+        }
+
+        private void setupRequestPermissionsButton() {
+            if (healthConnectRequestPermissions == null) {
+                return;
+            }
+            healthConnectRequestPermissions.setOnPreferenceClickListener(preference -> {
+                requestPermissionLauncher.launch(HealthConnectPermissionManager.getRequiredHealthConnectPermissions());
+                return true;
+            });
         }
 
         private void setupDeviceMultiSelectList() {

@@ -327,11 +327,13 @@
         {"num":4,"name":"auto_lap_distance","base":"UINT32","scale":100,"UOM":"METER"},
         {"num":7,"name":"auto_pause","base":"ENUM"},
         {"num":8,"name":"auto_pause_threshold","base":"UINT16","scale":1000,"UOM":"METER_PER_SECOND"},
+        {"num":11,"name":"data_screens","base":"UINT8"},
         {"num":12,"name":"power_averaging","base":"ENUM","type":"Bool"},
         {"num":14,"name":"display_pace","base":"ENUM","type":"Bool"},
         {"num":15,"name":"auto_scroll","base":"ENUM"},
         {"num":18,"name":"timer_start_prompt","base":"ENUM"},
         {"num":22,"name":"pool_length","base":"UINT16","scale":100,"UOM":"METER"},
+        {"num":24,"name":"extended_power_save_timeout","base":"ENUM","type":"Bool"},
         {"num":25,"name":"auto_sleep","base":"ENUM","type":"Bool"},
         {"num":27,"name":"satellites","base":"ENUM"},
         {"num":31,"name":"target_distance","base":"UINT32","scale":100,"UOM":"METER"},
@@ -350,6 +352,7 @@
         {"num":53,"name":"segment_alerts","base":"ENUM","type":"Bool"},
         {"num":55,"name":"proximity_alerts","base":"ENUM","type":"Bool"},
         {"num":57,"name":"countdown_start","base":"ENUM","type":"Bool"},
+        {"num":60,"name":"count_repetitions","base":"ENUM"},
         {"num":63,"name":"climb_pro","base":"ENUM","type":"Bool"},
         {"num":67,"name":"track_consumption","base":"ENUM","type":"Bool"},
         {"num":69,"name":"bottle_size","base":"UINT16","UOM":"MILLILITER"},
@@ -377,7 +380,9 @@
         {"num":117,"name":"climb_detection","base":"ENUM"},
         {"num":119,"name":"climb_pro_terrain","base":"ENUM"},
         {"num":122,"name":"big_numbers_mode","base":"ENUM","type":"Bool"},
+        {"num":123,"name":"target_repetitions","base":"UINT32"},
         {"num":124,"name":"ask_pool_size","base":"ENUM","type":"Bool"},
+        {"num":125,"name":"jump_mode","base":"ENUM"},
         {"num":127,"name":"detect_track","base":"ENUM","type":"Bool"},
         {"num":128,"name":"pack_weight","base":"UINT16","scale":10,"UOM":"KILOGRAM"},
         {"num":129,"name":"pack_mode","base":"ENUM","type":"Bool"},
@@ -442,6 +447,8 @@
         {"num":3,"name":"low_value","base":"UINT16"},
         {"num":4,"name":"high_status","base":"ENUM"},
         {"num":5,"name":"high_value","base":"UINT16"},
+        {"num":12,"name":"low_alert","base":"ENUM","type":"Bool"},
+        {"num":13,"name":"high_alert","base":"ENUM","type":"Bool"},
         {"num":254,"name":"message_index","base":"UINT16"}
       ]
     },
@@ -1119,7 +1126,7 @@
       "num": 34,
       "name": "ACTIVITY",
       "fields": [
-        {"num":0,"name":"total_timer_time","base":"UINT32"},
+        {"num":0,"name":"total_timer_time","base":"UINT32","scale":1000,"UOM":"SECONDS"},
         {"num":1,"name":"num_sessions","base":"UINT16"},
         {"num":2,"name":"type","base":"ENUM"},
         {"num":3,"name":"event","base":"ENUM","type":"Event"},
@@ -1305,7 +1312,7 @@
       "num": 78,
       "name": "HRV",
       "fields": [
-        {"num":0,"name":"time","base":"UINT16","arrayLen":0}
+        {"num":0,"name":"time","base":"UINT16","scale":1000,"arrayLen":0,"UOM":"SECONDS"}
       ]
     },
     {
@@ -1438,7 +1445,8 @@
       "num": 104,
       "name": "BATTERY",
       "fields": [
-        {"num":0,"name":"battery_voltage","base":"UINT16","scale":1000},
+        {"num":0,"name":"battery_voltage","base":"UINT16","scale":1000,"UOM":"VOLT"},
+        {"num":1,"name":"current","base":"SINT16","scale":1000,"UOM":"AMPERE"},
         {"num":2,"name":"capacity","base":"UINT8","UOM":"PERCENT"},
         {"num":3,"name":"temperature","base":"SINT8","UOM":"CELSIUS"},
         {"num":253,"name":"timestamp","base":"UINT32","type":"DateTime","UOM":"SECONDS"}
@@ -1915,6 +1923,11 @@
         {"num":5,"name":"heading","base":"UINT16","scale":100,"UOM":"DEGREES"},
         {"num":6,"name":"utc_timestamp","base":"UINT32","type":"DateTime","UOM":"SECONDS"},
         {"num":7,"name":"velocity","base":"SINT16","scale":100,"arrayLen":3,"UOM":"METER_PER_SECOND"},
+        {"num":8,"name":"epv","base":"UINT16"},
+        {"num":9,"name":"eph","base":"UINT16"},
+        {"num":10,"name":"epe","base":"UINT16"},
+        {"num":11,"name":"vdop","base":"UINT16"},
+        {"num":12,"name":"hdop","base":"UINT16"},
         {"num":253,"name":"timestamp","base":"UINT32","type":"DateTime","UOM":"SECONDS"}
       ]
     },

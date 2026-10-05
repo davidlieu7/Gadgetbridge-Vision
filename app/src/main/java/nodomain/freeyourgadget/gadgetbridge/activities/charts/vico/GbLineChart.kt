@@ -4,6 +4,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.RectangleShape
 import androidx.compose.ui.text.TextStyle
@@ -32,7 +33,7 @@ import com.patrykandpatrick.vico.compose.common.Fill
 import com.patrykandpatrick.vico.compose.common.component.rememberLineComponent
 import com.patrykandpatrick.vico.compose.common.component.rememberTextComponent
 
-private const val AREA_FILL_ALPHA = 0.24f
+private const val AREA_FILL_ALPHA = 0.45f
 private const val LIMIT_LINE_THICKNESS_DP = 1.5f
 private const val DASH_LENGTH_DP = 6f
 private const val DASH_GAP_DP = 4f
@@ -65,7 +66,16 @@ fun GbLineChart(spec: ChartSpec, theme: ChartTheme, modifier: Modifier = Modifie
         LineCartesianLayer.rememberLine(
             fill = LineCartesianLayer.LineFill.single(Fill(color)),
             areaFill = if (style.filled) {
-                LineCartesianLayer.AreaFill.single(Fill(color.copy(alpha = AREA_FILL_ALPHA)))
+                LineCartesianLayer.AreaFill.single(
+                    Fill(
+                        Brush.verticalGradient(
+                            colors = listOf(
+                                color.copy(alpha = AREA_FILL_ALPHA),
+                                color.copy(alpha = 0f),
+                            ),
+                        ),
+                    ),
+                )
             } else {
                 null
             },
