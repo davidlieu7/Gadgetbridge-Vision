@@ -28,6 +28,7 @@ import nodomain.freeyourgadget.gadgetbridge.model.ActivityKind
 import nodomain.freeyourgadget.gadgetbridge.model.ActivitySummaryEntries
 import nodomain.freeyourgadget.gadgetbridge.util.DateTimeUtils
 import nodomain.freeyourgadget.gadgetbridge.util.FormatUtils
+import nodomain.freeyourgadget.gadgetbridge.util.healthconnect.HealthConnectWorkoutStatus
 import java.util.Calendar
 import java.util.Date
 import java.util.concurrent.TimeUnit
@@ -51,6 +52,9 @@ class WorkoutSummariesAdapter(
      * and stats the exported files; a summary missing from the map shows no indicator.
      */
     var uploadStatuses: Map<Long, WorkoutUploadStatus> = emptyMap()
+
+    /** Health Connect sync state per summary id, resolved like [uploadStatuses]. */
+    var healthConnectStatuses: Map<Long, HealthConnectWorkoutStatus> = emptyMap()
 
     override fun onCreateViewHolder(
         parent: ViewGroup,
@@ -103,6 +107,7 @@ class WorkoutSummariesAdapter(
         private val subtitleView: TextView = itemView.findViewById(R.id.workout_row_subtitle)
         private val photoView: ImageView = itemView.findViewById(R.id.workout_row_photo)
         private val uploadView: ImageView = itemView.findViewById(R.id.workout_row_upload)
+        private val healthConnectView: ImageView = itemView.findViewById(R.id.workout_row_health_connect)
         private val gpsView: ImageView = itemView.findViewById(R.id.workout_row_gps)
         private val dateView: TextView = itemView.findViewById(R.id.workout_row_date)
         private val timeView: TextView = itemView.findViewById(R.id.workout_row_time)
@@ -147,6 +152,15 @@ class WorkoutSummariesAdapter(
                 uploadView.visibility = View.VISIBLE
             } else {
                 uploadView.visibility = View.GONE
+            }
+
+            val healthConnectStatus = healthConnectStatuses[summary.id]
+            if (healthConnectStatus != null) {
+                healthConnectView.setImageResource(healthConnectStatus.iconRes)
+                healthConnectView.contentDescription = context.getString(healthConnectStatus.labelRes)
+                healthConnectView.visibility = View.VISIBLE
+            } else {
+                healthConnectView.visibility = View.GONE
             }
 
             // The last activity is followed by the end spacer, and gets no separator.

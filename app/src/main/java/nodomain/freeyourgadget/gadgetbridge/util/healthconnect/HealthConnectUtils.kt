@@ -41,6 +41,7 @@ import nodomain.freeyourgadget.gadgetbridge.entities.HealthConnectSleepSession
 import nodomain.freeyourgadget.gadgetbridge.entities.HealthConnectSleepSessionDao
 import nodomain.freeyourgadget.gadgetbridge.entities.HealthConnectSyncState
 import nodomain.freeyourgadget.gadgetbridge.entities.HealthConnectSyncStateDao
+import nodomain.freeyourgadget.gadgetbridge.entities.HealthConnectWorkoutSyncFailureDao
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice
 import nodomain.freeyourgadget.gadgetbridge.model.ActivitySample
 import nodomain.freeyourgadget.gadgetbridge.util.GBPrefs
@@ -572,7 +573,14 @@ class HealthConnectUtils {
                     )
                     .buildDelete()
                     .executeDeleteWithoutDetachingEntities()
+                if (dataType == HealthConnectPermissionManager.HealthConnectDataType.WORKOUTS) {
+                    db.daoSession.healthConnectWorkoutSyncFailureDao.queryBuilder()
+                        .where(HealthConnectWorkoutSyncFailureDao.Properties.DeviceId.eq(deviceFromDb.id))
+                        .buildDelete()
+                        .executeDeleteWithoutDetachingEntities()
+                }
             }
+            HealthConnectWorkoutSync.notifyStateChanged(GBApplication.getContext())
         }
 
         private fun getSyncTimestampRange(

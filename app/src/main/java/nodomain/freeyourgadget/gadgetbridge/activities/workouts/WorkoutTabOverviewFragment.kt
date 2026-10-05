@@ -12,6 +12,7 @@ import androidx.fragment.app.Fragment
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.distinctUntilChanged
 import androidx.lifecycle.lifecycleScope
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
@@ -32,10 +33,13 @@ import nodomain.freeyourgadget.gadgetbridge.model.workout.WorkoutViewModel
 import nodomain.freeyourgadget.gadgetbridge.util.DateTimeUtils
 import nodomain.freeyourgadget.gadgetbridge.util.FileUtils
 import nodomain.freeyourgadget.gadgetbridge.util.GridTableBuilder
+import nodomain.freeyourgadget.gadgetbridge.util.healthconnect.HealthConnectWorkoutStatus
+import nodomain.freeyourgadget.gadgetbridge.util.healthconnect.HealthConnectWorkoutSync
 import org.apache.commons.lang3.StringUtils
 import org.apache.commons.lang3.tuple.Pair
 import java.io.File
 import java.util.Calendar
+import java.util.Date
 import java.util.concurrent.TimeUnit
 import kotlin.collections.component1
 import kotlin.collections.component2
@@ -243,6 +247,7 @@ class WorkoutTabOverviewFragment : Fragment(), WorkoutTabScreenshotProvider {
             binding.activitymeta.text = "$dateString · ${durationHms.keepTogether()}"
 
             updateUploadStatusIcon(summary)
+            updateHealthConnectStatusIcon(summary)
         }
     }
 
@@ -271,4 +276,39 @@ class WorkoutTabOverviewFragment : Fragment(), WorkoutTabScreenshotProvider {
         }
     }
 
+    /** Fills in the header's Health Connect indicator, hidden when the workout is not synced. */
+    private fun updateHealthConnectStatusIcon(summary: BaseActivitySummary) {
+        binding.healthConnectStatusIcon.visibility = View.GONE
+        val summaryId = summary.id ?: return
+        val context = requireContext()
+        lifecycleScope.launch {
+            val (status, failure) = withContext(Dispatchers.IO) {
+                val status = HealthConnectWorkoutSync.statusesFor(context, listOf(summary))[summaryId]
+                val failure = if (status == HealthConnectWorkoutStatus.FAILED) HealthConnectWorkoutSync.failureOf(summaryId) else null
+                status to failure
+            }
+            if (status == null || !isAdded) return@launch
+            val message = if (failure != null) {
+                getString(
+                    R.string.health_connect_workout_sync_failed_reason,
+                    DateTimeUtils.formatDateTimeRelative(context, Date(failure.failedAt)),
+                    failure.error.orEmpty()
+                )
+            } else {
+                getString(status.labelRes)
+            }
+            binding.healthConnectStatusIcon.apply {
+                setImageResource(status.iconRes)
+                contentDescription = getString(status.labelRes)
+                setOnClickListener {
+                    MaterialAlertDialogBuilder(context)
+                        .setTitle(R.string.healthconnect_settings)
+                        .setMessage(message)
+                        .setPositiveButton(R.string.ok, null)
+                        .show()
+                }
+                visibility = View.VISIBLE
+            }
+        }
+    }
 }

@@ -52,6 +52,7 @@ import nodomain.freeyourgadget.gadgetbridge.model.ActivityKind
 import nodomain.freeyourgadget.gadgetbridge.util.GBPrefs
 import nodomain.freeyourgadget.gadgetbridge.util.Prefs
 import nodomain.freeyourgadget.gadgetbridge.util.healthconnect.HealthConnectUtils
+import nodomain.freeyourgadget.gadgetbridge.util.healthconnect.HealthConnectWorkoutSync
 import org.slf4j.LoggerFactory
 import java.time.Instant
 import java.time.ZoneId
@@ -201,6 +202,7 @@ internal object RecordedWorkoutSyncer {
 
                 HealthConnectUtils.insertRecords(recordsToInsert, healthConnectClient)
                 LOG.info("Successfully inserted ${recordsToInsert.size} record(s) for workout (Type: ${activityKind}, Start: $workoutStartInstant) for device '$deviceName'.")
+                workout.id?.let { HealthConnectWorkoutSync.clearFailure(it) }
                 workoutRecordList.addAll(recordsToInsert)
                 val currentEnd = workoutEndInstant
                 if (latestWorkoutEndTs == null || currentEnd.isAfter(latestWorkoutEndTs)) {
@@ -208,6 +210,7 @@ internal object RecordedWorkoutSyncer {
                 }
             } catch (e: Exception) {
                 LOG.error("Error processing workout for device '$deviceName'", e)
+                HealthConnectWorkoutSync.recordFailure(workout, e.message ?: e.javaClass.simpleName)
                 // Continue with next workout instead of failing entire sync
             }
         }
@@ -228,7 +231,7 @@ internal object RecordedWorkoutSyncer {
     }
 
     /** UNKNOWN is kept: a BaseActivitySummary row was explicitly recorded as a workout. */
-    private fun isSyncedWorkout(workout: BaseActivitySummary): Boolean {
+    internal fun isSyncedWorkout(workout: BaseActivitySummary): Boolean {
         if (workout.endTime.before(workout.startTime)) {
             return false
         }

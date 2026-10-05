@@ -110,7 +110,7 @@ public class GBDaoGenerator {
             outputDir.mkdirs();
         }
 
-        final Schema schema = new Schema(149, MAIN_PACKAGE + ".entities");
+        final Schema schema = new Schema(150, MAIN_PACKAGE + ".entities");
 
         final List<Entity> sampleProvidersToGenerate = new LinkedList<>();
         final List<Entity> batterySampleProvidersToGenerate = new LinkedList<>();
@@ -122,6 +122,7 @@ public class GBDaoGenerator {
         Entity device = addDevice(schema, deviceAttributes);
         addHealthConnectSyncState(schema, device);
         addHealthConnectSleepSession(schema, device);
+        addHealthConnectWorkoutSyncFailure(schema, device);
         addInternetFirewallRule(schema, device);
         addXiaomiHipeeP1Reading(schema, device);
         addNxWearSportSample(schema, user, device);
@@ -1615,6 +1616,15 @@ public class GBDaoGenerator {
         indexUnique.addProperty(clientRecordId);
         indexUnique.makeUnique();
         healthConnectSleepSession.addIndex(indexUnique);
+    }
+
+    private static void addHealthConnectWorkoutSyncFailure(Schema schema, Entity device) {
+        Entity failure = addEntity(schema, "HealthConnectWorkoutSyncFailure");
+        failure.addLongProperty("summaryId").primaryKey().notNull();
+        Property deviceId = failure.addLongProperty("deviceId").notNull().index().getProperty();
+        failure.addToOne(device, deviceId);
+        failure.addLongProperty("failedAt").notNull();
+        failure.addStringProperty("error");
     }
 
     private static void addInternetFirewallRule(Schema schema, Entity device) {

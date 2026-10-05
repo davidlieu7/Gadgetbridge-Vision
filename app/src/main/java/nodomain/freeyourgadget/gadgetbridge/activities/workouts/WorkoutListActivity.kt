@@ -36,6 +36,7 @@ import nodomain.freeyourgadget.gadgetbridge.model.RecordedDataTypes
 import nodomain.freeyourgadget.gadgetbridge.util.AndroidUtils
 import nodomain.freeyourgadget.gadgetbridge.util.GB
 import nodomain.freeyourgadget.gadgetbridge.util.WorkoutFilterUtils
+import nodomain.freeyourgadget.gadgetbridge.util.healthconnect.HealthConnectWorkoutSync
 import nodomain.freeyourgadget.gadgetbridge.util.kotlin.applyAccentColors
 import nodomain.freeyourgadget.gadgetbridge.util.kotlin.getParcelableCompat
 import nodomain.freeyourgadget.gadgetbridge.util.kotlin.getSerializableCompat
@@ -115,6 +116,7 @@ class WorkoutListActivity : AbstractListActivity<BaseActivitySummary>() {
                 // and swipe-refresh spinner don't blink on every
                 // incremental update.
                 GBApplication.ACTION_NEW_DATA -> refresh(silent = true)
+                HealthConnectWorkoutSync.ACTION_STATE_CHANGED -> refresh(silent = true)
                 else -> LOG.warn("Got unexpected action {}", intent.action)
             }
         }
@@ -155,6 +157,7 @@ class WorkoutListActivity : AbstractListActivity<BaseActivitySummary>() {
         val filterLocal = IntentFilter().apply {
             addAction(GBDevice.ACTION_DEVICE_CHANGED)
             addAction(GBApplication.ACTION_NEW_DATA)
+            addAction(HealthConnectWorkoutSync.ACTION_STATE_CHANGED)
         }
         LocalBroadcastManager.getInstance(this).registerReceiver(receiver, filterLocal)
 
@@ -246,6 +249,7 @@ class WorkoutListActivity : AbstractListActivity<BaseActivitySummary>() {
         viewModel.summaries.observe(this) { summaries ->
             // Set before the items, so the first bind of every row already has its indicator.
             summariesAdapter?.uploadStatuses = viewModel.uploadStatuses.value.orEmpty()
+            summariesAdapter?.healthConnectStatuses = viewModel.healthConnectStatuses.value.orEmpty()
             itemAdapter?.setItems(summaries, true)
             activityKindMap = fillKindMap()
         }
