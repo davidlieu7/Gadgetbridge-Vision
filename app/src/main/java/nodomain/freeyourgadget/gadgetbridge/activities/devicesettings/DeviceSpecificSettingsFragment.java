@@ -90,6 +90,7 @@ import nodomain.freeyourgadget.gadgetbridge.activities.workouts.templates.Workou
 import nodomain.freeyourgadget.gadgetbridge.activities.NotificationsAppIconUploadActivity;
 import nodomain.freeyourgadget.gadgetbridge.activities.app_specific_notifications.AppSpecificNotificationSettingsActivity;
 import nodomain.freeyourgadget.gadgetbridge.activities.audiorecordings.AudioRecordingsActivity;
+import nodomain.freeyourgadget.gadgetbridge.activities.files.FtpFileBrowserActivity;
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.DeviceSetting;
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.DeviceSettingRenderer;
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.DeviceSettingsIndexer;
@@ -1714,6 +1715,16 @@ public class DeviceSpecificSettingsFragment extends AbstractPreferenceFragment i
         if (audioRecordings != null) {
             audioRecordings.setOnPreferenceClickListener(preference -> {
                 final Intent intent = new Intent(getContext(), AudioRecordingsActivity.class);
+                intent.putExtra(GBDevice.EXTRA_DEVICE, getDevice());
+                startActivity(intent);
+                return true;
+            });
+        }
+
+        final Preference ftpBrowse = findPreference(FTP_SERVER_BROWSE);
+        if (ftpBrowse != null) {
+            ftpBrowse.setOnPreferenceClickListener(preference -> {
+                final Intent intent = new Intent(getContext(), FtpFileBrowserActivity.class);
                 intent.putExtra(GBDevice.EXTRA_DEVICE, getDevice());
                 startActivity(intent);
                 return true;

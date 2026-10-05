@@ -408,6 +408,7 @@ public class DeviceSettingsPreferenceConst {
     public static final String FTP_SERVER_START = "ftp_server_start";
     public static final String FTP_SERVER_STOP = "ftp_server_stop";
     public static final String FTP_SERVER_STATUS = "ftp_server_status";
+    public static final String FTP_SERVER_BROWSE = "ftp_server_browse";
 
     public static final String PREF_NOTHING_EAR1_INEAR = "pref_nothing_inear_detection";
     public static final String PREF_NOTHING_EAR1_AUDIOMODE = "pref_nothing_audiomode";

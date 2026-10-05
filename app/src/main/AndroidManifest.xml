@@ -271,6 +271,9 @@
             android:label="@string/activity_data_management_directory_content_title"
             android:parentActivityName=".activities.DataManagementActivity" />
         <activity
+            android:name=".activities.files.FtpFileBrowserActivity"
+            android:label="@string/ftp_file_browser" />
+        <activity
             android:name=".activities.fit.FitViewerActivity"
             android:exported="true"
             android:label="@string/fit_file_viewer" />
@@ -723,6 +726,9 @@
             </intent-filter>
         </receiver>
 
+        <receiver
+            android:name=".service.ftp.WifiFtpSessionStopReceiver"
+            android:exported="false" />
         <receiver
             android:name=".service.receivers.GBMusicControlReceiver"
             android:exported="false">
