@@ -16,6 +16,7 @@ import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import nodomain.freeyourgadget.gadgetbridge.GBApplication
 import nodomain.freeyourgadget.gadgetbridge.R
 import nodomain.freeyourgadget.gadgetbridge.activities.AbstractGBActivity
+import nodomain.freeyourgadget.gadgetbridge.activities.charts.IntervalChartUtils
 import nodomain.freeyourgadget.gadgetbridge.activities.charts.mpchart.ChartLegendView
 import nodomain.freeyourgadget.gadgetbridge.databinding.WorkoutChartsBinding
 import nodomain.freeyourgadget.gadgetbridge.model.workout.WorkoutChart
@@ -28,6 +29,7 @@ class WorkoutChartsActivity : AbstractGBActivity(), MenuProvider {
     val selectedCharts = mutableListOf<Any>()
 
     private var showHrZones = false
+    private var showIntervals = false
 
     private var menu: Menu? = null
 
@@ -119,14 +121,29 @@ class WorkoutChartsActivity : AbstractGBActivity(), MenuProvider {
             }
             group.addView(chip)
         }
+        // Interval splits: only offered when the workout actually has distinct interval phases.
+        if (IntervalChartUtils.hasIntervalPhases(ChartDataRepository.intervals)) {
+            val chip = Chip(this).apply {
+                text = context.getString(R.string.workout_intervals)
+                isCheckable = true
+                isClickable = true
+                isChecked = false
+            }
+            chip.setOnCheckedChangeListener { _, isChecked ->
+                showIntervals = isChecked
+                refreshChart()
+            }
+            group.addView(chip)
+        }
     }
 
     fun refreshChart() {
         val charts = selectedCharts.mapNotNull { id -> chartData?.find { it.id == id } }
         if (charts.isEmpty()) return
         val chart = binding.workoutDataChart
-        chart.selectionContent = WorkoutChartSpecs.selection(charts)
-        chart.setSpec(WorkoutChartSpecs.spec(this, charts, showHrZones))
+        val intervals = ChartDataRepository.intervals.takeIf { showIntervals }
+        chart.selectionContent = WorkoutChartSpecs.selection(this, charts, intervals)
+        chart.setSpec(WorkoutChartSpecs.spec(this, charts, showHrZones, intervals))
         binding.workoutDataChartLegend.setSeries(
             if (charts.size > 1) charts.map { ChartLegendView.lineItem(it.title, WorkoutChartSpecs.colorOf(it)) } else emptyList()
         )

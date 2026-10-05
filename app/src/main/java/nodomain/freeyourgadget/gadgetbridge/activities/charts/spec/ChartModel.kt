@@ -113,6 +113,18 @@ data class LimitLineSpec(
 )
 
 /**
+ * A vertical line at x [value], e.g. where a workout interval starts. The [label] sits at the top or [labelAtBottom]
+ * of the plot, right of the line or [labelBeforeLine].
+ */
+data class XMarkerSpec(
+    val value: Double,
+    val color: Int,
+    val label: String? = null,
+    val labelAtBottom: Boolean = false,
+    val labelBeforeLine: Boolean = false,
+)
+
+/**
  * One legend. Usually mirrors a [ChartSeries] one-to-one, but might not (e.g. stress charts).
  */
 data class LegendItemSpec(
@@ -129,6 +141,7 @@ data class ChartSpec(
     val yAxis: AxisSpec = AxisSpec(),
     val endYAxis: AxisSpec? = null,
     val limitLines: List<LimitLineSpec> = emptyList(),
+    val xMarkers: List<XMarkerSpec> = emptyList(),
     val legend: List<LegendItemSpec> = emptyList(),
 ) {
     val isEmpty: Boolean get() = series.all { it.points.isEmpty() }

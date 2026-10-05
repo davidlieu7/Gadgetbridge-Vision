@@ -2,6 +2,7 @@ package nodomain.freeyourgadget.gadgetbridge.activities.workouts.charts
 
 import android.content.Context
 import nodomain.freeyourgadget.gadgetbridge.activities.HeartRateUtils
+import nodomain.freeyourgadget.gadgetbridge.activities.charts.IntervalChartUtils
 import nodomain.freeyourgadget.gadgetbridge.activities.charts.mpchart.ChartSelection
 import nodomain.freeyourgadget.gadgetbridge.activities.charts.spec.AxisSide
 import nodomain.freeyourgadget.gadgetbridge.activities.charts.spec.AxisSpec
@@ -23,7 +24,13 @@ import kotlin.math.abs
  */
 object WorkoutChartSpecs {
     @JvmStatic
-    fun spec(context: Context, charts: List<WorkoutChart>, showZones: Boolean): ChartSpec {
+    @JvmOverloads
+    fun spec(
+        context: Context,
+        charts: List<WorkoutChart>,
+        showZones: Boolean,
+        intervals: List<IntervalChartUtils.IntervalRow>? = null,
+    ): ChartSpec {
         val metricSeries = charts.mapIndexed { index, chart -> series(chart, sideOf(index)) }
         val points = metricSeries.flatMap { it.points }
         if (points.isEmpty()) {
@@ -47,18 +54,31 @@ object WorkoutChartSpecs {
             yAxis = yAxis(charts[0]),
             endYAxis = charts.getOrNull(1)?.let { yAxis(it) },
             limitLines = zoneLines,
+            xMarkers = if (IntervalChartUtils.hasIntervalPhases(intervals)) {
+                IntervalChartUtils.boundaryLines(context, intervals)
+            } else {
+                emptyList()
+            },
         )
     }
 
     /**
-     * Tooltip content for the charts: the elapsed time, then each chart's nearest value.
+     * Tooltip content for the charts: the elapsed time and the type of the interval it falls in, then each chart's
+     * nearest value.
      */
     @JvmStatic
-    fun selection(charts: List<WorkoutChart>): (Double) -> ChartSelection {
+    fun selection(
+        context: Context,
+        charts: List<WorkoutChart>,
+        intervals: List<IntervalChartUtils.IntervalRow>?,
+    ): (Double) -> ChartSelection {
         val points = charts.map { chart -> chart.series.points.sortedBy { it.x } }
         val xs = points.map { list -> DoubleArray(list.size) { list[it].x } }
+        val phases = intervals?.takeIf { IntervalChartUtils.hasIntervalPhases(it) }
         return { x ->
-            val title = durationLabel(x)
+            val interval = phases?.lastOrNull { it.startSeconds <= x }
+            val title = listOfNotNull(durationLabel(x), interval?.let { IntervalChartUtils.labelForType(context, it.type) })
+                .joinToString(" · ")
             val rows = charts.indices.mapNotNull { index ->
                 val chart = charts[index]
                 val nearest = nearest(points[index], xs[index], x) ?: return@mapNotNull null

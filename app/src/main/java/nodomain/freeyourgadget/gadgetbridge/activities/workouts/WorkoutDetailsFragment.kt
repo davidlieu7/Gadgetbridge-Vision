@@ -47,6 +47,7 @@ import kotlinx.coroutines.withContext
 import nodomain.freeyourgadget.gadgetbridge.GBApplication
 import nodomain.freeyourgadget.gadgetbridge.R
 import nodomain.freeyourgadget.gadgetbridge.activities.AbstractGBActivity
+import nodomain.freeyourgadget.gadgetbridge.activities.charts.IntervalChartUtils
 import nodomain.freeyourgadget.gadgetbridge.activities.endurain.EndurainApiClient
 import nodomain.freeyourgadget.gadgetbridge.activities.endurain.EndurainSetupViewModel
 import nodomain.freeyourgadget.gadgetbridge.activities.endurain.WandererApiClient
@@ -186,22 +187,29 @@ class WorkoutDetailsFragment : Fragment(), MenuProvider {
                             mutableListOf()
                         )
                     }
+                    // Reading the track means parsing the device's raw file a second time, so it is
+                    // only done when the workout has no charts of its own. That is also the only
+                    // path that yields interval phases: a parser that builds its own charts reports
+                    // laps through its summary instead.
                     if (parsedWorkout.charts.isEmpty()) {
                         try {
-                            val activityTrackProvider =
-                                gbDevice.deviceCoordinator.getActivityTrackProvider(gbDevice, requireContext())
-                            if (activityTrackProvider != null) {
-                                val activityPoints = activityTrackProvider.getActivityTrack(parsedWorkout.summary)?.allPoints
-                                if (!activityPoints.isNullOrEmpty()) {
-                                    val defaultCharts = DefaultWorkoutCharts.buildDefaultCharts(
-                                        requireContext(),
-                                        activityPoints,
-                                        ActivityKind.fromCode(parsedWorkout.summary.activityKind),
-                                        parsedWorkout.data,
-                                        gbDevice
-                                    )
-                                    return@withContext Workout(parsedWorkout.summary, parsedWorkout.data, defaultCharts)
-                                }
+                            val activityTrack = gbDevice.deviceCoordinator
+                                .getActivityTrackProvider(gbDevice, requireContext())
+                                ?.getActivityTrack(parsedWorkout.summary)
+                            val activityPoints = activityTrack?.allPoints
+                            if (activityTrack != null && !activityPoints.isNullOrEmpty()) {
+                                val intervals = IntervalChartUtils.deriveIntervals(
+                                    activityTrack.segments, activityTrack.segmentInfos
+                                )
+                                IntervalChartUtils.addToSummaryData(requireContext(), parsedWorkout.data, intervals)
+                                val defaultCharts = DefaultWorkoutCharts.buildDefaultCharts(
+                                    requireContext(),
+                                    activityPoints,
+                                    ActivityKind.fromCode(parsedWorkout.summary.activityKind),
+                                    parsedWorkout.data,
+                                    gbDevice
+                                )
+                                return@withContext Workout(parsedWorkout.summary, parsedWorkout.data, defaultCharts, intervals)
                             }
                         } catch (e: Exception) {
                             LOG.error("Failed to build default charts", e)

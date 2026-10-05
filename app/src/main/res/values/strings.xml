@@ -3471,6 +3471,9 @@
 
     <string name="category">Category</string>
     <string name="workout_intervals">Intervals</string>
+    <string name="interval_type_active">Active</string>
+    <string name="interval_type_rest">Rest</string>
+    <string name="interval_type_unknown">Unknown</string>
     <!-- Diving params -->
     <string name="diving_maximum_diving_depth">Maximum Diving Depth</string>
     <string name="diving_water_type">Water Type</string>

@@ -259,7 +259,7 @@ class GbChartView @JvmOverloads constructor(
         if (selected == selectedX) return
         selectedX = selected
         selection = selected?.let { selectionAt(it) }
-        xAxis.removeAllLimitLines()
+        resetXLimitLines()
         if (selected != null) {
             xAxis.addLimitLine(guide(selected))
             performHapticFeedback(
@@ -278,7 +278,28 @@ class GbChartView @JvmOverloads constructor(
     private fun clearSelection() {
         selectedX = null
         selection = null
+        resetXLimitLines()
+    }
+
+    /**
+     * Leaves only the [ChartSpec.xMarkers] on the x axis, which also carries the selection guide.
+     */
+    private fun resetXLimitLines() {
         xAxis.removeAllLimitLines()
+        for (marker in spec?.xMarkers.orEmpty()) {
+            xAxis.addLimitLine(LimitLine((marker.value - xOrigin).toFloat(), marker.label.orEmpty()).apply {
+                lineColor = marker.color
+                lineWidth = X_MARKER_WIDTH_DP
+                textColor = theme.textColor
+                textSize = X_MARKER_TEXT_SP
+                labelPosition = when {
+                    marker.labelBeforeLine && marker.labelAtBottom -> LimitLine.LimitLabelPosition.LEFT_BOTTOM
+                    marker.labelBeforeLine -> LimitLine.LimitLabelPosition.LEFT_TOP
+                    marker.labelAtBottom -> LimitLine.LimitLabelPosition.RIGHT_BOTTOM
+                    else -> LimitLine.LimitLabelPosition.RIGHT_TOP
+                }
+            })
+        }
     }
 
     private fun guide(x: Double) = LimitLine((x - xOrigin).toFloat()).apply {
@@ -534,6 +555,8 @@ class GbChartView @JvmOverloads constructor(
         const val LIMIT_LINE_WIDTH_DP = 1.5f
         const val LIMIT_LINE_DASH_DP = 6f
         const val LIMIT_LINE_GAP_DP = 4f
+        const val X_MARKER_WIDTH_DP = 1f
+        const val X_MARKER_TEXT_SP = 9f
         const val MIN_TIME_LABEL_WIDTH_DP = 32f
         const val TIME_LABEL_GAP_DP = 16f
         val GUIDE_COLOR = Color.parseColor("#8F8F8F")

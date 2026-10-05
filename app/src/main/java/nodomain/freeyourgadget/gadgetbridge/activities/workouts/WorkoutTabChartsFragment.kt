@@ -175,9 +175,10 @@ class WorkoutTabChartsFragment : Fragment(), WorkoutTabScreenshotProvider {
         }
         val charts = listOf(chart)
         lineChart.selectionEnabled = false
-        lineChart.setSpec(WorkoutChartSpecs.spec(requireContext(), charts, chart.zoneThresholds != null))
+        lineChart.setSpec(WorkoutChartSpecs.spec(requireContext(), charts, chart.zoneThresholds != null, workout.intervals))
         lineChart.setOnClickListener {
             ChartDataRepository.chartData = workout.charts
+            ChartDataRepository.intervals = workout.intervals
             val intent = Intent(requireContext(), WorkoutChartsActivity::class.java).apply {
                 putExtra(WorkoutChartsActivity.INIT_CHART_ID, chart.id)
                 workoutLabel()?.let {
