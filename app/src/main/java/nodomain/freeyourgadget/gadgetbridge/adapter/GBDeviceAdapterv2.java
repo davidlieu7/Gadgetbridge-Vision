@@ -39,6 +39,7 @@ import android.text.InputType;
 import android.text.TextWatcher;
 import android.util.Pair;
 import android.util.TypedValue;
+import android.view.ContextThemeWrapper;
 import android.view.LayoutInflater;
 import android.view.MenuItem;
 import android.view.View;
@@ -55,8 +56,10 @@ import android.widget.Spinner;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.annotation.DrawableRes;
 import androidx.annotation.NonNull;
 import androidx.annotation.RequiresApi;
+import androidx.appcompat.content.res.AppCompatResources;
 import androidx.appcompat.widget.PopupMenu;
 import androidx.coordinatorlayout.widget.CoordinatorLayout;
 import androidx.localbroadcastmanager.content.LocalBroadcastManager;
@@ -199,21 +202,26 @@ public class GBDeviceAdapterv2 extends ListAdapter<GBDevice, GBDeviceAdapterv2.V
         return count;
     }
 
+    private static void setDeviceIcon(final ViewHolder holder, @DrawableRes final int iconRes, final boolean connected) {
+        final Context iconContext = connected ? holder.connectedIconContext : holder.deviceImageView.getContext();
+        holder.deviceImageView.setImageDrawable(AppCompatResources.getDrawable(iconContext, iconRes));
+        holder.deviceImageView.setBackground(AppCompatResources.getDrawable(iconContext, R.drawable.device_card_icon_bg));
+        if (connected) {
+            holder.deviceImageView.setColorFilter(null);
+        } else {
+            final ColorMatrix colorMatrix = new ColorMatrix();
+            colorMatrix.setSaturation(0);
+            holder.deviceImageView.setColorFilter(new ColorMatrixColorFilter(colorMatrix));
+        }
+    }
+
     private void showDeviceFolder(ViewHolder holder, final GBDeviceFolder folder){
         holder.container.setVisibility(View.VISIBLE);
         holder.deviceNameLabel.setText(folder.getName());
         holder.infoIcons.setVisibility(View.GONE);
         holder.deviceInfoBox.setVisibility(View.GONE);
         holder.cardViewActivityCardLayout.setVisibility(View.GONE);
-        holder.deviceImageView.setImageResource(R.drawable.ic_device_folder);
-
-        if (countDevicesInFolder(folder.getName(), true) == 0) {
-            final ColorMatrix colorMatrix = new ColorMatrix();
-            colorMatrix.setSaturation(0);
-            holder.deviceImageView.setColorFilter(new ColorMatrixColorFilter(colorMatrix));
-        } else {
-            holder.deviceImageView.setColorFilter(null);
-        }
+        setDeviceIcon(holder, R.drawable.ic_device_folder, countDevicesInFolder(folder.getName(), true) > 0);
         holder.deviceInfoView.setVisibility(View.GONE);
         int countInFolder = countDevicesInFolder(folder.getName(), false);
         int connectedInFolder = countDevicesInFolder(folder.getName(), true);
@@ -323,15 +331,7 @@ public class GBDeviceAdapterv2 extends ListAdapter<GBDevice, GBDeviceAdapterv2.V
             }
         });
 
-        holder.deviceImageView.setImageResource(device.getDeviceCoordinator().getDefaultIconResource());
-        if (device.isInitialized()) {
-            holder.deviceImageView.setColorFilter(null);
-        } else {
-            final ColorMatrix colorMatrix = new ColorMatrix();
-            colorMatrix.setSaturation(0);
-
-            holder.deviceImageView.setColorFilter(new ColorMatrixColorFilter(colorMatrix));
-        }
+        setDeviceIcon(holder, device.getDeviceCoordinator().getDefaultIconResource(), device.isInitialized());
 
         holder.deviceNameLabel.setText(getUniqueDeviceName(device));
 
@@ -724,6 +724,7 @@ public class GBDeviceAdapterv2 extends ListAdapter<GBDevice, GBDeviceAdapterv2.V
         MaterialCardView container;
 
         ImageView deviceImageView;
+        final Context connectedIconContext;
         TextView deviceNameLabel;
         TextView deviceStatusLabel;
 
@@ -750,6 +751,7 @@ public class GBDeviceAdapterv2 extends ListAdapter<GBDevice, GBDeviceAdapterv2.V
             container = view.findViewById(R.id.card_view);
 
             deviceImageView = view.findViewById(R.id.device_image);
+            connectedIconContext = new ContextThemeWrapper(deviceImageView.getContext(), R.style.ThemeOverlay_App_DeviceCardIcon_Connected);
             deviceNameLabel = view.findViewById(R.id.device_name);
             deviceStatusLabel = view.findViewById(R.id.device_status);
 

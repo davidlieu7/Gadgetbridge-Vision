@@ -27,6 +27,7 @@
     <attr name="deviceIconBackground" format="color" />
     <attr name="deviceIconBackgroundLight" format="color" />
     <attr name="deviceIconBackgroundDark" format="color" />
+    <attr name="deviceCardIconTile" format="color" />
 
     <!-- Pill-style tab bars (workout tabs, charts tabs, Day/Week/Month sub-tabs) -->
     <attr name="tab_bar_bg" format="color" />

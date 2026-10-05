@@ -416,6 +416,14 @@
         <item name="deviceIconBackground">@android:color/transparent</item>
         <item name="deviceIconBackgroundLight">@android:color/transparent</item>
         <item name="deviceIconBackgroundDark">@android:color/transparent</item>
+        <item name="deviceCardIconTile">?attr/colorSurfaceContainerHighest</item>
+    </style>
+    <style name="ThemeOverlay.App.DeviceCardIcon.Connected">
+        <item name="deviceIconPrimary">?attr/colorPrimaryContainer</item>
+        <item name="deviceIconLight">?attr/colorPrimaryContainer</item>
+        <item name="deviceIconDark">?attr/colorPrimaryContainer</item>
+        <item name="deviceIconOnPrimary">?attr/colorOnPrimaryContainer</item>
+        <item name="deviceCardIconTile">?attr/colorPrimaryContainer</item>
     </style>
     <style name="DeviceCardActionIcon">
         <item name="android:layout_width">40dp</item>
