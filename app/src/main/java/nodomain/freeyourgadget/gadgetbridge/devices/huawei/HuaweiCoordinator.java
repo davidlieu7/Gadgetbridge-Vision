@@ -479,7 +479,7 @@ public abstract class HuaweiCoordinator extends AbstractDeviceCoordinator {
         // Health
         if (deviceState.supportsInactivityWarnings())
             deviceSpecificSettings.addRootScreen(DeviceSpecificSettingsScreen.HEALTH, R.xml.devicesettings_inactivity_sheduled);
-        if (deviceState.supportsTruSleep())
+        if (deviceState.supportsTruSleep() || deviceState.supportsSleepBreath() || deviceState.supportsSleepApnea())
             deviceSpecificSettings.addRootScreen(DeviceSpecificSettingsScreen.HEALTH, R.xml.devicesettings_trusleep);
         if (deviceState.supportsHeartRate()) {
             deviceSpecificSettings.addRootScreen(DeviceSpecificSettingsScreen.HEALTH, R.xml.devicesettings_heartrate_automatic_enable);

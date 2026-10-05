@@ -1027,6 +1027,9 @@ public class HuaweiSupportProvider {
             }
             if (getDeviceState().supportsSleepApnea()) {
                 huaweiDataSyncSleepApnea = new HuaweiDataSyncSleepApnea(HuaweiSupportProvider.this);
+                if (!huaweiDataSyncSleepApnea.querySleepApneaState()) {
+                    LOG.error("Failed to request sleep breathing account state");
+                }
             }
             if (getDeviceState().supportsArterialStiffnessDetection()) {
                 huaweiDataSyncArterialStiffnessDetection = new HuaweiDataSyncArterialStiffnessDetection(HuaweiSupportProvider.this);
@@ -2226,11 +2229,13 @@ public class HuaweiSupportProvider {
             boolean sleepBreathSwitch = GBApplication
                     .getDeviceSpecificSharedPrefs(this.getDevice().getAddress())
                     .getBoolean(HuaweiConstants.PREF_HUAWEI_SLEEP_BREATH, false);
+            // The account-side config is only enabled as a prerequisite. The capture does
+            // not show disabling it when the device setting is turned off.
+            if (sleepBreathSwitch && !huaweiDataSyncSleepApnea.changeSleepApneaState(true)) {
+                LOG.error("Failed to configure sleep breathing account state");
+            }
             if (!huaweiDataSyncSleepApnea.changeSleepBreatheState(sleepBreathSwitch)) {
                 LOG.error("Failed to configure sleep breathing");
-            }
-            if (!huaweiDataSyncSleepApnea.changeSleepApneaState(sleepBreathSwitch)) {
-                LOG.error("Failed to configure sleep apnea");
             }
         } else {
             try {
