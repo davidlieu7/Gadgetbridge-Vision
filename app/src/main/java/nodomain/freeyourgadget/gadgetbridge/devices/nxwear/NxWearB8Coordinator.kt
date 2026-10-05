@@ -242,6 +242,8 @@ class NxWearB8Coordinator : AbstractBLEDeviceCoordinator() {
 
     override fun supportsPowerOff(device: GBDevice): Boolean = true
 
+    override fun getMaxHeartRateMeasurementsGapMinutes(device: GBDevice): Int = 60
+
     override fun supportsHeartRateMeasurement(device: GBDevice): Boolean = true
 
     override fun supportsManualHeartRateMeasurement(device: GBDevice): Boolean = true
