@@ -5735,7 +5735,6 @@
     <string name="endurain_uploading_started">Uploading to Endurain…</string>
     <string name="endurain_successfully_uploaded_toast">Successfully uploaded to Endurain</string>
     <string name="endurain_error_while_uploading_toast">Error while uploading to Endurain</string>
-    <string name="endurain_unable_to_upload_gpx_file_toast">Unable to upload activity file to Endurain: %1$s</string>
     <string name="endurain_setup_title">Endurain setup</string>
     <string name="endurain_setup_server">Endurain server</string>
     <string name="endurain_setup_login_type_local">Local</string>
@@ -5778,6 +5777,9 @@
     <string name="workout_upload_status_disabled">Auto-upload off</string>
     <string name="workout_upload_status_remote_id">Activity %1$s</string>
     <string name="workout_upload_status_open">View activity</string>
+    <string name="workout_upload_toast_already_uploaded">%1$s already has this workout</string>
+    <string name="workout_upload_toast_updated">Updated the activity on %1$s</string>
+    <string name="workout_upload_toast_no_payload">Could not build the file to upload to %1$s</string>
     <string name="pref_endurain_replace_on_track_change_title">Replace workouts when the track changes</string>
     <string name="pref_endurain_replace_on_track_change_summary">Changing the track of an uploaded workout means deleting the activity and uploading it again, so it gets a new address. Activities you edited on Endurain are left untouched.</string>
 

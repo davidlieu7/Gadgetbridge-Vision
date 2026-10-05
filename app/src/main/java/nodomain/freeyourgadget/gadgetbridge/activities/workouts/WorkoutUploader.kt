@@ -25,11 +25,13 @@ import nodomain.freeyourgadget.gadgetbridge.activities.endurain.EndurainTokenMan
 import nodomain.freeyourgadget.gadgetbridge.activities.endurain.WandererApiClient
 import nodomain.freeyourgadget.gadgetbridge.activities.endurain.WandererTokenManager
 import nodomain.freeyourgadget.gadgetbridge.entities.BaseActivitySummary
+import nodomain.freeyourgadget.gadgetbridge.entities.WorkoutUpload
 import nodomain.freeyourgadget.gadgetbridge.export.FitExporter
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice
 import nodomain.freeyourgadget.gadgetbridge.model.ActivityKind
 import nodomain.freeyourgadget.gadgetbridge.model.ActivitySummaryData
 import nodomain.freeyourgadget.gadgetbridge.model.ActivitySummaryEntries
+import nodomain.freeyourgadget.gadgetbridge.model.ActivityTrackProvider
 import nodomain.freeyourgadget.gadgetbridge.util.ActivitySummaryUtils
 import nodomain.freeyourgadget.gadgetbridge.util.FileUtils
 import org.slf4j.LoggerFactory
@@ -126,6 +128,225 @@ object WorkoutUploader {
         val gpxTrack = summary.gpxTrack ?: return false
         val existing = FileUtils.tryFixPath(File(gpxTrack))
         return existing != null && existing.canRead()
+    }
+
+    /** What a sync of one workout to one service did. */
+    sealed interface SyncOutcome {
+        /** The service took the workout for the first time. */
+        object Uploaded : SyncOutcome
+
+        /**
+         * The remote activity was brought in line with the workout. [refusal] is the localized
+         * reason for the part of the sync the service would not do, null when all of it went
+         * through.
+         */
+        data class Resynced(val refusal: String?) : SyncOutcome
+
+        /** The service already holds the workout as it stands, so nothing was sent. */
+        object AlreadyInStep : SyncOutcome
+
+        /** The workout cannot be expressed in the format this service takes. */
+        object NotApplicable : SyncOutcome
+
+        /** [reason] is a localized explanation, null when the failure was transient. */
+        data class Failed(val reason: String?) : SyncOutcome
+    }
+
+    /**
+     * Sends [summary] to [target], doing whichever of the two the recorded state calls for: a
+     * first upload when the service does not hold the workout, and a re-sync of what changed
+     * since when it does. A service that already holds it as it stands is left alone, so asking
+     * for an upload twice does not leave a second activity behind.
+     *
+     * [summaryData] supplies the exported session fields; see [buildFitFile].
+     *
+     * Blocking: call from an IO context.
+     */
+    fun syncWorkout(
+        context: Context,
+        gbDevice: GBDevice,
+        provider: ActivityTrackProvider?,
+        target: WorkoutUploadTarget,
+        summary: BaseActivitySummary,
+        summaryData: ActivitySummaryData? = null
+    ): SyncOutcome {
+        val id = summary.id ?: return SyncOutcome.NotApplicable
+        val sourceHash = WorkoutUploadStore.sourceHashOf(summary)
+        val row = WorkoutUploadStore.rowsForSummaries(listOf(id))[id]?.get(target.service)
+        if (row == null || row.status != WorkoutUploadStore.STATUS_SUCCESS) {
+            return uploadNew(context, gbDevice, provider, target, summary, sourceHash, summaryData)
+        }
+        if (row.sourceHash == sourceHash && row.lastError == null) {
+            return SyncOutcome.AlreadyInStep
+        }
+        return resyncWorkout(context, gbDevice, provider, target, summary, row, sourceHash, summaryData)
+    }
+
+    /** Uploads [summary] to [target] for the first time. Blocking: call from an IO context. */
+    fun uploadNew(
+        context: Context,
+        gbDevice: GBDevice,
+        provider: ActivityTrackProvider?,
+        target: WorkoutUploadTarget,
+        summary: BaseActivitySummary,
+        sourceHash: String,
+        summaryData: ActivitySummaryData? = null
+    ): SyncOutcome {
+        val id = summary.id ?: return SyncOutcome.NotApplicable
+        val payload = buildPayload(context, gbDevice, provider, target, summary, summaryData)
+            ?: return SyncOutcome.NotApplicable
+        val result = target.upload(context, summary, payload)
+        if (!result.success) {
+            LOG.warn("Upload of summary {} to service {} failed: {}", id, target.service, result.reason)
+            WorkoutUploadStore.recordFailure(id, target.service, result.reason)
+            return SyncOutcome.Failed(result.reason)
+        }
+        // A photo the service did not take leaves both fingerprints unset, so the next run comes
+        // back for it rather than treating the workout as fully in step.
+        val photoLanded = summary.headerPhoto == null || result.photoMediaId != null
+        WorkoutUploadStore.recordSuccess(
+            id, target.service, result.remoteActivityId,
+            if (photoLanded) WorkoutUploadStore.photoHashOf(summary.headerPhoto) else null,
+            result.photoMediaId,
+            if (photoLanded) sourceHash else null,
+            WorkoutUploadStore.fileHashOf(payload),
+            summaryHasTrack(summary)
+        )
+        return SyncOutcome.Uploaded
+    }
+
+    /**
+     * Pushes to [target] whatever changed about [summary] since its last upload: the header photo,
+     * the name and type, and the track. Each of those is skipped when the service cannot express
+     * it, which is why the fingerprints are still stored on a partial sync: they record what the
+     * remote activity has been brought in line with, not what changed locally.
+     *
+     * Blocking: call from an IO context.
+     */
+    fun resyncWorkout(
+        context: Context,
+        gbDevice: GBDevice,
+        provider: ActivityTrackProvider?,
+        target: WorkoutUploadTarget,
+        summary: BaseActivitySummary,
+        row: WorkoutUpload,
+        sourceHash: String,
+        summaryData: ActivitySummaryData? = null
+    ): SyncOutcome {
+        val id = summary.id ?: return SyncOutcome.NotApplicable
+        var remoteId = row.remoteActivityId ?: return SyncOutcome.NotApplicable
+        var photoHash = row.photoHash
+        var photoMediaId = row.photoMediaId
+        var payloadHash = row.payloadHash
+        var hadTrack = row.hadTrack
+        var refusal: String? = null
+        // Set when something the service could have taken did not get through, so the fingerprint
+        // is left as it was and the next run comes back to it.
+        var pending = false
+
+        // The track goes first: a service that can only update one by re-creating the activity
+        // gives back a new activity id, and the photo and metadata belong on the replacement.
+        var recreated = false
+        val payload = buildPayload(context, gbDevice, provider, target, summary, summaryData)
+        val newPayloadHash = payload?.let { WorkoutUploadStore.fileHashOf(it) }
+        if (payload != null && newPayloadHash != row.payloadHash) {
+            val update = target.updateTrack(context, remoteId, payload, summary, row)
+            when {
+                update.success -> {
+                    payloadHash = newPayloadHash
+                    hadTrack = summaryHasTrack(summary)
+                    update.newRemoteActivityId?.let {
+                        remoteId = it
+                        recreated = true
+                        photoMediaId = update.newPhotoMediaId
+                        // The replacement is uploaded from the current workout, so it carries the
+                        // current photo, but only once the media id comes back.
+                        if (summary.headerPhoto == null || update.newPhotoMediaId != null) {
+                            photoHash = WorkoutUploadStore.photoHashOf(summary.headerPhoto)
+                        } else {
+                            pending = true
+                        }
+                    }
+                }
+
+                // Nothing this service can do about a changed track. Only the metadata and the
+                // photo can move, so the recorded payload stays what was uploaded.
+                update.unsupported -> Unit
+
+                else -> {
+                    LOG.warn("Track update to service {} failed for summary {}", target.service, id)
+                    refusal = update.refusal
+                    if (refusal == null) {
+                        // A transient failure: keep the old fingerprints so the next run retries.
+                        return SyncOutcome.Failed(null)
+                    }
+                    // A deliberate refusal will not resolve itself, so the fingerprints advance
+                    // and the user is told once rather than on every sync.
+                }
+            }
+        }
+
+        val newPhotoHash = WorkoutUploadStore.photoHashOf(summary.headerPhoto)
+        if (!recreated && newPhotoHash != row.photoHash) {
+            val sync = target.syncPhoto(
+                context, remoteId, summary.headerPhoto?.let { File(it) }, row.photoMediaId
+            )
+            when {
+                sync == null -> photoHash = newPhotoHash  // service has no media API
+                sync.success -> {
+                    photoHash = newPhotoHash
+                    photoMediaId = sync.mediaId
+                }
+
+                else -> {
+                    LOG.warn("Photo sync to service {} failed for summary {}", target.service, id)
+                    pending = true
+                }
+            }
+        }
+
+        if (!recreated) {
+            // A replacement activity is created with the right name and type already.
+            target.updateMetadata(context, remoteId, summary)
+        }
+
+        // A transient failure has already returned by here, so the only reason left is a refusal
+        // the user has to resolve, which the row carries until a later sync goes through.
+        WorkoutUploadStore.recordSuccess(
+            id, target.service, remoteId, photoHash, photoMediaId,
+            if (pending) row.sourceHash else sourceHash, payloadHash, hadTrack, refusal
+        )
+        return SyncOutcome.Resynced(refusal)
+    }
+
+    /**
+     * Exports [summary] in the format [target] accepts, or null when the workout cannot be
+     * expressed in it. A FIT is synthesized from the summary alone when there is no track; a GPX
+     * needs one, which is why a service that stores tracks skips trackless workouts outright.
+     */
+    private fun buildPayload(
+        context: Context,
+        gbDevice: GBDevice,
+        provider: ActivityTrackProvider?,
+        target: WorkoutUploadTarget,
+        summary: BaseActivitySummary,
+        summaryData: ActivitySummaryData?
+    ): File? {
+        if (target.requiresTrack && !summaryHasTrack(summary)) {
+            return null
+        }
+        return when (target.format) {
+            WorkoutPayloadFormat.FIT -> try {
+                buildFitFile(context, gbDevice, summary, summaryData)
+            } catch (e: Exception) {
+                LOG.warn("Could not build FIT for summary {}", summary.id, e)
+                null
+            }
+
+            WorkoutPayloadFormat.GPX -> provider?.let {
+                ActivitySummaryUtils.getShareableGpxFile(it, summary)
+            }
+        }
     }
 
     /**

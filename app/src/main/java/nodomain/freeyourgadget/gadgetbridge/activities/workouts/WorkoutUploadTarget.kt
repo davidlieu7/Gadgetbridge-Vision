@@ -17,6 +17,7 @@
 package nodomain.freeyourgadget.gadgetbridge.activities.workouts
 
 import android.content.Context
+import androidx.annotation.IdRes
 import androidx.annotation.StringRes
 import nodomain.freeyourgadget.gadgetbridge.GBApplication
 import nodomain.freeyourgadget.gadgetbridge.R
@@ -62,6 +63,10 @@ interface WorkoutUploadTarget {
     @get:StringRes
     val nameRes: Int
 
+    /** Menu item that uploads the workout on screen to this service. */
+    @get:IdRes
+    val uploadMenuItemRes: Int
+
     /** Format to export a workout in for this service. */
     val format: WorkoutPayloadFormat
 
@@ -74,11 +79,28 @@ interface WorkoutUploadTarget {
     /** Whether the user has finished setting this service up. */
     fun isLoggedIn(context: Context): Boolean
 
+    /**
+     * Whether the service can be reached at all, which for a self-hosted one also means the user
+     * gave an address. Kept apart from [isLoggedIn] because credentials can outlive the address
+     * they were obtained from, and a service with no address to give would answer on login alone.
+     */
+    fun isConfigured(context: Context): Boolean
+
     /** Whether the user asked for workouts to be uploaded to this service automatically. */
     fun isAutoUploadEnabled(prefs: GBPrefs): Boolean
 
-    /** Localized "upload to this service failed: %s" message. */
+    /** Localized "upload to this service failed: %s" message, for the auto-upload notification. */
     fun failureMessage(context: Context, reason: String): String
+
+    /** Localized confirmation that this service took the workout. */
+    @get:StringRes
+    val uploadedRes: Int
+
+    /**
+     * Localized "the upload to this service failed" message for an upload the user asked for,
+     * carrying [reason] when the service gave one.
+     */
+    fun uploadFailedMessage(context: Context, reason: String?): String
 
     /**
      * Web address of the activity [remoteActivityId] on the service, for opening it in a browser,
@@ -130,12 +152,13 @@ object WorkoutUploadTargets {
 
     /** Targets the user has both enabled and finished setting up. */
     fun active(context: Context, prefs: GBPrefs): List<WorkoutUploadTarget> =
-        ALL.filter { it.isAutoUploadEnabled(prefs) && it.isLoggedIn(context) }
+        ALL.filter { it.isAutoUploadEnabled(prefs) && it.isConfigured(context) }
 }
 
 object EndurainUploadTarget : WorkoutUploadTarget {
     override val service = WorkoutUploadStore.SERVICE_ENDURAIN
     override val nameRes = R.string.pref_category_endurain
+    override val uploadMenuItemRes = R.id.activity_action_upload_to_endurain
     override val format = WorkoutPayloadFormat.FIT
 
     // A FIT can be synthesized from the summary alone, so a trackless workout still uploads.
@@ -143,7 +166,12 @@ object EndurainUploadTarget : WorkoutUploadTarget {
 
     override val failureNotificationId = 4711
 
+    private fun serverUrl(): String? = GBApplication.getPrefs().preferences
+        .getString(WorkoutUploader.PREF_ENDURAIN_SERVER, null)
+
     override fun isLoggedIn(context: Context) = EndurainTokenManager(context).isLoggedIn()
+
+    override fun isConfigured(context: Context) = serverUrl() != null && isLoggedIn(context)
 
     override fun isAutoUploadEnabled(prefs: GBPrefs) =
         prefs.getBoolean(GBPrefs.ENDURAIN_AUTO_UPLOAD_ENABLED, false)
@@ -151,9 +179,13 @@ object EndurainUploadTarget : WorkoutUploadTarget {
     override fun failureMessage(context: Context, reason: String): String =
         context.getString(R.string.auto_upload_failed_endurain, reason)
 
+    override val uploadedRes = R.string.endurain_successfully_uploaded_toast
+
+    override fun uploadFailedMessage(context: Context, reason: String?): String =
+        reason ?: context.getString(R.string.endurain_error_while_uploading_toast)
+
     override fun activityUrl(context: Context, remoteActivityId: String): String? {
-        val server = GBApplication.getPrefs().preferences
-            .getString(WorkoutUploader.PREF_ENDURAIN_SERVER, null) ?: return null
+        val server = serverUrl() ?: return null
         return "${server.trimEnd('/')}/activity/$remoteActivityId"
     }
 
@@ -218,6 +250,7 @@ object EndurainUploadTarget : WorkoutUploadTarget {
 object WandererUploadTarget : WorkoutUploadTarget {
     override val service = WorkoutUploadStore.SERVICE_WANDERER
     override val nameRes = R.string.pref_category_wanderer
+    override val uploadMenuItemRes = R.id.activity_action_upload_to_wanderer
     override val format = WorkoutPayloadFormat.GPX
 
     // Wanderer stores trails, so there is nothing to upload without a track.
@@ -225,7 +258,12 @@ object WandererUploadTarget : WorkoutUploadTarget {
 
     override val failureNotificationId = 4712
 
+    private fun serverUrl(): String? = GBApplication.getPrefs().preferences
+        .getString(WorkoutUploader.PREF_WANDERER_SERVER, null)
+
     override fun isLoggedIn(context: Context) = WandererTokenManager(context).isLoggedIn()
+
+    override fun isConfigured(context: Context) = serverUrl() != null && isLoggedIn(context)
 
     override fun isAutoUploadEnabled(prefs: GBPrefs) =
         prefs.getBoolean(GBPrefs.WANDERER_AUTO_UPLOAD_ENABLED, false)
@@ -233,14 +271,21 @@ object WandererUploadTarget : WorkoutUploadTarget {
     override fun failureMessage(context: Context, reason: String): String =
         context.getString(R.string.auto_upload_failed_wanderer, reason)
 
+    override val uploadedRes = R.string.wanderer_toast_successfully_uploaded
+
+    override fun uploadFailedMessage(context: Context, reason: String?): String =
+        context.getString(
+            R.string.wanderer_toast_upload_error,
+            reason ?: context.getString(R.string.unknown_error)
+        )
+
     /**
      * A trail page is namespaced by the handle of the account that owns it, and a handle that does
      * not resolve answers 500 rather than falling back to the trail, so there is no link to give
      * until the handle is known.
      */
     override fun activityUrl(context: Context, remoteActivityId: String): String? {
-        val server = GBApplication.getPrefs().preferences
-            .getString(WorkoutUploader.PREF_WANDERER_SERVER, null) ?: return null
+        val server = serverUrl() ?: return null
         val handle = WandererTokenManager(context).getHandle() ?: return null
         return "${server.trimEnd('/')}/trail/view/@$handle/$remoteActivityId"
     }
