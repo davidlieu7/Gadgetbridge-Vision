@@ -25,13 +25,20 @@ internal data class NxWearSleepReading(val timestampMillis: Long, val durationMi
             if (!packet.isComplete || packet.command != 0x31 || packet.dataType != NxWearDataType.SLEEP) return null
             val payload = packet.payload
             if (payload.size < 4) return null
-            val count = payload[3].toInt() and 0xff
-            if (count < 2 || count > (payload.size - 4) / 5) return null
-            val records = (0 until count).map { index ->
-                val offset = 4 + index * 5
-                (payload[offset].toInt() and 0xff) to payload.le32(offset + 1)
+            val blockCount = payload[2].toInt() and 0xff
+            if (blockCount == 0) return null
+            val records = mutableListOf<Pair<Int, Long>>()
+            for (block in 0 until blockCount) {
+                val countOffset = 3 + block * 76
+                if (countOffset >= payload.size) return null
+                val count = payload[countOffset].toInt() and 0xff
+                if (count > 15 || count > (payload.size - countOffset - 1) / 5) return null
+                for (index in 0 until count) {
+                    val offset = countOffset + 1 + index * 5
+                    records.add((payload[offset].toInt() and 0xff) to payload.le32(offset + 1))
+                }
             }
-            if (records.first().first != 1 || records.last().first != 4 ||
+            if (records.size < 2 || records.first().first != 1 || records.last().first != 4 ||
                 records.any { it.first !in 1..5 } ||
                 records.zipWithNext().any { (start, end) -> end.second < start.second }) return null
             return records.zipWithNext().mapNotNull { (start, end) ->

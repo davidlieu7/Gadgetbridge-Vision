@@ -46,6 +46,51 @@ class NxWearSleepReadingTest {
     }
 
     @Test
+    fun reconstructsEverySleepBlockInOnePacket() {
+        val payload = bytes(first).also { it[2] = 2 } + bytes(second).copyOfRange(3, 79)
+        val packet = NxWearPacket.parse(NxWearPacket.frame(3, 0x31, NxWearDataType.SLEEP, payload))
+
+        val readings = requireNotNull(NxWearSleepReading.parse(packet))
+
+        assertEquals(350, readings.sumOf { it.durationMinutes })
+        assertEquals(0x6ac1e548L * 1000L, readings.last().let { it.timestampMillis + it.durationMinutes * 60_000L })
+    }
+
+    @Test
+    fun preservesWakeGapAndResumedSleepInLaterBlock() {
+        fun block(vararg records: Pair<Int, Int>): ByteArray {
+            val result = ByteArray(76)
+            result[0] = records.size.toByte()
+            records.forEachIndexed { index, (type, seconds) ->
+                val offset = 1 + index * 5
+                result[offset] = type.toByte()
+                for (byteIndex in 0 until 4) result[offset + 1 + byteIndex] = (seconds shr (byteIndex * 8)).toByte()
+            }
+            return result
+        }
+        // Synthetic two-block layout: wake at 06:00, resume at 06:10, end at 08:00.
+        val payload = byteArrayOf(1, 0, 2) +
+            block(1 to 0, 2 to 60, 4 to 21_600) +
+            block(1 to 22_200, 3 to 22_200, 4 to 28_800)
+        val packet = NxWearPacket.parse(NxWearPacket.frame(3, 0x31, NxWearDataType.SLEEP, payload))
+
+        val readings = requireNotNull(NxWearSleepReading.parse(packet))
+
+        assertEquals(NxWearSleepReading(21_600_000L, 10, ActivityKind.AWAKE_SLEEP), readings[2])
+        assertEquals(NxWearSleepReading(22_200_000L, 110, ActivityKind.LIGHT_SLEEP), readings.last())
+    }
+
+    @Test
+    fun rejectsMissingSleepBlockAndInvalidLaterBlockCount() {
+        val missingBlock = bytes(first).also { it[2] = 2 }
+        val invalidCount = bytes(first).also { it[2] = 2 } + bytes(second).copyOfRange(3, 79).also { it[0] = 16 }
+        for (payload in listOf(missingBlock, invalidCount, bytes(first).also { it[2] = 0 })) {
+            val packet = NxWearPacket.parse(NxWearPacket.frame(3, 0x31, NxWearDataType.SLEEP, payload))
+            assertNull(NxWearSleepReading.parse(packet))
+        }
+    }
+
+    @Test
     fun rejectsTruncatedCountUnknownStateAndBackwardsTime() {
         for (payload in listOf(
             bytes(first).also { it[3] = 16 },
