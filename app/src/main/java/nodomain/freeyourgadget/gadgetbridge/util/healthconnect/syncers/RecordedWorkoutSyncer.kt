@@ -231,7 +231,7 @@ internal object RecordedWorkoutSyncer {
     }
 
     /** UNKNOWN is kept: a BaseActivitySummary row was explicitly recorded as a workout. */
-    internal fun isSyncedWorkout(workout: BaseActivitySummary): Boolean {
+    private fun isSyncedWorkout(workout: BaseActivitySummary): Boolean {
         if (workout.endTime.before(workout.startTime)) {
             return false
         }

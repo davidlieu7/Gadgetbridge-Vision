@@ -33,7 +33,6 @@ import nodomain.freeyourgadget.gadgetbridge.model.workout.WorkoutViewModel
 import nodomain.freeyourgadget.gadgetbridge.util.DateTimeUtils
 import nodomain.freeyourgadget.gadgetbridge.util.FileUtils
 import nodomain.freeyourgadget.gadgetbridge.util.GridTableBuilder
-import nodomain.freeyourgadget.gadgetbridge.util.healthconnect.HealthConnectWorkoutStatus
 import nodomain.freeyourgadget.gadgetbridge.util.healthconnect.HealthConnectWorkoutSync
 import org.apache.commons.lang3.StringUtils
 import org.apache.commons.lang3.tuple.Pair
@@ -276,30 +275,20 @@ class WorkoutTabOverviewFragment : Fragment(), WorkoutTabScreenshotProvider {
         }
     }
 
-    /** Fills in the header's Health Connect indicator, hidden when the workout is not synced. */
+    /** Fills in the header's Health Connect indicator, hidden unless the workout failed to sync. */
     private fun updateHealthConnectStatusIcon(summary: BaseActivitySummary) {
         binding.healthConnectStatusIcon.visibility = View.GONE
         val summaryId = summary.id ?: return
         val context = requireContext()
         lifecycleScope.launch {
-            val (status, failure) = withContext(Dispatchers.IO) {
-                val status = HealthConnectWorkoutSync.statusesFor(context, listOf(summary))[summaryId]
-                val failure = if (status == HealthConnectWorkoutStatus.FAILED) HealthConnectWorkoutSync.failureOf(summaryId) else null
-                status to failure
-            }
-            if (status == null || !isAdded) return@launch
-            val message = if (failure != null) {
-                getString(
-                    R.string.health_connect_workout_sync_failed_reason,
-                    DateTimeUtils.formatDateTimeRelative(context, Date(failure.failedAt)),
-                    failure.error.orEmpty()
-                )
-            } else {
-                getString(status.labelRes)
-            }
+            val failure = withContext(Dispatchers.IO) { HealthConnectWorkoutSync.failureOf(summaryId) }
+            if (failure == null || !isAdded) return@launch
+            val message = getString(
+                R.string.health_connect_workout_sync_failed_reason,
+                DateTimeUtils.formatDateTimeRelative(context, Date(failure.failedAt)),
+                failure.error.orEmpty()
+            )
             binding.healthConnectStatusIcon.apply {
-                setImageResource(status.iconRes)
-                contentDescription = getString(status.labelRes)
                 setOnClickListener {
                     MaterialAlertDialogBuilder(context)
                         .setTitle(R.string.healthconnect_settings)

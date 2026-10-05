@@ -249,7 +249,7 @@ class WorkoutListActivity : AbstractListActivity<BaseActivitySummary>() {
         viewModel.summaries.observe(this) { summaries ->
             // Set before the items, so the first bind of every row already has its indicator.
             summariesAdapter?.uploadStatuses = viewModel.uploadStatuses.value.orEmpty()
-            summariesAdapter?.healthConnectStatuses = viewModel.healthConnectStatuses.value.orEmpty()
+            summariesAdapter?.healthConnectFailures = viewModel.healthConnectFailures.value.orEmpty()
             itemAdapter?.setItems(summaries, true)
             activityKindMap = fillKindMap()
         }

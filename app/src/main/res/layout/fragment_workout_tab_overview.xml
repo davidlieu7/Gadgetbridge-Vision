@@ -86,8 +86,9 @@
                 android:layout_height="24dp"
                 android:layout_marginStart="12dp"
                 android:background="?attr/selectableItemBackgroundBorderless"
+                android:contentDescription="@string/health_connect_workout_sync_failed"
                 android:visibility="gone"
-                tools:ignore="ContentDescription" />
+                app:srcCompat="@drawable/ic_health_connect_sync_problem" />
         </LinearLayout>
 
         <LinearLayout

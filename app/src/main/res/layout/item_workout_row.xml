@@ -100,8 +100,9 @@
                     android:layout_width="16dp"
                     android:layout_height="16dp"
                     android:layout_marginStart="6dp"
+                    android:contentDescription="@string/health_connect_workout_sync_failed"
                     android:visibility="gone"
-                    tools:ignore="ContentDescription" />
+                    app:srcCompat="@drawable/ic_health_connect_sync_problem" />
 
                 <ImageView
                     android:id="@+id/workout_row_gps"

@@ -18,84 +18,41 @@ package nodomain.freeyourgadget.gadgetbridge.util.healthconnect
 
 import android.content.Context
 import android.content.Intent
-import androidx.annotation.DrawableRes
-import androidx.annotation.StringRes
 import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import nodomain.freeyourgadget.gadgetbridge.GBApplication
-import nodomain.freeyourgadget.gadgetbridge.R
 import nodomain.freeyourgadget.gadgetbridge.entities.BaseActivitySummary
-import nodomain.freeyourgadget.gadgetbridge.entities.HealthConnectSyncStateDao
 import nodomain.freeyourgadget.gadgetbridge.entities.HealthConnectWorkoutSyncFailure
 import nodomain.freeyourgadget.gadgetbridge.entities.HealthConnectWorkoutSyncFailureDao
-import nodomain.freeyourgadget.gadgetbridge.util.GBPrefs
-import nodomain.freeyourgadget.gadgetbridge.util.healthconnect.syncers.RecordedWorkoutSyncer
 import org.slf4j.LoggerFactory
 
-enum class HealthConnectWorkoutStatus(
-    @DrawableRes val iconRes: Int,
-    @StringRes val labelRes: Int
-) {
-    SYNCED(R.drawable.ic_health_connect_synced, R.string.health_connect_workout_synced),
-    FAILED(R.drawable.ic_health_connect_sync_problem, R.string.health_connect_workout_sync_failed)
-}
-
 /**
- * Per-workout view of the Health Connect sync.
+ * Workouts whose Health Connect insert failed.
  *
- * A workout counts as synced when it lies within the WORKOUTS cursor of its device
- * (`HealthConnectSyncState.lastSyncTimestamp`, the end of the latest workout inserted), so a reset
- * of that cursor also clears the status. The cursor cannot tell a workout that failed and was
- * skipped from one that went through, so failures are kept in [HealthConnectWorkoutSyncFailure]
- * and take precedence.
+ * The syncer logs and skips such a workout, and the WORKOUTS cursor moves past it once a later
+ * workout goes through, so the failure is kept in [HealthConnectWorkoutSyncFailure] until a later
+ * insert of the same workout succeeds or the sync state is reset.
  */
 object HealthConnectWorkoutSync {
-    /** Local broadcast sent when workout sync states may have changed: a sync ended or was reset. */
+    /** Local broadcast sent when workout sync failures may have changed: a sync ended or was reset. */
     const val ACTION_STATE_CHANGED = "nodomain.freeyourgadget.gadgetbridge.healthconnect.action.workout_sync_state_changed"
 
     private val LOG = LoggerFactory.getLogger(HealthConnectWorkoutSync::class.java)
 
-    fun statusesFor(context: Context, summaries: Collection<BaseActivitySummary>): Map<Long, HealthConnectWorkoutStatus> {
-        val withIds = summaries.filter { it.id != null }
-        if (withIds.isEmpty()) return emptyMap()
-        val initialSyncStartSeconds = context
-            .getSharedPreferences(GBPrefs.HEALTH_CONNECT_SETTINGS, Context.MODE_PRIVATE)
-            .getLong(GBPrefs.HEALTH_CONNECT_INITIAL_SYNC_START_TS, -1L)
+    /** Ids of the given summaries that failed to sync. */
+    fun failedIn(summaries: Collection<BaseActivitySummary>): Set<Long> {
+        val ids = summaries.mapNotNullTo(HashSet()) { it.id }
+        if (ids.isEmpty()) return emptySet()
         return try {
             GBApplication.acquireDbReadOnly().use { db ->
-                val session = db.daoSession
-                // epoch seconds, keyed by device id
-                val cursors = session.healthConnectSyncStateDao.queryBuilder()
-                    .where(
-                        HealthConnectSyncStateDao.Properties.DeviceId.`in`(withIds.map { it.deviceId }.distinct()),
-                        HealthConnectSyncStateDao.Properties.DataType.eq(
-                            HealthConnectPermissionManager.HealthConnectDataType.WORKOUTS.name
-                        )
-                    )
+                // A query, not loadAll(), for the reason given in failureOf. The table only holds
+                // failed workouts, so it is read whole rather than binding every id of the list.
+                db.daoSession.healthConnectWorkoutSyncFailureDao.queryBuilder()
                     .list()
-                    .associate { it.deviceId to it.lastSyncTimestamp }
-                val failed = session.healthConnectWorkoutSyncFailureDao.queryBuilder()
-                    .where(HealthConnectWorkoutSyncFailureDao.Properties.SummaryId.`in`(withIds.map { it.id }))
-                    .list()
-                    .mapTo(HashSet()) { it.summaryId }
-
-                val statuses = HashMap<Long, HealthConnectWorkoutStatus>()
-                for (summary in withIds) {
-                    val id = summary.id ?: continue
-                    if (id in failed) {
-                        statuses[id] = HealthConnectWorkoutStatus.FAILED
-                        continue
-                    }
-                    val cursor = cursors[summary.deviceId] ?: continue
-                    if (initialSyncStartSeconds != -1L && summary.startTime.time / 1000 < initialSyncStartSeconds) continue
-                    if (summary.endTime.time / 1000 > cursor) continue
-                    if (!RecordedWorkoutSyncer.isSyncedWorkout(summary)) continue
-                    statuses[id] = HealthConnectWorkoutStatus.SYNCED
-                }
-                statuses
+                    .mapNotNullTo(HashSet()) { failure -> failure.summaryId.takeIf { it in ids } }
             }
         } catch (e: Exception) {
-            LOG.error("Failed to resolve Health Connect status of {} workouts", withIds.size, e)
-            emptyMap()
+            LOG.error("Failed to read Health Connect sync failures of {} workouts", ids.size, e)
+            emptySet()
         }
     }
 

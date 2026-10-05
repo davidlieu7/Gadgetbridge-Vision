@@ -28,7 +28,6 @@ import nodomain.freeyourgadget.gadgetbridge.model.ActivityKind
 import nodomain.freeyourgadget.gadgetbridge.model.ActivitySummaryEntries
 import nodomain.freeyourgadget.gadgetbridge.util.DateTimeUtils
 import nodomain.freeyourgadget.gadgetbridge.util.FormatUtils
-import nodomain.freeyourgadget.gadgetbridge.util.healthconnect.HealthConnectWorkoutStatus
 import java.util.Calendar
 import java.util.Date
 import java.util.concurrent.TimeUnit
@@ -53,8 +52,8 @@ class WorkoutSummariesAdapter(
      */
     var uploadStatuses: Map<Long, WorkoutUploadStatus> = emptyMap()
 
-    /** Health Connect sync state per summary id, resolved like [uploadStatuses]. */
-    var healthConnectStatuses: Map<Long, HealthConnectWorkoutStatus> = emptyMap()
+    /** Ids of the summaries whose Health Connect sync failed, resolved like [uploadStatuses]. */
+    var healthConnectFailures: Set<Long> = emptySet()
 
     override fun onCreateViewHolder(
         parent: ViewGroup,
@@ -154,14 +153,7 @@ class WorkoutSummariesAdapter(
                 uploadView.visibility = View.GONE
             }
 
-            val healthConnectStatus = healthConnectStatuses[summary.id]
-            if (healthConnectStatus != null) {
-                healthConnectView.setImageResource(healthConnectStatus.iconRes)
-                healthConnectView.contentDescription = context.getString(healthConnectStatus.labelRes)
-                healthConnectView.visibility = View.VISIBLE
-            } else {
-                healthConnectView.visibility = View.GONE
-            }
+            healthConnectView.visibility = if (summary.id in healthConnectFailures) View.VISIBLE else View.GONE
 
             // The last activity is followed by the end spacer, and gets no separator.
             separatorView.visibility = if (position == itemCount - 2) View.GONE else View.VISIBLE
