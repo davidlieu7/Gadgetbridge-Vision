@@ -45,7 +45,7 @@ class SoundcoreMotion300Coordinator : SoundcoreEarbudsCoordinator() {
 
     override fun getDeviceNameResource(): Int = R.string.devicetype_soundcore_motion300
 
-    override fun getDefaultIconResource(): Int = R.drawable.ic_device_default
+    override fun getDefaultIconResource(): Int = R.drawable.ic_device_speaker
 
     override fun getBondingStyle(): Int = BONDING_STYLE_ASK
 
