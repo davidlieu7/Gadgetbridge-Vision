@@ -205,6 +205,123 @@ public class XiaomiHealthServiceGpsTest extends TestBase {
     }
 
     @Test
+    public void reconnectDuringWorkoutKeepsSendingLocation() {
+        bandOpens();
+        bandStatus(STATUS_STARTED);
+        bandLiveStats();
+        phoneFix(1);
+
+        // the support keeps this service across a reconnect and initializes it again
+        service.onDisconnect();
+        service.initialize();
+        bandLiveStats();
+        phoneFix(2);
+        phoneFix(3);
+
+        assertEquals(3, locationsSent());
+    }
+
+    @Test
+    public void freshConnectionToARunningWorkoutResumesLocation() {
+        bandOpens();
+        bandStatus(STATUS_STARTED);
+        service.dispose();
+
+        service = newService();
+        service.initialize();
+        bandOpens();
+        for (int i = 0; i < 3 * OPEN_TIMEOUT_MS / 1000; i++) {
+            bandLiveStats();
+            idle(1000);
+        }
+        phoneFix(1);
+
+        assertEquals(1, locationsSent());
+        assertTrue(locationRunning());
+        assertNoStackedStart();
+    }
+
+    @Test
+    public void liveStatsKeepALongWorkoutRunning() {
+        bandOpens();
+        bandStatus(STATUS_STARTED);
+        for (int i = 0; i < 180; i++) {
+            bandLiveStats();
+            idle(1000);
+        }
+        phoneFix(1);
+
+        assertTrue(locationRunning());
+        assertEquals(1, locationsSent());
+    }
+
+    @Test
+    public void liveStatsAfterAQuietSpellStartLocationAgain() {
+        bandOpens();
+        bandStatus(STATUS_STARTED);
+        bandLiveStats();
+        idle(120_000);
+        assertFalse(locationRunning());
+
+        bandLiveStats();
+        phoneFix(1);
+
+        assertTrue(locationRunning());
+        assertEquals(1, locationsSent());
+    }
+
+    @Test
+    public void workoutThatEndedWhileDisconnectedStopsLocation() {
+        bandOpens();
+        bandStatus(STATUS_STARTED);
+        bandLiveStats();
+
+        service.onDisconnect();
+        service.initialize();
+        idle(120_000);
+        phoneFix(1);
+
+        assertFalse(locationRunning());
+        assertEquals(0, locationsSent());
+    }
+
+    @Test
+    public void reconnectWithoutWorkoutEvidenceStopsLocation() {
+        // a firmware that never pushes live stats gives no way to tell whether the workout survived
+        bandOpens();
+        bandStatus(STATUS_STARTED);
+
+        service.onDisconnect();
+        service.initialize();
+        idle(0);
+
+        assertFalse(locationRunning());
+    }
+
+    @Test
+    public void disposeStopsLocation() {
+        bandOpens();
+        bandStatus(STATUS_STARTED);
+        service.dispose();
+
+        assertFalse(locationRunning());
+    }
+
+    @Test
+    public void finishedWorkoutDoesNotLeakIntoTheNextOne() {
+        bandOpens();
+        bandStatus(STATUS_STARTED);
+        bandStatus(STATUS_FINISHED);
+
+        bandOpens();
+        phoneFix(1);
+        idle(OPEN_TIMEOUT_MS + 100);
+
+        assertEquals("no location before the band confirms the new workout", 0, locationsSent());
+        assertFalse("the open request timed out", locationRunning());
+    }
+
+    @Test
     public void sleepSessionStatsNeverStartLocation() {
         service.getSleepAsAndroidManager().setSender(mock(SleepAsAndroidSender.class));
         service.getSleepAsAndroidManager().start(false);
@@ -300,6 +417,16 @@ public class XiaomiHealthServiceGpsTest extends TestBase {
         idle(0);
         return !locationActions.isEmpty()
                 && GBLocationService.ACTION_START.equals(locationActions.get(locationActions.size() - 1));
+    }
+
+    /** Each start adds a provider, so a second start without a stop in between doubles every fix. */
+    private void assertNoStackedStart() {
+        idle(0);
+        for (int i = 1; i < locationActions.size(); i++) {
+            assertTrue("location started twice: " + locationActions,
+                    !GBLocationService.ACTION_START.equals(locationActions.get(i))
+                            || !GBLocationService.ACTION_START.equals(locationActions.get(i - 1)));
+        }
     }
 
     private void assertLocationActions(final String... expected) {

@@ -121,6 +121,8 @@ public class XiaomiHealthService extends AbstractXiaomiService {
     // rate the phone sends at.
     private static final int CMD_WEAR_SPORT_DATA_V2A = 50;  // FitnessID.WEAR_SPORT_DATA_V2A
     private static final int CMD_RAW_SENSOR_BATCH = 53;     // FitnessID.WEAR_SENSOR_DATA
+    // How long the band may go without pushing live stats before its workout counts as over.
+    private static final long WORKOUT_ALIVE_TIMEOUT_MS = 60_000L;
 
     static final int WORKOUT_OPEN_OK = 0;
     private static final int WORKOUT_OPEN_NO_PERMISSION = 3;
@@ -154,10 +156,15 @@ public class XiaomiHealthService extends AbstractXiaomiService {
     private final Set<RealtimeConsumer> realtimeConsumers = EnumSet.noneOf(RealtimeConsumer.class);
     private int previousSteps = -1;
 
-    private boolean gpsStarted = false;
-    private boolean gpsFixAcquired = false;
-    private boolean workoutStarted = false;
+    // Set from the Bluetooth thread (band commands) and read on the main thread (phone fixes, timeouts).
+    private volatile boolean gpsStarted = false;
+    private volatile boolean gpsFixAcquired = false;
+    private volatile boolean workoutStarted = false;
+    // Set once the band has pushed live stats during the current workout. Those come every second
+    // while a workout is open, so their absence tells that the workout is over.
+    private volatile boolean workoutLiveStatsSeen = false;
     private final Handler gpsTimeoutHandler = new Handler();
+    private final Handler workoutAliveHandler = new Handler();
 
     private final Set<Integer> currentGoals = new LinkedHashSet<>();
     private final Set<Integer> supportedGoals = new LinkedHashSet<>();
@@ -243,6 +250,7 @@ public class XiaomiHealthService extends AbstractXiaomiService {
                 sleepAsAndroidManager.handleRawSensorBatch(cmd.getHealth().getRawSensorBatch());
                 return;
             case CMD_WEAR_SPORT_DATA_V2A:
+                onWorkoutLiveStats();
                 sleepAsAndroidManager.handleWorkoutStatsWatch(cmd.getHealth().getWorkoutStatsWatch());
                 return;
             case CMD_WORKOUT_STATS_PHONE:
@@ -255,14 +263,11 @@ public class XiaomiHealthService extends AbstractXiaomiService {
 
     @Override
     public void initialize() {
-        gpsStarted = false;
-        gpsFixAcquired = false;
-        workoutStarted = false;
         synchronized (realtimeConsumers) {
             realtimeConsumers.clear();
         }
         sleepAsAndroidManager.reset();
-        gpsTimeoutHandler.removeCallbacksAndMessages(null);
+        resumeLocationAfterReconnect();
 
         setUserInfo();
         getSupport().sendCommand("get spo2 config", COMMAND_TYPE, CMD_CONFIG_SPO2_GET);
@@ -276,10 +281,7 @@ public class XiaomiHealthService extends AbstractXiaomiService {
 
     @Override
     public void dispose() {
-        gpsTimeoutHandler.removeCallbacksAndMessages(null);
-        gpsStarted = false;
-        gpsFixAcquired = false;
-        workoutStarted = false;
+        stopLocation();
         synchronized (realtimeConsumers) {
             realtimeConsumers.clear();
         }
@@ -756,8 +758,7 @@ public class XiaomiHealthService extends AbstractXiaomiService {
             return;
         }
 
-        final boolean sendGpsToBand = getDevicePrefs().getBoolean(DeviceSettingsPreferenceConst.PREF_WORKOUT_SEND_GPS_TO_BAND, false);
-        if (!sendGpsToBand || !GBLocationService.isGpsSupportedAndEnabled()) {
+        if (!canSendLocation()) {
             getSupport().sendCommand(
                     "send location disabled",
                     XiaomiProto.Command.newBuilder()
@@ -774,11 +775,7 @@ public class XiaomiHealthService extends AbstractXiaomiService {
             return;
         }
 
-        if (!gpsStarted) {
-            gpsStarted = true;
-            gpsFixAcquired = false;
-            GBLocationService.start(getSupport().getContext(), getSupport().getDevice(), GBLocationProviderType.GPS, 1000);
-        }
+        startLocation();
 
         if (!workoutStarted) {
             // Only schedule the timeout while we are still waiting for the watch to confirm
@@ -790,11 +787,84 @@ public class XiaomiHealthService extends AbstractXiaomiService {
             gpsTimeoutHandler.removeCallbacksAndMessages(null);
             gpsTimeoutHandler.postDelayed(() -> {
                 LOG.debug("Timed out waiting for workout");
-                gpsStarted = false;
-                gpsFixAcquired = false;
-                GBLocationService.stop(getSupport().getContext(), getSupport().getDevice());
+                stopLocation();
             }, timeout);
         }
+    }
+
+    private boolean canSendLocation() {
+        return getDevicePrefs().getBoolean(DeviceSettingsPreferenceConst.PREF_WORKOUT_SEND_GPS_TO_BAND, false)
+                && GBLocationService.isGpsSupportedAndEnabled();
+    }
+
+    private void startLocation() {
+        if (gpsStarted) {
+            return;
+        }
+        gpsStarted = true;
+        gpsFixAcquired = false;
+        GBLocationService.start(getSupport().getContext(), getSupport().getDevice(), GBLocationProviderType.GPS, 1000);
+    }
+
+    private void stopLocation() {
+        gpsTimeoutHandler.removeCallbacksAndMessages(null);
+        workoutAliveHandler.removeCallbacksAndMessages(null);
+        final boolean wasStarted = gpsStarted;
+        gpsStarted = false;
+        gpsFixAcquired = false;
+        workoutStarted = false;
+        workoutLiveStatsSeen = false;
+        if (wasStarted) {
+            GBLocationService.stop(getSupport().getContext(), getSupport().getDevice());
+        }
+    }
+
+    /**
+     * The band does not repeat the workout start after a reconnection, so a workout that was
+     * running before it is kept, as long as the band goes on pushing live stats for it.
+     */
+    private void resumeLocationAfterReconnect() {
+        gpsTimeoutHandler.removeCallbacksAndMessages(null);
+        if (!gpsStarted) {
+            return;
+        }
+        if (!workoutStarted || !workoutLiveStatsSeen) {
+            LOG.info("Reconnected with no sign of a running workout, stopping location");
+            stopLocation();
+            return;
+        }
+        // the band needs the location accuracy again before it shows the fix
+        gpsFixAcquired = false;
+        armWorkoutAliveTimeout();
+    }
+
+    private void armWorkoutAliveTimeout() {
+        workoutAliveHandler.removeCallbacksAndMessages(null);
+        workoutAliveHandler.postDelayed(() -> {
+            LOG.info("No live stats from the band for {} ms, workout is over, stopping location", WORKOUT_ALIVE_TIMEOUT_MS);
+            stopLocation();
+        }, WORKOUT_ALIVE_TIMEOUT_MS);
+    }
+
+    /**
+     * Live stats arrive every second while a workout is open on the band, including one it was
+     * already running when the connection came up, which never sends a start status again.
+     */
+    private void onWorkoutLiveStats() {
+        if (sleepAsAndroidManager.isSessionRequested() || sleepAsAndroidManager.isRawSensorActive()) {
+            return;
+        }
+        if (!workoutStarted) {
+            if (!canSendLocation()) {
+                return;
+            }
+            LOG.info("Band is running a workout, resuming location");
+            workoutStarted = true;
+            gpsTimeoutHandler.removeCallbacksAndMessages(null);
+            startLocation();
+        }
+        workoutLiveStatsSeen = true;
+        armWorkoutAliveTimeout();
     }
 
     private void handleWorkoutStatus(final WorkoutStatusWatch workoutStatus) {
@@ -818,9 +888,7 @@ public class XiaomiHealthService extends AbstractXiaomiService {
             case WORKOUT_RESUMED:
                 break;
             case WORKOUT_FINISHED:
-                gpsStarted = false;
-                gpsFixAcquired = false;
-                GBLocationService.stop(getSupport().getContext(), getSupport().getDevice());
+                stopLocation();
                 if (startOnPhone) {
                     OpenTracksController.stopRecording(getSupport().getContext());
                 }
