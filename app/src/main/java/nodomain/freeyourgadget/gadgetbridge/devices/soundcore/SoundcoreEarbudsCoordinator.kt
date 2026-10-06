@@ -107,6 +107,9 @@ abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator(
 
     override fun getDefaultIconResource(): Int = R.drawable.ic_device_galaxy_buds
 
+    /* IMPORTANT: To dynamically set the UUID, set this string in your coordinator. */
+    open fun getModelName(): String = "0"
+
     override fun getManufacturer(): String = "Anker"
 
     override fun getBondingStyle(): Int = BONDING_STYLE_NONE

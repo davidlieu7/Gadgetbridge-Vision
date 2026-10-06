@@ -12,25 +12,17 @@ import androidx.localbroadcastmanager.content.LocalBroadcastManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.util.UUID;
-
 import nodomain.freeyourgadget.gadgetbridge.GBApplication;
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsPreferenceConst;
 import nodomain.freeyourgadget.gadgetbridge.activities.multipoint.MultipointPairingActivity;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
 import nodomain.freeyourgadget.gadgetbridge.service.btbr.TransactionBuilder;
-import nodomain.freeyourgadget.gadgetbridge.service.serial.AbstractHeadphoneSerialDeviceSupportV2;
+import nodomain.freeyourgadget.gadgetbridge.service.devices.soundcore.SoundcoreDeviceSupport;
 
-public class SoundcoreSportX20DeviceSupport extends AbstractHeadphoneSerialDeviceSupportV2<SoundcoreSportX20Protocol> {
+public class SoundcoreSportX20DeviceSupport extends SoundcoreDeviceSupport<SoundcoreSportX20Protocol> {
     private static final Logger LOG = LoggerFactory.getLogger(SoundcoreSportX20DeviceSupport.class);
 
-    public static final UUID UUID_DEVICE_CTRL = UUID.fromString("0cf12d31-fac3-4553-bd80-d6832e7b3968");
-
     private boolean multipointReceiverRegistered;
-
-    public SoundcoreSportX20DeviceSupport() {
-        addSupportedService(UUID_DEVICE_CTRL);
-    }
 
     @Override
     protected SoundcoreSportX20Protocol createDeviceProtocol() {
@@ -52,18 +44,6 @@ public class SoundcoreSportX20DeviceSupport extends AbstractHeadphoneSerialDevic
             }
             super.dispose();
         }
-    }
-
-    @Override
-    protected TransactionBuilder initializeDevice(final TransactionBuilder builder) {
-        // 1. Request device info (battery, firmware, serial, embedded control functions)
-        builder.write(mDeviceProtocol.encodeDeviceInfoRequest());
-        // 2. Request extended info (firmware details, serial, additional settings)
-        builder.write(mDeviceProtocol.encodeExtendedInfoRequest());
-        // 3. Session-init handshake – the device ACKs with an empty response
-        builder.write(mDeviceProtocol.encodeSessionInitRequest());
-        builder.setDeviceState(GBDevice.State.INITIALIZED);
-        return builder;
     }
 
     private void registerMultipointReceiver() {
