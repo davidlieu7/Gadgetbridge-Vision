@@ -17,9 +17,6 @@
 package nodomain.freeyourgadget.gadgetbridge.devices.soundcore.q30
 
 import nodomain.freeyourgadget.gadgetbridge.R
-import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSpecificSettingsScreen
-import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.DeviceSettingsSpec
-import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.deviceSettings
 import nodomain.freeyourgadget.gadgetbridge.devices.DeviceCoordinator
 import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreEarbudsCoordinator
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice
@@ -50,10 +47,9 @@ open class SoundcoreQ30Coordinator : SoundcoreEarbudsCoordinator() {
 
     override fun supportsSessionInitRequest(): Boolean = false
 
-    protected open fun getSettingsResource(): Int = R.xml.devicesettings_soundcore_q30
-
-    override fun getDeviceSettings(device: GBDevice): DeviceSettingsSpec = deviceSettings {
-        xmlScreen(DeviceSpecificSettingsScreen.AUDIO, getSettingsResource())
-        xmlScreen(DeviceSpecificSettingsScreen.CALLS_AND_NOTIFICATIONS, R.xml.devicesettings_headphones)
-    }
+    override fun getDefaultCapabilities(): Set<Capability> = setOf(
+        Capability.NoiseControl,
+        Capability.AmbientSound,
+        Capability.NoiseCancellationModes,
+    )
 }
