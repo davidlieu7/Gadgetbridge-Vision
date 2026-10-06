@@ -34,7 +34,7 @@ public class SoundcoreA30iProtocol extends SoundcoreProtocolImplV1 {
     private static final String OUTDOOR = "outdoor";
     private static final String INDOOR = "indoor";
 
-    protected SoundcoreA30iProtocol(GBDevice device) {
+    public SoundcoreA30iProtocol(GBDevice device) {
         super(device);
     }
 

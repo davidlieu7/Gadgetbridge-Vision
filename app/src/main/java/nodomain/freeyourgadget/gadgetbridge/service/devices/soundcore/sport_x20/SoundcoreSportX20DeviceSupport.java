@@ -19,7 +19,7 @@ import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
 import nodomain.freeyourgadget.gadgetbridge.service.btbr.TransactionBuilder;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.soundcore.SoundcoreDeviceSupport;
 
-public class SoundcoreSportX20DeviceSupport extends SoundcoreDeviceSupport<SoundcoreSportX20Protocol> {
+public class SoundcoreSportX20DeviceSupport extends SoundcoreDeviceSupport {
     private static final Logger LOG = LoggerFactory.getLogger(SoundcoreSportX20DeviceSupport.class);
 
     private boolean multipointReceiverRegistered;
@@ -27,6 +27,10 @@ public class SoundcoreSportX20DeviceSupport extends SoundcoreDeviceSupport<Sound
     @Override
     protected SoundcoreSportX20Protocol createDeviceProtocol() {
         return new SoundcoreSportX20Protocol(getDevice());
+    }
+
+    private SoundcoreSportX20Protocol getSportX20Protocol() {
+        return (SoundcoreSportX20Protocol) mDeviceProtocol;
     }
 
     @Override
@@ -75,10 +79,10 @@ public class SoundcoreSportX20DeviceSupport extends SoundcoreDeviceSupport<Sound
 
             switch (action) {
                 case MultipointPairingActivity.ACTION_MULTIPOINT_GET_STATUS:
-                    mDeviceProtocol.broadcastMultipointStatus(isDualConnectionEnabled());
+                    getSportX20Protocol().broadcastMultipointStatus(isDualConnectionEnabled());
                     break;
                 case MultipointPairingActivity.ACTION_MULTIPOINT_GET_DEVICES:
-                    sendToDevice(mDeviceProtocol.encodePairedDevicesRequest());
+                    sendToDevice(getSportX20Protocol().encodePairedDevicesRequest());
                     break;
                 case MultipointPairingActivity.ACTION_MULTIPOINT_ENABLE:
                     setDualConnection(true);
@@ -89,9 +93,9 @@ public class SoundcoreSportX20DeviceSupport extends SoundcoreDeviceSupport<Sound
                 case MultipointPairingActivity.ACTION_MULTIPOINT_START_PAIRING:
                     final boolean enabled = intent.getBooleanExtra(MultipointPairingActivity.EXTRA_PAIRING_ENABLED, false);
                     if (enabled) {
-                        sendToDevice(mDeviceProtocol.encodeStartPairing());
+                        sendToDevice(getSportX20Protocol().encodeStartPairing());
                     }
-                    mDeviceProtocol.broadcastMultipointPairing(enabled);
+                    getSportX20Protocol().broadcastMultipointPairing(enabled);
                     break;
                 case MultipointPairingActivity.ACTION_MULTIPOINT_CONNECT_DEVICE:
                     connectDevice(intent.getStringExtra(MultipointPairingActivity.EXTRA_DEVICE_ADDRESS), true);
@@ -117,8 +121,8 @@ public class SoundcoreSportX20DeviceSupport extends SoundcoreDeviceSupport<Sound
         GBApplication.getDeviceSpecificSharedPrefs(getDevice().getAddress()).edit()
                 .putBoolean(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_DUAL_CONNECTION, enabled)
                 .apply();
-        sendToDevice(mDeviceProtocol.encodeDualConnection(enabled));
-        mDeviceProtocol.broadcastMultipointStatus(enabled);
+        sendToDevice(getSportX20Protocol().encodeDualConnection(enabled));
+        getSportX20Protocol().broadcastMultipointStatus(enabled);
     }
 
     private void connectDevice(final String address, final boolean connect) {
@@ -126,11 +130,11 @@ public class SoundcoreSportX20DeviceSupport extends SoundcoreDeviceSupport<Sound
             return;
         }
         sendToDevice(connect
-                ? mDeviceProtocol.encodeConnectDevice(address)
-                : mDeviceProtocol.encodeDisconnectDevice(address));
+                ? getSportX20Protocol().encodeConnectDevice(address)
+                : getSportX20Protocol().encodeDisconnectDevice(address));
         // Refresh the connection/active-audio status and the paired-device list afterwards.
-        sendToDevice(mDeviceProtocol.encodeConnectionStatusRequest());
-        sendToDevice(mDeviceProtocol.encodePairedDevicesRequest());
+        sendToDevice(getSportX20Protocol().encodeConnectionStatusRequest());
+        sendToDevice(getSportX20Protocol().encodePairedDevicesRequest());
     }
 
     /** Forgets/unpairs a paired device. */
@@ -138,9 +142,9 @@ public class SoundcoreSportX20DeviceSupport extends SoundcoreDeviceSupport<Sound
         if (address == null) {
             return;
         }
-        sendToDevice(mDeviceProtocol.encodeForgetDevice(address));
+        sendToDevice(getSportX20Protocol().encodeForgetDevice(address));
         // Refresh the paired-device list afterwards.
-        sendToDevice(mDeviceProtocol.encodePairedDevicesRequest());
+        sendToDevice(getSportX20Protocol().encodePairedDevicesRequest());
     }
 
     private void sendToDevice(final byte[] bytes) {

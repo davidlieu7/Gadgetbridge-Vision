@@ -28,6 +28,9 @@ import nodomain.freeyourgadget.gadgetbridge.devices.AbstractBLClassicDeviceCoord
 import nodomain.freeyourgadget.gadgetbridge.devices.DeviceCoordinator
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice
 import nodomain.freeyourgadget.gadgetbridge.model.BatteryConfig
+import nodomain.freeyourgadget.gadgetbridge.service.DeviceSupport
+import nodomain.freeyourgadget.gadgetbridge.service.devices.soundcore.SoundcoreDeviceSupport
+import nodomain.freeyourgadget.gadgetbridge.service.devices.soundcore.protocol.impl.v1.SoundcoreProtocolImplV1
 
 abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator() {
     enum class Capability {
@@ -110,17 +113,35 @@ abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator(
     /* IMPORTANT: To dynamically set the UUID, set this string in your coordinator. */
     open fun getModelName(): String = "0"
 
+    override fun getDeviceSupportClass(device: GBDevice): Class<out DeviceSupport> =
+        SoundcoreDeviceSupport::class.java
+
+    /** Creates the protocol implementation for this model. */
+    open fun createProtocol(device: GBDevice): SoundcoreProtocolImplV1 =
+        throw UnsupportedOperationException("Soundcore coordinator must provide its protocol factory")
+
+    /** Whether this model supports the extended-info initialization request. */
+    open fun supportsExtendedInfoRequest(): Boolean = true
+
     override fun getManufacturer(): String = "Anker"
 
     override fun getBondingStyle(): Int = BONDING_STYLE_NONE
 
     override fun getBatteryCount(device: GBDevice): Int = 3
 
-    override fun getBatteryConfig(device: GBDevice): Array<BatteryConfig> = arrayOf(
-        BatteryConfig(0, R.drawable.ic_buds_pro_case, R.string.battery_case),
-        BatteryConfig(1, R.drawable.ic_nothing_ear_l, R.string.left_earbud),
-        BatteryConfig(2, R.drawable.ic_nothing_ear_r, R.string.right_earbud),
-    )
+    override fun getBatteryConfig(device: GBDevice): Array<BatteryConfig> =
+        if (getBatteryCount(device) == 2) {
+            arrayOf(
+                BatteryConfig(0, R.drawable.ic_nothing_ear_l, R.string.left_earbud),
+                BatteryConfig(1, R.drawable.ic_nothing_ear_r, R.string.right_earbud),
+            )
+        } else {
+            arrayOf(
+                BatteryConfig(0, R.drawable.ic_buds_pro_case, R.string.battery_case),
+                BatteryConfig(1, R.drawable.ic_nothing_ear_l, R.string.left_earbud),
+                BatteryConfig(2, R.drawable.ic_nothing_ear_r, R.string.right_earbud),
+            )
+        }
 
     override fun supportsFindDevice(device: GBDevice): Boolean =
         getCapabilities(device).contains(Capability.FindDevice)

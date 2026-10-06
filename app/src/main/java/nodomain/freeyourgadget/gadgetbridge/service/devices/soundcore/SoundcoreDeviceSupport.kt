@@ -21,11 +21,11 @@ import android.content.Context
 import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreEarbudsCoordinator
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice
 import nodomain.freeyourgadget.gadgetbridge.service.btbr.TransactionBuilder
+import nodomain.freeyourgadget.gadgetbridge.service.devices.soundcore.protocol.impl.v1.SoundcoreProtocolImplV1
 import nodomain.freeyourgadget.gadgetbridge.service.serial.AbstractHeadphoneSerialDeviceSupportV2
-import nodomain.freeyourgadget.gadgetbridge.service.serial.GBDeviceProtocol
 import java.util.UUID
 
-abstract class SoundcoreDeviceSupport<T : GBDeviceProtocol> : AbstractHeadphoneSerialDeviceSupportV2<T>() {
+open class SoundcoreDeviceSupport : AbstractHeadphoneSerialDeviceSupportV2<SoundcoreProtocolImplV1>() {
     override fun setContext(gbDevice: GBDevice, btAdapter: BluetoothAdapter, context: Context) {
         super.setContext(gbDevice, btAdapter, context)
 
@@ -34,6 +34,9 @@ abstract class SoundcoreDeviceSupport<T : GBDeviceProtocol> : AbstractHeadphoneS
 
         addSupportedService(getServiceUUID(coordinator.getModelName()))
     }
+
+    protected override fun createDeviceProtocol(): SoundcoreProtocolImplV1 =
+        (getDevice().deviceCoordinator as SoundcoreEarbudsCoordinator).createProtocol(getDevice())
 
     fun getServiceUUID(modelId: String): UUID {
         require(MODEL_ID_PATTERN.matches(modelId)) {
@@ -45,11 +48,14 @@ abstract class SoundcoreDeviceSupport<T : GBDeviceProtocol> : AbstractHeadphoneS
 
     override fun initializeDevice(builder: TransactionBuilder): TransactionBuilder {
         // 1. Request device info (battery, firmware, serial, embedded control functions)
-        builder.write(mDeviceProtocol.encodeDeviceInfoRequest());
+        builder.write(*mDeviceProtocol.encodeDeviceInfoRequest())
         // 2. Request extended info (firmware details, serial, additional settings)
-        builder.write(mDeviceProtocol.encodeExtendedInfoRequest());
+        val coordinator = getDevice().deviceCoordinator as SoundcoreEarbudsCoordinator
+        if (coordinator.supportsExtendedInfoRequest()) {
+            builder.write(*mDeviceProtocol.encodeExtendedInfoRequest())
+        }
         // 3. Session-init handshake - the device ACKs with an empty response
-        builder.write(mDeviceProtocol.encodeSessionInitRequest());
+        builder.write(*mDeviceProtocol.encodeSessionInitRequest())
         builder.setDeviceState(GBDevice.State.INITIALIZED)
         return builder
     }
