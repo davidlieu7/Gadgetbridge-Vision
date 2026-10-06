@@ -20,7 +20,7 @@ public class SoundcoreLibertyProtocol extends SoundcoreProtocolImplV1 {
     private static final short CMD_SET_WEARING_TONE = (short) 0x8c01;
     private static final int BATTERY_MULTIPLIER = 20;
 
-    protected SoundcoreLibertyProtocol(GBDevice device) {
+    public SoundcoreLibertyProtocol(GBDevice device) {
         super(device);
     }
 
