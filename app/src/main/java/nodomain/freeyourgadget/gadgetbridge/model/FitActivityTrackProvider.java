@@ -70,6 +70,7 @@ public class FitActivityTrackProvider implements ActivityTrackProvider {
     public ActivityTrack getActivityTrack(@NonNull final BaseActivitySummary summary, @NonNull final FitFile fitFile) {
         final ActivityTrack activityTrack = new ActivityTrack();
         activityTrack.setName(summary.getName());
+        activityTrack.setStepCadencePerLeg(true);
 
         final Iterator<FitRecord> records = fitFile.getRecords().stream()
                 .filter(r -> r instanceof FitRecord)

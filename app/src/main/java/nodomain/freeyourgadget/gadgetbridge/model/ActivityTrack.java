@@ -212,6 +212,7 @@ public class ActivityTrack {
     private final List<LengthInfo> lengths = new ArrayList<>();
     private final List<SplitInfo> splits = new ArrayList<>();
     private final List<SetInfo> sets = new ArrayList<>();
+    private boolean stepCadencePerLeg;
 
     public void setBaseTime(Date baseTime) {
         this.baseTime = baseTime;
@@ -352,5 +353,15 @@ public class ActivityTrack {
 
     public void setName(String name) {
         this.name = name;
+    }
+
+    /** Whether the point cadence of step-based activities counts one leg (strides/min, the FIT
+     *  convention) rather than both (steps/min). Cycling cadence is rpm either way. */
+    public boolean isStepCadencePerLeg() {
+        return stepCadencePerLeg;
+    }
+
+    public void setStepCadencePerLeg(final boolean stepCadencePerLeg) {
+        this.stepCadencePerLeg = stepCadencePerLeg;
     }
 }
