@@ -56,6 +56,7 @@ abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator(
         BatteryLowTone,
         TouchTone,
         AudioEqualizer,
+        AudioEqualizer2,
         GamingMode,
         VoicePrompts,
         ButtonBrightness,
@@ -324,7 +325,7 @@ abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator(
                 }
             }
 
-            if (has(arrayOf(Capability.AudioEqualizer, Capability.SurroundSound, Capability.GamingMode, Capability.LDAC))) {
+            if (has(arrayOf(Capability.AudioEqualizer, Capability.AudioEqualizer2, Capability.SurroundSound, Capability.GamingMode, Capability.LDAC))) {
                 screen(
                     key = "pref_soundcore_audio",
                     title = R.string.pref_header_audio,
@@ -354,9 +355,8 @@ abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator(
                             summary = R.string.soundcore_3d_surround_summary,
                         )
                     }
-                    if (has(Capability.AudioEqualizer)) {
+                    if (has(arrayOf(Capability.AudioEqualizer, Capability.AudioEqualizer2))) {
                         val equalizerPresetEntries = getEqualizerPresetEntries()
-                        val hasCustomEqualizerPresets = getCustomEqualizerPresetNames().isNotEmpty()
                         category(key = "pref_header_soundcore_equalizer", title = R.string.pref_header_equalizer) {
                             if (has(Capability.AdaptiveDirection)) {
                                 switchSetting(
@@ -421,9 +421,9 @@ abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator(
                                     title = R.string.soundcore_equalizer_reset_title,
                                     summary = R.string.soundcore_equalizer_reset_summary,
                                     icon = R.drawable.ic_history,
-                                    onClick = { _, selectedDevice ->
-                                        selectedDevice?.let {
-                                            val adjustableFrequencies = hasCustomEqualizerPresets
+                                    onClick = { _, device ->
+                                        device?.let {
+                                            val adjustableFrequencies = has(Capability.AudioEqualizer2)
                                             val bandKeys = if (adjustableFrequencies) equalizerBandKeys else equalizerBandKeys.take(getSupportedEqualizerBands().size)
                                             val prefs = GBApplication.getDevicePrefs(it).preferences
                                             prefs.edit().apply {
@@ -441,7 +441,27 @@ abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator(
                                         true
                                     },
                                 )
-                                if (hasCustomEqualizerPresets) {
+                                // Simple Equalizer for Sport X20
+                                if (!has(Capability.AudioEqualizer2)) {
+                                    getSupportedEqualizerBands().take(equalizerBandKeys.size).forEachIndexed { index, frequency ->
+                                        val key = equalizerBandKeys[index]
+                                        category(
+                                            key = "${key}_category",
+                                            title = equalizerBandTitleResource(frequency),
+                                        ) {
+                                            seekbar(
+                                                key = key,
+                                                title = R.string.soundcore_equalizer_value,
+                                                icon = R.drawable.ic_graphic_eq,
+                                                min = -6,
+                                                max = 6,
+                                                defaultValue = 0,
+                                            )
+                                        }
+                                    }
+                                }
+                                // Equalizer for Motion 300
+                                if (has(Capability.AudioEqualizer2)) {
                                     val bandTitles = listOf(
                                         R.string.soundcore_equalizer_band1,
                                         R.string.soundcore_equalizer_band2,
@@ -485,23 +505,6 @@ abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator(
                                                 min = 0,
                                                 max = 120,
                                                 defaultValue = 60,
-                                            )
-                                        }
-                                    }
-                                } else {
-                                    getSupportedEqualizerBands().take(equalizerBandKeys.size).forEachIndexed { index, frequency ->
-                                        val key = equalizerBandKeys[index]
-                                        category(
-                                            key = "${key}_category",
-                                            title = equalizerBandTitleResource(frequency),
-                                        ) {
-                                            seekbar(
-                                                key = key,
-                                                title = R.string.soundcore_equalizer_value,
-                                                icon = R.drawable.ic_graphic_eq,
-                                                min = -6,
-                                                max = 6,
-                                                defaultValue = 0,
                                             )
                                         }
                                     }
