@@ -371,6 +371,6 @@ public class SoundcoreA30iProtocol extends SoundcoreProtocolImplV1 {
     /** Request more device info during init; currently not used because
      * it is unclear which additional information are in the returned message. */
     public byte[] encodeSessionInitMoreInfoRequest() {
-        return encodeRequest(CMD_GET_UNKNOWN_DATA_0105);
+        return encodeRequest(CMD_GET_EXTENDED_INFO);
     }
 }

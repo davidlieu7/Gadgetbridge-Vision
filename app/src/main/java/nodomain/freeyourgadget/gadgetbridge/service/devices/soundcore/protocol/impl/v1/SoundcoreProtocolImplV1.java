@@ -43,7 +43,6 @@ public abstract class SoundcoreProtocolImplV1 extends AbstractSoundcoreProtocol 
 
     public static final short CMD_SET_3D_SURROUND = (short) 0x8602;
     public static final short CMD_SET_BATTERY_LOW_TONE = (short) 0x8210;
-    public static final short CMD_SESSION_INIT = (short) 0x8105;
 
     private static final int DEFAULT_BATTERY_MULTIPLIER = 10;
     private static final int DEFAULT_BATTERY_OFFSET = 0;
