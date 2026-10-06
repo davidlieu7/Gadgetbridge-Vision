@@ -119,8 +119,6 @@ abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator(
     /* TIP: Override this function in case you need conditions/exclusions based on Action. */
     open fun getSupportedTapFunctions(action: ButtonAction): List<TapFunction> = supportedTapFunctions
 
-    open fun getSupportedEqualizerBands(): IntArray = intArrayOf()
-
     override fun getDefaultIconResource(): Int = R.drawable.ic_device_galaxy_buds
 
     /* IMPORTANT: To dynamically set the UUID, set this string in your coordinator. */
@@ -170,10 +168,6 @@ abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator(
 
     protected open val connectionSettings: IntArray = intArrayOf()
 
-    open fun getAutoPowerOffMinutes(): Array<Int> = arrayOf(10, 20, 30, 60)
-
-    open fun getNoiseCancellationLevelRange(): IntRange = 0..2
-
     protected fun getAutoPowerOffEntries(): List<ListEntry> = buildList {
         add(ListEntry.Res("0", R.string.pref_button_action_disabled))
         val context = GBApplication.getContext()
@@ -204,12 +198,11 @@ abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator(
     fun supports(device: GBDevice, capability: Capability): Boolean =
         getCapabilities(device).contains(capability)
 
-    /**
-     * Builds the standardized modern settings tree for Soundcore earbuds. A model that needs a
-     * completely isolated settings tree can override [getDeviceSettings].
-     */
-    override fun getDeviceSettings(device: GBDevice): DeviceSettingsSpec =
-        soundcoreEarbudsDeviceSettings(device)
+    open fun getNoiseCancellationLevelRange(): IntRange = 0..2
+
+    open fun getAutoPowerOffMinutes(): Array<Int> = arrayOf(10, 20, 30, 60)
+
+    open fun getSupportedEqualizerBands(): IntArray = intArrayOf()
 
     private fun equalizerBandTitleResource(frequency: Int): Int = when (frequency) {
         100 -> R.string.soundcore_equalizer_band1_freq
@@ -223,12 +216,20 @@ abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator(
         else -> R.string.soundcore_equalizer_value
     }
 
+    /**
+     * Builds the standardized modern settings tree for Soundcore earbuds. A model that needs a
+     * completely isolated settings tree can override [getDeviceSettings].
+     */
+    override fun getDeviceSettings(device: GBDevice): DeviceSettingsSpec =
+        soundcoreEarbudsDeviceSettings(device)
+
     protected fun soundcoreEarbudsDeviceSettings(device: GBDevice): DeviceSettingsSpec {
         val capabilities = getCapabilities(device)
         fun has(capability: Capability) = capabilities.contains(capability)
+        fun has(anyOf: Array<Capability>) = anyOf.any { capabilities.contains(it) }
 
         return deviceSettings {
-            if (has(Capability.TouchControls) || has(Capability.TouchControlDisable) || has(Capability.TouchTone)) {
+            if (has(arrayOf(Capability.TouchControls, Capability.TouchControlDisable, Capability.TouchTone))) {
                 screen(
                     key = "pref_soundcore_touch_options",
                     title = R.string.prefs_galaxy_touch_options,
@@ -284,7 +285,7 @@ abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator(
                 }
             }
 
-            if (has(Capability.AudioEqualizer) || has(Capability.SurroundSound) || has(Capability.GamingMode) || has(Capability.LDAC)) {
+            if (has(arrayOf(Capability.AudioEqualizer, Capability.SurroundSound, Capability.GamingMode, Capability.LDAC))) {
                 screen(
                     key = "pref_soundcore_audio",
                     title = R.string.pref_header_audio,
@@ -490,7 +491,7 @@ abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator(
                 }
             }
 
-            if (has(Capability.NoiseControl) || has(Capability.AmbientSound)) {
+            if (has(arrayOf(Capability.NoiseControl, Capability.AmbientSound))) {
                 val ambientSoundControlEntries = buildList {
                     add(ListEntry.Res("off", R.string.sony_ambient_sound_off))
                     if (has(Capability.Transparency)) {
@@ -563,7 +564,7 @@ abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator(
                     }
                 }
             }
-            if (has(Capability.WearingDetection) || has(Capability.WearingTone) || has(Capability.FitTest) || has(Capability.AutoPowerOff) || has(Capability.BatteryLowTone) || has(Capability.VoicePrompts) || has(Capability.ButtonBrightness)) {
+            if (has(arrayOf(Capability.WearingDetection, Capability.WearingTone, Capability.FitTest, Capability.AutoPowerOff, Capability.BatteryLowTone, Capability.VoicePrompts, Capability.ButtonBrightness))) {
                 category(key = "pref_header_soundcore_general", title = R.string.pref_header_general) {
                     if (has(Capability.WearingDetection)) {
                         switchSetting(
