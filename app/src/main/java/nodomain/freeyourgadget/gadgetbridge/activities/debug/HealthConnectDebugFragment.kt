@@ -17,6 +17,7 @@ import nodomain.freeyourgadget.gadgetbridge.util.DateTimeUtils
 import nodomain.freeyourgadget.gadgetbridge.util.GB
 import nodomain.freeyourgadget.gadgetbridge.util.healthconnect.GadgetbridgeDataExporter
 import nodomain.freeyourgadget.gadgetbridge.util.healthconnect.HealthConnectSyncWorker
+import nodomain.freeyourgadget.gadgetbridge.util.healthconnect.HealthConnectWorkoutSync
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import java.time.Instant
@@ -54,12 +55,14 @@ class HealthConnectDebugFragment : AbstractDebugFragment() {
                         GBApplication.acquireDB().use { db ->
                             db.daoSession.healthConnectSyncStateDao.deleteAll()
                             db.daoSession.healthConnectSleepSessionDao.deleteAll()
+                            db.daoSession.healthConnectWorkoutSyncFailureDao.deleteAll()
                             GB.toast("Health Connect sync state reset successfully", Toast.LENGTH_SHORT, GB.INFO)
                         }
                     } catch (e: Exception) {
                         GB.toast("Failed to reset Health Connect sync state", Toast.LENGTH_LONG, GB.ERROR, e)
                     }
                     reloadSyncStates()
+                    HealthConnectWorkoutSync.notifyStateChanged(requireContext())
                 }
                 .setNegativeButton(R.string.cancel) { _, _ -> }
                 .show()
@@ -140,6 +143,7 @@ class HealthConnectDebugFragment : AbstractDebugFragment() {
                                 }
 
                                 reloadSyncStates()
+                                HealthConnectWorkoutSync.notifyStateChanged(requireContext())
                             },
                             zonedDateTime.year,
                             zonedDateTime.monthValue - 1,

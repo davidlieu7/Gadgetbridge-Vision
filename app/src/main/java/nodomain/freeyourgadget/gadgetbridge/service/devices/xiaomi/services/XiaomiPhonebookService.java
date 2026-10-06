@@ -31,6 +31,9 @@ import java.util.List;
 import nodomain.freeyourgadget.gadgetbridge.GBApplication;
 import nodomain.freeyourgadget.gadgetbridge.R;
 import nodomain.freeyourgadget.gadgetbridge.model.Contact;
+import nodomain.freeyourgadget.gadgetbridge.proto.xiaomi.ContactInfo;
+import nodomain.freeyourgadget.gadgetbridge.proto.xiaomi.ContactList;
+import nodomain.freeyourgadget.gadgetbridge.proto.xiaomi.Phonebook;
 import nodomain.freeyourgadget.gadgetbridge.proto.xiaomi.XiaomiProto;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.xiaomi.XiaomiSupport;
 import nodomain.freeyourgadget.gadgetbridge.util.StringUtils;
@@ -55,7 +58,7 @@ public class XiaomiPhonebookService extends AbstractXiaomiService {
             throw new IllegalArgumentException("Not a phonebook command");
         }
 
-        XiaomiProto.Phonebook payload = cmd.getPhonebook();
+        Phonebook payload = cmd.getPhonebook();
 
         if (payload == null) {
             LOG.warn("Received phonebook command without phonebook payload");
@@ -78,14 +81,14 @@ public class XiaomiPhonebookService extends AbstractXiaomiService {
     public void handleContactRequest(String phoneNumber) {
         LOG.debug("Received request for contact info for {}", phoneNumber);
 
-        XiaomiProto.ContactInfo contact = getContactInfoForPhoneNumber(phoneNumber);
+        ContactInfo contact = getContactInfoForPhoneNumber(phoneNumber);
 
         getSupport().sendCommand(
                 "send requested contact information",
                 XiaomiProto.Command.newBuilder()
                         .setType(COMMAND_TYPE)
                         .setSubtype(CMD_GET_CONTACT_RESPONSE)
-                        .setPhonebook(XiaomiProto.Phonebook.newBuilder().setContactInfo(contact))
+                        .setPhonebook(Phonebook.newBuilder().setContactInfo(contact))
                         .build()
         );
     }
@@ -96,19 +99,19 @@ public class XiaomiPhonebookService extends AbstractXiaomiService {
      * @param number contact number
      * @return the contact display name, if found, otherwise the phone number
      */
-    private XiaomiProto.ContactInfo getContactInfoForPhoneNumber(String number) {
+    private ContactInfo getContactInfoForPhoneNumber(String number) {
         Context context = getSupport().getContext();
         String currentPrivacyMode = GBApplication.getPrefs().getString("pref_call_privacy_mode", GBApplication.getContext().getString(R.string.p_call_privacy_mode_off));
 
         // mask the display name if complete privacy is set in preferences
         if (currentPrivacyMode.equals(context.getString(R.string.p_call_privacy_mode_complete))) {
-            return XiaomiProto.ContactInfo.newBuilder().setDisplayName("********").setPhoneNumber(number).build();
+            return ContactInfo.newBuilder().setDisplayName("********").setPhoneNumber(number).build();
         }
 
         // send empty contact name if name privacy is set in preferences, as the device will show
         // the phone number instead
         if (currentPrivacyMode.equals(context.getString(R.string.p_call_privacy_mode_name))) {
-            return XiaomiProto.ContactInfo.newBuilder().setDisplayName("").setPhoneNumber(number).build();
+            return ContactInfo.newBuilder().setDisplayName("").setPhoneNumber(number).build();
         }
 
         String name = "";
@@ -128,7 +131,7 @@ public class XiaomiPhonebookService extends AbstractXiaomiService {
             }
         }
 
-        XiaomiProto.ContactInfo.Builder contactInfoBuilder = XiaomiProto.ContactInfo.newBuilder();
+        ContactInfo.Builder contactInfoBuilder = ContactInfo.newBuilder();
 
         // prevent the number from getting displayed if an empty contact name was retrieved from the
         // contact list
@@ -142,14 +145,14 @@ public class XiaomiPhonebookService extends AbstractXiaomiService {
     }
 
     public void setContacts(List<Contact> contacts) {
-        final XiaomiProto.ContactList.Builder contactList = XiaomiProto.ContactList.newBuilder();
+        final var contactList = ContactList.newBuilder();
         int maxContacts = 10; // TODO:verify, do not copy and paste
         int numContacts = Math.min(contacts.size(), maxContacts);
 
         for (int i = 0; i < numContacts; i++) {
             final Contact contact = contacts.get(i);
             if (!StringUtils.isNullOrEmpty(contact.getName()) && !StringUtils.isNullOrEmpty(contact.getNumber())) {
-                contactList.addContactInfo(XiaomiProto.ContactInfo.newBuilder().setDisplayName(contact.getName()).setPhoneNumber(contact.getNumber()));
+                contactList.addContactInfo(ContactInfo.newBuilder().setDisplayName(contact.getName()).setPhoneNumber(contact.getNumber()));
             }
         }
 
@@ -158,7 +161,7 @@ public class XiaomiPhonebookService extends AbstractXiaomiService {
                 XiaomiProto.Command.newBuilder()
                         .setType(COMMAND_TYPE)
                         .setSubtype(CMD_SET_CONTACT_LIST)
-                        .setPhonebook(XiaomiProto.Phonebook.newBuilder().setContactList(contactList))
+                        .setPhonebook(Phonebook.newBuilder().setContactList(contactList))
                         .build()
         );
     }

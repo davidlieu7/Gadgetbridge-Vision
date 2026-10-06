@@ -274,6 +274,7 @@ android {
         // https://issuetracker.google.com/issues/353554169
         jniLibs.keepDebugSymbols.add("**/libimage_processing_util_jni.so")
         jniLibs.keepDebugSymbols.add("**/libsurface_util_jni.so")
+        jniLibs.keepDebugSymbols.add("**/libandroidx.graphics.path.so")
     }
 }
 

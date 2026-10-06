@@ -139,6 +139,8 @@
     <uses-permission android:name="android.permission.health.WRITE_RESPIRATORY_RATE" />
     <uses-permission android:name="android.permission.health.WRITE_RESTING_HEART_RATE" />
     <uses-permission android:name="android.permission.health.WRITE_BLOOD_GLUCOSE" />
+    <uses-permission android:name="android.permission.health.WRITE_BLOOD_PRESSURE" />
+    <uses-permission android:name="android.permission.health.WRITE_HYDRATION" />
     <uses-permission android:name="android.permission.health.WRITE_STEPS_CADENCE" />
     <uses-permission android:name="android.permission.health.WRITE_CYCLING_PEDALING_CADENCE" />
     <uses-sdk tools:overrideLibrary="androidx.health.connect.client"/>
@@ -268,6 +270,9 @@
             android:name=".activities.files.FileManagerActivity"
             android:label="@string/activity_data_management_directory_content_title"
             android:parentActivityName=".activities.DataManagementActivity" />
+        <activity
+            android:name=".activities.files.FtpFileBrowserActivity"
+            android:label="@string/ftp_file_browser" />
         <activity
             android:name=".activities.fit.FitViewerActivity"
             android:exported="true"
@@ -721,6 +726,9 @@
             </intent-filter>
         </receiver>
 
+        <receiver
+            android:name=".service.ftp.WifiFtpSessionStopReceiver"
+            android:exported="false" />
         <receiver
             android:name=".service.receivers.GBMusicControlReceiver"
             android:exported="false">

@@ -206,7 +206,7 @@ public class GarminFitFileInstallHandler implements InstallHandler {
                         .filter(r -> r instanceof FitWorkout)
                         .map(r -> (FitWorkout) r)
                         .findFirst()
-                        .map(FitWorkout::getName)
+                        .map(FitWorkout::getWktName)
                         .orElse(filename);
                 break;
             case LOCATION:

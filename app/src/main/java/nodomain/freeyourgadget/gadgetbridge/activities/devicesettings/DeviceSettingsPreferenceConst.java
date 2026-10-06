@@ -243,6 +243,7 @@ public class DeviceSettingsPreferenceConst {
 
     public static final String PREF_HEARTRATE_USE_FOR_SLEEP_DETECTION = "heartrate_sleep_detection";
     public static final String PREF_HEARTRATE_MEASUREMENT_INTERVAL = "heartrate_measurement_interval";
+    public static final String PREF_BLOOD_PRESSURE_ACTIVE_USER = "blood_pressure_active_user";
     public static final String PREF_HEARTRATE_ACTIVITY_MONITORING = "heartrate_activity_monitoring";
     public static final String PREF_HEARTRATE_ALERT_ENABLED = "heartrate_alert_enabled";
     public static final String PREF_HEARTRATE_ALERT_ACTIVE_HIGH_THRESHOLD = "heartrate_alert_active_high_threshold";
@@ -333,6 +334,8 @@ public class DeviceSettingsPreferenceConst {
     public static final String PREF_SEND_APP_NOTIFICATIONS = "send_app_notifications";
     public static final String PREF_NOTIFICATION_WAKE_ON_OPEN = "notification_wake_on_open";
     public static final String PREF_AUTOREMOVE_NOTIFICATIONS = "autoremove_notifications";
+    public static final String PREF_NAVIGATION_CONTINUOUS_UPDATES = "navigation_continuous_updates";
+    public static final String PREF_NAVIGATION_UPDATE_RATE = "navigation_update_rate";
     public static final String PREF_SCREEN_ON_ON_NOTIFICATIONS = "screen_on_on_notifications";
     public static final String PREF_SCREEN_ON_ON_NOTIFICATIONS_TIMEOUT = "screen_on_on_notifications_timeout";
     public static final String PREF_WORKOUT_KEEP_SCREEN_ON = "workout_keep_screen_on";
@@ -359,6 +362,8 @@ public class DeviceSettingsPreferenceConst {
     public static final String PREF_HYDRATION_DND_END = "pref_hydration_dnd_end";
     public static final String PREF_HYDRATION_REMINDER_START = "pref_hydration_reminder_start";
     public static final String PREF_HYDRATION_REMINDER_END = "pref_hydration_reminder_end";
+    public static final String PREF_HYDRATION_UNIT = "hydration_unit";
+    public static final String PREF_HYDRATION_SEND_TODAY = "hydration_send_today";
     public static final String PREF_AMPM_ENABLED = "pref_ampm_enabled";
 
     public static final String PREF_SONYSWR12_LOW_VIBRATION = "vibration_preference";
@@ -403,6 +408,7 @@ public class DeviceSettingsPreferenceConst {
     public static final String FTP_SERVER_START = "ftp_server_start";
     public static final String FTP_SERVER_STOP = "ftp_server_stop";
     public static final String FTP_SERVER_STATUS = "ftp_server_status";
+    public static final String FTP_SERVER_BROWSE = "ftp_server_browse";
 
     public static final String PREF_NOTHING_EAR1_INEAR = "pref_nothing_inear_detection";
     public static final String PREF_NOTHING_EAR1_AUDIOMODE = "pref_nothing_audiomode";

@@ -26,6 +26,7 @@ import android.text.style.RelativeSizeSpan;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.LinearLayout;
 import android.widget.TextView;
 
 import com.github.mikephil.charting.animation.Easing;
@@ -60,6 +61,8 @@ import java.util.concurrent.TimeUnit;
 
 import nodomain.freeyourgadget.gadgetbridge.GBApplication;
 import nodomain.freeyourgadget.gadgetbridge.R;
+import nodomain.freeyourgadget.gadgetbridge.activities.workouts.StatTileData;
+import nodomain.freeyourgadget.gadgetbridge.activities.workouts.StatTileGridUtilKt;
 import nodomain.freeyourgadget.gadgetbridge.database.DBHandler;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
 import nodomain.freeyourgadget.gadgetbridge.model.StressSample;
@@ -71,10 +74,7 @@ public class StressDailyFragment extends StressFragment<StressDailyFragment.Stre
 
     private LineChart mStressChart;
     private PieChart mStressLevelsPieChart;
-    private TextView stressChartRelaxedTime;
-    private TextView stressChartMildTime;
-    private TextView stressChartModerateTime;
-    private TextView stressChartHighTime;
+    private LinearLayout mStatsContainer;
     private TextView stressDate;
 
     private String STRESS_AVERAGE_LABEL;
@@ -124,17 +124,27 @@ public class StressDailyFragment extends StressFragment<StressDailyFragment.Stre
         return lineDataSet;
     }
 
-    private void setZoneValue(TextView tv, Integer value, long totalStressTime) {
-        if(showStressLevelInPercents) {
-            int valuePercent = (value == null || totalStressTime == 0)? 0: (int) Math.round(((double) value / totalStressTime) * 100);
-            tv.setText(String.format(Locale.ROOT,"%d%%", valuePercent));
-        } else {
-            if (value != null && value > 0) {
-                tv.setText(DateTimeUtils.formatDurationHoursMinutes(value, TimeUnit.SECONDS));
-            } else {
-                tv.setText(R.string.stats_empty_value);
-            }
+    private String formatZoneValue(Integer value, long totalStressTime) {
+        if (showStressLevelInPercents) {
+            int valuePercent = (value == null || totalStressTime == 0) ? 0 : (int) Math.round(((double) value / totalStressTime) * 100);
+            return String.format(Locale.ROOT, "%d%%", valuePercent);
         }
+        if (value != null && value > 0) {
+            return DateTimeUtils.formatDurationHoursMinutes(value, TimeUnit.SECONDS);
+        }
+        return getString(R.string.stats_empty_value);
+    }
+
+    private StatTileData buildZoneTile(StressType stressType, Integer value, long totalStressTime) {
+        return new StatTileData(
+                formatZoneValue(value, totalStressTime),
+                stressType.getLabel(requireContext()),
+                null,
+                null,
+                null,
+                null,
+                stressType.getColor(requireContext())
+        );
     }
 
     @Override
@@ -146,10 +156,13 @@ public class StressDailyFragment extends StressFragment<StressDailyFragment.Stre
         stressDate.setText(formattedDate);
 
         Map<StressType, Integer> stressZoneTimes = stressData.getStressZoneTimes();
-        setZoneValue(stressChartRelaxedTime, stressZoneTimes.get(StressType.RELAXED), stressData.getTotalStressTime());
-        setZoneValue(stressChartMildTime, stressZoneTimes.get(StressType.MILD), stressData.getTotalStressTime());
-        setZoneValue(stressChartModerateTime, stressZoneTimes.get(StressType.MODERATE), stressData.getTotalStressTime());
-        setZoneValue(stressChartHighTime, stressZoneTimes.get(StressType.HIGH), stressData.getTotalStressTime());
+        final List<StatTileData> stats = new ArrayList<>();
+        stats.add(buildZoneTile(StressType.RELAXED, stressZoneTimes.get(StressType.RELAXED), stressData.getTotalStressTime()));
+        stats.add(buildZoneTile(StressType.MILD, stressZoneTimes.get(StressType.MILD), stressData.getTotalStressTime()));
+        stats.add(buildZoneTile(StressType.MODERATE, stressZoneTimes.get(StressType.MODERATE), stressData.getTotalStressTime()));
+        stats.add(buildZoneTile(StressType.HIGH, stressZoneTimes.get(StressType.HIGH), stressData.getTotalStressTime()));
+        mStatsContainer.removeAllViews();
+        StatTileGridUtilKt.addStatTileGrid(mStatsContainer, requireContext(), stats, 0);
 
         if (stressData.getAverage() > 0) {
             int noc = String.valueOf(stressData.getAverage()).length();
@@ -192,10 +205,7 @@ public class StressDailyFragment extends StressFragment<StressDailyFragment.Stre
 
         mStressChart = rootView.findViewById(R.id.stress_line_chart);
         mStressLevelsPieChart = rootView.findViewById(R.id.stress_pie_chart);
-        stressChartRelaxedTime = rootView.findViewById(R.id.stress_chart_relaxed_time);
-        stressChartMildTime = rootView.findViewById(R.id.stress_chart_mild_time);
-        stressChartModerateTime = rootView.findViewById(R.id.stress_chart_moderate_time);
-        stressChartHighTime = rootView.findViewById(R.id.stress_chart_high_time);
+        mStatsContainer = rootView.findViewById(R.id.stress_stats_container);
         stressDate = rootView.findViewById(R.id.stress_date);
 
         setupLineChart();

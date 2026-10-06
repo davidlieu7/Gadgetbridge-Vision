@@ -103,7 +103,7 @@
                     android:background="?android:attr/selectableItemBackground"
                     card_view:srcCompat="@drawable/ic_more_vert"
                     android:focusable="true"
-                    card_view:tint="@color/secondarytext" />
+                    card_view:tint="?attr/textColorSecondary" />
             </RelativeLayout>
 
             <com.google.android.flexbox.FlexboxLayout
@@ -131,7 +131,7 @@
                         android:padding="3dp"
                         android:scaleType="fitXY"
                         card_view:srcCompat="@drawable/level_list_battery"
-                        card_view:tint="@color/secondarytext" />
+                        card_view:tint="?attr/textColorSecondary" />
 
                     <TextView
                         android:id="@+id/battery_status"
@@ -139,7 +139,7 @@
                         android:layout_height="wrap_content"
                         android:gravity="center_horizontal"
                         android:minWidth="36dp"
-                        android:textColor="@color/secondarytext"
+                        android:textColor="?attr/textColorSecondary"
                         android:textStyle="bold"
                         tools:text="100%" />
 
@@ -162,7 +162,7 @@
                         android:padding="3dp"
                         android:scaleType="fitXY"
                         card_view:srcCompat="@drawable/level_list_battery"
-                        card_view:tint="@color/secondarytext" />
+                        card_view:tint="?attr/textColorSecondary" />
 
                     <TextView
                         android:id="@+id/battery_status1"
@@ -170,7 +170,7 @@
                         android:layout_height="wrap_content"
                         android:gravity="center_horizontal"
                         android:minWidth="36dp"
-                        android:textColor="@color/secondarytext"
+                        android:textColor="?attr/textColorSecondary"
                         android:textStyle="bold"
                         tools:text="100%" />
 
@@ -193,7 +193,7 @@
                         android:padding="3dp"
                         android:scaleType="fitXY"
                         card_view:srcCompat="@drawable/level_list_battery"
-                        card_view:tint="@color/secondarytext" />
+                        card_view:tint="?attr/textColorSecondary" />
 
                     <TextView
                         android:id="@+id/battery_status2"
@@ -201,7 +201,7 @@
                         android:layout_height="wrap_content"
                         android:gravity="center_horizontal"
                         android:minWidth="36dp"
-                        android:textColor="@color/secondarytext"
+                        android:textColor="?attr/textColorSecondary"
                         android:textStyle="bold"
                         tools:text="100%" />
 
@@ -226,7 +226,7 @@
                     android:tooltipText="@string/title_activity_device_specific_settings"
                     android:scaleType="fitXY"
                     card_view:srcCompat="@drawable/ic_settings"
-                    card_view:tint="@color/secondarytext" />
+                    card_view:tint="?attr/textColorSecondary" />
 
 
                 <LinearLayout
@@ -248,7 +248,7 @@
                         android:padding="3dp"
                         android:scaleType="fitXY"
                         card_view:srcCompat="@drawable/ic_radio"
-                        card_view:tint="@color/secondarytext" />
+                        card_view:tint="?attr/textColorSecondary" />
 
                     <TextView
                         android:id="@+id/fm_frequency"
@@ -256,7 +256,7 @@
                         android:layout_height="wrap_content"
                         android:gravity="center_horizontal"
                         android:minWidth="36dp"
-                        android:textColor="@color/secondarytext"
+                        android:textColor="?attr/textColorSecondary"
                         android:textStyle="bold"
                         tools:text="107.8" />
 
@@ -301,7 +301,7 @@
                         android:padding="3dp"
                         android:scaleType="fitXY"
                         card_view:srcCompat="@drawable/ic_refresh"
-                        card_view:tint="@color/secondarytext" />
+                        card_view:tint="?attr/textColorSecondary" />
 
                     <ProgressBar
                         android:id="@+id/device_busy_indicator"
@@ -329,7 +329,7 @@
                     android:padding="3dp"
                     android:scaleType="fitXY"
                     card_view:srcCompat="@drawable/ic_screenshot"
-                    card_view:tint="@color/secondarytext" />
+                    card_view:tint="?attr/textColorSecondary" />
 
                 <ImageView
                     android:id="@+id/device_action_manage_apps"
@@ -346,7 +346,7 @@
                     android:padding="3dp"
                     android:scaleType="fitXY"
                     card_view:srcCompat="@drawable/ic_action_manage_apps"
-                    card_view:tint="@color/secondarytext" />
+                    card_view:tint="?attr/textColorSecondary" />
 
                 <ImageView
                     android:id="@+id/device_action_set_alarms"
@@ -363,7 +363,7 @@
                     android:padding="3dp"
                     android:scaleType="fitXY"
                     card_view:srcCompat="@drawable/ic_access_alarms"
-                    card_view:tint="@color/secondarytext" />
+                    card_view:tint="?attr/textColorSecondary" />
 
                 <ImageView
                     android:id="@+id/device_action_set_reminders"
@@ -380,7 +380,7 @@
                     android:padding="4dp"
                     android:scaleType="fitXY"
                     card_view:srcCompat="@drawable/ic_device_set_reminders"
-                    app:tint="@color/secondarytext" />
+                    app:tint="?attr/textColorSecondary" />
 
                 <ImageView
                     android:id="@+id/device_action_show_activity_graphs"
@@ -397,7 +397,7 @@
                     android:padding="3dp"
                     android:scaleType="fitXY"
                     card_view:srcCompat="@drawable/ic_activity_graphs"
-                    card_view:tint="@color/secondarytext" />
+                    card_view:tint="?attr/textColorSecondary" />
 
                 <ImageView
                     android:id="@+id/device_action_show_activity_tracks"
@@ -414,7 +414,7 @@
                     android:padding="3dp"
                     android:scaleType="fitXY"
                     card_view:srcCompat="@drawable/ic_activity_tracks"
-                    card_view:tint="@color/secondarytext" />
+                    card_view:tint="?attr/textColorSecondary" />
 
                 <ImageView
                     android:id="@+id/device_action_find"
@@ -431,7 +431,7 @@
                     android:padding="3dp"
                     android:scaleType="fitXY"
                     card_view:srcCompat="@drawable/ic_action_find_lost_device"
-                    card_view:tint="@color/secondarytext" />
+                    card_view:tint="?attr/textColorSecondary" />
 
                 <ImageView
                     android:id="@+id/device_action_calibrate"
@@ -448,7 +448,7 @@
                     android:padding="3dp"
                     android:scaleType="fitXY"
                     card_view:srcCompat="@drawable/ic_activity_unknown"
-                    card_view:tint="@color/secondarytext" />
+                    card_view:tint="?attr/textColorSecondary" />
 
                 <LinearLayout
                     android:id="@+id/device_heart_rate_status_box"
@@ -468,7 +468,7 @@
                         android:padding="3dp"
                         android:scaleType="fitXY"
                         card_view:srcCompat="@drawable/ic_heart"
-                        card_view:tint="@color/secondarytext" />
+                        card_view:tint="?attr/textColorSecondary" />
 
                     <TextView
                         android:id="@+id/heart_rate_status"
@@ -476,7 +476,7 @@
                         android:layout_height="wrap_content"
                         android:gravity="center_horizontal"
                         android:minWidth="36dp"
-                        android:textColor="@color/secondarytext"
+                        android:textColor="?attr/textColorSecondary"
                         android:textStyle="bold"
                         tools:text="100%" />
 
@@ -496,7 +496,7 @@
                     android:padding="3dp"
                     android:scaleType="fitXY"
                     card_view:srcCompat="@drawable/ic_power_settings_new"
-                    card_view:tint="@color/secondarytext" />
+                    card_view:tint="?attr/textColorSecondary" />
 
                 <LinearLayout
                     android:id="@+id/device_custom_action_0_box"
@@ -517,7 +517,7 @@
                         android:padding="3dp"
                         android:scaleType="fitXY"
                         card_view:srcCompat="@drawable/ic_device_unknown"
-                        card_view:tint="@color/secondarytext" />
+                        card_view:tint="?attr/textColorSecondary" />
 
                     <TextView
                         android:id="@+id/device_custom_action_0_label"
@@ -525,7 +525,7 @@
                         android:layout_height="wrap_content"
                         android:gravity="center_horizontal"
                         android:minWidth="36dp"
-                        android:textColor="@color/secondarytext"
+                        android:textColor="?attr/textColorSecondary"
                         android:textStyle="bold"
                         tools:text="" />
                 </LinearLayout>
@@ -549,7 +549,7 @@
                         android:padding="3dp"
                         android:scaleType="fitXY"
                         card_view:srcCompat="@drawable/ic_device_unknown"
-                        card_view:tint="@color/secondarytext" />
+                        card_view:tint="?attr/textColorSecondary" />
 
                     <TextView
                         android:id="@+id/device_custom_action_1_label"
@@ -557,7 +557,7 @@
                         android:layout_height="wrap_content"
                         android:gravity="center_horizontal"
                         android:minWidth="36dp"
-                        android:textColor="@color/secondarytext"
+                        android:textColor="?attr/textColorSecondary"
                         android:textStyle="bold"
                         tools:text="" />
                 </LinearLayout>
@@ -581,7 +581,7 @@
                         android:padding="3dp"
                         android:scaleType="fitXY"
                         card_view:srcCompat="@drawable/ic_device_unknown"
-                        card_view:tint="@color/secondarytext" />
+                        card_view:tint="?attr/textColorSecondary" />
 
                     <TextView
                         android:id="@+id/device_custom_action_2_label"
@@ -589,7 +589,7 @@
                         android:layout_height="wrap_content"
                         android:gravity="center_horizontal"
                         android:minWidth="36dp"
-                        android:textColor="@color/secondarytext"
+                        android:textColor="?attr/textColorSecondary"
                         android:textStyle="bold"
                         tools:text="" />
                 </LinearLayout>

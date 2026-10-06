@@ -489,7 +489,7 @@ public class FitExporter {
             sumLapStrokes += s.longValue();
         }
         records.add(buildSession(summaryData, totalAgg, sport, subSport, startSeconds, elapsedSeconds, emittedLaps, sumLapStrokes,
-                track != null ? track.getLengths().size() : 0, summary.getName()));
+                track != null ? track.getLengths().size() : 0, predominantSwimStroke(track), summary.getName()));
         records.add(buildActivity(endSeconds, elapsedSeconds, utcOffsetSeconds));
 
         final FitFile fitFile = new FitFile(records);
@@ -570,7 +570,7 @@ public class FitExporter {
 
     private RecordData buildWorkout(@NonNull final String name, final int sport, final int subSport) {
         return new FitWorkout.Builder()
-                .setName(name)
+                .setWktName(name)
                 .setSport(sport)
                 .setSubSport(subSport)
                 .setNumValidSteps(0)
@@ -655,8 +655,8 @@ public class FitExporter {
 
         final GPSCoordinate loc = p.getLocation();
         if (loc != null) {
-            b.setLatitude(loc.getLatitude());
-            b.setLongitude(loc.getLongitude());
+            b.setPositionLat(loc.getLatitude());
+            b.setPositionLong(loc.getLongitude());
             // gps_accuracy (field 31, UINT8 metres, scale 1 — the byte IS the accuracy in
             // metres, no proportionate scaling). GB stores horizontal accuracy in metres in
             // the GPSCoordinate hdop slot (documented UNIT_METERS in ActivityPoint.Builder),
@@ -758,7 +758,7 @@ public class FitExporter {
         // sports leave these unset on ActivityPoint, so the gates skip the field.
         final float verticalOscillation = p.getVerticalOscillation();
         if (Float.isFinite(verticalOscillation) && verticalOscillation >= 0f) {
-            b.setOscillation(verticalOscillation);
+            b.setVerticalOscillation(verticalOscillation);
         }
         final float stanceTimePercent = p.getStanceTimePercent();
         if (Float.isFinite(stanceTimePercent) && stanceTimePercent >= 0f) {
@@ -823,12 +823,12 @@ public class FitExporter {
         final GPSCoordinate first = agg.getFirstLocation();
         final GPSCoordinate last = agg.getLastLocation();
         if (first != null) {
-            b.setStartLat(first.getLatitude());
-            b.setStartLong(first.getLongitude());
+            b.setStartPositionLat(first.getLatitude());
+            b.setStartPositionLong(first.getLongitude());
         }
         if (last != null) {
-            b.setEndLat(last.getLatitude());
-            b.setEndLong(last.getLongitude());
+            b.setEndPositionLat(last.getLatitude());
+            b.setEndPositionLong(last.getLongitude());
         }
         // Bounding box — drives map preview in Strava / Garmin Connect / Endurain.
         // Note: codegen currently maps setNecLat to FIT field 25 and setNecLong to 26
@@ -1018,6 +1018,7 @@ public class FitExporter {
                                     final int numLaps,
                                     @Nullable final Long lapStrokesFallback,
                                     final int numLengths,
+                                    @Nullable final Integer swimStrokeFallback,
                                     @Nullable final String workoutName) {
         final FitSession.Builder b = new FitSession.Builder();
         b.setMessageIndex(0);
@@ -1039,20 +1040,20 @@ public class FitExporter {
         final GPSCoordinate first = agg.getFirstLocation();
         final GPSCoordinate last = agg.getLastLocation();
         if (first != null) {
-            b.setStartLatitude(first.getLatitude());
-            b.setStartLongitude(first.getLongitude());
+            b.setStartPositionLat(first.getLatitude());
+            b.setStartPositionLong(first.getLongitude());
         }
         if (last != null) {
-            b.setEndLatitude(last.getLatitude());
-            b.setEndLongitude(last.getLongitude());
+            b.setEndPositionLat(last.getLatitude());
+            b.setEndPositionLong(last.getLongitude());
         }
         // Bounding box across the whole track. Codegen here is correct (29/30/31/32 per
         // FIT spec).
         if (agg.hasBoundingBox()) {
-            b.setNecLatitude(agg.getMaxLat());
-            b.setNecLongitude(agg.getMaxLong());
-            b.setSwcLatitude(agg.getMinLat());
-            b.setSwcLongitude(agg.getMinLong());
+            b.setNecLat(agg.getMaxLat());
+            b.setNecLong(agg.getMaxLong());
+            b.setSwcLat(agg.getMinLat());
+            b.setSwcLong(agg.getMinLong());
         }
         // num_lengths — gate via sportSupportsNumLengths. Endurain + Strava show this as
         // the session's "lengths" headline number.
@@ -1125,7 +1126,7 @@ public class FitExporter {
         }
         final Integer avgHr = readInt(data, ActivitySummaryEntries.HR_AVG, agg.getAvgHr());
         if (avgHr != null) {
-            b.setAverageHeartRate(avgHr);
+            b.setAvgHeartRate(avgHr);
         }
         final Integer maxHr = readInt(data, ActivitySummaryEntries.HR_MAX, agg.getMaxHr());
         if (maxHr != null) {
@@ -1256,11 +1257,11 @@ public class FitExporter {
         }
         final Integer hrvSdrr = readInt(data, ActivitySummaryEntries.HRV_SDRR, null);
         if (hrvSdrr != null) {
-            b.setHrvSdrr(hrvSdrr);
+            b.setSdrrHrv(hrvSdrr);
         }
         final Integer hrvRmssd = readInt(data, ActivitySummaryEntries.HRV_RMSSD, null);
         if (hrvRmssd != null) {
-            b.setHrvRmssd(hrvRmssd);
+            b.setRmssdHrv(hrvRmssd);
         }
         final Integer recoveryHr = readInt(data, ActivitySummaryEntries.RECOVERY_HR, null);
         if (recoveryHr != null) {
@@ -1322,7 +1323,7 @@ public class FitExporter {
         }
         final Integer restingCalories = readInt(data, ActivitySummaryEntries.CALORIES_RESTING, null);
         if (restingCalories != null) {
-            b.setRestingCalories(restingCalories);
+            b.setMetabolicCalories(restingCalories);
         }
 
         // ---- Running form ----
@@ -1387,15 +1388,15 @@ public class FitExporter {
         }
         final Integer frontShifts = readInt(data, ActivitySummaryEntries.FRONT_GEAR_SHIFTS, null);
         if (frontShifts != null) {
-            b.setFrontShifts(frontShifts);
+            b.setFrontGearShiftCount(frontShifts);
         }
         final Integer rearShifts = readInt(data, ActivitySummaryEntries.REAR_GEAR_SHIFTS, null);
         if (rearShifts != null) {
-            b.setRearShifts(rearShifts);
+            b.setRearGearShiftCount(rearShifts);
         }
         final Long standTime = readSeconds(data, ActivitySummaryEntries.STANDING_TIME);
         if (standTime != null) {
-            b.setStandTime((double) standTime);
+            b.setTimeStanding((double) standTime);
         }
         final Integer standCount = readInt(data, ActivitySummaryEntries.STANDING_COUNT, null);
         if (standCount != null) {
@@ -1411,11 +1412,20 @@ public class FitExporter {
         }
 
         // ---- Swimming ----
-        final Double poolLength = readMeters(data, ActivitySummaryEntries.POOL_LENGTH);
+        // POOL_LENGTH is what Xiaomi and Garmin write; ZeppOS calls the same value
+        // LANE_LENGTH, so accept either rather than dropping pool_length for those devices.
+        final Double poolLength = first(
+                readMeters(data, ActivitySummaryEntries.POOL_LENGTH),
+                readMeters(data, ActivitySummaryEntries.LANE_LENGTH)
+        );
         if (poolLength != null) {
             b.setPoolLength(poolLength.floatValue());
         }
-        final Integer swolfAvg = readInt(data, ActivitySummaryEntries.SWOLF_AVG, null);
+        // Likewise SWOLF_INDEX is the ZeppOS/Huami spelling of the average SWOLF.
+        final Integer swolfAvg = first(
+                readInt(data, ActivitySummaryEntries.SWOLF_AVG, null),
+                readInt(data, ActivitySummaryEntries.SWOLF_INDEX, null)
+        );
         if (swolfAvg != null) {
             b.setAvgSwolf(swolfAvg);
         }
@@ -1423,14 +1433,16 @@ public class FitExporter {
         // unit=strokes/min. If a parser stores Hz (strokes/sec) we'd 60x-undershoot.
         final Float strokeRateAvg = readFloat(data, ActivitySummaryEntries.STROKE_RATE_AVG, null);
         if (strokeRateAvg != null) {
-            b.setAvgSwimCadence(strokeRateAvg);
+            b.setAvgStrokesPerLength(strokeRateAvg);
         }
         // Predominant stroke style → FIT session.swim_stroke (enum). Source codes are
         // device-specific; mapXiaomiSwimStyleToFit handles the convention used by Xiaomi
         // band firmware (0=free,1=back,2=breast,3=fly,4=mixed). Unknown sources whose
         // codes already match the FIT enum will pass through unchanged for 0-3.
+        // Some parsers (ZeppOS) store SWIM_STYLE as a localised label rather than a code;
+        // for those, the predominant stroke computed from the per-length records is used.
         final Integer swimStyleRaw = readInt(data, ActivitySummaryEntries.SWIM_STYLE, null);
-        final Integer swimStroke = mapXiaomiSwimStyleToFit(swimStyleRaw);
+        final Integer swimStroke = first(mapXiaomiSwimStyleToFit(swimStyleRaw), swimStrokeFallback);
         if (swimStroke != null) {
             b.setSwimStroke(swimStroke);
         }
@@ -1498,8 +1510,6 @@ public class FitExporter {
 
     private RecordData buildActivity(final long endSeconds, final long elapsedSeconds,
                                      final int utcOffsetSeconds) {
-        // NativeFITMessage.ACTIVITY field 0 (total_timer_time) is declared without scale —
-        // FIT spec is scale=1000 unit=s, so pre-multiply seconds → milliseconds.
         // Field 5 (local_timestamp) is a FIT TIMESTAMP, so the encoder subtracts the Garmin
         // epoch — pass raw Unix seconds plus the phone-zone UTC offset so local_timestamp
         // holds the local wall-clock; importers recover the timezone as
@@ -1507,7 +1517,7 @@ public class FitExporter {
         return new FitActivity.Builder()
                 .setTimestamp(endSeconds)
                 .setLocalTimestamp(endSeconds + utcOffsetSeconds)
-                .setTotalTimerTime(elapsedSeconds * 1000L)
+                .setTotalTimerTime((double)elapsedSeconds)
                 .setNumSessions(1)
                 .setType(ACTIVITY_TYPE_MANUAL)
                 .setEvent(Event.ACTIVITY)
@@ -1723,6 +1733,29 @@ public class FitExporter {
         return v != null ? v.doubleValue() : 0.0;
     }
 
+    /// The most frequent swim_stroke across the track's length records, used for
+    /// session.swim_stroke when summaryData does not carry a numeric SWIM_STYLE. Returns
+    /// null when the track has no lengths, or none of them names a stroke. A tie is broken
+    /// by the first stroke to reach the winning count, i.e. the earliest in the workout.
+    @Nullable
+    private static Integer predominantSwimStroke(@Nullable final ActivityTrack track) {
+        if (track == null || track.getLengths().isEmpty()) return null;
+        final java.util.Map<Integer, Integer> counts = new java.util.LinkedHashMap<>();
+        for (final ActivityTrack.LengthInfo li : track.getLengths()) {
+            if (li.swimStroke == null) continue;
+            counts.merge(li.swimStroke, 1, Integer::sum);
+        }
+        Integer best = null;
+        int bestCount = 0;
+        for (final java.util.Map.Entry<Integer, Integer> e : counts.entrySet()) {
+            if (e.getValue() > bestCount) {
+                best = e.getKey();
+                bestCount = e.getValue();
+            }
+        }
+        return best;
+    }
+
     /// Maps a Xiaomi-band SWIM_STYLE byte to the FIT swim_stroke enum.
     /// Xiaomi convention (empirical): 0=freestyle, 1=backstroke, 2=breaststroke,
     /// 3=butterfly, 4=mixed. FIT enum: 0=freestyle, 1=backstroke, 2=breaststroke,
@@ -1833,7 +1866,7 @@ public class FitExporter {
         return mm == null ? null : Math.round(mm);
     }
 
-    /// Reads a length and converts to metres (mm/cm/m/km accepted).
+    /// Reads a length and converts to metres (mm/cm/m/km/yd accepted).
     @Nullable
     private static Double readMeters(@Nullable final ActivitySummaryData data,
                                      @NonNull final String key) {
@@ -1847,6 +1880,8 @@ public class FitExporter {
             case ActivitySummaryEntries.UNIT_KILOMETERS -> v * 1000.0;
             case ActivitySummaryEntries.UNIT_CM -> v / 100.0;
             case ActivitySummaryEntries.UNIT_MM -> v / 1000.0;
+            // ZeppOS reports the pool size in yards when the watch is set to imperial units.
+            case ActivitySummaryEntries.UNIT_YARD -> v * 0.9144;
             default -> {
                 LOG.warn("Unknown length unit '{}' for key {}, assuming m", unit, key);
                 yield v;

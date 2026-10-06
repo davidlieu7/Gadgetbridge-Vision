@@ -16,7 +16,6 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 package nodomain.freeyourgadget.gadgetbridge.activities.charts;
 
-import android.app.DatePickerDialog;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
@@ -41,16 +40,30 @@ import androidx.annotation.Nullable;
 import androidx.appcompat.app.ActionBar;
 import androidx.fragment.app.Fragment;
 import androidx.fragment.app.FragmentActivity;
+import androidx.fragment.app.FragmentManager;
 import androidx.fragment.app.FragmentStatePagerAdapter;
 import androidx.localbroadcastmanager.content.LocalBroadcastManager;
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
 import androidx.viewpager2.adapter.FragmentStateAdapter;
 import androidx.viewpager2.widget.ViewPager2;
 
+import com.google.android.material.datepicker.CalendarConstraints;
+import com.google.android.material.datepicker.CompositeDateValidator;
+import com.google.android.material.datepicker.DateValidatorPointBackward;
+import com.google.android.material.datepicker.DateValidatorPointForward;
+import com.google.android.material.datepicker.MaterialDatePicker;
 import com.google.android.material.tabs.TabLayout;
 import com.google.android.material.tabs.TabLayoutMediator;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.text.SimpleDateFormat;
+import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneId;
+import java.time.ZoneOffset;
+import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Collections;
 import java.util.Date;
@@ -62,15 +75,20 @@ import nodomain.freeyourgadget.gadgetbridge.GBApplication;
 import nodomain.freeyourgadget.gadgetbridge.R;
 import nodomain.freeyourgadget.gadgetbridge.activities.AbstractGBActivity;
 import nodomain.freeyourgadget.gadgetbridge.activities.AbstractGBFragment;
+import nodomain.freeyourgadget.gadgetbridge.activities.charts.vico.AbstractVicoChartFragment;
+import nodomain.freeyourgadget.gadgetbridge.database.DBHandler;
 import nodomain.freeyourgadget.gadgetbridge.devices.DeviceCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
 import nodomain.freeyourgadget.gadgetbridge.model.ActivityAmounts;
 import nodomain.freeyourgadget.gadgetbridge.model.RecordedDataTypes;
+import nodomain.freeyourgadget.gadgetbridge.util.BarShade;
 import nodomain.freeyourgadget.gadgetbridge.util.DateTimeUtils;
 import nodomain.freeyourgadget.gadgetbridge.util.GB;
 import nodomain.freeyourgadget.gadgetbridge.util.LimitedQueue;
 
 public class ActivityChartsActivity extends AbstractGBActivity implements ChartsHost {
+    private static final Logger LOG = LoggerFactory.getLogger(ActivityChartsActivity.class);
+
     public static final String STATE_START_DATE = "stateStartDate";
     public static final String STATE_END_DATE = "stateEndDate";
 
@@ -93,6 +111,7 @@ public class ActivityChartsActivity extends AbstractGBActivity implements Charts
 
     private GBDevice mGBDevice;
     private ViewGroup dateBar;
+    private List<Button> nextButtons;
 
     private ActivityResultLauncher<Intent> chartsPreferencesLauncher;
     private final ActivityResultCallback<ActivityResult> chartsPreferencesCallback = result -> {
@@ -132,6 +151,10 @@ public class ActivityChartsActivity extends AbstractGBActivity implements Charts
     protected void onCreate(final Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_charts);
+        if (BarShade.continuesToolbar(this, R.attr.tab_bar_bg)) {
+            setTopShade(findViewById(R.id.charts_tab_shade));
+        }
+        setBottomShade(findViewById(R.id.charts_date_bar_shade));
 
         final Bundle extras = getIntent().getExtras();
         if (extras == null) {
@@ -141,8 +164,8 @@ public class ActivityChartsActivity extends AbstractGBActivity implements Charts
         mGBDevice = extras.getParcelable(GBDevice.EXTRA_DEVICE);
 
         chartsPreferencesLauncher = registerForActivityResult(
-                new ActivityResultContracts.StartActivityForResult(),
-                chartsPreferencesCallback
+            new ActivityResultContracts.StartActivityForResult(),
+            chartsPreferencesCallback
         );
 
         // Set start and end date
@@ -186,9 +209,9 @@ public class ActivityChartsActivity extends AbstractGBActivity implements Charts
         viewPager.setAdapter(getPagerAdapter());
 
         new TabLayoutMediator(tabLayout, viewPager,
-                (tab, position) -> {
-            tab.setText(getPageTitle(position));
-                }).attach();
+            (tab, position) -> {
+                tab.setText(getPageTitle(position));
+            }).attach();
 
         if (tabFragmentIdToOpen > -1) {
             viewPager.setCurrentItem(tabFragmentIdToOpen);  // open the tab as specified in the intent
@@ -230,6 +253,8 @@ public class ActivityChartsActivity extends AbstractGBActivity implements Charts
         mPrevMonthButton.setOnClickListener(v -> handleButtonClicked(DATE_PREV_MONTH));
         final Button mNextMonthButton = findViewById(R.id.charts_next_month);
         mNextMonthButton.setOnClickListener(v -> handleButtonClicked(DATE_NEXT_MONTH));
+
+        nextButtons = Arrays.asList(mNextButton, mNextWeekButton, mNextMonthButton);
     }
 
     @Override
@@ -251,6 +276,7 @@ public class ActivityChartsActivity extends AbstractGBActivity implements Charts
     protected FragmentStateAdapter getPagerAdapter() {
         return new SectionsStateAdapter(this);
     }
+
     protected List<String> fillChartsTabsList() {
         return fillChartsTabsList(getDevice());
     }
@@ -302,6 +328,13 @@ public class ActivityChartsActivity extends AbstractGBActivity implements Charts
     @Override
     public void setDateInfo(final String dateInfo) {
         mDateControl.setText(dateInfo);
+
+        final LocalDate endDate = Instant.ofEpochMilli(getEndDate().getTime()).atZone(ZoneId.systemDefault()).toLocalDate();
+        final boolean isCurrentDay = !endDate.isBefore(LocalDate.now());
+        for (final Button button : nextButtons) {
+            button.setEnabled(!isCurrentDay);
+            button.setAlpha(!isCurrentDay ? 1f : 0.38f);
+        }
     }
 
     @Override
@@ -342,14 +375,8 @@ public class ActivityChartsActivity extends AbstractGBActivity implements Charts
             fetchRecordedData();
             return true;
         } else if (itemId == R.id.charts_set_date) {
-            final Calendar currentDate = Calendar.getInstance();
-            currentDate.setTime(getEndDate());
-            new DatePickerDialog(this, (view, year, monthOfYear, dayOfMonth) -> {
-                currentDate.set(year, monthOfYear, dayOfMonth);
-                setEndDate(currentDate.getTime());
-                setStartDate(DateTimeUtils.shiftByDays(getEndDate(), -1));
-                LocalBroadcastManager.getInstance(this).sendBroadcast(new Intent(REFRESH));
-            }, currentDate.get(Calendar.YEAR), currentDate.get(Calendar.MONTH), currentDate.get(Calendar.DATE)).show();
+            showDatePicker();
+            return true;
         } else if (itemId == R.id.prefs_charts_menu) {
             final Intent settingsIntent = new Intent(this, ChartsPreferencesActivity.class);
             chartsPreferencesLauncher.launch(settingsIntent);
@@ -357,6 +384,91 @@ public class ActivityChartsActivity extends AbstractGBActivity implements Charts
         }
 
         return super.onOptionsItemSelected(item);
+    }
+
+    private void showDatePicker() {
+        final MaterialDatePicker.Builder<Long> builder = MaterialDatePicker.Builder.datePicker()
+            .setSelection(toUtcMillis(getEndDate().getTime()));
+
+        final CalendarConstraints constraints = getAvailableDataConstraints();
+        if (constraints != null) {
+            builder.setCalendarConstraints(constraints);
+        }
+
+        final MaterialDatePicker<Long> datePicker = builder.build();
+        datePicker.addOnPositiveButtonClickListener(selection -> {
+            final LocalDate date = Instant.ofEpochMilli(selection).atZone(ZoneOffset.UTC).toLocalDate();
+            final Calendar currentDate = Calendar.getInstance();
+            currentDate.setTime(getEndDate());
+            currentDate.set(date.getYear(), date.getMonthValue() - 1, date.getDayOfMonth());
+            setEndDate(currentDate.getTime());
+            setStartDate(DateTimeUtils.shiftByDays(getEndDate(), -1));
+            LocalBroadcastManager.getInstance(this).sendBroadcast(new Intent(REFRESH));
+        });
+        datePicker.show(getSupportFragmentManager(), "CHARTS_DATE_PICKER");
+    }
+
+    /**
+     * Calendar constraints that limit the selection to the days that have any data in the visible chart,
+     * or null if the range of its data is not known.
+     */
+    @Nullable
+    private CalendarConstraints getAvailableDataConstraints() {
+        final ChartDataRange range;
+        try (DBHandler db = GBApplication.acquireDbReadOnly()) {
+            range = findAvailableDataRange(getSupportFragmentManager(), db);
+        } catch (final Exception e) {
+            LOG.error("Failed to get the range of available data", e);
+            return null;
+        }
+        if (range == null) {
+            return null;
+        }
+
+        final long start = toUtcMillis(range.getStartMillis());
+        final long end = toUtcMillis(range.getEndMillis());
+        return new CalendarConstraints.Builder()
+            .setStart(start)
+            .setEnd(end)
+            .setValidator(CompositeDateValidator.allOf(Arrays.asList(
+                DateValidatorPointForward.from(start),
+                DateValidatorPointBackward.before(end)
+            )))
+            .build();
+    }
+
+    /**
+     * Returns the data range of the currently visible (resumed) chart fragment.
+     */
+    @Nullable
+    private ChartDataRange findAvailableDataRange(final FragmentManager fragmentManager, final DBHandler db) {
+        for (final Fragment fragment : fragmentManager.getFragments()) {
+            if (!fragment.isResumed()) {
+                continue;
+            }
+            if (fragment instanceof AbstractChartFragment) {
+                return ((AbstractChartFragment<?>) fragment).getAvailableDataRange(getDevice(), db);
+            }
+            if (fragment instanceof AbstractVicoChartFragment) {
+                return ((AbstractVicoChartFragment<?>) fragment).getAvailableDataRange(getDevice(), db);
+            }
+            if (fragment instanceof AbstractCollectionFragment) {
+                return findAvailableDataRange(fragment.getChildFragmentManager(), db);
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Converts a timestamp to the UTC midnight of its local date, as {@link MaterialDatePicker} expects.
+     */
+    private static long toUtcMillis(final long timestampMillis) {
+        return Instant.ofEpochMilli(timestampMillis)
+            .atZone(ZoneId.systemDefault())
+            .toLocalDate()
+            .atStartOfDay(ZoneOffset.UTC)
+            .toInstant()
+            .toEpochMilli();
     }
 
     @Override
@@ -377,6 +489,7 @@ public class ActivityChartsActivity extends AbstractGBActivity implements Charts
     protected int getRecordedDataType() {
         return RecordedDataTypes.TYPE_ACTIVITY | RecordedDataTypes.TYPE_STRESS;
     }
+
     private void fetchRecordedData() {
         if (getDevice().isInitialized()) {
             GBApplication.deviceService(getDevice()).onFetchRecordedData(getRecordedDataType());
@@ -390,9 +503,9 @@ public class ActivityChartsActivity extends AbstractGBActivity implements Charts
         final DeviceCoordinator coordinator = getDevice().getDeviceCoordinator();
         final DeviceChartsProvider chartsProvider = coordinator.getChartsProvider();
         return chartsProvider.getChartLabel(
-                this,
-                getDevice(),
-                enabledTabsList.get(position)
+            this,
+            getDevice(),
+            enabledTabsList.get(position)
         );
     }
 
@@ -411,9 +524,9 @@ public class ActivityChartsActivity extends AbstractGBActivity implements Charts
             final DeviceCoordinator coordinator = getDevice().getDeviceCoordinator();
             final DeviceChartsProvider chartsProvider = coordinator.getChartsProvider();
             return chartsProvider.getChartFragment(
-                    getDevice(),
-                    enabledTabsList.get(position),
-                    enabledTabsList.size() == 1
+                getDevice(),
+                enabledTabsList.get(position),
+                enabledTabsList.size() == 1
             );
         }
 

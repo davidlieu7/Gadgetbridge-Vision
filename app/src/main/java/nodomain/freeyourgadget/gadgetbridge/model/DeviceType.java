@@ -113,6 +113,13 @@ import nodomain.freeyourgadget.gadgetbridge.devices.garmin.hrm.GarminHrm200Coord
 import nodomain.freeyourgadget.gadgetbridge.devices.garmin.hrm.GarminHrm600Coordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.garmin.hrm.GarminHrmProPlusCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.garmin.watches.cirqa.GarminCirqaCoordinator;
+import nodomain.freeyourgadget.gadgetbridge.devices.garmin.watches.d2.GarminD2AirCoordinator;
+import nodomain.freeyourgadget.gadgetbridge.devices.garmin.watches.d2.GarminD2AirX10Coordinator;
+import nodomain.freeyourgadget.gadgetbridge.devices.garmin.watches.d2.GarminD2AirX15Coordinator;
+import nodomain.freeyourgadget.gadgetbridge.devices.garmin.watches.d2.GarminD2Mach1Coordinator;
+import nodomain.freeyourgadget.gadgetbridge.devices.garmin.watches.d2.GarminD2Mach1ProCoordinator;
+import nodomain.freeyourgadget.gadgetbridge.devices.garmin.watches.d2.GarminD2Mach2Coordinator;
+import nodomain.freeyourgadget.gadgetbridge.devices.garmin.watches.d2.GarminD2Mach2ProCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.garmin.watches.descent.GarminDescentG1Coordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.garmin.watches.descent.GarminDescentG2Coordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.garmin.watches.descent.GarminDescentMk3Coordinator;
@@ -493,6 +500,7 @@ import nodomain.freeyourgadget.gadgetbridge.devices.nothing.Ear2Coordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.nothing.EarACoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.nothing.EarStickCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.nut.NutCoordinator;
+import nodomain.freeyourgadget.gadgetbridge.devices.nxwear.NxWearB8Coordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.ollee.OlleeDeviceCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.onemoresonoflow.OneMoreSonoFlowCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.onemoresonoflow.OneMoreSonoFlowSECoordinator;
@@ -817,6 +825,7 @@ public enum DeviceType {
     ITAG(ITagCoordinator.class),
     IKEA_IDASEN(IdasenCoordinator.class),
     NUTMINI(NutCoordinator.class),
+    NX_WEAR_B8(NxWearB8Coordinator.class),
     VIVOMOVE_HR(GarminVivomoveHrCoordinator.class),
     GARMIN_HRM_PRO_PLUS(GarminHrmProPlusCoordinator.class),
     GARMIN_HRM_200(GarminHrm200Coordinator.class),
@@ -1000,6 +1009,13 @@ public enum DeviceType {
     GARMIN_VIVOSMART_5(GarminVivosmart5Coordinator.class),
     GARMIN_VIVOSPORT(GarminVivosportCoordinator.class),
     GARMIN_CIRQA(GarminCirqaCoordinator.class),
+    GARMIN_D2_AIR(GarminD2AirCoordinator.class),
+    GARMIN_D2_AIR_X10(GarminD2AirX10Coordinator.class),
+    GARMIN_D2_AIR_X15(GarminD2AirX15Coordinator.class),
+    GARMIN_D2_MACH_1(GarminD2Mach1Coordinator.class),
+    GARMIN_D2_MACH_1_PRO(GarminD2Mach1ProCoordinator.class),
+    GARMIN_D2_MACH_2(GarminD2Mach2Coordinator.class),
+    GARMIN_D2_MACH_2_PRO(GarminD2Mach2ProCoordinator.class),
     GREE_AC(GreeAcCoordinator.class),
     AAWIRELESS(AAWirelessCoordinator.class),
     VIBRATISSIMO(VibratissimoCoordinator.class),

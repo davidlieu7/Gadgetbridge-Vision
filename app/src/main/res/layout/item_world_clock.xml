@@ -58,7 +58,7 @@
                 android:layout_marginEnd="0dp"
                 android:layout_marginBottom="8dp"
                 android:text="00:00"
-                card_view:tint="@color/secondarytext" />
+                card_view:tint="?attr/textColorSecondary" />
 
         </RelativeLayout>
     </com.google.android.material.card.MaterialCardView>

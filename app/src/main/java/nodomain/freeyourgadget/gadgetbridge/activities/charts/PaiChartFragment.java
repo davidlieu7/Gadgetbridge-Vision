@@ -25,6 +25,7 @@ import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
+import androidx.annotation.Nullable;
 import androidx.core.content.ContextCompat;
 
 import com.github.mikephil.charting.charts.BarChart;
@@ -52,6 +53,8 @@ import java.util.Optional;
 import nodomain.freeyourgadget.gadgetbridge.GBApplication;
 import nodomain.freeyourgadget.gadgetbridge.R;
 import nodomain.freeyourgadget.gadgetbridge.activities.dashboard.GaugeDrawer;
+import nodomain.freeyourgadget.gadgetbridge.activities.workouts.StatTileData;
+import nodomain.freeyourgadget.gadgetbridge.activities.workouts.StatTileGridUtilKt;
 import nodomain.freeyourgadget.gadgetbridge.database.DBHandler;
 import nodomain.freeyourgadget.gadgetbridge.devices.DeviceCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.TimeSampleProvider;
@@ -69,17 +72,16 @@ public class PaiChartFragment extends AbstractChartFragment<PaiChartFragment.Pai
     protected ImageView mGoalMinutesGauge;
     protected BarChart mWeekChart;
     protected TextView mDateView;
-    protected TextView mLineToday;
-    protected TextView mLineTotal;
+    protected LinearLayout mSummaryStatsContainer;
     protected TextView mLineLowInc;
     protected TextView mLineLowTime;
     protected TextView mLineModerateInc;
     protected TextView mLineModerateTime;
     protected TextView mLineHighInc;
     protected TextView mLineHighTime;
-    protected LinearLayout mTileLow;
-    protected LinearLayout mTileModerate;
-    protected LinearLayout mTileHigh;
+    protected View mTileLow;
+    protected View mTileModerate;
+    protected View mTileHigh;
 
     protected int BACKGROUND_COLOR;
     protected int DESCRIPTION_COLOR;
@@ -94,7 +96,7 @@ public class PaiChartFragment extends AbstractChartFragment<PaiChartFragment.Pai
     protected void init() {
         BACKGROUND_COLOR = GBApplication.getBackgroundColor(requireContext());
         LEGEND_TEXT_COLOR = DESCRIPTION_COLOR = TEXT_COLOR = GBApplication.getTextColor(requireContext());
-        CHART_TEXT_COLOR = ContextCompat.getColor(requireContext(), R.color.secondarytext);
+        CHART_TEXT_COLOR = GBApplication.getSecondaryTextColor(requireContext());
 
         PAI_TOTAL_COLOR = ContextCompat.getColor(requireContext(), R.color.chart_pai_weekly);
         PAI_DAY_COLOR = ContextCompat.getColor(requireContext(), R.color.chart_pai_today);
@@ -115,8 +117,7 @@ public class PaiChartFragment extends AbstractChartFragment<PaiChartFragment.Pai
         mGoalMinutesGauge = rootView.findViewById(R.id.goal_minutes_gauge);
         mWeekChart = rootView.findViewById(R.id.pai_chart_week);
         mDateView = rootView.findViewById(R.id.pai_date_view);
-        mLineToday = rootView.findViewById(R.id.pai_line_today);
-        mLineTotal = rootView.findViewById(R.id.pai_line_total);
+        mSummaryStatsContainer = rootView.findViewById(R.id.pai_summary_stats_container);
         mLineLowInc = rootView.findViewById(R.id.pai_line_low_inc);
         mLineLowTime = rootView.findViewById(R.id.pai_line_low_time);
         mLineModerateInc = rootView.findViewById(R.id.pai_line_moderate_inc);
@@ -247,8 +248,23 @@ public class PaiChartFragment extends AbstractChartFragment<PaiChartFragment.Pai
                 Math.max(pcd.getWeekBeforeData().getMaxPai(), getPaiTarget()) + 20);
 
         mDateView.setText(DateTimeUtils.formatDate(pcd.getDayData().day.getTime()));
-        mLineToday.setText(requireContext().getString(R.string.pai_plus_num, pcd.getDayData().today));
-        mLineTotal.setText(String.valueOf(pcd.getDayData().total));
+
+        final List<StatTileData> summaryStats = new ArrayList<>();
+        summaryStats.add(new StatTileData(
+                requireContext().getString(R.string.pai_plus_num, pcd.getDayData().today),
+                getString(R.string.activity_summary_today),
+                null, null, null, null,
+                PAI_DAY_COLOR
+        ));
+        summaryStats.add(new StatTileData(
+                String.valueOf(pcd.getDayData().total),
+                getString(R.string.weekly_total),
+                null, null, null, null,
+                PAI_TOTAL_COLOR
+        ));
+        mSummaryStatsContainer.removeAllViews();
+        StatTileGridUtilKt.addStatTileGrid(mSummaryStatsContainer, requireContext(), summaryStats, 0);
+
         mLineLowInc.setText(String.valueOf(pcd.getDayData().paiLow));
         mLineLowTime.setText(requireContext().getString(R.string.num_min, pcd.getDayData().minutesLow));
         mLineModerateInc.setText(String.valueOf(pcd.getDayData().paiModerate));
@@ -472,5 +488,11 @@ public class PaiChartFragment extends AbstractChartFragment<PaiChartFragment.Pai
         public WeekChartsData<BarData> getWeekBeforeData() {
             return weekBeforeData;
         }
+    }
+
+    @Nullable
+    @Override
+    public ChartDataRange getAvailableDataRange(final GBDevice device, final DBHandler db) {
+        return ChartDataRange.ofSamples(device.getDeviceCoordinator().getPaiSampleProvider(device, db.getDaoSession()));
     }
 }

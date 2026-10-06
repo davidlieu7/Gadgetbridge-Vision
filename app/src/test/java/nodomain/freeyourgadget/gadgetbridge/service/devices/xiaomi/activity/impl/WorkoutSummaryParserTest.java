@@ -295,4 +295,96 @@ public class WorkoutSummaryParserTest {
         new WorkoutSummaryParser().parseBinaryData(summary, true);
         assertEquals(ActivityKind.OUTDOOR_CYCLING.getCode(), summary.getActivityKind());
     }
+
+    /** Outdoor run v5, Mi Band 9 Active, 30 Sep 2026 (#6875). The paired DETAILS file has 1704
+     *  records whose HR spans 119-200 (mean 162), pace 395-782 s/km and cadence up to 178. */
+    private static final String OUTDOOR_RUN_V5_30SEP =
+            "wpe9avQF2QD///////8AAAABAMKXvWprnr1qqAYAAKgGAABdEAAACwHkAJYBAACLAQAADgMA"
+                    + "AJmZDUEbkhFBThAAAGQAkgCyAKLIdwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+                    + "AAAAAB8CAABEAQAAOQIAAAUBAAACAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+                    + "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADqDW67";
+
+    @Test
+    public void outdoorRunV5_matchesDetails() {
+        final byte[] bytes = Base64.getDecoder().decode(OUTDOOR_RUN_V5_30SEP);
+        final BaseActivitySummary summary = new BaseActivitySummary();
+        summary.setRawSummaryData(bytes);
+        new WorkoutSummaryParser().parseBinaryData(summary, true);
+        assertEquals(ActivityKind.OUTDOOR_RUNNING.getCode(), summary.getActivityKind());
+
+        final ActivitySummaryData data = parse(OUTDOOR_RUN_V5_30SEP);
+        assertEquals(1704d, num(data, ActivitySummaryEntries.ACTIVE_SECONDS), 0.001);
+        assertEquals(4189d, num(data, ActivitySummaryEntries.DISTANCE_METERS), 0.001);
+        assertEquals(119d, num(data, ActivitySummaryEntries.HR_MIN), 0.001);
+        assertEquals(200d, num(data, ActivitySummaryEntries.HR_MAX), 0.001);
+        assertEquals(162d, num(data, ActivitySummaryEntries.HR_AVG), 0.001);
+        assertEquals(395d, num(data, ActivitySummaryEntries.PACE_MAX), 0.001);
+        assertEquals(782d, num(data, ActivitySummaryEntries.PACE_MIN), 0.001);
+        assertEquals(178d, num(data, ActivitySummaryEntries.STEP_RATE_MAX), 0.001);
+    }
+
+    /** Walk v6, 29 May 2026. The paired DETAILS file has 1912 records whose HR spans 131-192
+     *  (mean 149.8). */
+    private static final String WALKING_V6_29MAY =
+            "lrAZaggG2QD3///4/gf/AAACAJawGWoPuBlqeAcAAHgHAABzDQAAHQHpACsCAAB7AQAAdAMA"
+                    + "AMFxz0B2phdB9g4AAE8AfQCtAJXAgwAAAAAAAAAAAAAAAAAAAAAAAAAAAABAQAAzM/M/AAAA"
+                    + "ABMAAHEAAAAYAgAAagQAAHMAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAPQACAAAAAAAA"
+                    + "AAAAAAAAAAAbAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAUDnru";
+
+    @Test
+    public void walkingV6_matchesDetails() {
+        final ActivitySummaryData data = parse(WALKING_V6_29MAY);
+        assertEquals(1912d, num(data, ActivitySummaryEntries.ACTIVE_SECONDS), 0.001);
+        assertEquals(131d, num(data, ActivitySummaryEntries.HR_MIN), 0.001);
+        assertEquals(192d, num(data, ActivitySummaryEntries.HR_MAX), 0.001);
+        assertEquals(149d, num(data, ActivitySummaryEntries.HR_AVG), 0.001);
+    }
+
+    /** Walk v9, 4 Jan 2026. The paired DETAILS file has HR spanning 99-163
+     *  (mean 135.5). */
+    private static final String WALKING_V9_04JAN =
+            "glJaaQQJ2QD3///4P4AAf/AAAAAfAgCDUlppIVhaaZ0FAACdBQAACAoAAM8ArwAjAgAA1gEA"
+                    + "AFYDAABv3s1ANA31QKYLAABVAH8AhwCHo2MAAAAAAAAAAAAAAAAAAAAAAAAAAGZmJkAAAAAA"
+                    + "AAAAAAAAAAAAABAAAAAAAADVAAAAbQIAAO8BAABQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+                    + "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABwAAQAAAAAAAAAAAAAAAAAACgAAAAAAAAAAAAAA"
+                    + "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+                    + "AAAAAAALE479";
+
+    @Test
+    public void walkingV9_matchesDetails() {
+        final ActivitySummaryData data = parse(WALKING_V9_04JAN);
+        assertEquals(99d, num(data, ActivitySummaryEntries.HR_MIN), 0.001);
+        assertEquals(163d, num(data, ActivitySummaryEntries.HR_MAX), 0.001);
+        assertEquals(135d, num(data, ActivitySummaryEntries.HR_AVG), 0.001);
+    }
+
+    /** Indoor cycling v9, 22 Feb 2025. The paired DETAILS file has HR spanning 94-150
+     *  (mean 135.6). */
+    private static final String INDOOR_CYCLING_V9_22FEB =
+            "UB+6ZwQJnQD/7++f/kOAf1Afume6KLpnagkAAAAAAACIAgAAAACHll6amTlAAABIAAAAAAAA"
+                    + "AAAAbQQAAMQEAAAjAAAARwNqCQAAAAAAAAAAAAgHAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+                    + "AAAAAAAAAAAAAFUAAgAAAAAAAAAAAAAAAAAAAAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+                    + "AAAAAAAAAAAAGaZY0A==";
+
+    @Test
+    public void indoorCyclingV9_matchesDetails() {
+        final ActivitySummaryData data = parse(INDOOR_CYCLING_V9_22FEB);
+        assertEquals(94d, num(data, ActivitySummaryEntries.HR_MIN), 0.001);
+        assertEquals(150d, num(data, ActivitySummaryEntries.HR_MAX), 0.001);
+        assertEquals(135d, num(data, ActivitySummaryEntries.HR_AVG), 0.001);
+    }
+
+    /** Elliptical v6, 10 Feb 2025. The paired DETAILS file has HR spanning 118-156
+     *  (mean 147.6). */
+    private static final String ELLIPTICAL_V6_10FEB =
+            "6FuqZwQGrQD/9/+P6FuqZ+tiqmcDBwAApgJoAQAADACuAJOcdgAAYEAAAEgAAAAAABUAAAC8"
+                    + "BgAAHQAAAAAAAAAGAwMHAACamZk+AAAAAAAAAAAAAABgAAIDAC12aDs=";
+
+    @Test
+    public void ellipticalV6_matchesDetails() {
+        final ActivitySummaryData data = parse(ELLIPTICAL_V6_10FEB);
+        assertEquals(118d, num(data, ActivitySummaryEntries.HR_MIN), 0.001);
+        assertEquals(156d, num(data, ActivitySummaryEntries.HR_MAX), 0.001);
+        assertEquals(147d, num(data, ActivitySummaryEntries.HR_AVG), 0.001);
+    }
 }

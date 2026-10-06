@@ -48,12 +48,20 @@ internal object BloodPressureSyncer : AbstractTimeSampleSyncer<BloodPressureSamp
     ): BloodPressureRecord? {
         val systolic = sample.bpSystolic
         val diastolic = sample.bpDiastolic
-        if (systolic !in 60..250 || diastolic !in 30..150 || systolic <= diastolic) {
+        if (systolic !in 20..200) {
+            logger.skipOutOfRange(deviceName, "BloodPressure systolic", systolic, "20..200 mmHg")
+            return null
+        }
+        if (diastolic !in 10..180) {
+            logger.skipOutOfRange(deviceName, "BloodPressure diastolic", diastolic, "10..180 mmHg")
+            return null
+        }
+        if (systolic <= diastolic) {
             logger.skipOutOfRange(
                 deviceName,
                 "BloodPressure",
                 "$systolic/$diastolic mmHg",
-                "systolic 60..250, diastolic 30..150, systolic > diastolic"
+                "systolic > diastolic"
             )
             return null
         }

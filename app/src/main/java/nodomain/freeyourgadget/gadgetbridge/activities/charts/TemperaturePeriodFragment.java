@@ -21,8 +21,10 @@ import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.LinearLayout;
 import android.widget.TextView;
 
+import androidx.annotation.Nullable;
 import androidx.core.content.ContextCompat;
 
 import com.github.mikephil.charting.charts.Chart;
@@ -55,6 +57,8 @@ import java.util.Locale;
 import lineageos.weather.util.TemperatureUtils;
 import nodomain.freeyourgadget.gadgetbridge.GBApplication;
 import nodomain.freeyourgadget.gadgetbridge.R;
+import nodomain.freeyourgadget.gadgetbridge.activities.workouts.StatTileData;
+import nodomain.freeyourgadget.gadgetbridge.activities.workouts.StatTileGridUtilKt;
 import nodomain.freeyourgadget.gadgetbridge.database.DBHandler;
 import nodomain.freeyourgadget.gadgetbridge.devices.DeviceCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.TimeSampleProvider;
@@ -77,9 +81,7 @@ public class TemperaturePeriodFragment extends AbstractChartFragment<Temperature
     private int TEMPERATURE_AVG_COLOR;
 
     private TextView dateView;
-    private TextView temperatureMinimum;
-    private TextView temperatureMaximum;
-    private TextView temperatureAverage;
+    private LinearLayout statsContainer;
     private CombinedChart temperatureChart;
     private int totalDays;
 
@@ -121,9 +123,7 @@ public class TemperaturePeriodFragment extends AbstractChartFragment<Temperature
                 getChartsHost().enableSwipeRefresh(scrollY == 0));
 
         dateView = rootView.findViewById(R.id.temperature_period_date_view);
-        temperatureMinimum = rootView.findViewById(R.id.temperature_period_minimum);
-        temperatureMaximum = rootView.findViewById(R.id.temperature_period_maximum);
-        temperatureAverage = rootView.findViewById(R.id.temperature_period_average);
+        statsContainer = rootView.findViewById(R.id.temperature_period_stats_container);
         temperatureChart = rootView.findViewById(R.id.temperature_period_chart);
 
         setupChart();
@@ -214,9 +214,12 @@ public class TemperaturePeriodFragment extends AbstractChartFragment<Temperature
         final float maximum = maxAccumulator.getCount() > 0 ? (float) maxAccumulator.getMax() : DATA_INVALID;
 
         final String emptyValue = getString(R.string.stats_empty_value);
-        temperatureMinimum.setText(hasData(minimum) ? formatTemperature(minimum) : emptyValue);
-        temperatureMaximum.setText(hasData(maximum) ? formatTemperature(maximum) : emptyValue);
-        temperatureAverage.setText(hasData(average) ? formatTemperature(average) : emptyValue);
+        final List<StatTileData> stats = new ArrayList<>();
+        stats.add(new StatTileData(hasData(minimum) ? formatTemperature(minimum) : emptyValue, getString(R.string.hr_minimum)));
+        stats.add(new StatTileData(hasData(maximum) ? formatTemperature(maximum) : emptyValue, getString(R.string.hr_maximum)));
+        stats.add(new StatTileData(hasData(average) ? formatTemperature(average) : emptyValue, getString(R.string.hr_average)));
+        statsContainer.removeAllViews();
+        StatTileGridUtilKt.addStatTileGrid(statsContainer, requireContext(), stats, 0);
 
         temperatureChart.getXAxis().setValueFormatter(createDayFormatter(startTs));
         configureYAxis(minimum, maximum);
@@ -388,5 +391,11 @@ public class TemperaturePeriodFragment extends AbstractChartFragment<Temperature
             this.minimum = minimum;
             this.maximum = maximum;
         }
+    }
+
+    @Nullable
+    @Override
+    public ChartDataRange getAvailableDataRange(final GBDevice device, final DBHandler db) {
+        return ChartDataRange.ofSamples(device.getDeviceCoordinator().getTemperatureSampleProvider(device, db.getDaoSession()));
     }
 }

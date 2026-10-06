@@ -31,8 +31,9 @@ internal object TotalCaloriesSyncer : AbstractActivitySampleSyncer<TotalCalories
     override val logger: Logger = LoggerFactory.getLogger(TotalCaloriesSyncer::class.java)
     override val recordClass: KClass<TotalCaloriesBurnedRecord> = TotalCaloriesBurnedRecord::class
 
-    override fun convertSample(
-        sample: ActivitySample,
+    override fun convertMinute(
+        endTs: Instant,
+        minuteSamples: List<ActivitySample>,
         offset: ZoneOffset,
         metadata: Metadata,
         deviceName: String,
@@ -41,17 +42,16 @@ internal object TotalCaloriesSyncer : AbstractActivitySampleSyncer<TotalCalories
         // Devices with supportsTotalCalories expose their single reported kcal figure through
         // getActiveCalories (the band/vendor app shows one "calories" number, no active/total
         // split), so the same value feeds both record types.
-        val calories = sample.activeCalories
-        if (calories <= 0) {
+        val caloriesInMinute = minuteSamples.sumOf { if (it.activeCalories > 0) it.activeCalories else 0 }
+        if (caloriesInMinute <= 0) {
             return null
         }
         // HC's TotalCaloriesBurnedRecord caps energy at 1_000_000 kcal (= 1e9 cal).
-        if (calories > 1_000_000_000) {
-            logger.skipOutOfRange(deviceName, "TotalCalories", "$calories cal", "<= 1000000 kcal per record")
+        if (caloriesInMinute > 1_000_000_000) {
+            logger.skipOutOfRange(deviceName, "TotalCalories", "$caloriesInMinute cal", "<= 1000000 kcal per record")
             return null
         }
 
-        val endTs = Instant.ofEpochSecond(sample.timestamp.toLong())
         val startTs = endTs.minus(1, ChronoUnit.MINUTES)
 
         return TotalCaloriesBurnedRecord(
@@ -59,7 +59,7 @@ internal object TotalCaloriesSyncer : AbstractActivitySampleSyncer<TotalCalories
             offset,
             endTs,
             offset,
-            Energy.calories(calories.toDouble()),
+            Energy.calories(caloriesInMinute.toDouble()),
             clientRecordMetadata(metadata, "total-calories", endTs.epochSecond, version)
         )
     }

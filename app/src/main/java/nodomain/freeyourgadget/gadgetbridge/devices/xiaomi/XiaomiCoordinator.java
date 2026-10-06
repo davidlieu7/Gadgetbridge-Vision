@@ -334,7 +334,13 @@ public abstract class XiaomiCoordinator extends AbstractBLEDeviceCoordinator {
 
     @Override
     public boolean supportsBodyEnergy(@NonNull GBDevice device) {
-        return false; // FIXME is should, but untested
+        return true;
+    }
+
+    @Override
+    public boolean supportsVO2Max(@NonNull GBDevice device) {
+        // Persisted in the workout summaries - see WorkoutSummaryParser
+        return true;
     }
 
     @Override
@@ -615,6 +621,9 @@ public abstract class XiaomiCoordinator extends AbstractBLEDeviceCoordinator {
         if (getCannedRepliesSlotCount(device) > 0) {
             notifications.add(R.xml.devicesettings_canned_dismisscall_16);
         }
+        if (supportsNavigation(device)) {
+            notifications.add(R.xml.devicesettings_navigation_notifications);
+        }
         notifications.add(R.xml.devicesettings_transliteration);
 
         //
@@ -722,6 +731,11 @@ public abstract class XiaomiCoordinator extends AbstractBLEDeviceCoordinator {
     @Override
     public WidgetManager getWidgetManager(@NonNull final GBDevice device) {
         return new XiaomiWidgetManager(device);
+    }
+
+    @Override
+    public boolean supportsNavigation(@NonNull final GBDevice device) {
+        return true;
     }
 
     protected static Prefs getPrefs(@NonNull final GBDevice device) {

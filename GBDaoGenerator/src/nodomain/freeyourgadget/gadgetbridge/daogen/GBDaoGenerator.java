@@ -110,7 +110,7 @@ public class GBDaoGenerator {
             outputDir.mkdirs();
         }
 
-        final Schema schema = new Schema(148, MAIN_PACKAGE + ".entities");
+        final Schema schema = new Schema(152, MAIN_PACKAGE + ".entities");
 
         final List<Entity> sampleProvidersToGenerate = new LinkedList<>();
         final List<Entity> batterySampleProvidersToGenerate = new LinkedList<>();
@@ -122,8 +122,10 @@ public class GBDaoGenerator {
         Entity device = addDevice(schema, deviceAttributes);
         addHealthConnectSyncState(schema, device);
         addHealthConnectSleepSession(schema, device);
+        addHealthConnectWorkoutSyncFailure(schema, device);
         addInternetFirewallRule(schema, device);
         addXiaomiHipeeP1Reading(schema, device);
+        addNxWearSportSample(schema, user, device);
 
         // yeah deep shit, has to be here (after device) for db upgrade and column order
         // because addDevice adds a property to deviceAttributes also....
@@ -186,7 +188,7 @@ public class GBDaoGenerator {
         addPineTimeActivitySample(schema, user, device);
         addPolarH10ActivitySample(schema, user, device);
         addWithingsSteelHRActivitySample(schema, user, device);
-        sampleProvidersToGenerate.add(addGenericBloodPressureSample(schema, user, device));
+        addGenericBloodPressureSample(schema, user, device);
         sampleProvidersToGenerate.add(addGenericBodyCompositionSample(schema, user, device));
         sampleProvidersToGenerate.add(addGenericBloodLipidSample(schema, user, device));
         addHybridHRActivitySample(schema, user, device);
@@ -281,6 +283,7 @@ public class GBDaoGenerator {
         addAppSpecificNotificationSettings(schema, device);
         sampleProvidersToGenerate.add(addCyclingSample(schema, user, device));
         addAudioRecordings(schema, device);
+        addDeviceMusicFile(schema, device);
         addPebbleAppstoreIdEntry(schema);
 
         Entity weightSampleF8 = addWeightSampleF8(schema, user, device);
@@ -316,6 +319,7 @@ public class GBDaoGenerator {
         addGenericMetricsSample(schema, user, device);
         sampleProvidersToGenerate.add(addGenericSleepScoreSample(schema, user, device));
         sampleProvidersToGenerate.add(addGenericBodyEnergySample(schema, user, device));
+        addGenericHydrationSample(schema, user, device);
 
         validateSerializableEntities(schema);
 
@@ -1165,6 +1169,16 @@ public class GBDaoGenerator {
         return downloadedFitFile;
     }
 
+    private static Entity addNxWearSportSample(Schema schema, Entity user, Entity device) {
+        Entity sample = addEntity(schema, "NxWearSportSample");
+        addCommonTimeSampleProperties("AbstractTimeSample", sample, user, device);
+        sample.addIntProperty(SAMPLE_STEPS).notNull();
+        sample.addIntProperty("distance").notNull();
+        sample.addIntProperty("calories").notNull();
+        sample.addIntProperty("duration").notNull();
+        return sample;
+    }
+
     private static Entity addGarminActivitySample(Schema schema, Entity user, Entity device) {
         Entity activitySample = addEntity(schema, "GarminActivitySample");
         addCommonActivitySampleProperties("AbstractActivitySample", activitySample, user, device);
@@ -1677,6 +1691,15 @@ public class GBDaoGenerator {
         healthConnectSleepSession.addIndex(indexUnique);
     }
 
+    private static void addHealthConnectWorkoutSyncFailure(Schema schema, Entity device) {
+        Entity failure = addEntity(schema, "HealthConnectWorkoutSyncFailure");
+        failure.addLongProperty("summaryId").primaryKey().notNull();
+        Property deviceId = failure.addLongProperty("deviceId").notNull().index().getProperty();
+        failure.addToOne(device, deviceId);
+        failure.addLongProperty("failedAt").notNull();
+        failure.addStringProperty("error");
+    }
+
     private static void addInternetFirewallRule(Schema schema, Entity device) {
         Entity firewall = addEntity(schema, "InternetFirewallRule");
         firewall.addIdProperty().autoincrement();
@@ -1806,6 +1829,27 @@ public class GBDaoGenerator {
         recording.addIntProperty("duration");
 
         recording.addToOne(device, deviceId);
+    }
+
+    private static void addDeviceMusicFile(Schema schema, Entity device) {
+        Entity musicFile = addEntity(schema, "DeviceMusicFile");
+        musicFile.addIdProperty().autoincrement();
+
+        Property deviceId = musicFile.addLongProperty("deviceId").notNull().getProperty();
+        Property hash = musicFile.addStringProperty("hash").notNull().getProperty();
+
+        Index indexUnique = new Index();
+        indexUnique.addProperty(deviceId);
+        indexUnique.addProperty(hash);
+        indexUnique.makeUnique();
+        musicFile.addIndex(indexUnique);
+
+        musicFile.addStringProperty("title");
+        musicFile.addStringProperty("album");
+        musicFile.addStringProperty("artist");
+        musicFile.addLongProperty("size").notNull();
+
+        musicFile.addToOne(device, deviceId);
     }
 
     private static void addNotificationFilterEntry(Schema schema, Entity notificationFilterEntity) {
@@ -2943,6 +2987,18 @@ public class GBDaoGenerator {
         Entity sample = addEntity(schema, "GenericBodyEnergySample");
         addCommonTimeSampleProperties("AbstractBodyEnergySample", sample, user, device);
         sample.addIntProperty(SAMPLE_ENERGY).notNull().codeBeforeGetter(OVERRIDE);
+        return sample;
+    }
+
+    private static Entity addGenericHydrationSample(Schema schema, Entity user, Entity device) {
+        Entity sample = addEntity(schema, "GenericHydrationSample");
+        addCommonTimeSampleProperties("AbstractHydrationSample", sample, user, device);
+        Property day = sample.addIntProperty("day").notNull().codeBeforeGetter(OVERRIDE).getProperty();
+        sample.addDoubleProperty("volumeMl").notNull().codeBeforeGetter(OVERRIDE);
+        final Index indexDeviceDay = new Index();
+        indexDeviceDay.addProperty(findProperty(sample, "deviceId"));
+        indexDeviceDay.addProperty(day);
+        sample.addIndex(indexDeviceDay);
         return sample;
     }
 

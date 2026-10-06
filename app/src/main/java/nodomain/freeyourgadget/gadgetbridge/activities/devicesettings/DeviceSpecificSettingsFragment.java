@@ -90,6 +90,7 @@ import nodomain.freeyourgadget.gadgetbridge.activities.workouts.templates.Workou
 import nodomain.freeyourgadget.gadgetbridge.activities.NotificationsAppIconUploadActivity;
 import nodomain.freeyourgadget.gadgetbridge.activities.app_specific_notifications.AppSpecificNotificationSettingsActivity;
 import nodomain.freeyourgadget.gadgetbridge.activities.audiorecordings.AudioRecordingsActivity;
+import nodomain.freeyourgadget.gadgetbridge.activities.files.FtpFileBrowserActivity;
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.DeviceSetting;
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.DeviceSettingRenderer;
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.DeviceSettingsIndexer;
@@ -1551,6 +1552,7 @@ public class DeviceSpecificSettingsFragment extends AbstractPreferenceFragment i
         setInputTypeFor(DeviceSettingsPreferenceConst.PREF_DEVICE_GPS_UPDATE_INTERVAL, InputType.TYPE_CLASS_NUMBER);
         setInputTypeFor(DeviceSettingsPreferenceConst.PREF_BANGLEJS_TEXT_BITMAP_SIZE, InputType.TYPE_CLASS_NUMBER);
         setInputTypeFor(DeviceSettingsPreferenceConst.PREF_AUTO_REPLY_INCOMING_CALL_DELAY, InputType.TYPE_CLASS_NUMBER);
+        setInputTypeFor(DeviceSettingsPreferenceConst.PREF_NAVIGATION_UPDATE_RATE, InputType.TYPE_CLASS_NUMBER);
         setInputTypeFor("hplus_screentime", InputType.TYPE_CLASS_NUMBER);
         setInputTypeFor(PREF_CALENDAR_SYNC_EVENTS_AMOUNT, InputType.TYPE_CLASS_NUMBER);
         setInputTypeFor(PREF_CALENDAR_MAX_TITLE_LENGTH, InputType.TYPE_CLASS_NUMBER);
@@ -1713,6 +1715,16 @@ public class DeviceSpecificSettingsFragment extends AbstractPreferenceFragment i
         if (audioRecordings != null) {
             audioRecordings.setOnPreferenceClickListener(preference -> {
                 final Intent intent = new Intent(getContext(), AudioRecordingsActivity.class);
+                intent.putExtra(GBDevice.EXTRA_DEVICE, getDevice());
+                startActivity(intent);
+                return true;
+            });
+        }
+
+        final Preference ftpBrowse = findPreference(FTP_SERVER_BROWSE);
+        if (ftpBrowse != null) {
+            ftpBrowse.setOnPreferenceClickListener(preference -> {
+                final Intent intent = new Intent(getContext(), FtpFileBrowserActivity.class);
                 intent.putExtra(GBDevice.EXTRA_DEVICE, getDevice());
                 startActivity(intent);
                 return true;

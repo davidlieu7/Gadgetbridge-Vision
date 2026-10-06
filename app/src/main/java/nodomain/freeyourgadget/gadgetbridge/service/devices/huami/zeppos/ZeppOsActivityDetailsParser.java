@@ -120,6 +120,9 @@ public class ZeppOsActivityDetailsParser extends AbstractHuamiActivityDetailsPar
                 case SPEED:
                     consumeSpeed(buf);
                     break;
+                case DISTANCE:
+                    consumeDistance(buf);
+                    break;
                 case ALTITUDE:
                     consumeAltitude(buf, length);
                     break;
@@ -324,6 +327,14 @@ public class ZeppOsActivityDetailsParser extends AbstractHuamiActivityDetailsPar
         trace("Consumed speed: cadence={}, stride={}, pace={}", cadence, stride, pace);
     }
 
+    private void consumeDistance(final ByteBuffer buf) {
+        consumeTimestampOffset(buf);
+        // Cumulative centimetres, confirmed against Balance 3 workout summaries.
+        final double distanceMeters = Integer.toUnsignedLong(buf.getInt()) / 100.0;
+        activityPointBuilder.setDistance(distanceMeters);
+        trace("Consumed distance: {}", distanceMeters);
+    }
+
     private void consumeAltitude(final ByteBuffer buf, final int length) {
         consumeTimestampOffset(buf);
         final int altitudeRaw = buf.getInt();
@@ -506,7 +517,7 @@ public class ZeppOsActivityDetailsParser extends AbstractHuamiActivityDetailsPar
         TEMPERATURE(13, 7),
         STRENGTH_SET(15, 34),
         SWIMMING_INTERVAL(20, 31),
-        //UNKNOWN_7945(7945, 6),
+        DISTANCE(0x1F09, 6),
         ;
 
         private final int code;

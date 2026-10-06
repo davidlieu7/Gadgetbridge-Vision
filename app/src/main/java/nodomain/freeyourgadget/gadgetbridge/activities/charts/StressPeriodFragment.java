@@ -24,6 +24,7 @@ import android.text.style.RelativeSizeSpan;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.LinearLayout;
 import android.widget.TextView;
 
 import com.github.mikephil.charting.charts.BarChart;
@@ -54,6 +55,8 @@ import java.util.concurrent.TimeUnit;
 
 import nodomain.freeyourgadget.gadgetbridge.GBApplication;
 import nodomain.freeyourgadget.gadgetbridge.R;
+import nodomain.freeyourgadget.gadgetbridge.activities.workouts.StatTileData;
+import nodomain.freeyourgadget.gadgetbridge.activities.workouts.StatTileGridUtilKt;
 import nodomain.freeyourgadget.gadgetbridge.database.DBHandler;
 import nodomain.freeyourgadget.gadgetbridge.devices.DeviceCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
@@ -65,10 +68,7 @@ public class StressPeriodFragment extends StressFragment<StressPeriodFragment.My
 
     protected int TOTAL_DAYS = getRangeDays();
 
-    private TextView relaxedStressTimeText;
-    private TextView mildStressTimeText;
-    private TextView moderateStressTimeText;
-    private TextView highStressTimeText;
+    private LinearLayout mStatsContainer;
     private TextView stressDatesText;
     private PieChart mStressLevelsPieChart;
     private BarChart mWeekChart;
@@ -101,10 +101,7 @@ public class StressPeriodFragment extends StressFragment<StressPeriodFragment.My
 
         mWeekChart = rootView.findViewById(R.id.weekstresschart);
         mStressLevelsPieChart = rootView.findViewById(R.id.stress_pie_chart);
-        relaxedStressTimeText = rootView.findViewById(R.id.stress_chart_relaxed_time);
-        mildStressTimeText = rootView.findViewById(R.id.stress_chart_mild_time);
-        moderateStressTimeText = rootView.findViewById(R.id.stress_chart_moderate_time);
-        highStressTimeText = rootView.findViewById(R.id.stress_chart_high_time);
+        mStatsContainer = rootView.findViewById(R.id.stress_stats_container);
         stressDatesText = rootView.findViewById(R.id.stress_dates);
 
         setupPieChart();
@@ -134,7 +131,7 @@ public class StressPeriodFragment extends StressFragment<StressPeriodFragment.My
         mWeekChart.getBarData().setValueTextSize(10f);
 
         updatePieChart(mcd.getStressWeeklyData());
-        updateStressTimeTexts(mcd.getStressWeeklyData());
+        updateStressTiles(mcd.getStressWeeklyData());
 
         stressDatesText.setText(DateTimeUtils.formatDaysUntil(TOTAL_DAYS, getTSEnd()));
     }
@@ -204,7 +201,8 @@ public class StressPeriodFragment extends StressFragment<StressPeriodFragment.My
         }
     }
 
-    private void updateStressTimeTexts(final MyStressWeeklyData stressWeeklyData) {
+    private void updateStressTiles(final MyStressWeeklyData stressWeeklyData) {
+        final List<StatTileData> stats = new ArrayList<>();
         if (stressWeeklyData.totalDaysForAverage() > 0) {
             int relaxedAvg = (int) (stressWeeklyData.totalRelaxed() / stressWeeklyData.totalDaysForAverage());
             int mildAvg = (int) (stressWeeklyData.totalMild() / stressWeeklyData.totalDaysForAverage());
@@ -213,26 +211,34 @@ public class StressPeriodFragment extends StressFragment<StressPeriodFragment.My
 
             if (stressWeeklyData.showStressLevelInPercents()) {
                 long totalDailyAvg = relaxedAvg + mildAvg + moderateAvg + highAvg;
-                relaxedStressTimeText.setText(String.format(Locale.ROOT, "%d%%",
-                        totalDailyAvg > 0 ? Math.round(100f * relaxedAvg / totalDailyAvg) : 0));
-                mildStressTimeText.setText(String.format(Locale.ROOT, "%d%%",
-                        totalDailyAvg > 0 ? Math.round(100f * mildAvg / totalDailyAvg) : 0));
-                moderateStressTimeText.setText(String.format(Locale.ROOT, "%d%%",
-                        totalDailyAvg > 0 ? Math.round(100f * moderateAvg / totalDailyAvg) : 0));
-                highStressTimeText.setText(String.format(Locale.ROOT, "%d%%",
-                        totalDailyAvg > 0 ? Math.round(100f * highAvg / totalDailyAvg) : 0));
+                stats.add(buildStressTile(StressType.RELAXED, String.format(Locale.ROOT, "%d%%",
+                        totalDailyAvg > 0 ? Math.round(100f * relaxedAvg / totalDailyAvg) : 0)));
+                stats.add(buildStressTile(StressType.MILD, String.format(Locale.ROOT, "%d%%",
+                        totalDailyAvg > 0 ? Math.round(100f * mildAvg / totalDailyAvg) : 0)));
+                stats.add(buildStressTile(StressType.MODERATE, String.format(Locale.ROOT, "%d%%",
+                        totalDailyAvg > 0 ? Math.round(100f * moderateAvg / totalDailyAvg) : 0)));
+                stats.add(buildStressTile(StressType.HIGH, String.format(Locale.ROOT, "%d%%",
+                        totalDailyAvg > 0 ? Math.round(100f * highAvg / totalDailyAvg) : 0)));
             } else {
-                relaxedStressTimeText.setText(DateTimeUtils.formatDurationHoursMinutes(relaxedAvg, TimeUnit.SECONDS));
-                mildStressTimeText.setText(DateTimeUtils.formatDurationHoursMinutes(mildAvg, TimeUnit.SECONDS));
-                moderateStressTimeText.setText(DateTimeUtils.formatDurationHoursMinutes(moderateAvg, TimeUnit.SECONDS));
-                highStressTimeText.setText(DateTimeUtils.formatDurationHoursMinutes(highAvg, TimeUnit.SECONDS));
+                stats.add(buildStressTile(StressType.RELAXED, DateTimeUtils.formatDurationHoursMinutes(relaxedAvg, TimeUnit.SECONDS)));
+                stats.add(buildStressTile(StressType.MILD, DateTimeUtils.formatDurationHoursMinutes(mildAvg, TimeUnit.SECONDS)));
+                stats.add(buildStressTile(StressType.MODERATE, DateTimeUtils.formatDurationHoursMinutes(moderateAvg, TimeUnit.SECONDS)));
+                stats.add(buildStressTile(StressType.HIGH, DateTimeUtils.formatDurationHoursMinutes(highAvg, TimeUnit.SECONDS)));
             }
         } else {
-            relaxedStressTimeText.setText("-");
-            mildStressTimeText.setText("-");
-            moderateStressTimeText.setText("-");
-            highStressTimeText.setText("-");
+            final String emptyValue = getString(R.string.stats_empty_value);
+            stats.add(buildStressTile(StressType.RELAXED, emptyValue));
+            stats.add(buildStressTile(StressType.MILD, emptyValue));
+            stats.add(buildStressTile(StressType.MODERATE, emptyValue));
+            stats.add(buildStressTile(StressType.HIGH, emptyValue));
         }
+
+        mStatsContainer.removeAllViews();
+        StatTileGridUtilKt.addStatTileGrid(mStatsContainer, requireContext(), stats, 0);
+    }
+
+    private StatTileData buildStressTile(final StressType stressType, final String value) {
+        return new StatTileData(value, stressType.getLabel(requireContext()), null, null, null, null, stressType.getColor(requireContext()));
     }
 
     private MyStressWeeklyData getMyStressWeeklyData(DBHandler db, Calendar day, GBDevice device) {

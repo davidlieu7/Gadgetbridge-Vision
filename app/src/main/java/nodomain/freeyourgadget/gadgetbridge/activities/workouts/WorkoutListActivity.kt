@@ -36,6 +36,8 @@ import nodomain.freeyourgadget.gadgetbridge.model.RecordedDataTypes
 import nodomain.freeyourgadget.gadgetbridge.util.AndroidUtils
 import nodomain.freeyourgadget.gadgetbridge.util.GB
 import nodomain.freeyourgadget.gadgetbridge.util.WorkoutFilterUtils
+import nodomain.freeyourgadget.gadgetbridge.util.healthconnect.HealthConnectWorkoutSync
+import nodomain.freeyourgadget.gadgetbridge.util.kotlin.applyAccentColors
 import nodomain.freeyourgadget.gadgetbridge.util.kotlin.getParcelableCompat
 import nodomain.freeyourgadget.gadgetbridge.util.kotlin.getSerializableCompat
 import kotlinx.coroutines.Dispatchers
@@ -114,6 +116,7 @@ class WorkoutListActivity : AbstractListActivity<BaseActivitySummary>() {
                 // and swipe-refresh spinner don't blink on every
                 // incremental update.
                 GBApplication.ACTION_NEW_DATA -> refresh(silent = true)
+                HealthConnectWorkoutSync.ACTION_STATE_CHANGED -> refresh(silent = true)
                 else -> LOG.warn("Got unexpected action {}", intent.action)
             }
         }
@@ -154,6 +157,7 @@ class WorkoutListActivity : AbstractListActivity<BaseActivitySummary>() {
         val filterLocal = IntentFilter().apply {
             addAction(GBDevice.ACTION_DEVICE_CHANGED)
             addAction(GBApplication.ACTION_NEW_DATA)
+            addAction(HealthConnectWorkoutSync.ACTION_STATE_CHANGED)
         }
         LocalBroadcastManager.getInstance(this).registerReceiver(receiver, filterLocal)
 
@@ -237,12 +241,15 @@ class WorkoutListActivity : AbstractListActivity<BaseActivitySummary>() {
 
         val fab: FloatingActionButton = findViewById(R.id.fab)
         fab.setOnClickListener { fetchTrackData() }
+        // The FAB comes from the layout shared by every list screen, so it is only recolored here.
+        fab.applyAccentColors()
     }
 
     private fun setupViewModel() {
         viewModel.summaries.observe(this) { summaries ->
             // Set before the items, so the first bind of every row already has its indicator.
             summariesAdapter?.uploadStatuses = viewModel.uploadStatuses.value.orEmpty()
+            summariesAdapter?.healthConnectFailures = viewModel.healthConnectFailures.value.orEmpty()
             itemAdapter?.setItems(summaries, true)
             activityKindMap = fillKindMap()
         }
@@ -562,6 +569,16 @@ class WorkoutListActivity : AbstractListActivity<BaseActivitySummary>() {
     }
 
     private fun refresh(silent: Boolean) {
+        // The adapter only reads the kind and date filters to title the dashboard, so it has to
+        // be kept in sync here: the filter screen result only updates this activity's fields.
+        summariesAdapter?.let { adapter ->
+            adapter.setActivityKindFilter(activityFilter)
+            adapter.setDateFromFilter(dateFromFilter)
+            adapter.setDateToFilter(dateToFilter)
+            adapter.setNameContainsFilter(nameContainsFilter)
+            adapter.setItemsFilter(itemsFilter)
+            adapter.setDeviceFilter(deviceFilter)
+        }
         gbDevice?.let { device ->
             viewModel.loadSummaries(
                 device,

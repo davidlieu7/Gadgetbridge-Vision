@@ -1,6 +1,6 @@
 [FitFileId{type=WORKOUTS, manufacturer=1, product=65534, serial_number=1, number=1},
 FitFileCreator{software_version=1},
-FitWorkout{sport=1, capabilities=32, num_valid_steps=14, name=garmin_run_full, sub_sport=0, message_index=0},
+FitWorkout{sport=1, capabilities=32, num_valid_steps=14, wkt_name=garmin_run_full, sub_sport=0, message_index=0},
 FitWorkoutStep{duration_type=TIME, duration_value=45000, target_type=OPEN, target_value=0, intensity=WARMUP, weight_display_unit=KILOGRAM, message_index=0},
 FitWorkoutStep{duration_type=DISTANCE, duration_value=40000, target_type=SPEED, custom_target_value_low=3175, custom_target_value_high=3509, intensity=ACTIVE, notes=CaptureNoteCaptureNoteCaptureNoteCaptureNoteCaptureNoteCaptureNoteCaptureNoteCaptureNoteCaptureNoteCaptureNoteCaptureNoteCaptureNoteCaptureNoteCaptureNoteCaptureNoteCaptureNoteCaptureNoteCaptureNoteCa, weight_display_unit=KILOGRAM, message_index=1},
 FitWorkoutStep{duration_type=TIME, duration_value=510000, target_type=CADENCE, custom_target_value_low=90, custom_target_value_high=92, intensity=ACTIVE, weight_display_unit=KILOGRAM, message_index=2},
@@ -12,6 +12,6 @@ FitWorkoutStep{duration_type=TIME, duration_value=45000, target_type=OPEN, targe
 FitWorkoutStep{duration_type=TIME, duration_value=45000, target_type=OPEN, target_value=0, intensity=ACTIVE, weight_display_unit=KILOGRAM, message_index=8},
 FitWorkoutStep{duration_type=DISTANCE, duration_value=40000, target_type=SPEED, custom_target_value_low=2020, custom_target_value_high=2151, intensity=ACTIVE, weight_display_unit=KILOGRAM, message_index=9},
 FitWorkoutStep{duration_type=TIME, duration_value=45000, target_type=OPEN, target_value=0, intensity=RECOVERY, weight_display_unit=KILOGRAM, message_index=10},
-FitWorkoutStep{duration_type=REPEAT_UNTIL_STEPS_CMPLT, duration_value=9, target_value=3, skip_last_recover=0, message_index=11},
+FitWorkoutStep{duration_type=REPEAT_UNTIL_STEPS_CMPLT, duration_value=9, target_value=3, skip_last_recover=false, message_index=11},
 FitWorkoutStep{duration_type=TIME, duration_value=86399000, target_type=SPEED, custom_target_value_low=3175, custom_target_value_high=3509, intensity=ACTIVE, weight_display_unit=KILOGRAM, message_index=12},
 FitWorkoutStep{duration_type=DISTANCE, duration_value=2110000, target_type=OPEN, target_value=0, intensity=COOLDOWN, weight_display_unit=KILOGRAM, message_index=13}]

@@ -424,6 +424,11 @@ public interface DeviceCoordinator {
     boolean supportsWeightMeasurement(@NonNull final GBDevice device);
 
     /**
+     * Returns true if storing hydration entries is supported for the device.
+     */
+    boolean supportsHydration(@NonNull final GBDevice device);
+
+    /**
      * Returns the sample provider for the device being supported.
      */
     @Nullable
@@ -568,6 +573,12 @@ public interface DeviceCoordinator {
     @Nullable
     TimeSampleProvider<? extends WeightSample> getWeightSampleProvider(@NonNull final GBDevice device, @NonNull final DaoSession session);
 
+    /**
+     * Returns the sample provider for hydration data, for the device being supported.
+     */
+    @Nullable
+    HydrationSampleProvider getHydrationSampleProvider(@NonNull final GBDevice device, @NonNull final DaoSession session);
+
     /// @deprecated see {@link #getMetricsSampleProvider(GBDevice, DaoSession)} and {@link MetricSample.Metric#GENERIC_RESTING_METABOLIC_RATE}
     @Deprecated
     @Nullable
@@ -707,6 +718,11 @@ public interface DeviceCoordinator {
      * @return
      */
     boolean supportsHeartRateMeasurement(@NonNull final GBDevice device);
+
+    /** Maximum gap between heart-rate measurements that chart lines should bridge, in minutes. */
+    default int getMaxHeartRateMeasurementsGapMinutes(@NonNull final GBDevice device) {
+        return nodomain.freeyourgadget.gadgetbridge.activities.HeartRateUtils.MAX_HR_MEASUREMENTS_GAP_MINUTES;
+    }
 
     /**
      * Returns true if the given device supports resting heart rate measurements.
@@ -1093,6 +1109,8 @@ public interface DeviceCoordinator {
     WidgetManager getWidgetManager(@NonNull final GBDevice device);
 
     boolean supportsNavigation(@NonNull final GBDevice device);
+
+    boolean supportsNotifications(@NonNull final GBDevice device);
 
     int getOrderPriority();
 

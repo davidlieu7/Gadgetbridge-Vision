@@ -321,4 +321,10 @@ public class WeightChartFragment extends AbstractChartFragment<WeightChartFragme
             return format.format(calendar.getTime());
         }
     }
+
+    @Nullable
+    @Override
+    public ChartDataRange getAvailableDataRange(final GBDevice device, final DBHandler db) {
+        return ChartDataRange.ofSamples(device.getDeviceCoordinator().getWeightSampleProvider(device, db.getDaoSession()));
+    }
 }

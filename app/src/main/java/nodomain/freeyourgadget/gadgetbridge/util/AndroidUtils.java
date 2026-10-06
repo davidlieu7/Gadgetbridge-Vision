@@ -127,18 +127,8 @@ public class AndroidUtils {
      */
     public static String getTextColorHex(Context context) {
         int color;
-        if (DynamicColors.isDynamicColorAvailable() && GBApplication.areDynamicColorsEnabled()) {
-            Context dynamicColorContext;
-            if (GBApplication.isDarkThemeEnabled()) {
-                dynamicColorContext = DynamicColors.wrapContextIfAvailable(context, R.style.GadgetbridgeThemeDynamicDark);
-            } else {
-                dynamicColorContext = DynamicColors.wrapContextIfAvailable(context, R.style.GadgetbridgeThemeDynamicLight);
-            }
-            int[] attrsToResolve = {com.google.android.material.R.attr.colorOnSurface};
-            @SuppressLint("ResourceType")
-            TypedArray ta = dynamicColorContext.obtainStyledAttributes(attrsToResolve);
-            color = ta.getColor(0, 0);
-            ta.recycle();
+        if (isDynamicColorActive()) {
+            color = getDynamicColor(context, com.google.android.material.R.attr.colorOnSurface);
         } else if (GBApplication.isDarkThemeEnabled()) {
             color = ContextCompat.getColor(context, R.color.primarytext_dark);
         } else {
@@ -153,18 +143,8 @@ public class AndroidUtils {
      */
     public static String getBackgroundColorHex(Context context) {
         int color;
-        if (DynamicColors.isDynamicColorAvailable() && GBApplication.areDynamicColorsEnabled()) {
-            Context dynamicColorContext;
-            if (GBApplication.isDarkThemeEnabled()) {
-                dynamicColorContext = DynamicColors.wrapContextIfAvailable(context, R.style.GadgetbridgeThemeDynamicDark);
-            } else {
-                dynamicColorContext = DynamicColors.wrapContextIfAvailable(context, R.style.GadgetbridgeThemeDynamicLight);
-            }
-            int[] attrsToResolve = {com.google.android.material.R.attr.colorSurface};
-            @SuppressLint("ResourceType")
-            TypedArray ta = dynamicColorContext.obtainStyledAttributes(attrsToResolve);
-            color = ta.getColor(0, 0);
-            ta.recycle();
+        if (isDynamicColorActive()) {
+            color = getDynamicColor(context, com.google.android.material.R.attr.colorSurface);
         } else if (GBApplication.isDarkThemeEnabled()) {
             color = ContextCompat.getColor(context, androidx.cardview.R.color.cardview_dark_background);
         } else {
@@ -173,13 +153,25 @@ public class AndroidUtils {
         return colorToHex(color);
     }
 
-    public static int getBackgroundColor(Context context) {
-        int color;
-        if (GBApplication.isDarkThemeEnabled()) {
-            color = ContextCompat.getColor(context, androidx.cardview.R.color.cardview_dark_background);
-        } else {
-            color = ContextCompat.getColor(context, androidx.cardview.R.color.cardview_light_background);
-        }
+    /**
+     * Whether the Dynamic Color theme is both selected and supported by the system.
+     */
+    public static boolean isDynamicColorActive() {
+        return DynamicColors.isDynamicColorAvailable() && GBApplication.areDynamicColorsEnabled();
+    }
+
+    /**
+     * Resolves a color attribute against the Dynamic Color theme matching the current
+     * light/dark setting. Independent of the context's own theme, so it also works with
+     * the application context.
+     */
+    public static int getDynamicColor(Context context, int attr) {
+        final Context dynamicColorContext = DynamicColors.wrapContextIfAvailable(context,
+                GBApplication.isDarkThemeEnabled() ? R.style.GadgetbridgeThemeDynamicDark : R.style.GadgetbridgeThemeDynamicLight);
+        @SuppressLint("ResourceType")
+        final TypedArray ta = dynamicColorContext.obtainStyledAttributes(new int[]{attr});
+        final int color = ta.getColor(0, 0);
+        ta.recycle();
         return color;
     }
 

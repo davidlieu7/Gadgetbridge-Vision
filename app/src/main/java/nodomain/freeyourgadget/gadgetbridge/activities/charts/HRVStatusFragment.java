@@ -16,12 +16,15 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 package nodomain.freeyourgadget.gadgetbridge.activities.charts;
 
+import androidx.annotation.Nullable;
+
 import android.graphics.Paint;
 import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ImageView;
+import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -62,6 +65,8 @@ import nodomain.freeyourgadget.gadgetbridge.GBApplication;
 import nodomain.freeyourgadget.gadgetbridge.R;
 import nodomain.freeyourgadget.gadgetbridge.widgets.impl.HrvWidget;
 import nodomain.freeyourgadget.gadgetbridge.activities.dashboard.GaugeDrawer;
+import nodomain.freeyourgadget.gadgetbridge.activities.workouts.StatTileData;
+import nodomain.freeyourgadget.gadgetbridge.activities.workouts.StatTileGridUtilKt;
 import nodomain.freeyourgadget.gadgetbridge.database.DBHandler;
 import nodomain.freeyourgadget.gadgetbridge.devices.DeviceCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.SampleProvider;
@@ -106,14 +111,7 @@ public class HRVStatusFragment extends AbstractChartFragment<HRVStatusFragment.H
     private ImageView mHRVStatusGauge;
     private CombinedChart mWeeklyHRVStatusChart;
     private ChipGroup mHRVStatusDataTypeGroup;
-    private TextView mHRVStatusSevenDaysAvg;
-    private TextView mHRVStatusSevenDaysAvgStatus; // Balanced, Unbalanced, Low
-    private TextView mHRVStatusLastNight;
-    private TextView mHRVStatusLastNightLabel;
-    private TextView mHRVStatusLastNight5MinHighest;
-    private TextView mHRVStatusLastNight5MinHighestLabel;
-    private TextView mHRVStatusDayAvg;
-    private TextView mHRVStatusBaseline;
+    private LinearLayout mHRVStatusStatsContainer;
     private TextView mDateView;
     private TextView mHRVGaugeValue;
     private TextView mHRVGaugeStatus;
@@ -173,14 +171,7 @@ public class HRVStatusFragment extends AbstractChartFragment<HRVStatusFragment.H
         });
 
         mWeeklyHRVStatusChart = rootView.findViewById(R.id.hrv_weekly_line_chart);
-        mHRVStatusLastNight = rootView.findViewById(R.id.hrv_status_last_night);
-        mHRVStatusLastNightLabel = rootView.findViewById(R.id.hrv_status_last_night_label);
-        mHRVStatusSevenDaysAvg = rootView.findViewById(R.id.hrv_status_seven_days_avg);
-        mHRVStatusSevenDaysAvgStatus = rootView.findViewById(R.id.hrv_status_seven_days_avg_rate);
-        mHRVStatusLastNight5MinHighest = rootView.findViewById(R.id.hrv_status_last_night_highest_5);
-        mHRVStatusLastNight5MinHighestLabel = rootView.findViewById(R.id.hrv_status_last_night_highest_5_label);
-        mHRVStatusDayAvg = rootView.findViewById(R.id.hrv_status_day_avg);
-        mHRVStatusBaseline = rootView.findViewById(R.id.hrv_status_baseline);
+        mHRVStatusStatsContainer = rootView.findViewById(R.id.hrv_status_stats_container);
         mDateView = rootView.findViewById(R.id.hrv_status_date_view);
         mHRVStatusGauge = rootView.findViewById(R.id.hrv_status_gauge_bar);
         mHRVGaugeValue = rootView.findViewById(R.id.hrv_gauge_value);
@@ -188,7 +179,6 @@ public class HRVStatusFragment extends AbstractChartFragment<HRVStatusFragment.H
         mHRVStatusDataTypeGroup = rootView.findViewById(R.id.hrv_status_chart_data_type_group);
 
         gaugeDrawer = new GaugeDrawer();
-        updateNightlySummaryLabels();
         setupPeriodDataTypeChips(inflater);
         setupLineChart();
         refresh();
@@ -408,71 +398,69 @@ public class HRVStatusFragment extends AbstractChartFragment<HRVStatusFragment.H
         }
 
         HRVStatusDayData today = weeklyData.getCurrentDay();
-        // Show weekly average even if we don't have full 7 days - it's computed from available data
-        mHRVStatusSevenDaysAvg.setText(today.weeklyAvg > 0 ? getString(R.string.hrv_status_unit, today.weeklyAvg) :
-                (today.dayAvg > 0 ? getString(R.string.hrv_status_unit, today.dayAvg) : getString(R.string.stats_empty_value)));
-        updateNightlySummaryStats(weeklyData, today);
-        mHRVStatusDayAvg.setText(formatHrvStatusValue(today.dayAvg));
-        mHRVStatusBaseline.setText(today.baseLineBalancedLower > 0 && today.baseLineBalancedUpper > 0 ? getString(R.string.hrv_status_baseline, today.baseLineBalancedLower, today.baseLineBalancedUpper) : "-");
+
+        final String statusLabel;
+        final int statusColor;
         switch (today.status) {
-            case NONE:
-                mHRVStatusSevenDaysAvgStatus.setText("-");
-                mHRVStatusSevenDaysAvgStatus.setTextColor(TEXT_COLOR);
-                mHRVGaugeStatus.setText("");
-                mHRVGaugeStatus.setTextColor(TEXT_COLOR);
-                break;
             case POOR:
-                mHRVStatusSevenDaysAvgStatus.setText(getString(R.string.hrv_status_poor));
-                mHRVStatusSevenDaysAvgStatus.setTextColor(getResources().getColor(R.color.hrv_status_poor));
-                mHRVGaugeStatus.setText(getString(R.string.hrv_status_poor));
-                mHRVGaugeStatus.setTextColor(getResources().getColor(R.color.hrv_status_poor));
+                statusLabel = getString(R.string.hrv_status_poor);
+                statusColor = getResources().getColor(R.color.hrv_status_poor);
                 break;
             case LOW:
-                mHRVStatusSevenDaysAvgStatus.setText(getString(R.string.hrv_status_low));
-                mHRVStatusSevenDaysAvgStatus.setTextColor(getResources().getColor(R.color.hrv_status_low));
-                mHRVGaugeStatus.setText(getString(R.string.hrv_status_low));
-                mHRVGaugeStatus.setTextColor(getResources().getColor(R.color.hrv_status_low));
+                statusLabel = getString(R.string.hrv_status_low);
+                statusColor = getResources().getColor(R.color.hrv_status_low);
                 break;
             case UNBALANCED:
-                mHRVStatusSevenDaysAvgStatus.setText(getString(R.string.hrv_status_unbalanced));
-                mHRVStatusSevenDaysAvgStatus.setTextColor(getResources().getColor(R.color.hrv_status_unbalanced));
-                mHRVGaugeStatus.setText(getString(R.string.hrv_status_unbalanced));
-                mHRVGaugeStatus.setTextColor(getResources().getColor(R.color.hrv_status_unbalanced));
+                statusLabel = getString(R.string.hrv_status_unbalanced);
+                statusColor = getResources().getColor(R.color.hrv_status_unbalanced);
                 break;
             case BALANCED:
-                mHRVStatusSevenDaysAvgStatus.setText(getString(R.string.hrv_status_balanced));
-                mHRVStatusSevenDaysAvgStatus.setTextColor(getResources().getColor(R.color.hrv_status_balanced));
-                mHRVGaugeStatus.setText(getString(R.string.hrv_status_balanced));
-                mHRVGaugeStatus.setTextColor(getResources().getColor(R.color.hrv_status_balanced));
+                statusLabel = getString(R.string.hrv_status_balanced);
+                statusColor = getResources().getColor(R.color.hrv_status_balanced);
+                break;
+            case NONE:
+            default:
+                statusLabel = "";
+                statusColor = TEXT_COLOR;
                 break;
         }
+        mHRVGaugeStatus.setText(statusLabel);
+        mHRVGaugeStatus.setTextColor(statusColor);
+
+        final boolean lastNight = viewMode == ViewMode.LAST_NIGHT;
+        final int nightlyAvgLabel = lastNight ? R.string.hrv_status_last_night : R.string.hrv_status_nightly_avg;
+        final int highestNightlyAvgLabel = lastNight ? R.string.hrv_status_last_night_highest_5 : R.string.hrv_status_highest_nightly_avg;
+        final int nightlyAvgValue = lastNight ? today.lastNight : weeklyData.getPeriodNightlyAverage();
+        final int highestNightlyAvgValue = lastNight ? today.lastNight5MinHigh : weeklyData.getHighestNightlyAverage();
+
+        mHRVStatusStatsContainer.removeAllViews();
+        final List<StatTileData> stats = new ArrayList<>();
+        // Show weekly average even if we don't have full 7 days - it's computed from available data
+        stats.add(new StatTileData(
+                today.weeklyAvg > 0 ? getString(R.string.hrv_status_unit, today.weeklyAvg) :
+                        (today.dayAvg > 0 ? getString(R.string.hrv_status_unit, today.dayAvg) : getString(R.string.stats_empty_value)),
+                getString(R.string.hrv_status_seven_days_avg)
+        ));
+        final boolean hasStatus = today.status != HrvSummarySample.Status.NONE;
+        stats.add(new StatTileData(
+                hasStatus ? statusLabel : "-",
+                getString(R.string.hrv_status_seven_days_avg_status),
+                hasStatus ? statusColor : null
+        ));
+        stats.add(new StatTileData(formatHrvStatusValue(today.dayAvg), getString(R.string.hrv_status_day_avg)));
+        stats.add(new StatTileData(
+                today.baseLineBalancedLower > 0 && today.baseLineBalancedUpper > 0
+                        ? getString(R.string.hrv_status_baseline, today.baseLineBalancedLower, today.baseLineBalancedUpper) : "-",
+                getString(R.string.hrv_status_baseline_label)
+        ));
+        stats.add(new StatTileData(formatHrvStatusValue(nightlyAvgValue), getString(nightlyAvgLabel)));
+        stats.add(new StatTileData(formatHrvStatusValue(highestNightlyAvgValue), getString(highestNightlyAvgLabel)));
+        StatTileGridUtilKt.addStatTileGrid(mHRVStatusStatsContainer, requireContext(), stats, 0);
+
         final float value = HrvWidget.calculateGaugeValue(today.weeklyAvg, today.baseLineLowUpper, today.baseLineBalancedLower, today.baseLineBalancedUpper);
         final String valueText = value > 0 ? getString(R.string.hrv_status_unit, today.weeklyAvg) : getString(R.string.stats_empty_value);
         mHRVGaugeValue.setText(valueText);
         gaugeDrawer.drawSegmentedGauge(mHRVStatusGauge, HrvWidget.colors(requireContext()), HrvWidget.SEGMENTS, value, false, true);
-    }
-
-    private void updateNightlySummaryStats(final HRVStatusWeeklyData weeklyData, final HRVStatusDayData today) {
-        updateNightlySummaryLabels();
-        if (viewMode == ViewMode.LAST_NIGHT) {
-            mHRVStatusLastNight.setText(formatHrvStatusValue(today.lastNight));
-            mHRVStatusLastNight5MinHighest.setText(formatHrvStatusValue(today.lastNight5MinHigh));
-            return;
-        }
-
-        mHRVStatusLastNight.setText(formatHrvStatusValue(weeklyData.getPeriodNightlyAverage()));
-        mHRVStatusLastNight5MinHighest.setText(formatHrvStatusValue(weeklyData.getHighestNightlyAverage()));
-    }
-
-    private void updateNightlySummaryLabels() {
-        if (viewMode == ViewMode.LAST_NIGHT) {
-            mHRVStatusLastNightLabel.setText(R.string.hrv_status_last_night);
-            mHRVStatusLastNight5MinHighestLabel.setText(R.string.hrv_status_last_night_highest_5);
-            return;
-        }
-
-        mHRVStatusLastNightLabel.setText(R.string.hrv_status_nightly_avg);
-        mHRVStatusLastNight5MinHighestLabel.setText(R.string.hrv_status_highest_nightly_avg);
     }
 
     private String formatHrvStatusValue(final int value) {
@@ -1060,5 +1048,14 @@ public class HRVStatusFragment extends AbstractChartFragment<HRVStatusFragment.H
             this.baseLineBalancedLower = baseLineBalancedLower;
             this.baseLineBalancedUpper = baseLineBalancedUpper;
         }
+    }
+
+    @Nullable
+    @Override
+    public ChartDataRange getAvailableDataRange(final GBDevice device, final DBHandler db) {
+        return ChartDataRange.union(
+                ChartDataRange.ofSamples(device.getDeviceCoordinator().getHrvSummarySampleProvider(device, db.getDaoSession())),
+                ChartDataRange.ofSamples(device.getDeviceCoordinator().getHrvValueSampleProvider(device, db.getDaoSession()))
+        );
     }
 }

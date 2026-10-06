@@ -320,8 +320,8 @@ public class VO2MaxPeriodFragment extends AbstractChartFragment<VO2MaxPeriodFrag
         Collections.sort(visibleSorted, (a, b) -> Float.compare(a.getX(), b.getX()));
 
         final int maxLabelSlots = contentWidthPx > 0
-                ? Math.max(2, (int) (contentWidthPx / (MIN_VALUE_LABEL_SPACING_DP * density)))
-                : visibleSorted.size();
+            ? Math.max(2, (int) (contentWidthPx / (MIN_VALUE_LABEL_SPACING_DP * density)))
+            : visibleSorted.size();
 
         if (visibleSorted.size() <= maxLabelSlots) {
             labeledEntries.addAll(visibleSorted);
@@ -485,5 +485,11 @@ public class VO2MaxPeriodFragment extends AbstractChartFragment<VO2MaxPeriodFrag
         public VO2MaxRecord getLatestValue(Vo2MaxSample.Type type) {
             return latestValues != null ? latestValues.get(type) : null;
         }
+    }
+
+    @Nullable
+    @Override
+    public ChartDataRange getAvailableDataRange(final GBDevice device, final DBHandler db) {
+        return ChartDataRange.ofSamples(device.getDeviceCoordinator().getVo2MaxSampleProvider(device, db.getDaoSession()));
     }
 }

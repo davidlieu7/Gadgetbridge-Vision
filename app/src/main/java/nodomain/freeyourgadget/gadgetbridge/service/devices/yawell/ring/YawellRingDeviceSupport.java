@@ -566,6 +566,19 @@ public class YawellRingDeviceSupport extends AbstractBTLESingleDeviceSupport {
             case SettingsActivity.PREF_UNIT_DISTANCE:
                 setUserPreferences();
                 break;
+            case DeviceSettingsPreferenceConst.PREF_HEARTRATE_MEASUREMENT_INTERVAL:
+                final long hrIntervalSecs = prefs.getLong(DeviceSettingsPreferenceConst.PREF_HEARTRATE_MEASUREMENT_INTERVAL, 0);
+                // Round to nearest 5 minutes and limit to 60 minutes due to device constraints
+                final long hrIntervalMins = Math.min(Math.round(hrIntervalSecs / 60.0 / 5.0) * 5, 60);
+                byte[] hrIntervalPacket = buildPacket(new byte[]{
+                    YawellRingConstants.CMD_AUTO_HR_PREF,
+                    YawellRingConstants.PREF_WRITE,
+                    hrIntervalMins > 0 ? (byte) 0x01 : (byte) 0x02,
+                    (byte) hrIntervalMins
+                });
+                LOG.info("HR interval preference request sent: {}", StringUtils.bytesToHex(hrIntervalPacket));
+                sendWrite("hrIntervalPreferenceRequest", hrIntervalPacket);
+                break;
             case DeviceSettingsPreferenceConst.PREF_SPO2_ALL_DAY_MONITORING:
                 final boolean spo2Enabled = prefs.getBoolean(DeviceSettingsPreferenceConst.PREF_SPO2_ALL_DAY_MONITORING, false);
                 byte[] spo2PrefsPacket = buildPacket(new byte[]{YawellRingConstants.CMD_AUTO_SPO2_PREF, YawellRingConstants.PREF_WRITE, (byte) (spo2Enabled ? 0x01 : 0x00)});
@@ -624,20 +637,6 @@ public class YawellRingDeviceSupport extends AbstractBTLESingleDeviceSupport {
                 sendWrite("displayPreferencesRequest", displayPrefsPacket);
                 break;
         }
-    }
-
-    @Override
-    public void onSetHeartRateMeasurementInterval(int seconds) {
-        // Round to nearest 5 minutes and limit to 60 minutes due to device constraints
-        long hrIntervalMins = Math.min(Math.round(seconds / 60.0 / 5.0) * 5, 60);
-        byte[] hrIntervalPacket = buildPacket(new byte[]{
-                YawellRingConstants.CMD_AUTO_HR_PREF,
-                YawellRingConstants.PREF_WRITE,
-                hrIntervalMins > 0 ? (byte) 0x01 : (byte) 0x02,
-                (byte) hrIntervalMins
-        });
-        LOG.info("HR interval preference request sent: {}", StringUtils.bytesToHex(hrIntervalPacket));
-        sendWrite("hrIntervalPreferenceRequest", hrIntervalPacket);
     }
 
     private void setUserPreferences() {

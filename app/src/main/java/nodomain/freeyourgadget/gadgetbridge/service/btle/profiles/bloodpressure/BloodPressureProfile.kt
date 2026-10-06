@@ -120,5 +120,7 @@ class BloodPressureProfile<T : AbstractBTLESingleDeviceSupport>(val support: T) 
         const val FLAG_PULSE_RATE = 0x04
         const val FLAG_USER_ID = 0x08
         const val FLAG_MEASUREMENT_STATUS = 0x10
+
+        const val USER_ID_UNKNOWN = 0xff
     }
 }

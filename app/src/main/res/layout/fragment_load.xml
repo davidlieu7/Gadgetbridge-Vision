@@ -28,7 +28,10 @@
             <RelativeLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_margin="8dp"
+                android:layout_marginStart="8dp"
+                android:layout_marginEnd="8dp"
+                android:layout_marginTop="@dimen/chart_section_spacing"
+                android:layout_marginBottom="@dimen/chart_section_spacing"
                 android:orientation="vertical"
                 >
 
@@ -59,16 +62,11 @@
 
             </RelativeLayout>
 
-            <TextView
+            <nodomain.freeyourgadget.gadgetbridge.activities.workouts.SectionHeaderView
                 android:id="@+id/acute_load_header"
-                android:layout_marginTop="30dp"
-                android:layout_marginStart="25dp"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:gravity="start"
-                android:textSize="20sp"
-                android:text="@string/training_acute_load"
-                />
+                app:sectionTitle="@string/training_acute_load" />
             <com.github.mikephil.charting.charts.CombinedChart
                 android:id="@+id/acute_load_chart"
                 android:layout_width="fill_parent"
@@ -84,66 +82,21 @@
                 android:layout_marginBottom="10dp"
                 app:selectionRequired="true" />
 
-            <GridLayout
-                android:background="@color/gauge_line_color"
+            <LinearLayout
+                android:id="@+id/acute_chronic_load_stats_container"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:columnCount="2"
                 android:layout_marginTop="15dp"
-                android:layout_marginBottom="15dp"
-                >
-                <LinearLayout
-                    android:id="@+id/acute_load_wrapper"
-                    style="@style/GridTile"
-                    android:layout_marginEnd="1dp"
-                    android:layout_marginTop="2dp"
-                    >
-                    <TextView
-                        android:id="@+id/acute_load"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="0"
-                        android:textColor="?attr/textColorPrimary"
-                        android:textSize="20sp" />
-
-                    <TextView
-                        android:id="@+id/acute_load_label"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="@string/training_acute_load"
-                        android:textSize="12sp" />
-                </LinearLayout>
-                <LinearLayout
-                    android:id="@+id/chronic_load_wrapper"
-                    style="@style/GridTile"
-                    android:layout_marginStart="1dp"
-                    android:layout_marginTop="2dp"
-                    >
-                    <TextView
-                        android:id="@+id/chronic_load"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="0"
-                        android:textColor="?attr/textColorPrimary"
-                        android:textSize="20sp" />
-                    <TextView
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:text="@string/training_chronic_load"
-                        android:textSize="12sp" />
-                </LinearLayout>
-            </GridLayout>
+                android:layout_marginStart="15dp"
+                android:layout_marginEnd="15dp"
+                android:orientation="vertical" />
         </LinearLayout>
 
-        <TextView
-            android:layout_marginTop="30dp"
-            android:layout_marginStart="25dp"
+        <nodomain.freeyourgadget.gadgetbridge.activities.workouts.SectionHeaderView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:gravity="start"
-            android:textSize="20sp"
-            android:text="@string/training_daily_load"
-            />
+            android:layout_marginTop="@dimen/chart_section_spacing"
+            app:sectionTitle="@string/training_daily_load" />
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="250sp">
@@ -154,52 +107,15 @@
                 android:layout_weight="2" />
         </LinearLayout>
 
-        <GridLayout
-            android:background="@color/gauge_line_color"
+        <LinearLayout
+            android:id="@+id/weekly_load_stats_container"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:columnCount="2"
             android:layout_marginTop="15dp"
             android:layout_marginBottom="15dp"
-            >
-            <LinearLayout
-                style="@style/GridTile"
-                android:layout_marginEnd="1dp"
-                android:layout_marginTop="2dp"
-                >
-                <TextView
-                    android:id="@+id/this_week_total"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="0"
-                    android:textColor="?attr/textColorPrimary"
-                    android:textSize="20sp" />
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/this_week_total"
-                    android:textSize="12sp" />
-            </LinearLayout>
-            <LinearLayout
-                style="@style/GridTile"
-                android:layout_marginStart="1dp"
-                android:layout_marginTop="2dp"
-                >
-                <TextView
-                    android:id="@+id/last_week_total"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="0"
-                    android:textColor="?attr/textColorPrimary"
-                    android:textSize="20sp" />
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/last_week_total"
-                    android:textSize="12sp" />
-            </LinearLayout>
-        </GridLayout>
+            android:layout_marginStart="15dp"
+            android:layout_marginEnd="15dp"
+            android:orientation="vertical" />
 
     </LinearLayout>
 </ScrollView>

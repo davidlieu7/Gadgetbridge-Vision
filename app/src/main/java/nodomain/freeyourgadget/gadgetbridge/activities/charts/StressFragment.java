@@ -2,6 +2,7 @@ package nodomain.freeyourgadget.gadgetbridge.activities.charts;
 
 import android.content.Context;
 
+import androidx.annotation.Nullable;
 import androidx.core.content.ContextCompat;
 
 import com.github.mikephil.charting.charts.Chart;
@@ -176,5 +177,11 @@ public abstract class StressFragment<D extends ChartsData> extends AbstractChart
                 return StressType.HIGH;
             }
         }
+    }
+
+    @Nullable
+    @Override
+    public ChartDataRange getAvailableDataRange(final GBDevice device, final DBHandler db) {
+        return ChartDataRange.ofSamples(device.getDeviceCoordinator().getStressSampleProvider(device, db.getDaoSession()));
     }
 }

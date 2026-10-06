@@ -5,8 +5,11 @@
 
     <com.google.android.material.tabs.TabLayout
         android:id="@+id/tab_layout"
+        style="@style/Widget.App.TabLayout.SubPill"
         android:layout_width="match_parent"
-        android:layout_height="wrap_content" />
+        android:layout_height="32dp"
+        android:layout_marginHorizontal="10dp"
+        android:layout_marginVertical="8dp" />
 
     <androidx.viewpager2.widget.ViewPager2
         android:id="@+id/pager"

@@ -138,6 +138,8 @@ import nodomain.freeyourgadget.gadgetbridge.service.devices.huawei.datasync.Huaw
 import nodomain.freeyourgadget.gadgetbridge.service.devices.huawei.datasync.HuaweiDataSyncGoals;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.huawei.datasync.HuaweiDataSyncArterialStiffnessDetection;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.huawei.datasync.HuaweiDataSyncSleepApnea;
+import nodomain.freeyourgadget.gadgetbridge.service.devices.huawei.datasync.HuaweiDataSyncSyncDeviceService;
+import nodomain.freeyourgadget.gadgetbridge.service.devices.huawei.datasync.HuaweiDataSyncWheelchairService;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.huawei.p2p.HuaweiP2PAppIcon;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.huawei.p2p.HuaweiP2PBatteryService;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.huawei.p2p.HuaweiP2PCalendarService;
@@ -323,6 +325,10 @@ public class HuaweiSupportProvider {
     private HuaweiDataSyncEcg huaweiDataSyncEcg = null;
 
     private HuaweiDataSyncArterialStiffnessDetection huaweiDataSyncArterialStiffnessDetection = null;
+
+    private HuaweiDataSyncWheelchairService huaweiDataSyncWheelchairService = null;
+
+    private HuaweiDataSyncSyncDeviceService huaweiDataSyncSyncDeviceService = null;
 
     protected HuaweiOTAManager huaweiOTAManager = new HuaweiOTAManager(this);
 
@@ -1025,6 +1031,19 @@ public class HuaweiSupportProvider {
             if (getDeviceState().supportsArterialStiffnessDetection()) {
                 huaweiDataSyncArterialStiffnessDetection = new HuaweiDataSyncArterialStiffnessDetection(HuaweiSupportProvider.this);
             }
+            if (getDeviceState().supportsWheelchairMode()) {
+                huaweiDataSyncWheelchairService = new HuaweiDataSyncWheelchairService(HuaweiSupportProvider.this);
+                huaweiDataSyncSyncDeviceService = new HuaweiDataSyncSyncDeviceService(HuaweiSupportProvider.this);
+                if (!huaweiDataSyncSyncDeviceService.requestConfigurationSync()) {
+                    LOG.error("Failed to request wheelchair mode sync");
+                }
+                final boolean wheelchairModeEnabled = GBApplication
+                        .getDeviceSpecificSharedPrefs(getDevice().getAddress())
+                        .getBoolean(HuaweiConstants.PREF_HUAWEI_WHEELCHAIR_MODE, false);
+                if (!huaweiDataSyncWheelchairService.requestWheelchairModeStatus(wheelchairModeEnabled)) {
+                    LOG.error("Failed to request wheelchair mode status");
+                }
+            }
 
             // All of the below check that they are supported and otherwise they skip themselves
             final List<Request> initRequestQueue = new ArrayList<>();
@@ -1421,6 +1440,9 @@ public class HuaweiSupportProvider {
                     break;
                 case HuaweiConstants.PREF_HUAWEI_ARTERIAL_STIFFNESS_DETECTION_SWITCH:
                     setArterialStiffnessDetection();
+                    break;
+                case HuaweiConstants.PREF_HUAWEI_WHEELCHAIR_MODE:
+                    setWheelchairMode();
                     break;
                 case DeviceSettingsPreferenceConst.PREF_FORCE_ENABLE_SMART_ALARM:
                     getAlarms();
@@ -2411,6 +2433,20 @@ public class HuaweiSupportProvider {
             if (!huaweiDataSyncEcg.changeECGState(ecgEnabled)) {
                 LOG.error("Error to set ECG");
             }
+        }
+    }
+
+    private void setWheelchairMode() {
+        if (huaweiDataSyncWheelchairService == null) {
+            LOG.warn("DataSync wheelchair service is not registered");
+            return;
+        }
+
+        final boolean enabled = GBApplication
+                .getDeviceSpecificSharedPrefs(getDevice().getAddress())
+                .getBoolean(HuaweiConstants.PREF_HUAWEI_WHEELCHAIR_MODE, false);
+        if (!huaweiDataSyncWheelchairService.setWheelchairMode(enabled)) {
+            LOG.error("Failed to set wheelchair mode");
         }
     }
 

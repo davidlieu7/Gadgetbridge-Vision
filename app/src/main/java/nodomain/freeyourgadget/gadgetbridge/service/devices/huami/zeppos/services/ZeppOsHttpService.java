@@ -40,6 +40,7 @@ import nodomain.freeyourgadget.gadgetbridge.service.devices.huami.zeppos.ZeppOsW
 import nodomain.freeyourgadget.gadgetbridge.service.devices.huami.zeppos.AbstractZeppOsService;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.huami.zeppos.services.http.HttpAppsSettingsHandler;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.huami.zeppos.services.http.ZeppOsWeatherHandlerV5;
+import nodomain.freeyourgadget.gadgetbridge.service.devices.huami.zeppos.services.http.ZeppOsWeatherHandlerV6;
 import nodomain.freeyourgadget.gadgetbridge.util.FileUtils;
 import nodomain.freeyourgadget.gadgetbridge.util.HttpUtils;
 import nodomain.freeyourgadget.gadgetbridge.util.StringUtils;
@@ -98,6 +99,13 @@ public class ZeppOsHttpService extends AbstractZeppOsService {
                     return;
                 }
                 // headers after, but we ignore them
+                final int numHeaders = buf.get() & 0xff;
+                final Map<String, String> headers = new HashMap<>(numHeaders);
+                for (int i = 0; i < numHeaders; i++) {
+                    final String headerKey = StringUtils.untilNullTerminator(buf);
+                    final String headerValue = StringUtils.untilNullTerminator(buf);
+                    headers.put(headerKey, headerValue);
+                }
 
                 LOG.info("Got simple HTTP {} request: {}", method, url);
 
@@ -157,6 +165,16 @@ public class ZeppOsHttpService extends AbstractZeppOsService {
         final String host = url.getHost();
         final String path = url.getPath();
         final Map<String, String> query = HttpUtils.urlQueryParameters(url.getQuery());
+
+        if (path.startsWith("/weather/v6/")) {
+            final byte[] response = ZeppOsWeatherHandlerV6.handleHttpRequest(path, query);
+            if (response != null) {
+                replySimpleHttpSuccess(requestId, 200, response);
+            } else {
+                replyHttpNoInternet(requestId);
+            }
+            return;
+        }
 
         final int statusCode;
         final String response;
@@ -284,7 +302,10 @@ public class ZeppOsHttpService extends AbstractZeppOsService {
     private void replySimpleHttpSuccess(final int requestId, final int status, final String content) {
         LOG.debug("Replying with http {} request {} with {}", status, requestId, content);
 
-        final byte[] contentBytes = content.getBytes(StandardCharsets.UTF_8);
+        replySimpleHttpSuccess(requestId, status, content.getBytes(StandardCharsets.UTF_8));
+    }
+
+    private void replySimpleHttpSuccess(final int requestId, final int status, final byte[] contentBytes) {
         final ByteBuffer buf = ByteBuffer.allocate(8 + contentBytes.length);
         buf.order(ByteOrder.LITTLE_ENDIAN);
 

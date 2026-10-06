@@ -321,7 +321,7 @@ public class ActivitySummariesChartFragment extends AbstractActivityChartFragmen
             int lastTsShorten = 0;
             for (final ActivityPoint activityPoint : activityPoints) {
                 int tsShorten = tsTranslation.shorten((int) (activityPoint.getTime().getTime() / 1000));
-                if (lastTsShorten == 0 || (tsShorten - lastTsShorten) <= 60 * HeartRateUtils.MAX_HR_MEASUREMENTS_GAP_MINUTES) {
+                if (lastTsShorten == 0 || (tsShorten - lastTsShorten) <= 60 * gbDevice.getDeviceCoordinator().getMaxHeartRateMeasurementsGapMinutes(gbDevice)) {
                     heartRateEntries.add(new Entry(tsShorten, activityPoint.getHeartRate()));
                 } else {
                     if (!heartRateEntries.isEmpty()) {

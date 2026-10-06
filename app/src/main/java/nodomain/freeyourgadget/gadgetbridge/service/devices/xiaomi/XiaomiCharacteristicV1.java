@@ -319,6 +319,11 @@ public class XiaomiCharacteristicV1 {
                         }
                         case 1: {
                             LOG.debug("Got chunked ack start");
+                            if (currentPayload == null) {
+                                // Some devices (e.g. Mi Watch Color Sport) send unsolicited chunked acks
+                                LOG.warn("Got chunked ack start, but nothing is being sent");
+                                return;
+                            }
                             final TransactionBuilder builder = mSupport.createTransactionBuilder("send chunks for " + currentPayload.getTaskName());
                             final byte[] payload = currentPayload.getBytesToSend();
                             final int chunkPayloadSize = maxWriteSizeForCurrentMessage - 2;
