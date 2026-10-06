@@ -17,11 +17,7 @@
 package nodomain.freeyourgadget.gadgetbridge.devices.soundcore.motion300
 
 import nodomain.freeyourgadget.gadgetbridge.R
-import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsPreferenceConst
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSpecificSettingsCustomizer
-import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSpecificSettingsScreen
-import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.DeviceSettingsSpec
-import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.deviceSettings
 import nodomain.freeyourgadget.gadgetbridge.devices.DeviceCoordinator
 import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreEarbudsCoordinator
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice
@@ -31,6 +27,18 @@ import nodomain.freeyourgadget.gadgetbridge.service.devices.soundcore.motion300.
 import java.util.regex.Pattern
 
 class SoundcoreMotion300Coordinator : SoundcoreEarbudsCoordinator() {
+    override fun getAutoPowerOffMinutes(): Array<Int> = arrayOf(5, 10, 20, 60)
+
+    override fun getDefaultCapabilities(): Set<Capability> = setOf(
+        Capability.AutoPowerOff,
+        Capability.VoicePrompts,
+        Capability.ButtonBrightness,
+        Capability.LDAC,
+        Capability.AudioEqualizer,
+        Capability.AdaptiveDirection,
+        Capability.AdjustableEqualizerFrequencies,
+    )
+
     override fun getModelName(): String = "A3135"
 
     override fun getSupportedDeviceName(): Pattern = Pattern.compile("soundcore Motion 300")
@@ -60,34 +68,4 @@ class SoundcoreMotion300Coordinator : SoundcoreEarbudsCoordinator() {
 
     override fun getDeviceSpecificSettingsCustomizer(device: GBDevice): DeviceSpecificSettingsCustomizer =
         SoundcoreMotion300SettingsCustomizer()
-
-    override fun getDeviceSettings(device: GBDevice): DeviceSettingsSpec = deviceSettings {
-        switchSetting(
-            key = DeviceSettingsPreferenceConst.PREF_SOUNDCORE_VOICE_PROMPTS,
-            title = R.string.soundcore_voice_prompts,
-            icon = R.drawable.ic_voice,
-            defaultValue = true,
-            connectedOnly = false,
-        )
-        list(
-            key = DeviceSettingsPreferenceConst.PREF_SOUNDCORE_BUTTON_BRIGHTNESS,
-            title = R.string.soundcore_button_brightness,
-            icon = R.drawable.ic_wb_sunny,
-            entriesRes = R.array.soundcore_button_brightness_names,
-            entryValuesRes = R.array.soundcore_button_brightness_values,
-            defaultValue = "70",
-            connectedOnly = false,
-        )
-        list(
-            key = DeviceSettingsPreferenceConst.PREF_SOUNDCORE_AUTO_POWER_OFF,
-            title = R.string.prefs_wena3_auto_power_off_item,
-            icon = R.drawable.ic_power_settings_new,
-            entriesRes = R.array.soundcore_motion_auto_power_off_names,
-            entryValuesRes = R.array.soundcore_auto_power_off_values,
-            defaultValue = "3",
-            connectedOnly = false,
-        )
-        xmlScreen(DeviceSpecificSettingsScreen.AUDIO, R.xml.devicesettings_soundcore_motion300_audio)
-        xmlScreen(DeviceSpecificSettingsScreen.CALLS_AND_NOTIFICATIONS, R.xml.devicesettings_headphones)
-    }
 }

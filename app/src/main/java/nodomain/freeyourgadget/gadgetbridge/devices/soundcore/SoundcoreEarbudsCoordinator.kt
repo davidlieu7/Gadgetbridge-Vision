@@ -50,6 +50,13 @@ abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator(
         AutoPowerOff,
         TouchTone,
         AudioEqualizer,
+        GamingMode,
+        BatteryLowTone,
+        VoicePrompts,
+        ButtonBrightness,
+        LDAC,
+        AdaptiveDirection,
+        AdjustableEqualizerFrequencies,
     }
 
     enum class ButtonAction(
@@ -158,6 +165,21 @@ abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator(
 
     protected open val connectionSettings: IntArray = intArrayOf()
 
+    open fun getAutoPowerOffMinutes(): Array<Int> = arrayOf(10, 20, 30, 60)
+
+    protected fun getAutoPowerOffEntries(): List<ListEntry> = buildList {
+        add(ListEntry.Res("0", R.string.pref_button_action_disabled))
+        val context = GBApplication.getContext()
+        getAutoPowerOffMinutes().forEachIndexed { index, minutes ->
+            val label = context.resources.getIdentifier("minutes_$minutes", "string", context.packageName)
+            require(label != 0) {
+                "Missing string resource for auto power off duration: minutes_$minutes"
+            }
+            // Preferences store the protocol option index, not the duration in minutes.
+            add(ListEntry.Res((index + 1).toString(), label))
+        }
+    }
+
     open fun getDefaultCapabilities(): Set<Capability> = emptySet()
 
     open fun getCapabilities(device: GBDevice): Set<Capability> {
@@ -199,7 +221,7 @@ abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator(
         fun has(capability: Capability) = capabilities.contains(capability)
 
         return deviceSettings {
-            if (has(Capability.TouchControls)) {
+            if (has(Capability.TouchControls) || has(Capability.TouchControlDisable) || has(Capability.TouchTone)) {
                 screen(
                     key = "pref_soundcore_touch_options",
                     title = R.string.prefs_galaxy_touch_options,
@@ -223,42 +245,61 @@ abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator(
                         disableDependentsState = true,
                         visibleWhen = { _ -> has(Capability.TouchControlDisable) },
                     )
-                    list(
-                        key = DeviceSettingsPreferenceConst.PREF_SONY_AMBIENT_SOUND_CONTROL_BUTTON_MODE,
-                        title = R.string.sony_ambient_sound_control_button_modes,
-                        icon = R.drawable.ic_hearing,
-                        entriesRes = R.array.sony_ambient_sound_control_button_mode_names,
-                        entryValuesRes = R.array.sony_ambient_sound_control_button_mode_values,
-                        defaultValue = "nc_as_off",
-                        visibleWhen = { _ -> TapFunction.AMBIENT_SOUND_CONTROL in supportedTapFunctions },
-                    )
-                    supportedButtonActions.forEach { action ->
-                        category(key = "pref_header_${action.name.lowercase()}", title = action.title) {
-                            list(
-                                key = action.leftPreference,
-                                title = R.string.prefs_left,
-                                icon = R.drawable.ic_touch,
-                                entries = getSupportedTapFunctions(action).map { ListEntry.Res(it.value, it.label) },
-                                dependency = DeviceSettingsPreferenceConst.PREF_SOUNDCORE_CONTROL_TOUCH_DISABLED,
-                            )
-                            list(
-                                key = action.rightPreference,
-                                title = R.string.prefs_right,
-                                icon = R.drawable.ic_touch,
-                                entries = getSupportedTapFunctions(action).map { ListEntry.Res(it.value, it.label) },
-                                dependency = DeviceSettingsPreferenceConst.PREF_SOUNDCORE_CONTROL_TOUCH_DISABLED,
-                            )
+                    if (has(Capability.TouchControls)) {
+                        list(
+                            key = DeviceSettingsPreferenceConst.PREF_SONY_AMBIENT_SOUND_CONTROL_BUTTON_MODE,
+                            title = R.string.sony_ambient_sound_control_button_modes,
+                            icon = R.drawable.ic_hearing,
+                            entriesRes = R.array.sony_ambient_sound_control_button_mode_names,
+                            entryValuesRes = R.array.sony_ambient_sound_control_button_mode_values,
+                            defaultValue = "nc_as_off",
+                            visibleWhen = { _ -> TapFunction.AMBIENT_SOUND_CONTROL in supportedTapFunctions },
+                        )
+                        supportedButtonActions.forEach { action ->
+                            category(key = "pref_header_${action.name.lowercase()}", title = action.title) {
+                                list(
+                                    key = action.leftPreference,
+                                    title = R.string.prefs_left,
+                                    icon = R.drawable.ic_touch,
+                                    entries = getSupportedTapFunctions(action).map { ListEntry.Res(it.value, it.label) },
+                                    dependency = DeviceSettingsPreferenceConst.PREF_SOUNDCORE_CONTROL_TOUCH_DISABLED,
+                                )
+                                list(
+                                    key = action.rightPreference,
+                                    title = R.string.prefs_right,
+                                    icon = R.drawable.ic_touch,
+                                    entries = getSupportedTapFunctions(action).map { ListEntry.Res(it.value, it.label) },
+                                    dependency = DeviceSettingsPreferenceConst.PREF_SOUNDCORE_CONTROL_TOUCH_DISABLED,
+                                )
+                            }
                         }
                     }
                 }
             }
 
-            if (has(Capability.AudioEqualizer) || has(Capability.SurroundSound)) {
+            if (has(Capability.AudioEqualizer) || has(Capability.SurroundSound) || has(Capability.GamingMode) || has(Capability.LDAC)) {
                 screen(
                     key = "pref_soundcore_audio",
                     title = R.string.pref_header_audio,
                     icon = R.drawable.ic_music_note,
                 ) {
+                    if (has(Capability.GamingMode)) {
+                        switchSetting(
+                            key = DeviceSettingsPreferenceConst.PREF_SOUNDCORE_GAMING_MODE,
+                            title = R.string.soundcore_gaming_mode_title,
+                            summary = R.string.soundcore_gaming_mode_summary,
+                            defaultValue = false,
+                        )
+                    }
+                    if (has(Capability.LDAC)) {
+                        switchSetting(
+                            key = DeviceSettingsPreferenceConst.PREF_SOUNDCORE_LDAC_MODE,
+                            title = R.string.soundcore_ldac_mode_title,
+                            summary = R.string.soundcore_ldac_mode_summary,
+                            icon = R.drawable.ic_music_note,
+                            defaultValue = false,
+                        )
+                    }
                     if (has(Capability.SurroundSound)) {
                         switchSetting(
                             key = DeviceSettingsPreferenceConst.PREF_SOUNDCORE_3D_SURROUND,
@@ -268,12 +309,21 @@ abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator(
                     }
                     if (has(Capability.AudioEqualizer)) {
                         category(key = "pref_header_soundcore_equalizer", title = R.string.pref_header_equalizer) {
+                            if (has(Capability.AdaptiveDirection)) {
+                                switchSetting(
+                                    key = DeviceSettingsPreferenceConst.PREF_SOUNDCORE_ADAPTIVE_DIRECTION,
+                                    title = R.string.soundcore_adaptive_direction_title,
+                                    summary = R.string.soundcore_adaptive_direction_summary,
+                                    icon = R.drawable.ic_switch_left,
+                                    defaultValue = true,
+                                )
+                            }
                             list(
                                 key = DeviceSettingsPreferenceConst.PREF_SOUNDCORE_EQUALIZER_PRESET,
                                 title = R.string.soundcore_equalizer_preset,
                                 icon = R.drawable.ic_equalizer,
-                                entriesRes = R.array.soundcore_sport_x20_equalizer_preset_names,
-                                entryValuesRes = R.array.soundcore_sport_x20_equalizer_preset_values,
+                                entriesRes = if (has(Capability.AdjustableEqualizerFrequencies)) R.array.soundcore_equalizer_preset_names else R.array.soundcore_sport_x20_equalizer_preset_names,
+                                entryValuesRes = if (has(Capability.AdjustableEqualizerFrequencies)) R.array.soundcore_equalizer_preset_values else R.array.soundcore_sport_x20_equalizer_preset_values,
                                 defaultValue = "0",
                             )
                             screen(
@@ -285,6 +335,17 @@ abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator(
                                     prefs.getString(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_EQUALIZER_PRESET, "0") == "254"
                                 },
                             ) {
+                                if (has(Capability.AdaptiveDirection)) {
+                                    list(
+                                        key = DeviceSettingsPreferenceConst.PREF_SOUNDCORE_EQUALIZER_DIRECTION,
+                                        title = R.string.soundcore_equalizer_direction,
+                                        icon = R.drawable.ic_switch_left,
+                                        entriesRes = R.array.soundcore_equalizer_direction_names,
+                                        entryValuesRes = R.array.soundcore_equalizer_direction_values,
+                                        defaultValue = "0",
+                                        visibleWhen = { prefs -> prefs.getBoolean(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_ADAPTIVE_DIRECTION, true) },
+                                    )
+                                }
                                 val equalizerBandKeys = listOf(
                                     DeviceSettingsPreferenceConst.PREF_SOUNDCORE_EQUALIZER_BAND1_VALUE,
                                     DeviceSettingsPreferenceConst.PREF_SOUNDCORE_EQUALIZER_BAND2_VALUE,
@@ -296,6 +357,17 @@ abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator(
                                     DeviceSettingsPreferenceConst.PREF_SOUNDCORE_EQUALIZER_BAND8_VALUE,
                                     DeviceSettingsPreferenceConst.PREF_SOUNDCORE_EQUALIZER_BAND9_VALUE,
                                 )
+                                val equalizerFrequencyKeys = listOf(
+                                    DeviceSettingsPreferenceConst.PREF_SOUNDCORE_EQUALIZER_BAND1_FREQ,
+                                    DeviceSettingsPreferenceConst.PREF_SOUNDCORE_EQUALIZER_BAND2_FREQ,
+                                    DeviceSettingsPreferenceConst.PREF_SOUNDCORE_EQUALIZER_BAND3_FREQ,
+                                    DeviceSettingsPreferenceConst.PREF_SOUNDCORE_EQUALIZER_BAND4_FREQ,
+                                    DeviceSettingsPreferenceConst.PREF_SOUNDCORE_EQUALIZER_BAND5_FREQ,
+                                    DeviceSettingsPreferenceConst.PREF_SOUNDCORE_EQUALIZER_BAND6_FREQ,
+                                    DeviceSettingsPreferenceConst.PREF_SOUNDCORE_EQUALIZER_BAND7_FREQ,
+                                    DeviceSettingsPreferenceConst.PREF_SOUNDCORE_EQUALIZER_BAND8_FREQ,
+                                    DeviceSettingsPreferenceConst.PREF_SOUNDCORE_EQUALIZER_BAND9_FREQ,
+                                )
                                 action(
                                     key = DeviceSettingsPreferenceConst.PREF_SOUNDCORE_EQUALIZER_RESET,
                                     title = R.string.soundcore_equalizer_reset_title,
@@ -303,33 +375,87 @@ abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator(
                                     icon = R.drawable.ic_history,
                                     onClick = { _, selectedDevice ->
                                         selectedDevice?.let {
+                                            val adjustableFrequencies = has(Capability.AdjustableEqualizerFrequencies)
+                                            val bandKeys = if (adjustableFrequencies) equalizerBandKeys else equalizerBandKeys.take(getSupportedEqualizerBands().size)
                                             val prefs = GBApplication.getDevicePrefs(it).preferences
                                             prefs.edit().apply {
-                                                equalizerBandKeys.take(getSupportedEqualizerBands().size)
-                                                    .forEach { key -> putInt(key, 0) }
+                                                bandKeys.forEach { key -> putInt(key, if (adjustableFrequencies) 60 else 0) }
+                                                if (adjustableFrequencies) {
+                                                    equalizerFrequencyKeys.forEachIndexed { index, key ->
+                                                        putString(key, when (index) { 7 -> "6"; 8 -> "1"; else -> "7" })
+                                                    }
+                                                }
                                                 apply()
                                             }
-                                            equalizerBandKeys.take(getSupportedEqualizerBands().size)
-                                                .lastOrNull()
-                                                ?.let { key -> GBApplication.deviceService(it).onSendConfiguration(key) }
+                                            val lastKey = if (adjustableFrequencies) equalizerFrequencyKeys.last() else bandKeys.lastOrNull()
+                                            lastKey?.let { key -> GBApplication.deviceService(it).onSendConfiguration(key) }
                                         }
                                         true
                                     },
                                 )
-                                getSupportedEqualizerBands().take(equalizerBandKeys.size).forEachIndexed { index, frequency ->
-                                    val key = equalizerBandKeys[index]
-                                    category(
-                                        key = "${key}_category",
-                                        title = equalizerBandTitleResource(frequency),
-                                    ) {
-                                        seekbar(
-                                            key = key,
-                                            title = R.string.soundcore_equalizer_value,
-                                            icon = R.drawable.ic_graphic_eq,
-                                            min = -6,
-                                            max = 6,
-                                            defaultValue = 0,
-                                        )
+                                if (has(Capability.AdjustableEqualizerFrequencies)) {
+                                    val bandTitles = listOf(
+                                        R.string.soundcore_equalizer_band1,
+                                        R.string.soundcore_equalizer_band2,
+                                        R.string.soundcore_equalizer_band3,
+                                        R.string.soundcore_equalizer_band4,
+                                        R.string.soundcore_equalizer_band5,
+                                        R.string.soundcore_equalizer_band6,
+                                        R.string.soundcore_equalizer_band7,
+                                        R.string.soundcore_equalizer_band8,
+                                        R.string.soundcore_equalizer_band9,
+                                    )
+                                    val frequencyEntries = listOf(
+                                        R.array.soundcore_equalizer_band1_freq_names,
+                                        R.array.soundcore_equalizer_band2_freq_names,
+                                        R.array.soundcore_equalizer_band3_freq_names,
+                                        R.array.soundcore_equalizer_band4_freq_names,
+                                        R.array.soundcore_equalizer_band5_freq_names,
+                                        R.array.soundcore_equalizer_band6_freq_names,
+                                        R.array.soundcore_equalizer_band7_freq_names,
+                                        R.array.soundcore_equalizer_band8_freq_names,
+                                        R.array.soundcore_equalizer_band9_freq_names,
+                                    )
+                                    equalizerBandKeys.forEachIndexed { index, key ->
+                                        val band = index + 1
+                                        category(
+                                            key = "${key}_category",
+                                            title = bandTitles[index],
+                                        ) {
+                                            list(
+                                                key = equalizerFrequencyKeys[index],
+                                                title = R.string.soundcore_equalizer_frequency,
+                                                icon = R.drawable.ic_hearing,
+                                                entriesRes = frequencyEntries[index],
+                                                entryValuesRes = R.array.soundcore_equalizer_freq_values,
+                                                defaultValue = when (band) { 8 -> "6"; 9 -> "1"; else -> "7" },
+                                            )
+                                            seekbar(
+                                                key = key,
+                                                title = R.string.soundcore_equalizer_value,
+                                                icon = R.drawable.ic_graphic_eq,
+                                                min = 0,
+                                                max = 120,
+                                                defaultValue = 60,
+                                            )
+                                        }
+                                    }
+                                } else {
+                                    getSupportedEqualizerBands().take(equalizerBandKeys.size).forEachIndexed { index, frequency ->
+                                        val key = equalizerBandKeys[index]
+                                        category(
+                                            key = "${key}_category",
+                                            title = equalizerBandTitleResource(frequency),
+                                        ) {
+                                            seekbar(
+                                                key = key,
+                                                title = R.string.soundcore_equalizer_value,
+                                                icon = R.drawable.ic_graphic_eq,
+                                                min = -6,
+                                                max = 6,
+                                                defaultValue = 0,
+                                            )
+                                        }
                                     }
                                 }
                             }
@@ -401,8 +527,36 @@ abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator(
                     }
                 }
             }
-            if (has(Capability.FitTest) || has(Capability.AutoPowerOff)) {
+            if (has(Capability.FitTest) || has(Capability.AutoPowerOff) || has(Capability.BatteryLowTone) || has(Capability.VoicePrompts) || has(Capability.ButtonBrightness)) {
                 category(key = "pref_header_soundcore_general", title = R.string.pref_header_general) {
+                    if (has(Capability.BatteryLowTone)) {
+                        switchSetting(
+                            key = DeviceSettingsPreferenceConst.PREF_SOUNDCORE_BATTERY_LOW_TONE,
+                            title = R.string.soundcore_battery_low_tone_title,
+                            summary = R.string.soundcore_battery_low_tone_summary,
+                            defaultValue = false,
+                        )
+                    }
+                    if (has(Capability.VoicePrompts)) {
+                        switchSetting(
+                            key = DeviceSettingsPreferenceConst.PREF_SOUNDCORE_VOICE_PROMPTS,
+                            title = R.string.soundcore_voice_prompts,
+                            icon = R.drawable.ic_voice,
+                            defaultValue = true,
+                            connectedOnly = false,
+                        )
+                    }
+                    if (has(Capability.ButtonBrightness)) {
+                        list(
+                            key = DeviceSettingsPreferenceConst.PREF_SOUNDCORE_BUTTON_BRIGHTNESS,
+                            title = R.string.soundcore_button_brightness,
+                            icon = R.drawable.ic_wb_sunny,
+                            entriesRes = R.array.soundcore_button_brightness_names,
+                            entryValuesRes = R.array.soundcore_button_brightness_values,
+                            defaultValue = "70",
+                            connectedOnly = false,
+                        )
+                    }
                     if (has(Capability.FitTest)) {
                         action(
                             key = DeviceSettingsPreferenceConst.PREF_SOUNDCORE_FIT_TEST,
@@ -425,8 +579,7 @@ abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator(
                             title = R.string.soundcore_auto_power_off_title,
                             summary = R.string.soundcore_auto_power_off_summary,
                             icon = R.drawable.ic_power_settings_new,
-                            entriesRes = R.array.soundcore_aerofit_auto_power_off_names,
-                            entryValuesRes = R.array.soundcore_auto_power_off_values,
+                            entries = getAutoPowerOffEntries(),
                             defaultValue = "3",
                         )
                     }

@@ -17,9 +17,6 @@
 package nodomain.freeyourgadget.gadgetbridge.devices.soundcore.aerofit
 
 import nodomain.freeyourgadget.gadgetbridge.R
-import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSpecificSettingsScreen
-import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.DeviceSettingsSpec
-import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.deviceSettings
 import nodomain.freeyourgadget.gadgetbridge.devices.DeviceCoordinator
 import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreEarbudsCoordinator
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice
@@ -39,7 +36,12 @@ class SoundcoreAeroFit2Coordinator : SoundcoreEarbudsCoordinator() {
         DeviceCoordinator.DeviceKind.HEADPHONES
 
     override fun getDefaultCapabilities(): Set<Capability> = setOf(
-        Capability.FindDevice
+        Capability.FindDevice,
+        Capability.AutoPowerOff,
+        Capability.GamingMode,
+        Capability.TouchControlDisable,
+        Capability.TouchTone,
+        Capability.BatteryLowTone,
     )
 
     override fun createProtocol(device: GBDevice): SoundcoreAeroFitProtocol =
@@ -48,9 +50,4 @@ class SoundcoreAeroFit2Coordinator : SoundcoreEarbudsCoordinator() {
     override fun supportsExtendedInfoRequest(): Boolean = false
 
     override fun supportsSessionInitRequest(): Boolean = false
-
-    override fun getDeviceSettings(device: GBDevice): DeviceSettingsSpec = deviceSettings {
-        xmlScreen(DeviceSpecificSettingsScreen.AUDIO, R.xml.devicesettings_soundcore_aerofit)
-        xmlScreen(DeviceSpecificSettingsScreen.CALLS_AND_NOTIFICATIONS, R.xml.devicesettings_headphones)
-    }
 }
