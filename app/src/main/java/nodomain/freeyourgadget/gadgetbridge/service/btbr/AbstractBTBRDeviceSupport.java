@@ -126,6 +126,18 @@ public abstract class AbstractBTBRDeviceSupport extends AbstractBluetoothDeviceS
     }
 
     /**
+     * Drops the primary connection the way a lost link does, so the device goes through the
+     * regular reconnect path. {@link #disconnect()} marks the device as not connected instead.
+     */
+    public void dropConnection() {
+        synchronized (ConnectionMonitor) {
+            if (mQueue != null) {
+                mQueue.closeSocket();
+            }
+        }
+    }
+
+    /**
      * Opens a secondary ("aux") RFCOMM socket on the given channel, in addition to the primary
      * connection. Aux sockets share this support's {@link #onSocketRead(byte[])} sink but never
      * affect the primary device connection state or re-run device initialization. Writes are

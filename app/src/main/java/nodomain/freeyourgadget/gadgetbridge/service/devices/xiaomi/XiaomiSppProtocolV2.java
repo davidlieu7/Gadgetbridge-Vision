@@ -16,16 +16,23 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>. */
 package nodomain.freeyourgadget.gadgetbridge.service.devices.xiaomi;
 
+import android.bluetooth.BluetoothSocket;
+import android.os.Handler;
+import android.os.Looper;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Locale;
-import java.util.concurrent.atomic.AtomicInteger;
 
+import nodomain.freeyourgadget.gadgetbridge.service.btbr.BtBRAction;
 import nodomain.freeyourgadget.gadgetbridge.service.btbr.TransactionBuilder;
+import nodomain.freeyourgadget.gadgetbridge.service.btbr.actions.FunctionAction;
+import nodomain.freeyourgadget.gadgetbridge.service.btbr.actions.WriteAction;
 import nodomain.freeyourgadget.gadgetbridge.util.GB;
 
 import static nodomain.freeyourgadget.gadgetbridge.service.devices.xiaomi.XiaomiSppPacketV2.PACKET_PREAMBLE;
@@ -34,28 +41,76 @@ import static nodomain.freeyourgadget.gadgetbridge.service.devices.xiaomi.Xiaomi
 import static nodomain.freeyourgadget.gadgetbridge.service.devices.xiaomi.XiaomiSppPacketV2.PACKET_TYPE_NACK;
 import static nodomain.freeyourgadget.gadgetbridge.service.devices.xiaomi.XiaomiSppPacketV2.PACKET_TYPE_SESSION_CONFIG;
 
+/**
+ * Data packets are delivered go-back-N: the watch accepts them strictly in sequence and acks
+ * cumulatively, so a packet that reaches it out of order is dropped together with everything
+ * sent after it until the missing one is resent.
+ */
 public class XiaomiSppProtocolV2 extends AbstractXiaomiSppProtocol {
     private static final Logger LOG = LoggerFactory.getLogger(XiaomiSppProtocolV2.class);
 
-    private final AtomicInteger packetSequenceCounter = new AtomicInteger(0);
+    /// Same value as the send timeout announced in the session config.
+    static final long RESEND_TIMEOUT_MILLIS = 10_000L;
+    /// Resend timeouts in a row without any ack before the link is considered dead.
+    static final int MAX_TIMEOUTS_WITHOUT_ACK = 3;
+
+    interface Link {
+        void queue(String taskName, BtBRAction action);
+
+        /// Ends the connection so the regular reconnect logic takes over.
+        void dropConnection();
+    }
+
     private final XiaomiSppSupport support;
+    private final Link link;
+    private final XiaomiSppV2SendWindow sendWindow = new XiaomiSppV2SendWindow();
+    private final Handler timeoutHandler = new Handler(Looper.getMainLooper());
+    private final Runnable timeoutRunnable = this::onResendTimeout;
+    private boolean timeoutPending = false;
+    private int timeoutsWithoutAck = 0;
 
     public XiaomiSppProtocolV2(final XiaomiSppSupport support) {
+        this(support, new Link() {
+            @Override
+            public void queue(final String taskName, final BtBRAction action) {
+                support.commsSupport.createTransactionBuilder(taskName)
+                        .add(action)
+                        .queue();
+            }
+
+            @Override
+            public void dropConnection() {
+                support.commsSupport.dropConnection();
+            }
+        });
+    }
+
+    XiaomiSppProtocolV2(final XiaomiSppSupport support, final Link link) {
         this.support = support;
+        this.link = link;
     }
 
     private void sendAck(final int sequenceNumber) {
-        final TransactionBuilder b = support.commsSupport.createTransactionBuilder(String.format(Locale.ROOT, "send ack for %d", sequenceNumber));
-        b.write(new XiaomiSppPacketV2.AckPacket.Builder()
-                .setSequenceNumber(sequenceNumber)
-                .build()
-                .encode(null));
-        b.queue();
+        link.queue(String.format(Locale.ROOT, "send ack for %d", sequenceNumber),
+                new WriteAction(new XiaomiSppPacketV2.AckPacket.Builder()
+                        .setSequenceNumber(sequenceNumber)
+                        .build()
+                        .encode(null)));
     }
 
     @Override
     public void reset() {
-        packetSequenceCounter.set(0);
+        dispose();
+    }
+
+    @Override
+    public void dispose() {
+        synchronized (timeoutRunnable) {
+            timeoutHandler.removeCallbacks(timeoutRunnable);
+            timeoutPending = false;
+            timeoutsWithoutAck = 0;
+        }
+        sendWindow.clear();
     }
 
     @Override
@@ -121,11 +176,10 @@ public class XiaomiSppProtocolV2 extends AbstractXiaomiSppProtocol {
                     break;
                 case PACKET_TYPE_ACK:
                     LOG.debug("receive ack for packet {}", decodedPacket.getSequenceNumber());
+                    onAck(decodedPacket.getSequenceNumber());
                     break;
                 case PACKET_TYPE_NACK:
-                    // The watch rejected a packet it had already received. Nothing is retransmitted
-                    // here: the sequence number is what identifies which command it refused.
-                    LOG.warn("receive nack for packet {}, watch rejected it", decodedPacket.getSequenceNumber());
+                    onNack(decodedPacket.getSequenceNumber());
                     break;
                 default:
                     LOG.warn("Unhandled packet with type {} (decoded type {})", decodedPacket.getPacketType(), decodedPacket.getClass().getSimpleName());
@@ -136,26 +190,118 @@ public class XiaomiSppProtocolV2 extends AbstractXiaomiSppProtocol {
         return new ParseResult(ParseResult.Status.Complete, packetSize);
     }
 
+    private void onAck(final int sequenceNumber) {
+        if (sendWindow.onAck(sequenceNumber) > 0) {
+            onAckProgress();
+        }
+    }
+
+    private void onNack(final int expectedSequenceNumber) {
+        onAck((expectedSequenceNumber - 1) & 0xff);
+
+        if (sendWindow.getOldestUnacked() != expectedSequenceNumber) {
+            LOG.warn("receive nack, watch expects packet {}, which is not pending", expectedSequenceNumber);
+            return;
+        }
+
+        LOG.warn("receive nack, watch expects packet {}, resending", expectedSequenceNumber);
+        queueResend(String.format(Locale.ROOT, "resend from %d", expectedSequenceNumber));
+    }
+
+    private void queueResend(final String taskName) {
+        link.queue(taskName, new FunctionAction(this::resendUnacked));
+    }
+
+    private boolean resendUnacked(final BluetoothSocket socket) {
+        final List<byte[]> frames = sendWindow.getUnackedFrames();
+        LOG.debug("resending {} unacked packets", frames.size());
+        for (final byte[] frame : frames) {
+            if (!new WriteAction(frame).run(socket)) {
+                return false;
+            }
+        }
+        armResendTimeout();
+        return true;
+    }
+
+    private void onAckProgress() {
+        synchronized (timeoutRunnable) {
+            timeoutsWithoutAck = 0;
+            timeoutHandler.removeCallbacks(timeoutRunnable);
+            timeoutPending = false;
+        }
+        if (!sendWindow.isEmpty()) {
+            armResendTimeout();
+        }
+    }
+
+    private void armResendTimeout() {
+        synchronized (timeoutRunnable) {
+            if (!timeoutPending) {
+                timeoutPending = true;
+                timeoutHandler.postDelayed(timeoutRunnable, RESEND_TIMEOUT_MILLIS);
+            }
+        }
+    }
+
+    private void onResendTimeout() {
+        final int timeouts;
+        synchronized (timeoutRunnable) {
+            timeoutPending = false;
+            if (sendWindow.isEmpty()) {
+                timeoutsWithoutAck = 0;
+                return;
+            }
+            timeouts = ++timeoutsWithoutAck;
+        }
+
+        if (timeouts >= MAX_TIMEOUTS_WITHOUT_ACK) {
+            LOG.warn("no ack for packet {} after {} timeouts, dropping the connection", sendWindow.getOldestUnacked(), timeouts);
+            dispose();
+            link.dropConnection();
+            return;
+        }
+
+        LOG.warn("no ack for packet {} within {} ms, resending", sendWindow.getOldestUnacked(), RESEND_TIMEOUT_MILLIS);
+        queueResend(String.format(Locale.ROOT, "resend from %d after timeout", sendWindow.getOldestUnacked()));
+    }
+
     @Override
     public boolean initializeSession() {
-        final TransactionBuilder builder = support.commsSupport.createTransactionBuilder("send session config");
-        builder.write(XiaomiSppPacketV2.newSessionConfigPacketBuilder()
+        dispose();
+        link.queue("send session config", new WriteAction(XiaomiSppPacketV2.newSessionConfigPacketBuilder()
                 .setOpCode(XiaomiSppPacketV2.SessionConfigPacket.OPCODE_START_SESSION_REQUEST)
                 .setSequenceNumber(0)
                 .build()
-                .encode(null));
-        builder.queue();
+                .encode(null)));
         return false;
     }
 
     @Override
-    public byte[] encodePacket(XiaomiChannelHandler.Channel channel, byte[] payloadBytes) {
-        return XiaomiSppPacketV2.newDataPacketBuilder()
+    public void writePacket(final TransactionBuilder builder, final XiaomiChannelHandler.Channel channel, final byte[] payloadBytes) {
+        builder.add(createDataPacketAction(channel, payloadBytes));
+    }
+
+    /**
+     * The payload is encrypted here, but the sequence number is only taken when the action runs
+     * on the queue's write thread, so packets reach the socket in sequence whichever thread
+     * queued them.
+     */
+    BtBRAction createDataPacketAction(final XiaomiChannelHandler.Channel channel, final byte[] payloadBytes) {
+        final byte[] packetPayload = XiaomiSppPacketV2.newDataPacketBuilder()
                 .setChannel(channel)
-                .setSequenceNumber(packetSequenceCounter.getAndIncrement())
                 .setOpCode(XiaomiSppPacketV2.DataPacket.getOpCodeForChannel(channel))
                 .setPayload(payloadBytes)
                 .build()
-                .encode(support.getAuthService());
+                .getPacketPayloadBytes(support.getAuthService());
+
+        return new FunctionAction(socket -> {
+            final int sequenceNumber = sendWindow.nextSequenceNumber();
+            final byte[] frame = XiaomiSppPacketV2.encodeFrame(PACKET_TYPE_DATA, sequenceNumber, packetPayload);
+            sendWindow.onSent(sequenceNumber, frame);
+            final boolean written = new WriteAction(frame).run(socket);
+            armResendTimeout();
+            return written;
+        });
     }
 }
