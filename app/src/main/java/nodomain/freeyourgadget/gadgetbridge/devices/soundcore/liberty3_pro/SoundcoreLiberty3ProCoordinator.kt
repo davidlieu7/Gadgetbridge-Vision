@@ -17,9 +17,6 @@
 package nodomain.freeyourgadget.gadgetbridge.devices.soundcore.liberty3_pro
 
 import nodomain.freeyourgadget.gadgetbridge.R
-import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSpecificSettingsScreen
-import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.DeviceSettingsSpec
-import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.deviceSettings
 import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreEarbudsCoordinator
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice
 import nodomain.freeyourgadget.gadgetbridge.service.devices.soundcore.liberty.SoundcoreLibertyProtocol
@@ -39,13 +36,32 @@ class SoundcoreLiberty3ProCoordinator : SoundcoreEarbudsCoordinator() {
 
     override fun supportsSessionInitRequest(): Boolean = false
 
-    override fun getDeviceSettings(device: GBDevice): DeviceSettingsSpec = deviceSettings {
-        xmlScreen(
-            DeviceSpecificSettingsScreen.TOUCH_OPTIONS,
-            R.xml.devicesettings_sony_headphones_ambient_sound_control_button_modes,
-            R.xml.devicesettings_soundcore_liberty_touch_options,
-        )
-        xmlScreen(DeviceSpecificSettingsScreen.AUDIO, R.xml.devicesettings_soundcore_liberty)
-        xmlScreen(DeviceSpecificSettingsScreen.CALLS_AND_NOTIFICATIONS, R.xml.devicesettings_headphones)
-    }
+    override fun getDefaultCapabilities(): Set<Capability> = setOf(
+        Capability.NoiseControl,
+        Capability.AmbientSound,
+        Capability.AdaptiveNoiseCancellation,
+        Capability.WindNoiseReduction,
+        Capability.VocalMode,
+        Capability.TouchControls,
+        Capability.TouchTone,
+        Capability.WearingDetection,
+        Capability.WearingTone,
+    )
+
+    override val supportedButtonActions: List<ButtonAction> = listOf(
+        ButtonAction.SINGLE_TAP,
+        ButtonAction.DOUBLE_TAP,
+        ButtonAction.TRIPLE_TAP,
+        ButtonAction.LONG_PRESS,
+    )
+
+    override val supportedTapFunctions: List<TapFunction> = listOf(
+        TapFunction.VOLUME_DOWN,
+        TapFunction.VOLUME_UP,
+        TapFunction.MEDIA_NEXT,
+        TapFunction.MEDIA_PREV,
+        TapFunction.PLAYPAUSE,
+        TapFunction.VOICE_ASSISTANT,
+        TapFunction.AMBIENT_SOUND_CONTROL,
+    )
 }

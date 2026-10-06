@@ -48,6 +48,8 @@ abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator(
         VocalMode,
         TouchControls,
         TouchControlDisable,
+        WearingDetection,
+        WearingTone,
         SurroundSound,
         FitTest,
         AutoPowerOff,
@@ -561,8 +563,24 @@ abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator(
                     }
                 }
             }
-            if (has(Capability.FitTest) || has(Capability.AutoPowerOff) || has(Capability.BatteryLowTone) || has(Capability.VoicePrompts) || has(Capability.ButtonBrightness)) {
+            if (has(Capability.WearingDetection) || has(Capability.WearingTone) || has(Capability.FitTest) || has(Capability.AutoPowerOff) || has(Capability.BatteryLowTone) || has(Capability.VoicePrompts) || has(Capability.ButtonBrightness)) {
                 category(key = "pref_header_soundcore_general", title = R.string.pref_header_general) {
+                    if (has(Capability.WearingDetection)) {
+                        switchSetting(
+                            key = DeviceSettingsPreferenceConst.PREF_SOUNDCORE_WEARING_DETECTION,
+                            title = R.string.nothing_prefs_inear_title,
+                            summary = R.string.nothing_prefs_inear_summary,
+                            defaultValue = false,
+                        )
+                    }
+                    if (has(Capability.WearingTone)) {
+                        switchSetting(
+                            key = DeviceSettingsPreferenceConst.PREF_SOUNDCORE_WEARING_TONE,
+                            title = R.string.pref_wearing_tone,
+                            summary = R.string.pref_wearing_tone_summary,
+                            defaultValue = false,
+                        )
+                    }
                     if (has(Capability.BatteryLowTone)) {
                         switchSetting(
                             key = DeviceSettingsPreferenceConst.PREF_SOUNDCORE_BATTERY_LOW_TONE,
