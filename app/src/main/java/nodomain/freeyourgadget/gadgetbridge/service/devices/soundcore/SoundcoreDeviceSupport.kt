@@ -32,7 +32,7 @@ open class SoundcoreDeviceSupport : AbstractHeadphoneSerialDeviceSupportV2<Sound
         val coordinator = gbDevice.deviceCoordinator as? SoundcoreEarbudsCoordinator
             ?: throw IllegalArgumentException("Expected a SoundcoreEarbudsCoordinator for Soundcore earbuds support")
 
-        addSupportedService(getServiceUUID(coordinator.getModelName()))
+        addSupportedService(coordinator.getServiceUUID() ?: getServiceUUID(coordinator.getModelName()))
     }
 
     protected override fun createDeviceProtocol(): SoundcoreProtocolImplV1 =
@@ -55,7 +55,9 @@ open class SoundcoreDeviceSupport : AbstractHeadphoneSerialDeviceSupportV2<Sound
             builder.write(*mDeviceProtocol.encodeExtendedInfoRequest())
         }
         // 3. Session-init handshake - the device ACKs with an empty response
-        builder.write(*mDeviceProtocol.encodeSessionInitRequest())
+        if (coordinator.supportsSessionInitRequest()) {
+            builder.write(*mDeviceProtocol.encodeSessionInitRequest())
+        }
         builder.setDeviceState(GBDevice.State.INITIALIZED)
         return builder
     }

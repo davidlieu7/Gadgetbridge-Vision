@@ -7,15 +7,13 @@ import java.util.regex.Pattern;
 import nodomain.freeyourgadget.gadgetbridge.R;
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSpecificSettings;
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSpecificSettingsScreen;
-import nodomain.freeyourgadget.gadgetbridge.devices.AbstractBLClassicDeviceCoordinator;
+import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.q30.SoundcoreQ30Coordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.DeviceCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
 import nodomain.freeyourgadget.gadgetbridge.model.BatteryConfig;
-import nodomain.freeyourgadget.gadgetbridge.service.DeviceSupport;
-import nodomain.freeyourgadget.gadgetbridge.service.devices.soundcore.q30.SoundcoreQ30DeviceSupport;
 // NOTE: This device base is the same as Soundcore Q30.
 
-public class SoundcoreLifeTuneXRCoordinator extends AbstractBLClassicDeviceCoordinator {
+public class SoundcoreLifeTuneXRCoordinator extends SoundcoreQ30Coordinator {
     @Override
     public int getDeviceNameResource() {
         return R.string.devicetype_soundcore_life_tune_xr;
@@ -61,9 +59,8 @@ public class SoundcoreLifeTuneXRCoordinator extends AbstractBLClassicDeviceCoord
         return DeviceKind.HEADPHONES;
     }
 
-    @NonNull
     @Override
-    public Class<? extends DeviceSupport> getDeviceSupportClass(final GBDevice device) {
-        return SoundcoreQ30DeviceSupport.class;
+    protected int getSettingsResource() {
+        return R.xml.devicesettings_soundcore_life_tune;
     }
 }

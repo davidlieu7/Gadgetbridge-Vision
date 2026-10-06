@@ -16,6 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 package nodomain.freeyourgadget.gadgetbridge.devices.soundcore
 
+import java.util.UUID
 import nodomain.freeyourgadget.gadgetbridge.GBApplication
 import nodomain.freeyourgadget.gadgetbridge.R
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsPreferenceConst
@@ -120,6 +121,12 @@ abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator(
     open fun createProtocol(device: GBDevice): SoundcoreProtocolImplV1 =
         throw UnsupportedOperationException("Soundcore coordinator must provide its protocol factory")
 
+    /** Overrides the model-derived control service for devices using a different service. */
+    open fun getServiceUUID(): UUID? = null
+
+    /** Whether this model supports the session initialization request. */
+    open fun supportsSessionInitRequest(): Boolean = true
+
     /** Whether this model supports the extended-info initialization request. */
     open fun supportsExtendedInfoRequest(): Boolean = true
 
@@ -130,13 +137,13 @@ abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator(
     override fun getBatteryCount(device: GBDevice): Int = 3
 
     override fun getBatteryConfig(device: GBDevice): Array<BatteryConfig> =
-        if (getBatteryCount(device) == 2) {
-            arrayOf(
+        when (getBatteryCount(device)) {
+            1 -> arrayOf(BatteryConfig(0, R.drawable.ic_battery, R.string.battery))
+            2 -> arrayOf(
                 BatteryConfig(0, R.drawable.ic_nothing_ear_l, R.string.left_earbud),
                 BatteryConfig(1, R.drawable.ic_nothing_ear_r, R.string.right_earbud),
             )
-        } else {
-            arrayOf(
+            else -> arrayOf(
                 BatteryConfig(0, R.drawable.ic_buds_pro_case, R.string.battery_case),
                 BatteryConfig(1, R.drawable.ic_nothing_ear_l, R.string.left_earbud),
                 BatteryConfig(2, R.drawable.ic_nothing_ear_r, R.string.right_earbud),
