@@ -21,7 +21,7 @@ public class SoundcoreAeroFitProtocol extends SoundcoreProtocolImplV1 {
     private static final int BATTERY_MULTIPLIER = 10;
     private static final int BATTERY_OFFSET = 1;
 
-    protected SoundcoreAeroFitProtocol(GBDevice device) {
+    public SoundcoreAeroFitProtocol(GBDevice device) {
         super(device);
     }
 
