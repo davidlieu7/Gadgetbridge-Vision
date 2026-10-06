@@ -88,6 +88,6 @@ public class GBLocationListener implements LocationListener {
 
     private static long getLocationTimestamp(final Location location) {
         long nanosSinceLocation = SystemClock.elapsedRealtimeNanos() - location.getElapsedRealtimeNanos();
-        return System.currentTimeMillis() - (nanosSinceLocation / 100_000L);
+        return System.currentTimeMillis() - (nanosSinceLocation / 1_000_000L);
     }
 }

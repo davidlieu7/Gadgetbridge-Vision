@@ -58,6 +58,19 @@ public class GBLocationListenerTest extends TestBase {
         assertFalse("speed " + older.getSpeed(), older.hasSpeed());
     }
 
+    @Test
+    public void fixTimeIsWallClockMinusItsAge() {
+        final GBLocationListener listener = new GBLocationListener(createDummyGDevice("00:00:00:00:00:73"));
+        final Location fix = fix(48.0, SystemClock.elapsedRealtimeNanos() - 2_000_000_000L);
+
+        final long before = System.currentTimeMillis();
+        listener.onLocationChanged(fix);
+        final long after = System.currentTimeMillis();
+
+        assertTrue("fix stamped " + (before - fix.getTime()) + " ms ago, expected 2000",
+                fix.getTime() >= before - 2_000L && fix.getTime() <= after - 2_000L);
+    }
+
     private static Location fix(final double latitude, final long elapsedRealtimeNanos) {
         final Location location = new Location(LocationManager.GPS_PROVIDER);
         location.setLatitude(latitude);
