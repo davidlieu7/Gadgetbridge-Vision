@@ -66,14 +66,16 @@ public class AncConfigModule extends AbstractModule {
         final ByteBuffer buf = ByteBuffer.wrap(payload);
         final GBDeviceEventUpdatePreferences event = new GBDeviceEventUpdatePreferences();
 
-        if (buf.remaining() != 4) {
+        if (buf.remaining() < 3) {
             LOG.warn("Unexpected anc config ret payload remaining {}, expected 4", buf.remaining());
             return event;
         }
 
         final int zero = buf.get();
-        final int typeCode = buf.get() & 0xFF;
-        final int one = buf.get();
+        final Integer typeCode = getTypeCode(buf);
+        if (typeCode == null) {
+            return event;
+        }
         final int valueCode = buf.get() & 0xff;
 
         final AncConfigType type = AncConfigType.fromCode(typeCode);
@@ -83,31 +85,28 @@ public class AncConfigModule extends AbstractModule {
         }
 
         switch (type) {
-            case MODE: {
+            case MODE -> {
                 final AncConfigValue value = AncConfigValue.fromCode(valueCode);
                 if (value == null) {
                     LOG.warn("Unknown anc value code 0x{}", OppoUtils.numberToHex(valueCode, 2));
                     break;
                 }
 
-                LOG.debug("Got anc config for {} = {}", type, value);
+                LOG.debug("Got {} = {}", type, value);
                 event.withPreference(OppoHeadphonesPreferences.ANC_SELECTOR, value.getPrefId());
-                break;
             }
-            case TOUCH_CYCLE_MODES: {
+            case TOUCH_CYCLE_MODES -> {
                 final EnumSet<AncConfigValue> values = AncConfigValue.fromMask(valueCode);
                 if (values.isEmpty()) {
                     LOG.warn("Unknown anc value mask 0x{}", OppoUtils.numberToHex(valueCode, 2));
                     break;
                 }
+                LOG.debug("Got {} = {}", type, values);
                 final Set<String> valuePrefIds = AncConfigValue.toPrefIds(values);
-                LOG.debug("Got anc config for {} = {}", type, valuePrefIds);
                 event.withPreference(OppoHeadphonesPreferences.ANC_TOUCH_CYCLE_MODES, valuePrefIds);
-                break;
             }
-            default: {
+            default -> {
                 LOG.debug("Unknown anc type code {}", typeCode);
-                break;
             }
         }
         return event;
@@ -122,5 +121,25 @@ public class AncConfigModule extends AbstractModule {
         };
 
         return new OppoMessage(OppoCommand.ANC_CONFIG_SET, payload);
+    }
+
+    private Integer getTypeCode(ByteBuffer buf) {
+        switch (buf.remaining()) {
+            case 2 -> {
+                return buf.get() & 0xff;
+            }
+            case 3 -> {
+                final int typeCode = buf.get() & 0xff;
+                final int one = buf.get() & 0xff;
+                return typeCode;
+            }
+            default -> {
+                LOG.warn("Unexpected payload length {}, expected {} or {}",
+                    buf.position() + buf.remaining(),
+                    buf.position() + 2,
+                    buf.position() + 3);
+                return null;
+            }
+        }
     }
 }

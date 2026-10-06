@@ -476,16 +476,14 @@ public class OppoHeadphonesSupport extends AbstractHeadphoneBTBRDeviceSupport {
         }
 
         switch (type) {
-            case BATTERY: {
+            case BATTERY -> {
                 parseBattery(buf.array());
-                break;
             }
-            case STATUS: {
+            case STATUS -> {
                 LOG.debug("Got status");
                 // TODO handle
-                break;
             }
-            case GAME_MODE: {
+            case GAME_MODE -> {
                 if (buf.remaining() != 1) {
                     LOG.warn("Unexpected payload remaining: {}, expected 1", buf.remaining());
                     return;
@@ -495,38 +493,16 @@ public class OppoHeadphonesSupport extends AbstractHeadphoneBTBRDeviceSupport {
                 evaluateGBDeviceEvent(new GBDeviceEventUpdatePreferences(
                     OppoHeadphonesPreferences.GAME_MODE,
                     isEnabled));
-                break;
             }
-            case ANC_SELECTOR: {
-                if (buf.remaining() != 2) {
-                    LOG.warn("Unexpected payload remaining: {}, expected 2", buf.remaining());
-                    return;
-                }
-
-                final int one = buf.get();
-                if (one != 1) {
-                    LOG.warn("Unexpected payload: {}", StringUtils.bytesToHex(buf.array()));
-                }
-
-                final int valueCode = buf.get();
-                final AncConfigValue value = AncConfigValue.fromCode(valueCode);
-                if (value == null) {
-                    LOG.warn("Unknown anc value code 0x{}", OppoUtils.numberToHex(valueCode, 2));
-                    break;
-                }
-                LOG.debug("Got anc config for MODE = {}", value);
-                evaluateGBDeviceEvent(new GBDeviceEventUpdatePreferences(
-                    OppoHeadphonesPreferences.ANC_SELECTOR,
-                    value.getPrefId()));
-                break;
+            case ANC_SELECTOR -> {
+                final GBDeviceEvent event = getAncConfigModule().decodeRet(payload);
+                evaluateGBDeviceEvent(event);
             }
-            case MULTIPOINT: {
+            case MULTIPOINT -> {
                 multipointReceiverDevices(getMultipointDevsModule().decodeRet(payload));
-                break;
             }
-            default: {
+            default -> {
                 LOG.warn("Unhandled subscription type {}", type);
-                break;
             }
         }
     }
