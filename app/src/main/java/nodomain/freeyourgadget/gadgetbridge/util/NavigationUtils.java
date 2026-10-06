@@ -84,6 +84,8 @@ public class NavigationUtils {
             case NavigationInfoSpec.ACTION_ROUNDABOUT_STRAIGHT -> R.drawable.ic_turn_round_straight;
             case NavigationInfoSpec.ACTION_ROUNDABOUT_UTURN -> R.drawable.ic_turn_round_uturn;
             case NavigationInfoSpec.ACTION_FINISH -> R.drawable.ic_turn_finish;
+            case NavigationInfoSpec.ACTION_OFFROUTE -> R.drawable.ic_turn_offroute;
+            case NavigationInfoSpec.ACTION_MERGE -> R.drawable.ic_turn_merge;
             default -> 0;
         };
     }
