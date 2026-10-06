@@ -18,23 +18,12 @@ package nodomain.freeyourgadget.gadgetbridge.service.devices.soundcore.motion300
 
 import android.os.Handler;
 
-import java.util.UUID;
-
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
 import nodomain.freeyourgadget.gadgetbridge.service.btbr.TransactionBuilder;
-import nodomain.freeyourgadget.gadgetbridge.service.serial.AbstractHeadphoneSerialDeviceSupportV2;
+import nodomain.freeyourgadget.gadgetbridge.service.devices.soundcore.SoundcoreDeviceSupport;
 
-public class SoundcoreMotion300DeviceSupport extends AbstractHeadphoneSerialDeviceSupportV2<SoundcoreMotion300Protocol> {
+public class SoundcoreMotion300DeviceSupport extends SoundcoreDeviceSupport {
     private final Handler handler = new Handler();
-
-    public SoundcoreMotion300DeviceSupport() {
-        addSupportedService(UUID.fromString("0cf12d31-fac3-4553-bd80-d6832e7b3135"));
-    }
-
-    @Override
-    protected SoundcoreMotion300Protocol createDeviceProtocol() {
-        return new SoundcoreMotion300Protocol(getDevice());
-    }
 
     @Override
     protected TransactionBuilder initializeDevice(final TransactionBuilder builder) {

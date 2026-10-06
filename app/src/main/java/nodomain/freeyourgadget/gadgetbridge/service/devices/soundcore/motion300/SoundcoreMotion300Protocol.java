@@ -33,17 +33,13 @@ import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEventUpdatePref
 import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEventVersionInfo;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
 import nodomain.freeyourgadget.gadgetbridge.model.BatteryState;
-import nodomain.freeyourgadget.gadgetbridge.service.devices.soundcore.AbstractSoundcoreProtocol;
+import nodomain.freeyourgadget.gadgetbridge.service.devices.soundcore.protocol.impl.v1.SoundcoreProtocolImplV1;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.soundcore.SoundcorePacket;
 import nodomain.freeyourgadget.gadgetbridge.util.Prefs;
 
 import static nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsPreferenceConst.*;
-import static nodomain.freeyourgadget.gadgetbridge.service.devices.soundcore.protocol.impl.v1.SoundcoreProtocolImplV1.CMD_GET_DEVICE_INFO;
-import static nodomain.freeyourgadget.gadgetbridge.service.devices.soundcore.protocol.impl.v1.SoundcoreProtocolImplV1.CMD_NOTIFY_BATTERY_INFO;
-import static nodomain.freeyourgadget.gadgetbridge.service.devices.soundcore.protocol.impl.v1.SoundcoreProtocolImplV1.CMD_NOTIFY_CHARGING_INFO;
-import static nodomain.freeyourgadget.gadgetbridge.service.devices.soundcore.protocol.impl.v1.SoundcoreProtocolImplV1.CMD_SET_AUTO_POWER_OFF;
 
-public class SoundcoreMotion300Protocol extends AbstractSoundcoreProtocol {
+public class SoundcoreMotion300Protocol extends SoundcoreProtocolImplV1 {
     private static final Logger LOG = LoggerFactory.getLogger(SoundcoreMotion300Protocol.class);
 
     // Some of these commands are not used right now, they serve as documentation
@@ -91,7 +87,7 @@ public class SoundcoreMotion300Protocol extends AbstractSoundcoreProtocol {
 
     private final GBDeviceEventBatteryInfo batteryInfo = new GBDeviceEventBatteryInfo();
 
-    protected SoundcoreMotion300Protocol(GBDevice device) {
+    public SoundcoreMotion300Protocol(GBDevice device) {
         super(device);
     }
 
@@ -296,10 +292,6 @@ public class SoundcoreMotion300Protocol extends AbstractSoundcoreProtocol {
         }
 
         return super.encodeSendConfiguration(config);
-    }
-
-    public byte[] encodeDeviceInfoRequest() {
-        return encodeRequest(CMD_GET_DEVICE_INFO);
     }
 
     @Override
