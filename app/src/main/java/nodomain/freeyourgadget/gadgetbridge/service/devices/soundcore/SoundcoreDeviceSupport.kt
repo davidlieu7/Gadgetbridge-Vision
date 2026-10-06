@@ -47,10 +47,14 @@ open class SoundcoreDeviceSupport : AbstractHeadphoneSerialDeviceSupportV2<Sound
     }
 
     override fun initializeDevice(builder: TransactionBuilder): TransactionBuilder {
+        val coordinator = getDevice().deviceCoordinator as SoundcoreEarbudsCoordinator
+        val delayMillis = coordinator.getConnectDelayMillis()
+        if (delayMillis > 0) {
+            builder.sleep(delayMillis)
+        }
         // 1. Request device info (battery, firmware, serial, embedded control functions)
         builder.write(*mDeviceProtocol.encodeDeviceInfoRequest())
         // 2. Request extended info (firmware details, serial, additional settings)
-        val coordinator = getDevice().deviceCoordinator as SoundcoreEarbudsCoordinator
         if (coordinator.supportsExtendedInfoRequest()) {
             builder.write(*mDeviceProtocol.encodeExtendedInfoRequest())
         }

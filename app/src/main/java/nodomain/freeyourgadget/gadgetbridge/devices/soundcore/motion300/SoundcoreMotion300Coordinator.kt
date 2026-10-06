@@ -21,8 +21,6 @@ import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSpec
 import nodomain.freeyourgadget.gadgetbridge.devices.DeviceCoordinator
 import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreEarbudsCoordinator
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice
-import nodomain.freeyourgadget.gadgetbridge.service.DeviceSupport
-import nodomain.freeyourgadget.gadgetbridge.service.devices.soundcore.motion300.SoundcoreMotion300DeviceSupport
 import nodomain.freeyourgadget.gadgetbridge.service.devices.soundcore.motion300.SoundcoreMotion300Protocol
 import java.util.regex.Pattern
 
@@ -69,8 +67,7 @@ class SoundcoreMotion300Coordinator : SoundcoreEarbudsCoordinator() {
 
     override fun supportsSessionInitRequest(): Boolean = false
 
-    override fun getDeviceSupportClass(device: GBDevice): Class<out DeviceSupport> =
-        SoundcoreMotion300DeviceSupport::class.java
+    override fun getConnectDelayMillis(): Int = 500
 
     override fun getDeviceSpecificSettingsCustomizer(device: GBDevice): DeviceSpecificSettingsCustomizer =
         SoundcoreMotion300SettingsCustomizer()

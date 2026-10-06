@@ -134,6 +134,9 @@ abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator(
     /** Overrides the model-derived control service for devices using a different service. */
     open fun getServiceUUID(): UUID? = null
 
+    /** Delay before the first initialization command, after the socket is connected. */
+    open fun getConnectDelayMillis(): Int = 0
+
     /** Whether this model supports the session initialization request. */
     open fun supportsSessionInitRequest(): Boolean = true
 
