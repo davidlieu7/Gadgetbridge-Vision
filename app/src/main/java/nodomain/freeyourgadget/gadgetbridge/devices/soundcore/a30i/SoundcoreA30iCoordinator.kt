@@ -34,12 +34,20 @@ class SoundcoreA30iCoordinator : SoundcoreEarbudsCoordinator() {
     override fun getDefaultCapabilities(): Set<Capability> = setOf(
         Capability.NoiseControl,
         Capability.AmbientSound,
+        Capability.Transparency,
+        Capability.AdaptiveNoiseCancellationMode,
         Capability.NoiseCancellationModes,
+        Capability.AdaptiveNoiseCancellation,
+        Capability.FindDevice,
+        Capability.FindIndividualEarbuds,
+        Capability.BatteryLowTone,
         Capability.WindNoiseReduction,
         Capability.SurroundSound,
         Capability.AutoPowerOff,
         Capability.TouchTone,
     )
+
+    override fun getNoiseCancellationLevelRange(): IntRange = 1..5
 
     /* Battery case not reported */
     override fun getBatteryCount(device: GBDevice): Int = 2

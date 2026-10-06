@@ -36,11 +36,14 @@ import nodomain.freeyourgadget.gadgetbridge.service.devices.soundcore.protocol.i
 abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator() {
     enum class Capability {
         FindDevice,
+        FindIndividualEarbuds,
         Multipoint,
+        Transparency,
         NoiseControl,
-        AmbientSound,
-        AdaptiveNoiseCancellation,
         NoiseCancellationModes,
+        AdaptiveNoiseCancellation,
+        AdaptiveNoiseCancellationMode,
+        AmbientSound,
         WindNoiseReduction,
         VocalMode,
         TouchControls,
@@ -48,15 +51,15 @@ abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator(
         SurroundSound,
         FitTest,
         AutoPowerOff,
+        BatteryLowTone,
         TouchTone,
         AudioEqualizer,
+        AdjustableEqualizerFrequencies,
         GamingMode,
-        BatteryLowTone,
         VoicePrompts,
         ButtonBrightness,
         LDAC,
         AdaptiveDirection,
-        AdjustableEqualizerFrequencies,
     }
 
     enum class ButtonAction(
@@ -167,6 +170,8 @@ abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator(
 
     open fun getAutoPowerOffMinutes(): Array<Int> = arrayOf(10, 20, 30, 60)
 
+    open fun getNoiseCancellationLevelRange(): IntRange = 0..2
+
     protected fun getAutoPowerOffEntries(): List<ListEntry> = buildList {
         add(ListEntry.Res("0", R.string.pref_button_action_disabled))
         val context = GBApplication.getContext()
@@ -188,7 +193,7 @@ abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator(
             return devicePrefs.getStringSet(
                 DeviceSettingsPreferenceConst.PREF_OVERRIDE_FEATURES_LIST,
                 emptySet(),
-            ).mapTo(mutableSetOf()) { Capability.valueOf(it) }
+            ).mapNotNullTo(mutableSetOf()) { name -> Capability.values().firstOrNull { it.name == name } }
         }
 
         return getDefaultCapabilities()
@@ -464,11 +469,36 @@ abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator(
                 }
             }
 
+            if (has(Capability.FindIndividualEarbuds)) {
+                listOf(
+                    DeviceSettingsPreferenceConst.PREF_SOUNDCORE_FIND_LEFT_EARBUD to R.string.earfun_earbud_mode_left,
+                    DeviceSettingsPreferenceConst.PREF_SOUNDCORE_FIND_RIGHT_EARBUD to R.string.earfun_earbud_mode_right,
+                ).forEach { (key, title) ->
+                    list(
+                        key = key,
+                        title = title,
+                        summary = R.string.earfun_find_headphones,
+                        icon = R.drawable.ic_action_find_lost_device,
+                        entries = listOf(
+                            ListEntry.Res("0", R.string.off),
+                            ListEntry.Res("1", R.string.earfun_find_headphones_hint),
+                        ),
+                        defaultValue = "0",
+                    )
+                }
+            }
+
             if (has(Capability.NoiseControl) || has(Capability.AmbientSound)) {
                 val ambientSoundControlEntries = buildList {
                     add(ListEntry.Res("off", R.string.sony_ambient_sound_off))
+                    if (has(Capability.Transparency)) {
+                        add(ListEntry.Res("transparency", R.string.prefs_active_noise_cancelling_transparency))
+                    }
                     if (has(Capability.NoiseControl)) {
                         add(ListEntry.Res("noise_cancelling", R.string.sony_ambient_sound_noise_cancelling))
+                    }
+                    if (has(Capability.AdaptiveNoiseCancellationMode)) {
+                        add(ListEntry.Res("adaptive_anc", R.string.pref_adaptive_noise_cancelling_title))
                     }
                     if (has(Capability.AmbientSound)) {
                         add(ListEntry.Res("ambient_sound", R.string.sony_ambient_sound_ambient_sound))
@@ -492,7 +522,8 @@ abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator(
                             defaultValue = "transport",
                         )
                     }
-                    if (has(Capability.AdaptiveNoiseCancellation)) {
+                    val separateAdaptiveToggle = !has(Capability.AdaptiveNoiseCancellationMode)
+                    if (has(Capability.AdaptiveNoiseCancellation) && separateAdaptiveToggle) {
                         switchSetting(
                             key = DeviceSettingsPreferenceConst.PREF_SOUNDCORE_ADAPTIVE_NOISE_CANCELLING,
                             title = R.string.pref_adaptive_noise_cancelling_title,
@@ -501,13 +532,16 @@ abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator(
                             defaultValue = true,
                             disableDependentsState = true,
                         )
+                    }
+                    if (has(Capability.AdaptiveNoiseCancellation)) {
+                        val levelRange = getNoiseCancellationLevelRange()
                         seekbar(
                             key = DeviceSettingsPreferenceConst.PREF_SONY_AMBIENT_SOUND_LEVEL,
                             title = R.string.prefs_active_noise_cancelling_level,
                             icon = R.drawable.ic_hearing,
-                            min = 0,
-                            max = 2,
-                            defaultValue = 0,
+                            min = levelRange.first,
+                            max = levelRange.last,
+                            defaultValue = levelRange.first,
                             dependency = DeviceSettingsPreferenceConst.PREF_SOUNDCORE_ADAPTIVE_NOISE_CANCELLING,
                         )
                     }

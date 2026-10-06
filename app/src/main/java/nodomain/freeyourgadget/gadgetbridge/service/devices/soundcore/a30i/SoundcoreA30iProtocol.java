@@ -67,7 +67,6 @@ public class SoundcoreA30iProtocol extends SoundcoreProtocolImplV1 {
             String ambient_mode = getAmbientMode(payload[70]);
             int noiseCancellingLevel = getNoiseCancellingLevel(payload[65]);
             boolean wind_noise_reduction = payload[68] == 0x01;
-            turn_ANC_settings_on_off(ANC_mode);
             //-------------------------------------------------------------------------
             boolean touchTone = payload[72] == 0x01;
             boolean surround3d = payload[74] == 0x01;
@@ -101,52 +100,6 @@ public class SoundcoreA30iProtocol extends SoundcoreProtocolImplV1 {
             LOG.debug("Respond Data:" + hexdump(responseData));
         }
         return devEvts.toArray(new GBDeviceEvent[devEvts.size()]);
-    }
-
-    /**
-     * It greys out some ANC settings on the UI, depending on the
-     * selected ANC_mode.
-     * The (de)activation is useful because some settings do not make
-     * sense in all modes.
-     */
-    private void turn_ANC_settings_on_off(String ANC_mode){
-        boolean ambient_mode;
-        boolean ANC_sound_level;
-        boolean wind_noise_reduction;
-        switch (ANC_mode) {
-            case OFF -> {
-                ambient_mode = true;
-                ANC_sound_level = true;
-                wind_noise_reduction = true;
-            }
-            case TRANSPARENCY, ADAPTIVE_ANC -> {
-                ambient_mode = true;
-                ANC_sound_level = true;
-                wind_noise_reduction = false;
-            }
-            case NOISE_CANCELLING -> {
-                ambient_mode = true;
-                ANC_sound_level = false;
-                wind_noise_reduction = false;
-            }
-            case AMBIENT_SOUND -> {
-                ambient_mode = false;
-                ANC_sound_level = true;
-                wind_noise_reduction = false;
-            }
-            default -> {
-                // Unknown state (should never happen), but if so, allow the user to select
-                // all options so they can make the best out of it.
-                ambient_mode = false;
-                ANC_sound_level = false;
-                wind_noise_reduction = false;
-            }
-        }
-        getDevicePrefs().getPreferences().edit()
-                .putBoolean(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_A30I_DISABLE_OPTION_AMBIENT_MODE, ambient_mode)
-                .putBoolean(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_A30I_DISABLE_OPTION_AMBIENT_SOUND_LEVEL, ANC_sound_level)
-                .putBoolean(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_A30I_DISABLE_OPTION_WIND_NOISE_REDUCTION, wind_noise_reduction)
-                .apply();
     }
 
     /**
@@ -256,7 +209,6 @@ public class SoundcoreA30iProtocol extends SoundcoreProtocolImplV1 {
                 int noiseCancellingLevel = prefs.getInt(DeviceSettingsPreferenceConst.PREF_SONY_AMBIENT_SOUND_LEVEL, 0);
                 boolean wind_noise_reduction = prefs.getBoolean(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_WIND_NOISE_REDUCTION, false);
 
-                turn_ANC_settings_on_off(ANC_mode);
                 byte[] ANC_result = build_ANC_mode_value(ANC_mode, ambient_mode, noiseCancellingLevel, wind_noise_reduction);
                 if(ANC_result != null) {
                     return ANC_result;
