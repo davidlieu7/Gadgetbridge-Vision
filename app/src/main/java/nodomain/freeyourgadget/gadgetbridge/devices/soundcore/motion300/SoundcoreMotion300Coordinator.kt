@@ -27,6 +27,23 @@ import nodomain.freeyourgadget.gadgetbridge.service.devices.soundcore.motion300.
 import java.util.regex.Pattern
 
 class SoundcoreMotion300Coordinator : SoundcoreEarbudsCoordinator() {
+    override fun getModelName(): String = "A3135"
+
+    override fun getSupportedDeviceName(): Pattern = Pattern.compile("soundcore Motion 300")
+
+    override fun getDeviceNameResource(): Int = R.string.devicetype_soundcore_motion300
+
+    override fun getDefaultIconResource(): Int = R.drawable.ic_device_speaker
+
+    override fun getBondingStyle(): Int = BONDING_STYLE_ASK
+
+    override fun getDeviceKind(device: GBDevice): DeviceCoordinator.DeviceKind =
+        DeviceCoordinator.DeviceKind.SPEAKER
+
+    override fun getBatteryCount(device: GBDevice): Int = 1
+
+    override fun supportsPowerOff(device: GBDevice): Boolean = true
+
     override fun getAutoPowerOffMinutes(): Array<Int> = arrayOf(5, 10, 20, 60)
 
     override fun getDefaultCapabilities(): Set<Capability> = setOf(
@@ -44,23 +61,6 @@ class SoundcoreMotion300Coordinator : SoundcoreEarbudsCoordinator() {
         R.string.soundcore_equalizer_preset_voice,
         R.string.soundcore_equalizer_preset_balanced,
     )
-
-    override fun getModelName(): String = "A3135"
-
-    override fun getSupportedDeviceName(): Pattern = Pattern.compile("soundcore Motion 300")
-
-    override fun getDeviceNameResource(): Int = R.string.devicetype_soundcore_motion300
-
-    override fun getDefaultIconResource(): Int = R.drawable.ic_device_speaker
-
-    override fun getBondingStyle(): Int = BONDING_STYLE_ASK
-
-    override fun getDeviceKind(device: GBDevice): DeviceCoordinator.DeviceKind =
-        DeviceCoordinator.DeviceKind.SPEAKER
-
-    override fun getBatteryCount(device: GBDevice): Int = 1
-
-    override fun supportsPowerOff(device: GBDevice): Boolean = true
 
     override fun createProtocol(device: GBDevice): SoundcoreMotion300Protocol =
         SoundcoreMotion300Protocol(device)
