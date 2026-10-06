@@ -28,14 +28,13 @@ import java.util.UUID
 import java.util.regex.Pattern
 
 open class SoundcoreQ30Coordinator : SoundcoreEarbudsCoordinator() {
+    override fun getModelName(): String = "A3028"
+
+    override fun getSupportedDeviceName(): Pattern = Pattern.compile("Soundcore +Q30", Pattern.CASE_INSENSITIVE)
+
     override fun getDeviceNameResource(): Int = R.string.devicetype_soundcore_q30
 
     override fun getDefaultIconResource(): Int = R.drawable.ic_device_headphones
-
-    override fun getModelName(): String = "A3028"
-
-    override fun getSupportedDeviceName(): Pattern =
-        Pattern.compile("Soundcore +Q30", Pattern.CASE_INSENSITIVE)
 
     override fun getDeviceKind(device: GBDevice): DeviceCoordinator.DeviceKind =
         DeviceCoordinator.DeviceKind.HEADPHONES

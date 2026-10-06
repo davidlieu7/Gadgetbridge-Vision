@@ -21,11 +21,11 @@ import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.q30.SoundcoreQ30Co
 import java.util.regex.Pattern
 
 class SoundcoreLifeTuneCoordinator : SoundcoreQ30Coordinator() {
-    override fun getDeviceNameResource(): Int = R.string.devicetype_soundcore_life_tune
-
     override fun getModelName(): String = "A3029"
 
     override fun getSupportedDeviceName(): Pattern = Pattern.compile("Soundcore Life Tune")
+
+    override fun getDeviceNameResource(): Int = R.string.devicetype_soundcore_life_tune
 
     override fun getSettingsResource(): Int = R.xml.devicesettings_soundcore_life_tune
 }

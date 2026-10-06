@@ -24,11 +24,11 @@ import nodomain.freeyourgadget.gadgetbridge.service.devices.soundcore.sport_x20.
 import java.util.regex.Pattern
 
 class SoundcoreSportX20Coordinator : SoundcoreEarbudsCoordinator() {
-    override fun getDeviceNameResource(): Int = R.string.devicetype_soundcore_sport_x20
-
     override fun getModelName(): String = "A3968"
 
     override fun getSupportedDeviceName(): Pattern = Pattern.compile("soundcore Sport X20")
+
+    override fun getDeviceNameResource(): Int = R.string.devicetype_soundcore_sport_x20
 
     override fun getDefaultCapabilities(): Set<Capability> = setOf(
         Capability.FindDevice,
