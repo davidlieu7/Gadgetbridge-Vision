@@ -65,6 +65,15 @@ class SoundcoreSportX20Coordinator : SoundcoreEarbudsCoordinator() {
         TapFunction.NONE,
     )
 
+    override fun getSupportedTapFunctions(action: ButtonAction): List<TapFunction> =
+        when (action) {
+            ButtonAction.SINGLE_TAP -> supportedTapFunctions.filterNot {
+                it == TapFunction.VOICE_ASSISTANT ||
+                it == TapFunction.AMBIENT_SOUND_CONTROL
+            }
+            else -> supportedTapFunctions
+        }
+
     override fun getDeviceSupportClass(device: GBDevice): Class<out DeviceSupport> =
         SoundcoreSportX20DeviceSupport::class.java
 }

@@ -32,7 +32,6 @@ public class SoundcoreSportX20Protocol extends SoundcoreProtocolImplV1 {
     private static final Logger LOG = LoggerFactory.getLogger(SoundcoreSportX20Protocol.class);
 
     private static final short CMD_SET_EQUALIZER = (short) 0x8703;
-    private static final short CMD_SET_3D_SURROUND = (short) 0x8602;
     private static final short CMD_SET_DUAL_CONNECTION = (short) 0x840b;
     private static final short CMD_SET_FIT_TEST = (short) 0x0109;
     private static final int BATTERY_MULTIPLIER = 20;

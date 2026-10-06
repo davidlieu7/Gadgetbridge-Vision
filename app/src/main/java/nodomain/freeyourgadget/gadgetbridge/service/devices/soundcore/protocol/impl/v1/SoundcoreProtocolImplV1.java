@@ -151,8 +151,7 @@ public abstract class SoundcoreProtocolImplV1 extends AbstractSoundcoreProtocol 
      * override the multiplier and offset when their wire encoding differs from the defaults.
      */
     protected GBDeviceEvent[] decodeBatteryInfo(final byte[] payload) {
-        if (payload.length != 2 && payload.length != 3) {
-            // LOG.warn("CMD_NOTIFY_BATTERY_INFO payload too short: {} bytes", payload.length);
+        if (payload == null || payload.length < 2) {
             return new GBDeviceEvent[0];
         }
         return handleBatteryInfo(payload, getBatteryMultiplier(), getBatteryOffset());
@@ -168,9 +167,9 @@ public abstract class SoundcoreProtocolImplV1 extends AbstractSoundcoreProtocol 
 
     /**
      * Builds battery events for the earbud/case notification payload used by V1 earbuds.
-     * A two-byte payload contains left and right earbuds; a three-byte payload appends the
-     * charging case. The payload values are deliberately kept in their original wire format:
-     * concrete protocols provide the multiplier and optional offset.
+     * The first two bytes contain left and right earbuds; an optional third byte contains the
+     * charging case. Any additional bytes are ignored. The payload values are deliberately kept
+     * in their original wire format: concrete protocols provide the multiplier and optional offset.
      */
     protected final GBDeviceEvent[] handleBatteryInfo(final byte[] payload, final int multiplier) {
         return handleBatteryInfo(payload, multiplier, DEFAULT_BATTERY_OFFSET);
@@ -184,15 +183,15 @@ public abstract class SoundcoreProtocolImplV1 extends AbstractSoundcoreProtocol 
     protected final GBDeviceEvent[] handleBatteryInfo(final byte[] payload,
                                                        final int multiplier,
                                                        final int offset) {
-        if (payload == null || (payload.length != 2 && payload.length != 3)) {
+        if (payload == null || payload.length < 2) {
             return new GBDeviceEvent[0];
         }
 
-        final int[] batteryIndexes = payload.length == 3
+        final int[] batteryIndexes = payload.length >= 3
                 ? new int[]{battery_earphone_left, battery_earphone_right, battery_case}
                 : new int[]{battery_earphone_left, battery_earphone_right};
-        final GBDeviceEvent[] events = new GBDeviceEvent[payload.length];
-        for (int index = 0; index < payload.length; index++) {
+        final GBDeviceEvent[] events = new GBDeviceEvent[batteryIndexes.length];
+        for (int index = 0; index < batteryIndexes.length; index++) {
             events[index] = buildBatteryInfo(
                     batteryIndexes[index],
                     (payload[index] + offset) * multiplier

@@ -100,6 +100,9 @@ abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator(
     open val supportedTapFunctions: List<TapFunction>
         get() = emptyList()
 
+    /* TIP: Override this function in case you need conditions/exclusions based on Action. */
+    open fun getSupportedTapFunctions(action: ButtonAction): List<TapFunction> = supportedTapFunctions
+
     open fun getSupportedEqualizerBands(): IntArray = intArrayOf()
 
     override fun getDefaultIconResource(): Int = R.drawable.ic_device_galaxy_buds
@@ -204,14 +207,14 @@ abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator(
                                 key = action.leftPreference,
                                 title = R.string.prefs_left,
                                 icon = R.drawable.ic_touch,
-                                entries = supportedTapFunctions.map { ListEntry.Res(it.value, it.label) },
+                                entries = getSupportedTapFunctions(action).map { ListEntry.Res(it.value, it.label) },
                                 dependency = DeviceSettingsPreferenceConst.PREF_SOUNDCORE_CONTROL_TOUCH_DISABLED,
                             )
                             list(
                                 key = action.rightPreference,
                                 title = R.string.prefs_right,
                                 icon = R.drawable.ic_touch,
-                                entries = supportedTapFunctions.map { ListEntry.Res(it.value, it.label) },
+                                entries = getSupportedTapFunctions(action).map { ListEntry.Res(it.value, it.label) },
                                 dependency = DeviceSettingsPreferenceConst.PREF_SOUNDCORE_CONTROL_TOUCH_DISABLED,
                             )
                         }

@@ -26,7 +26,7 @@ public class SoundcoreV1ResponseTest {
 
         assertNotNull(events);
         assertEquals(1, events.length);
-        assertEquals(1, protocol.lastCommand);
+        assertEquals(SoundcoreProtocolImplV1.CMD_NOTIFY_BATTERY_INFO, protocol.lastCommand);
         assertEquals(3, protocol.lastPayloadLength);
     }
 
@@ -54,6 +54,56 @@ public class SoundcoreV1ResponseTest {
         assertEquals(20, ((GBDeviceEventBatteryInfo) events[0]).level);
         assertEquals(40, ((GBDeviceEventBatteryInfo) events[1]).level);
         assertEquals(60, ((GBDeviceEventBatteryInfo) events[2]).level);
+    }
+
+    @Test
+    public void handleBatteryInfoIgnoresBytesAfterCase() {
+        final TestProtocol protocol = new TestProtocol();
+
+        final GBDeviceEvent[] events = protocol.batteryInfo(new byte[]{1, 2, 3, 4, 5}, 20);
+
+        assertEquals(3, events.length);
+        assertEquals(1, ((GBDeviceEventBatteryInfo) events[0]).batteryIndex);
+        assertEquals(2, ((GBDeviceEventBatteryInfo) events[1]).batteryIndex);
+        assertEquals(0, ((GBDeviceEventBatteryInfo) events[2]).batteryIndex);
+        assertEquals(20, ((GBDeviceEventBatteryInfo) events[0]).level);
+        assertEquals(40, ((GBDeviceEventBatteryInfo) events[1]).level);
+        assertEquals(60, ((GBDeviceEventBatteryInfo) events[2]).level);
+    }
+
+    @Test
+    public void batteryInfoRejectsNullAndShortPayloads() {
+        final TestProtocol protocol = new TestProtocol();
+
+        for (final byte[] payload : new byte[][]{null, new byte[0], new byte[]{1}}) {
+            assertEquals(0, protocol.batteryInfo(payload, 20).length);
+            assertEquals(0, protocol.defaultBatteryInfo(payload).length);
+        }
+    }
+
+    @Test
+    public void batteryNotificationAcceptsTrailingBytes() {
+        final TestLibertyProtocol protocol = new TestLibertyProtocol();
+
+        final GBDeviceEvent[] events = protocol.decodeResponse(
+                devicePacket(SoundcoreProtocolImplV1.CMD_NOTIFY_BATTERY_INFO, new byte[]{1, 2, 3, 4})
+        );
+
+        assertEquals(3, events.length);
+        assertEquals(20, ((GBDeviceEventBatteryInfo) events[0]).level);
+        assertEquals(40, ((GBDeviceEventBatteryInfo) events[1]).level);
+        assertEquals(60, ((GBDeviceEventBatteryInfo) events[2]).level);
+    }
+
+    @Test
+    public void batteryNotificationRejectsShortPayloads() {
+        final TestLibertyProtocol protocol = new TestLibertyProtocol();
+
+        for (final byte[] payload : new byte[][]{new byte[0], new byte[]{1}}) {
+            assertEquals(0, protocol.decodeResponse(
+                    devicePacket(SoundcoreProtocolImplV1.CMD_NOTIFY_BATTERY_INFO, payload)
+            ).length);
+        }
     }
 
     @Test
@@ -145,6 +195,10 @@ public class SoundcoreV1ResponseTest {
             lastCommand = CMD_NOTIFY_BATTERY_INFO;
             lastPayloadLength = payload.length;
             return new GBDeviceEvent[]{new GBDeviceEventBatteryInfo()};
+        }
+
+        private GBDeviceEvent[] defaultBatteryInfo(final byte[] payload) {
+            return super.decodeBatteryInfo(payload);
         }
 
         private GBDeviceEvent[] batteryInfo(final byte[] payload, final int multiplier) {

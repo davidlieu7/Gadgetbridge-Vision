@@ -17,7 +17,6 @@ public class SoundcoreAeroFitProtocol extends SoundcoreProtocolImplV1 {
 
     private static final Logger LOG = LoggerFactory.getLogger(SoundcoreAeroFitProtocol.class);
 
-    private static final short CMD_SET_BATTERY_LOW_TONE = (short) 0x8210;
     private static final short CMD_SET_GAMING_MODE = (short) 0x8701;
     private static final int BATTERY_MULTIPLIER = 10;
     private static final int BATTERY_OFFSET = 1;
