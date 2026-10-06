@@ -139,6 +139,8 @@
     <uses-permission android:name="android.permission.health.WRITE_RESPIRATORY_RATE" />
     <uses-permission android:name="android.permission.health.WRITE_RESTING_HEART_RATE" />
     <uses-permission android:name="android.permission.health.WRITE_BLOOD_GLUCOSE" />
+    <uses-permission android:name="android.permission.health.WRITE_BLOOD_PRESSURE" />
+    <uses-permission android:name="android.permission.health.WRITE_HYDRATION" />
     <uses-permission android:name="android.permission.health.WRITE_STEPS_CADENCE" />
     <uses-permission android:name="android.permission.health.WRITE_CYCLING_PEDALING_CADENCE" />
     <uses-sdk tools:overrideLibrary="androidx.health.connect.client"/>
@@ -269,6 +271,9 @@
             android:label="@string/activity_data_management_directory_content_title"
             android:parentActivityName=".activities.DataManagementActivity" />
         <activity
+            android:name=".activities.files.FtpFileBrowserActivity"
+            android:label="@string/ftp_file_browser" />
+        <activity
             android:name=".activities.fit.FitViewerActivity"
             android:exported="true"
             android:label="@string/fit_file_viewer" />
@@ -308,6 +313,25 @@
             android:name=".activities.NotificationsAppIconUploadActivity"
             android:label="@string/notifications_app_icon_upload"
             android:parentActivityName=".activities.devicesettings.DeviceSettingsActivity" />
+        <activity
+            android:name=".activities.workouts.templates.WorkoutTemplateListActivity"
+            android:label="@string/pref_workout_templates_title"
+            android:parentActivityName=".activities.devicesettings.DeviceSettingsActivity" />
+        <activity
+            android:name=".activities.workouts.templates.WorkoutTemplateEditActivity"
+            android:label="@string/pref_workout_templates_title"
+            android:parentActivityName=".activities.workouts.templates.WorkoutTemplateListActivity"
+            android:windowSoftInputMode="stateHidden" />
+        <activity
+            android:name=".activities.workouts.templates.WorkoutStepEditActivity"
+            android:label="@string/workout_template_edit_step"
+            android:parentActivityName=".activities.workouts.templates.WorkoutTemplateEditActivity"
+            android:windowSoftInputMode="stateHidden" />
+        <activity
+            android:name=".activities.workouts.templates.WorkoutExercisePickerActivity"
+            android:label="@string/workout_exercise_picker_title"
+            android:parentActivityName=".activities.workouts.templates.WorkoutStepEditActivity"
+            android:windowSoftInputMode="stateHidden" />
         <activity
             android:name=".activities.workouts.WorkoutListActivity"
             android:label="@string/activity_summaries"
@@ -702,6 +726,9 @@
             </intent-filter>
         </receiver>
 
+        <receiver
+            android:name=".service.ftp.WifiFtpSessionStopReceiver"
+            android:exported="false" />
         <receiver
             android:name=".service.receivers.GBMusicControlReceiver"
             android:exported="false">
@@ -1118,6 +1145,12 @@
             android:label="OpenTracks controller and intent receiver"
             android:exported="true"/>
 
+        <activity
+            android:name=".activities.hipee.XiaomiHipeeP1HistoryActivity"
+            android:exported="false" />
+        <activity
+            android:name=".activities.hipee.XiaomiHipeeP1LivePostureActivity"
+            android:exported="false" />
         <activity
             android:name=".activities.dashboard.DashboardCalendarActivity"
             android:label="@string/menuitem_calendar"

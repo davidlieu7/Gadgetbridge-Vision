@@ -21,7 +21,7 @@ class ActivitySampleSliceBoundaryTest {
     private object IdempotentSyncer : AbstractActivitySampleSyncer<StepsRecord>() {
         override val logger: Logger = LoggerFactory.getLogger("test")
         override val recordClass: KClass<StepsRecord> = StepsRecord::class
-        override fun convertSample(sample: ActivitySample, offset: ZoneOffset, metadata: Metadata, deviceName: String, version: Long): StepsRecord? = null
+        override fun convertMinute(endTs: Instant, minuteSamples: List<ActivitySample>, offset: ZoneOffset, metadata: Metadata, deviceName: String, version: Long): StepsRecord? = null
     }
 
     // Syncer that opts out of the lookback (mirrors a non-idempotent record type).
@@ -29,7 +29,7 @@ class ActivitySampleSliceBoundaryTest {
         override val logger: Logger = LoggerFactory.getLogger("test")
         override val recordClass: KClass<StepsRecord> = StepsRecord::class
         override val lateSampleLookback = java.time.Duration.ZERO
-        override fun convertSample(sample: ActivitySample, offset: ZoneOffset, metadata: Metadata, deviceName: String, version: Long): StepsRecord? = null
+        override fun convertMinute(endTs: Instant, minuteSamples: List<ActivitySample>, offset: ZoneOffset, metadata: Metadata, deviceName: String, version: Long): StepsRecord? = null
     }
 
     private fun within(syncer: AbstractActivitySampleSyncer<*>, endTs: Instant): Boolean =

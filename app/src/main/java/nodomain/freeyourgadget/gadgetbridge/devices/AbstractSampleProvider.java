@@ -20,6 +20,7 @@ package nodomain.freeyourgadget.gadgetbridge.devices;
 import static nodomain.freeyourgadget.gadgetbridge.util.GB.toast;
 
 import android.content.Context;
+import android.text.format.DateUtils;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
@@ -29,25 +30,23 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.time.Instant;
-import java.time.LocalDate;
 import java.util.ArrayList;
-import java.util.Calendar;
 import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.ListIterator;
+import java.util.Objects;
 import java.util.Set;
+import java.util.TimeZone;
 import java.util.function.ToIntFunction;
 
 import de.greenrobot.dao.AbstractDao;
 import de.greenrobot.dao.Property;
 import de.greenrobot.dao.query.QueryBuilder;
-import de.greenrobot.dao.query.WhereCondition;
 import nodomain.freeyourgadget.gadgetbridge.GBApplication;
 import nodomain.freeyourgadget.gadgetbridge.R;
 import nodomain.freeyourgadget.gadgetbridge.database.DBHelper;
 import nodomain.freeyourgadget.gadgetbridge.entities.AbstractActivitySample;
-import nodomain.freeyourgadget.gadgetbridge.entities.AbstractTimeSample;
 import nodomain.freeyourgadget.gadgetbridge.entities.DaoSession;
 import nodomain.freeyourgadget.gadgetbridge.entities.Device;
 import nodomain.freeyourgadget.gadgetbridge.entities.User;
@@ -65,7 +64,6 @@ import nodomain.freeyourgadget.gadgetbridge.util.GB;
 public abstract class AbstractSampleProvider<T extends AbstractActivitySample> implements SampleProvider<T>, PersistenceProvider<T> {
     private static final Logger LOG = LoggerFactory.getLogger(AbstractSampleProvider.class);
 
-    private static final WhereCondition[] NO_CONDITIONS = new WhereCondition[0];
     private static final int CUMULATIVE_COUNTER_DAY_BOUNDARY_MAX_GAP_SECONDS = 30 * 60;
     private final DaoSession mSession;
     private final GBDevice mDevice;
@@ -360,11 +358,13 @@ public abstract class AbstractSampleProvider<T extends AbstractActivitySample> i
             final int activeCalories = s2.getActiveCalories();
             s2.setTimestamp(timestamp);
 
+            final boolean crossedDayBoundary = !sameDay(s1.getTimestamp(), timestamp);
+
             s2.setSteps(convertCumulativeValue(
                     samples,
                     i,
-                    s1.getTimestamp(),
                     timestamp,
+                    crossedDayBoundary,
                     steps,
                     stepsState,
                     AbstractActivitySample::getSteps,
@@ -373,8 +373,8 @@ public abstract class AbstractSampleProvider<T extends AbstractActivitySample> i
             s2.setDistanceCm(convertCumulativeValue(
                     samples,
                     i,
-                    s1.getTimestamp(),
                     timestamp,
+                    crossedDayBoundary,
                     distance,
                     distanceState,
                     AbstractActivitySample::getDistanceCm,
@@ -383,8 +383,8 @@ public abstract class AbstractSampleProvider<T extends AbstractActivitySample> i
             s2.setActiveCalories(convertCumulativeValue(
                     samples,
                     i,
-                    s1.getTimestamp(),
                     timestamp,
+                    crossedDayBoundary,
                     activeCalories,
                     activeCaloriesState,
                     AbstractActivitySample::getActiveCalories,
@@ -433,14 +433,12 @@ public abstract class AbstractSampleProvider<T extends AbstractActivitySample> i
 
     private int convertCumulativeValue(final List<T> samples,
                                        final int currentIndex,
-                                       final int previousSampleTimestamp,
                                        final int currentTimestamp,
+                                       final boolean crossedDayBoundary,
                                        final int currentValue,
                                        final CumulativeCounterState state,
                                        final ToIntFunction<T> counterValue,
                                        final String counterName) {
-        final boolean crossedDayBoundary = !sameDay(previousSampleTimestamp, currentTimestamp);
-
         if (crossedDayBoundary || state.pendingDayBoundary) {
             if (!measuredCounterValue(currentValue)) {
                 if (crossedDayBoundary) {
@@ -553,7 +551,7 @@ public abstract class AbstractSampleProvider<T extends AbstractActivitySample> i
     }
 
     private boolean continuedCumulativeValue(final int currentValue, final int previousValue) {
-        return currentValue > 0 && previousValue > 0 && currentValue >= previousValue;
+        return previousValue > 0 && currentValue >= previousValue;
     }
 
     private boolean measuredCounterValue(final int value) {
@@ -591,7 +589,7 @@ public abstract class AbstractSampleProvider<T extends AbstractActivitySample> i
 
         private void update(final int timestamp, final int value) {
             previousTimestamp = timestamp;
-            previousValue = value > 0 ? value : 0;
+            previousValue = Math.max(value, 0);
         }
     }
 
@@ -616,21 +614,13 @@ public abstract class AbstractSampleProvider<T extends AbstractActivitySample> i
     }
 
     public boolean sameDay(final int t1, final int t2) {
-        final Calendar cal = Calendar.getInstance();
-
-        cal.setTimeInMillis(t1 * 1000L - 1000L);
-        final LocalDate d1 = LocalDate.of(cal.get(Calendar.YEAR), cal.get(Calendar.MONTH) + 1, cal.get(Calendar.DAY_OF_MONTH));
-
-        cal.setTimeInMillis(t2 * 1000L - 1000L);
-        final LocalDate d2 = LocalDate.of(cal.get(Calendar.YEAR), cal.get(Calendar.MONTH) + 1, cal.get(Calendar.DAY_OF_MONTH));
-
-        return d1.equals(d2);
+        final TimeZone timeZone = TimeZone.getDefault();
+        return localDayIndex(t1, timeZone) == localDayIndex(t2, timeZone);
     }
 
-    public LocalDate getLocalDate(final long timestampMillis) {
-        final Calendar cal = Calendar.getInstance();
-        cal.setTimeInMillis(timestampMillis);
-        return LocalDate.of(cal.get(Calendar.YEAR), cal.get(Calendar.MONTH) + 1, cal.get(Calendar.DAY_OF_MONTH));
+    private static int localDayIndex(final int timestampSeconds, final TimeZone timeZone) {
+        final long millis = timestampSeconds * 1000L - 1000L;
+        return (int) Math.floorDiv(millis + timeZone.getOffset(millis), DateUtils.DAY_IN_MILLIS);
     }
 
     protected List<T> fillGaps(final List<T> samples, final int timestamp_from, final int timestamp_to) {
@@ -736,10 +726,10 @@ public abstract class AbstractSampleProvider<T extends AbstractActivitySample> i
                 LOG.warn("Device not found in database for '{}'", gbDevice.getAliasOrName());
                 return false;
             }
-            final long deviceId = device.getId();
+            final long deviceId = Objects.requireNonNull(device.getId());
 
             final User user = DBHelper.getUser(session);
-            final long userId = user.getId();
+            final long userId = Objects.requireNonNull(user.getId());
 
             for (final T sample : samples) {
                 sample.setProvider(this);

@@ -61,6 +61,7 @@ import static nodomain.freeyourgadget.gadgetbridge.devices.huawei.HuaweiConstant
 import static nodomain.freeyourgadget.gadgetbridge.devices.huawei.HuaweiConstants.PREF_HUAWEI_STRESS_SWITCH;
 import static nodomain.freeyourgadget.gadgetbridge.devices.huawei.HuaweiConstants.PREF_HUAWEI_TRUSLEEP;
 import static nodomain.freeyourgadget.gadgetbridge.devices.huawei.HuaweiConstants.PREF_HUAWEI_WORKMODE;
+import static nodomain.freeyourgadget.gadgetbridge.devices.huawei.HuaweiConstants.PREF_HUAWEI_WHEELCHAIR_MODE;
 import static nodomain.freeyourgadget.gadgetbridge.devices.huawei.HuaweiConstants.PREF_HUAWEI_ARTERIAL_STIFFNESS_DETECTION_SWITCH;
 
 public class HuaweiSettingsCustomizer implements DeviceSpecificSettingsCustomizer {
@@ -153,6 +154,7 @@ public class HuaweiSettingsCustomizer implements DeviceSpecificSettingsCustomize
         handler.addPreferenceHandlerFor(PREF_HUAWEI_ARRHYTHMIA_ALERT);
 
         handler.addPreferenceHandlerFor(PREF_HUAWEI_ARTERIAL_STIFFNESS_DETECTION_SWITCH);
+        handler.addPreferenceHandlerFor(PREF_HUAWEI_WHEELCHAIR_MODE);
 
 
         final Preference forceOptions = handler.findPreference(PREF_FORCE_OPTIONS);

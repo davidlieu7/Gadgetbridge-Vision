@@ -14,6 +14,7 @@ import java.util.Objects;
 import java.util.UUID;
 
 import nodomain.freeyourgadget.gadgetbridge.GBApplication;
+import nodomain.freeyourgadget.gadgetbridge.util.GBPrefs;
 import nodomain.freeyourgadget.gadgetbridge.activities.appmanager.config.DynamicAppConfig;
 import nodomain.freeyourgadget.gadgetbridge.capabilities.loyaltycards.LoyaltyCard;
 import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEventCameraRemote;
@@ -23,6 +24,7 @@ import nodomain.freeyourgadget.gadgetbridge.model.CalendarEventSpec;
 import nodomain.freeyourgadget.gadgetbridge.model.CallSpec;
 import nodomain.freeyourgadget.gadgetbridge.model.CannedMessagesSpec;
 import nodomain.freeyourgadget.gadgetbridge.model.Contact;
+import nodomain.freeyourgadget.gadgetbridge.model.FindDeviceTarget;
 import nodomain.freeyourgadget.gadgetbridge.model.MusicSpec;
 import nodomain.freeyourgadget.gadgetbridge.model.MusicStateSpec;
 import nodomain.freeyourgadget.gadgetbridge.model.NavigationInfoSpec;
@@ -124,7 +126,8 @@ public class DeviceActionHandler {
             }
             case ACTION_FIND_DEVICE: {
                 final boolean start = intentCopy.getBooleanExtra(EXTRA_FIND_START, false);
-                deviceSupport.onFindDevice(start);
+                final FindDeviceTarget target = (FindDeviceTarget) intentCopy.getSerializableExtra(EXTRA_FIND_TARGET);
+                deviceSupport.onFindDevice(start, target != null ? target : FindDeviceTarget.ALL);
                 break;
             }
             case ACTION_PHONE_FOUND: {
@@ -274,6 +277,9 @@ public class DeviceActionHandler {
                 final ArrayList<? extends Contact> contacts = (ArrayList<? extends Contact>) intentCopy.getSerializableExtra(EXTRA_CONTACTS);
                 deviceSupport.onSetContacts(contacts);
                 break;
+            case ACTION_SYNC_WORKOUT_TEMPLATE:
+                deviceSupport.onSyncWorkoutTemplate(intentCopy.getLongExtra(EXTRA_WORKOUT_TEMPLATE_ID, -1));
+                break;
             case ACTION_ENABLE_REALTIME_STEPS: {
                 final boolean enable = intentCopy.getBooleanExtra(EXTRA_BOOLEAN_ENABLE, false);
                 deviceSupport.onEnableRealtimeSteps(enable);
@@ -331,7 +337,7 @@ public class DeviceActionHandler {
                 deviceSupport.onSetGpsLocation(location);
                 break;
             case ACTION_SLEEP_AS_ANDROID:
-                if (device.getDeviceCoordinator().supportsSleepAsAndroid(device) && GBApplication.getPrefs().getString("sleepasandroid_device", "").equals(device.getAddress())) {
+                if (device.getDeviceCoordinator().supportsSleepAsAndroid(device) && GBApplication.getPrefs().getString(GBPrefs.SLEEP_AS_ANDROID_DEVICE, "").equals(device.getAddress())) {
                     final String sleepAsAndroidAction = intentCopy.getStringExtra(EXTRA_SLEEP_AS_ANDROID_ACTION);
                     deviceSupport.onSleepAsAndroidAction(sleepAsAndroidAction, intentCopy.getExtras());
                 }

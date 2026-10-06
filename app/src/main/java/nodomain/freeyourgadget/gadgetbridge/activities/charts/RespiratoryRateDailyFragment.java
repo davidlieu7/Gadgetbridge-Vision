@@ -4,6 +4,7 @@ import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.LinearLayout;
 import android.widget.TextView;
 
 import androidx.core.content.ContextCompat;
@@ -27,6 +28,8 @@ import java.util.Calendar;
 import java.util.List;
 
 import nodomain.freeyourgadget.gadgetbridge.R;
+import nodomain.freeyourgadget.gadgetbridge.activities.workouts.StatTileData;
+import nodomain.freeyourgadget.gadgetbridge.activities.workouts.StatTileGridUtilKt;
 import nodomain.freeyourgadget.gadgetbridge.database.DBHandler;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
 import nodomain.freeyourgadget.gadgetbridge.model.RespiratoryRateSample;
@@ -35,10 +38,7 @@ public class RespiratoryRateDailyFragment extends RespiratoryRateFragment<Respir
     protected static final Logger LOG = LoggerFactory.getLogger(RespiratoryRateDailyFragment.class);
 
     private TextView mDateView;
-    private TextView sleepAvg;
-    private TextView awakeAvg;
-    private TextView lowest;
-    private TextView highest;
+    private LinearLayout statsContainer;
     private LineChart respiratoryRateChart;
 
     @Override
@@ -55,10 +55,7 @@ public class RespiratoryRateDailyFragment extends RespiratoryRateFragment<Respir
         });
 
         mDateView = rootView.findViewById(R.id.rr_date_view);
-        awakeAvg = rootView.findViewById(R.id.awake_avg);
-        sleepAvg = rootView.findViewById(R.id.sleep_avg);
-        lowest = rootView.findViewById(R.id.day_lowest);
-        highest = rootView.findViewById(R.id.day_highest);
+        statsContainer = rootView.findViewById(R.id.respiratory_rate_daily_stats_container);
         respiratoryRateChart = rootView.findViewById(R.id.respiratory_rate_line_chart);
         setupRespiratoryRateChart();
         refresh();
@@ -89,10 +86,25 @@ public class RespiratoryRateDailyFragment extends RespiratoryRateFragment<Respir
         String formattedDate = new SimpleDateFormat("E, MMM dd").format(respiratoryRateDay.day.getTime());
         mDateView.setText(formattedDate);
         final String emptyValue = requireContext().getString(R.string.stats_empty_value);
-        awakeAvg.setText(respiratoryRateDay.awakeRateAvg > 0 ? String.valueOf(respiratoryRateDay.awakeRateAvg) : emptyValue);
-        sleepAvg.setText(respiratoryRateDay.sleepRateAvg > 0 ? String.valueOf(respiratoryRateDay.sleepRateAvg) : emptyValue);
-        lowest.setText(respiratoryRateDay.rateLowest > 0 ? String.valueOf(respiratoryRateDay.rateLowest) : emptyValue);
-        highest.setText(respiratoryRateDay.rateHighest > 0 ? String.valueOf(respiratoryRateDay.rateHighest) : emptyValue);
+        final List<StatTileData> stats = new ArrayList<>();
+        stats.add(new StatTileData(
+                respiratoryRateDay.awakeRateAvg > 0 ? String.valueOf(respiratoryRateDay.awakeRateAvg) : emptyValue,
+                getString(R.string.sleep_colored_stats_awake_avg)
+        ));
+        stats.add(new StatTileData(
+                respiratoryRateDay.sleepRateAvg > 0 ? String.valueOf(respiratoryRateDay.sleepRateAvg) : emptyValue,
+                getString(R.string.sleep_avg)
+        ));
+        stats.add(new StatTileData(
+                respiratoryRateDay.rateLowest > 0 ? String.valueOf(respiratoryRateDay.rateLowest) : emptyValue,
+                getString(R.string.lowest)
+        ));
+        stats.add(new StatTileData(
+                respiratoryRateDay.rateHighest > 0 ? String.valueOf(respiratoryRateDay.rateHighest) : emptyValue,
+                getString(R.string.highest)
+        ));
+        statsContainer.removeAllViews();
+        StatTileGridUtilKt.addStatTileGrid(statsContainer, requireContext(), stats, 0);
 
         // Chart
         final List<LegendEntry> legendEntries = new ArrayList<>(1);

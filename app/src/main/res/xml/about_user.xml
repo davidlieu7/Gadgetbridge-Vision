@@ -127,5 +127,14 @@
             android:maxLength="3"
             android:title="@string/activity_prefs_goal_fat_burn_time_minutes"
             app:useSimpleSummaryProvider="true" />
+
+        <EditTextPreference
+            android:icon="@drawable/ic_drink"
+            android:defaultValue="2000"
+            android:inputType="number"
+            android:key="activity_user_goal_hydration_ml"
+            android:maxLength="5"
+            android:title="@string/activity_prefs_goal_hydration_ml"
+            app:useSimpleSummaryProvider="true" />
     </PreferenceCategory>
 </PreferenceScreen>

@@ -62,6 +62,8 @@ public class XiaomiBleSupport extends XiaomiConnectionSupport {
 
         @Override
         protected TransactionBuilder initializeDevice(final TransactionBuilder builder) {
+            mXiaomiSupport.onInitializeDevice();
+
             final XiaomiBleProtocolV1 protocolV1 = new XiaomiBleProtocolV1(XiaomiBleSupport.this);
             if (protocolV1.initializeDevice(builder)) {
                 bleProtocol = protocolV1;

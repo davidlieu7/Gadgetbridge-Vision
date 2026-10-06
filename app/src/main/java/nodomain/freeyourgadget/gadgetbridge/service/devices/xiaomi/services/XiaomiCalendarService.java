@@ -28,6 +28,8 @@ import java.util.Set;
 import nodomain.freeyourgadget.gadgetbridge.GBApplication;
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsPreferenceConst;
 import nodomain.freeyourgadget.gadgetbridge.model.CalendarEventSpec;
+import nodomain.freeyourgadget.gadgetbridge.proto.xiaomi.Calendar;
+import nodomain.freeyourgadget.gadgetbridge.proto.xiaomi.CalendarInfo;
 import nodomain.freeyourgadget.gadgetbridge.proto.xiaomi.XiaomiProto;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.xiaomi.XiaomiSupport;
 import nodomain.freeyourgadget.gadgetbridge.util.Prefs;
@@ -86,7 +88,7 @@ public class XiaomiCalendarService extends AbstractXiaomiService {
         final boolean syncEnabled = GBApplication.getDeviceSpecificSharedPrefs(getSupport().getDevice().getAddress())
                 .getBoolean(PREF_SYNC_CALENDAR, false);
 
-        final XiaomiProto.CalendarSync.Builder calendarSync = XiaomiProto.CalendarSync.newBuilder();
+        final var calendarSync = CalendarInfo.List.newBuilder();
 
         if (!syncEnabled) {
             LOG.debug("Calendar sync is disabled");
@@ -112,7 +114,7 @@ public class XiaomiCalendarService extends AbstractXiaomiService {
                     notifyMinutesBefore = (int) ((calendarEvent.getBeginSeconds() * 1000L - calendarEvent.getRemindersAbsoluteTs().get(0)) / (1000 * 60));
                 }
 
-                final XiaomiProto.CalendarEvent xiaomiCalendarEvent = XiaomiProto.CalendarEvent.newBuilder()
+                final var xiaomiCalendarEvent = CalendarInfo.newBuilder()
                         .setTitle(calendarEvent.getTitle())
                         .setDescription(StringUtils.ensureNotNull(calendarEvent.getDescription()))
                         .setLocation(StringUtils.ensureNotNull(calendarEvent.getLocation()))
@@ -141,7 +143,7 @@ public class XiaomiCalendarService extends AbstractXiaomiService {
                 XiaomiProto.Command.newBuilder()
                         .setType(COMMAND_TYPE)
                         .setSubtype(CMD_CALENDAR_SET)
-                        .setCalendar(XiaomiProto.Calendar.newBuilder().setCalendarSync(calendarSync))
+                        .setCalendar(Calendar.newBuilder().setCalendarSync(calendarSync))
                         .build()
         );
     }

@@ -1,25 +1,20 @@
 package nodomain.freeyourgadget.gadgetbridge.activities.workouts
 
 import android.content.Intent
-import android.graphics.Typeface
 import android.os.Bundle
-import android.util.TypedValue
-import android.view.Gravity
 import android.view.LayoutInflater
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.widget.FrameLayout
 import android.widget.LinearLayout
-import android.widget.TextView
-import androidx.annotation.StringRes
-import androidx.core.content.ContextCompat
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.distinctUntilChanged
 import com.github.mikephil.charting.charts.BarLineChartBase
 import com.github.mikephil.charting.charts.LineChart
 import com.github.mikephil.charting.charts.ScatterChart
+import com.github.mikephil.charting.components.LimitLine
 import com.github.mikephil.charting.components.XAxis
 import com.github.mikephil.charting.data.LineData
 import com.github.mikephil.charting.data.ScatterData
@@ -29,15 +24,18 @@ import nodomain.freeyourgadget.gadgetbridge.GBApplication
 import nodomain.freeyourgadget.gadgetbridge.R
 import nodomain.freeyourgadget.gadgetbridge.activities.ActivitySummariesChartFragment
 import nodomain.freeyourgadget.gadgetbridge.activities.charts.DurationXLabelFormatter
+import nodomain.freeyourgadget.gadgetbridge.activities.charts.HeartRateZoneChartUtils
 import nodomain.freeyourgadget.gadgetbridge.activities.workouts.charts.ChartDataRepository
 import nodomain.freeyourgadget.gadgetbridge.activities.workouts.charts.WorkoutChartsActivity
 import nodomain.freeyourgadget.gadgetbridge.activities.workouts.entries.ActivitySummaryEntry
 import nodomain.freeyourgadget.gadgetbridge.activities.workouts.entries.ActivitySummaryGroup
+import nodomain.freeyourgadget.gadgetbridge.activities.workouts.entries.ActivitySummarySimpleEntry
 import nodomain.freeyourgadget.gadgetbridge.databinding.FragmentWorkoutTabChartsBinding
 import nodomain.freeyourgadget.gadgetbridge.entities.Device
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice
 import nodomain.freeyourgadget.gadgetbridge.model.ActivityKind
 import nodomain.freeyourgadget.gadgetbridge.model.ActivitySummaryEntries
+import nodomain.freeyourgadget.gadgetbridge.model.heartratezones.HeartRateZonesResolver
 import nodomain.freeyourgadget.gadgetbridge.model.workout.Workout
 import nodomain.freeyourgadget.gadgetbridge.model.workout.WorkoutChart
 import nodomain.freeyourgadget.gadgetbridge.model.workout.WorkoutViewModel
@@ -56,6 +54,8 @@ class WorkoutTabChartsFragment : Fragment(), WorkoutTabScreenshotProvider {
     override val screenshotView: View get() = binding.root
 
     private var heartRateChartFragment: ActivitySummariesChartFragment? = null
+
+    private var isFirstChartHeader = true
 
     private var latestWorkout: Workout? = null
 
@@ -97,9 +97,10 @@ class WorkoutTabChartsFragment : Fragment(), WorkoutTabScreenshotProvider {
 
     private fun renderWorkout(workout: Workout) {
         binding.dynamicCharts.removeAllViews()
+        isFirstChartHeader = true
         val groupedEntries = ActivitySummaryGroup.buildGroupedList(workout.data)
         workout.charts.forEach { chart ->
-            addChart(binding.dynamicCharts, true, chart, workout.charts, groupedEntries)
+            addChart(binding.dynamicCharts, true, chart, workout, groupedEntries)
         }
         updateHeartRateFallback(workout)
     }
@@ -143,38 +144,27 @@ class WorkoutTabChartsFragment : Fragment(), WorkoutTabScreenshotProvider {
         chartsLayout: LinearLayout,
         includeHeader: Boolean,
         chart: WorkoutChart,
-        allChartsData: List<WorkoutChart>,
+        workout: Workout,
         groupedEntries: Map<String, List<Pair<String, ActivitySummaryEntry>>>
     ) {
         if (includeHeader) {
-            val chartTitle = TextView(context).apply {
-                id = View.generateViewId()
-                layoutParams = LinearLayout.LayoutParams(
-                    LinearLayout.LayoutParams.MATCH_PARENT,
-                    LinearLayout.LayoutParams.WRAP_CONTENT
-                )
-                text = chart.title
-                gravity = Gravity.CENTER
-                textSize = 18f
-                typeface = Typeface.DEFAULT_BOLD
-                setTextColor(GBApplication.getTextColor(context))
-
-                val paddingPx = (16 * resources.displayMetrics.density).toInt()
-                setPaddingRelative(paddingPx, paddingPx, paddingPx, paddingPx)
-            }
-
-            chartsLayout.addView(chartTitle)
+            addSectionHeader(chartsLayout, requireContext(), chart.title, showDivider = !isFirstChartHeader)
+            isFirstChartHeader = false
         }
 
-        // Basic info for this chart's metric, shown above it. Its table draws its own border.
-        // Therefore, we only need a separator when there's no basic info to display.
-        val statEntries = CHART_STAT_KEYS[chart.group]?.let { statKeys ->
-            groupedEntries[chart.group].orEmpty().filter { (key, _) -> key in statKeys }
-        }.orEmpty()
-        if (statEntries.isNotEmpty()) {
-            addStatRow(chartsLayout, statEntries)
-        } else if (includeHeader) {
-            chartsLayout.addView(createSeparator())
+        // Basic avg/max info for this chart's metric, shown above it.
+        CHART_STAT_KEYS[chart.group]?.let { statKeys ->
+            val statEntries = groupedEntries[chart.group].orEmpty().filter { (key, _) -> key in statKeys }
+            val stats = statEntries.mapNotNull { (key, entry) ->
+                (entry as? ActivitySummarySimpleEntry)?.takeIf { it.value != null }?.let {
+                    StatTileData(workoutValueFormatter.formatTileValue(it.value, it.unit), workoutValueFormatter.getStringResourceByName(key))
+                }
+            }
+            if (stats.isNotEmpty()) {
+                // dynamicCharts already has 16dp of its own container padding; the chart title
+                // header adds another 16dp on top of that, so match that same inset here.
+                addStatTileGrid(chartsLayout, requireContext(), stats, horizontalMarginDp = 16)
+            }
         }
 
         val chartsFragmentHolder = FrameLayout(requireContext()).apply {
@@ -182,7 +172,9 @@ class WorkoutTabChartsFragment : Fragment(), WorkoutTabScreenshotProvider {
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 (300 * resources.displayMetrics.density).toInt()
-            )
+            ).apply {
+                bottomMargin = (16 * resources.displayMetrics.density).toInt()
+            }
         }
 
         val chartTextColor = GBApplication.getSecondaryTextColor(context)
@@ -222,6 +214,17 @@ class WorkoutTabChartsFragment : Fragment(), WorkoutTabScreenshotProvider {
         lineChart.axisRight.apply {
             isEnabled = false
         }
+        chart.zoneThresholds?.let { zones ->
+            lineChart.axisLeft.setDrawLimitLinesBehindData(true)
+            for ((zoneIdx, hr) in listOf(2 to zones.zone2, 3 to zones.zone3, 4 to zones.zone4, 5 to zones.zone5)) {
+                if (hr <= 0) continue
+                lineChart.axisLeft.addLimitLine(LimitLine(hr.toFloat()).apply {
+                    lineColor = HeartRateZonesResolver.colorForZone(requireContext(), zoneIdx)
+                    lineWidth = 0.7f
+                    enableDashedLine(6f, 6f, 0f)
+                })
+            }
+        }
         chart.lineChart(lineChart);
         when {
             lineChart is LineChart && chart.chartData is LineData -> {
@@ -237,7 +240,7 @@ class WorkoutTabChartsFragment : Fragment(), WorkoutTabScreenshotProvider {
             override fun onChartGestureStart(me: MotionEvent?, lastPerformedGesture: ChartTouchListener.ChartGesture?) {}
             override fun onChartGestureEnd(me: MotionEvent?, lastPerformedGesture: ChartTouchListener.ChartGesture?) {}
             override fun onChartSingleTapped(me: MotionEvent?) {
-                ChartDataRepository.chartData = allChartsData
+                ChartDataRepository.chartData = workout.charts
                 val intent = Intent(requireContext(), WorkoutChartsActivity::class.java).apply {
                     putExtra(WorkoutChartsActivity.INIT_CHART_ID, chart.id)
                     workoutLabel()?.let {
@@ -256,51 +259,21 @@ class WorkoutTabChartsFragment : Fragment(), WorkoutTabScreenshotProvider {
 
         chartsLayout.addView(chartsFragmentHolder)
 
-        // Heart rate zones go directly under the heart rate chart. The zones table is a grid
-        // with its own separators. Everything else ends in a plain view, so it gets a separator
-        // to break it from the next chart.
-        val zoneEntries = if (chart.group == ActivitySummaryEntries.GROUP_HEART_RATE) {
-            groupedEntries[ActivitySummaryEntries.GROUP_HEART_RATE_ZONES].orEmpty()
-        } else {
-            emptyList()
-        }
-        if (zoneEntries.isNotEmpty()) {
-            chartsLayout.addView(createSeparator())
-            addSectionHeader(chartsLayout, R.string.workout_time_in_zones)
-            addStatRow(chartsLayout, zoneEntries)
-        } else {
-            chartsLayout.addView(createSeparator())
-        }
-    }
-
-    private fun addSectionHeader(chartsLayout: LinearLayout, @StringRes labelRes: Int) {
-        val labelField = TextView(context).apply {
-            textSize = 18f
-            gravity = Gravity.CENTER
-            setPaddingRelative(dpToPx(16), dpToPx(16), dpToPx(16), dpToPx(8))
-            typeface = Typeface.DEFAULT_BOLD
-            setTextColor(GBApplication.getTextColor(context))
-            setText(labelRes)
-        }
-        chartsLayout.addView(labelField)
-    }
-
-    @Suppress("SameParameterValue")
-    private fun dpToPx(dp: Int): Int {
-        val density = resources.displayMetrics.density
-        return (dp * density).toInt()
-    }
-
-    private fun createSeparator(): View {
-        return View(context).apply {
-            layoutParams = LinearLayout.LayoutParams(
-                LinearLayout.LayoutParams.MATCH_PARENT,
-                (1 * resources.displayMetrics.density).toInt()
-            )
-
-            val typedValue = TypedValue()
-            context?.theme?.resolveAttribute(R.attr.row_separator, typedValue, true)
-            setBackgroundColor(ContextCompat.getColor(requireContext(), typedValue.resourceId))
+        // Heart rate zones go directly under the heart rate chart.
+        if (chart.group == ActivitySummaryEntries.GROUP_HEART_RATE) {
+            val zoneEntries = groupedEntries[ActivitySummaryEntries.GROUP_HEART_RATE_ZONES].orEmpty()
+            val zoneSeconds = chart.secondsInZone
+            val zoneThresholds = chart.zoneThresholds
+            if (zoneEntries.isNotEmpty()) {
+                addSectionHeader(chartsLayout, requireContext(), getString(R.string.workout_time_in_zones), showDivider = !isFirstChartHeader)
+                isFirstChartHeader = false
+                addStatRow(chartsLayout, zoneEntries)
+            } else if (zoneSeconds != null && zoneThresholds != null && (1..5).sumOf { zoneSeconds[it] } > 0) {
+                // The device reported no time in zones, so show the split computed from the HR samples.
+                addSectionHeader(chartsLayout, requireContext(), getString(R.string.workout_time_in_zones), showDivider = !isFirstChartHeader)
+                isFirstChartHeader = false
+                HeartRateZoneChartUtils.populateZoneSummary(requireContext(), chartsLayout, zoneSeconds, zoneThresholds)
+            }
         }
     }
 
@@ -309,7 +282,19 @@ class WorkoutTabChartsFragment : Fragment(), WorkoutTabScreenshotProvider {
         for ((key, entry) in entries) {
             gridTableBuilder.addEntry(workoutValueFormatter.getStringResourceByName(key), entry)
         }
-        chartsLayout.addView(gridTableBuilder.build())
+        val grid = gridTableBuilder.build().apply {
+            // GridTableBuilder paints its own background behind the cells and relies on small
+            // cell margins to reveal it as divider lines between rows - only used here for the
+            // heart rate zone progress bars, which don't need that grid look, so clear it.
+            setBackgroundColor(android.graphics.Color.TRANSPARENT)
+        }
+        val params = LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT
+        ).apply {
+            bottomMargin = (16 * resources.displayMetrics.density).toInt()
+        }
+        chartsLayout.addView(grid, params)
     }
 
     companion object {

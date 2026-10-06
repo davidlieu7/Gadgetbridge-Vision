@@ -21,6 +21,7 @@ package nodomain.freeyourgadget.gadgetbridge.util;
 import android.annotation.SuppressLint;
 import android.content.ActivityNotFoundException;
 import android.content.BroadcastReceiver;
+import android.content.ClipData;
 import android.content.ContentUris;
 import android.content.Context;
 import android.content.Intent;
@@ -54,6 +55,8 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.net.URISyntaxException;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Locale;
 
 import nodomain.freeyourgadget.gadgetbridge.GBApplication;
@@ -124,18 +127,8 @@ public class AndroidUtils {
      */
     public static String getTextColorHex(Context context) {
         int color;
-        if (DynamicColors.isDynamicColorAvailable() && GBApplication.areDynamicColorsEnabled()) {
-            Context dynamicColorContext;
-            if (GBApplication.isDarkThemeEnabled()) {
-                dynamicColorContext = DynamicColors.wrapContextIfAvailable(context, R.style.GadgetbridgeThemeDynamicDark);
-            } else {
-                dynamicColorContext = DynamicColors.wrapContextIfAvailable(context, R.style.GadgetbridgeThemeDynamicLight);
-            }
-            int[] attrsToResolve = {com.google.android.material.R.attr.colorOnSurface};
-            @SuppressLint("ResourceType")
-            TypedArray ta = dynamicColorContext.obtainStyledAttributes(attrsToResolve);
-            color = ta.getColor(0, 0);
-            ta.recycle();
+        if (isDynamicColorActive()) {
+            color = getDynamicColor(context, com.google.android.material.R.attr.colorOnSurface);
         } else if (GBApplication.isDarkThemeEnabled()) {
             color = ContextCompat.getColor(context, R.color.primarytext_dark);
         } else {
@@ -150,18 +143,8 @@ public class AndroidUtils {
      */
     public static String getBackgroundColorHex(Context context) {
         int color;
-        if (DynamicColors.isDynamicColorAvailable() && GBApplication.areDynamicColorsEnabled()) {
-            Context dynamicColorContext;
-            if (GBApplication.isDarkThemeEnabled()) {
-                dynamicColorContext = DynamicColors.wrapContextIfAvailable(context, R.style.GadgetbridgeThemeDynamicDark);
-            } else {
-                dynamicColorContext = DynamicColors.wrapContextIfAvailable(context, R.style.GadgetbridgeThemeDynamicLight);
-            }
-            int[] attrsToResolve = {com.google.android.material.R.attr.colorSurface};
-            @SuppressLint("ResourceType")
-            TypedArray ta = dynamicColorContext.obtainStyledAttributes(attrsToResolve);
-            color = ta.getColor(0, 0);
-            ta.recycle();
+        if (isDynamicColorActive()) {
+            color = getDynamicColor(context, com.google.android.material.R.attr.colorSurface);
         } else if (GBApplication.isDarkThemeEnabled()) {
             color = ContextCompat.getColor(context, androidx.cardview.R.color.cardview_dark_background);
         } else {
@@ -170,13 +153,25 @@ public class AndroidUtils {
         return colorToHex(color);
     }
 
-    public static int getBackgroundColor(Context context) {
-        int color;
-        if (GBApplication.isDarkThemeEnabled()) {
-            color = ContextCompat.getColor(context, androidx.cardview.R.color.cardview_dark_background);
-        } else {
-            color = ContextCompat.getColor(context, androidx.cardview.R.color.cardview_light_background);
-        }
+    /**
+     * Whether the Dynamic Color theme is both selected and supported by the system.
+     */
+    public static boolean isDynamicColorActive() {
+        return DynamicColors.isDynamicColorAvailable() && GBApplication.areDynamicColorsEnabled();
+    }
+
+    /**
+     * Resolves a color attribute against the Dynamic Color theme matching the current
+     * light/dark setting. Independent of the context's own theme, so it also works with
+     * the application context.
+     */
+    public static int getDynamicColor(Context context, int attr) {
+        final Context dynamicColorContext = DynamicColors.wrapContextIfAvailable(context,
+                GBApplication.isDarkThemeEnabled() ? R.style.GadgetbridgeThemeDynamicDark : R.style.GadgetbridgeThemeDynamicLight);
+        @SuppressLint("ResourceType")
+        final TypedArray ta = dynamicColorContext.obtainStyledAttributes(new int[]{attr});
+        final int color = ta.getColor(0, 0);
+        ta.recycle();
         return color;
     }
 
@@ -323,6 +318,41 @@ public class AndroidUtils {
         intent.setFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
         try {
             context.startActivity(Intent.createChooser(intent, "Share file"));
+        } catch (ActivityNotFoundException e) {
+            Toast.makeText(context, R.string.activity_error_share_failed, Toast.LENGTH_LONG).show();
+        }
+    }
+
+    /**
+     * Shares several files in one {@link Intent#ACTION_SEND_MULTIPLE}, or a single file through
+     * {@link #shareFile}. The files must lie under a path exposed in {@code shared_paths.xml}.
+     */
+    public static void shareFiles(final Context context, final List<File> files, final String type) throws IOException {
+        if (files.size() == 1) {
+            shareFile(context, files.get(0), type);
+            return;
+        }
+
+        final String authority = context.getApplicationContext().getPackageName() + ".screenshot_provider";
+        final ArrayList<Uri> uris = new ArrayList<>(files.size());
+        for (final File file : files) {
+            uris.add(FileProvider.getUriForFile(context, authority, file));
+        }
+        if (uris.isEmpty()) {
+            return;
+        }
+
+        final Intent intent = new Intent(Intent.ACTION_SEND_MULTIPLE);
+        intent.setType(type);
+        intent.putParcelableArrayListExtra(Intent.EXTRA_STREAM, uris);
+        final ClipData clipData = ClipData.newRawUri(null, uris.get(0));
+        for (int i = 1; i < uris.size(); i++) {
+            clipData.addItem(new ClipData.Item(uris.get(i)));
+        }
+        intent.setClipData(clipData);
+        intent.setFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
+        try {
+            context.startActivity(Intent.createChooser(intent, "Share files"));
         } catch (ActivityNotFoundException e) {
             Toast.makeText(context, R.string.activity_error_share_failed, Toast.LENGTH_LONG).show();
         }

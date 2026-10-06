@@ -5,8 +5,10 @@ import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.LinearLayout;
 import android.widget.TextView;
 
+import androidx.annotation.Nullable;
 import androidx.core.content.ContextCompat;
 
 import com.github.mikephil.charting.charts.CandleStickChart;
@@ -31,6 +33,8 @@ import java.util.Locale;
 
 import nodomain.freeyourgadget.gadgetbridge.GBApplication;
 import nodomain.freeyourgadget.gadgetbridge.R;
+import nodomain.freeyourgadget.gadgetbridge.activities.workouts.StatTileData;
+import nodomain.freeyourgadget.gadgetbridge.activities.workouts.StatTileGridUtilKt;
 import nodomain.freeyourgadget.gadgetbridge.database.DBHandler;
 import nodomain.freeyourgadget.gadgetbridge.devices.DeviceCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.TimeSampleProvider;
@@ -51,8 +55,7 @@ public class BodyEnergyPeriodFragment extends AbstractChartFragment<BodyEnergyPe
     private int BODY_ENERGY_COLOR;
 
     private TextView mDateView;
-    private TextView bodyEnergyMinimum;
-    private TextView bodyEnergyMaximum;
+    private LinearLayout bodyEnergyStatsContainer;
     private CandleStickChart bodyEnergyChart;
     private int TOTAL_DAYS;
 
@@ -92,8 +95,7 @@ public class BodyEnergyPeriodFragment extends AbstractChartFragment<BodyEnergyPe
         });
 
         mDateView = rootView.findViewById(R.id.date_view);
-        bodyEnergyMinimum = rootView.findViewById(R.id.body_energy_minimum);
-        bodyEnergyMaximum = rootView.findViewById(R.id.body_energy_maximum);
+        bodyEnergyStatsContainer = rootView.findViewById(R.id.body_energy_period_stats_container);
         bodyEnergyChart = rootView.findViewById(R.id.body_energy_chart);
 
         setupChart();
@@ -175,8 +177,11 @@ public class BodyEnergyPeriodFragment extends AbstractChartFragment<BodyEnergyPe
         final int minimum = minAccumulator.getCount() > 0 ? (int) Math.round(minAccumulator.getMin()) : DATA_INVALID;
         final int maximum = maxAccumulator.getCount() > 0 ? (int) Math.round(maxAccumulator.getMax()) : DATA_INVALID;
 
-        bodyEnergyMinimum.setText(minimum > 0 ? String.valueOf(minimum) : emptyValue);
-        bodyEnergyMaximum.setText(maximum > 0 ? String.valueOf(maximum) : emptyValue);
+        bodyEnergyStatsContainer.removeAllViews();
+        final List<StatTileData> stats = new ArrayList<>();
+        stats.add(new StatTileData(minimum > 0 ? String.valueOf(minimum) : emptyValue, getString(R.string.hr_minimum)));
+        stats.add(new StatTileData(maximum > 0 ? String.valueOf(maximum) : emptyValue, getString(R.string.hr_maximum)));
+        StatTileGridUtilKt.addStatTileGrid(bodyEnergyStatsContainer, requireContext(), stats, 0);
 
         final String fmt = TOTAL_DAYS == 7 ? "EEE" : "dd";
         SimpleDateFormat formatDay = new SimpleDateFormat(fmt, Locale.getDefault());
@@ -293,5 +298,10 @@ public class BodyEnergyPeriodFragment extends AbstractChartFragment<BodyEnergyPe
             this.maximum = maximum;
         }
     }
-}
 
+    @Nullable
+    @Override
+    public ChartDataRange getAvailableDataRange(final GBDevice device, final DBHandler db) {
+        return ChartDataRange.ofSamples(device.getDeviceCoordinator().getBodyEnergySampleProvider(device, db.getDaoSession()));
+    }
+}

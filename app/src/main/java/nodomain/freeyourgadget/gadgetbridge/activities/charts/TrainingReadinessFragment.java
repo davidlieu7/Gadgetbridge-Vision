@@ -21,6 +21,7 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ImageView;
+import android.widget.LinearLayout;
 import android.widget.TextView;
 
 import androidx.annotation.Nullable;
@@ -29,6 +30,7 @@ import androidx.core.content.ContextCompat;
 import com.github.mikephil.charting.charts.Chart;
 
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
@@ -36,6 +38,8 @@ import java.util.Locale;
 import nodomain.freeyourgadget.gadgetbridge.GBApplication;
 import nodomain.freeyourgadget.gadgetbridge.R;
 import nodomain.freeyourgadget.gadgetbridge.activities.dashboard.GaugeDrawer;
+import nodomain.freeyourgadget.gadgetbridge.activities.workouts.StatTileData;
+import nodomain.freeyourgadget.gadgetbridge.activities.workouts.StatTileGridUtilKt;
 import nodomain.freeyourgadget.gadgetbridge.database.DBHandler;
 import nodomain.freeyourgadget.gadgetbridge.devices.DeviceCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.GenericMetricSampleProvider;
@@ -82,19 +86,7 @@ public class TrainingReadinessFragment extends AbstractChartFragment<TrainingRea
     private TextView gaugeZone;
     private TextView zoneDescription;
     private TextView lastUpdated;
-
-    private TextView hrvValue;
-    private TextView hrvIndicator;
-    private TextView acuteLoadValue;
-    private TextView acuteLoadIndicator;
-    private TextView sleepScoreValue;
-    private TextView sleepScoreIndicator;
-    private TextView recoveryValue;
-    private TextView recoveryIndicator;
-    private TextView sleepHistoryValue;
-    private TextView sleepHistoryIndicator;
-    private TextView stressHistoryValue;
-    private TextView stressHistoryIndicator;
+    private LinearLayout statsContainer;
 
     @Override
     public String getTitle() {
@@ -120,19 +112,7 @@ public class TrainingReadinessFragment extends AbstractChartFragment<TrainingRea
         gaugeZone = rootView.findViewById(R.id.training_readiness_gauge_zone);
         zoneDescription = rootView.findViewById(R.id.training_readiness_zone_description);
         lastUpdated = rootView.findViewById(R.id.training_readiness_last_updated);
-
-        hrvValue = rootView.findViewById(R.id.training_readiness_hrv_value);
-        hrvIndicator = rootView.findViewById(R.id.training_readiness_hrv_indicator);
-        acuteLoadValue = rootView.findViewById(R.id.training_readiness_acute_load_value);
-        acuteLoadIndicator = rootView.findViewById(R.id.training_readiness_acute_load_indicator);
-        sleepScoreValue = rootView.findViewById(R.id.training_readiness_sleep_score_value);
-        sleepScoreIndicator = rootView.findViewById(R.id.training_readiness_sleep_score_indicator);
-        recoveryValue = rootView.findViewById(R.id.training_readiness_recovery_value);
-        recoveryIndicator = rootView.findViewById(R.id.training_readiness_recovery_indicator);
-        sleepHistoryValue = rootView.findViewById(R.id.training_readiness_sleep_history_value);
-        sleepHistoryIndicator = rootView.findViewById(R.id.training_readiness_sleep_history_indicator);
-        stressHistoryValue = rootView.findViewById(R.id.training_readiness_stress_history_value);
-        stressHistoryIndicator = rootView.findViewById(R.id.training_readiness_stress_history_indicator);
+        statsContainer = rootView.findViewById(R.id.training_readiness_stats_container);
 
         refresh();
 
@@ -253,115 +233,115 @@ public class TrainingReadinessFragment extends AbstractChartFragment<TrainingRea
             lastUpdated.setText("");
         }
 
-        updateHrvTile(data.hrvStatus, data.hrvWeeklyAverage);
-        updateAcuteLoadTile(data.acuteLoad, data.chronicLoad);
-        updateSleepScoreTile(sleepScoreValue, sleepScoreIndicator, data.sleepScore);
-        updateRecoveryTile(data.recoveryMinutes);
-        updateSleepScoreTile(sleepHistoryValue, sleepHistoryIndicator, data.sleepHistoryAvg);
-        updateStressTile(data.stressHistoryAvg, data.stressRanges);
+        final List<StatTileData> stats = new ArrayList<>();
+        stats.add(buildHrvTile(data.hrvStatus, data.hrvWeeklyAverage));
+        stats.add(buildAcuteLoadTile(data.acuteLoad, data.chronicLoad));
+        stats.add(buildSleepScoreTile(data.sleepScore, getString(R.string.menuitem_sleep)));
+        stats.add(buildRecoveryTile(data.recoveryMinutes));
+        stats.add(buildSleepScoreTile(data.sleepHistoryAvg, getString(R.string.training_readiness_factor_sleep_3_nights)));
+        stats.add(buildStressTile(data.stressHistoryAvg, data.stressRanges));
+
+        statsContainer.removeAllViews();
+        StatTileGridUtilKt.addStatTileGrid(statsContainer, requireContext(), stats, 0);
     }
 
-    private void updateHrvTile(final HrvSummarySample.Status status, @Nullable final Integer weeklyAverageMs) {
-        hrvValue.setText(weeklyAverageMs != null
+    private StatTileData buildHrvTile(final HrvSummarySample.Status status, @Nullable final Integer weeklyAverageMs) {
+        final String value = weeklyAverageMs != null
                 ? getString(R.string.hrv_status_unit, weeklyAverageMs)
-                : getString(R.string.stats_empty_value));
+                : getString(R.string.stats_empty_value);
+        final String label = getString(R.string.pref_header_hrv_status);
 
         switch (status) {
             case BALANCED:
-                setIndicator(hrvIndicator, getString(R.string.hrv_status_balanced), R.color.hrv_status_balanced);
-                break;
+                return indicatorTile(value, label, getString(R.string.hrv_status_balanced), R.color.hrv_status_balanced);
             case UNBALANCED:
-                setIndicator(hrvIndicator, getString(R.string.hrv_status_unbalanced), R.color.hrv_status_unbalanced);
-                break;
+                return indicatorTile(value, label, getString(R.string.hrv_status_unbalanced), R.color.hrv_status_unbalanced);
             case LOW:
-                setIndicator(hrvIndicator, getString(R.string.hrv_status_low), R.color.hrv_status_low);
-                break;
+                return indicatorTile(value, label, getString(R.string.hrv_status_low), R.color.hrv_status_low);
             case POOR:
-                setIndicator(hrvIndicator, getString(R.string.hrv_status_poor), R.color.hrv_status_poor);
-                break;
+                return indicatorTile(value, label, getString(R.string.hrv_status_poor), R.color.hrv_status_poor);
             case NONE:
             default:
-                setIndicator(hrvIndicator, "", null);
-                break;
+                return new StatTileData(value, label);
         }
     }
 
-    private void updateAcuteLoadTile(@Nullable final Integer acuteLoad, @Nullable final Integer chronicLoad) {
+    private StatTileData buildAcuteLoadTile(@Nullable final Integer acuteLoad, @Nullable final Integer chronicLoad) {
+        final String label = getString(R.string.training_acute_load);
         if (acuteLoad == null) {
-            acuteLoadValue.setText(getString(R.string.stats_empty_value));
-            setIndicator(acuteLoadIndicator, "", null);
-            return;
+            return new StatTileData(getString(R.string.stats_empty_value), label);
         }
 
-        acuteLoadValue.setText(String.valueOf(acuteLoad));
+        final String value = String.valueOf(acuteLoad);
 
         if (chronicLoad == null || chronicLoad <= 0) {
-            setIndicator(acuteLoadIndicator, getString(R.string.none), null);
-            return;
+            return indicatorTile(value, label, getString(R.string.none), null);
         }
 
         final float ratio = (float) acuteLoad / chronicLoad;
         if (ratio < LoadFragment.OPTIMAL_LOAD_RATIO_LOWER) {
-            setIndicator(acuteLoadIndicator, getString(R.string.low), R.color.training_load_low);
+            return indicatorTile(value, label, getString(R.string.low), R.color.training_load_low);
         } else if (ratio < LoadFragment.OPTIMAL_LOAD_RATIO_UPPER) {
-            setIndicator(acuteLoadIndicator, getString(R.string.optimal), R.color.training_load_optimal);
+            return indicatorTile(value, label, getString(R.string.optimal), R.color.training_load_optimal);
         } else if (ratio < 2f) {
-            setIndicator(acuteLoadIndicator, getString(R.string.high), R.color.training_load_high);
+            return indicatorTile(value, label, getString(R.string.high), R.color.training_load_high);
         } else {
-            setIndicator(acuteLoadIndicator, getString(R.string.very_high), R.color.training_load_high);
+            return indicatorTile(value, label, getString(R.string.very_high), R.color.training_load_high);
         }
     }
 
-    private void updateSleepScoreTile(final TextView valueView, final TextView indicatorView, @Nullable final Integer score) {
+    private StatTileData buildSleepScoreTile(@Nullable final Integer score, final String label) {
         if (score == null) {
-            valueView.setText(getString(R.string.stats_empty_value));
-            setIndicator(indicatorView, "", null);
-            return;
+            return new StatTileData(getString(R.string.stats_empty_value), label);
         }
 
-        valueView.setText(String.valueOf(score));
+        final String value = String.valueOf(score);
         if (score >= 90) {
-            setIndicator(indicatorView, getString(R.string.sleep_score_excellent), R.color.training_readiness_high);
+            return indicatorTile(value, label, getString(R.string.sleep_score_excellent), R.color.training_readiness_high);
         } else if (score >= 80) {
-            setIndicator(indicatorView, getString(R.string.sleep_score_good), R.color.training_readiness_moderate);
+            return indicatorTile(value, label, getString(R.string.sleep_score_good), R.color.training_readiness_moderate);
         } else if (score >= 60) {
-            setIndicator(indicatorView, getString(R.string.sleep_score_fair), R.color.training_readiness_low);
+            return indicatorTile(value, label, getString(R.string.sleep_score_fair), R.color.training_readiness_low);
         } else {
-            setIndicator(indicatorView, getString(R.string.sleep_score_poor), R.color.training_readiness_poor);
+            return indicatorTile(value, label, getString(R.string.sleep_score_poor), R.color.training_readiness_poor);
         }
     }
 
-    private void updateRecoveryTile(@Nullable final Integer minutesOrNull) {
+    private StatTileData buildRecoveryTile(@Nullable final Integer minutesOrNull) {
         // No sample yet is treated the same as "0 minutes" - a device that hasn't recorded a
         // recovery time is fully recovered by default, not in an unknown state.
         final int minutes = (minutesOrNull != null) ? minutesOrNull : 0;
+        final String value = (minutes / 60) + getString(R.string.unit_hours);
+        final String label = getString(R.string.recoveryTime);
 
-        recoveryValue.setText((minutes / 60) + getString(R.string.unit_hours));
         if (minutes == 0) {
-            setIndicator(recoveryIndicator, getString(R.string.training_readiness_recovery_fully_recovered), R.color.training_load_optimal);
-        } else {
-            setIndicator(recoveryIndicator, getString(R.string.training_readiness_recovery_recovering), null);
+            return indicatorTile(value, label, getString(R.string.training_readiness_recovery_fully_recovered), R.color.training_load_optimal);
         }
+        return indicatorTile(value, label, getString(R.string.training_readiness_recovery_recovering), null);
     }
 
-    private void updateStressTile(@Nullable final Integer avgStress, final int[] stressRanges) {
+    private StatTileData buildStressTile(@Nullable final Integer avgStress, final int[] stressRanges) {
+        final String label = getString(R.string.training_readiness_factor_stress_3_days);
         if (avgStress == null) {
-            stressHistoryValue.setText(getString(R.string.stats_empty_value));
-            setIndicator(stressHistoryIndicator, "", null);
-            return;
+            return new StatTileData(getString(R.string.stats_empty_value), label);
         }
 
-        stressHistoryValue.setText(String.valueOf(avgStress));
         final StressFragment.StressType stressType = StressFragment.StressType.fromStress(avgStress, stressRanges);
-        stressHistoryIndicator.setText(stressType.getLabel(requireContext()));
-        stressHistoryIndicator.setTextColor(stressType.getColor(requireContext()));
+        return new StatTileData(
+                String.valueOf(avgStress),
+                label,
+                null,
+                stressType.getLabel(requireContext()),
+                null,
+                stressType.getColor(requireContext())
+        );
     }
 
-    private void setIndicator(final TextView view, final String text, @Nullable final Integer colorRes) {
-        view.setText(text);
-        view.setTextColor(colorRes != null
+    private StatTileData indicatorTile(final String value, final String label, final String indicatorText, @Nullable final Integer colorRes) {
+        final int color = colorRes != null
                 ? ContextCompat.getColor(requireContext(), colorRes)
-                : GBApplication.getSecondaryTextColor(requireContext()));
+                : GBApplication.getSecondaryTextColor(requireContext());
+        return new StatTileData(value, label, null, indicatorText, null, color);
     }
 
     private int[] zoneColors() {
@@ -434,5 +414,14 @@ public class TrainingReadinessFragment extends AbstractChartFragment<TrainingRea
             this.stressHistoryAvg = stressHistoryAvg;
             this.stressRanges = stressRanges;
         }
+    }
+
+    @Nullable
+    @Override
+    public ChartDataRange getAvailableDataRange(final GBDevice device, final DBHandler db) {
+        return ChartDataRange.union(
+                ChartDataRange.ofSamples(device.getDeviceCoordinator().getHrvSummarySampleProvider(device, db.getDaoSession())),
+                ChartDataRange.ofSamples(device.getDeviceCoordinator().getStressSampleProvider(device, db.getDaoSession()))
+        );
     }
 }

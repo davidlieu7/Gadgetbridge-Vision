@@ -22,12 +22,16 @@ import static org.junit.Assert.assertTrue;
 
 import org.junit.Test;
 
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
+import java.util.Arrays;
 import java.util.Base64;
 
 import nodomain.freeyourgadget.gadgetbridge.entities.BaseActivitySummary;
 import nodomain.freeyourgadget.gadgetbridge.model.ActivityKind;
 import nodomain.freeyourgadget.gadgetbridge.model.ActivitySummaryData;
 import nodomain.freeyourgadget.gadgetbridge.model.ActivitySummaryEntries;
+import nodomain.freeyourgadget.gadgetbridge.util.CheckSums;
 
 /**
  * Tests for {@link WorkoutSummaryParser} using captured device data. Each base64 blob
@@ -202,5 +206,185 @@ public class WorkoutSummaryParserTest {
                 + num(data, ActivitySummaryEntries.HR_ZONE_WARM_UP);
         assertEquals("heart rate zones should add up to the active seconds",
                 num(data, ActivitySummaryEntries.ACTIVE_SECONDS), zones, 0.001);
+    }
+
+    /** Outdoor cycling v8 (Smart Band 10 Pro), 23 Sep 2026, 5.28 km ride, no route. */
+    private static final String OUTDOOR_CYCLING_V8_23SEP =
+            "doGzaggI3QD3/n/X/4chPwYAdoGzaqGHs2orBgAAKwYAAKIUAACmAH8ATAAAAAwEAABRrkBBnbQ7QoWo"
+                    + "UAAAAAAAAAAAAAAAAAAAAAAAAAAAMzMTQADNzEw/AAAAAAAAAAAADQAAAAAAAF8AAAAuAwAAVAEA"
+                    + "ABsBAAAAAAAAAAAAAAAAAAAAAAAAAAAAABwAAAAAAAAAAQAAAAAAAAAABwAAAAAAAAAAy+id1Q==";
+
+    @Test
+    public void outdoorCyclingV8_extractsStatsZonesLoadVitality() {
+        final BaseActivitySummary summary = new BaseActivitySummary();
+        summary.setRawSummaryData(Base64.getDecoder().decode(OUTDOOR_CYCLING_V8_23SEP));
+        new WorkoutSummaryParser().parseBinaryData(summary, true);
+        assertEquals(ActivityKind.OUTDOOR_CYCLING.getCode(), summary.getActivityKind());
+
+        final ActivitySummaryData data = ActivitySummaryData.fromJson(summary.getSummaryData());
+        assertEquals(1579, num(data, ActivitySummaryEntries.ACTIVE_SECONDS), 0.001);
+        assertEquals(5282, num(data, ActivitySummaryEntries.DISTANCE_METERS), 0.001);
+        assertEquals(166, num(data, ActivitySummaryEntries.CALORIES_TOTAL), 0.001);
+        assertEquals(127, num(data, ActivitySummaryEntries.CALORIES_BURNT), 0.001);
+        assertEquals(76, num(data, ActivitySummaryEntries.PACE_MAX), 0.001);
+        assertEquals(1036, num(data, ActivitySummaryEntries.PACE_MIN), 0.001);
+        // Average speed must agree with distance over time: 5282 m / 1579 s = 12.04 km/h
+        assertEquals(12.04, num(data, ActivitySummaryEntries.SPEED_AVG), 0.01);
+        assertEquals(46.93, num(data, ActivitySummaryEntries.SPEED_MAX), 0.01);
+        assertEquals(133, num(data, ActivitySummaryEntries.HR_AVG), 0.001);
+        assertEquals(168, num(data, ActivitySummaryEntries.HR_MAX), 0.001);
+        assertEquals(80, num(data, ActivitySummaryEntries.HR_MIN), 0.001);
+        assertEquals(2.3, num(data, ActivitySummaryEntries.TRAINING_EFFECT_AEROBIC), 0.01);
+        assertEquals(0.8, num(data, ActivitySummaryEntries.TRAINING_EFFECT_ANAEROBIC), 0.01);
+        assertEquals(13, num(data, ActivitySummaryEntries.RECOVERY_TIME), 0.001);
+        assertEquals(95, num(data, ActivitySummaryEntries.HR_ZONE_ANAEROBIC), 0.001);
+        assertEquals(814, num(data, ActivitySummaryEntries.HR_ZONE_AEROBIC), 0.001);
+        assertEquals(340, num(data, ActivitySummaryEntries.HR_ZONE_FAT_BURN), 0.001);
+        assertEquals(283, num(data, ActivitySummaryEntries.HR_ZONE_WARM_UP), 0.001);
+        assertEquals(28, num(data, ActivitySummaryEntries.WORKOUT_LOAD), 0.001);
+        assertEquals(7, num(data, ActivitySummaryEntries.VITALITY_GAIN), 0.001);
+    }
+
+    /** Outdoor cycling v6 (Smart Band 10), 23 May 2026, 11.98 km ride, no route. */
+    private static final String OUTDOOR_CYCLING_V6_23MAY =
+            "V7kRaggG3QD3//9fw5CPBgBXuRFqJsoRas8QAADPEAAAzi4AABoCtwFoAAAApCYAACNkIEG56wlC"
+                    + "W41IAAAAAAAAAAAAAAAAAAAAAAAAAACamRk/AAAAAAAAAAAAAAAAAAAAAAAAAAAKAAAAYQAAAFYE"
+                    + "AAAAAAAAAAAAAAAAAAAAAAAFAAEAAAAAAAAAAAAAAAAAAAAAAAAAANY0wh8=";
+
+    @Test
+    public void outdoorCyclingV6_extractsCaloriesPaceAndLoad() {
+        final ActivitySummaryData data = parse(OUTDOOR_CYCLING_V6_23MAY);
+
+        assertEquals(11982, num(data, ActivitySummaryEntries.DISTANCE_METERS), 0.001);
+        assertEquals(538, num(data, ActivitySummaryEntries.CALORIES_TOTAL), 0.001);
+        assertEquals(439, num(data, ActivitySummaryEntries.CALORIES_BURNT), 0.001);
+        // Fastest pace 104 s/km is 34.6 km/h, the maximum speed of the ride
+        assertEquals(104, num(data, ActivitySummaryEntries.PACE_MAX), 0.001);
+        assertEquals(34.48, num(data, ActivitySummaryEntries.SPEED_MAX), 0.01);
+        assertEquals(10, num(data, ActivitySummaryEntries.HR_ZONE_AEROBIC), 0.001);
+        assertEquals(97, num(data, ActivitySummaryEntries.HR_ZONE_FAT_BURN), 0.001);
+        assertEquals(1110, num(data, ActivitySummaryEntries.HR_ZONE_WARM_UP), 0.001);
+        assertEquals(5, num(data, ActivitySummaryEntries.WORKOUT_LOAD), 0.001);
+    }
+
+    /** The route byte sits at offset 0x8D of a v8 cycling summary; a route ride carries
+     *  8 more bytes after it. */
+    @Test
+    public void outdoorCyclingV8_routeRide_keepsLoadAndVitalityAligned() {
+        final byte[] plain = Base64.getDecoder().decode(OUTDOOR_CYCLING_V8_23SEP);
+        final int routeOffset = 0x8D;
+        final byte[] route = new byte[plain.length + 8];
+        System.arraycopy(plain, 0, route, 0, routeOffset + 1);
+        route[routeOffset] = (byte) 0xFF;
+        Arrays.fill(route, routeOffset + 1, routeOffset + 9, (byte) 0x5A);
+        System.arraycopy(plain, routeOffset + 1, route, routeOffset + 9, plain.length - routeOffset - 1);
+        final ByteBuffer crc = ByteBuffer.wrap(route).order(ByteOrder.LITTLE_ENDIAN);
+        crc.putInt(route.length - 4, CheckSums.getCRC32(route, 0, route.length - 4));
+
+        final ActivitySummaryData data = parse(Base64.getEncoder().encodeToString(route));
+        assertEquals(28, num(data, ActivitySummaryEntries.WORKOUT_LOAD), 0.001);
+        assertEquals(7, num(data, ActivitySummaryEntries.VITALITY_GAIN), 0.001);
+    }
+
+    @Test
+    public void outdoorCyclingUnsupportedVersion_isStillCycling() {
+        final byte[] bytes = Base64.getDecoder().decode(OUTDOOR_CYCLING_V8_23SEP);
+        bytes[5] = 99; // fileId version byte
+        final BaseActivitySummary summary = new BaseActivitySummary();
+        summary.setRawSummaryData(bytes);
+        new WorkoutSummaryParser().parseBinaryData(summary, true);
+        assertEquals(ActivityKind.OUTDOOR_CYCLING.getCode(), summary.getActivityKind());
+    }
+
+    /** Outdoor run v5, Mi Band 9 Active, 30 Sep 2026 (#6875). The paired DETAILS file has 1704
+     *  records whose HR spans 119-200 (mean 162), pace 395-782 s/km and cadence up to 178. */
+    private static final String OUTDOOR_RUN_V5_30SEP =
+            "wpe9avQF2QD///////8AAAABAMKXvWprnr1qqAYAAKgGAABdEAAACwHkAJYBAACLAQAADgMA"
+                    + "AJmZDUEbkhFBThAAAGQAkgCyAKLIdwAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+                    + "AAAAAB8CAABEAQAAOQIAAAUBAAACAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+                    + "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAADqDW67";
+
+    @Test
+    public void outdoorRunV5_matchesDetails() {
+        final byte[] bytes = Base64.getDecoder().decode(OUTDOOR_RUN_V5_30SEP);
+        final BaseActivitySummary summary = new BaseActivitySummary();
+        summary.setRawSummaryData(bytes);
+        new WorkoutSummaryParser().parseBinaryData(summary, true);
+        assertEquals(ActivityKind.OUTDOOR_RUNNING.getCode(), summary.getActivityKind());
+
+        final ActivitySummaryData data = parse(OUTDOOR_RUN_V5_30SEP);
+        assertEquals(1704d, num(data, ActivitySummaryEntries.ACTIVE_SECONDS), 0.001);
+        assertEquals(4189d, num(data, ActivitySummaryEntries.DISTANCE_METERS), 0.001);
+        assertEquals(119d, num(data, ActivitySummaryEntries.HR_MIN), 0.001);
+        assertEquals(200d, num(data, ActivitySummaryEntries.HR_MAX), 0.001);
+        assertEquals(162d, num(data, ActivitySummaryEntries.HR_AVG), 0.001);
+        assertEquals(395d, num(data, ActivitySummaryEntries.PACE_MAX), 0.001);
+        assertEquals(782d, num(data, ActivitySummaryEntries.PACE_MIN), 0.001);
+        assertEquals(178d, num(data, ActivitySummaryEntries.STEP_RATE_MAX), 0.001);
+    }
+
+    /** Walk v6, 29 May 2026. The paired DETAILS file has 1912 records whose HR spans 131-192
+     *  (mean 149.8). */
+    private static final String WALKING_V6_29MAY =
+            "lrAZaggG2QD3///4/gf/AAACAJawGWoPuBlqeAcAAHgHAABzDQAAHQHpACsCAAB7AQAAdAMA"
+                    + "AMFxz0B2phdB9g4AAE8AfQCtAJXAgwAAAAAAAAAAAAAAAAAAAAAAAAAAAABAQAAzM/M/AAAA"
+                    + "ABMAAHEAAAAYAgAAagQAAHMAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAPQACAAAAAAAA"
+                    + "AAAAAAAAAAAbAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAUDnru";
+
+    @Test
+    public void walkingV6_matchesDetails() {
+        final ActivitySummaryData data = parse(WALKING_V6_29MAY);
+        assertEquals(1912d, num(data, ActivitySummaryEntries.ACTIVE_SECONDS), 0.001);
+        assertEquals(131d, num(data, ActivitySummaryEntries.HR_MIN), 0.001);
+        assertEquals(192d, num(data, ActivitySummaryEntries.HR_MAX), 0.001);
+        assertEquals(149d, num(data, ActivitySummaryEntries.HR_AVG), 0.001);
+    }
+
+    /** Walk v9, 4 Jan 2026. The paired DETAILS file has HR spanning 99-163
+     *  (mean 135.5). */
+    private static final String WALKING_V9_04JAN =
+            "glJaaQQJ2QD3///4P4AAf/AAAAAfAgCDUlppIVhaaZ0FAACdBQAACAoAAM8ArwAjAgAA1gEA"
+                    + "AFYDAABv3s1ANA31QKYLAABVAH8AhwCHo2MAAAAAAAAAAAAAAAAAAAAAAAAAAGZmJkAAAAAA"
+                    + "AAAAAAAAAAAAABAAAAAAAADVAAAAbQIAAO8BAABQAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+                    + "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAABwAAQAAAAAAAAAAAAAAAAAACgAAAAAAAAAAAAAA"
+                    + "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+                    + "AAAAAAALE479";
+
+    @Test
+    public void walkingV9_matchesDetails() {
+        final ActivitySummaryData data = parse(WALKING_V9_04JAN);
+        assertEquals(99d, num(data, ActivitySummaryEntries.HR_MIN), 0.001);
+        assertEquals(163d, num(data, ActivitySummaryEntries.HR_MAX), 0.001);
+        assertEquals(135d, num(data, ActivitySummaryEntries.HR_AVG), 0.001);
+    }
+
+    /** Indoor cycling v9, 22 Feb 2025. The paired DETAILS file has HR spanning 94-150
+     *  (mean 135.6). */
+    private static final String INDOOR_CYCLING_V9_22FEB =
+            "UB+6ZwQJnQD/7++f/kOAf1Afume6KLpnagkAAAAAAACIAgAAAACHll6amTlAAABIAAAAAAAA"
+                    + "AAAAbQQAAMQEAAAjAAAARwNqCQAAAAAAAAAAAAgHAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+                    + "AAAAAAAAAAAAAFUAAgAAAAAAAAAAAAAAAAAAAAAEAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+                    + "AAAAAAAAAAAAGaZY0A==";
+
+    @Test
+    public void indoorCyclingV9_matchesDetails() {
+        final ActivitySummaryData data = parse(INDOOR_CYCLING_V9_22FEB);
+        assertEquals(94d, num(data, ActivitySummaryEntries.HR_MIN), 0.001);
+        assertEquals(150d, num(data, ActivitySummaryEntries.HR_MAX), 0.001);
+        assertEquals(135d, num(data, ActivitySummaryEntries.HR_AVG), 0.001);
+    }
+
+    /** Elliptical v6, 10 Feb 2025. The paired DETAILS file has HR spanning 118-156
+     *  (mean 147.6). */
+    private static final String ELLIPTICAL_V6_10FEB =
+            "6FuqZwQGrQD/9/+P6FuqZ+tiqmcDBwAApgJoAQAADACuAJOcdgAAYEAAAEgAAAAAABUAAAC8"
+                    + "BgAAHQAAAAAAAAAGAwMHAACamZk+AAAAAAAAAAAAAABgAAIDAC12aDs=";
+
+    @Test
+    public void ellipticalV6_matchesDetails() {
+        final ActivitySummaryData data = parse(ELLIPTICAL_V6_10FEB);
+        assertEquals(118d, num(data, ActivitySummaryEntries.HR_MIN), 0.001);
+        assertEquals(156d, num(data, ActivitySummaryEntries.HR_MAX), 0.001);
+        assertEquals(147d, num(data, ActivitySummaryEntries.HR_AVG), 0.001);
     }
 }

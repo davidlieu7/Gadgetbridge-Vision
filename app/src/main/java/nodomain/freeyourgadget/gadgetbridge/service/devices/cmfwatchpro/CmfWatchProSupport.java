@@ -32,8 +32,7 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 import net.e175.klaus.solarpositioning.DeltaT;
-import net.e175.klaus.solarpositioning.SPA;
-import net.e175.klaus.solarpositioning.SunriseResult;
+import net.e175.klaus.solarpositioning.SolarEvents;
 
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.commons.lang3.StringUtils;
@@ -47,6 +46,7 @@ import java.security.MessageDigest;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneOffset;
+import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Calendar;
@@ -956,16 +956,18 @@ public class CmfWatchProSupport extends AbstractBTLESingleDeviceSupport implemen
     }
 
     private void putSunriseSunset(final ByteBuffer buf, final Location location, final GregorianCalendar date) {
-        final SunriseResult sunriseResult = SPA.calculateSunriseTransitSet(
-                date.toZonedDateTime(),
+        final ZonedDateTime zonedDate = date.toZonedDateTime();
+        final SolarEvents.Day solarDay = SolarEvents.spa().forDate(
+                zonedDate.toLocalDate(),
+                zonedDate.getZone(),
                 location.getLatitude(),
                 location.getLongitude(),
-                DeltaT.estimate(date.toZonedDateTime().toLocalDate())
+                DeltaT.estimate(zonedDate.toLocalDate())
         );
 
-        if (sunriseResult instanceof SunriseResult.RegularDay regularDay) {
-            buf.putInt((int) regularDay.sunrise().toInstant().getEpochSecond());
-            buf.putInt((int) regularDay.sunset().toInstant().getEpochSecond());
+        if (!solarDay.rises().isEmpty() && !solarDay.sets().isEmpty()) {
+            buf.putInt((int) solarDay.rises().get(0).toEpochSecond());
+            buf.putInt((int) solarDay.sets().get(0).toEpochSecond());
         } else {
             buf.putInt(0);
             buf.putInt(0);

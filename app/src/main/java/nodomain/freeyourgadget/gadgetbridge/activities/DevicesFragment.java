@@ -59,6 +59,7 @@ import nodomain.freeyourgadget.gadgetbridge.model.ActivitySample;
 import nodomain.freeyourgadget.gadgetbridge.model.DailyTotals;
 import nodomain.freeyourgadget.gadgetbridge.model.DeviceService;
 import nodomain.freeyourgadget.gadgetbridge.util.GB;
+import nodomain.freeyourgadget.gadgetbridge.util.kotlin.FloatingActionButtonExtensionsKt;
 
 public class DevicesFragment extends Fragment {
 
@@ -136,6 +137,7 @@ public class DevicesFragment extends Fragment {
         });
 
         fab = currentView.findViewById(R.id.fab);
+        FloatingActionButtonExtensionsKt.applyAccentColors(fab);
         fab.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {

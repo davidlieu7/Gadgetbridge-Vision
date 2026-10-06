@@ -28,7 +28,7 @@
                 android:layout_height="wrap_content"
                 android:text="@string/activity_db_management_backup_restore_label"
                 android:textAppearance="?android:attr/textAppearanceMedium"
-                android:textColor="@color/accent" />
+                android:textColor="?attr/accent_color" />
 
             <TextView
                 android:id="@+id/backup_restore_intro"
@@ -79,7 +79,7 @@
                 android:layout_height="wrap_content"
                 android:text="@string/activity_db_management_exportimport_label"
                 android:textAppearance="?android:attr/textAppearanceMedium"
-                android:textColor="@color/accent" />
+                android:textColor="?attr/accent_color" />
 
             <TextView
                 android:id="@+id/db_management_intro"

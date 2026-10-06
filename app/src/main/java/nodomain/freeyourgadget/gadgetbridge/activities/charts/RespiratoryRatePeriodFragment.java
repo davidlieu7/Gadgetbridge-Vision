@@ -4,6 +4,7 @@ import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.LinearLayout;
 import android.widget.TextView;
 
 import com.github.mikephil.charting.charts.Chart;
@@ -28,6 +29,8 @@ import java.util.List;
 import java.util.Locale;
 
 import nodomain.freeyourgadget.gadgetbridge.R;
+import nodomain.freeyourgadget.gadgetbridge.activities.workouts.StatTileData;
+import nodomain.freeyourgadget.gadgetbridge.activities.workouts.StatTileGridUtilKt;
 import nodomain.freeyourgadget.gadgetbridge.database.DBHandler;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
 import nodomain.freeyourgadget.gadgetbridge.util.DateTimeUtils;
@@ -36,8 +39,7 @@ public class RespiratoryRatePeriodFragment extends RespiratoryRateFragment<Respi
     protected static final Logger LOG = LoggerFactory.getLogger(RespiratoryRatePeriodFragment.class);
 
     private TextView mDateView;
-    private TextView sleepAvg;
-    private TextView awakeAvg;
+    private LinearLayout statsContainer;
     private LineChart respiratoryRateChart;
 
     @Override
@@ -68,8 +70,7 @@ public class RespiratoryRatePeriodFragment extends RespiratoryRateFragment<Respi
         });
 
         mDateView = rootView.findViewById(R.id.rr_date_view);
-        sleepAvg = rootView.findViewById(R.id.sleep_avg);
-        awakeAvg = rootView.findViewById(R.id.awake_avg);
+        statsContainer = rootView.findViewById(R.id.respiratory_rate_period_stats_container);
         respiratoryRateChart = rootView.findViewById(R.id.respiratory_rate_line_chart);
         setupRespiratoryRateChart();
         refresh();
@@ -150,8 +151,17 @@ public class RespiratoryRatePeriodFragment extends RespiratoryRateFragment<Respi
         respiratoryRateChart.setData(null);
         mDateView.setText(respiratoryRateData.formattedDate);
         final String emptyValue = requireContext().getString(R.string.stats_empty_value);
-        sleepAvg.setText(respiratoryRateData.sleepRateAvg > 0 ? String.valueOf(respiratoryRateData.sleepRateAvg) : emptyValue);
-        awakeAvg.setText(respiratoryRateData.awakeRateAvg > 0 ? String.valueOf(respiratoryRateData.awakeRateAvg) : emptyValue);
+        final List<StatTileData> stats = new ArrayList<>();
+        stats.add(new StatTileData(
+                respiratoryRateData.awakeRateAvg > 0 ? String.valueOf(respiratoryRateData.awakeRateAvg) : emptyValue,
+                getString(R.string.sleep_colored_stats_awake_avg)
+        ));
+        stats.add(new StatTileData(
+                respiratoryRateData.sleepRateAvg > 0 ? String.valueOf(respiratoryRateData.sleepRateAvg) : emptyValue,
+                getString(R.string.sleep_avg)
+        ));
+        statsContainer.removeAllViews();
+        StatTileGridUtilKt.addStatTileGrid(statsContainer, requireContext(), stats, 0);
 
         List<Entry> lineAwakeRateAvgEntries = new ArrayList<>();
         List<Entry> lineSleepRateEntries = new ArrayList<>();

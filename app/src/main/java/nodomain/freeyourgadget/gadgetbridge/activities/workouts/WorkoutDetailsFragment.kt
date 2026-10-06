@@ -46,6 +46,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import nodomain.freeyourgadget.gadgetbridge.GBApplication
 import nodomain.freeyourgadget.gadgetbridge.R
+import nodomain.freeyourgadget.gadgetbridge.activities.AbstractGBActivity
 import nodomain.freeyourgadget.gadgetbridge.activities.endurain.EndurainApiClient
 import nodomain.freeyourgadget.gadgetbridge.activities.endurain.EndurainSetupViewModel
 import nodomain.freeyourgadget.gadgetbridge.activities.endurain.WandererApiClient
@@ -65,6 +66,7 @@ import nodomain.freeyourgadget.gadgetbridge.model.workout.Workout
 import nodomain.freeyourgadget.gadgetbridge.model.workout.WorkoutViewModel
 import nodomain.freeyourgadget.gadgetbridge.util.ActivitySummaryUtils
 import nodomain.freeyourgadget.gadgetbridge.util.AndroidUtils
+import nodomain.freeyourgadget.gadgetbridge.util.BarShade
 import nodomain.freeyourgadget.gadgetbridge.util.DateTimeUtils
 import nodomain.freeyourgadget.gadgetbridge.util.FileUtils
 import nodomain.freeyourgadget.gadgetbridge.util.GB
@@ -80,6 +82,8 @@ import java.util.Locale
 class WorkoutDetailsFragment : Fragment(), MenuProvider {
     private var workoutId: Long = -1
     private var currentWorkout: Workout? = null
+    private var rawDetailsFile: File? = null
+    private var rawGpsFile: File? = null
     private lateinit var gbDevice: GBDevice
 
     private lateinit var binding: FragmentWorkoutDetailsBinding
@@ -114,6 +118,10 @@ class WorkoutDetailsFragment : Fragment(), MenuProvider {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+
+        if (BarShade.continuesToolbar(requireContext(), R.attr.tab_bar_bg)) {
+            (requireActivity() as AbstractGBActivity).setTopShade(binding.tabRowShade)
+        }
 
         // Attach workout tabs.
         val viewPager = binding.tabsViewPager
@@ -164,6 +172,8 @@ class WorkoutDetailsFragment : Fragment(), MenuProvider {
                     }
                     gbDevice = getGBDevice(summary.device)
                     workoutEditor.gbDevice = gbDevice
+                    rawDetailsFile = gbDevice.deviceCoordinator.getWorkoutRawDetailsFile(gbDevice, summary)
+                    rawGpsFile = gbDevice.deviceCoordinator.getWorkoutRawGpsFile(gbDevice, summary)
                     val parsedWorkout = try {
                         gbDevice.deviceCoordinator.getActivitySummaryParser(gbDevice, requireContext())
                             .parseWorkout(summary, true)
@@ -186,7 +196,9 @@ class WorkoutDetailsFragment : Fragment(), MenuProvider {
                                     val defaultCharts = DefaultWorkoutCharts.buildDefaultCharts(
                                         requireContext(),
                                         activityPoints,
-                                        ActivityKind.fromCode(parsedWorkout.summary.activityKind)
+                                        ActivityKind.fromCode(parsedWorkout.summary.activityKind),
+                                        parsedWorkout.data,
+                                        gbDevice
                                     )
                                     return@withContext Workout(parsedWorkout.summary, parsedWorkout.data, defaultCharts)
                                 }
@@ -206,8 +218,9 @@ class WorkoutDetailsFragment : Fragment(), MenuProvider {
 
                 currentWorkout?.let { workout ->
                     workoutValueFormatter.setActivityKind(ActivityKind.fromCode(workout.summary.activityKind))
+                    updateActionBarTitle()
                     workoutViewModel.setWorkout(workout, workoutId)
-                    tabsPagerAdapter.setLapsTab(hasLaps(workout))
+                    tabsPagerAdapter.setOptionalTabs(hasCharts(workout), hasLaps(workout))
 
                     showLoading(false)
                 } ?: run {
@@ -235,6 +248,10 @@ class WorkoutDetailsFragment : Fragment(), MenuProvider {
         binding.tabsViewPager.visibility = View.GONE
         binding.errorMessage.visibility = View.VISIBLE
         binding.errorMessage.text = message
+    }
+
+    private fun hasCharts(workout: Workout): Boolean {
+        return workout.charts.isNotEmpty() || gbDevice.deviceCoordinator.supportsHeartRateMeasurement(gbDevice)
     }
 
     /** Whether the workout has laps/intervals data (cardio-type workouts), and so gets a Laps tab. */
@@ -310,7 +327,12 @@ class WorkoutDetailsFragment : Fragment(), MenuProvider {
             }
 
             R.id.activity_action_dev_share_raw_details -> {
-                shareRawDetails(workout)
+                shareRawFile(rawDetailsFile, "details")
+                true
+            }
+
+            R.id.activity_action_dev_share_raw_gps -> {
+                shareRawFile(rawGpsFile, "GPS")
                 true
             }
 
@@ -336,6 +358,19 @@ class WorkoutDetailsFragment : Fragment(), MenuProvider {
                             notifyWorkoutChanged()
                             updateActionBarTitle()
                             workoutViewModel.refreshWorkout(workoutId)
+                        }
+                    })
+                }
+                true
+            }
+
+            R.id.activity_summary_detail_action_edit_type -> {
+                currentWorkout?.let {
+                    workoutEditor.editWorkoutType(it, object : WorkoutEditor.Callback {
+                        override fun onWorkoutUpdated() {
+                            notifyWorkoutChanged()
+                            workoutViewModel.refreshWorkout(workoutId)
+                            scheduleUploadSync()
                         }
                     })
                 }
@@ -415,16 +450,17 @@ class WorkoutDetailsFragment : Fragment(), MenuProvider {
 
         val hasGpx = workoutHasGps(workout)
         val hasRawSummary = workout.summary.rawSummaryData != null
-        val hasRawDetails = workout.summary.rawDetailsPath?.let { FileUtils.tryFixPath(File(it)) != null } ?: false
+        val hasRawDetailsPath = workout.summary.rawDetailsPath?.let { FileUtils.tryFixPath(File(it)) != null } ?: false
 
         val overflowMenu = menu.findItem(R.id.activity_detail_overflowMenu)?.subMenu
         if (overflowMenu != null) {
             overflowMenu.findItem(R.id.activity_action_show_gpx)?.isVisible = hasGpx
             overflowMenu.findItem(R.id.activity_action_share_gpx)?.isVisible = hasGpx
             overflowMenu.findItem(R.id.activity_action_dev_inspect_file)?.isVisible =
-                hasRawDetails && workout.summary.rawDetailsPath?.lowercase(Locale.ROOT)?.endsWith(".fit") == true
+                hasRawDetailsPath && workout.summary.rawDetailsPath?.lowercase(Locale.ROOT)?.endsWith(".fit") == true
             overflowMenu.findItem(R.id.activity_action_dev_share_raw_summary)?.isVisible = hasRawSummary
-            overflowMenu.findItem(R.id.activity_action_dev_share_raw_details)?.isVisible = hasRawDetails
+            overflowMenu.findItem(R.id.activity_action_dev_share_raw_details)?.isVisible = rawDetailsFile != null
+            overflowMenu.findItem(R.id.activity_action_dev_share_raw_gps)?.isVisible = rawGpsFile != null
 
             val devToolsMenu = overflowMenu.findItem(R.id.activity_action_dev_tools)
             val devToolsSubMenu = devToolsMenu?.subMenu
@@ -811,15 +847,9 @@ class WorkoutDetailsFragment : Fragment(), MenuProvider {
         }
     }
 
-    private fun shareRawDetails(workout: Workout) {
-        val rawDetailsPath = workout.summary.rawDetailsPath
-        if (rawDetailsPath == null) {
-            GB.toast(requireContext(), "No raw details in this activity", Toast.LENGTH_LONG, GB.WARN)
-            return
-        }
-        val file = FileUtils.tryFixPath(File(rawDetailsPath))
+    private fun shareRawFile(file: File?, what: String) {
         if (file == null) {
-            GB.toast(requireContext(), "No raw details in this activity", Toast.LENGTH_LONG, GB.WARN)
+            GB.toast(requireContext(), "No raw $what in this activity", Toast.LENGTH_LONG, GB.WARN)
             return
         }
 
@@ -828,7 +858,7 @@ class WorkoutDetailsFragment : Fragment(), MenuProvider {
         } catch (e: Exception) {
             GB.toast(
                 requireContext(),
-                "Unable to share raw details: ${e.localizedMessage}",
+                "Unable to share raw $what: ${e.localizedMessage}",
                 Toast.LENGTH_LONG,
                 GB.ERROR,
                 e

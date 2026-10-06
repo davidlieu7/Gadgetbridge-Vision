@@ -54,6 +54,7 @@ import android.view.WindowManager;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.annotation.StyleRes;
 import androidx.annotation.VisibleForTesting;
 import androidx.core.app.NotificationCompat;
 import androidx.core.content.ContextCompat;
@@ -700,8 +701,53 @@ public class GBApplication extends Application {
         return selectedTheme.equals(context.getString(R.string.pref_theme_value_dynamic));
     }
 
+    public static final String PREF_ACCENT_COLOR = "pref_key_accent_color";
+    public static final String PREF_ACCENT_COLOR_DEFAULT = "red";
+
+    /**
+     * The ThemeOverlay for the user's chosen accent color preset (Settings > User interface).
+     * Not meaningful when {@link #areDynamicColorsEnabled()} is true - callers should skip
+     * applying it in that case, since Dynamic Color already ties these colors to the wallpaper.
+     */
+    @StyleRes
+    public static int getAccentColorOverlay() {
+        final String accent = prefs.getString(PREF_ACCENT_COLOR, PREF_ACCENT_COLOR_DEFAULT);
+        final boolean dark = isDarkThemeEnabled();
+        switch (accent) {
+            case "coral":
+                return dark ? R.style.ThemeOverlay_App_Accent_Coral_Dark : R.style.ThemeOverlay_App_Accent_Coral_Light;
+            case "orange":
+                return dark ? R.style.ThemeOverlay_App_Accent_Orange_Dark : R.style.ThemeOverlay_App_Accent_Orange_Light;
+            case "amber":
+                return dark ? R.style.ThemeOverlay_App_Accent_Amber_Dark : R.style.ThemeOverlay_App_Accent_Amber_Light;
+            case "lime":
+                return dark ? R.style.ThemeOverlay_App_Accent_Lime_Dark : R.style.ThemeOverlay_App_Accent_Lime_Light;
+            case "green":
+                return dark ? R.style.ThemeOverlay_App_Accent_Green_Dark : R.style.ThemeOverlay_App_Accent_Green_Light;
+            case "teal":
+                return dark ? R.style.ThemeOverlay_App_Accent_Teal_Dark : R.style.ThemeOverlay_App_Accent_Teal_Light;
+            case "cyan":
+                return dark ? R.style.ThemeOverlay_App_Accent_Cyan_Dark : R.style.ThemeOverlay_App_Accent_Cyan_Light;
+            case "blue":
+                return dark ? R.style.ThemeOverlay_App_Accent_Blue_Dark : R.style.ThemeOverlay_App_Accent_Blue_Light;
+            case "indigo":
+                return dark ? R.style.ThemeOverlay_App_Accent_Indigo_Dark : R.style.ThemeOverlay_App_Accent_Indigo_Light;
+            case "violet":
+                return dark ? R.style.ThemeOverlay_App_Accent_Violet_Dark : R.style.ThemeOverlay_App_Accent_Violet_Light;
+            case "pink":
+                return dark ? R.style.ThemeOverlay_App_Accent_Pink_Dark : R.style.ThemeOverlay_App_Accent_Pink_Light;
+            case "white":
+                return dark ? R.style.ThemeOverlay_App_Accent_White_Dark : R.style.ThemeOverlay_App_Accent_White_Light;
+            case "red":
+            default:
+                return dark ? R.style.ThemeOverlay_App_Accent_Red_Dark : R.style.ThemeOverlay_App_Accent_Red_Light;
+        }
+    }
+
     public static int getTextColor(Context context) {
-        if (GBApplication.isDarkThemeEnabled()) {
+        if (AndroidUtils.isDynamicColorActive()) {
+            return AndroidUtils.getDynamicColor(context, com.google.android.material.R.attr.colorOnSurface);
+        } else if (GBApplication.isDarkThemeEnabled()) {
             return context.getResources().getColor(R.color.primarytext_dark);
         } else {
             return context.getResources().getColor(R.color.primarytext_light);
@@ -709,7 +755,13 @@ public class GBApplication extends Application {
     }
 
     public static int getSecondaryTextColor(Context context) {
-        return context.getResources().getColor(R.color.secondarytext);
+        if (AndroidUtils.isDynamicColorActive()) {
+            return AndroidUtils.getDynamicColor(context, com.google.android.material.R.attr.colorOnSurfaceVariant);
+        } else if (isDarkThemeEnabled()) {
+            return context.getResources().getColor(R.color.on_surface_variant_dark);
+        } else {
+            return context.getResources().getColor(R.color.on_surface_variant_light);
+        }
     }
 
     @Override

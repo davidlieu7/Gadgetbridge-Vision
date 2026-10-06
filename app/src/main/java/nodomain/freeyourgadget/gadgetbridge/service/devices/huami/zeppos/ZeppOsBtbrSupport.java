@@ -462,6 +462,11 @@ public class ZeppOsBtbrSupport extends AbstractBTBRDeviceSupport implements Zepp
     }
 
     @Override
+    public void onMusicListReq() {
+        zeppOsSupport.onMusicListReq();
+    }
+
+    @Override
     public void onFindPhone(final boolean start) {
         zeppOsSupport.onFindPhone(start);
     }
@@ -529,6 +534,11 @@ public class ZeppOsBtbrSupport extends AbstractBTBRDeviceSupport implements Zepp
     @Override
     public void onSetContacts(ArrayList<? extends Contact> contacts) {
         zeppOsSupport.onSetContacts(contacts);
+    }
+
+    @Override
+    public void onSyncWorkoutTemplate(final long templateId) {
+        zeppOsSupport.onSyncWorkoutTemplate(templateId);
     }
 
     @Override

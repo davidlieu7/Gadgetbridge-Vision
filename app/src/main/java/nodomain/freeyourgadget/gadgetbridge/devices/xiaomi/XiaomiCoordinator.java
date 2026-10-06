@@ -30,6 +30,7 @@ import androidx.annotation.Nullable;
 
 import org.apache.commons.lang3.ArrayUtils;
 
+import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -60,6 +61,7 @@ import nodomain.freeyourgadget.gadgetbridge.devices.SampleProvider;
 import nodomain.freeyourgadget.gadgetbridge.devices.TimeSampleProvider;
 import nodomain.freeyourgadget.gadgetbridge.devices.WorkoutLoadSampleProvider;
 import nodomain.freeyourgadget.gadgetbridge.devices.XiaomiDailySummarySampleProvider;
+import nodomain.freeyourgadget.gadgetbridge.entities.BaseActivitySummary;
 import nodomain.freeyourgadget.gadgetbridge.entities.BaseActivitySummaryDao;
 import nodomain.freeyourgadget.gadgetbridge.entities.DaoSession;
 import nodomain.freeyourgadget.gadgetbridge.entities.GenericTrainingLoadAcuteSample;
@@ -88,8 +90,10 @@ import nodomain.freeyourgadget.gadgetbridge.service.DeviceSupport;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.xiaomi.XiaomiUuids;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.xiaomi.XiaomiPreferences;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.xiaomi.XiaomiSupport;
+import nodomain.freeyourgadget.gadgetbridge.service.devices.xiaomi.activity.XiaomiActivityFileId;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.xiaomi.activity.XiaomiActivityTrackProvider;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.xiaomi.activity.impl.WorkoutSummaryParser;
+import nodomain.freeyourgadget.gadgetbridge.util.FileUtils;
 import nodomain.freeyourgadget.gadgetbridge.util.Prefs;
 
 public abstract class XiaomiCoordinator extends AbstractBLEDeviceCoordinator {
@@ -234,6 +238,20 @@ public abstract class XiaomiCoordinator extends AbstractBLEDeviceCoordinator {
         return new XiaomiActivityTrackProvider(device, context);
     }
 
+    @Nullable
+    @Override
+    public File getWorkoutRawDetailsFile(@NonNull final GBDevice device, @NonNull final BaseActivitySummary summary) {
+        return XiaomiActivityTrackProvider.getRawFile(device, summary, XiaomiActivityFileId.DetailType.DETAILS);
+    }
+
+    @Nullable
+    @Override
+    public File getWorkoutRawGpsFile(@NonNull final GBDevice device, @NonNull final BaseActivitySummary summary) {
+        final File gps = XiaomiActivityTrackProvider.getRawFile(device, summary, XiaomiActivityFileId.DetailType.GPS_TRACK);
+        // Summaries from before the file registry existed only carry the GPS file, in rawDetailsPath
+        return gps != null ? gps : FileUtils.tryFixPath(summary.getRawDetailsPath());
+    }
+
     @Override
     public boolean supportsFlashing(@NonNull GBDevice device) {
         return true;
@@ -316,7 +334,13 @@ public abstract class XiaomiCoordinator extends AbstractBLEDeviceCoordinator {
 
     @Override
     public boolean supportsBodyEnergy(@NonNull GBDevice device) {
-        return false; // FIXME is should, but untested
+        return true;
+    }
+
+    @Override
+    public boolean supportsVO2Max(@NonNull GBDevice device) {
+        // Persisted in the workout summaries - see WorkoutSummaryParser
+        return true;
     }
 
     @Override
@@ -597,6 +621,9 @@ public abstract class XiaomiCoordinator extends AbstractBLEDeviceCoordinator {
         if (getCannedRepliesSlotCount(device) > 0) {
             notifications.add(R.xml.devicesettings_canned_dismisscall_16);
         }
+        if (supportsNavigation(device)) {
+            notifications.add(R.xml.devicesettings_navigation_notifications);
+        }
         notifications.add(R.xml.devicesettings_transliteration);
 
         //
@@ -704,6 +731,11 @@ public abstract class XiaomiCoordinator extends AbstractBLEDeviceCoordinator {
     @Override
     public WidgetManager getWidgetManager(@NonNull final GBDevice device) {
         return new XiaomiWidgetManager(device);
+    }
+
+    @Override
+    public boolean supportsNavigation(@NonNull final GBDevice device) {
+        return true;
     }
 
     protected static Prefs getPrefs(@NonNull final GBDevice device) {

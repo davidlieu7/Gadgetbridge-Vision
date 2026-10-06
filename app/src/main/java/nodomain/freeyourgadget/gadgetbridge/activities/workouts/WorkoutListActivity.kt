@@ -10,10 +10,13 @@ import android.view.ActionMode
 import android.view.Menu
 import android.view.MenuItem
 import android.view.View
+import android.widget.CheckBox
+import android.widget.RadioGroup
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.activity.viewModels
-import androidx.core.content.FileProvider
+import androidx.appcompat.app.AlertDialog
+import androidx.lifecycle.lifecycleScope
 import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import androidx.recyclerview.widget.RecyclerView
 import androidx.recyclerview.widget.SimpleItemAnimator
@@ -30,15 +33,20 @@ import nodomain.freeyourgadget.gadgetbridge.entities.BaseActivitySummary
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice
 import nodomain.freeyourgadget.gadgetbridge.model.ActivityKind
 import nodomain.freeyourgadget.gadgetbridge.model.RecordedDataTypes
-import nodomain.freeyourgadget.gadgetbridge.util.ActivitySummaryUtils
+import nodomain.freeyourgadget.gadgetbridge.util.AndroidUtils
 import nodomain.freeyourgadget.gadgetbridge.util.GB
 import nodomain.freeyourgadget.gadgetbridge.util.WorkoutFilterUtils
+import nodomain.freeyourgadget.gadgetbridge.util.healthconnect.HealthConnectWorkoutSync
+import nodomain.freeyourgadget.gadgetbridge.util.kotlin.applyAccentColors
 import nodomain.freeyourgadget.gadgetbridge.util.kotlin.getParcelableCompat
 import nodomain.freeyourgadget.gadgetbridge.util.kotlin.getSerializableCompat
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import org.slf4j.LoggerFactory
-import java.io.File
 import java.util.BitSet
 import java.util.Calendar
+import java.util.Locale
 import androidx.core.view.get
 import androidx.core.view.size
 
@@ -108,6 +116,7 @@ class WorkoutListActivity : AbstractListActivity<BaseActivitySummary>() {
                 // and swipe-refresh spinner don't blink on every
                 // incremental update.
                 GBApplication.ACTION_NEW_DATA -> refresh(silent = true)
+                HealthConnectWorkoutSync.ACTION_STATE_CHANGED -> refresh(silent = true)
                 else -> LOG.warn("Got unexpected action {}", intent.action)
             }
         }
@@ -148,6 +157,7 @@ class WorkoutListActivity : AbstractListActivity<BaseActivitySummary>() {
         val filterLocal = IntentFilter().apply {
             addAction(GBDevice.ACTION_DEVICE_CHANGED)
             addAction(GBApplication.ACTION_NEW_DATA)
+            addAction(HealthConnectWorkoutSync.ACTION_STATE_CHANGED)
         }
         LocalBroadcastManager.getInstance(this).registerReceiver(receiver, filterLocal)
 
@@ -231,12 +241,15 @@ class WorkoutListActivity : AbstractListActivity<BaseActivitySummary>() {
 
         val fab: FloatingActionButton = findViewById(R.id.fab)
         fab.setOnClickListener { fetchTrackData() }
+        // The FAB comes from the layout shared by every list screen, so it is only recolored here.
+        fab.applyAccentColors()
     }
 
     private fun setupViewModel() {
         viewModel.summaries.observe(this) { summaries ->
             // Set before the items, so the first bind of every row already has its indicator.
             summariesAdapter?.uploadStatuses = viewModel.uploadStatuses.value.orEmpty()
+            summariesAdapter?.healthConnectFailures = viewModel.healthConnectFailures.value.orEmpty()
             itemAdapter?.setItems(summaries, true)
             activityKindMap = fillKindMap()
         }
@@ -319,21 +332,13 @@ class WorkoutListActivity : AbstractListActivity<BaseActivitySummary>() {
                         return true
                     }
                     R.id.activity_action_export -> {
-                        val paths = ArrayList<String>()
+                        val toExport = ArrayList<BaseActivitySummary>()
                         for (i in 0 until selectedItems!!.length()) {
                             if (selectedItems!!.get(i)) {
-                                itemAdapter?.getItem(i)?.let { summary ->
-                                    val activityTrackProvider =
-                                        gbDevice?.deviceCoordinator?.getActivityTrackProvider(gbDevice!!, this@WorkoutListActivity)
-                                    if (activityTrackProvider != null) {
-                                        ActivitySummaryUtils.getShareableGpxFile(activityTrackProvider, summary)?.let { file ->
-                                            paths.add(file.path)
-                                        }
-                                    }
-                                }
+                                itemAdapter?.getItem(i)?.let { toExport.add(it) }
                             }
                         }
-                        shareMultiple(paths)
+                        showExportDialog(toExport)
                         return true
                     }
                     R.id.activity_action_select_all -> {
@@ -442,24 +447,80 @@ class WorkoutListActivity : AbstractListActivity<BaseActivitySummary>() {
         }
     }
 
-    private fun shareMultiple(paths: List<String>) {
-        val uris = paths.map { path ->
-            val file = File(path)
-            FileProvider.getUriForFile(
-                this,
-                "${applicationContext.packageName}.screenshot_provider",
-                file
-            )
-        }
+    private fun showExportDialog(summaries: List<BaseActivitySummary>) {
+        val device = gbDevice ?: return
+        if (summaries.isEmpty()) return
 
-        if (uris.isNotEmpty()) {
-            val intent = Intent(Intent.ACTION_SEND_MULTIPLE).apply {
-                type = "application/gpx+xml"
-                putParcelableArrayListExtra(Intent.EXTRA_STREAM, ArrayList(uris))
+        val prefs = GBApplication.getPrefs()
+        val view = layoutInflater.inflate(R.layout.dialog_workout_export, null)
+        val boxes = mapOf(
+            WorkoutBatchExporter.Part.FIT to view.findViewById<CheckBox>(R.id.workout_export_fit),
+            WorkoutBatchExporter.Part.GPX to view.findViewById<CheckBox>(R.id.workout_export_gpx),
+            WorkoutBatchExporter.Part.RAW to view.findViewById<CheckBox>(R.id.workout_export_raw)
+        )
+        fun prefKey(part: WorkoutBatchExporter.Part) = "workout_export_" + part.name.lowercase(Locale.ROOT)
+        boxes.forEach { (part, box) ->
+            box.isChecked = prefs.getBoolean(prefKey(part), part != WorkoutBatchExporter.Part.RAW)
+        }
+        val shareAs = view.findViewById<RadioGroup>(R.id.workout_export_share_as)
+        shareAs.check(
+            if (prefs.getBoolean(PREF_EXPORT_AS_ZIP, false)) R.id.workout_export_zip else R.id.workout_export_separate
+        )
+
+        val dialog = MaterialAlertDialogBuilder(this)
+            .setTitle(R.string.workout_export_title)
+            .setView(view)
+            .setPositiveButton(android.R.string.ok) { _, _ ->
+                val asZip = shareAs.checkedRadioButtonId == R.id.workout_export_zip
+                prefs.preferences.edit().apply {
+                    boxes.forEach { (part, box) -> putBoolean(prefKey(part), box.isChecked) }
+                    putBoolean(PREF_EXPORT_AS_ZIP, asZip)
+                    apply()
+                }
+                val parts = boxes.filterValues { it.isChecked }.keys
+                exportWorkouts(device, summaries, parts, asZip)
             }
-            startActivity(Intent.createChooser(intent, "SHARE"))
-        } else {
-            GB.toast(this, "No selected activity contains a GPX track to share", Toast.LENGTH_SHORT, GB.ERROR)
+            .setNegativeButton(android.R.string.cancel, null)
+            .create()
+        dialog.show()
+        val ok = dialog.getButton(AlertDialog.BUTTON_POSITIVE)
+        ok.isEnabled = boxes.values.any { it.isChecked }
+        boxes.values.forEach { box ->
+            box.setOnCheckedChangeListener { _, _ -> ok.isEnabled = boxes.values.any { it.isChecked } }
+        }
+    }
+
+    private fun exportWorkouts(
+        device: GBDevice,
+        summaries: List<BaseActivitySummary>,
+        parts: Set<WorkoutBatchExporter.Part>,
+        asZip: Boolean
+    ) {
+        actionMode?.finish()
+        GB.toast(this, getString(R.string.workout_export_preparing), Toast.LENGTH_SHORT, GB.INFO)
+        lifecycleScope.launch {
+            val result = try {
+                withContext(Dispatchers.IO) {
+                    WorkoutBatchExporter.export(this@WorkoutListActivity, device, summaries, parts, asZip)
+                }
+            } catch (e: Exception) {
+                LOG.error("Failed to export workouts", e)
+                GB.toast(this@WorkoutListActivity, getString(R.string.workout_export_nothing), Toast.LENGTH_LONG, GB.ERROR)
+                return@launch
+            }
+            if (result.files.isEmpty()) {
+                GB.toast(this@WorkoutListActivity, getString(R.string.workout_export_nothing), Toast.LENGTH_LONG, GB.ERROR)
+                return@launch
+            }
+            if (result.skipped > 0) {
+                GB.toast(
+                    this@WorkoutListActivity,
+                    resources.getQuantityString(R.plurals.workout_export_skipped, result.skipped, result.skipped),
+                    Toast.LENGTH_LONG,
+                    GB.WARN
+                )
+            }
+            AndroidUtils.shareFiles(this@WorkoutListActivity, result.files, WorkoutBatchExporter.mimeTypeFor(result.files))
         }
     }
 
@@ -508,6 +569,16 @@ class WorkoutListActivity : AbstractListActivity<BaseActivitySummary>() {
     }
 
     private fun refresh(silent: Boolean) {
+        // The adapter only reads the kind and date filters to title the dashboard, so it has to
+        // be kept in sync here: the filter screen result only updates this activity's fields.
+        summariesAdapter?.let { adapter ->
+            adapter.setActivityKindFilter(activityFilter)
+            adapter.setDateFromFilter(dateFromFilter)
+            adapter.setDateToFilter(dateToFilter)
+            adapter.setNameContainsFilter(nameContainsFilter)
+            adapter.setItemsFilter(itemsFilter)
+            adapter.setDeviceFilter(deviceFilter)
+        }
         gbDevice?.let { device ->
             viewModel.loadSummaries(
                 device,
@@ -532,5 +603,6 @@ class WorkoutListActivity : AbstractListActivity<BaseActivitySummary>() {
 
     companion object {
         private val LOG = LoggerFactory.getLogger(WorkoutListActivity::class.java)
+        private const val PREF_EXPORT_AS_ZIP = "workout_export_as_zip"
     }
 }

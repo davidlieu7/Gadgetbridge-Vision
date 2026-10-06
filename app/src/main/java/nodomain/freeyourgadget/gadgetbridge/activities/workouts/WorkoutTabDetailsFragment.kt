@@ -1,6 +1,5 @@
 package nodomain.freeyourgadget.gadgetbridge.activities.workouts
 
-import android.graphics.Typeface
 import android.os.Bundle
 import android.util.TypedValue
 import android.view.Gravity
@@ -78,6 +77,7 @@ class WorkoutTabDetailsFragment : Fragment(), WorkoutTabScreenshotProvider {
 
         val activityKind = ActivityKind.fromCode(workout.summary.activityKind)
         val groups = ActivitySummaryGroup.buildGroupedList(workout.data)
+        var isFirstHeader = true
         for ((groupKey, entries) in groups) {
             if (groupKey == ActivitySummaryEntries.GROUP_ACTIVITY ||
                 groupKey == ActivitySummaryEntries.GROUP_LAPS ||
@@ -93,7 +93,8 @@ class WorkoutTabDetailsFragment : Fragment(), WorkoutTabScreenshotProvider {
                 continue
             }
 
-            addGroupHeader(groupKey, activityKind)
+            addGroupHeader(groupKey, activityKind, showDivider = !isFirstHeader)
+            isFirstHeader = false
             addGroupContent(rows)
         }
     }
@@ -128,17 +129,8 @@ class WorkoutTabDetailsFragment : Fragment(), WorkoutTabScreenshotProvider {
         return rows
     }
 
-    private fun addGroupHeader(groupKey: String, activityKind: ActivityKind) {
-        val labelField = TextView(context).apply {
-            id = View.generateViewId()
-            textSize = 18f
-            gravity = Gravity.START
-            setPaddingRelative(dpToPx(16), dpToPx(16), dpToPx(16), dpToPx(8))
-            typeface = Typeface.DEFAULT_BOLD
-            setTextColor(GBApplication.getTextColor(context))
-            text = groupLabel(groupKey, activityKind)
-        }
-        binding.summaryDetails.addView(labelField)
+    private fun addGroupHeader(groupKey: String, activityKind: ActivityKind, showDivider: Boolean) {
+        addSectionHeader(binding.summaryDetails, requireContext(), groupLabel(groupKey, activityKind), showDivider)
     }
 
     /**

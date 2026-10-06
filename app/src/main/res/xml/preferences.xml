@@ -230,6 +230,12 @@
             android:layout="@layout/preference_checkbox"
             android:title="@string/pref_theme_black_background" />
 
+        <Preference
+            android:icon="@drawable/ic_invert_colors"
+            android:key="pref_key_accent_color"
+            android:summary="@string/pref_summary_accent_color"
+            android:title="@string/pref_title_accent_color" />
+
         <SwitchPreferenceCompat
             android:defaultValue="false"
             android:icon="@drawable/ic_visibility_lock"
@@ -340,13 +346,21 @@
                 android:layout="@layout/preference_checkbox"
                 android:title="@string/pref_title_whenscreenon"
                 app:iconSpaceReserved="false" />
-            <ListPreference
-                android:defaultValue="autodetect"
-                android:entries="@array/osmand_package_names"
-                android:entryValues="@array/osmand_package_names_values"
-                android:key="pref_key_osmand_packagename"
-                android:summary="@string/pref_summary_osmand_packagename"
-                android:title="@string/pref_title_osmand_packagename"
+            <SwitchPreferenceCompat
+                android:defaultValue="false"
+                android:dependency="navigation_forward"
+                android:key="navigation_allow_unsupported_devices"
+                android:layout="@layout/preference_checkbox"
+                android:summary="@string/pref_summary_navigation_allow_unsupported_devices"
+                android:title="@string/pref_title_allow_unsupported_devices"
+                app:iconSpaceReserved="false" />
+            <SwitchPreferenceCompat
+                android:defaultValue="true"
+                android:dependency="navigation_forward"
+                android:key="navigation_right_hand_traffic"
+                android:layout="@layout/preference_checkbox"
+                android:summary="@string/pref_description_navigation_right_hand_driving"
+                android:title="@string/pref_title_navigation_right_hand_driving"
                 app:iconSpaceReserved="false" />
             <PreferenceCategory
                 android:key="navigation_apps_selection"
@@ -357,6 +371,15 @@
                     android:key="navigation_app_osmand"
                     android:layout="@layout/preference_checkbox"
                     android:title="@string/pref_navigation_app_osmand"
+                    app:iconSpaceReserved="false" />
+                <ListPreference
+                    android:defaultValue="autodetect"
+                    android:dependency="navigation_app_osmand"
+                    android:entries="@array/osmand_package_names"
+                    android:entryValues="@array/osmand_package_names_values"
+                    android:key="pref_key_osmand_packagename"
+                    android:summary="@string/pref_summary_osmand_packagename"
+                    android:title="@string/pref_title_osmand_packagename"
                     app:iconSpaceReserved="false" />
                 <SwitchPreferenceCompat
                     android:defaultValue="true"
@@ -371,6 +394,7 @@
                     android:title="@string/pref_navigation_app_comaps"
                     app:iconSpaceReserved="false" />
             </PreferenceCategory>
+
         </PreferenceScreen>
 
         <nodomain.freeyourgadget.gadgetbridge.util.preferences.SubtitleListPreference

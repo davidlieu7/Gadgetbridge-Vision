@@ -26,7 +26,7 @@ import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.baseTypes
 
 public class FieldDefinitionCoordinate extends FieldDefinition {
 
-    public FieldDefinitionCoordinate(int localNumber, int size, BaseType baseType, String name, int scale, int offset) {
+    public FieldDefinitionCoordinate(int localNumber, int size, BaseType baseType, String name, double scale, int offset) {
         super(localNumber, size, baseType, name, scale, offset);
     }
 

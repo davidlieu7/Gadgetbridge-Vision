@@ -63,6 +63,8 @@ object HealthConnectPermissionManager {
         RESPIRATORY_RATE,
         RESTING_HEART_RATE,
         BLOOD_GLUCOSE,
+        BLOOD_PRESSURE,
+        HYDRATION,
         WORKOUTS
     }
 
@@ -84,6 +86,8 @@ object HealthConnectPermissionManager {
             HealthConnectDataType.RESPIRATORY_RATE -> setOf(HealthPermission.getWritePermission(RespiratoryRateRecord::class))
             HealthConnectDataType.RESTING_HEART_RATE -> setOf(HealthPermission.getWritePermission(RestingHeartRateRecord::class))
             HealthConnectDataType.BLOOD_GLUCOSE -> setOf(HealthPermission.getWritePermission(BloodGlucoseRecord::class))
+            HealthConnectDataType.BLOOD_PRESSURE -> setOf(HealthPermission.getWritePermission(BloodPressureRecord::class))
+            HealthConnectDataType.HYDRATION -> setOf(HealthPermission.getWritePermission(HydrationRecord::class))
             HealthConnectDataType.TEMPERATURE -> setOf(
                 HealthPermission.getWritePermission(BodyTemperatureRecord::class),
                 HealthPermission.getWritePermission(SkinTemperatureRecord::class)
@@ -307,9 +311,11 @@ object HealthConnectPermissionManager {
             try {
                 GBApplication.acquireDB().use { db ->
                     db.daoSession.healthConnectSyncStateDao.deleteAll()
+                    db.daoSession.healthConnectWorkoutSyncFailureDao.deleteAll()
                     db.daoSession.clear()
                     LOG.info("Successfully cleared all HealthConnect sync states and session cache.")
                 }
+                HealthConnectWorkoutSync.notifyStateChanged(context)
                 setHealthConnectPermissionResetNeeded(context, false) // Use new setter
                 // LOG.info("Cleared PREF_KEY_HC_PROMPT_FOR_FULL_DAO_RESET after DAO reset.") // Log is now part of setter
 

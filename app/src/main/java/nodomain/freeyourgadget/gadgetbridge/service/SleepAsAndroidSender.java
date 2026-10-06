@@ -2,11 +2,15 @@ package nodomain.freeyourgadget.gadgetbridge.service;
 
 import android.content.Context;
 import android.content.Intent;
+import android.os.Bundle;
+
+import androidx.annotation.Nullable;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
+import java.util.Calendar;
 import java.util.Set;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
@@ -15,14 +19,17 @@ import java.util.concurrent.TimeUnit;
 import nodomain.freeyourgadget.gadgetbridge.GBApplication;
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsPreferenceConst;
 import nodomain.freeyourgadget.gadgetbridge.devices.SleepAsAndroidFeature;
+import nodomain.freeyourgadget.gadgetbridge.entities.Alarm;
 import nodomain.freeyourgadget.gadgetbridge.externalevents.sleepasandroid.SleepAsAndroidAction;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
 import nodomain.freeyourgadget.gadgetbridge.model.RecordedDataTypes;
+import nodomain.freeyourgadget.gadgetbridge.util.AlarmUtils;
+import nodomain.freeyourgadget.gadgetbridge.util.GBPrefs;
 import nodomain.freeyourgadget.gadgetbridge.util.Prefs;
 
 public class SleepAsAndroidSender {
 
-    private final Logger LOG = LoggerFactory.getLogger(SleepAsAndroidSender.class);
+    private static final Logger LOG = LoggerFactory.getLogger(SleepAsAndroidSender.class);
     private final String PACKAGE_SLEEP_AS_ANDROID = "com.urbandroid.sleep";
     private final String ACTION_EXTRA_DATA_UPDATE = "com.urbandroid.sleep.ACTION_EXTRA_DATA_UPDATE";
     private final String ACTION_MOVEMENT_DATA_UPDATE = "com.urbandroid.sleep.watch.DATA_UPDATE";
@@ -63,6 +70,8 @@ public class SleepAsAndroidSender {
     private float sumRawData = 0;
     private int sampleCount = 0;
     private long lastHrDataMs = 0;
+    private boolean heartRateRequested = false;
+    private boolean oximetryRequested = false;
     private ArrayList<Float> hrData = new ArrayList<>();
 
     private ArrayList<Float> accDataMaxRaw = new ArrayList<>();
@@ -135,7 +144,27 @@ public class SleepAsAndroidSender {
     }
 
     /**
-     * Start tracking
+     * Start tracking, honouring the sensors Sleep as Android asked for in START_TRACKING. It
+     * signals them by the presence of the extras, so an absent extra means the user turned that
+     * sensor off and the device should not power it up.
+     * <p>
+     * Sleep as Android also repeats START_TRACKING as its own watchdog, and that repeat carries
+     * the heart rate extra alone, so a session keeps every sensor it has been asked for until it
+     * is stopped.
+     */
+    public void startTracking(@Nullable final Bundle extras) {
+        final boolean heartRate = extras != null && extras.containsKey("DO_HR_MONITORING");
+        final boolean oximetry = extras != null && extras.containsKey("DO_OXIMETER_MONITORING");
+
+        heartRateRequested = trackingOngoing ? heartRateRequested || heartRate : heartRate;
+        oximetryRequested = trackingOngoing ? oximetryRequested || oximetry : oximetry;
+
+        LOG.debug("Sleep as Android requested heart rate={}, oximetry={}", heartRateRequested, oximetryRequested);
+        startTracking();
+    }
+
+    /**
+     * Start tracking, keeping the sensor request of the ongoing session.
      */
     public void startTracking() {
         if (!isDeviceDefault()) return;
@@ -196,6 +225,11 @@ public class SleepAsAndroidSender {
         }
 
         if (!enable) {
+            return;
+        }
+
+        if (!oximetryRequested) {
+            LOG.debug("Not starting spo2 auto-fetch, Sleep as Android did not ask for oximetry");
             return;
         }
 
@@ -435,6 +469,14 @@ public class SleepAsAndroidSender {
         out[2] = sum;
     }
 
+    public boolean isHeartRateRequested() {
+        return heartRateRequested;
+    }
+
+    public boolean isOximetryRequested() {
+        return oximetryRequested;
+    }
+
     /**
      * On heart rate changed
      *
@@ -442,6 +484,7 @@ public class SleepAsAndroidSender {
      * @param sendDelay the send delay in ms. If 0 the data will be sent right away. Anything bigger will gather all the data then send it all after the specified interval
      */
     public void onHrChanged(float hr, long sendDelay) {
+        if (!heartRateRequested) return;
         if (!isDeviceDefault() || !isFeatureEnabled(SleepAsAndroidFeature.HEART_RATE) || !hasFeature(SleepAsAndroidFeature.HEART_RATE) || !trackingOngoing)
             return;
         if (trackingPaused) return;
@@ -641,13 +684,13 @@ public class SleepAsAndroidSender {
     public boolean isDeviceDefault() {
         if (device == null || !device.isInitialized()) return false;
         if (isSleepAsAndroidEnabled()) {
-            return device.getAddress().equals(GBApplication.getPrefs().getString("sleepasandroid_device", ""));
+            return device.getAddress().equals(GBApplication.getPrefs().getString(GBPrefs.SLEEP_AS_ANDROID_DEVICE, ""));
         }
         return false;
     }
 
     public boolean isSleepAsAndroidEnabled() {
-        return GBApplication.getPrefs().getBoolean("pref_key_sleepasandroid_enable", false);
+        return GBApplication.getPrefs().getBoolean(GBPrefs.SLEEP_AS_ANDROID_ENABLED, false);
     }
 
     /**
@@ -715,11 +758,67 @@ public class SleepAsAndroidSender {
      * @return the alarm slot to be used for setting alarms on the watch
      */
     public static int getAlarmSlot() {
-        Prefs prefs = GBApplication.getPrefs();
-        String slotString = prefs.getString("sleepasandroid_alarm_slot", "");
-        if (!slotString.isEmpty()) {
-            return Integer.parseInt(slotString);
+        final Prefs prefs = GBApplication.getPrefs();
+        final String slotString = prefs.getString(GBPrefs.SLEEP_AS_ANDROID_ALARM_SLOT, "");
+        if (slotString.isEmpty()) {
+            return 0;
         }
-        return 0;
+        try {
+            return Integer.parseInt(slotString);
+        } catch (final NumberFormatException e) {
+            // Losing the configured slot is better than aborting the alarm entirely.
+            LOG.warn("Invalid Sleep as Android alarm slot {}, falling back to the first slot", slotString);
+            return 0;
+        }
+    }
+
+    /**
+     * Build the watch alarm for an UPDATE_ALARM timestamp.
+     * <p>
+     * A one-shot alarm keeps only hour and minute, so the watch would ring at the next occurrence
+     * of that time, which is the wrong day once the next Sleep as Android alarm is more than a day
+     * away (e.g. after "skip next alarm"). The alarm therefore repeats on the target's weekday
+     * only: under a week ahead, its first ring is the target itself, and Sleep as Android sends a
+     * new UPDATE_ALARM once that alarm is done. A target in the past or a week or more ahead
+     * cannot be expressed that way and leaves the slot disabled.
+     *
+     * @param slot      the watch alarm slot
+     * @param timestamp the UPDATE_ALARM TIMESTAMP extra, in milliseconds since the epoch
+     * @param now       the current time, in the zone the watch alarm is expressed in
+     */
+    public static Alarm createAlarm(final int slot, final long timestamp, final Calendar now) {
+        final Calendar target = (Calendar) now.clone();
+        target.setTimeInMillis(timestamp);
+
+        // The watch counts days on the wall clock, so a week is 7 calendar days, not 7 x 24 h.
+        final Calendar weekAhead = (Calendar) now.clone();
+        weekAhead.add(Calendar.DAY_OF_MONTH, 7);
+
+        final Alarm alarm = AlarmUtils.createSingleShot(slot, false, false, target);
+        if (target.after(now) && target.before(weekAhead)) {
+            alarm.setRepetition(weekdayMask(target.get(Calendar.DAY_OF_WEEK)));
+        } else {
+            alarm.setEnabled(false);
+        }
+        return alarm;
+    }
+
+    private static int weekdayMask(final int dayOfWeek) {
+        switch (dayOfWeek) {
+            case Calendar.MONDAY:
+                return Alarm.ALARM_MON;
+            case Calendar.TUESDAY:
+                return Alarm.ALARM_TUE;
+            case Calendar.WEDNESDAY:
+                return Alarm.ALARM_WED;
+            case Calendar.THURSDAY:
+                return Alarm.ALARM_THU;
+            case Calendar.FRIDAY:
+                return Alarm.ALARM_FRI;
+            case Calendar.SATURDAY:
+                return Alarm.ALARM_SAT;
+            default:
+                return Alarm.ALARM_SUN;
+        }
     }
 }

@@ -4,6 +4,7 @@ import static nodomain.freeyourgadget.gadgetbridge.service.btle.AbstractBTLEDevi
 import static nodomain.freeyourgadget.gadgetbridge.service.devices.xiaomi.XiaomiSppPacketV2.PACKET_PREAMBLE;
 import static nodomain.freeyourgadget.gadgetbridge.service.devices.xiaomi.XiaomiSppPacketV2.PACKET_TYPE_ACK;
 import static nodomain.freeyourgadget.gadgetbridge.service.devices.xiaomi.XiaomiSppPacketV2.PACKET_TYPE_DATA;
+import static nodomain.freeyourgadget.gadgetbridge.service.devices.xiaomi.XiaomiSppPacketV2.PACKET_TYPE_NACK;
 import static nodomain.freeyourgadget.gadgetbridge.service.devices.xiaomi.XiaomiSppPacketV2.PACKET_TYPE_SESSION_CONFIG;
 
 import android.bluetooth.BluetoothGatt;
@@ -329,6 +330,9 @@ public class XiaomiBleProtocolV2 extends AbstractXiaomiBleProtocol {
                     break;
                 case PACKET_TYPE_ACK:
                     LOG.debug("receive ack for packet {}", decodedPacket.getSequenceNumber());
+                    break;
+                case PACKET_TYPE_NACK:
+                    LOG.warn("receive nack for packet {}, watch rejected it", decodedPacket.getSequenceNumber());
                     break;
                 default:
                     LOG.warn("Unhandled packet with type {} (decoded type {})", decodedPacket.getPacketType(), decodedPacket.getClass().getSimpleName());

@@ -5,6 +5,7 @@ import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.LinearLayout;
 import android.widget.TextView;
 
 import com.github.mikephil.charting.charts.BarChart;
@@ -29,6 +30,8 @@ import java.util.Locale;
 
 import nodomain.freeyourgadget.gadgetbridge.GBApplication;
 import nodomain.freeyourgadget.gadgetbridge.R;
+import nodomain.freeyourgadget.gadgetbridge.activities.workouts.StatTileData;
+import nodomain.freeyourgadget.gadgetbridge.activities.workouts.StatTileGridUtilKt;
 import nodomain.freeyourgadget.gadgetbridge.database.DBHandler;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
 import nodomain.freeyourgadget.gadgetbridge.model.ActivityUser;
@@ -38,10 +41,7 @@ public class CaloriesPeriodFragment extends CaloriesFragment<CaloriesPeriodFragm
     protected static final Logger LOG = LoggerFactory.getLogger(CaloriesPeriodFragment.class);
 
     private TextView mDateView;
-    private TextView activeCaloriesAvg;
-    private TextView activeCaloriesTotal;
-    private TextView restingCaloriesAvg;
-    private TextView restingCaloriesTotal;
+    private LinearLayout caloriesStatsContainer;
     private BarChart caloriesChart;
 
     private TextView mBalanceView;
@@ -82,10 +82,7 @@ public class CaloriesPeriodFragment extends CaloriesFragment<CaloriesPeriodFragm
 
         mDateView = rootView.findViewById(R.id.calories_date_view);
         caloriesChart = rootView.findViewById(R.id.calories_chart);
-        activeCaloriesAvg = rootView.findViewById(R.id.active_calories_avg);
-        activeCaloriesTotal = rootView.findViewById(R.id.active_calories_total);
-        restingCaloriesAvg = rootView.findViewById(R.id.resting_calories_avg);
-        restingCaloriesTotal = rootView.findViewById(R.id.resting_calories_total);
+        caloriesStatsContainer = rootView.findViewById(R.id.calories_period_stats_container);
         CALORIES_GOAL = GBApplication.getPrefs().getInt(ActivityUser.PREF_USER_CALORIES_BURNT, ActivityUser.defaultUserCaloriesBurntGoal);
 
         mBalanceView = rootView.findViewById(R.id.balance);
@@ -178,10 +175,14 @@ public class CaloriesPeriodFragment extends CaloriesFragment<CaloriesPeriodFragm
             caloriesChart.setRenderer(new AngledLabelsChartRenderer(caloriesChart, caloriesChart.getAnimator(), caloriesChart.getViewPortHandler()));
         }
         caloriesChart.setData(barData);
-        activeCaloriesAvg.setText(String.format(String.valueOf(caloriesData.activeCaloriesDailyAvg)));
-        activeCaloriesTotal.setText(String.format(String.valueOf(caloriesData.totalActiveCalories)));
-        restingCaloriesAvg.setText(String.format(String.valueOf(caloriesData.restingCaloriesDailyAvg)));
-        restingCaloriesTotal.setText(String.format(String.valueOf(caloriesData.totalRestingCalories)));
+
+        final List<StatTileData> stats = new ArrayList<>();
+        stats.add(new StatTileData(String.format(String.valueOf(caloriesData.activeCaloriesDailyAvg)), getString(R.string.active_calories_avg)));
+        stats.add(new StatTileData(String.format(String.valueOf(caloriesData.totalActiveCalories)), getString(R.string.active_calories_total)));
+        stats.add(new StatTileData(String.format(String.valueOf(caloriesData.restingCaloriesDailyAvg)), getString(R.string.metabolic_rate)));
+        stats.add(new StatTileData(String.format(String.valueOf(caloriesData.totalRestingCalories)), getString(R.string.resting_calories_total)));
+        caloriesStatsContainer.removeAllViews();
+        StatTileGridUtilKt.addStatTileGrid(caloriesStatsContainer, requireContext(), stats, 0);
 
         mBalanceView.setText(caloriesData.getBalanceMessage(getContext(), CALORIES_GOAL));
     }

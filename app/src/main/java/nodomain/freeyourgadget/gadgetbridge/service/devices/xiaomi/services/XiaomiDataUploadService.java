@@ -28,6 +28,9 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.util.Objects;
 
+import nodomain.freeyourgadget.gadgetbridge.proto.xiaomi.DataUpload;
+import nodomain.freeyourgadget.gadgetbridge.proto.xiaomi.DataUploadAck;
+import nodomain.freeyourgadget.gadgetbridge.proto.xiaomi.DataUploadRequest;
 import nodomain.freeyourgadget.gadgetbridge.proto.xiaomi.XiaomiProto;
 import nodomain.freeyourgadget.gadgetbridge.service.btle.BLETypeConversions;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.xiaomi.XiaomiSendCallback;
@@ -68,10 +71,10 @@ public class XiaomiDataUploadService extends AbstractXiaomiService {
     public void handleCommand(final XiaomiProto.Command cmd) {
         switch (cmd.getSubtype()) {
             case CMD_UPLOAD_START:
-                final XiaomiProto.DataUploadAck dataUploadAck = cmd.getDataUpload().getDataUploadAck();
-                LOG.debug("Got upload start, unknown2={}, resumePosition={}", dataUploadAck.getUnknown2(), dataUploadAck.getResumePosition());
+                final DataUploadAck dataUploadAck = cmd.getDataUpload().getDataUploadAck();
+                LOG.debug("Got upload start, unknown2={}, resumePosition={}", dataUploadAck.getErrno(), dataUploadAck.getResumePosition());
 
-                if (dataUploadAck.getUnknown2() != 0) {
+                if (dataUploadAck.getErrno() != 0) {
                     LOG.warn("Unexpected response");
                     onUploadFinish(false);
                     return;
@@ -116,8 +119,8 @@ public class XiaomiDataUploadService extends AbstractXiaomiService {
                 XiaomiProto.Command.newBuilder()
                         .setType(COMMAND_TYPE)
                         .setSubtype(CMD_UPLOAD_START)
-                        .setDataUpload(XiaomiProto.DataUpload.newBuilder().setDataUploadRequest(
-                                XiaomiProto.DataUploadRequest.newBuilder()
+                        .setDataUpload(DataUpload.newBuilder().setDataUploadRequest(
+                                DataUploadRequest.newBuilder()
                                         .setType(type)
                                         .setMd5Sum(ByteString.copyFrom(Objects.requireNonNull(CheckSums.md5(bytes))))
                                         .setSize(bytes.length)

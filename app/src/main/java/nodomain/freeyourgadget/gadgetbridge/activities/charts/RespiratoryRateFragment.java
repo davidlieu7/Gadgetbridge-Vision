@@ -16,6 +16,8 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 package nodomain.freeyourgadget.gadgetbridge.activities.charts;
 
+import androidx.annotation.Nullable;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -162,5 +164,12 @@ abstract class RespiratoryRateFragment<T extends ChartsData> extends AbstractCha
         }
     }
 
-
+    @Nullable
+    @Override
+    public ChartDataRange getAvailableDataRange(final GBDevice device, final DBHandler db) {
+        return ChartDataRange.union(
+                ChartDataRange.ofSamples(device.getDeviceCoordinator().getRespiratoryRateSampleProvider(device, db.getDaoSession())),
+                ChartDataRange.ofActivitySamples(device.getDeviceCoordinator().getSampleProvider(device, db.getDaoSession()))
+        );
+    }
 }

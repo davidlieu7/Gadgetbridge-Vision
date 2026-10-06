@@ -19,6 +19,7 @@ package nodomain.freeyourgadget.gadgetbridge.devices.huami.zeppos;
 import android.app.Activity;
 import android.content.Context;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
 
 import androidx.annotation.NonNull;
@@ -31,7 +32,6 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
-import java.util.EnumSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -52,7 +52,6 @@ import nodomain.freeyourgadget.gadgetbridge.capabilities.password.PasswordCapabi
 import nodomain.freeyourgadget.gadgetbridge.devices.DeviceCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.InstallHandler;
 import nodomain.freeyourgadget.gadgetbridge.devices.SampleProvider;
-import nodomain.freeyourgadget.gadgetbridge.devices.SleepAsAndroidFeature;
 import nodomain.freeyourgadget.gadgetbridge.devices.huami.HuamiConst;
 import nodomain.freeyourgadget.gadgetbridge.devices.huami.HuamiCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.huami.HuamiExtendedSampleProvider;
@@ -61,6 +60,7 @@ import nodomain.freeyourgadget.gadgetbridge.entities.DaoSession;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
 import nodomain.freeyourgadget.gadgetbridge.model.ActivitySummaryParser;
 import nodomain.freeyourgadget.gadgetbridge.model.ActivityTrackProvider;
+import nodomain.freeyourgadget.gadgetbridge.model.workouts.spec.WorkoutTemplateSpec;
 import nodomain.freeyourgadget.gadgetbridge.service.DeviceSupport;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.huami.HuamiLanguageType;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.huami.HuamiVibrationPatternNotificationType;
@@ -119,7 +119,7 @@ public abstract class ZeppOsCoordinator extends HuamiCoordinator {
 
     @NonNull
     @Override
-    public final Class<? extends DeviceSupport> getDeviceSupportClass(final GBDevice device) {
+    public final Class<? extends DeviceSupport> getDeviceSupportClass(@NonNull final GBDevice device) {
         // Prioritize user choice
         DeviceCoordinator.ConnectionType connType = GBApplication.getDevicePrefs(device).getForcedConnectionTypeFromPrefs();
         if (connType == DeviceCoordinator.ConnectionType.BOTH) {
@@ -233,11 +233,6 @@ public abstract class ZeppOsCoordinator extends HuamiCoordinator {
     @Override
     public boolean supportsMusicInfo(@NonNull GBDevice device) {
         return hasDisplay();
-    }
-
-    @Override
-    public boolean supportsSleepAsAndroid(@NonNull GBDevice device) {
-        return true;
     }
 
     @Override
@@ -368,7 +363,8 @@ public abstract class ZeppOsCoordinator extends HuamiCoordinator {
 
     @Override
     public boolean supportsAudioRecordings(@NonNull final GBDevice device) {
-        return supportsDisplayItem(device, "voice_memos") && supportsBleFileTransfer(device, "voicememo");
+        return supportsDisplayItem(device, "voice_memos") &&
+            (supportsBleFileTransfer(device, "voicememo") || supportsWifiFtp(device));
     }
 
     @Override
@@ -388,6 +384,15 @@ public abstract class ZeppOsCoordinator extends HuamiCoordinator {
         return new int[]{R.xml.devicesettings_zeppos_experimental};
     }
 
+    @Nullable
+    @Override
+    public WorkoutTemplateSpec getWorkoutTemplateSpec(@NonNull final GBDevice device) {
+        if (!supportsBleFileTransfer(device, "sport")) {
+            return null;
+        }
+        return ZeppOsWorkoutTemplateSpec.INSTANCE.build();
+    }
+
     /**
      * Returns a superset of all settings supported by Zepp OS Devices. Unsupported settings are removed
      * by {@link ZeppOsSettingsCustomizer}.
@@ -405,6 +410,9 @@ public abstract class ZeppOsCoordinator extends HuamiCoordinator {
         }
         if (supportsAudioRecordings(device)) {
             deviceSpecificSettings.addRootScreen(R.xml.devicesettings_audio_recordings);
+        }
+        if (supportsWifiFtp(device) && supportsDisplayItem(device, "music")) {
+            deviceSpecificSettings.addRootScreen(R.xml.devicesettings_musicmanagement);
         }
 
         //
@@ -471,6 +479,9 @@ public abstract class ZeppOsCoordinator extends HuamiCoordinator {
                 workout.add(R.xml.devicesettings_workout_keep_screen_on);
             }
             workout.add(R.xml.devicesettings_workout_detection);
+            if (supportsBleFileTransfer(device, "sport")) {
+                workout.add(R.xml.devicesettings_workout_templates);
+            }
         }
 
         //
@@ -491,6 +502,9 @@ public abstract class ZeppOsCoordinator extends HuamiCoordinator {
             notifications.add(R.xml.devicesettings_autoremove_notifications);
             if (getCannedRepliesSlotCount(device) > 0) {
                 notifications.add(R.xml.devicesettings_canned_reply_16);
+            }
+            if (supportsNavigation(device)) {
+                notifications.add(R.xml.devicesettings_navigation_notifications);
             }
             notifications.add(R.xml.devicesettings_transliteration);
         } else {
@@ -550,6 +564,7 @@ public abstract class ZeppOsCoordinator extends HuamiCoordinator {
         }
         if (supportsFtpServer(device)) {
             developer.add(R.xml.devicesettings_ftp_server);
+            developer.add(R.xml.devicesettings_ftp_file_browser);
         }
         developer.add(R.xml.devicesettings_keep_activity_data_on_device);
         developer.add(R.xml.devicesettings_huami2021_fetch_operation_time_unit);
@@ -662,6 +677,12 @@ public abstract class ZeppOsCoordinator extends HuamiCoordinator {
         return supportsWifiHotspot(device);
     }
 
+    public boolean supportsWifiFtp(final GBDevice device) {
+        return Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q &&
+            supportsWifiHotspot(device) &&
+            supportsFtpServer(device);
+    }
+
     public boolean hasGps(final GBDevice device) {
         return supportsConfig(device, ZeppOsConfigService.ConfigArg.AGPS_UPDATE_TIME);
     }
@@ -686,8 +707,14 @@ public abstract class ZeppOsCoordinator extends HuamiCoordinator {
         return supportsDisplayItem(device, "map");
     }
 
+    @Override
+    public boolean supportsNavigation(@NonNull final GBDevice device) {
+        return hasDisplay();
+    }
+
     public boolean supportsMusicUpload(final GBDevice device) {
-        return supportsDisplayItem(device, "music") && supportsBleFileTransfer(device, "music");
+        return supportsDisplayItem(device, "music") &&
+            (supportsBleFileTransfer(device, "music") || supportsWifiFtp(device));
     }
 
     private boolean supportsConfig(final GBDevice device, final ZeppOsConfigService.ConfigArg config) {

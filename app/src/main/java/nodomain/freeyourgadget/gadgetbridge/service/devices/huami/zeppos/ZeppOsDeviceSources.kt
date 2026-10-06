@@ -98,6 +98,7 @@ object ZeppOsDeviceSources {
         ZeppOsDeviceInfo(167, 257, 10944769),
         ZeppOsDeviceInfo(167, 259, 10944771),
         ZeppOsDeviceInfo(167, 4355, 10948867),
+        ZeppOsDeviceInfo(170, 259, 11141379), // Amazfit Balance 3
     )
 
     fun resolve(productId: Int, productVersion: Int): ZeppOsDeviceInfo? {

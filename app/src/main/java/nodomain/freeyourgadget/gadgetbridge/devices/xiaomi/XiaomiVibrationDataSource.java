@@ -33,6 +33,7 @@ import nodomain.freeyourgadget.gadgetbridge.devices.VibrationPatternData;
 import nodomain.freeyourgadget.gadgetbridge.devices.VibrationPatternDataSource;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
 import nodomain.freeyourgadget.gadgetbridge.proto.xiaomi.XiaomiProto;
+import nodomain.freeyourgadget.gadgetbridge.proto.xiaomi.XiaomiSystem;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.xiaomi.services.XiaomiVibrationManager;
 import nodomain.freeyourgadget.gadgetbridge.util.GB;
 
@@ -52,17 +53,17 @@ public class XiaomiVibrationDataSource implements VibrationPatternDataSource {
 
     @Override
     public VibrationPatternData loadData() {
-        final XiaomiProto.VibrationPatterns patterns = loadRaw();
+        final XiaomiSystem.VibrationPatterns patterns = loadRaw();
 
         final Map<Integer, String> customByName = new HashMap<>();
-        for (final XiaomiProto.CustomVibrationPattern p : patterns.getCustomVibrationPatternList()) {
+        for (final XiaomiSystem.CustomVibrationPattern p : patterns.getCustomVibrationPatternList()) {
             customByName.put(p.getId(), patternName(p.getId(), p.getName()));
         }
 
         final Set<Integer> usedIds = new HashSet<>();
 
         final List<VibrationPatternData.TypeEntry> types = new ArrayList<>();
-        for (final XiaomiProto.VibrationNotificationType t : patterns.getNotificationTypeList()) {
+        for (final XiaomiSystem.VibrationNotificationType t : patterns.getNotificationTypeList()) {
             usedIds.add(t.getPreset());
             types.add(new VibrationPatternData.TypeEntry(
                     t.getNotificationType(),
@@ -73,12 +74,12 @@ public class XiaomiVibrationDataSource implements VibrationPatternDataSource {
         }
 
         final List<VibrationPatternData.PatternEntry> patternsList = new ArrayList<>();
-        for (final XiaomiProto.CustomVibrationPattern p : patterns.getCustomVibrationPatternList()) {
+        for (final XiaomiSystem.CustomVibrationPattern p : patterns.getCustomVibrationPatternList()) {
             final boolean canDelete = !coordinator.isProtectedVibrationPatternId(p.getId())
                     && !usedIds.contains(p.getId());
 
             final List<VibrationPatternData.Segment> segs = new ArrayList<>();
-            for (final XiaomiProto.Vibration v : p.getVibrationList()) {
+            for (final XiaomiSystem.Vibration v : p.getVibrationList()) {
                 segs.add(new VibrationPatternData.Segment(
                         v.getVibrate() != 0, v.getMs(), v.getStrength()));
             }
@@ -100,7 +101,7 @@ public class XiaomiVibrationDataSource implements VibrationPatternDataSource {
     public List<Integer> getSelectableNotificationTypeIds() {
         if (selectableTypeIds == null) {
             selectableTypeIds = new ArrayList<>();
-            for (final XiaomiProto.VibrationType type : XiaomiProto.VibrationType.values()) {
+            for (final XiaomiSystem.VibrationType type : XiaomiSystem.VibrationType.values()) {
                 if (type.getNumber() > 0) {
                     selectableTypeIds.add(type.getNumber());
                 }
@@ -111,7 +112,7 @@ public class XiaomiVibrationDataSource implements VibrationPatternDataSource {
 
     @Override
     public String getNotificationTypeName(final int typeId) {
-        final XiaomiProto.VibrationType type = XiaomiProto.VibrationType.forNumber(typeId);
+        final XiaomiSystem.VibrationType type = XiaomiSystem.VibrationType.forNumber(typeId);
         if (type != null) {
             switch (type) {
                 case VIBRATION_TYPE_CALL:
@@ -145,11 +146,11 @@ public class XiaomiVibrationDataSource implements VibrationPatternDataSource {
     @Override
     public void addPattern(final String name, final int notificationTypeId,
                            final List<VibrationPatternData.Segment> segments) {
-        final XiaomiProto.CustomVibrationPattern.Builder pb = XiaomiProto.CustomVibrationPattern.newBuilder()
+        final XiaomiSystem.CustomVibrationPattern.Builder pb = XiaomiSystem.CustomVibrationPattern.newBuilder()
                 .setName(name != null ? name : "")
                 .setType(notificationTypeId);
         for (final VibrationPatternData.Segment seg : segments) {
-            final XiaomiProto.Vibration.Builder vb = XiaomiProto.Vibration.newBuilder()
+            final XiaomiSystem.Vibration.Builder vb = XiaomiSystem.Vibration.newBuilder()
                     .setVibrate(seg.on ? 1 : 0)
                     .setMs(seg.durationMs);
             if (seg.on && seg.strengthPercent > 0) {
@@ -175,7 +176,7 @@ public class XiaomiVibrationDataSource implements VibrationPatternDataSource {
         GBApplication.deviceService(device).onSendConfiguration(XiaomiVibrationManager.PREF_REFRESH);
     }
 
-    private XiaomiProto.VibrationPatterns loadRaw() {
+    private XiaomiSystem.VibrationPatterns loadRaw() {
         return XiaomiVibrationManager.parseVibrationPatterns(
                 devicePrefs.getString(XiaomiVibrationManager.PREF_PATTERNS, null));
     }

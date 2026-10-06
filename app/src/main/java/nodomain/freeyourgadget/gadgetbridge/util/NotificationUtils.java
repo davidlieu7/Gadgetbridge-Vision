@@ -29,6 +29,7 @@ import android.os.UserManager;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.core.content.res.ResourcesCompat;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -102,6 +103,11 @@ public class NotificationUtils {
 
     @Nullable
     public static Drawable getAppIcon(final Context context, final String packageName) {
+        final int navigationIcon = NavigationUtils.getIconResource(packageName);
+        if (navigationIcon != 0) {
+            return ResourcesCompat.getDrawable(context.getResources(), navigationIcon, context.getTheme());
+        }
+
         try {
             return context.getPackageManager().getApplicationIcon(packageName);
         } catch (final PackageManager.NameNotFoundException ignored) {

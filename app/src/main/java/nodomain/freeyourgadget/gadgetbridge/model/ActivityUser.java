@@ -47,6 +47,7 @@ public class ActivityUser {
     private int activityUserDistanceGoalMeters;
     private int activityUserActiveTimeGoalMinutes;
     private int activityUserStandingTimeGoalHours;
+    private int activityUserHydrationGoalMl;
     private int activityUserStepLengthCm;
 
     private static final String defaultUserName = "gadgetbridge-user";
@@ -64,6 +65,7 @@ public class ActivityUser {
     public static final int defaultUserGoalWeightKg = 70;
     public static final int defaultUserGoalStandingTimeHours = 12;
     public static final int defaultUserFatBurnTimeMinutes = 30;
+    public static final int defaultUserGoalHydrationMl = 2000;
 
     public static final String PREF_USER_NAME = "mi_user_alias";
     public static final String PREF_USER_DATE_OF_BIRTH = "activity_user_date_of_birth";
@@ -79,6 +81,7 @@ public class ActivityUser {
     public static final String PREF_USER_GOAL_WEIGHT_KG = "activity_user_goal_weight_kg";
     public static final String PREF_USER_GOAL_STANDING_TIME_HOURS = "activity_user_goal_standing_hours";
     public static final String PREF_USER_GOAL_FAT_BURN_TIME_MINUTES = "activity_user_goal_fat_burn_time_minutes";
+    public static final String PREF_USER_GOAL_HYDRATION_ML = "activity_user_goal_hydration_ml";
 
     public ActivityUser() {
         fetchPreferences();
@@ -167,6 +170,7 @@ public class ActivityUser {
         activityUserDistanceGoalMeters = prefs.getInt(PREF_USER_DISTANCE_METERS, defaultUserDistanceGoalMeters);
         activityUserActiveTimeGoalMinutes = prefs.getInt(PREF_USER_ACTIVETIME_MINUTES, defaultUserActiveTimeGoalMinutes);
         activityUserStandingTimeGoalHours = prefs.getInt(PREF_USER_GOAL_STANDING_TIME_HOURS, defaultUserGoalStandingTimeHours);
+        activityUserHydrationGoalMl = prefs.getInt(PREF_USER_GOAL_HYDRATION_ML, defaultUserGoalHydrationMl);
         activityUserStepLengthCm = prefs.getInt(PREF_USER_STEP_LENGTH_CM, defaultUserStepLengthCm);
     }
 
@@ -213,5 +217,13 @@ public class ActivityUser {
             activityUserStandingTimeGoalHours = defaultUserGoalStandingTimeHours;
         }
         return activityUserStandingTimeGoalHours;
+    }
+
+    public int getHydrationGoalMl()
+    {
+        if (activityUserHydrationGoalMl < 1) {
+            activityUserHydrationGoalMl = defaultUserGoalHydrationMl;
+        }
+        return activityUserHydrationGoalMl;
     }
 }

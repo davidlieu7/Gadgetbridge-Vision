@@ -175,9 +175,8 @@ class OnlineFitnessTrackersPreferencesActivity : AbstractSettingsActivityV2() {
 
             // Update Wanderer preferences
             summaryText = getString(R.string.endurain_not_logged_in_integration_disabled)
-            if (wandererAPITokenAvailable) {
-                summaryText =
-                    getString(R.string.wanderer_logged_in).format(wandererServer)
+            if (wandererAPITokenAvailable && wandererServer != null) {
+                summaryText = getString(R.string.wanderer_logged_in, wandererServer)
             }
             wandererStatusPref?.summary = summaryText
         }

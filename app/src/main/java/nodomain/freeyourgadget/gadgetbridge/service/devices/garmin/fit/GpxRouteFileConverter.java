@@ -1,3 +1,19 @@
+/*  Copyright (C) 2024-2026 Daniele Gobbetti, José Rebelo, Thomas Kuehne, Sam Jeffery
+
+    This file is part of Gadgetbridge.
+
+    Gadgetbridge is free software: you can redistribute it and/or modify
+    it under the terms of the GNU Affero General Public License as published
+    by the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    Gadgetbridge is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU Affero General Public License for more details.
+
+    You should have received a copy of the GNU Affero General Public License
+    along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 package nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit;
 
 import androidx.annotation.NonNull;
@@ -15,6 +31,8 @@ import nodomain.freeyourgadget.gadgetbridge.model.GPSCoordinate;
 import nodomain.freeyourgadget.gadgetbridge.model.NavigationInfoSpec;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.FileType;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.enums.CoursePoint;
+import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.enums.Event;
+import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.enums.EventType;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.enums.GarminSport;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.messages.FitCourse;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.messages.FitCoursePoint;
@@ -106,8 +124,8 @@ public class GpxRouteFileConverter {
 
             final FitRecord.Builder recordBuilder = new FitRecord.Builder();
             recordBuilder.setTimestamp(runningTs);
-            recordBuilder.setLatitude(point.getLatitude());
-            recordBuilder.setLongitude(point.getLongitude());
+            recordBuilder.setPositionLat(point.getLatitude());
+            recordBuilder.setPositionLong(point.getLongitude());
             recordBuilder.setDistance(totalDistance);
 
             if(point.hasAltitude()){
@@ -205,21 +223,21 @@ public class GpxRouteFileConverter {
         courseFileDataRecords.add(getCourseRecordData());
         courseFileDataRecords.add(lapRecordBuilder.build(0x03));
 
-        courseFileDataRecords.add(getEventRecordData(timestamp, 0));
+        courseFileDataRecords.add(getEventRecordData(timestamp, EventType.START));
 
         courseFileDataRecords.addAll(gpxPointDataRecords);
 
         // Stop must be at the end, or some watches will freeze
-        courseFileDataRecords.add(getEventRecordData(runningTs, 9));
+        courseFileDataRecords.add(getEventRecordData(runningTs, EventType.STOP_DISABLE_ALL));
         courseFileDataRecords.addAll(gpxCoursePointDataRecords);
 
         return new FitFile(courseFileDataRecords);
     }
 
-    private FitEvent getEventRecordData(long timestamp, int eventType) {
+    private FitEvent getEventRecordData(long timestamp, EventType eventType) {
         final FitEvent.Builder eventBuilder = new FitEvent.Builder();
         eventBuilder.setTimestamp(timestamp);
-        eventBuilder.setEvent(0);
+        eventBuilder.setEvent(Event.TIMER);
         eventBuilder.setEventGroup(0);
         eventBuilder.setEventType(eventType);
         return eventBuilder.build(0x04);
@@ -230,10 +248,10 @@ public class GpxRouteFileConverter {
         final GPSCoordinate last = gpxTrackPointList.get(gpxTrackPointList.size() - 1);
 
         final FitLap.Builder lapBuilder = new FitLap.Builder();
-        lapBuilder.setStartLat(first.getLatitude());
-        lapBuilder.setStartLong(first.getLongitude());
-        lapBuilder.setEndLat(last.getLatitude());
-        lapBuilder.setEndLong(last.getLongitude());
+        lapBuilder.setStartPositionLat(first.getLatitude());
+        lapBuilder.setStartPositionLong(first.getLongitude());
+        lapBuilder.setEndPositionLat(last.getLatitude());
+        lapBuilder.setEndPositionLong(last.getLongitude());
         lapBuilder.setTimestamp(timestamp);
         lapBuilder.setMessageIndex(0);
         lapBuilder.setStartTime(timestamp);

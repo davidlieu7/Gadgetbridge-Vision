@@ -16,6 +16,8 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 package nodomain.freeyourgadget.gadgetbridge.activities.charts;
 
+import androidx.annotation.Nullable;
+
 import android.graphics.Color;
 import android.os.Bundle;
 import android.view.LayoutInflater;
@@ -46,6 +48,8 @@ import java.util.Locale;
 
 import nodomain.freeyourgadget.gadgetbridge.GBApplication;
 import nodomain.freeyourgadget.gadgetbridge.R;
+import nodomain.freeyourgadget.gadgetbridge.activities.workouts.StatTileData;
+import nodomain.freeyourgadget.gadgetbridge.activities.workouts.StatTileGridUtilKt;
 import nodomain.freeyourgadget.gadgetbridge.database.DBHandler;
 import nodomain.freeyourgadget.gadgetbridge.databinding.FragmentSpo2Binding;
 import nodomain.freeyourgadget.gadgetbridge.devices.DeviceCoordinator;
@@ -133,9 +137,23 @@ public class Spo2ChartFragment extends AbstractChartFragment<Spo2ChartFragment.S
         binding.manualMeasurements.setVisibility(View.GONE);
         final String emptyValue = requireContext().getString(R.string.stats_empty_value);
         binding.dateView.setText(data.formattedDate);
-        binding.spo2Minimum.setText(data.minimum > 0 ? getString(R.string.battery_percentage_str, String.valueOf(data.minimum)) : emptyValue);
-        binding.spo2Maximum.setText(data.maximum > 0 ? getString(R.string.battery_percentage_str, String.valueOf(data.maximum)) : emptyValue);
-        binding.spo2Average.setText(data.average > 0 ? getString(R.string.battery_percentage_str, String.valueOf(data.average)) : emptyValue);
+
+        final List<StatTileData> stats = new ArrayList<>();
+        stats.add(new StatTileData(
+                data.minimum > 0 ? getString(R.string.battery_percentage_str, String.valueOf(data.minimum)) : emptyValue,
+                getString(R.string.hr_minimum)
+        ));
+        stats.add(new StatTileData(
+                data.maximum > 0 ? getString(R.string.battery_percentage_str, String.valueOf(data.maximum)) : emptyValue,
+                getString(R.string.hr_maximum)
+        ));
+        stats.add(new StatTileData(
+                data.average > 0 ? getString(R.string.battery_percentage_str, String.valueOf(data.average)) : emptyValue,
+                getString(R.string.hr_average)
+        ));
+        binding.spo2DailyStatsContainer.removeAllViews();
+        StatTileGridUtilKt.addStatTileGrid(binding.spo2DailyStatsContainer, requireContext(), stats, 0);
+
         binding.spo2LineChart.setData(null); // workaround for https://github.com/PhilJay/MPAndroidChart/issues/2317
         binding.spo2LineChart.getAxisLeft().removeAllLimitLines();
 
@@ -308,4 +326,9 @@ public class Spo2ChartFragment extends AbstractChartFragment<Spo2ChartFragment.S
         }
     }
 
+    @Nullable
+    @Override
+    public ChartDataRange getAvailableDataRange(final GBDevice device, final DBHandler db) {
+        return ChartDataRange.ofSamples(device.getDeviceCoordinator().getSpo2SampleProvider(device, db.getDaoSession()));
+    }
 }

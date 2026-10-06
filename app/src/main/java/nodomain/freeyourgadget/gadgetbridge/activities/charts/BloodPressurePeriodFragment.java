@@ -24,8 +24,10 @@ import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.LinearLayout;
 import android.widget.TextView;
 
+import androidx.annotation.Nullable;
 import androidx.appcompat.app.AlertDialog;
 import androidx.core.content.ContextCompat;
 
@@ -58,6 +60,8 @@ import java.util.Locale;
 import nodomain.freeyourgadget.gadgetbridge.GBApplication;
 import nodomain.freeyourgadget.gadgetbridge.R;
 import nodomain.freeyourgadget.gadgetbridge.activities.HeartRateUtils;
+import nodomain.freeyourgadget.gadgetbridge.activities.workouts.StatTileData;
+import nodomain.freeyourgadget.gadgetbridge.activities.workouts.StatTileGridUtilKt;
 import nodomain.freeyourgadget.gadgetbridge.database.DBHandler;
 import nodomain.freeyourgadget.gadgetbridge.devices.DeviceCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.TimeSampleProvider;
@@ -81,10 +85,7 @@ public class BloodPressurePeriodFragment extends AbstractChartFragment<BloodPres
     private int HEART_RATE_COLOR;
 
     private TextView mDateView;
-    private TextView mSystolicLast;
-    private TextView mDiastolicLast;
-    private TextView mAverage;
-    private TextView mMeasurementCount;
+    private LinearLayout mStatsContainer;
     private CombinedChart mChart;
     private int TOTAL_DAYS;
     private List<? extends BloodPressureSample> allSamples;
@@ -131,10 +132,7 @@ public class BloodPressurePeriodFragment extends AbstractChartFragment<BloodPres
         );
 
         mDateView = rootView.findViewById(R.id.date_view);
-        mSystolicLast = rootView.findViewById(R.id.bp_systolic_last);
-        mDiastolicLast = rootView.findViewById(R.id.bp_diastolic_last);
-        mAverage = rootView.findViewById(R.id.bp_average);
-        mMeasurementCount = rootView.findViewById(R.id.bp_measurement_count);
+        mStatsContainer = rootView.findViewById(R.id.bp_stats_container);
         mChart = rootView.findViewById(R.id.blood_pressure_chart);
 
         setupChart();
@@ -262,14 +260,17 @@ public class BloodPressurePeriodFragment extends AbstractChartFragment<BloodPres
             totalMeasurements += dayData.measurementCount;
         }
 
-        mSystolicLast.setText(systolicLast > 0 ? String.valueOf(systolicLast) : emptyValue);
-        mDiastolicLast.setText(diastolicLast > 0 ? String.valueOf(diastolicLast) : emptyValue);
-        if (systolicAvg > 0 && diastolicAvg > 0) {
-            mAverage.setText(getString(R.string.blood_pressure_avg_format, systolicAvg, diastolicAvg));
-        } else {
-            mAverage.setText(emptyValue);
-        }
-        mMeasurementCount.setText(String.valueOf(totalMeasurements));
+        final String average = (systolicAvg > 0 && diastolicAvg > 0)
+                ? getString(R.string.blood_pressure_avg_format, systolicAvg, diastolicAvg)
+                : emptyValue;
+
+        final List<StatTileData> stats = new ArrayList<>();
+        stats.add(new StatTileData(systolicLast > 0 ? String.valueOf(systolicLast) : emptyValue, getString(R.string.blood_pressure_systolic)));
+        stats.add(new StatTileData(diastolicLast > 0 ? String.valueOf(diastolicLast) : emptyValue, getString(R.string.blood_pressure_diastolic)));
+        stats.add(new StatTileData(average, getString(R.string.hr_average)));
+        stats.add(new StatTileData(String.valueOf(totalMeasurements), getString(R.string.blood_pressure_measurement_count)));
+        mStatsContainer.removeAllViews();
+        StatTileGridUtilKt.addStatTileGrid(mStatsContainer, requireContext(), stats, 0);
 
         mChart.getXAxis().setValueFormatter(createDayFormatter(startTs));
 
@@ -509,5 +510,11 @@ public class BloodPressurePeriodFragment extends AbstractChartFragment<BloodPres
             this.heartRateAvg = heartRateAvg;
             this.measurementCount = measurementCount;
         }
+    }
+
+    @Nullable
+    @Override
+    public ChartDataRange getAvailableDataRange(final GBDevice device, final DBHandler db) {
+        return ChartDataRange.ofSamples(device.getDeviceCoordinator().getBloodPressureSampleProvider(device, db.getDaoSession()));
     }
 }

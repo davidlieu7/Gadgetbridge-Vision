@@ -80,4 +80,9 @@ public class MiBand10Coordinator extends XiaomiCoordinator {
         return getVibrationPresetNameRes(id) != 0;
     }
 
+    @Override
+    public boolean supportsNavigation(@NonNull final GBDevice device) {
+        return true;
+    }
+
 }

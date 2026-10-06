@@ -37,8 +37,10 @@ import androidx.core.graphics.scale
 import androidx.exifinterface.media.ExifInterface
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import nodomain.freeyourgadget.gadgetbridge.R
+import nodomain.freeyourgadget.gadgetbridge.entities.BaseActivitySummary
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice
 import nodomain.freeyourgadget.gadgetbridge.model.workout.Workout
+import nodomain.freeyourgadget.gadgetbridge.model.ActivityKind
 import nodomain.freeyourgadget.gadgetbridge.util.FileUtils
 import nodomain.freeyourgadget.gadgetbridge.util.GB
 import org.slf4j.LoggerFactory
@@ -62,6 +64,28 @@ class WorkoutEditor(private val context: Context, resultCaller: ActivityResultCa
         ) { uri: Uri? -> onHeaderPhotoPicked(uri) }
     private var pendingHeaderPhotoWorkout: Workout? = null
     private var pendingHeaderPhotoCallback: Callback? = null
+
+
+    fun editWorkoutType(workout: Workout, callback: Callback) {
+        val builder = MaterialAlertDialogBuilder(context)
+        val kinds = ActivityKind.entries.filterNot { ActivityKind.isSleep(it) }.sortedBy { it.label }
+        val labels = kinds.map { it.getLabel(context) }
+
+        builder.setTitle(R.string.activity_summary_edit_type_title)
+        val kindListing = ArrayAdapter(context, android.R.layout.simple_list_item_1, labels)
+
+        builder.setSingleChoiceItems(kindListing, 0) { dialog: DialogInterface?, which: Int ->
+            val selectedKind = kinds[which]
+            workout.summary.setOverrideActivityKind(false)
+            workout.summary.setActivityKind(selectedKind.code)
+            workout.summary.setOverrideActivityKind(true)
+            save(workout)
+            callback.onWorkoutUpdated()
+            dialog!!.dismiss()
+        }
+        val dialog = builder.create()
+        dialog.show()
+    }
 
     fun editWorkoutName(workout: Workout, callback: Callback) {
         val input = EditText(context).apply {
@@ -87,7 +111,7 @@ class WorkoutEditor(private val context: Context, resultCaller: ActivityResultCa
             .setPositiveButton(R.string.ok) { _, _ ->
                 val newName = input.text.toString().takeIf { it.isNotEmpty() }
                 workout.summary.name = newName
-                workout.summary.update()
+                save(workout)
                 callback.onWorkoutUpdated()
             }
             .setNegativeButton(R.string.cancel, null)
@@ -176,7 +200,7 @@ class WorkoutEditor(private val context: Context, resultCaller: ActivityResultCa
                 .setMessage(message)
                 .setPositiveButton(R.string.ok) { dialog1, which1 ->
                     workout.summary.gpxTrack = selectedGpxFile
-                    workout.summary.update()
+                    save(workout)
                     callback.onWorkoutUpdated()
                 }
                 .setNegativeButton(R.string.cancel) { dialog2, which2 -> }
@@ -205,7 +229,7 @@ class WorkoutEditor(private val context: Context, resultCaller: ActivityResultCa
         if (photoFile.exists())
             photoFile.delete()
         workout.summary.headerPhoto = null
-        workout.summary.update()
+        save(workout)
         callback.onWorkoutUpdated()
     }
 
@@ -223,7 +247,7 @@ class WorkoutEditor(private val context: Context, resultCaller: ActivityResultCa
         val savedPath = copyHeaderPhotoToAppStorage(uri)
         if (savedPath != null) {
             workout.summary.headerPhoto = savedPath
-            workout.summary.update()
+            save(workout)
             callback.onWorkoutUpdated()
         } else {
             GB.toast(
@@ -386,6 +410,14 @@ class WorkoutEditor(private val context: Context, resultCaller: ActivityResultCa
         return sampleSize
     }
 
+    /**
+     * Writes the edit made to [workout]'s summary, leaving its `summaryData` as stored. Opening a
+     * workout re-parses its raw details into the entity in memory, which is not a change the user
+     * made: writing it back would rewrite the stored value, and with it the fingerprint that tells
+     * an upload service the workout changed (see [WorkoutUploadStore.storedSummaryData]).
+     */
+    private fun save(workout: Workout) = saveKeepingStoredSummaryData(workout.summary)
+
     interface Callback {
         fun onWorkoutUpdated()
     }
@@ -393,5 +425,20 @@ class WorkoutEditor(private val context: Context, resultCaller: ActivityResultCa
     companion object {
         private val LOG = LoggerFactory.getLogger(WorkoutEditor::class.java)
         private const val MAX_HEADER_PHOTO_WIDTH_PX = 1000
+
+        /** See [save]. */
+        @JvmStatic
+        internal fun saveKeepingStoredSummaryData(summary: BaseActivitySummary) {
+            val inMemory = summary.summaryData
+            val stored = summary.id?.let { WorkoutUploadStore.storedSummaryData(listOf(it))[it] }
+            if (stored != null) {
+                summary.summaryData = stored.takeIf { it.isNotEmpty() }
+            }
+            try {
+                summary.update()
+            } finally {
+                summary.summaryData = inMemory
+            }
+        }
     }
 }

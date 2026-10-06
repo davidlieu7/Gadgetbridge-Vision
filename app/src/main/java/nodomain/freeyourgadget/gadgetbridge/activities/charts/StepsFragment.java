@@ -1,5 +1,7 @@
 package nodomain.freeyourgadget.gadgetbridge.activities.charts;
 
+import androidx.annotation.Nullable;
+
 import android.app.Activity;
 
 import org.slf4j.Logger;
@@ -130,5 +132,9 @@ abstract class StepsFragment<T extends ChartsData> extends AbstractChartFragment
         }
     }
 
-
+    @Nullable
+    @Override
+    public ChartDataRange getAvailableDataRange(final GBDevice device, final DBHandler db) {
+        return ChartDataRange.ofActivitySamples(device.getDeviceCoordinator().getSampleProvider(device, db.getDaoSession()));
+    }
 }

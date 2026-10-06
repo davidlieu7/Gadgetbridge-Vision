@@ -16,8 +16,6 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 package nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit;
 
-import static nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.GarminTimeUtils.GARMIN_TIME_EPOCH;
-
 import androidx.annotation.NonNull;
 
 import org.slf4j.Logger;
@@ -28,7 +26,7 @@ import java.util.Objects;
 
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.GarminByteBufferReader;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.baseTypes.BaseType;
-import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.fieldDefinitions.FieldDefinitionTimestamp;
+import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.fieldDefinitions.FieldDefinitionDateTime;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.messages.MessageWriter;
 import nodomain.freeyourgadget.gadgetbridge.util.GBToStringBuilder;
 
@@ -36,13 +34,13 @@ public class FieldDefinition implements FieldInterface {
     protected static final Logger LOG = LoggerFactory.getLogger(FieldDefinition.class);
 
     protected final BaseType baseType;
-    protected final int scale;
+    protected final double scale;
     protected final int offset;
     private final int number;
     private final int size;
     private final String name;
 
-    public FieldDefinition(int number, int size, BaseType baseType, String name, int scale, int offset) {
+    public FieldDefinition(int number, int size, BaseType baseType, String name, double scale, int offset) {
         this.number = number;
         this.size = size;
         this.baseType = baseType;
@@ -52,10 +50,10 @@ public class FieldDefinition implements FieldInterface {
     }
 
     public FieldDefinition(int number, int size, BaseType baseType, String name) {
-        this(number, size, baseType, name, 1, 0);
+        this(number, size, baseType, name, 1.0, 0);
     }
 
-    private static FieldDefinitionTimestamp TIMESTAMP_253;
+    private static FieldDefinitionDateTime TIMESTAMP_253;
 
     public static FieldDefinition parseIncoming(GarminByteBufferReader garminByteBufferReader, NativeFITMessage nativeFITMessage) {
         int number = garminByteBufferReader.readByte();
@@ -69,7 +67,7 @@ public class FieldDefinition implements FieldInterface {
 
         if (number == 253 && size == 4 && baseType.equals(BaseType.UINT32)) {
             if (TIMESTAMP_253 == null) {
-                TIMESTAMP_253 = new FieldDefinitionTimestamp(number, size, baseType, "253_timestamp");
+                TIMESTAMP_253 = new FieldDefinitionDateTime(number, size, baseType, "253_timestamp");
             }
             return TIMESTAMP_253;
         }
@@ -147,7 +145,7 @@ public class FieldDefinition implements FieldInterface {
     @Override
     public int hashCode() {
         int result = Objects.hashCode(baseType);
-        result = 31 * result + scale;
+        result = 31 * result + Double.hashCode(scale);
         result = 31 * result + offset;
         result = 31 * result + number;
         result = 31 * result + size;

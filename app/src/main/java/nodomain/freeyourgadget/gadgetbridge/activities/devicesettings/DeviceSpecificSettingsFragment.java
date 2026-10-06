@@ -65,6 +65,8 @@ import androidx.preference.PreferenceCategory;
 import androidx.preference.PreferenceScreen;
 import androidx.preference.SwitchPreferenceCompat;
 
+import com.bytehamster.lib.preferencesearch.SearchConfiguration;
+
 import org.apache.commons.lang3.ArrayUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -84,11 +86,14 @@ import nodomain.freeyourgadget.gadgetbridge.activities.AbstractPreferenceFragmen
 import nodomain.freeyourgadget.gadgetbridge.activities.CalendarSelectionActivity;
 import nodomain.freeyourgadget.gadgetbridge.activities.ConfigureContacts;
 import nodomain.freeyourgadget.gadgetbridge.activities.ConfigureWorldClocks;
+import nodomain.freeyourgadget.gadgetbridge.activities.workouts.templates.WorkoutTemplateListActivity;
 import nodomain.freeyourgadget.gadgetbridge.activities.NotificationsAppIconUploadActivity;
 import nodomain.freeyourgadget.gadgetbridge.activities.app_specific_notifications.AppSpecificNotificationSettingsActivity;
 import nodomain.freeyourgadget.gadgetbridge.activities.audiorecordings.AudioRecordingsActivity;
+import nodomain.freeyourgadget.gadgetbridge.activities.files.FtpFileBrowserActivity;
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.DeviceSetting;
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.DeviceSettingRenderer;
+import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.DeviceSettingsIndexer;
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.DeviceSettingsRefreshHandle;
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.DeviceSettingsSpec;
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.ScreenSetting;
@@ -282,6 +287,9 @@ public class DeviceSpecificSettingsFragment extends AbstractPreferenceFragment i
             if (modelSpec != null) {
                 modelManagedKeys = modelSpec.collectAllKeys();
                 setPreferenceScreen(getPreferenceManager().createPreferenceScreen(requireContext()));
+                // Declares the (invisible) "searchPreference" preference that getSearchConfiguration()
+                // looks up, so that this device's settings can be searched - see indexModelSettings().
+                addPreferencesFromResource(R.xml.devicesettings_search);
                 final Prefs prefs = new Prefs(getPreferenceManager().getSharedPreferences());
                 modelVisibilityRefresh = DeviceSettingRenderer.INSTANCE.render(
                         modelSpec.getItems(),
@@ -310,6 +318,7 @@ public class DeviceSpecificSettingsFragment extends AbstractPreferenceFragment i
                     }
                     addPreferencesFromResource(screen);
                 }
+                indexModelSettings(modelSpec, prefs);
             } else {
                 boolean first = true;
                 for (int setting : deviceSpecificSettings.getRootScreens()) {
@@ -387,6 +396,32 @@ public class DeviceSpecificSettingsFragment extends AbstractPreferenceFragment i
         }
     }
 
+    /**
+     * Indexes this device's settings for search: the model spec's own nodes (via {@link DeviceSettingsIndexer},
+     * which honours {@code visibleWhen}), plus the generic and {@link XmlScreenSetting} XML screens registered
+     * for this device, with added breadcrumbs for the title of their owning root screen.
+     */
+    private void indexModelSettings(final DeviceSettingsSpec modelSpec, final Prefs prefs) {
+        final SearchConfiguration searchConfiguration = getSearchConfiguration();
+        if (searchConfiguration == null) {
+            return;
+        }
+
+        DeviceSettingsIndexer.INSTANCE.index(requireContext(), searchConfiguration, modelSpec.getItems(), prefs);
+
+        for (final int screen : deviceSpecificSettings.getAllScreens()) {
+            if (DeviceSpecificSettingsScreen.fromXml(screen) != null) {
+                // Title-only root placeholder, e.g. devicesettings_root_connection.xml - nothing
+                // to search for in it.
+                continue;
+            }
+            final String rootScreenKey = deviceSpecificSettings.getRootScreenForSubScreen(screen);
+            final DeviceSpecificSettingsScreen rootScreen = rootScreenKey != null
+                    ? DeviceSpecificSettingsScreen.fromKey(rootScreenKey) : null;
+            index(screen, rootScreen != null ? rootScreen.getTitle() : 0);
+        }
+    }
+
     private void addDynamicSettings(final String rootKey) {
         if (rootKey.equals(DeviceSpecificSettingsScreen.BATTERY.getKey())) {
             addBatterySettings();
@@ -417,7 +452,7 @@ public class DeviceSpecificSettingsFragment extends AbstractPreferenceFragment i
             showInNotification.setLayoutResource(R.layout.preference_checkbox);
             showInNotification.setKey(PREF_BATTERY_SHOW_IN_NOTIFICATION + batteryConfig.getBatteryIndex());
             showInNotification.setTitle(R.string.show_in_notification);
-            showInNotification.setIconSpaceReserved(false);
+            showInNotification.setIcon(R.drawable.ic_message_outline);
             showInNotification.setDefaultValue(true);
             batteryScreen.addPreference(showInNotification);
 
@@ -426,14 +461,14 @@ public class DeviceSpecificSettingsFragment extends AbstractPreferenceFragment i
             notifyLowEnabled.setKey(PREF_BATTERY_NOTIFY_LOW_ENABLED + batteryConfig.getBatteryIndex());
             notifyLowEnabled.setTitle(R.string.battery_low_notify_enabled);
             notifyLowEnabled.setDefaultValue(true);
-            notifyLowEnabled.setIconSpaceReserved(false);
+            notifyLowEnabled.setIcon(R.drawable.ic_battery_alert);
             batteryScreen.addPreference(notifyLowEnabled);
 
             final EditTextPreference notifyLowThreshold = new EditTextPreference(requireContext());
             notifyLowThreshold.setKey(PREF_BATTERY_NOTIFY_LOW_THRESHOLD + batteryConfig.getBatteryIndex());
             notifyLowThreshold.setTitle(R.string.battery_low_threshold);
             notifyLowThreshold.setDialogTitle(R.string.battery_low_threshold);
-            notifyLowThreshold.setIconSpaceReserved(false);
+            notifyLowThreshold.setIcon(R.drawable.ic_battery_empty);
             notifyLowThreshold.setOnBindEditTextListener(editText -> {
                 editText.setInputType(InputType.TYPE_CLASS_NUMBER);
                 editText.addTextChangedListener(new MinMaxTextWatcher(editText, 0, 100, true));
@@ -451,14 +486,14 @@ public class DeviceSpecificSettingsFragment extends AbstractPreferenceFragment i
             notifyFullEnabled.setKey(PREF_BATTERY_NOTIFY_FULL_ENABLED + batteryConfig.getBatteryIndex());
             notifyFullEnabled.setTitle(R.string.battery_full_notify_enabled);
             notifyFullEnabled.setDefaultValue(true);
-            notifyFullEnabled.setIconSpaceReserved(false);
+            notifyFullEnabled.setIcon(R.drawable.ic_battery_status_good);
             batteryScreen.addPreference(notifyFullEnabled);
 
             final EditTextPreference notifyFullThreshold = new EditTextPreference(requireContext());
             notifyFullThreshold.setKey(PREF_BATTERY_NOTIFY_FULL_THRESHOLD + batteryConfig.getBatteryIndex());
             notifyFullThreshold.setTitle(R.string.battery_full_threshold);
             notifyFullThreshold.setDialogTitle(R.string.battery_full_threshold);
-            notifyFullThreshold.setIconSpaceReserved(false);
+            notifyFullThreshold.setIcon(R.drawable.ic_battery_full);
             notifyFullThreshold.setOnBindEditTextListener(editText -> {
                 editText.setInputType(InputType.TYPE_CLASS_NUMBER);
                 editText.addTextChangedListener(new MinMaxTextWatcher(editText, 0, 100, true));
@@ -484,14 +519,14 @@ public class DeviceSpecificSettingsFragment extends AbstractPreferenceFragment i
             pollingToggle.setKey(PREF_BATTERY_POLLING_ENABLE);
             pollingToggle.setTitle(R.string.pref_battery_polling_enable);
             pollingToggle.setDefaultValue(true);
-            pollingToggle.setIconSpaceReserved(false);
+            pollingToggle.setIcon(R.drawable.ic_question_exchange);
             batteryScreen.addPreference(pollingToggle);
 
             final EditTextPreference pollingInterval = new EditTextPreference(requireContext());
             pollingInterval.setKey(PREF_BATTERY_POLLING_INTERVAL);
             pollingInterval.setTitle(R.string.pref_battery_polling_interval);
             pollingInterval.setDialogTitle(R.string.pref_battery_polling_interval);
-            pollingInterval.setIconSpaceReserved(false);
+            pollingInterval.setIcon(R.drawable.ic_timer);
             pollingInterval.setOnBindEditTextListener(editText -> {
                 editText.setInputType(InputType.TYPE_CLASS_NUMBER);
                 // Max is set to 8 days, which should be more than enough
@@ -914,7 +949,6 @@ public class DeviceSpecificSettingsFragment extends AbstractPreferenceFragment i
         addPreferenceHandlerFor(PREF_HUAWEI_FREEBUDS_BETTER_AUDIO_QUALITY);
         addPreferenceHandlerFor(PREF_HUAWEI_FREEBUDS_ADAPTIVE_VOLUME);
         addPreferenceHandlerFor(PREF_HUAWEI_FREEBUDS_EXTRA_MEDIA_VOLUME);
-        addPreferenceHandlerFor(PREF_HUAWEI_FREEBUDS_FIND_HEADPHONES);
 
 
         addPreferenceHandlerFor(PREF_GALAXY_BUDS_AMBIENT_VOICE_FOCUS);
@@ -952,59 +986,6 @@ public class DeviceSpecificSettingsFragment extends AbstractPreferenceFragment i
         addPreferenceHandlerFor(SHORTCUT_CARDS_SORTABLE);
 
         addPreferenceHandlerFor(PREF_WATCHFACE);
-
-        addPreferenceHandlerFor(PREF_REDMI_BUDS_5_PRO_AMBIENT_SOUND_CONTROL);
-        addPreferenceHandlerFor(PREF_REDMI_BUDS_5_PRO_NOISE_CANCELLING_STRENGTH);
-        addPreferenceHandlerFor(PREF_REDMI_BUDS_5_PRO_TRANSPARENCY_STRENGTH);
-        addPreferenceHandlerFor(PREF_REDMI_BUDS_5_PRO_ADAPTIVE_NOISE_CANCELLING);
-//        addPreferenceHandlerFor(PREF_REDMI_BUDS_5_PRO_PERSONALIZED_NOISE_CANCELLING);
-        addPreferenceHandlerFor(PREF_REDMI_BUDS_5_PRO_CONTROL_SINGLE_TAP_LEFT);
-        addPreferenceHandlerFor(PREF_REDMI_BUDS_5_PRO_CONTROL_SINGLE_TAP_RIGHT);
-        addPreferenceHandlerFor(PREF_REDMI_BUDS_5_PRO_CONTROL_DOUBLE_TAP_LEFT);
-        addPreferenceHandlerFor(PREF_REDMI_BUDS_5_PRO_CONTROL_DOUBLE_TAP_RIGHT);
-        addPreferenceHandlerFor(PREF_REDMI_BUDS_5_PRO_CONTROL_TRIPLE_TAP_LEFT);
-        addPreferenceHandlerFor(PREF_REDMI_BUDS_5_PRO_CONTROL_TRIPLE_TAP_RIGHT);
-        addPreferenceHandlerFor(PREF_REDMI_BUDS_5_PRO_CONTROL_LONG_TAP_MODE_LEFT);
-        addPreferenceHandlerFor(PREF_REDMI_BUDS_5_PRO_CONTROL_LONG_TAP_MODE_RIGHT);
-        addPreferenceHandlerFor(PREF_REDMI_BUDS_5_PRO_CONTROL_LONG_TAP_SETTINGS_LEFT);
-        addPreferenceHandlerFor(PREF_REDMI_BUDS_5_PRO_CONTROL_LONG_TAP_SETTINGS_RIGHT);
-        addPreferenceHandlerFor(PREF_REDMI_BUDS_5_PRO_WEARING_DETECTION);
-        addPreferenceHandlerFor(PREF_REDMI_BUDS_5_PRO_AUTO_REPLY_PHONECALL);
-        addPreferenceHandlerFor(PREF_REDMI_BUDS_5_PRO_DOUBLE_CONNECTION);
-//        addPreferenceHandlerFor(PREF_REDMI_BUDS_5_PRO_SURROUND_SOUND);
-        addPreferenceHandlerFor(PREF_REDMI_BUDS_5_PRO_ADAPTIVE_SOUND);
-//        addPreferenceHandlerFor(PREF_REDMI_BUDS_5_PRO_SURROUND_SOUND_MODE);
-        addPreferenceHandlerFor(PREF_REDMI_BUDS_5_PRO_EQUALIZER_PRESET);
-        addPreferenceHandlerFor(PREF_REDMI_BUDS_5_PRO_EQUALIZER_BAND_62);
-        addPreferenceHandlerFor(PREF_REDMI_BUDS_5_PRO_EQUALIZER_BAND_125);
-        addPreferenceHandlerFor(PREF_REDMI_BUDS_5_PRO_EQUALIZER_BAND_250);
-        addPreferenceHandlerFor(PREF_REDMI_BUDS_5_PRO_EQUALIZER_BAND_500);
-        addPreferenceHandlerFor(PREF_REDMI_BUDS_5_PRO_EQUALIZER_BAND_1k);
-        addPreferenceHandlerFor(PREF_REDMI_BUDS_5_PRO_EQUALIZER_BAND_2k);
-        addPreferenceHandlerFor(PREF_REDMI_BUDS_5_PRO_EQUALIZER_BAND_4k);
-        addPreferenceHandlerFor(PREF_REDMI_BUDS_5_PRO_EQUALIZER_BAND_8k);
-        addPreferenceHandlerFor(PREF_REDMI_BUDS_5_PRO_EQUALIZER_BAND_12k);
-        addPreferenceHandlerFor(PREF_REDMI_BUDS_5_PRO_EQUALIZER_BAND_16k);
-
-        addPreferenceHandlerFor(PREF_REDMI_BUDS_6_ACTIVE_CONTROL_SINGLE_TAP_LEFT);
-        addPreferenceHandlerFor(PREF_REDMI_BUDS_6_ACTIVE_CONTROL_SINGLE_TAP_RIGHT);
-        addPreferenceHandlerFor(PREF_REDMI_BUDS_6_ACTIVE_CONTROL_DOUBLE_TAP_LEFT);
-        addPreferenceHandlerFor(PREF_REDMI_BUDS_6_ACTIVE_CONTROL_DOUBLE_TAP_RIGHT);
-        addPreferenceHandlerFor(PREF_REDMI_BUDS_6_ACTIVE_CONTROL_TRIPLE_TAP_LEFT);
-        addPreferenceHandlerFor(PREF_REDMI_BUDS_6_ACTIVE_CONTROL_TRIPLE_TAP_RIGHT);
-        addPreferenceHandlerFor(PREF_REDMI_BUDS_6_ACTIVE_CONTROL_LONG_TAP_MODE_LEFT);
-        addPreferenceHandlerFor(PREF_REDMI_BUDS_6_ACTIVE_CONTROL_LONG_TAP_MODE_RIGHT);
-        addPreferenceHandlerFor(PREF_REDMI_BUDS_6_ACTIVE_EQUALIZER_PRESET);
-
-        addPreferenceHandlerFor(PREF_REDMI_BUDS_8_ACTIVE_CONTROL_SINGLE_TAP_LEFT);
-        addPreferenceHandlerFor(PREF_REDMI_BUDS_8_ACTIVE_CONTROL_SINGLE_TAP_RIGHT);
-        addPreferenceHandlerFor(PREF_REDMI_BUDS_8_ACTIVE_CONTROL_DOUBLE_TAP_LEFT);
-        addPreferenceHandlerFor(PREF_REDMI_BUDS_8_ACTIVE_CONTROL_DOUBLE_TAP_RIGHT);
-        addPreferenceHandlerFor(PREF_REDMI_BUDS_8_ACTIVE_CONTROL_TRIPLE_TAP_LEFT);
-        addPreferenceHandlerFor(PREF_REDMI_BUDS_8_ACTIVE_CONTROL_TRIPLE_TAP_RIGHT);
-        addPreferenceHandlerFor(PREF_REDMI_BUDS_8_ACTIVE_CONTROL_LONG_TAP_MODE_LEFT);
-        addPreferenceHandlerFor(PREF_REDMI_BUDS_8_ACTIVE_CONTROL_LONG_TAP_MODE_RIGHT);
-        addPreferenceHandlerFor(PREF_REDMI_BUDS_8_ACTIVE_EQUALIZER_PRESET);
 
         addPreferenceHandlerFor(PREF_SONY_AMBIENT_SOUND_CONTROL_BUTTON_MODE);
         addPreferenceHandlerFor(PREF_SONY_AMBIENT_SOUND_LEVEL);
@@ -1070,6 +1051,11 @@ public class DeviceSpecificSettingsFragment extends AbstractPreferenceFragment i
         addPreferenceHandlerFor(PREF_SOUNDCORE_EQUALIZER_BAND8_VALUE);
         addPreferenceHandlerFor(PREF_SOUNDCORE_EQUALIZER_BAND9_FREQ);
         addPreferenceHandlerFor(PREF_SOUNDCORE_EQUALIZER_BAND9_VALUE);
+        addPreferenceHandlerFor(PREF_SOUNDCORE_FIND_LEFT_EARBUD);
+        addPreferenceHandlerFor(PREF_SOUNDCORE_FIND_RIGHT_EARBUD);
+        addPreferenceHandlerFor(PREF_SOUNDCORE_A30I_DISABLE_OPTION_AMBIENT_MODE);
+        addPreferenceHandlerFor(PREF_SOUNDCORE_A30I_DISABLE_OPTION_AMBIENT_SOUND_LEVEL);
+        addPreferenceHandlerFor(PREF_SOUNDCORE_A30I_DISABLE_OPTION_WIND_NOISE_REDUCTION);
 
         addPreferenceHandlerFor(PREF_MOONDROP_EQUALIZER_PRESET);
         addPreferenceHandlerFor(PREF_MOONDROP_ANC_MODE);
@@ -1418,6 +1404,19 @@ public class DeviceSpecificSettingsFragment extends AbstractPreferenceFragment i
             });
         }
 
+        final Preference workoutTemplates = findPreference(PREF_WORKOUT_TEMPLATES);
+        if (workoutTemplates != null) {
+            workoutTemplates.setOnPreferenceClickListener(new Preference.OnPreferenceClickListener() {
+                @Override
+                public boolean onPreferenceClick(Preference preference) {
+                    final Intent intent = new Intent(getContext(), WorkoutTemplateListActivity.class);
+                    intent.putExtra(GBDevice.EXTRA_DEVICE, device);
+                    startActivity(intent);
+                    return true;
+                }
+            });
+        }
+
         final Preference contacts = findPreference(PREF_CONTACTS);
         if (contacts != null) {
             contacts.setOnPreferenceClickListener(new Preference.OnPreferenceClickListener() {
@@ -1558,6 +1557,7 @@ public class DeviceSpecificSettingsFragment extends AbstractPreferenceFragment i
         setInputTypeFor(DeviceSettingsPreferenceConst.PREF_DEVICE_GPS_UPDATE_INTERVAL, InputType.TYPE_CLASS_NUMBER);
         setInputTypeFor(DeviceSettingsPreferenceConst.PREF_BANGLEJS_TEXT_BITMAP_SIZE, InputType.TYPE_CLASS_NUMBER);
         setInputTypeFor(DeviceSettingsPreferenceConst.PREF_AUTO_REPLY_INCOMING_CALL_DELAY, InputType.TYPE_CLASS_NUMBER);
+        setInputTypeFor(DeviceSettingsPreferenceConst.PREF_NAVIGATION_UPDATE_RATE, InputType.TYPE_CLASS_NUMBER);
         setInputTypeFor("hplus_screentime", InputType.TYPE_CLASS_NUMBER);
         setInputTypeFor(PREF_CALENDAR_SYNC_EVENTS_AMOUNT, InputType.TYPE_CLASS_NUMBER);
         setInputTypeFor(PREF_CALENDAR_MAX_TITLE_LENGTH, InputType.TYPE_CLASS_NUMBER);
@@ -1726,6 +1726,16 @@ public class DeviceSpecificSettingsFragment extends AbstractPreferenceFragment i
             });
         }
 
+        final Preference ftpBrowse = findPreference(FTP_SERVER_BROWSE);
+        if (ftpBrowse != null) {
+            ftpBrowse.setOnPreferenceClickListener(preference -> {
+                final Intent intent = new Intent(getContext(), FtpFileBrowserActivity.class);
+                intent.putExtra(GBDevice.EXTRA_DEVICE, getDevice());
+                startActivity(intent);
+                return true;
+            });
+        }
+
         final Preference notificationSettings = findPreference(PREFS_PER_APP_NOTIFICATION_SETTINGS);
         if (notificationSettings != null) {
             notificationSettings.setOnPreferenceClickListener(preference -> {
@@ -1741,7 +1751,14 @@ public class DeviceSpecificSettingsFragment extends AbstractPreferenceFragment i
         }
     }
 
-    static DeviceSpecificSettingsFragment newInstance(GBDevice device, DeviceSettingsActivity.MENU_ENTRY_POINTS applicationSpecificSettings) {
+    /**
+     * Builds the set of root/sub XML preference screens for a device: the generic screens
+     * (authentication, connection, battery, activity info, developer, experimental) that are
+     * unconditionally added alongside the coordinator's own settings, plus - for coordinators
+     * not yet migrated to {@link DeviceCoordinator#getDeviceSettings} - the legacy
+     * {@link DeviceCoordinator#getDeviceSpecificSettings} screens.
+     */
+    static DeviceSpecificSettings buildDeviceSpecificSettings(GBDevice device, DeviceSettingsActivity.MENU_ENTRY_POINTS applicationSpecificSettings) {
         final DeviceCoordinator coordinator = device.getDeviceCoordinator();
 
         final DeviceSpecificSettings deviceSpecificSettings = new DeviceSpecificSettings();
@@ -1759,6 +1776,16 @@ public class DeviceSpecificSettingsFragment extends AbstractPreferenceFragment i
                                 xmlScreen.getScreen(),
                                 xmlScreen.getSubScreens().stream().mapToInt(Integer::intValue).toArray()
                         );
+                    } else if (item instanceof ScreenSetting screenSetting && !screenSetting.getXmlSubScreens().isEmpty()) {
+                        final DeviceSpecificSettingsScreen enumScreen = DeviceSpecificSettingsScreen.fromKey(screenSetting.getKey());
+                        if (enumScreen != null) {
+                            deviceSpecificSettings.addRootScreen(
+                                    enumScreen,
+                                    screenSetting.getXmlSubScreens().stream().mapToInt(Integer::intValue).toArray()
+                            );
+                        } else {
+                            LOG.warn("Screen {} declares xml sub-screens but is not a known screen", screenSetting.getKey());
+                        }
                     }
                 }
                 deviceSpecificSettings.addConnectedPreferences(modelSpec.collectConnectedKeys());
@@ -1871,6 +1898,13 @@ public class DeviceSpecificSettingsFragment extends AbstractPreferenceFragment i
                 }
             }
         }
+
+        return deviceSpecificSettings;
+    }
+
+    static DeviceSpecificSettingsFragment newInstance(GBDevice device, DeviceSettingsActivity.MENU_ENTRY_POINTS applicationSpecificSettings) {
+        final DeviceCoordinator coordinator = device.getDeviceCoordinator();
+        final DeviceSpecificSettings deviceSpecificSettings = buildDeviceSpecificSettings(device, applicationSpecificSettings);
 
         final DeviceSpecificSettingsCustomizer deviceSpecificSettingsCustomizer = coordinator.getDeviceSpecificSettingsCustomizer(device);
         final String settingsFileSuffix = device.getAddress();
