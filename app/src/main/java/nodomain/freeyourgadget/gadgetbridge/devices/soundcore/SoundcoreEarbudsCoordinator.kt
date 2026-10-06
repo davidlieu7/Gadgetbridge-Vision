@@ -56,7 +56,6 @@ abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator(
         BatteryLowTone,
         TouchTone,
         AudioEqualizer,
-        AdjustableEqualizerFrequencies,
         GamingMode,
         VoicePrompts,
         ButtonBrightness,
@@ -204,6 +203,46 @@ abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator(
 
     open fun getSupportedEqualizerBands(): IntArray = intArrayOf()
 
+    /**
+     * Returns preset label resources whose values map to zero-based preset indices.
+     * The Custom option (value 254) is appended automatically and must not be included here.
+     */
+    open fun getCustomEqualizerPresetNames(): Array<Int> = emptyArray()
+
+    open fun getCustomEqualizerPresetArray(): Int? = null
+
+    open fun getDefaultEqualizerPresetNames(): Array<Int> = arrayOf(
+        R.string.soundcore_equalizer_preset_signature,
+        R.string.soundcore_equalizer_preset_xtra_bass,
+        R.string.soundcore_equalizer_preset_voice,
+        R.string.soundcore_equalizer_preset_balanced,
+    )
+
+    private fun getEqualizerPresetEntries(): List<ListEntry> {
+        val customPresetNames = getCustomEqualizerPresetNames()
+        if (customPresetNames.isNotEmpty()) {
+            return customPresetNames.mapIndexed { index, name -> ListEntry.Res(index.toString(), name) } +
+                ListEntry.Res("254", R.string.custom)
+        }
+
+        val presetNamesArray = getCustomEqualizerPresetArray()
+        val presetNames = if (presetNamesArray == null) {
+            getDefaultEqualizerPresetNames().toList()
+        } else {
+            val typedArray = GBApplication.getContext().resources.obtainTypedArray(presetNamesArray)
+            try {
+                (0 until typedArray.length()).mapNotNull { index ->
+                    typedArray.getResourceId(index, 0).takeIf { it != 0 && it != R.string.custom }
+                }
+            } finally {
+                typedArray.recycle()
+            }
+        }
+        require(presetNames.isNotEmpty()) { "Equalizer preset names must not be empty" }
+        return presetNames.mapIndexed { index, name -> ListEntry.Res(index.toString(), name) } +
+            ListEntry.Res("254", R.string.custom)
+    }
+
     private fun equalizerBandTitleResource(frequency: Int): Int = when (frequency) {
         100 -> R.string.soundcore_equalizer_band1_freq
         200 -> R.string.soundcore_equalizer_band2_freq
@@ -316,6 +355,8 @@ abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator(
                         )
                     }
                     if (has(Capability.AudioEqualizer)) {
+                        val equalizerPresetEntries = getEqualizerPresetEntries()
+                        val hasCustomEqualizerPresets = getCustomEqualizerPresetNames().isNotEmpty()
                         category(key = "pref_header_soundcore_equalizer", title = R.string.pref_header_equalizer) {
                             if (has(Capability.AdaptiveDirection)) {
                                 switchSetting(
@@ -330,8 +371,7 @@ abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator(
                                 key = DeviceSettingsPreferenceConst.PREF_SOUNDCORE_EQUALIZER_PRESET,
                                 title = R.string.soundcore_equalizer_preset,
                                 icon = R.drawable.ic_equalizer,
-                                entriesRes = if (has(Capability.AdjustableEqualizerFrequencies)) R.array.soundcore_equalizer_preset_names else R.array.soundcore_sport_x20_equalizer_preset_names,
-                                entryValuesRes = if (has(Capability.AdjustableEqualizerFrequencies)) R.array.soundcore_equalizer_preset_values else R.array.soundcore_sport_x20_equalizer_preset_values,
+                                entries = equalizerPresetEntries,
                                 defaultValue = "0",
                             )
                             screen(
@@ -383,7 +423,7 @@ abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator(
                                     icon = R.drawable.ic_history,
                                     onClick = { _, selectedDevice ->
                                         selectedDevice?.let {
-                                            val adjustableFrequencies = has(Capability.AdjustableEqualizerFrequencies)
+                                            val adjustableFrequencies = hasCustomEqualizerPresets
                                             val bandKeys = if (adjustableFrequencies) equalizerBandKeys else equalizerBandKeys.take(getSupportedEqualizerBands().size)
                                             val prefs = GBApplication.getDevicePrefs(it).preferences
                                             prefs.edit().apply {
@@ -401,7 +441,7 @@ abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator(
                                         true
                                     },
                                 )
-                                if (has(Capability.AdjustableEqualizerFrequencies)) {
+                                if (hasCustomEqualizerPresets) {
                                     val bandTitles = listOf(
                                         R.string.soundcore_equalizer_band1,
                                         R.string.soundcore_equalizer_band2,

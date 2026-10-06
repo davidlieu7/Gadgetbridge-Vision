@@ -36,7 +36,13 @@ class SoundcoreMotion300Coordinator : SoundcoreEarbudsCoordinator() {
         Capability.LDAC,
         Capability.AudioEqualizer,
         Capability.AdaptiveDirection,
-        Capability.AdjustableEqualizerFrequencies,
+    )
+
+    override fun getCustomEqualizerPresetNames(): Array<Int> = arrayOf(
+        R.string.soundcore_equalizer_preset_signature,
+        R.string.soundcore_equalizer_preset_xtra_bass,
+        R.string.soundcore_equalizer_preset_voice,
+        R.string.soundcore_equalizer_preset_balanced,
     )
 
     override fun getModelName(): String = "A3135"
