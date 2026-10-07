@@ -27,9 +27,7 @@
         <item>@string/pref_theme_value_dynamic</item>
     </string-array>
 
-    <!--
-    These must match nodomain.freeyourgadget.gadgetbridge.util.maps.MapTheme
-    -->
+    <!-- these must match MapTheme, plus the custom value -->
     <string-array name="maps_themes_names">
         <item>@string/pref_default</item>
         <item>@string/map_theme_biker</item>
@@ -37,6 +35,7 @@
         <item>@string/map_theme_indigo</item>
         <item>@string/map_theme_motorider</item>
         <item>@string/map_theme_osmarender</item>
+        <item>@string/map_theme_custom</item>
     </string-array>
     <string-array name="maps_themes_values">
         <item>default</item>
@@ -45,6 +44,7 @@
         <item>indigo</item>
         <item>motorider</item>
         <item>osmarender</item>
+        <item>custom</item>
     </string-array>
 
     <!-- https://meta.wikimedia.org/wiki/Template:List_of_language_names_ordered_by_code -->
