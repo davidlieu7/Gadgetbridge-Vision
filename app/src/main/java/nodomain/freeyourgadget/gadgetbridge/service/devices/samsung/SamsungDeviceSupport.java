@@ -43,9 +43,11 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import nodomain.freeyourgadget.gadgetbridge.GBApplication;
 import nodomain.freeyourgadget.gadgetbridge.R;
@@ -58,6 +60,7 @@ import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEventAppInfo;
 import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEventBatteryInfo;
 import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEventCallControl;
 import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEventMusicControl;
+import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEventNotificationControl;
 import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEventUpdatePreferences;
 import nodomain.freeyourgadget.gadgetbridge.devices.samsung.SamsungSampleProvider;
 import nodomain.freeyourgadget.gadgetbridge.entities.BaseActivitySummary;
@@ -109,6 +112,7 @@ import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3NotificationIcon;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3Settings;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3MenuOrder;
+import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3NotificationAction;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3WeatherInfo;
 import nodomain.freeyourgadget.gadgetbridge.util.FileUtils;
 import nodomain.freeyourgadget.gadgetbridge.util.GB;
@@ -209,6 +213,16 @@ public class SamsungDeviceSupport extends AbstractBTLESingleDeviceSupport {
     // the exact IMAGE_URL string (see Fit3NotificationIcon); populated as
     // notifications are pushed, since the fetch request only carries the id.
     private final Map<String, String> notificationPackagesByIconUrl = new HashMap<>();
+    // Latest notification id per stand-in APP_ID, so the band's "launch app"
+    // (which only names the app) can open that app's newest notification.
+    private final Map<String, Integer> latestNotificationByAppId = new HashMap<>();
+    // Notifications the band itself dismissed: when the phone then removes
+    // them, there's no need to tell the band again.
+    private final Set<Integer> dismissedOnBand = new HashSet<>();
+    // How to deliver a reply from the band, per notification id: the reply
+    // action's handle, or for an SMS the sender's number.
+    private final Map<Integer, Long> replyHandles = new HashMap<>();
+    private final Map<Integer, String> replyNumbers = new HashMap<>();
 
     /** Pushes the icons of the user-picked apps ahead of time; see {@link Fit3AppIconUploader}. */
     private final Fit3AppIconUploader iconUploader = new Fit3AppIconUploader(new Fit3AppIconUploader.Listener() {
@@ -1061,9 +1075,82 @@ public class SamsungDeviceSupport extends AbstractBTLESingleDeviceSupport {
             if (ack != null) {
                 iconUploader.onTransferAck(ack);
             }
+        } else if (msgId == Fit3NotificationAction.MSG_ID_DISMISSED_ON_BAND
+                || msgId == Fit3NotificationAction.MSG_ID_CLEARED_ALL
+                || msgId == Fit3NotificationAction.MSG_ID_ACTION
+                || msgId == Fit3NotificationAction.MSG_ID_OPEN_ON_PHONE
+                || msgId == Fit3NotificationAction.MSG_ID_LAUNCH_APP) {
+            handleNotificationAction(body);
         } else {
             LOG.debug("TODO handle notification request MSG_ID={}", msgId);
         }
+    }
+
+    /** Carry out what the user did with a notification on the band, and answer it. */
+    private void handleNotificationAction(byte[] body) {
+        Fit3NotificationAction.Action action = Fit3NotificationAction.parse(body);
+        if (action == null) {
+            LOG.warn("Samsung Fit 3: malformed notification action");
+            return;
+        }
+        LOG.info("Samsung Fit 3: notification {}", action);
+        GBDeviceEventNotificationControl control = new GBDeviceEventNotificationControl();
+        switch (action.kind) {
+            case DISMISS:
+                dismissedOnBand.add(action.sequenceId);
+                control.handle = action.sequenceId;
+                control.event = GBDeviceEventNotificationControl.Event.DISMISS;
+                break;
+            case CLEAR_ALL:
+                control.event = GBDeviceEventNotificationControl.Event.DISMISS_ALL;
+                break;
+            case REPLY: {
+                // The reply goes to the notification's reply action, found by
+                // that action's handle - or straight to the sender, for an SMS.
+                Long handle = replyHandles.get(action.sequenceId);
+                control.phoneNumber = replyNumbers.get(action.sequenceId);
+                if (handle == null && control.phoneNumber == null) {
+                    LOG.warn("Samsung Fit 3: no way to deliver a reply to notification {}", action.sequenceId);
+                }
+                control.handle = handle != null ? handle : ((long) action.sequenceId << 4);
+                control.reply = action.reply;
+                control.event = GBDeviceEventNotificationControl.Event.REPLY;
+                break;
+            }
+            case OPEN:
+                control.handle = action.sequenceId;
+                control.event = GBDeviceEventNotificationControl.Event.OPEN;
+                break;
+            case LAUNCH_APP: {
+                Integer latest = latestNotificationByAppId.get(action.appId);
+                if (latest == null) {
+                    LOG.warn("Samsung Fit 3: no notification known for app id {}", action.appId);
+                    return;
+                }
+                control.handle = latest;
+                control.event = GBDeviceEventNotificationControl.Event.OPEN;
+                break;
+            }
+            default:
+                return;
+        }
+        evaluateGBDeviceEvent(control);
+        byte[] response = Fit3NotificationAction.buildResponse(action, true);
+        if (response != null) {
+            sendMessage(Fit3NotificationAction.CHANNEL, response, "notification-action-ack");
+        }
+    }
+
+    /** A notification went away on the phone: take it off the band too. */
+    @Override
+    public void onDeleteNotification(int id) {
+        replyHandles.remove(id);
+        replyNumbers.remove(id);
+        if (dismissedOnBand.remove(id)) {
+            return; // the band removed it itself
+        }
+        sendMessage(Fit3NotificationAction.CHANNEL, Fit3NotificationAction.buildDeletedOnPhone(id),
+                "notification-deleted-on-phone");
     }
 
     private void handleNotificationIconRequest(byte[] body) {
@@ -1408,6 +1495,17 @@ public class SamsungDeviceSupport extends AbstractBTLESingleDeviceSupport {
     @Override
     public void onNotification(NotificationSpec spec) {
         String pkg = Fit3Notification.resolvePackage(spec, getContext());
+        if (!pkg.isEmpty()) {
+            latestNotificationByAppId.put(Fit3Notification.appIdFor(pkg), spec.getId());
+        }
+        // An SMS reply goes straight to the sender; anything else to the app's reply action.
+        String replyNumber = Fit3Notification.replyPhoneNumber(spec);
+        Long replyHandle = Fit3Notification.replyActionHandle(spec);
+        if (replyNumber != null) {
+            replyNumbers.put(spec.getId(), replyNumber);
+        } else if (replyHandle != null) {
+            replyHandles.put(spec.getId(), replyHandle);
+        }
         // Only apps the user picked get an icon; the rest show the band's generic one.
         boolean withIcon = !pkg.isEmpty() && iconUploader.isSelected(pkg);
         boolean iconNewlyAdded = false;

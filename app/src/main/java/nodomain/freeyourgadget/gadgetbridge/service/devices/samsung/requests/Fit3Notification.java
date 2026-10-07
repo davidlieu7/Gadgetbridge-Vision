@@ -153,7 +153,7 @@ public final class Fit3Notification {
         String body    = firstNonEmpty(spec.getBody(), spec.getSubject(), "");
         String appName = spec.getSourceName();
         long whenMillis = spec.getWhen() > 0 ? spec.getWhen() : System.currentTimeMillis();
-        boolean hasQuickReplies = spec.getCannedReplies() != null && spec.getCannedReplies().length > 0;
+        boolean hasQuickReplies = canReply(spec);
 
         SapPayloadBuilder b = SapPayloadBuilder.variable(msgId)
                 .addByte(PARAM_TYPE, 1)
@@ -189,6 +189,41 @@ public final class Fit3Notification {
         }
 
         return b.build();
+    }
+
+    /**
+     * Whether a reply from the band can be delivered: the notification has a
+     * reply action, or it's an SMS with a known sender. The band offers its
+     * own canned list, so this doesn't depend on any being configured here.
+     */
+    public static boolean canReply(NotificationSpec spec) {
+        return replyPhoneNumber(spec) != null || replyActionHandle(spec) != null;
+    }
+
+    /**
+     * Where an SMS reply goes: the sender's number. SMS notifications carry a
+     * synthetic reply action with no handle, so the number is what counts.
+     */
+    public static String replyPhoneNumber(NotificationSpec spec) {
+        String number = spec.getPhoneNumber();
+        return number != null && !number.isEmpty() ? number : null;
+    }
+
+    /**
+     * The handle of the notification's reply action - the key the phone's
+     * notification listener finds the app's reply hook by - or {@code null}
+     * if it has none. Synthetic actions have no handle (0) and don't count.
+     */
+    public static Long replyActionHandle(NotificationSpec spec) {
+        if (spec.getAttachedActions() == null) {
+            return null;
+        }
+        for (NotificationSpec.Action action : spec.getAttachedActions()) {
+            if (action != null && action.isReply() && action.getHandle() != 0) {
+                return action.getHandle();
+            }
+        }
+        return null;
     }
 
     private static String firstNonEmpty(String... values) {
