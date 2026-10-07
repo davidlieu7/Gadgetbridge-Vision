@@ -193,7 +193,13 @@ public class SamsungFit3Coordinator extends AbstractBLEDeviceCoordinator {
                 R.xml.devicesettings_samsung_fit3_menus,
                 R.xml.devicesettings_canned_reply_16,
                 R.xml.devicesettings_canned_dismisscall_16,
+                R.xml.devicesettings_sync_calendar,
         };
+    }
+
+    @Override
+    public boolean supportsCalendarEvents(@NonNull GBDevice device) {
+        return true;
     }
 
     @Override

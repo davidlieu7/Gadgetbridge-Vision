@@ -26,6 +26,8 @@ import android.content.Context;
 import android.content.SharedPreferences;
 import android.net.Uri;
 import android.os.Bundle;
+import android.os.Handler;
+import android.os.Looper;
 import android.text.TextUtils;
 import android.widget.Toast;
 
@@ -37,9 +39,11 @@ import org.slf4j.LoggerFactory;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.Calendar;
 import java.util.Collections;
 import java.util.Date;
 import java.util.HashMap;
@@ -48,7 +52,9 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
+import java.util.TimeZone;
 import java.util.UUID;
+import java.util.zip.CRC32;
 import nodomain.freeyourgadget.gadgetbridge.GBApplication;
 import nodomain.freeyourgadget.gadgetbridge.R;
 import nodomain.freeyourgadget.gadgetbridge.activities.SettingsActivity;
@@ -78,6 +84,7 @@ import nodomain.freeyourgadget.gadgetbridge.model.ActivityUser;
 import nodomain.freeyourgadget.gadgetbridge.model.ActivitySummaryData;
 import nodomain.freeyourgadget.gadgetbridge.model.ActivitySummaryEntries;
 import nodomain.freeyourgadget.gadgetbridge.model.BatteryState;
+import nodomain.freeyourgadget.gadgetbridge.model.CalendarEventSpec;
 import nodomain.freeyourgadget.gadgetbridge.model.CallSpec;
 import nodomain.freeyourgadget.gadgetbridge.model.CannedMessagesSpec;
 import nodomain.freeyourgadget.gadgetbridge.model.MusicSpec;
@@ -112,12 +119,15 @@ import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3NotificationCapability;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3NotificationIcon;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3Settings;
+import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3Calendar;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3MenuOrder;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3NotificationAction;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3QuickReplies;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3WeatherInfo;
 import nodomain.freeyourgadget.gadgetbridge.util.FileUtils;
 import nodomain.freeyourgadget.gadgetbridge.util.GB;
+import nodomain.freeyourgadget.gadgetbridge.util.calendar.CalendarEvent;
+import nodomain.freeyourgadget.gadgetbridge.util.calendar.CalendarManager;
 import nodomain.freeyourgadget.gadgetbridge.util.preferences.DevicePrefs;
 
 
@@ -225,6 +235,15 @@ public class SamsungDeviceSupport extends AbstractBTLESingleDeviceSupport {
     // action's handle, or for an SMS the sender's number.
     private final Map<Integer, Long> replyHandles = new HashMap<>();
     private final Map<Integer, String> replyNumbers = new HashMap<>();
+
+    /** The event list last sent to the band, for answering its detail requests. */
+    private List<Fit3Calendar.Event> calendarEvents = Collections.emptyList();
+    private int calendarSyncSeq;
+    private final Handler mainHandler = new Handler(Looper.getMainLooper());
+    private final Runnable calendarPoke = () -> sendMessage(Fit3Calendar.CHANNEL, Fit3Calendar.buildSyncPoke(),
+            "calendar-sync-poke");
+    private static final String PREF_CALENDAR_STAMP = "samsung_fit3_calendar_stamp";
+    private static final String PREF_CALENDAR_HASH = "samsung_fit3_calendar_hash";
 
     /** Pushes the icons of the user-picked apps ahead of time; see {@link Fit3AppIconUploader}. */
     private final Fit3AppIconUploader iconUploader = new Fit3AppIconUploader(new Fit3AppIconUploader.Listener() {
@@ -514,11 +533,148 @@ public class SamsungDeviceSupport extends AbstractBTLESingleDeviceSupport {
 
     /** Answer the band's 0x08 requests: timezone, alarms, calendar. */
     private void onTimeCalendarRequest(int msgId, byte[] req) {
-        // e.g. band sends 0x0c (MSG_ID 12) -> reply with the timezone name+offset,
-        // 0x07 (MSG_ID 7) -> alarms, 0x09 (MSG_ID 9) -> calendar events.
-        // Build these from the user's timezone/calendar; see
-        // the captured 0x08 responses for the exact field layout.
-        LOG.debug("TODO respond to time/calendar request MSG_ID={}", msgId);
+        Fit3Calendar.Request request = Fit3Calendar.parseRequest(req);
+        if (request == null) {
+            LOG.warn("Samsung Fit 3: malformed calendar request MSG_ID={}", msgId);
+            return;
+        }
+        long now = System.currentTimeMillis();
+        switch (msgId) {
+            case Fit3Calendar.MSG_ID_SETTINGS:
+                sendMessage(Fit3Calendar.CHANNEL, Fit3Calendar.buildSettings(
+                        Calendar.getInstance().getFirstDayOfWeek(), TimeZone.getDefault(),
+                        now, Locale.getDefault()), "calendar-settings");
+                return;
+            case Fit3Calendar.MSG_ID_HOLIDAYS:
+                sendMessage(Fit3Calendar.CHANNEL, Fit3Calendar.buildNoHolidays(), "calendar-holidays");
+                return;
+            case Fit3Calendar.MSG_ID_NOW:
+            case Fit3Calendar.MSG_ID_UPCOMING:
+                // The vendor answers these with "no data" too, events or not;
+                // the band reads its events from the synced list instead.
+                sendMessage(Fit3Calendar.CHANNEL, Fit3Calendar.buildNoData(), "calendar-no-data");
+                return;
+            case Fit3Calendar.MSG_ID_SYNC:
+            case Fit3Calendar.MSG_ID_SYNC_WITH_DETAIL:
+                sendCalendarEvents(request.lastSyncMs, now);
+                return;
+            case Fit3Calendar.MSG_ID_EVENT_DETAIL:
+                sendCalendarEventDetail(request, now);
+                return;
+            default:
+                LOG.debug("Samsung Fit 3: calendar request MSG_ID={} not handled", msgId);
+        }
+    }
+
+    /**
+     * Answer the band's sync request with the coming events - unless it
+     * already has them: the stamp it reports is the one sent with our last
+     * list, so a matching stamp and an unchanged list means nothing to send,
+     * as the vendor app does.
+     */
+    private void sendCalendarEvents(long bandStamp, long now) {
+        List<Fit3Calendar.Event> events = loadCalendarEvents();
+        long hash = calendarHash(events);
+        SharedPreferences prefs = GBApplication.getDeviceSpecificSharedPrefs(getDevice().getAddress());
+        long stamp = prefs.getLong(PREF_CALENDAR_STAMP, -1);
+        if (bandStamp != 0 && bandStamp == stamp && hash == prefs.getLong(PREF_CALENDAR_HASH, 0)) {
+            LOG.debug("Samsung Fit 3: band calendar is current ({} events)", events.size());
+            calendarEvents = events;
+            return;
+        }
+        // Must not be in the future: the band discards a stamp later than now.
+        stamp = now;
+        prefs.edit().putLong(PREF_CALENDAR_STAMP, stamp).putLong(PREF_CALENDAR_HASH, hash).apply();
+        calendarEvents = events;
+        calendarSyncSeq = (calendarSyncSeq % 255) + 1;
+        List<byte[]> pages = Fit3Calendar.buildEventList(events, calendarSyncSeq, TimeZone.getDefault(),
+                stamp, now);
+        LOG.info("Samsung Fit 3: sending {} calendar event(s) in {} message(s)", events.size(), pages.size());
+        for (byte[] page : pages) {
+            sendMessage(Fit3Calendar.CHANNEL, page, "calendar-events");
+        }
+    }
+
+    private void sendCalendarEventDetail(Fit3Calendar.Request request, long now) {
+        Fit3Calendar.Event match = null;
+        for (Fit3Calendar.Event e : calendarEvents) {
+            if (e.id == request.eventId && (match == null || e.beginMs == request.eventStartMs)) {
+                match = e;
+            }
+        }
+        if (match == null) {
+            LOG.warn("Samsung Fit 3: band asked for unknown calendar event {}", request.eventId);
+            return;
+        }
+        sendMessage(Fit3Calendar.CHANNEL, Fit3Calendar.buildEventDetail(match, now, Locale.getDefault()),
+                "calendar-event-detail");
+    }
+
+    /** The coming events, filtered by the device's calendar settings; none if sync is off. */
+    private List<Fit3Calendar.Event> loadCalendarEvents() {
+        if (!getDevicePrefs().getBoolean(DeviceSettingsPreferenceConst.PREF_SYNC_CALENDAR, false)) {
+            return Collections.emptyList();
+        }
+        List<Fit3Calendar.Event> events = new ArrayList<>();
+        try {
+            for (CalendarEvent ce : new CalendarManager(getContext(), getDevice().getAddress()).getCalendarEventList()) {
+                Fit3Calendar.Event e = new Fit3Calendar.Event();
+                e.id = ce.getId();
+                e.title = nonNull(ce.getTitle());
+                e.beginMs = ce.getBegin();
+                e.endMs = ce.getEnd();
+                e.allDay = ce.isAllDay();
+                e.color = ce.getColor();
+                e.description = nonNull(ce.getDescription());
+                e.location = nonNull(ce.getLocation());
+                e.calendarName = nonNull(ce.getCalName());
+                List<Integer> reminders = new ArrayList<>();
+                if (ce.getRemindersAbsoluteTs() != null) {
+                    for (Long ts : ce.getRemindersAbsoluteTs()) {
+                        reminders.add((int) ((ce.getBegin() - ts) / 60_000L));
+                    }
+                }
+                e.reminderMinutes = reminders;
+                events.add(e);
+            }
+        } catch (SecurityException e) {
+            LOG.warn("Samsung Fit 3: no calendar permission", e);
+            return Collections.emptyList();
+        }
+        return events;
+    }
+
+    private static long calendarHash(List<Fit3Calendar.Event> events) {
+        CRC32 crc = new CRC32();
+        for (Fit3Calendar.Event e : events) {
+            String key = e.id + "|" + e.title + "|" + e.beginMs + "|" + e.endMs + "|" + e.allDay + "|" + e.color
+                    + "|" + e.description + "|" + e.location + "|" + e.calendarName + "|" + e.reminderMinutes;
+            crc.update(key.getBytes(StandardCharsets.UTF_8));
+        }
+        return crc.getValue();
+    }
+
+    private static String nonNull(String s) {
+        return s != null ? s : "";
+    }
+
+    /**
+     * Gadgetbridge's calendar sync reports each change; the band wants to be
+     * asked instead, so any burst of changes becomes one prompt to re-sync.
+     */
+    @Override
+    public void onAddCalendarEvent(CalendarEventSpec calendarEventSpec) {
+        scheduleCalendarPoke();
+    }
+
+    @Override
+    public void onDeleteCalendarEvent(byte type, long id) {
+        scheduleCalendarPoke();
+    }
+
+    private void scheduleCalendarPoke() {
+        mainHandler.removeCallbacks(calendarPoke);
+        mainHandler.postDelayed(calendarPoke, 2000);
     }
 
     /** Answer / ack the band's 0x0a health requests and data uploads. */
@@ -1921,6 +2077,7 @@ public class SamsungDeviceSupport extends AbstractBTLESingleDeviceSupport {
         // Same for a watchface install: the band forgets it on disconnect.
         watchfaceManager.cancel();
         iconUploader.cancel();
+        mainHandler.removeCallbacks(calendarPoke);
         super.dispose();
     }
 
