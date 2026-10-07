@@ -23,6 +23,7 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.os.Handler;
+import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.localbroadcastmanager.content.LocalBroadcastManager;
@@ -44,6 +45,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.LinkedList;
 
+import nodomain.freeyourgadget.gadgetbridge.R;
 import nodomain.freeyourgadget.gadgetbridge.activities.multipoint.MultipointPairingActivity;
 import nodomain.freeyourgadget.gadgetbridge.activities.multipoint.MultipointDevice;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
@@ -51,6 +53,7 @@ import nodomain.freeyourgadget.gadgetbridge.service.devices.oppo.commands.Earbud
 import nodomain.freeyourgadget.gadgetbridge.service.devices.oppo.commands.EarbudsStatusValue;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.oppo.modules.AncConfigModule;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.oppo.modules.EarbudsStatusModule;
+import nodomain.freeyourgadget.gadgetbridge.util.GB;
 import nodomain.freeyourgadget.gadgetbridge.util.LEB128Utils;
 import nodomain.freeyourgadget.gadgetbridge.model.BatteryState;
 import nodomain.freeyourgadget.gadgetbridge.service.btbr.TransactionBuilder;
@@ -280,6 +283,13 @@ public class OppoHeadphonesSupport extends AbstractHeadphoneBTBRDeviceSupport {
                 AncConfigValue value = AncConfigValue.fromPrefId(valuePrefId);
                 if (value == null) {
                     LOG.warn("Unknown ANC prefId = \"{}\"", valuePrefId);
+                    return;
+                }
+
+                if (!getCoordinator().canApplyAncMode(getDevice(), earbudsStatus, value)) {
+                    queueCommand(getAncConfigModule().encodeReq(AncConfigType.MODE));
+                    final String message = getContext().getString(R.string.activity_type_not_worn);
+                    GB.toast(getContext(), message, Toast.LENGTH_LONG, GB.WARN);
                     return;
                 }
 
