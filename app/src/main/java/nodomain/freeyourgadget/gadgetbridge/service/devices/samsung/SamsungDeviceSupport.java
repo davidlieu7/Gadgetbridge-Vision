@@ -79,6 +79,7 @@ import nodomain.freeyourgadget.gadgetbridge.model.ActivitySummaryData;
 import nodomain.freeyourgadget.gadgetbridge.model.ActivitySummaryEntries;
 import nodomain.freeyourgadget.gadgetbridge.model.BatteryState;
 import nodomain.freeyourgadget.gadgetbridge.model.CallSpec;
+import nodomain.freeyourgadget.gadgetbridge.model.CannedMessagesSpec;
 import nodomain.freeyourgadget.gadgetbridge.model.MusicSpec;
 import nodomain.freeyourgadget.gadgetbridge.model.MusicStateSpec;
 import nodomain.freeyourgadget.gadgetbridge.model.NotificationSpec;
@@ -113,6 +114,7 @@ import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3Settings;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3MenuOrder;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3NotificationAction;
+import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3QuickReplies;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3WeatherInfo;
 import nodomain.freeyourgadget.gadgetbridge.util.FileUtils;
 import nodomain.freeyourgadget.gadgetbridge.util.GB;
@@ -253,6 +255,8 @@ public class SamsungDeviceSupport extends AbstractBTLESingleDeviceSupport {
             UUID.fromString("63e30bad-4206-4596-839f-e47cbf7a4b5d");
 
     private static final int MTU = 512;
+    /** Canned replies per list, matching the settings screens' slots. */
+    public static final int CANNED_REPLY_SLOTS = 16;
     private static final String PHONE_MODEL = "SM-S918B";   // announced in HELLO; any works
     private static final String PHONE_VENDOR = "samsung";
     private String deviceMac; //get it from GB
@@ -1249,9 +1253,11 @@ public class SamsungDeviceSupport extends AbstractBTLESingleDeviceSupport {
         // start configuration requests
 
 
-        // 3) push canned quick-reply lists (0x12/0 notifications, 0x12/1 calls)
-//        sendRawMessage(SapProtocol.CH_QUICK_REPLY, hex("02 03 01"), "quickreply-init");
-        // (send your localized canned-reply lists here: 0x12 MSG_ID 0 and 1)
+        // 3) quick replies: switch the feature on, then the user's canned
+        //    lists, if any are set - otherwise the band keeps what it has.
+        sendRawMessage(Fit3QuickReplies.CHANNEL, Fit3QuickReplies.buildEnabled(true), "quick-replies-enabled");
+        sendCannedList(Fit3QuickReplies.MSG_ID_NOTIFICATION_REPLIES, "canned_reply_");
+        sendCannedList(Fit3QuickReplies.MSG_ID_CALL_REPLIES, "canned_message_dismisscall_");
 
         // 4) identity + BINDING TOKEN on 0x1a. The 16-byte token registers this
         //    host with the band; a random value likely works (like the HELLO
@@ -1313,6 +1319,44 @@ public class SamsungDeviceSupport extends AbstractBTLESingleDeviceSupport {
         sendRawMessage(Fit3InitSetting.CHANNEL,
                 Fit3InitSetting.buildRequest(Locale.getDefault(), false, is24Hour),
                 "init-setting"); //required
+    }
+
+    /** Send one canned-reply list from the device preferences ({@code <prefix>1..16}), if it has any entries. */
+    private void sendCannedList(int msgId, String prefix) {
+        List<String> replies = new ArrayList<>();
+        DevicePrefs prefs = getDevicePrefs();
+        for (int i = 1; i <= CANNED_REPLY_SLOTS; i++) {
+            String reply = prefs.getString(prefix + i, null);
+            if (reply != null && !reply.trim().isEmpty()) {
+                replies.add(reply);
+            }
+        }
+        if (!replies.isEmpty()) {
+            sendMessage(Fit3QuickReplies.CHANNEL, Fit3QuickReplies.buildList(msgId, replies), "quick-replies");
+        }
+    }
+
+    @Override
+    public void onSetCannedMessages(CannedMessagesSpec cannedMessagesSpec) {
+        String[] messages = cannedMessagesSpec.getCannedMessages();
+        if (messages == null) {
+            return;
+        }
+        int msgId;
+        if (cannedMessagesSpec.getType() == CannedMessagesSpec.TYPE_REJECTEDCALLS) {
+            msgId = Fit3QuickReplies.MSG_ID_CALL_REPLIES;
+        } else if (cannedMessagesSpec.getType() == CannedMessagesSpec.TYPE_GENERIC) {
+            msgId = Fit3QuickReplies.MSG_ID_NOTIFICATION_REPLIES;
+        } else {
+            return;
+        }
+        List<String> replies = new ArrayList<>();
+        for (String m : messages) {
+            if (m != null && !m.trim().isEmpty()) {
+                replies.add(m);
+            }
+        }
+        sendMessage(Fit3QuickReplies.CHANNEL, Fit3QuickReplies.buildList(msgId, replies), "quick-replies");
     }
 
     /** Binding token on 0x1a MSG_ID 2: 02 0a 01 0b 00 0c 20 <32 hex ASCII>. */

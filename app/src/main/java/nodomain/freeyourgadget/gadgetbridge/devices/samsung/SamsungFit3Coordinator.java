@@ -191,7 +191,14 @@ public class SamsungFit3Coordinator extends AbstractBLEDeviceCoordinator {
                 R.xml.devicesettings_timeformat,
                 R.xml.devicesettings_upload_notifications_app_icon,
                 R.xml.devicesettings_samsung_fit3_menus,
+                R.xml.devicesettings_canned_reply_16,
+                R.xml.devicesettings_canned_dismisscall_16,
         };
+    }
+
+    @Override
+    public int getCannedRepliesSlotCount(@NonNull GBDevice device) {
+        return SamsungDeviceSupport.CANNED_REPLY_SLOTS;
     }
 
     @Override
