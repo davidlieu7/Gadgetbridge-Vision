@@ -17,7 +17,6 @@
 package nodomain.freeyourgadget.gadgetbridge.devices.soundcore.motion300
 
 import nodomain.freeyourgadget.gadgetbridge.R
-import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSpecificSettingsCustomizer
 import nodomain.freeyourgadget.gadgetbridge.devices.DeviceCoordinator
 import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreEarbudsCoordinator
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice
@@ -53,6 +52,10 @@ class SoundcoreMotion300Coordinator : SoundcoreEarbudsCoordinator() {
         Capability.AdaptiveDirection,
     )
 
+    override fun getSupportedEqualizerBands(): IntArray = intArrayOf(
+        80, 150, 300, 600, 1200, 2500, 5000, 9000, 13000,
+    )
+
     override fun getCustomEqualizerPresetNames(): Array<Int> = arrayOf(
         R.string.soundcore_equalizer_preset_signature,
         R.string.soundcore_equalizer_preset_xtra_bass,
@@ -68,7 +71,4 @@ class SoundcoreMotion300Coordinator : SoundcoreEarbudsCoordinator() {
     override fun supportsSessionInitRequest(): Boolean = false
 
     override fun getConnectDelayMillis(): Int = 500
-
-    override fun getDeviceSpecificSettingsCustomizer(device: GBDevice): DeviceSpecificSettingsCustomizer =
-        SoundcoreMotion300SettingsCustomizer()
 }
