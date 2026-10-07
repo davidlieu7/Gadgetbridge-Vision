@@ -76,15 +76,8 @@ interface WorkoutUploadTarget {
     /** Notification id used to report a failure, so services do not overwrite each other. */
     val failureNotificationId: Int
 
-    /** Whether the user has finished setting this service up. */
+    /** Whether the user has finished setting this service up: an address and valid credentials. */
     fun isLoggedIn(context: Context): Boolean
-
-    /**
-     * Whether the service can be reached at all, which for a self-hosted one also means the user
-     * gave an address. Kept apart from [isLoggedIn] because credentials can outlive the address
-     * they were obtained from, and a service with no address to give would answer on login alone.
-     */
-    fun isConfigured(context: Context): Boolean
 
     /** Whether the user asked for workouts to be uploaded to this service automatically. */
     fun isAutoUploadEnabled(prefs: GBPrefs): Boolean
@@ -152,7 +145,7 @@ object WorkoutUploadTargets {
 
     /** Targets the user has both enabled and finished setting up. */
     fun active(context: Context, prefs: GBPrefs): List<WorkoutUploadTarget> =
-        ALL.filter { it.isAutoUploadEnabled(prefs) && it.isConfigured(context) }
+        ALL.filter { it.isAutoUploadEnabled(prefs) && it.isLoggedIn(context) }
 }
 
 object EndurainUploadTarget : WorkoutUploadTarget {
@@ -169,9 +162,8 @@ object EndurainUploadTarget : WorkoutUploadTarget {
     private fun serverUrl(): String? = GBApplication.getPrefs().preferences
         .getString(WorkoutUploader.PREF_ENDURAIN_SERVER, null)
 
-    override fun isLoggedIn(context: Context) = EndurainTokenManager(context).isLoggedIn()
-
-    override fun isConfigured(context: Context) = serverUrl() != null && isLoggedIn(context)
+    override fun isLoggedIn(context: Context) =
+        serverUrl() != null && EndurainTokenManager(context).isLoggedIn()
 
     override fun isAutoUploadEnabled(prefs: GBPrefs) =
         prefs.getBoolean(GBPrefs.ENDURAIN_AUTO_UPLOAD_ENABLED, false)
@@ -261,9 +253,8 @@ object WandererUploadTarget : WorkoutUploadTarget {
     private fun serverUrl(): String? = GBApplication.getPrefs().preferences
         .getString(WorkoutUploader.PREF_WANDERER_SERVER, null)
 
-    override fun isLoggedIn(context: Context) = WandererTokenManager(context).isLoggedIn()
-
-    override fun isConfigured(context: Context) = serverUrl() != null && isLoggedIn(context)
+    override fun isLoggedIn(context: Context) =
+        serverUrl() != null && WandererTokenManager(context).isLoggedIn()
 
     override fun isAutoUploadEnabled(prefs: GBPrefs) =
         prefs.getBoolean(GBPrefs.WANDERER_AUTO_UPLOAD_ENABLED, false)

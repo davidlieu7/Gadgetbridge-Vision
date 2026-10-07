@@ -484,7 +484,7 @@ class WorkoutDetailsFragment : Fragment(), MenuProvider {
         viewLifecycleOwner.lifecycleScope.launch {
             val offered = withContext(Dispatchers.IO) {
                 WorkoutUploadTargets.ALL.filter {
-                    (!it.requiresTrack || hasGpx) && it.isConfigured(context)
+                    (!it.requiresTrack || hasGpx) && it.isLoggedIn(context)
                 }
             }
             WorkoutUploadTargets.ALL.forEach { target ->
@@ -513,7 +513,7 @@ class WorkoutDetailsFragment : Fragment(), MenuProvider {
         val container = view.findViewById<LinearLayout>(R.id.upload_status_container)
 
         WorkoutUploadTargets.ALL
-            .filter { it.isConfigured(context) }
+            .filter { it.isLoggedIn(context) }
             .forEach { target ->
                 val row = rows[target.service]
                 val state = when {
