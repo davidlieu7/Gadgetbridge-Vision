@@ -87,6 +87,7 @@ public class SoundcoreProtocolImplV1 extends AbstractSoundcoreProtocol {
     public static final short CMD_SET_EQUALIZER_PRESET = (short) 0x8b02;
     public static final short CMD_POWER_OFF = (short) 0x8901;
 
+    public static final short CMD_NOTIFY_ANC_ENABLED = (short) 0x0706;
     public static final short CMD_SET_ANC_ENABLED = (short) 0x8706;
     public static final short CMD_SET_LISTENING_MODE = (short) 0xa901;
     public static final short CMD_SET_LOCAL_PLAYBACK = (short) 0x0213;

@@ -4882,6 +4882,7 @@
     <string name="pref_speak_notifications_focus_exclusive_summary_on">Playback from other applications will be paused while the notification is spoken</string>
     <string name="pref_speak_notifications_focus_exclusive_summary_off">Playback volume of other applications will be lowered while the notification is spoken</string>
     <string name="pref_header_calls_and_notifications">Calls and notifications</string>
+    <string name="notification_sounds">Notification sounds</string>
     <string name="pref_title_bottom_navigation_bar">Bottom navigation bar</string>
     <string name="pref_summary_bottom_navigation_bar_on">Switch between main screens using the navigation bar or horizontal swiping</string>
     <string name="pref_summary_bottom_navigation_bar_off">Switch between main screens only using horizontal swiping</string>
@@ -6231,9 +6232,15 @@
     <string name="soundcore_sleep_local">Play local audio, ANC off</string>
     <string name="soundcore_sleep_pause">Pause audio</string>
     <string name="soundcore_sleep_keep">Keep audio</string>
-    <string name="soundcore_calls_enabled">Bluetooth calls and microphone</string>
+    <string name="soundcore_calls_enabled">Enable call</string>
+    <string name="soundcore_calls_enabled_summary">Enable incoming call, answering, and microphone during Bluetooth mode</string>
     <string name="soundcore_power_off_tone">Power-off tone</string>
+    <string name="soundcore_power_off_tone_summary">Hear a tone when the earbuds automatically turn off.</string>
     <string name="soundcore_anc_tone">ANC tone</string>
+    <string name="soundcore_anc_tone_summary">Hear a tone when you manually turn ANC on/off.</string>
     <string name="soundcore_mode_tone">Mode-switch tone</string>
+    <string name="soundcore_mode_tone_summary">Hear a voice prompt when switching Bluetooth and Local modes.</string>
     <string name="soundcore_control_reset">Reset tap controls</string>
+    <string name="soundcore_local_playback_pause">Pause local audio</string>
+    <string name="soundcore_control_reset_confirmation">Reset all touch controls to their defaults?</string>
 </resources>

@@ -18,12 +18,7 @@ package nodomain.freeyourgadget.gadgetbridge.devices.soundcore.sleep_a30
 
 import java.util.UUID
 import java.util.regex.Pattern
-import nodomain.freeyourgadget.gadgetbridge.GBApplication
 import nodomain.freeyourgadget.gadgetbridge.R
-import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsPreferenceConst.*
-import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.DeviceSettingsSpec
-import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.ListEntry
-import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.deviceSettings
 import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreEarbudsCoordinator
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice
 import nodomain.freeyourgadget.gadgetbridge.service.devices.soundcore.sleep_a30.SoundcoreSleepA30Protocol
@@ -37,17 +32,25 @@ class SoundcoreSleepA30Coordinator : SoundcoreEarbudsCoordinator() {
 
     override fun getServiceUUID(): UUID = UUID.fromString("0cf12d31-fac3-4553-bd80-d6832e7d1301")
 
-    // override fun getConnectDelayMillis(): Int = 500
-
     override fun createProtocol(device: GBDevice) = SoundcoreSleepA30Protocol(device)
 
     override fun getDefaultCapabilities(): Set<Capability> = setOf(
+        Capability.FindDevice,
         Capability.NoiseControl,
+        Capability.NoiseCancellationTone,
         Capability.TouchControls,
         Capability.TouchControlDisable,
+        Capability.TouchControlReset,
+        Capability.ListeningMode,
+        Capability.ListeningModeTone,
+        Capability.DefaultListeningMode,
+        Capability.LocalAudioPlayback,
+        Capability.LocalAudioVolume,
+        Capability.DynamicSnoreMasking,
+        Capability.SleepAudioAutoSwitch,
+        Capability.BluetoothCalls,
+        Capability.PowerOffTone,
         Capability.BatteryLowTone,
-        Capability.FindDevice,
-        Capability.FindIndividualEarbuds,
     )
 
     override val supportedButtonActions = listOf(
@@ -65,41 +68,4 @@ class SoundcoreSleepA30Coordinator : SoundcoreEarbudsCoordinator() {
         TapFunction.MEDIA_PREV,
         TapFunction.NONE,
     )
-
-    override fun getDeviceSettings(device: GBDevice): DeviceSettingsSpec {
-        val sleepSettings = deviceSettings {
-            val modeEntries = listOf(
-                ListEntry.Res("0", R.string.soundcore_bluetooth_mode),
-                ListEntry.Res("1", R.string.soundcore_local_mode),
-            )
-            category(key = "soundcore_sleep_audio", title = R.string.pref_header_audio) {
-                list(key = PREF_SOUNDCORE_LISTENING_MODE, title = R.string.soundcore_listening_mode,
-                    entries = modeEntries, defaultValue = "0")
-                list(key = PREF_SOUNDCORE_DEFAULT_LISTENING_MODE, title = R.string.soundcore_default_listening_mode,
-                    entries = modeEntries, defaultValue = "0")
-                switchSetting(key = PREF_SOUNDCORE_LOCAL_PLAYBACK, title = R.string.soundcore_local_playback)
-                seekbar(key = PREF_SOUNDCORE_LOCAL_VOLUME, title = R.string.soundcore_local_volume,
-                    min = 0, max = 65, defaultValue = 0)
-                switchSetting(key = PREF_SOUNDCORE_SNORE_MASKING, title = R.string.soundcore_snore_masking)
-                list(key = PREF_SOUNDCORE_SLEEP_AUDIO, title = R.string.soundcore_sleep_audio,
-                    entries = listOf(
-                        ListEntry.Res("local", R.string.soundcore_sleep_local),
-                        ListEntry.Res("pause", R.string.soundcore_sleep_pause),
-                        ListEntry.Res("keep", R.string.soundcore_sleep_keep),
-                    ), defaultValue = "keep")
-            }
-            category(key = "soundcore_sleep_tones", title = R.string.pref_header_general) {
-                switchSetting(key = PREF_SOUNDCORE_CALLS_ENABLED, title = R.string.soundcore_calls_enabled)
-                switchSetting(key = PREF_SOUNDCORE_POWER_OFF_TONE, title = R.string.soundcore_power_off_tone)
-                switchSetting(key = PREF_SOUNDCORE_ANC_TONE, title = R.string.soundcore_anc_tone)
-                switchSetting(key = PREF_SOUNDCORE_MODE_TONE, title = R.string.soundcore_mode_tone)
-                action(key = PREF_SOUNDCORE_CONTROL_RESET, title = R.string.soundcore_control_reset,
-                    onClick = { _, selected ->
-                        selected?.let { GBApplication.deviceService(it).onSendConfiguration(PREF_SOUNDCORE_CONTROL_RESET) }
-                        true
-                    })
-            }
-        }
-        return DeviceSettingsSpec(super.getDeviceSettings(device).items + sleepSettings.items)
-    }
 }

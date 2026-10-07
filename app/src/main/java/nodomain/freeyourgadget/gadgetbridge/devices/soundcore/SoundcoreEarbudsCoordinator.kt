@@ -49,6 +49,17 @@ abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator(
         TouchControls,
         TouchControlDisable,
         TouchControlTapDisable,
+        TouchControlReset,
+        ListeningMode,
+        DefaultListeningMode,
+        LocalAudioPlayback,
+        LocalAudioVolume,
+        DynamicSnoreMasking,
+        SleepAudioAutoSwitch,
+        BluetoothCalls,
+        PowerOffTone,
+        NoiseCancellationTone,
+        ListeningModeTone,
         WearingDetection,
         WearingTone,
         SurroundSound,
@@ -356,7 +367,7 @@ abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator(
         fun has(anyOf: Array<Capability>) = anyOf.any { capabilities.contains(it) }
 
         return deviceSettings {
-            if (has(arrayOf(Capability.TouchControls, Capability.TouchControlDisable, Capability.TouchTone))) {
+            if (has(arrayOf(Capability.TouchControls, Capability.TouchControlDisable, Capability.TouchTone, Capability.TouchControlReset))) {
                 screen(
                     key = "pref_soundcore_touch_options",
                     title = R.string.prefs_galaxy_touch_options,
@@ -379,6 +390,19 @@ abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator(
                         defaultValue = false,
                         disableDependentsState = true,
                         visibleWhen = { _ -> has(Capability.TouchControlDisable) },
+                    )
+                    action(
+                        key = DeviceSettingsPreferenceConst.PREF_SOUNDCORE_CONTROL_RESET,
+                        title = R.string.soundcore_control_reset,
+                        icon = R.drawable.ic_refresh,
+                        confirmationMessage = R.string.soundcore_control_reset_confirmation,
+                        visibleWhen = { _ -> has(Capability.TouchControlReset) },
+                        onClick = { _, selectedDevice ->
+                            selectedDevice?.let {
+                                GBApplication.deviceService(it).onSendConfiguration(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_CONTROL_RESET)
+                            }
+                            true
+                        },
                     )
                     if (has(Capability.TouchControls)) {
                         list(
@@ -429,12 +453,98 @@ abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator(
                 }
             }
 
-            if (has(arrayOf(Capability.AudioEqualizer, Capability.SurroundSound, Capability.GamingMode, Capability.LDAC))) {
+            if (has(arrayOf(
+                    Capability.AudioEqualizer, Capability.SurroundSound, Capability.GamingMode, Capability.LDAC,
+                    Capability.ListeningMode, Capability.DefaultListeningMode, Capability.LocalAudioPlayback,
+                    Capability.LocalAudioVolume, Capability.DynamicSnoreMasking, Capability.SleepAudioAutoSwitch,
+                ))) {
                 screen(
                     key = "pref_soundcore_audio",
                     title = R.string.pref_header_audio,
                     icon = R.drawable.ic_music_note,
                 ) {
+                    val listeningModeEntries = listOf(
+                        ListEntry.Res("0", R.string.soundcore_bluetooth_mode),
+                        ListEntry.Res("1", R.string.soundcore_local_mode),
+                    )
+                    if (has(Capability.ListeningMode)) {
+                        list(
+                            key = DeviceSettingsPreferenceConst.PREF_SOUNDCORE_LISTENING_MODE,
+                            title = R.string.soundcore_listening_mode,
+                            entries = listeningModeEntries,
+                            defaultValue = "0",
+                        )
+                    }
+                    if (has(Capability.DefaultListeningMode)) {
+                        list(
+                            key = DeviceSettingsPreferenceConst.PREF_SOUNDCORE_DEFAULT_LISTENING_MODE,
+                            title = R.string.soundcore_default_listening_mode,
+                            entries = listeningModeEntries,
+                            defaultValue = "0",
+                        )
+                    }
+                    if (has(Capability.LocalAudioPlayback)) {
+                        action(
+                            key = "pref_soundcore_local_playback_play",
+                            title = R.string.soundcore_local_playback,
+                            icon = R.drawable.ic_play,
+                            visibleWhen = { prefs -> !prefs.getBoolean(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_LOCAL_PLAYBACK, false) },
+                            onClick = { _, selectedDevice ->
+                                selectedDevice?.let {
+                                    // This tracks the requested playback state, not a device readback.
+                                    GBApplication.getDevicePrefs(it).preferences.edit()
+                                        .putBoolean(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_LOCAL_PLAYBACK, true)
+                                        .apply()
+                                    GBApplication.deviceService(it).onSendConfiguration(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_LOCAL_PLAYBACK)
+                                }
+                                true
+                            },
+                        )
+                        action(
+                            key = "pref_soundcore_local_playback_pause",
+                            title = R.string.soundcore_local_playback_pause,
+                            icon = R.drawable.ic_pause,
+                            visibleWhen = { prefs -> prefs.getBoolean(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_LOCAL_PLAYBACK, false) },
+                            onClick = { _, selectedDevice ->
+                                selectedDevice?.let {
+                                    GBApplication.getDevicePrefs(it).preferences.edit()
+                                        .putBoolean(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_LOCAL_PLAYBACK, false)
+                                        .apply()
+                                    GBApplication.deviceService(it).onSendConfiguration(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_LOCAL_PLAYBACK)
+                                }
+                                true
+                            },
+                        )
+                    }
+                    if (has(Capability.LocalAudioVolume)) {
+                        val volumeRange: IntRange = 0..65
+                        seekbar(
+                            key = DeviceSettingsPreferenceConst.PREF_SOUNDCORE_LOCAL_VOLUME,
+                            title = R.string.soundcore_local_volume,
+                            icon = R.drawable.ic_volume_up,
+                            min = volumeRange.first,
+                            max = volumeRange.last,
+                            defaultValue = volumeRange.first,
+                        )
+                    }
+                    if (has(Capability.DynamicSnoreMasking)) {
+                        switchSetting(
+                            key = DeviceSettingsPreferenceConst.PREF_SOUNDCORE_SNORE_MASKING,
+                            title = R.string.soundcore_snore_masking,
+                        )
+                    }
+                    if (has(Capability.SleepAudioAutoSwitch)) {
+                        list(
+                            key = DeviceSettingsPreferenceConst.PREF_SOUNDCORE_SLEEP_AUDIO,
+                            title = R.string.soundcore_sleep_audio,
+                            entries = listOf(
+                                ListEntry.Res("local", R.string.soundcore_sleep_local),
+                                ListEntry.Res("pause", R.string.soundcore_sleep_pause),
+                                ListEntry.Res("keep", R.string.soundcore_sleep_keep),
+                            ),
+                            defaultValue = "keep",
+                        )
+                    }
                     if (has(Capability.GamingMode)) {
                         switchSetting(
                             key = DeviceSettingsPreferenceConst.PREF_SOUNDCORE_GAMING_MODE,
@@ -674,7 +784,7 @@ abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator(
                     }
                 }
             }
-            if (has(arrayOf(Capability.WearingDetection, Capability.WearingTone, Capability.FitTest, Capability.AutoPowerOff, Capability.BatteryLowTone, Capability.VoicePrompts, Capability.ButtonBrightness))) {
+            if (has(arrayOf(Capability.WearingDetection, Capability.WearingTone, Capability.FitTest, Capability.AutoPowerOff, Capability.VoicePrompts, Capability.ButtonBrightness))) {
                 category(key = "pref_header_soundcore_general", title = R.string.pref_header_general) {
                     if (has(Capability.WearingDetection)) {
                         switchSetting(
@@ -689,14 +799,6 @@ abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator(
                             key = DeviceSettingsPreferenceConst.PREF_SOUNDCORE_WEARING_TONE,
                             title = R.string.pref_wearing_tone,
                             summary = R.string.pref_wearing_tone_summary,
-                            defaultValue = false,
-                        )
-                    }
-                    if (has(Capability.BatteryLowTone)) {
-                        switchSetting(
-                            key = DeviceSettingsPreferenceConst.PREF_SOUNDCORE_BATTERY_LOW_TONE,
-                            title = R.string.soundcore_battery_low_tone_title,
-                            summary = R.string.soundcore_battery_low_tone_summary,
                             defaultValue = false,
                         )
                     }
@@ -763,11 +865,66 @@ abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator(
                 }
             }
 
-            xmlScreen(
-                DeviceSpecificSettingsScreen.CALLS_AND_NOTIFICATIONS,
-                R.xml.devicesettings_headphones,
+            if (has(Capability.BatteryLowTone)) {
+                screen(
+                    key = DeviceSpecificSettingsScreen.BATTERY.key,
+                    title = R.string.battery,
+                    icon = R.drawable.ic_battery
+                ) {
+                    switchSetting(
+                        key = DeviceSettingsPreferenceConst.PREF_SOUNDCORE_BATTERY_LOW_TONE,
+                        title = R.string.soundcore_battery_low_tone_title,
+                        summary = R.string.soundcore_battery_low_tone_summary,
+                        defaultValue = false,
+                    )
+                }
+            }
+            screen(
+                key = DeviceSpecificSettingsScreen.CALLS_AND_NOTIFICATIONS.key,
+                title = R.string.pref_header_calls_and_notifications,
+                icon = R.drawable.ic_notifications,
+                xmlSubScreens = listOf(R.xml.devicesettings_headphones),
                 connectedOnly = false,
-            )
+            ) {
+                if (has(arrayOf(
+                        Capability.BluetoothCalls, Capability.PowerOffTone,
+                        Capability.NoiseCancellationTone, Capability.ListeningModeTone,
+                    ))) {
+                    category(
+                        key = "pref_header_soundcore_notification_sounds",
+                        title = R.string.notification_sounds,
+                    ) {
+                        if (has(Capability.BluetoothCalls)) {
+                            switchSetting(
+                                key = DeviceSettingsPreferenceConst.PREF_SOUNDCORE_CALLS_ENABLED,
+                                title = R.string.soundcore_calls_enabled,
+                                summary = R.string.soundcore_calls_enabled_summary,
+                            )
+                        }
+                        if (has(Capability.PowerOffTone)) {
+                            switchSetting(
+                                key = DeviceSettingsPreferenceConst.PREF_SOUNDCORE_POWER_OFF_TONE,
+                                title = R.string.soundcore_power_off_tone,
+                                summary = R.string.soundcore_power_off_tone_summary,
+                            )
+                        }
+                        if (has(Capability.NoiseCancellationTone)) {
+                            switchSetting(
+                                key = DeviceSettingsPreferenceConst.PREF_SOUNDCORE_ANC_TONE,
+                                title = R.string.soundcore_anc_tone,
+                                summary = R.string.soundcore_anc_tone_summary,
+                            )
+                        }
+                        if (has(Capability.ListeningModeTone)) {
+                            switchSetting(
+                                key = DeviceSettingsPreferenceConst.PREF_SOUNDCORE_MODE_TONE,
+                                title = R.string.soundcore_mode_tone,
+                                summary = R.string.soundcore_mode_tone_summary,
+                            )
+                        }
+                    }
+                }
+            }
         }
     }
 

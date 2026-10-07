@@ -21,6 +21,7 @@ import static nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.Dev
 import java.util.Arrays;
 import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreEarbudsCoordinator.TapFunction;
 import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEvent;
+import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEventUpdatePreferences;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.soundcore.protocol.impl.v1.SoundcoreProtocolImplV1;
 import nodomain.freeyourgadget.gadgetbridge.util.Prefs;
@@ -72,9 +73,10 @@ public class SoundcoreSleepA30Protocol extends SoundcoreProtocolImplV1 {
 
     @Override
     protected GBDeviceEvent[] decodeCommand(final short command, final byte[] payload) {
-        if (command == CMD_SET_ANC_ENABLED && payload.length == 1 && (payload[0] == 0 || payload[0] == 1)) {
-            getDevicePrefs().getPreferences().edit().putString(PREF_SOUNDCORE_AMBIENT_SOUND_CONTROL,
-                    payload[0] == 1 ? "noise_cancelling" : "off").apply();
+        if ((command == CMD_NOTIFY_ANC_ENABLED || command == CMD_SET_ANC_ENABLED)
+                && payload != null && payload.length == 1 && (payload[0] == 0 || payload[0] == 1)) {
+            return new GBDeviceEvent[]{new GBDeviceEventUpdatePreferences(PREF_SOUNDCORE_AMBIENT_SOUND_CONTROL,
+                    payload[0] == 1 ? "noise_cancelling" : "off")};
         }
         // Empty setter responses are acknowledgements, not settings readback.
         return new GBDeviceEvent[0];
