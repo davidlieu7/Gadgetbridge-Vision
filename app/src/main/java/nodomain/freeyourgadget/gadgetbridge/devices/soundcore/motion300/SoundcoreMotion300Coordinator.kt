@@ -56,6 +56,18 @@ class SoundcoreMotion300Coordinator : SoundcoreEarbudsCoordinator() {
         80, 150, 300, 600, 1200, 2500, 5000, 9000, 13000,
     )
 
+    override fun getSupportedEqualizerBandsRanges(): Array<IntArray> = arrayOf(
+        intArrayOf(48, 51, 55, 59, 63, 68, 72, 80, 83, 89),
+        intArrayOf(95, 102, 109, 117, 125, 134, 144, 150, 165, 177),
+        intArrayOf(190, 203, 218, 233, 250, 268, 287, 300, 330, 353),
+        intArrayOf(379, 406, 435, 467, 500, 536, 574, 600, 659, 706),
+        intArrayOf(759, 813, 871, 933, 1000, 1070, 1100, 1200, 1300, 1400),
+        intArrayOf(1500, 1600, 1750, 1860, 2000, 2150, 2300, 2500, 2600, 2800),
+        intArrayOf(3000, 3200, 3500, 3700, 4000, 4300, 4600, 5000, 5300, 5600),
+        intArrayOf(6000, 6500, 7000, 7500, 8000, 8500, 9000, 9800, 10500, 11300),
+        intArrayOf(12100, 13000, 14000, 15000, 16000, 17100, 18300, 20000),
+    )
+
     override fun getCustomEqualizerPresetNames(): Array<Int> = arrayOf(
         R.string.soundcore_equalizer_preset_signature,
         R.string.soundcore_equalizer_preset_xtra_bass,

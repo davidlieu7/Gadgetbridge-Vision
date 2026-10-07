@@ -207,6 +207,9 @@ abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator(
 
     open fun getSupportedEqualizerBands(): IntArray = intArrayOf()
 
+    /** Per-band frequency choices in protocol index order. */
+    open fun getSupportedEqualizerBandsRanges(): Array<IntArray> = emptyArray()
+
     /**
      * Returns preset label resources whose values map to zero-based preset indices.
      * The Custom option (value 254) is appended automatically and must not be included here.
@@ -245,6 +248,12 @@ abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator(
         require(presetNames.isNotEmpty()) { "Equalizer preset names must not be empty" }
         return presetNames.mapIndexed { index, name -> ListEntry.Res(index.toString(), name) } +
             ListEntry.Res("254", R.string.custom)
+    }
+
+    private fun formatEqualizerFrequency(frequency: Int): String = if (frequency < 1000) {
+        "$frequency Hz"
+    } else {
+        "${(frequency / 1000.0).toString().removeSuffix(".0")} kHz"
     }
 
     private fun equalizerBandTitleResource(frequency: Int): Int = when (frequency) {
@@ -419,6 +428,19 @@ abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator(
                                     DeviceSettingsPreferenceConst.PREF_SOUNDCORE_EQUALIZER_BAND8_FREQ,
                                     DeviceSettingsPreferenceConst.PREF_SOUNDCORE_EQUALIZER_BAND9_FREQ,
                                 )
+                                val equalizerBands = getSupportedEqualizerBands()
+                                val equalizerBandRanges = getSupportedEqualizerBandsRanges()
+                                val adjustableFrequencies = equalizerBandRanges.isNotEmpty()
+                                val defaultFrequencyIndices = if (adjustableFrequencies) {
+                                    require(equalizerBandRanges.size == equalizerBands.size)
+                                    equalizerBands.mapIndexed { index, frequency ->
+                                        equalizerBandRanges[index].indexOf(frequency).also {
+                                            require(it >= 0) { "Equalizer default frequency must be in its band range" }
+                                        }
+                                    }
+                                } else {
+                                    emptyList()
+                                }
                                 action(
                                     key = DeviceSettingsPreferenceConst.PREF_SOUNDCORE_EQUALIZER_RESET,
                                     title = R.string.soundcore_equalizer_reset_title,
@@ -426,26 +448,25 @@ abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator(
                                     icon = R.drawable.ic_history,
                                     onClick = { _, device ->
                                         device?.let {
-                                            val adjustableFrequencies = has(Capability.AudioEqualizer2)
-                                            val bandKeys = if (adjustableFrequencies) equalizerBandKeys else equalizerBandKeys.take(getSupportedEqualizerBands().size)
+                                            val bandKeys = equalizerBandKeys.take(equalizerBands.size)
                                             val prefs = GBApplication.getDevicePrefs(it).preferences
                                             prefs.edit().apply {
                                                 bandKeys.forEach { key -> putInt(key, if (adjustableFrequencies) 60 else 0) }
                                                 if (adjustableFrequencies) {
-                                                    equalizerFrequencyKeys.forEachIndexed { index, key ->
-                                                        putString(key, when (index) { 7 -> "6"; 8 -> "1"; else -> "7" })
+                                                    defaultFrequencyIndices.forEachIndexed { index, frequencyIndex ->
+                                                        putString(equalizerFrequencyKeys[index], frequencyIndex.toString())
                                                     }
                                                 }
                                                 apply()
                                             }
-                                            val lastKey = if (adjustableFrequencies) equalizerFrequencyKeys.last() else bandKeys.lastOrNull()
+                                            val lastKey = if (adjustableFrequencies) equalizerFrequencyKeys.getOrNull(equalizerBands.lastIndex) else bandKeys.lastOrNull()
                                             lastKey?.let { key -> GBApplication.deviceService(it).onSendConfiguration(key) }
                                         }
                                         true
                                     },
                                 )
                                 // Simple Equalizer for Sport X20
-                                if (!has(Capability.AudioEqualizer2)) {
+                                if (!adjustableFrequencies) {
                                     getSupportedEqualizerBands().take(equalizerBandKeys.size).forEachIndexed { index, frequency ->
                                         val key = equalizerBandKeys[index]
                                         category(
@@ -464,7 +485,7 @@ abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator(
                                     }
                                 }
                                 // Equalizer for Motion 300
-                                if (has(Capability.AudioEqualizer2)) {
+                                if (adjustableFrequencies) {
                                     val bandTitles = listOf(
                                         R.string.soundcore_equalizer_band1,
                                         R.string.soundcore_equalizer_band2,
@@ -476,19 +497,8 @@ abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator(
                                         R.string.soundcore_equalizer_band8,
                                         R.string.soundcore_equalizer_band9,
                                     )
-                                    val frequencyEntries = listOf(
-                                        R.array.soundcore_equalizer_band1_freq_names,
-                                        R.array.soundcore_equalizer_band2_freq_names,
-                                        R.array.soundcore_equalizer_band3_freq_names,
-                                        R.array.soundcore_equalizer_band4_freq_names,
-                                        R.array.soundcore_equalizer_band5_freq_names,
-                                        R.array.soundcore_equalizer_band6_freq_names,
-                                        R.array.soundcore_equalizer_band7_freq_names,
-                                        R.array.soundcore_equalizer_band8_freq_names,
-                                        R.array.soundcore_equalizer_band9_freq_names,
-                                    )
-                                    equalizerBandKeys.forEachIndexed { index, key ->
-                                        val band = index + 1
+                                    equalizerBands.forEachIndexed { index, _ ->
+                                        val key = equalizerBandKeys[index]
                                         category(
                                             key = "${key}_category",
                                             title = bandTitles[index],
@@ -497,9 +507,10 @@ abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator(
                                                 key = equalizerFrequencyKeys[index],
                                                 title = R.string.soundcore_equalizer_frequency,
                                                 icon = R.drawable.ic_hearing,
-                                                entriesRes = frequencyEntries[index],
-                                                entryValuesRes = R.array.soundcore_equalizer_freq_values,
-                                                defaultValue = when (band) { 8 -> "6"; 9 -> "1"; else -> "7" },
+                                                entries = equalizerBandRanges[index].mapIndexed { frequencyIndex, frequency ->
+                                                    ListEntry.Text(frequencyIndex.toString(), formatEqualizerFrequency(frequency))
+                                                },
+                                                defaultValue = defaultFrequencyIndices[index].toString(),
                                             )
                                             seekbar(
                                                 key = key,
