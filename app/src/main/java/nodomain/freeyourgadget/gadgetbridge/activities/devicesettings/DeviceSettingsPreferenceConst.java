@@ -558,6 +558,17 @@ public class DeviceSettingsPreferenceConst {
     public static final String PREF_SOUNDCORE_EQUALIZER_PRESET = "pref_soundcore_equalizer_preset";
     public static final String PREF_SOUNDCORE_EQUALIZER_CUSTOM = "pref_soundcore_equalizer_custom";
     public static final String PREF_SOUNDCORE_EQUALIZER_DIRECTION = "pref_soundcore_equalizer_direction";
+    public static final String PREF_SOUNDCORE_LISTENING_MODE = "pref_soundcore_listening_mode";
+    public static final String PREF_SOUNDCORE_DEFAULT_LISTENING_MODE = "pref_soundcore_default_listening_mode";
+    public static final String PREF_SOUNDCORE_LOCAL_PLAYBACK = "pref_soundcore_local_playback";
+    public static final String PREF_SOUNDCORE_LOCAL_VOLUME = "pref_soundcore_local_volume";
+    public static final String PREF_SOUNDCORE_SNORE_MASKING = "pref_soundcore_snore_masking";
+    public static final String PREF_SOUNDCORE_SLEEP_AUDIO = "pref_soundcore_sleep_audio";
+    public static final String PREF_SOUNDCORE_CALLS_ENABLED = "pref_soundcore_calls_enabled";
+    public static final String PREF_SOUNDCORE_POWER_OFF_TONE = "pref_soundcore_power_off_tone";
+    public static final String PREF_SOUNDCORE_ANC_TONE = "pref_soundcore_anc_tone";
+    public static final String PREF_SOUNDCORE_MODE_TONE = "pref_soundcore_mode_tone";
+    public static final String PREF_SOUNDCORE_CONTROL_RESET = "pref_soundcore_control_reset";
     public static final String PREF_SOUNDCORE_EQUALIZER_RESET = "pref_soundcore_equalizer_reset";
     public static final String PREF_SOUNDCORE_EQUALIZER_BAND1_FREQ = "pref_soundcore_equalizer_band1_freq";
     public static final String PREF_SOUNDCORE_EQUALIZER_BAND1_VALUE = "pref_soundcore_equalizer_band1_value";

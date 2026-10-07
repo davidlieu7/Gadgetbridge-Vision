@@ -157,6 +157,8 @@ abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator(
         PLAYPAUSE(6, R.string.pref_media_playpause),
         VOICE_ASSISTANT(5, R.string.pref_title_touch_voice_assistant),
         AMBIENT_SOUND_CONTROL(4, R.string.sony_button_mode_ambient_sound_control),
+        ANC_TOGGLE(8, R.string.soundcore_anc_toggle),
+        SWITCH_MODE(13, R.string.soundcore_switch_mode),
         NONE(15, R.string.none),
 
         ;

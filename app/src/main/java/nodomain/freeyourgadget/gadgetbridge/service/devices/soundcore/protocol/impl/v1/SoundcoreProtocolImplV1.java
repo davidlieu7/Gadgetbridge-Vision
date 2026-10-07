@@ -87,6 +87,20 @@ public class SoundcoreProtocolImplV1 extends AbstractSoundcoreProtocol {
     public static final short CMD_SET_EQUALIZER_PRESET = (short) 0x8b02;
     public static final short CMD_POWER_OFF = (short) 0x8901;
 
+    public static final short CMD_SET_ANC_ENABLED = (short) 0x8706;
+    public static final short CMD_SET_LISTENING_MODE = (short) 0xa901;
+    public static final short CMD_SET_LOCAL_PLAYBACK = (short) 0x0213;
+    public static final short CMD_SET_LOCAL_VOLUME = (short) 0x0513;
+    public static final short CMD_SET_SNORE_MASKING = (short) 0x0613;
+    public static final short CMD_SET_SLEEP_AUDIO = (short) 0x8515;
+    public static final short CMD_SET_SLEEP_AUTO_SWITCH = (short) 0x8f15;
+    public static final short CMD_GET_SLEEP_SETTINGS = (short) 0x0315;
+    public static final short CMD_SET_CALLS_ENABLED = (short) 0x7510;
+    public static final short CMD_SET_POWER_OFF_TONE = (short) 0x9e10;
+    public static final short CMD_SET_ANC_TONE = (short) 0x7710;
+    public static final short CMD_SET_MODE_TONE = (short) 0x9f10;
+    public static final short CMD_SET_DEFAULT_LISTENING_MODE = (short) 0x9510;
+
     public static final int battery_case = 0;
     public static final int battery_earphone_left = 1;
     public static final int battery_earphone_right = 2;
@@ -602,6 +616,36 @@ public class SoundcoreProtocolImplV1 extends AbstractSoundcoreProtocol {
 
     protected byte[] encodePairingMode() {
         return encodeCommand(CMD_ENABLE_PAIRING_MODE, new byte[]{0x00, (byte) 0x90});
+    }
+
+    public byte[] encodeAncEnabled(final boolean enabled) {
+        return encodeBooleanCommand(CMD_SET_ANC_ENABLED, enabled);
+    }
+
+    public byte[] encodeListeningMode(final boolean local) {
+        return encodeBooleanCommand(CMD_SET_LISTENING_MODE, local);
+    }
+
+    public byte[] encodeLocalPlayback(final boolean playing) {
+        return encodeCommand(CMD_SET_LOCAL_PLAYBACK, new byte[]{0, encodeBoolean(playing)});
+    }
+
+    public byte[] encodeLocalVolume(final int volume) {
+        if (volume < 0 || volume > 65) throw new IllegalArgumentException("Local volume must be 0..65");
+        return encodeByteCommand(CMD_SET_LOCAL_VOLUME, (byte) volume);
+    }
+
+    public byte[] encodeSleepAudio(final String action) {
+        if ("keep".equals(action)) return encodeBooleanCommand(CMD_SET_SLEEP_AUTO_SWITCH, false);
+        if (!"local".equals(action) && !"pause".equals(action)) return null;
+        final byte[] enable = encodeBooleanCommand(CMD_SET_SLEEP_AUTO_SWITCH, true);
+        final byte[] configure = encodeCommand(CMD_SET_SLEEP_AUDIO,
+                new byte[]{(byte) 0xff, (byte) 0xff, (byte) 0xff, encodeBoolean("local".equals(action))});
+        final byte[] readback = encodeRequest(CMD_GET_SLEEP_SETTINGS);
+        final byte[] result = Arrays.copyOf(enable, enable.length + configure.length + readback.length);
+        System.arraycopy(configure, 0, result, enable.length, configure.length);
+        System.arraycopy(readback, 0, result, enable.length + configure.length, readback.length);
+        return result;
     }
 
     protected byte[] encodeControlFunction(final boolean right, final byte action, final byte function) {
