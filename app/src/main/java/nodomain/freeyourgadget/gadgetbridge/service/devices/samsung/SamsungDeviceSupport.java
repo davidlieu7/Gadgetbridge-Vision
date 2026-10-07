@@ -26,6 +26,7 @@ import android.content.Context;
 import android.content.SharedPreferences;
 import android.net.Uri;
 import android.os.Bundle;
+import android.text.TextUtils;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
@@ -50,6 +51,7 @@ import nodomain.freeyourgadget.gadgetbridge.GBApplication;
 import nodomain.freeyourgadget.gadgetbridge.R;
 import nodomain.freeyourgadget.gadgetbridge.activities.SettingsActivity;
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsPreferenceConst;
+import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsUtils;
 import nodomain.freeyourgadget.gadgetbridge.database.DBHandler;
 import nodomain.freeyourgadget.gadgetbridge.database.DBHelper;
 import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEventAppInfo;
@@ -106,9 +108,11 @@ import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3NotificationCapability;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3NotificationIcon;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3Settings;
+import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3MenuOrder;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3WeatherInfo;
 import nodomain.freeyourgadget.gadgetbridge.util.FileUtils;
 import nodomain.freeyourgadget.gadgetbridge.util.GB;
+import nodomain.freeyourgadget.gadgetbridge.util.preferences.DevicePrefs;
 
 
 public class SamsungDeviceSupport extends AbstractBTLESingleDeviceSupport {
@@ -401,13 +405,18 @@ public class SamsungDeviceSupport extends AbstractBTLESingleDeviceSupport {
             watchfaceManager.onFileTransferMessage(body);
             return;
         }
+        // Tiles, quick panel, apps: the band's arrangement of each menu. None
+        // is answered - the tile table in particular looks like a request, and
+        // a reply on its MSG_ID asks for it again (see Fit3MenuOrder).
+        Fit3MenuOrder.Menu menu = Fit3MenuOrder.Menu.forChannel(channel);
+        if (menu != null) {
+            handleMenuTable(menu, body);
+            return;
+        }
 
         // Parsing band responses here. Ussually has payload with data.
         if (isResponse) {
             switch (channel) {
-                case SapProtocol.CH_CAPABILITY_0F:       // capability table -> ack 0x00
-                    //sendRawMessage(SapProtocol.CH_CAPABILITY_0F, new byte[]{0x00}, "cap-ack"); //WARN: loops
-                    return;
                 case SapProtocol.CH_NOTIFICATION:        // 0x07: /13 capabilities, /19 icon push ack
                     onNotificationResponse(msgId, body);
                     return;
@@ -1178,6 +1187,14 @@ public class SamsungDeviceSupport extends AbstractBTLESingleDeviceSupport {
 
         sendRawMessage(Fit3BatteryInfo.CHANNEL, Fit3BatteryInfo.buildRequest(), "battery-request");
 
+        // Menu arrangements: tiles and quick panel on request (the band also
+        // sends the tiles unprompted); the app list arrives on its own after
+        // the license agreement above.
+        sendRawMessage(Fit3MenuOrder.Menu.TILES.channel,
+                Fit3MenuOrder.buildRequest(Fit3MenuOrder.Menu.TILES), "tiles-request");
+        sendRawMessage(Fit3MenuOrder.Menu.QUICK_PANEL.channel,
+                Fit3MenuOrder.buildRequest(Fit3MenuOrder.Menu.QUICK_PANEL), "quick-panel-request");
+
         // Notification capabilities - the icon size to render at. The reply
         // starts the push of any picked app icons the band doesn't hold yet.
         sendRawMessage(Fit3NotificationCapability.CHANNEL, Fit3NotificationCapability.buildRequest(),
@@ -1524,6 +1541,11 @@ public class SamsungDeviceSupport extends AbstractBTLESingleDeviceSupport {
                 // whole profile.
                 sendUserProfile();
                 break;
+            case "samsung_fit3_tiles_sortable":
+            case "samsung_fit3_quick_panel_sortable":
+            case "samsung_fit3_apps_sortable":
+                sendMenuOrder(Fit3MenuOrder.Menu.forPrefKey(config));
+                break;
             case DeviceSettingsPreferenceConst.PREF_UPLOAD_NOTIFICATIONS_APP_ICON:
                 // The picked-apps list changed: push whatever is new.
                 iconUploader.sync();
@@ -1546,6 +1568,70 @@ public class SamsungDeviceSupport extends AbstractBTLESingleDeviceSupport {
             return;
         }
         sendMessage(Fit3WeatherInfo.CHANNEL, Fit3WeatherInfo.buildRequest(weatherSpec), "weather");
+    }
+
+    /**
+     * Adopt the band's arrangement of a menu (see {@link Fit3MenuOrder}) into
+     * its sortable preference: which items exist and their names, and which
+     * are shown, in order. The band is authoritative - it re-sends a table
+     * whenever the user rearranges that menu on the band itself.
+     */
+    private void handleMenuTable(Fit3MenuOrder.Menu menu, byte[] body) {
+        List<Fit3MenuOrder.Entry> entries = Fit3MenuOrder.parse(menu, body);
+        if (entries == null) {
+            LOG.debug("Samsung Fit 3: {} msgId={} ignored", menu, body[0] & 0x3f);
+            return;
+        }
+        List<Integer> shown = Fit3MenuOrder.shownIds(entries);
+        LOG.info("Samsung Fit 3: {} - {} item(s), shown in order: {}", menu, entries.size(), shown);
+
+        // Possible values: shown ones first, in order, then the hidden ones.
+        List<Integer> all = new ArrayList<>(shown);
+        for (Fit3MenuOrder.Entry e : entries) {
+            if (!all.contains(e.id)) {
+                all.add(e.id);
+            }
+        }
+        List<String> labels = new ArrayList<>(all.size());
+        for (Integer id : all) {
+            labels.add(Fit3MenuOrder.name(menu, id).replace(",", " "));
+        }
+        evaluateGBDeviceEvent(new GBDeviceEventUpdatePreferences()
+                .withPreference(menu.prefKey, joinIds(shown))
+                .withPreference(DeviceSettingsUtils.getPrefPossibleValuesKey(menu.prefKey), joinIds(all))
+                .withPreference(DeviceSettingsUtils.getPrefPossibleValueLabelsKey(menu.prefKey),
+                        TextUtils.join(",", labels)));
+    }
+
+    /** Send the user's new arrangement of a menu (see {@link Fit3MenuOrder#buildSet}). */
+    private void sendMenuOrder(Fit3MenuOrder.Menu menu) {
+        DevicePrefs prefs = getDevicePrefs();
+        List<Integer> shown = parseIds(prefs.getList(menu.prefKey, Collections.emptyList()));
+        List<Integer> all = parseIds(prefs.getList(
+                DeviceSettingsUtils.getPrefPossibleValuesKey(menu.prefKey), Collections.emptyList()));
+        if (all.isEmpty()) {
+            LOG.warn("Samsung Fit 3: {} not reported by the band yet, not sending", menu);
+            return;
+        }
+        shown.retainAll(all);
+        LOG.info("Samsung Fit 3: setting {} to {}", menu, shown);
+        sendMessage(menu.channel, Fit3MenuOrder.buildSet(menu, shown, all), "menu-order-" + menu);
+    }
+
+    private static String joinIds(List<Integer> ids) {
+        return TextUtils.join(",", ids);
+    }
+
+    private static List<Integer> parseIds(List<String> values) {
+        List<Integer> ids = new ArrayList<>(values.size());
+        for (String v : values) {
+            try {
+                ids.add(Integer.parseInt(v.trim()));
+            } catch (NumberFormatException e) {
+                LOG.warn("Samsung Fit 3: ignoring bad menu item '{}'", v);
+            }
+        }
+        return ids;
     }
 
     private void handleBatteryInfo(Fit3BatteryInfo info) {

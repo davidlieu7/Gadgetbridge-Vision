@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.preference.PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Entries come from the band at connect, see SamsungFit3SettingsCustomizer. -->
+    <com.mobeta.android.dslv.DragSortListPreference
+        android:defaultValue="@array/pref_huami2021_empty_array"
+        android:dialogTitle="@string/pref_samsung_fit3_tiles_title"
+        android:entries="@array/pref_huami2021_empty_array"
+        android:entryValues="@array/pref_huami2021_empty_array"
+        android:icon="@drawable/ic_widgets"
+        android:key="samsung_fit3_tiles_sortable"
+        android:persistent="true"
+        android:summary="@string/pref_samsung_fit3_tiles_summary"
+        android:title="@string/pref_samsung_fit3_tiles_title" />
+    <com.mobeta.android.dslv.DragSortListPreference
+        android:defaultValue="@array/pref_huami2021_empty_array"
+        android:dialogTitle="@string/pref_samsung_fit3_quick_panel_title"
+        android:entries="@array/pref_huami2021_empty_array"
+        android:entryValues="@array/pref_huami2021_empty_array"
+        android:icon="@drawable/ic_toggle_on"
+        android:key="samsung_fit3_quick_panel_sortable"
+        android:persistent="true"
+        android:summary="@string/pref_samsung_fit3_quick_panel_summary"
+        android:title="@string/pref_samsung_fit3_quick_panel_title" />
+    <com.mobeta.android.dslv.DragSortListPreference
+        android:defaultValue="@array/pref_huami2021_empty_array"
+        android:dialogTitle="@string/pref_samsung_fit3_apps_title"
+        android:entries="@array/pref_huami2021_empty_array"
+        android:entryValues="@array/pref_huami2021_empty_array"
+        android:icon="@drawable/ic_menu"
+        android:key="samsung_fit3_apps_sortable"
+        android:persistent="true"
+        android:summary="@string/pref_samsung_fit3_apps_summary"
+        android:title="@string/pref_samsung_fit3_apps_title" />
+</androidx.preference.PreferenceScreen>

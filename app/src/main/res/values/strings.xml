@@ -6039,4 +6039,10 @@
     <string name="datestep_prev_month">Previous month</string>
     <string name="datestep_next_month">Next month</string>
     <string name="devicetype_samsung_fit3">Samsung Fit3</string>
+    <string name="pref_samsung_fit3_tiles_title">Tiles</string>
+    <string name="pref_samsung_fit3_tiles_summary">Choose and order the tiles shown next to the watch face</string>
+    <string name="pref_samsung_fit3_quick_panel_title">Quick panel</string>
+    <string name="pref_samsung_fit3_quick_panel_summary">Choose and order the quick panel buttons</string>
+    <string name="pref_samsung_fit3_apps_title">Apps order</string>
+    <string name="pref_samsung_fit3_apps_summary">Order the apps list; every app stays on the band</string>
 </resources>

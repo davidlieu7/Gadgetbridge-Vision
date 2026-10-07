@@ -32,6 +32,7 @@ import de.greenrobot.dao.AbstractDao;
 import de.greenrobot.dao.Property;
 import nodomain.freeyourgadget.gadgetbridge.R;
 import nodomain.freeyourgadget.gadgetbridge.activities.appmanager.AppManagerActivity;
+import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSpecificSettingsCustomizer;
 import nodomain.freeyourgadget.gadgetbridge.devices.AbstractBLEDeviceCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.InstallHandler;
 import nodomain.freeyourgadget.gadgetbridge.devices.SampleProvider;
@@ -189,7 +190,13 @@ public class SamsungFit3Coordinator extends AbstractBLEDeviceCoordinator {
                 R.xml.devicesettings_liftwrist_display_noshed,
                 R.xml.devicesettings_timeformat,
                 R.xml.devicesettings_upload_notifications_app_icon,
+                R.xml.devicesettings_samsung_fit3_menus,
         };
+    }
+
+    @Override
+    public DeviceSpecificSettingsCustomizer getDeviceSpecificSettingsCustomizer(final GBDevice device) {
+        return new SamsungFit3SettingsCustomizer();
     }
 
 }
