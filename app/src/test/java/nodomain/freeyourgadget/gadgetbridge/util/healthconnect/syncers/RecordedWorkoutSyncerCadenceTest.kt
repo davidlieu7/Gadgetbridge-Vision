@@ -19,49 +19,44 @@ class RecordedWorkoutSyncerCadenceTest {
         return p
     }
 
-    private fun rates(points: List<ActivityPoint>, unit: ActivityKind.CycleUnit, perLeg: Boolean): List<Double> =
-        RecordedWorkoutSyncer.cadenceSamples(points, unit, perLeg, start, end).map { it.second }
+    private fun rates(points: List<ActivityPoint>, unit: ActivityKind.CycleUnit): List<Double> =
+        RecordedWorkoutSyncer.cadenceSamples(points, unit, start, end).map { it.second }
 
     @Test
-    fun steps_perLeg_isDoubled() {
-        assertEquals(listOf(170.0, 176.0), rates(listOf(pt(1, 85), pt(2, 88)), ActivityKind.CycleUnit.STEPS, true))
+    fun steps_areKept() {
+        assertEquals(listOf(170.0, 176.0), rates(listOf(pt(1, 170), pt(2, 176)), ActivityKind.CycleUnit.STEPS))
     }
 
     @Test
-    fun steps_bothLegs_isKept() {
-        assertEquals(listOf(170.0), rates(listOf(pt(1, 170)), ActivityKind.CycleUnit.STEPS, false))
-    }
-
-    @Test
-    fun revolutions_isNeverDoubled() {
-        assertEquals(listOf(90.0), rates(listOf(pt(1, 90)), ActivityKind.CycleUnit.REVOLUTIONS, true))
+    fun revolutions_areKept() {
+        assertEquals(listOf(90.0), rates(listOf(pt(1, 90)), ActivityKind.CycleUnit.REVOLUTIONS))
     }
 
     @Test
     fun unsetAndZero_areDropped() {
-        assertEquals(listOf(80.0), rates(listOf(pt(1, -1), pt(2, 0), pt(3, 80)), ActivityKind.CycleUnit.STEPS, false))
+        assertEquals(listOf(80.0), rates(listOf(pt(1, -1), pt(2, 0), pt(3, 80)), ActivityKind.CycleUnit.STEPS))
     }
 
     @Test
     fun outsideWorkout_isDropped() {
-        assertEquals(listOf(80.0), rates(listOf(pt(-5, 70), pt(3, 80), pt(601, 90)), ActivityKind.CycleUnit.STEPS, false))
+        assertEquals(listOf(80.0), rates(listOf(pt(-5, 70), pt(3, 80), pt(601, 90)), ActivityKind.CycleUnit.STEPS))
     }
 
     @Test
     fun pointWithoutTime_isDropped() {
         val noTime = ActivityPoint()
         noTime.cadence = 80
-        assertTrue(rates(listOf(noTime), ActivityKind.CycleUnit.STEPS, false).isEmpty())
+        assertTrue(rates(listOf(noTime), ActivityKind.CycleUnit.STEPS).isEmpty())
     }
 
     @Test
     fun strokes_haveNoRecord() {
-        assertTrue(rates(listOf(pt(1, 30)), ActivityKind.CycleUnit.STROKES, false).isEmpty())
+        assertTrue(rates(listOf(pt(1, 30)), ActivityKind.CycleUnit.STROKES).isEmpty())
     }
 
     @Test
     fun samplesKeepPointTime() {
-        val samples = RecordedWorkoutSyncer.cadenceSamples(listOf(pt(42, 80)), ActivityKind.CycleUnit.STEPS, false, start, end)
+        val samples = RecordedWorkoutSyncer.cadenceSamples(listOf(pt(42, 80)), ActivityKind.CycleUnit.STEPS, start, end)
         assertEquals(start.plusSeconds(42), samples.single().first)
     }
 }

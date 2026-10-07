@@ -45,6 +45,7 @@ import nodomain.freeyourgadget.gadgetbridge.activities.workouts.entries.Activity
 import nodomain.freeyourgadget.gadgetbridge.entities.BaseActivitySummary;
 import nodomain.freeyourgadget.gadgetbridge.entities.GenericMetricSample;
 import nodomain.freeyourgadget.gadgetbridge.model.ActivityKind;
+import nodomain.freeyourgadget.gadgetbridge.model.FitActivityTrackProvider;
 import nodomain.freeyourgadget.gadgetbridge.model.ActivityPoint;
 import nodomain.freeyourgadget.gadgetbridge.model.ActivitySummaryData;
 import nodomain.freeyourgadget.gadgetbridge.model.ActivitySummaryParser;
@@ -192,11 +193,7 @@ public class GarminWorkoutParser implements ActivitySummaryParser {
 
         final ActivitySummaryData activitySummaryData = updateSummary(summary);
         final ActivityKind activityKind = ActivityKind.fromCode(summary.getActivityKind());
-        final ActivityKind.CycleUnit cycleUnit = ActivityKind.getCycleUnit(activityKind);
-
-        if (cycleUnit == ActivityKind.CycleUnit.STEPS) {
-            activityPoints.forEach(ap -> ap.setCadence(ap.getCadence() * 2));
-        }
+        activityPoints.forEach(ap -> FitActivityTrackProvider.normalizeStepCadence(ap, activityKind));
 
         final List<WorkoutChart> charts = new LinkedList<>();
         if (!this.activityPoints.isEmpty()) {
