@@ -188,6 +188,7 @@ public class SamsungFit3Coordinator extends AbstractBLEDeviceCoordinator {
                 R.xml.devicesettings_always_on_display,
                 R.xml.devicesettings_liftwrist_display_noshed,
                 R.xml.devicesettings_timeformat,
+                R.xml.devicesettings_upload_notifications_app_icon,
         };
     }
 

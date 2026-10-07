@@ -56,8 +56,8 @@ import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.SapProtocol;
  *      0e len utf8...      [if app name]     param 0x0e = APP_NAME (string, 1-byte len)
  *      0f 01                             param 0x0f = ALERT_TYPE = 1 (byte)
  *      10 01                             param 0x10 = IS_URGENT = 1 (byte)
- *      09 len ascii...     [if package]           param 0x09 = IMAGE_URL (string, 1-byte len)
- *      13 01               [if package, first push for this icon]  param 0x13 = IMAGE_NEWLY_ADDED = 1 (byte)
+ *      09 len ascii...     [if icon]              param 0x09 = IMAGE_URL (string, 1-byte len)
+ *      13 01               [if icon not yet on the band]  param 0x13 = IMAGE_NEWLY_ADDED = 1 (byte)
  *      12 len utf8...      [if package]           param 0x12 = APP_PACKAGE_NAME (string, 1-byte len)
  * </pre>
  *
@@ -79,10 +79,10 @@ import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.SapProtocol;
  * {@code NOTI_ADDITIONAL_INFO} request, regardless of whether {@code
  * APP_ID}/{@code APP_PACKAGE_NAME} are otherwise valid. {@code
  * IMAGE_NEWLY_ADDED} additionally forces a re-fetch even if the band still
- * has that URL cached from a previous push - the source app only sets it
- * when its own persisted per-app icon hash changed; the caller here passes
- * it for the first push of a given icon per connection and leaves it off
- * afterwards, as a cheap stand-in for that hash check.
+ * has that URL cached. Icons are only sent for the apps the user picked, and
+ * those are normally pushed ahead of time (see {@code Fit3AppIconUploader});
+ * the caller sets the flag while an app's icon isn't confirmed on the band,
+ * so the band falls back to fetching it.
  */
 public final class Fit3Notification {
 
@@ -136,12 +136,19 @@ public final class Fit3Notification {
     }
 
     /** Build with the MSG_ID picked automatically from {@code spec.dndSuppressed}. */
-    public static byte[] buildRequest(NotificationSpec spec, String pkg, boolean iconNewlyAdded) {
+    public static byte[] buildRequest(NotificationSpec spec, String pkg, boolean withIcon, boolean iconNewlyAdded) {
         int msgId = spec.getDndSuppressed() != 0 ? MSG_ID_WITH_DND : MSG_ID_NEW_WITH_POPUP;
-        return buildRequest(msgId, spec, pkg, iconNewlyAdded);
+        return buildRequest(msgId, spec, pkg, withIcon, iconNewlyAdded);
     }
 
-    public static byte[] buildRequest(int msgId, NotificationSpec spec, String pkg, boolean iconNewlyAdded) {
+    /**
+     * @param withIcon       reference the app's icon ({@code IMAGE_URL}); without
+     *                       it the band shows its generic notification icon
+     * @param iconNewlyAdded ask the band to (re)fetch that icon - only
+     *                       meaningful with {@code withIcon}
+     */
+    public static byte[] buildRequest(int msgId, NotificationSpec spec, String pkg, boolean withIcon,
+                                      boolean iconNewlyAdded) {
         String heading = firstNonEmpty(spec.getTitle(), spec.getSender(), spec.getSourceName(), "Notification");
         String body    = firstNonEmpty(spec.getBody(), spec.getSubject(), "");
         String appName = spec.getSourceName();
@@ -172,9 +179,11 @@ public final class Fit3Notification {
          .addByte(PARAM_IS_URGENT, 1);
 
         if (!pkg.isEmpty()) {
-            b.addString(PARAM_IMAGE_URL, Fit3NotificationIcon.iconUrlFor(pkg));
-            if (iconNewlyAdded) {
-                b.addByte(PARAM_IMAGE_NEWLY_ADDED, 1);
+            if (withIcon) {
+                b.addString(PARAM_IMAGE_URL, Fit3NotificationIcon.iconUrlFor(pkg));
+                if (iconNewlyAdded) {
+                    b.addByte(PARAM_IMAGE_NEWLY_ADDED, 1);
+                }
             }
             b.addString(PARAM_APP_PACKAGE, pkg);
         }

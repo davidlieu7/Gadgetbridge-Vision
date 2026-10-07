@@ -62,6 +62,7 @@ public final class Fit3BigData {
     public static final int DEFAULT_CHUNK_CAP = 980;
 
     private int version = 0;
+    private int lastVersion = -1;
 
     private int nextVersion() {
         int v = version;
@@ -77,9 +78,11 @@ public final class Fit3BigData {
      */
     public List<byte[]> chunk(byte[] data, int cap) {
         if (data.length <= cap) {
+            lastVersion = -1;
             return Collections.singletonList(data);
         }
         int ver = nextVersion();
+        lastVersion = ver;
         int dataCap = cap - CHUNK_HEADER_LEN;
         List<byte[]> chunks = new ArrayList<>();
         int offset = 0;
@@ -103,6 +106,15 @@ public final class Fit3BigData {
             idx++;
         }
         return chunks;
+    }
+
+    /**
+     * The version the last {@link #chunk} call tagged its chunks with - what
+     * the band's {@link Ack} for that transfer will echo - or -1 if that
+     * payload was small enough to go out unchunked (and gets no such ack).
+     */
+    public int lastVersion() {
+        return lastVersion;
     }
 
     /** Parsed {@code LARGE_DATA_ACK_NACK} (MSG_ID 0x3e) body. */

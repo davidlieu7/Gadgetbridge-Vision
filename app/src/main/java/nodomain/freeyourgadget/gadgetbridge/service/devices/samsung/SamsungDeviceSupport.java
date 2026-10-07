@@ -103,6 +103,7 @@ import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3MediaInfo;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3MediaVolume;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3Notification;
+import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3NotificationCapability;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3NotificationIcon;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3Settings;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3WeatherInfo;
@@ -204,6 +205,27 @@ public class SamsungDeviceSupport extends AbstractBTLESingleDeviceSupport {
     // the exact IMAGE_URL string (see Fit3NotificationIcon); populated as
     // notifications are pushed, since the fetch request only carries the id.
     private final Map<String, String> notificationPackagesByIconUrl = new HashMap<>();
+
+    /** Pushes the icons of the user-picked apps ahead of time; see {@link Fit3AppIconUploader}. */
+    private final Fit3AppIconUploader iconUploader = new Fit3AppIconUploader(new Fit3AppIconUploader.Listener() {
+        @Override
+        public int sendNotificationPayload(byte[] body, String reason) {
+            for (byte[] chunk : bigData.chunk(body, Fit3BigData.DEFAULT_CHUNK_CAP)) {
+                sendMessage(SapProtocol.CH_NOTIFICATION, chunk, reason);
+            }
+            return bigData.lastVersion();
+        }
+
+        @Override
+        public Context getContext() {
+            return SamsungDeviceSupport.this.getContext();
+        }
+
+        @Override
+        public String getDeviceAddress() {
+            return getDevice().getAddress();
+        }
+    });
     // TODO: replace with the real UUIDs discovered from the band.
     public static final UUID UUID_SERVICE =
             UUID.fromString("00001a1a-0000-1000-8000-00805f9b34fb");
@@ -386,7 +408,8 @@ public class SamsungDeviceSupport extends AbstractBTLESingleDeviceSupport {
                 case SapProtocol.CH_CAPABILITY_0F:       // capability table -> ack 0x00
                     //sendRawMessage(SapProtocol.CH_CAPABILITY_0F, new byte[]{0x00}, "cap-ack"); //WARN: loops
                     return;
-                case SapProtocol.CH_NOTIFICATION:        // 0x07: /16,/22 notification config
+                case SapProtocol.CH_NOTIFICATION:        // 0x07: /13 capabilities, /19 icon push ack
+                    onNotificationResponse(msgId, body);
                     return;
                 case SapProtocol.CH_MEDIA:               // 0x09: /1,/8 media state; /4 transport button
                     onMediaRequest(msgId, body);
@@ -993,11 +1016,42 @@ public class SamsungDeviceSupport extends AbstractBTLESingleDeviceSupport {
      * big-data-chunk upload ack (MSG_ID 0x3e) for an icon response already
      * sent - see {@link Fit3NotificationIcon} and {@link Fit3BigData}.
      */
+    /**
+     * The band's answers on {@code CH_NOTIFICATION}: the capability reply
+     * (icon size, then push any picked icons it lacks) and the per-icon ack
+     * of those pushes.
+     */
+    private void onNotificationResponse(int msgId, byte[] body) {
+        if (msgId == Fit3NotificationCapability.MSG_ID) {
+            Fit3NotificationCapability cap = Fit3NotificationCapability.parse(body);
+            if (cap == null) {
+                LOG.warn("Samsung Fit 3: notification capability reply could not be parsed");
+                return;
+            }
+            LOG.info("Samsung Fit 3: {}", cap);
+            iconUploader.setIconSize(cap.iconSize());
+            iconUploader.sync();
+        } else if (msgId == Fit3NotificationIcon.MSG_ID_PUSH) {
+            Fit3NotificationIcon.PushAck ack = Fit3NotificationIcon.parsePushAck(body);
+            if (ack == null) {
+                LOG.warn("Samsung Fit 3: malformed icon push ack");
+                return;
+            }
+            iconUploader.onAck(ack);
+        } else {
+            LOG.debug("Samsung Fit 3: notification response msgId={} unhandled", msgId);
+        }
+    }
+
     private void onNotificationRequest(int msgId, byte[] body) {
         if (msgId == Fit3NotificationIcon.MSG_ID_ADDITIONAL_INFO) {
             handleNotificationIconRequest(body);
         } else if (msgId == 0x3e) {
-            LOG.debug("Samsung Fit 3: notification icon upload ack: {}", Fit3BigData.parseAck(body));
+            Fit3BigData.Ack ack = Fit3BigData.parseAck(body);
+            LOG.debug("Samsung Fit 3: notification icon upload ack: {}", ack);
+            if (ack != null) {
+                iconUploader.onTransferAck(ack);
+            }
         } else {
             LOG.debug("TODO handle notification request MSG_ID={}", msgId);
         }
@@ -1009,9 +1063,13 @@ public class SamsungDeviceSupport extends AbstractBTLESingleDeviceSupport {
             LOG.warn("Samsung Fit 3: could not parse notification icon request");
             return;
         }
+        // Only picked apps' icons are ever referenced, so only those are served.
         String pkg = notificationPackagesByIconUrl.get(request.iconUrl);
         if (pkg == null) {
-            LOG.warn("Samsung Fit 3: no package known for icon request '{}'", request.iconUrl);
+            pkg = iconUploader.packageForIconUrl(request.iconUrl);
+        }
+        if (pkg == null) {
+            LOG.warn("Samsung Fit 3: no picked app for icon request '{}'", request.iconUrl);
             return;
         }
         byte[] rgba = Fit3NotificationIcon.renderIcon(getContext(), pkg, request.size);
@@ -1119,6 +1177,11 @@ public class SamsungDeviceSupport extends AbstractBTLESingleDeviceSupport {
                 "license-agreement"); // required
 
         sendRawMessage(Fit3BatteryInfo.CHANNEL, Fit3BatteryInfo.buildRequest(), "battery-request");
+
+        // Notification capabilities - the icon size to render at. The reply
+        // starts the push of any picked app icons the band doesn't hold yet.
+        sendRawMessage(Fit3NotificationCapability.CHANNEL, Fit3NotificationCapability.buildRequest(),
+                "notification-capability");
 
         // 7) full settings snapshot - the band tells us what it is actually set
         //    to, so the settings screen starts from its state and not ours.
@@ -1328,17 +1391,20 @@ public class SamsungDeviceSupport extends AbstractBTLESingleDeviceSupport {
     @Override
     public void onNotification(NotificationSpec spec) {
         String pkg = Fit3Notification.resolvePackage(spec, getContext());
+        // Only apps the user picked get an icon; the rest show the band's generic one.
+        boolean withIcon = !pkg.isEmpty() && iconUploader.isSelected(pkg);
         boolean iconNewlyAdded = false;
-        if (!pkg.isEmpty()) {
+        if (withIcon) {
             // Remembered so a later icon-fetch request (which only carries this
             // id, see Fit3NotificationIcon) can be resolved back to a package.
-            // Its prior absence also doubles as "the band hasn't been told
-            // about this icon yet", since there's no persisted icon-hash
-            // cache here to check like the source app has.
             String iconUrl = Fit3NotificationIcon.iconUrlFor(pkg);
-            iconNewlyAdded = notificationPackagesByIconUrl.put(iconUrl, pkg) == null;
+            boolean firstThisConnection = notificationPackagesByIconUrl.put(iconUrl, pkg) == null;
+            // Ask the band to fetch the icon itself while the push hasn't been
+            // confirmed - once per connection, so it isn't re-sent every time.
+            iconNewlyAdded = firstThisConnection && !iconUploader.isOnBand(pkg);
         }
-        sendMessage(Fit3Notification.CHANNEL, Fit3Notification.buildRequest(spec, pkg, iconNewlyAdded), "notification");
+        sendMessage(Fit3Notification.CHANNEL,
+                Fit3Notification.buildRequest(spec, pkg, withIcon, iconNewlyAdded), "notification");
     }
 
     @Override
@@ -1457,6 +1523,10 @@ public class SamsungDeviceSupport extends AbstractBTLESingleDeviceSupport {
                 // all of them in a single message - so any of them re-sends the
                 // whole profile.
                 sendUserProfile();
+                break;
+            case DeviceSettingsPreferenceConst.PREF_UPLOAD_NOTIFICATIONS_APP_ICON:
+                // The picked-apps list changed: push whatever is new.
+                iconUploader.sync();
                 break;
             case DeviceSettingsPreferenceConst.PREF_TIMEFORMAT:
                 // Not a CH_SETTINGS param - the band only learns the clock
@@ -1622,6 +1692,7 @@ public class SamsungDeviceSupport extends AbstractBTLESingleDeviceSupport {
         logDumpStamp = null;
         // Same for a watchface install: the band forgets it on disconnect.
         watchfaceManager.cancel();
+        iconUploader.cancel();
         super.dispose();
     }
 

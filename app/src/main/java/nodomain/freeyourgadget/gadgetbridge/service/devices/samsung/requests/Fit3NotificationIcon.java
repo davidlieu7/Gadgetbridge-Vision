@@ -29,8 +29,20 @@ import nodomain.freeyourgadget.gadgetbridge.util.BitmapUtil;
 import nodomain.freeyourgadget.gadgetbridge.util.NotificationUtils;
 
 /**
- * Answers the band's icon-fetch request on {@code CH_NOTIFICATION} (0x07),
- * {@code NOTI_ADDITIONAL_INFO} (MSG_ID 3). Fixed format, no count byte, both
+ * App icons on {@code CH_NOTIFICATION} (0x07): pushed to the band ahead of
+ * time ({@link #buildPush}, MSG_ID 0x13), or sent when the band asks for one
+ * it doesn't have ({@code NOTI_ADDITIONAL_INFO}, MSG_ID 3).
+ *
+ * <p>The push and its ack, fixed format, no count byte (the push is
+ * source-derived; the vendor app has the builder but
+ * doesn't use it on this band):
+ *
+ * <pre>
+ *   push (phone -&gt; band): 13 [9 IMAGE_URL][7 IMAGE:4B-LE-len]
+ *   ack  (band -&gt; phone): 53 [9 IMAGE_URL][11 RESULT:1B]   RESULT 1 = stored
+ * </pre>
+ *
+ * <p>The fetch: fixed format, no count byte, both
  * directions - confirmed against a live capture:
  *
  * <pre>
@@ -60,11 +72,13 @@ public final class Fit3NotificationIcon {
     public static final int CHANNEL = SapProtocol.CH_NOTIFICATION;
 
     public static final int MSG_ID_ADDITIONAL_INFO = 0x03;
+    public static final int MSG_ID_PUSH = 0x13;
 
     private static final String ICON_URL_PREFIX = "APP_ICON_";
 
     private static final int PARAM_IMAGE = 0x07;
     private static final int PARAM_IMAGE_URL = 0x09;
+    private static final int PARAM_RESULT = 0x0b;
     private static final int PARAM_ICON_SIZE = 0x23; // 35
 
     private Fit3NotificationIcon() {
@@ -114,6 +128,57 @@ public final class Fit3NotificationIcon {
             return null;
         }
         return new Request(iconUrl, size);
+    }
+
+    /**
+     * Build the full (un-chunked) icon push for {@code iconUrl}. Like the
+     * fetch response it is normally too big for one message and goes out
+     * through {@code Fit3BigData}.
+     */
+    public static byte[] buildPush(String iconUrl, byte[] rgbaBytes) {
+        byte[] urlBytes = iconUrl.getBytes(UTF8);
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        out.write(MSG_ID_PUSH); // fixed, request
+        out.write(PARAM_IMAGE_URL);
+        out.write(urlBytes.length);
+        out.write(urlBytes, 0, urlBytes.length);
+        out.write(PARAM_IMAGE);
+        out.write(rgbaBytes.length & 0xFF);
+        out.write((rgbaBytes.length >> 8) & 0xFF);
+        out.write((rgbaBytes.length >> 16) & 0xFF);
+        out.write((rgbaBytes.length >> 24) & 0xFF);
+        out.write(rgbaBytes, 0, rgbaBytes.length);
+        return out.toByteArray();
+    }
+
+    /** The band's answer to a {@link #buildPush push}. */
+    public static final class PushAck {
+        public final String iconUrl;
+        public final boolean stored;
+
+        private PushAck(String iconUrl, boolean stored) {
+            this.iconUrl = iconUrl;
+            this.stored = stored;
+        }
+
+        @Override
+        public String toString() {
+            return "PushAck{" + iconUrl + ", stored=" + stored + "}";
+        }
+    }
+
+    /** @return the ack, or {@code null} if this isn't one. */
+    public static PushAck parsePushAck(byte[] body) {
+        if (body.length < 3 || (body[0] & 0x40) == 0 || (body[0] & 0x3F) != MSG_ID_PUSH
+                || (body[1] & 0xFF) != PARAM_IMAGE_URL) {
+            return null;
+        }
+        int len = body[2] & 0xFF;
+        int off = 3 + len;
+        if (off + 2 > body.length || (body[off] & 0xFF) != PARAM_RESULT) {
+            return null;
+        }
+        return new PushAck(new String(body, 3, len, UTF8), body[off + 1] == 1);
     }
 
     /** Build the full (un-chunked) {@code NOTI_ADDITIONAL_INFO} response body. */
