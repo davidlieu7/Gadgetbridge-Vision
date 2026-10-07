@@ -33,6 +33,8 @@ import org.slf4j.LoggerFactory;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.BufferUnderflowException;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.UUID;
 import java.util.Set;
 import java.util.EnumSet;
@@ -45,8 +47,10 @@ import java.util.LinkedList;
 import nodomain.freeyourgadget.gadgetbridge.activities.multipoint.MultipointPairingActivity;
 import nodomain.freeyourgadget.gadgetbridge.activities.multipoint.MultipointDevice;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
+import nodomain.freeyourgadget.gadgetbridge.service.devices.oppo.commands.EarbudsStatusSide;
+import nodomain.freeyourgadget.gadgetbridge.service.devices.oppo.commands.EarbudsStatusValue;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.oppo.modules.AncConfigModule;
-import nodomain.freeyourgadget.gadgetbridge.util.StringUtils;
+import nodomain.freeyourgadget.gadgetbridge.service.devices.oppo.modules.EarbudsStatusModule;
 import nodomain.freeyourgadget.gadgetbridge.util.LEB128Utils;
 import nodomain.freeyourgadget.gadgetbridge.model.BatteryState;
 import nodomain.freeyourgadget.gadgetbridge.service.btbr.TransactionBuilder;
@@ -80,6 +84,7 @@ public class OppoHeadphonesSupport extends AbstractHeadphoneBTBRDeviceSupport {
 
     private final ByteBuffer packetBuffer = ByteBuffer.allocate(MAX_MTU).order(ByteOrder.LITTLE_ENDIAN);
     private int seqNum = 0;
+    private Map<EarbudsStatusSide, EarbudsStatusValue> earbudsStatus = new HashMap<>();
 
     private final Queue<OppoMessage> messageQueue = new LinkedList<>();
     private OppoMessage pendingMessage = null;
@@ -119,6 +124,7 @@ public class OppoHeadphonesSupport extends AbstractHeadphoneBTBRDeviceSupport {
 
         batteryReq();
         queueCommand(getMiscConfigModule().encodeReq(getMiscSupports()));
+        queueCommand(getStatusModule().encodeReq());
         queueCommand(getAncConfigModule().encodeReq(getAncSupports()));
         touchConfigReq();
         subscriptionSet();
@@ -384,6 +390,9 @@ public class OppoHeadphonesSupport extends AbstractHeadphoneBTBRDeviceSupport {
             case MULTIPOINT_DEVICES_RET -> {
                 multipointReceiverDevices(getMultipointDevsModule().decodeRet(payload));
             }
+            case EARBUDS_STATUS_RET -> {
+                earbudsStatus = getStatusModule().decodeRet(payload);
+            }
             default -> LOG.warn("Unhandled command {}", command);
         }
 
@@ -446,6 +455,7 @@ public class OppoHeadphonesSupport extends AbstractHeadphoneBTBRDeviceSupport {
     private void subscriptionSet() {
         final List<SubscriptionType> types = new ArrayList<>();
         types.add(SubscriptionType.BATTERY);
+        types.add(SubscriptionType.EARBUDS_STATUS);
         if (getCoordinator().supportsAnc(getDevice()))
             types.add(SubscriptionType.ANC_SELECTOR);
         if (getCoordinator().supportsGameMode(getDevice()))
@@ -478,10 +488,9 @@ public class OppoHeadphonesSupport extends AbstractHeadphoneBTBRDeviceSupport {
         switch (type) {
             case BATTERY -> {
                 parseBattery(buf.array());
-            }
-            case STATUS -> {
-                LOG.debug("Got status");
-                // TODO handle
+             }
+            case EARBUDS_STATUS -> {
+                earbudsStatus = getStatusModule().decodeRet(payload);
             }
             case GAME_MODE -> {
                 if (buf.remaining() != 1) {
@@ -747,6 +756,10 @@ public class OppoHeadphonesSupport extends AbstractHeadphoneBTBRDeviceSupport {
 
     protected AncConfigModule getAncConfigModule() {
         return new AncConfigModule(getContext());
+    }
+
+    protected EarbudsStatusModule getStatusModule() {
+        return new EarbudsStatusModule(getContext());
     }
 
     protected MultipointDevicesModule getMultipointDevsModule() {
