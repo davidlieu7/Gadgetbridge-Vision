@@ -541,6 +541,18 @@ public abstract class XiaomiCoordinator extends AbstractBLEDeviceCoordinator {
     }
 
     @Override
+    public int[] getSupportedDebugSettings(final GBDevice device) {
+        if (getConnectionType().equals(ConnectionType.BLE)) {
+            return super.getSupportedDebugSettings(device);
+        }
+        // Only SPP V2 drops packets, see XiaomiSppProtocolV2
+        return ArrayUtils.add(
+                super.getSupportedDebugSettings(device),
+                R.xml.devicesettings_debug_drop_packets
+        );
+    }
+
+    @Override
     public DeviceSpecificSettings getDeviceSpecificSettings(@NonNull final GBDevice device) {
         final DeviceSpecificSettings deviceSpecificSettings = new DeviceSpecificSettings();
 

@@ -28,7 +28,9 @@ import java.nio.ByteOrder;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
+import java.util.concurrent.ThreadLocalRandom;
 
+import nodomain.freeyourgadget.gadgetbridge.BuildConfig;
 import nodomain.freeyourgadget.gadgetbridge.service.btbr.BtBRAction;
 import nodomain.freeyourgadget.gadgetbridge.service.btbr.TransactionBuilder;
 import nodomain.freeyourgadget.gadgetbridge.service.btbr.actions.FunctionAction;
@@ -59,6 +61,9 @@ public class XiaomiSppProtocolV2 extends AbstractXiaomiSppProtocol {
 
         /// Ends the connection so the regular reconnect logic takes over.
         void dropConnection();
+
+        /// Whether to pretend the next frame in the given direction got lost (debug builds only).
+        boolean simulatePacketLoss(boolean outbound);
     }
 
     private final XiaomiSppSupport support;
@@ -82,6 +87,18 @@ public class XiaomiSppProtocolV2 extends AbstractXiaomiSppProtocol {
             public void dropConnection() {
                 support.commsSupport.dropConnection();
             }
+
+            @Override
+            public boolean simulatePacketLoss(final boolean outbound) {
+                if (!BuildConfig.DEBUG) {
+                    return false;
+                }
+                final int percentage = support.commsSupport.getDevicePrefs().getInt(
+                        outbound ? "pref_debug_drop_packet_percentage_out" : "pref_debug_drop_packet_percentage_in",
+                        0
+                );
+                return percentage > 0 && ThreadLocalRandom.current().nextInt(100) < percentage;
+            }
         });
     }
 
@@ -91,11 +108,20 @@ public class XiaomiSppProtocolV2 extends AbstractXiaomiSppProtocol {
     }
 
     private void sendAck(final int sequenceNumber) {
+        final byte[] frame = new XiaomiSppPacketV2.AckPacket.Builder()
+                .setSequenceNumber(sequenceNumber)
+                .build()
+                .encode(null);
         link.queue(String.format(Locale.ROOT, "send ack for %d", sequenceNumber),
-                new WriteAction(new XiaomiSppPacketV2.AckPacket.Builder()
-                        .setSequenceNumber(sequenceNumber)
-                        .build()
-                        .encode(null)));
+                new FunctionAction(socket -> writeFrame(socket, frame)));
+    }
+
+    private boolean writeFrame(final BluetoothSocket socket, final byte[] frame) {
+        if (link.simulatePacketLoss(true)) {
+            LOG.warn("Simulating dropped outbound packet type={} seq={}", frame[2] & 0x0f, frame[3] & 0xff);
+            return true;
+        }
+        return new WriteAction(frame).run(socket);
     }
 
     @Override
@@ -157,7 +183,11 @@ public class XiaomiSppProtocolV2 extends AbstractXiaomiSppProtocol {
         }
 
         final XiaomiSppPacketV2 decodedPacket = XiaomiSppPacketV2.decode(rxBuf);
-        if (decodedPacket != null) {
+        if (decodedPacket != null && link.simulatePacketLoss(false)) {
+            LOG.warn("Simulating dropped inbound packet type={} seq={}",
+                    decodedPacket.getPacketType(),
+                    decodedPacket.getSequenceNumber());
+        } else if (decodedPacket != null) {
             switch (decodedPacket.getPacketType()) {
                 case PACKET_TYPE_SESSION_CONFIG:
                     // TODO handle device's session config
@@ -216,7 +246,7 @@ public class XiaomiSppProtocolV2 extends AbstractXiaomiSppProtocol {
         final List<byte[]> frames = sendWindow.getUnackedFrames();
         LOG.debug("resending {} unacked packets", frames.size());
         for (final byte[] frame : frames) {
-            if (!new WriteAction(frame).run(socket)) {
+            if (!writeFrame(socket, frame)) {
                 return false;
             }
         }
@@ -299,7 +329,7 @@ public class XiaomiSppProtocolV2 extends AbstractXiaomiSppProtocol {
             final int sequenceNumber = sendWindow.nextSequenceNumber();
             final byte[] frame = XiaomiSppPacketV2.encodeFrame(PACKET_TYPE_DATA, sequenceNumber, packetPayload);
             sendWindow.onSent(sequenceNumber, frame);
-            final boolean written = new WriteAction(frame).run(socket);
+            final boolean written = writeFrame(socket, frame);
             armResendTimeout();
             return written;
         });

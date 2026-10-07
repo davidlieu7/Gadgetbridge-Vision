@@ -45,6 +45,8 @@ import nodomain.freeyourgadget.gadgetbridge.util.GB;
 public class XiaomiSppProtocolV2Test extends TestBase {
     private final List<byte[]> written = new ArrayList<>();
     private boolean connectionDropped;
+    private boolean dropOutbound;
+    private boolean dropInbound;
     private BluetoothSocket socket;
     private XiaomiSppProtocolV2 protocol;
 
@@ -75,6 +77,11 @@ public class XiaomiSppProtocolV2Test extends TestBase {
             @Override
             public void dropConnection() {
                 connectionDropped = true;
+            }
+
+            @Override
+            public boolean simulatePacketLoss(final boolean outbound) {
+                return outbound ? dropOutbound : dropInbound;
             }
         });
     }
@@ -186,5 +193,31 @@ public class XiaomiSppProtocolV2Test extends TestBase {
 
         Assert.assertTrue(written.isEmpty());
         Assert.assertFalse(connectionDropped);
+    }
+
+    @Test
+    public void resendsDataPacketsLostOnTheWayOut() {
+        dropOutbound = true;
+        Assert.assertTrue(sendPackets(3).isEmpty());
+        dropOutbound = false;
+
+        receive("A5A5000000000000");
+
+        Assert.assertEquals(3, written.size());
+        for (int i = 0; i < 3; i++) {
+            Assert.assertEquals(i, sequenceNumberOf(written.get(i)));
+        }
+    }
+
+    @Test
+    public void ignoresAnAckLostOnTheWayIn() {
+        final List<byte[]> sent = sendPackets(3);
+
+        dropInbound = true;
+        receive("A5A5010200000000");
+        dropInbound = false;
+        shadowOf(Looper.getMainLooper()).idleFor(Duration.ofMillis(XiaomiSppProtocolV2.RESEND_TIMEOUT_MILLIS));
+
+        assertFrames(sent, written);
     }
 }
