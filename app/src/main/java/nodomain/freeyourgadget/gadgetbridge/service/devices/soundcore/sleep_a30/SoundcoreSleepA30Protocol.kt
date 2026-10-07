@@ -19,11 +19,23 @@ package nodomain.freeyourgadget.gadgetbridge.service.devices.soundcore.sleep_a30
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsPreferenceConst.*
 import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreEarbudsCoordinator.TapFunction
 import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEvent
+import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEventSendBytes
+import nodomain.freeyourgadget.gadgetbridge.model.Alarm
+import org.slf4j.LoggerFactory
+import java.util.ArrayList
 import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEventUpdatePreferences
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice
 import nodomain.freeyourgadget.gadgetbridge.service.devices.soundcore.protocol.impl.v1.SoundcoreProtocolImplV1
 
 open class SoundcoreSleepA30Protocol(device: GBDevice?) : SoundcoreProtocolImplV1(device) {
+    private var pendingAlarms: List<AlarmRequest>? = null
+    private val alarmCommands = ArrayDeque<ByteArray>()
+    private var awaitingAlarmWrite = false
+    private var awaitingAlarmRead = false
+
+    private data class AlarmRequest(val id: Int, val unused: Boolean, val enabled: Boolean,
+                                    val minutes: Int, val repetition: Int, val snooze: Boolean)
+
     private val currentFunctions = intArrayOf(-1, -1, -1, -1)
 
     protected override fun getBatteryOffset(): Int = BATTERY_OFFSET
@@ -86,6 +98,7 @@ open class SoundcoreSleepA30Protocol(device: GBDevice?) : SoundcoreProtocolImplV
         if (payload == null) return emptyArray()
         var result: Array<GBDeviceEvent> = emptyArray()
         when (command) {
+            CMD_GET_ALARMS -> result = decodeAlarms(payload)
             CMD_NOTIFY_LISTENING_MODE -> {
                 if (payload.size == 1 && payload[0] in 0..1) {
                     result = arrayOf(listeningModeEvent(payload[0]))
@@ -125,6 +138,65 @@ open class SoundcoreSleepA30Protocol(device: GBDevice?) : SoundcoreProtocolImplV
     open fun encodeTapFunction(right: Boolean, triple: Boolean, previous: Int, function: TapFunction): ByteArray =
         encodeControlFunction(right, (if (triple) 5 else 0).toByte(),
             ((previous shl 4) or function.code).toByte())
+
+    override fun encodeAlarmsRequest(): ByteArray {
+        awaitingAlarmRead = true
+        return encodeRequest(CMD_GET_ALARMS)
+    }
+
+    override fun encodeSetAlarms(alarms: ArrayList<out Alarm>): ByteArray? {
+        if (alarms.any { !it.unused && (it.hour !in 0..23 || it.minute !in 0..59) }) return null
+        val requests = alarms.map {
+            AlarmRequest(it.position, it.unused, it.enabled, it.hour * 60 + it.minute, it.repetition, it.snooze)
+        }
+        if (requests.any { it.id !in 0 until device.deviceCoordinator.getAlarmSlotCount(device) ||
+                (!it.unused && (it.minutes !in 0..1439 || it.repetition !in 0..127)) } ||
+            requests.map { it.id }.distinct().size != requests.size) return null
+        pendingAlarms = requests
+        // Always read before writing: volume, tune and snooze duration are not represented by GB's alarm UI.
+        return if (awaitingAlarmWrite || awaitingAlarmRead) null else encodeAlarmsRequest()
+    }
+
+    private fun decodeAlarms(payload: ByteArray): Array<GBDeviceEvent> {
+        val records = SoundcoreSleepA30Alarm.decodeList(payload, device.deviceCoordinator.getAlarmSlotCount(device)) ?: return emptyArray()
+        awaitingAlarmRead = false
+        if (awaitingAlarmWrite && alarmCommands.isNotEmpty()) {
+            return arrayOf(GBDeviceEventSendBytes(alarmCommands.removeFirst()))
+        }
+        awaitingAlarmWrite = false
+        val requested = pendingAlarms
+        if (requested != null) {
+            pendingAlarms = null
+            val byId = records.associateBy { it.id }
+            // No one-shot alarm was captured. Do not guess its wire repeat mask.
+            if (requested.any { !it.unused && it.repetition == 0 && byId[it.id]?.repetition != 0 }) {
+                LOG.warn("Sleep A30 one-shot alarm encoding has not been established")
+                return arrayOf(SoundcoreSleepA30AlarmEvent(records))
+            }
+            for (alarm in requested) {
+                val previous = byId[alarm.id]
+                if (alarm.unused) {
+                    if (previous != null) alarmCommands.addLast(encodeCommand(CMD_DELETE_ALARM, byteArrayOf(alarm.id.toByte())))
+                } else {
+                    // Captured tunes: Nature=0, Glow=1, Rhythm=2, Bloom=3; volume is 0..100.
+                    // New GB alarms default to Nature/50%; snooze defaults to 10 minutes when enabled.
+                    // Existing values, including unknown tune IDs, are preserved rather than exposed in new UI.
+                    val updated = SoundcoreSleepA30Alarm(
+                        alarm.id, alarm.enabled, alarm.minutes,
+                        SoundcoreSleepA30Alarm.encodeRepetition(alarm.repetition) or ((previous?.dayMask ?: 0) and 1),
+                        previous?.tune ?: 0, previous?.volume ?: 50,
+                        if (alarm.snooze) previous?.snoozeMinutes?.takeIf { it > 0 } ?: 10 else 0
+                    )
+                    if (updated != previous) alarmCommands.addLast(encodeCommand(CMD_SET_ALARM, updated.encode()))
+                }
+            }
+            if (alarmCommands.isNotEmpty()) {
+                awaitingAlarmWrite = true
+                return arrayOf(GBDeviceEventSendBytes(alarmCommands.removeFirst()))
+            }
+        }
+        return arrayOf(SoundcoreSleepA30AlarmEvent(records))
+    }
 
     override fun encodeSendConfiguration(config: String): ByteArray? {
         val prefs = devicePrefs
@@ -173,6 +245,8 @@ open class SoundcoreSleepA30Protocol(device: GBDevice?) : SoundcoreProtocolImplV
     }
 
     companion object {
+        private val LOG = LoggerFactory.getLogger(SoundcoreSleepA30Protocol::class.java)
+
         const val ACTION_TOGGLE_LOCAL_PLAYBACK = "soundcore_toggle_local_playback"
         private const val BATTERY_OFFSET = 1
 

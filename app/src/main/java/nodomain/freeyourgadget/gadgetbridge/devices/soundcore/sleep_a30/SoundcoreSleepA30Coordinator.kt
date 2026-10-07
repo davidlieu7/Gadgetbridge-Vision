@@ -36,6 +36,10 @@ class SoundcoreSleepA30Coordinator : SoundcoreEarbudsCoordinator() {
 
     override fun getServiceUUID(): UUID = UUID.fromString("0cf12d31-fac3-4553-bd80-d6832e7d1301")
 
+    override fun getAlarmSlotCount(device: GBDevice): Int = 5
+
+    override fun supportsAlarmSnoozing(device: GBDevice): Boolean = true
+
     override fun createProtocol(device: GBDevice) = SoundcoreSleepA30Protocol(device)
 
     override fun getCustomActions(): List<DeviceCardAction> = listOf(

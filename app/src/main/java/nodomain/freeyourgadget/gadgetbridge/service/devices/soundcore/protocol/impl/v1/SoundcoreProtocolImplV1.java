@@ -46,6 +46,10 @@ public class SoundcoreProtocolImplV1 extends AbstractSoundcoreProtocol {
     // Session handshake sent after CMD_GET_DEVICE_INFO; device ACKs with empty payload
     public static final short CMD_SESSION_INIT = (short) 0x8105;
 
+    public static final short CMD_GET_ALARMS = (short) 0x0114;
+    public static final short CMD_SET_ALARM = (short) 0x8114;
+    public static final short CMD_DELETE_ALARM = (short) 0x8214;
+
     public static final short CMD_NOTIFY_BATTERY_INFO = (short) 0x0301;
     public static final short CMD_NOTIFY_CHARGING_INFO = (short) 0x0401;
     public static final short CMD_NOTIFY_AUDIO_MODE = (short) 0x0106;
@@ -601,6 +605,10 @@ public class SoundcoreProtocolImplV1 extends AbstractSoundcoreProtocol {
     /** Sent after CMD_GET_DEVICE_INFO to finalise the session with the device. */
     public byte[] encodeSessionInitRequest() {
         return encodeRequest(CMD_SESSION_INIT);
+    }
+
+    public byte[] encodeAlarmsRequest() {
+        return encodeRequest(CMD_GET_ALARMS);
     }
 
     @Override
