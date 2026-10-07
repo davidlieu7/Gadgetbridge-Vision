@@ -18,7 +18,11 @@ package nodomain.freeyourgadget.gadgetbridge.devices.soundcore.sleep_a30
 
 import java.util.UUID
 import java.util.regex.Pattern
+import nodomain.freeyourgadget.gadgetbridge.GBApplication
 import nodomain.freeyourgadget.gadgetbridge.R
+import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsPreferenceConst
+import nodomain.freeyourgadget.gadgetbridge.devices.DeviceCardAction
+import nodomain.freeyourgadget.gadgetbridge.devices.deviceCardAction
 import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreEarbudsCoordinator
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice
 import nodomain.freeyourgadget.gadgetbridge.service.devices.soundcore.sleep_a30.SoundcoreSleepA30Protocol
@@ -33,6 +37,37 @@ class SoundcoreSleepA30Coordinator : SoundcoreEarbudsCoordinator() {
     override fun getServiceUUID(): UUID = UUID.fromString("0cf12d31-fac3-4553-bd80-d6832e7d1301")
 
     override fun createProtocol(device: GBDevice) = SoundcoreSleepA30Protocol(device)
+
+    override fun getCustomActions(): List<DeviceCardAction> = listOf(
+        deviceCardAction {
+            isVisible = { device ->
+                device.isConnected && GBApplication.getDevicePrefs(device)
+                    .getString(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_LISTENING_MODE, "0") == "1"
+            }
+            icon = { device ->
+                if (GBApplication.getDevicePrefs(device).getBoolean(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_LOCAL_PLAYBACK, false)) {
+                    R.drawable.ic_pause
+                } else {
+                    R.drawable.ic_play
+                }
+            }
+            description = { device, context ->
+                context.getString(
+                    if (GBApplication.getDevicePrefs(device).getBoolean(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_LOCAL_PLAYBACK, false)) {
+                        R.string.soundcore_local_playback_pause
+                    } else {
+                        R.string.soundcore_local_playback
+                    }
+                )
+            }
+            onClick = { device, _ ->
+                if (device.isConnected) {
+                    GBApplication.deviceService(device)
+                        .onSendConfiguration(SoundcoreSleepA30Protocol.ACTION_TOGGLE_LOCAL_PLAYBACK)
+                }
+            }
+        }
+    )
 
     override fun getDefaultCapabilities(): Set<Capability> = setOf(
         Capability.FindDevice,

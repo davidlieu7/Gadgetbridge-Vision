@@ -27,6 +27,8 @@ import nodomain.freeyourgadget.gadgetbridge.service.devices.soundcore.protocol.i
 import nodomain.freeyourgadget.gadgetbridge.util.Prefs;
 
 public class SoundcoreSleepA30Protocol extends SoundcoreProtocolImplV1 {
+    public static final String ACTION_TOGGLE_LOCAL_PLAYBACK = "soundcore_toggle_local_playback";
+    private static final int BATTERY_OFFSET = 1;
     private final int[] currentFunctions = {-1, -1, -1, -1};
     private static final String[] TAP_PREFERENCES = {
         PREF_SOUNDCORE_CONTROL_DOUBLE_TAP_ACTION_LEFT, PREF_SOUNDCORE_CONTROL_DOUBLE_TAP_ACTION_RIGHT,
@@ -38,13 +40,31 @@ public class SoundcoreSleepA30Protocol extends SoundcoreProtocolImplV1 {
     }
 
     @Override
+    protected int getBatteryOffset() {
+        return BATTERY_OFFSET;
+    }
+
+    @Override
     protected GBDeviceEvent[] decodeDeviceInfo(final byte[] payload) {
         if (payload == null || payload.length < 51) return new GBDeviceEvent[0];
         // Sleep A30's version header starts two bytes earlier than Liberty's.
         decodeTapControls(Arrays.copyOfRange(payload, 45, 51));
-        final GBDeviceEvent[] batteries = handleBatteryInfo(new byte[]{payload[2], payload[3]});
-        return new GBDeviceEvent[]{batteries[0], batteries[1],
-                buildVersionInfo(readString(payload, 4, 5), readString(payload, 9, 5), readString(payload, 14, 16))};
+        final GBDeviceEvent[] batteries = handleBatteryInfo(
+            new byte[]{payload[2], payload[3]}, getBatteryMultiplier(), getBatteryOffset()
+        );
+        final GBDeviceEvent version = buildVersionInfo(
+            readString(payload, 4, 5),
+            readString(payload, 9, 5),
+            readString(payload, 14, 16)
+        );
+        if (payload.length > 65 && isBoolean(payload[65])) {
+            return new GBDeviceEvent[]{
+                batteries[0], batteries[1],
+                version,
+                listeningModeEvent(payload[65])
+            };
+        }
+        return new GBDeviceEvent[]{batteries[0], batteries[1], version};
     }
 
     // header, four control slots, trailer.
@@ -73,6 +93,23 @@ public class SoundcoreSleepA30Protocol extends SoundcoreProtocolImplV1 {
 
     @Override
     protected GBDeviceEvent[] decodeCommand(final short command, final byte[] payload) {
+        if (command == CMD_NOTIFY_LISTENING_MODE && payload != null
+                && payload.length == 1 && isBoolean(payload[0])) {
+            return new GBDeviceEvent[]{listeningModeEvent(payload[0])};
+        }
+        if (command == CMD_NOTIFY_LOCAL_AUDIO && payload != null && payload.length == 11) {
+            final GBDeviceEventUpdatePreferences preferences = new GBDeviceEventUpdatePreferences();
+            if (isBoolean(payload[9])) {
+                preferences.withPreference(PREF_SOUNDCORE_LOCAL_PLAYBACK, payload[9] == 1);
+            }
+            final int volume = payload[10] & 0xff;
+            if (volume <= 65) {
+                preferences.withPreference(PREF_SOUNDCORE_LOCAL_VOLUME, volume);
+            }
+            if (!preferences.preferences.isEmpty()) {
+                return new GBDeviceEvent[]{preferences};
+            }
+        }
         if ((command == CMD_NOTIFY_ANC_ENABLED || command == CMD_SET_ANC_ENABLED)
                 && payload != null && payload.length == 1 && (payload[0] == 0 || payload[0] == 1)) {
             return new GBDeviceEvent[]{new GBDeviceEventUpdatePreferences(PREF_SOUNDCORE_AMBIENT_SOUND_CONTROL,
@@ -80,6 +117,14 @@ public class SoundcoreSleepA30Protocol extends SoundcoreProtocolImplV1 {
         }
         // Empty setter responses are acknowledgements, not settings readback.
         return new GBDeviceEvent[0];
+    }
+
+    private static boolean isBoolean(final byte value) {
+        return value == 0 || value == 1;
+    }
+
+    private static GBDeviceEventUpdatePreferences listeningModeEvent(final byte mode) {
+        return new GBDeviceEventUpdatePreferences(PREF_SOUNDCORE_LISTENING_MODE, mode == 1 ? "1" : "0");
     }
 
     public byte[] encodeTapFunction(final boolean right, final boolean triple, final int previous, final TapFunction function) {
@@ -91,6 +136,9 @@ public class SoundcoreSleepA30Protocol extends SoundcoreProtocolImplV1 {
     public byte[] encodeSendConfiguration(final String config) {
         final Prefs prefs = getDevicePrefs();
         switch (config) {
+            case ACTION_TOGGLE_LOCAL_PLAYBACK:
+                if (!"1".equals(prefs.getString(PREF_SOUNDCORE_LISTENING_MODE, "0"))) return null;
+                return encodeLocalPlayback(!prefs.getBoolean(PREF_SOUNDCORE_LOCAL_PLAYBACK, false));
             case PREF_SOUNDCORE_AMBIENT_SOUND_CONTROL:
                 return encodeAncEnabled("noise_cancelling".equals(prefs.getString(config, "off")));
             case PREF_SOUNDCORE_LISTENING_MODE:
