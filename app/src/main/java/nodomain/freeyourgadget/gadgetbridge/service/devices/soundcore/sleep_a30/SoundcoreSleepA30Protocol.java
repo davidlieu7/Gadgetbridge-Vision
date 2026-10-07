@@ -57,14 +57,34 @@ public class SoundcoreSleepA30Protocol extends SoundcoreProtocolImplV1 {
             readString(payload, 9, 5),
             readString(payload, 14, 16)
         );
-        if (payload.length > 65 && isBoolean(payload[65])) {
+        final GBDeviceEventUpdatePreferences preferences = new GBDeviceEventUpdatePreferences();
+        decodeBooleanPreference(payload, 65, PREF_SOUNDCORE_LISTENING_MODE, preferences, "0", "1");
+        decodeBooleanPreference(payload, 69, PREF_SOUNDCORE_BATTERY_LOW_TONE, preferences);
+        decodeBooleanPreference(payload, 137, PREF_SOUNDCORE_POWER_OFF_TONE, preferences);
+        decodeBooleanPreference(payload, 138, PREF_SOUNDCORE_MODE_TONE, preferences);
+        decodeBooleanPreference(payload, 141, PREF_SOUNDCORE_CALLS_ENABLED, preferences);
+        decodeBooleanPreference(payload, 147, PREF_SOUNDCORE_ANC_TONE, preferences);
+        if (!preferences.preferences.isEmpty()) {
             return new GBDeviceEvent[]{
                 batteries[0], batteries[1],
                 version,
-                listeningModeEvent(payload[65])
+                preferences
             };
         }
         return new GBDeviceEvent[]{batteries[0], batteries[1], version};
+    }
+
+    private static void decodeBooleanPreference(final byte[] payload, final int offset, final String key,
+                                                final GBDeviceEventUpdatePreferences preferences) {
+        decodeBooleanPreference(payload, offset, key, preferences, false, true);
+    }
+
+    private static void decodeBooleanPreference(final byte[] payload, final int offset, final String key,
+                                                final GBDeviceEventUpdatePreferences preferences,
+                                                final Object falseValue, final Object trueValue) {
+        if (payload.length > offset && isBoolean(payload[offset])) {
+            preferences.withPreference(key, payload[offset] == 1 ? trueValue : falseValue);
+        }
     }
 
     // header, four control slots, trailer.
