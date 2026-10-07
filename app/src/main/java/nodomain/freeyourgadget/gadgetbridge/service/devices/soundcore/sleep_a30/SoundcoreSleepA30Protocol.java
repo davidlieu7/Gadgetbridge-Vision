@@ -29,10 +29,13 @@ import nodomain.freeyourgadget.gadgetbridge.util.Prefs;
 public class SoundcoreSleepA30Protocol extends SoundcoreProtocolImplV1 {
     public static final String ACTION_TOGGLE_LOCAL_PLAYBACK = "soundcore_toggle_local_playback";
     private static final int BATTERY_OFFSET = 1;
+
     private final int[] currentFunctions = {-1, -1, -1, -1};
     private static final String[] TAP_PREFERENCES = {
-        PREF_SOUNDCORE_CONTROL_DOUBLE_TAP_ACTION_LEFT, PREF_SOUNDCORE_CONTROL_DOUBLE_TAP_ACTION_RIGHT,
-        PREF_SOUNDCORE_CONTROL_TRIPLE_TAP_ACTION_LEFT, PREF_SOUNDCORE_CONTROL_TRIPLE_TAP_ACTION_RIGHT,
+        PREF_SOUNDCORE_CONTROL_DOUBLE_TAP_ACTION_LEFT,
+        PREF_SOUNDCORE_CONTROL_DOUBLE_TAP_ACTION_RIGHT,
+        PREF_SOUNDCORE_CONTROL_TRIPLE_TAP_ACTION_LEFT,
+        PREF_SOUNDCORE_CONTROL_TRIPLE_TAP_ACTION_RIGHT,
     };
 
     public SoundcoreSleepA30Protocol(final GBDevice device) {
@@ -54,7 +57,7 @@ public class SoundcoreSleepA30Protocol extends SoundcoreProtocolImplV1 {
         );
         final GBDeviceEvent version = buildVersionInfo(
             readString(payload, 4, 5),
-            readString(payload, 9, 5),
+            readString(payload, 36, 5), // charging case, fw2
             readString(payload, 14, 16)
         );
         final GBDeviceEventUpdatePreferences preferences = new GBDeviceEventUpdatePreferences();
@@ -63,15 +66,13 @@ public class SoundcoreSleepA30Protocol extends SoundcoreProtocolImplV1 {
         decodeBooleanPreference(payload, 137, PREF_SOUNDCORE_POWER_OFF_TONE, preferences);
         decodeBooleanPreference(payload, 138, PREF_SOUNDCORE_MODE_TONE, preferences);
         decodeBooleanPreference(payload, 141, PREF_SOUNDCORE_CALLS_ENABLED, preferences);
+        decodeBooleanPreference(payload, 143, PREF_SOUNDCORE_SNORE_MASKING, preferences);
         decodeBooleanPreference(payload, 147, PREF_SOUNDCORE_ANC_TONE, preferences);
-        if (!preferences.preferences.isEmpty()) {
-            return new GBDeviceEvent[]{
-                batteries[0], batteries[1],
-                version,
-                preferences
-            };
-        }
-        return new GBDeviceEvent[]{batteries[0], batteries[1], version};
+        return new GBDeviceEvent[]{
+            batteries[0], batteries[1],
+            version,
+            preferences
+        };
     }
 
     private static void decodeBooleanPreference(final byte[] payload, final int offset, final String key,
