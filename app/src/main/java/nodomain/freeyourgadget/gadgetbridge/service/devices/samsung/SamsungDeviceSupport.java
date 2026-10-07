@@ -242,6 +242,12 @@ public class SamsungDeviceSupport extends AbstractBTLESingleDeviceSupport {
     private final Handler mainHandler = new Handler(Looper.getMainLooper());
     private final Runnable calendarPoke = () -> sendMessage(Fit3Calendar.CHANNEL, Fit3Calendar.buildSyncPoke(),
             "calendar-sync-poke");
+    /** A manual fetch counts as done once the health channel has been quiet this long... */
+    private static final long FETCH_QUIET_MS = 2000;
+    /** ...or after this long at most, whatever the band is doing. */
+    private static final long FETCH_TIMEOUT_MS = 30_000;
+    private final Runnable fetchDone = this::finishFetch;
+    private boolean fetchInProgress;
     private static final String PREF_CALENDAR_STAMP = "samsung_fit3_calendar_stamp";
     private static final String PREF_CALENDAR_HASH = "samsung_fit3_calendar_hash";
 
@@ -427,6 +433,11 @@ public class SamsungDeviceSupport extends AbstractBTLESingleDeviceSupport {
         // Log-file pull (see Fit3LogDump): the band mixes response-typed
         // (count/init) and request-typed (transfer) messages on this channel,
         // so route both to the state machine before the request/response split.
+        if (channel == SapProtocol.CH_HEALTH && fetchInProgress) {
+            // Still talking: push the end of the manual fetch back.
+            mainHandler.removeCallbacks(fetchDone);
+            mainHandler.postDelayed(fetchDone, FETCH_QUIET_MS);
+        }
         if (channel == SapProtocol.CH_DEBUG) {
             logDump.onMessage(msgId, body);
             return;
@@ -1613,9 +1624,34 @@ public class SamsungDeviceSupport extends AbstractBTLESingleDeviceSupport {
     public void onFetchRecordedData(int dataTypes) {
         int since = getLastSyncedTimestamp();
         LOG.debug("Samsung Fit 3: manual sync, asking for everything after {}", toUnixTime(since));
+        // The sync screens wait for the device to stop being busy; nothing in
+        // the band's answers says "that's all", so the fetch ends once the
+        // health channel goes quiet (or at the timeout).
+        if (!fetchInProgress) {
+            fetchInProgress = true;
+            getDevice().setBusyTask(R.string.busy_task_fetch_activity_data, getContext());
+            getDevice().sendDeviceUpdateIntent(getContext());
+        }
+        mainHandler.removeCallbacks(fetchDone);
+        mainHandler.postDelayed(fetchDone, FETCH_TIMEOUT_MS);
         sendMessage(Fit3HealthRequestData.CHANNEL,
                 Fit3HealthRequestData.buildRequest(healthRequestSequence++, since),
                 "health-request-data-trigger");
+    }
+
+    private void finishFetch() {
+        if (!fetchInProgress) {
+            return;
+        }
+        fetchInProgress = false;
+        mainHandler.removeCallbacks(fetchDone);
+        LOG.debug("Samsung Fit 3: manual sync finished");
+        GBDevice device = getDevice();
+        if (device.isBusy()) {
+            device.unsetBusyTask();
+        }
+        device.sendDeviceUpdateIntent(getContext());
+        GB.signalActivityDataFinish(device);
     }
 
     /**
@@ -2078,6 +2114,8 @@ public class SamsungDeviceSupport extends AbstractBTLESingleDeviceSupport {
         watchfaceManager.cancel();
         iconUploader.cancel();
         mainHandler.removeCallbacks(calendarPoke);
+        mainHandler.removeCallbacks(fetchDone);
+        fetchInProgress = false;
         super.dispose();
     }
 
