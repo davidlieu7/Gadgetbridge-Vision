@@ -99,6 +99,7 @@ open class SoundcoreSleepA30Protocol(device: GBDevice?) : SoundcoreProtocolImplV
         var result: Array<GBDeviceEvent> = emptyArray()
         when (command) {
             CMD_GET_ALARMS -> result = decodeAlarms(payload)
+            CMD_GET_SLEEP_SETTINGS -> result = decodeAutoStop(payload)
             CMD_NOTIFY_LISTENING_MODE -> {
                 if (payload.size == 1 && payload[0] in 0..1) {
                     result = arrayOf(listeningModeEvent(payload[0]))
@@ -130,6 +131,28 @@ open class SoundcoreSleepA30Protocol(device: GBDevice?) : SoundcoreProtocolImplV
         }
         // Empty setter responses are acknowledgements, not settings readback.
         return result
+    }
+
+    override fun encodeDeviceInfoRequest(): ByteArray =
+        super.encodeDeviceInfoRequest() + encodeRequest(CMD_GET_SLEEP_SETTINGS) +
+            encodeRequest(CMD_NOTIFY_LISTENING_MODE)
+
+    private fun decodeAutoStop(payload: ByteArray): Array<GBDeviceEvent> {
+        if (payload.size != 8 || payload[0] !in 0..1) return emptyArray()
+        val minutes = (payload[1].toInt() and 0xff) or ((payload[2].toInt() and 0xff) shl 8)
+        if (minutes !in 1..240) return emptyArray()
+        return arrayOf(GBDeviceEventUpdatePreferences()
+            .withPreference(PREF_SOUNDCORE_AUTO_STOP, payload[0] == 1.toByte())
+            .withPreference(PREF_SOUNDCORE_AUTO_STOP_TIMER, if (minutes in AUTO_STOP_PRESETS) minutes.toString() else "custom")
+            .withPreference(PREF_SOUNDCORE_AUTO_STOP_MINUTES, minutes))
+    }
+
+    fun encodeAutoStop(enabled: Boolean, minutes: Int): ByteArray? {
+        if (minutes !in 1..240) return null
+        // Captured timer writes use action 0 (stop audio), not the auto-switch sentinel ff ff ff.
+        return encodeCommand(CMD_SET_SLEEP_AUDIO,
+            byteArrayOf(encodeBoolean(enabled), minutes.toByte(), (minutes shr 8).toByte(), 0)) +
+            encodeRequest(CMD_GET_SLEEP_SETTINGS)
     }
 
     private fun listeningModeEvent(mode: Byte) =
@@ -210,7 +233,18 @@ open class SoundcoreSleepA30Protocol(device: GBDevice?) : SoundcoreProtocolImplV
             PREF_SOUNDCORE_DEFAULT_LISTENING_MODE -> encodeBooleanCommand(CMD_SET_DEFAULT_LISTENING_MODE, prefs.getString(config, "0") == "1")
             PREF_SOUNDCORE_LOCAL_PLAYBACK -> encodeLocalPlayback(prefs.getBoolean(config, false))
             PREF_SOUNDCORE_LOCAL_VOLUME -> encodeLocalVolume(prefs.getInt(config, 0))
-            PREF_SOUNDCORE_SLEEP_AUDIO -> encodeSleepAudio(prefs.getString(config, "keep"))
+            PREF_SOUNDCORE_AUTO_STOP, PREF_SOUNDCORE_AUTO_STOP_TIMER, PREF_SOUNDCORE_AUTO_STOP_MINUTES -> {
+                val timer = prefs.getString(PREF_SOUNDCORE_AUTO_STOP_TIMER, "30")
+                // Selecting Custom only reveals the duration control; it must not restart the timer.
+                if (config == PREF_SOUNDCORE_AUTO_STOP_TIMER && timer == "custom") return null
+                val minutes = if (timer == "custom") prefs.getInt(PREF_SOUNDCORE_AUTO_STOP_MINUTES, 30)
+                    else timer.toIntOrNull()?.takeIf { it in AUTO_STOP_PRESETS } ?: return null
+                encodeAutoStop(prefs.getBoolean(PREF_SOUNDCORE_AUTO_STOP, false), minutes)
+            }
+            PREF_SOUNDCORE_SLEEP_AUDIO -> {
+                if (prefs.getBoolean(PREF_SOUNDCORE_AUTO_STOP, false)) return null
+                encodeSleepAudio(prefs.getString(config, "keep"))
+            }
             PREF_SOUNDCORE_SNORE_MASKING -> encodeBooleanCommand(CMD_SET_SNORE_MASKING, prefs.getBoolean(config, false))
             PREF_SOUNDCORE_CONTROL_TOUCH_DISABLED -> encodeBooleanCommand(CMD_SET_TAP_CONTROLS_ENABLE, prefs.getBoolean(config, false))
             PREF_SOUNDCORE_BATTERY_LOW_TONE -> encodeBooleanCommand(CMD_SET_BATTERY_LOW_TONE, prefs.getBoolean(config, false))
@@ -249,6 +283,7 @@ open class SoundcoreSleepA30Protocol(device: GBDevice?) : SoundcoreProtocolImplV
 
         const val ACTION_TOGGLE_LOCAL_PLAYBACK = "soundcore_toggle_local_playback"
         private const val BATTERY_OFFSET = 1
+        private val AUTO_STOP_PRESETS = setOf(10, 20, 30, 60, 90)
 
         private val TAP_PREFERENCES = arrayOf(
             PREF_SOUNDCORE_CONTROL_DOUBLE_TAP_ACTION_LEFT,

@@ -6228,6 +6228,10 @@
     <string name="soundcore_local_playback">Play local audio</string>
     <string name="soundcore_local_volume">Local audio volume</string>
     <string name="soundcore_snore_masking">Dynamic snore masking</string>
+    <string name="soundcore_auto_stop">Earbuds auto-stop</string>
+    <string name="soundcore_auto_stop_summary">Stop audio when the timer ends. Auto-switch once asleep is unavailable while the timer is active.</string>
+    <string name="soundcore_auto_stop_timer">Auto-stop timer</string>
+    <string name="soundcore_auto_stop_minutes">Custom timer (minutes)</string>
     <string name="soundcore_sleep_audio">Audio once asleep</string>
     <string name="soundcore_sleep_local">Play local audio, ANC off</string>
     <string name="soundcore_sleep_pause">Pause audio</string>

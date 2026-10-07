@@ -54,6 +54,7 @@ abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator(
         DefaultListeningMode,
         LocalAudioPlayback,
         LocalAudioVolume,
+        LocalAudioAutoStop,
         DynamicSnoreMasking,
         SleepAudioAutoSwitch,
         BluetoothCalls,
@@ -456,7 +457,7 @@ abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator(
             if (has(arrayOf(
                     Capability.AudioEqualizer, Capability.SurroundSound, Capability.GamingMode, Capability.LDAC,
                     Capability.ListeningMode, Capability.DefaultListeningMode, Capability.LocalAudioPlayback,
-                    Capability.LocalAudioVolume, Capability.DynamicSnoreMasking, Capability.SleepAudioAutoSwitch,
+                    Capability.LocalAudioVolume, Capability.DynamicSnoreMasking, Capability.SleepAudioAutoSwitch, Capability.LocalAudioAutoStop,
                 ))) {
                 screen(
                     key = "pref_soundcore_audio",
@@ -531,6 +532,39 @@ abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator(
                         switchSetting(
                             key = DeviceSettingsPreferenceConst.PREF_SOUNDCORE_SNORE_MASKING,
                             title = R.string.soundcore_snore_masking,
+                        )
+                    }
+                    if (has(Capability.LocalAudioAutoStop)) {
+                        switchSetting(
+                            key = DeviceSettingsPreferenceConst.PREF_SOUNDCORE_AUTO_STOP,
+                            title = R.string.soundcore_auto_stop,
+                            summary = R.string.soundcore_auto_stop_summary,
+                            disableDependentsState = true,
+                        )
+                        list(
+                            key = DeviceSettingsPreferenceConst.PREF_SOUNDCORE_AUTO_STOP_TIMER,
+                            title = R.string.soundcore_auto_stop_timer,
+                            entries = listOf(
+                                ListEntry.Res("10", R.string.minutes_10),
+                                ListEntry.Res("20", R.string.minutes_20),
+                                ListEntry.Res("30", R.string.minutes_30),
+                                ListEntry.Res("60", R.string.minutes_60),
+                                ListEntry.Res("90", R.string.minutes_90),
+                                ListEntry.Res("custom", R.string.custom),
+                            ),
+                            defaultValue = "30",
+                            visibleWhen = { prefs -> prefs.getBoolean(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_AUTO_STOP, false) },
+                        )
+                        seekbar(
+                            key = DeviceSettingsPreferenceConst.PREF_SOUNDCORE_AUTO_STOP_MINUTES,
+                            title = R.string.soundcore_auto_stop_minutes,
+                            min = 1,
+                            max = 240,
+                            defaultValue = 30,
+                            visibleWhen = { prefs ->
+                                prefs.getBoolean(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_AUTO_STOP, false) &&
+                                    prefs.getString(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_AUTO_STOP_TIMER, "30") == "custom"
+                            },
                         )
                     }
                     if (has(Capability.SleepAudioAutoSwitch)) {

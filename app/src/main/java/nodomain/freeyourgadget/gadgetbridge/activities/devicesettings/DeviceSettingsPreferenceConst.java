@@ -563,6 +563,9 @@ public class DeviceSettingsPreferenceConst {
     public static final String PREF_SOUNDCORE_LOCAL_PLAYBACK = "pref_soundcore_local_playback";
     public static final String PREF_SOUNDCORE_LOCAL_VOLUME = "pref_soundcore_local_volume";
     public static final String PREF_SOUNDCORE_SNORE_MASKING = "pref_soundcore_snore_masking";
+    public static final String PREF_SOUNDCORE_AUTO_STOP = "pref_soundcore_auto_stop";
+    public static final String PREF_SOUNDCORE_AUTO_STOP_TIMER = "pref_soundcore_auto_stop_timer";
+    public static final String PREF_SOUNDCORE_AUTO_STOP_MINUTES = "pref_soundcore_auto_stop_minutes";
     public static final String PREF_SOUNDCORE_SLEEP_AUDIO = "pref_soundcore_sleep_audio";
     public static final String PREF_SOUNDCORE_CALLS_ENABLED = "pref_soundcore_calls_enabled";
     public static final String PREF_SOUNDCORE_POWER_OFF_TONE = "pref_soundcore_power_off_tone";

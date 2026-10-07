@@ -85,6 +85,7 @@ class SoundcoreSleepA30Coordinator : SoundcoreEarbudsCoordinator() {
         Capability.DefaultListeningMode,
         Capability.LocalAudioPlayback,
         Capability.LocalAudioVolume,
+        Capability.LocalAudioAutoStop,
         Capability.DynamicSnoreMasking,
         Capability.SleepAudioAutoSwitch,
         Capability.BluetoothCalls,
