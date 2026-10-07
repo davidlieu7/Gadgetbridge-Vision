@@ -45,43 +45,16 @@
                 android:textSize="16sp"
                 tools:text="Morning run" />
 
-            <LinearLayout
+            <TextView
+                android:id="@+id/workout_row_subtitle"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="2dp"
-                android:gravity="center_vertical"
-                android:orientation="horizontal">
+                android:ellipsize="end"
+                android:maxLines="1"
+                android:textColor="?attr/colorOnSurfaceVariant"
+                android:textSize="14sp"
+                tools:text="Running • 43min 53s" />
 
-                <TextView
-                    android:id="@+id/workout_row_subtitle"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:ellipsize="end"
-                    android:maxLines="1"
-                    android:textColor="?attr/colorOnSurfaceVariant"
-                    android:textSize="14sp"
-                    tools:text="Running • 43min 53s" />
-
-                <ImageView
-                    android:id="@+id/workout_row_photo"
-                    android:layout_width="16dp"
-                    android:layout_height="16dp"
-                    android:layout_marginStart="6dp"
-                    android:importantForAccessibility="no"
-                    android:visibility="gone"
-                    app:srcCompat="@android:drawable/ic_menu_camera"
-                    app:tint="?attr/colorOnSurfaceVariant" />
-
-                <ImageView
-                    android:id="@+id/workout_row_upload"
-                    android:layout_width="16dp"
-                    android:layout_height="16dp"
-                    android:layout_marginStart="6dp"
-                    android:visibility="gone"
-                    tools:ignore="ContentDescription" />
-
-            </LinearLayout>
         </LinearLayout>
 
         <LinearLayout
@@ -113,6 +86,24 @@
                     android:visibility="gone"
                     app:srcCompat="@drawable/ic_gps_location"
                     app:tint="?attr/colorOnSurfaceVariant" />
+
+                <ImageView
+                    android:id="@+id/workout_row_photo"
+                    android:layout_width="16dp"
+                    android:layout_height="16dp"
+                    android:layout_marginStart="6dp"
+                    android:importantForAccessibility="no"
+                    android:visibility="gone"
+                    app:srcCompat="@android:drawable/ic_menu_camera"
+                    app:tint="?attr/colorOnSurfaceVariant" />
+
+                <ImageView
+                    android:id="@+id/workout_row_upload"
+                    android:layout_width="16dp"
+                    android:layout_height="16dp"
+                    android:layout_marginStart="6dp"
+                    android:visibility="gone"
+                    tools:ignore="ContentDescription" />
             </LinearLayout>
 
             <TextView
