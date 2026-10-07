@@ -256,18 +256,6 @@ abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator(
         "${(frequency / 1000.0).toString().removeSuffix(".0")} kHz"
     }
 
-    private fun equalizerBandTitleResource(frequency: Int): Int = when (frequency) {
-        100 -> R.string.soundcore_equalizer_band1_freq
-        200 -> R.string.soundcore_equalizer_band2_freq
-        400 -> R.string.soundcore_equalizer_band3_freq
-        800 -> R.string.soundcore_equalizer_band4_freq
-        1600 -> R.string.soundcore_equalizer_band5_freq
-        3200 -> R.string.soundcore_equalizer_band6_freq
-        6400 -> R.string.soundcore_equalizer_band7_freq
-        12800 -> R.string.soundcore_equalizer_band8_freq
-        else -> R.string.soundcore_equalizer_value
-    }
-
     /**
      * Builds the standardized modern settings tree for Soundcore earbuds. A model that needs a
      * completely isolated settings tree can override [getDeviceSettings].
@@ -471,7 +459,7 @@ abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator(
                                         val key = equalizerBandKeys[index]
                                         category(
                                             key = "${key}_category",
-                                            title = equalizerBandTitleResource(frequency),
+                                            titleText = "${GBApplication.getContext().getString(R.string.band_index, index + 1)} (${formatEqualizerFrequency(frequency)})",
                                         ) {
                                             seekbar(
                                                 key = key,
@@ -486,22 +474,11 @@ abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator(
                                 }
                                 // Equalizer for Motion 300
                                 if (adjustableFrequencies) {
-                                    val bandTitles = listOf(
-                                        R.string.soundcore_equalizer_band1,
-                                        R.string.soundcore_equalizer_band2,
-                                        R.string.soundcore_equalizer_band3,
-                                        R.string.soundcore_equalizer_band4,
-                                        R.string.soundcore_equalizer_band5,
-                                        R.string.soundcore_equalizer_band6,
-                                        R.string.soundcore_equalizer_band7,
-                                        R.string.soundcore_equalizer_band8,
-                                        R.string.soundcore_equalizer_band9,
-                                    )
                                     equalizerBands.forEachIndexed { index, _ ->
                                         val key = equalizerBandKeys[index]
                                         category(
                                             key = "${key}_category",
-                                            title = bandTitles[index],
+                                            titleText = GBApplication.getContext().getString(R.string.band_index, index + 1),
                                         ) {
                                             list(
                                                 key = equalizerFrequencyKeys[index],
