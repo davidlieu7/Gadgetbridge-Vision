@@ -1,6 +1,15 @@
 package nodomain.freeyourgadget.gadgetbridge.service.devices.soundcore.protocol.impl.v1;
 
 import android.content.SharedPreferences;
+import android.content.Intent;
+import androidx.localbroadcastmanager.content.LocalBroadcastManager;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Set;
+import nodomain.freeyourgadget.gadgetbridge.GBApplication;
+import nodomain.freeyourgadget.gadgetbridge.activities.multipoint.MultipointDevice;
+import nodomain.freeyourgadget.gadgetbridge.activities.multipoint.MultipointPairingActivity;
+import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreEarbudsCoordinator;
 
 import java.util.Arrays;
 
@@ -29,6 +38,7 @@ public abstract class SoundcoreProtocolImplV1 extends AbstractSoundcoreProtocol 
     public static final short CMD_DISCONNECT_DEVICE = (short) 0x810b;
     public static final short CMD_CONNECT_DEVICE = (short) 0x820b;
     public static final short CMD_FORGET_DEVICE = (short) 0x830b;
+    public static final short CMD_SET_DUAL_CONNECTION = (short) 0x840b;
 
     public static final short CMD_SET_AUDIO_MODE = (short) 0x8106;
     public static final short CMD_SET_AMBIENT_SOUND_CONTROL_BUTTON_MODE = (short) 0x8206;
@@ -248,6 +258,82 @@ public abstract class SoundcoreProtocolImplV1 extends AbstractSoundcoreProtocol 
      */
     protected GBDeviceEvent[] decodeCommand(final short command, final byte[] payload) {
         return null;
+    }
+
+    /** Requests the paired-device list from the device. */
+    public byte[] encodePairedDevicesRequest() {
+        return encodeRequest(CMD_NOTIFY_PAIRED_DEVICES);
+    }
+
+    /** Enables or disables dual connection (multipoint) on the device. */
+    public byte[] encodeDualConnection(final boolean enabled) {
+        return encodeBooleanCommand(CMD_SET_DUAL_CONNECTION, enabled);
+    }
+
+    /** Puts the device into pairing mode so a new device can be paired. */
+    public byte[] encodeStartPairing() {
+        return encodePairingMode();
+    }
+
+    /** Connects the device to the given paired device (address as "AA:BB:CC:DD:EE:FF"). */
+    public byte[] encodeConnectDevice(final String address) {
+        return encodeCommand(CMD_CONNECT_DEVICE, addressToLittleEndian(address));
+    }
+
+    /** Disconnects the device from the given paired device (address as "AA:BB:CC:DD:EE:FF"). */
+    public byte[] encodeDisconnectDevice(final String address) {
+        return encodeCommand(CMD_DISCONNECT_DEVICE, addressToLittleEndian(address));
+    }
+
+    /** Forgets/unpairs the given paired device (address as "AA:BB:CC:DD:EE:FF"). */
+    public byte[] encodeForgetDevice(final String address) {
+        return encodeCommand(CMD_FORGET_DEVICE, addressToLittleEndian(address));
+    }
+
+    /** Requests the current connection/active-audio status from the device. */
+    public byte[] encodeConnectionStatusRequest() {
+        return encodeRequest(CMD_NOTIFY_CONNECTION_STATUS);
+    }
+
+    /**
+     * Converts a Bluetooth address string ("AA:BB:CC:DD:EE:FF") into the 6-byte little-endian
+     * representation used by the device (the same byte order as reported in the paired-device list).
+     */
+    private static byte[] addressToLittleEndian(final String address) {
+        final String[] parts = address.split(":");
+        final byte[] mac = new byte[6];
+        for (int i = 0; i < 6 && i < parts.length; i++) {
+            mac[5 - i] = (byte) Integer.parseInt(parts[i], 16);
+        }
+        return mac;
+    }
+
+    public void broadcastMultipointStatus(final boolean enabled) {
+        final Intent intent = new Intent(MultipointPairingActivity.ACTION_MULTIPOINT_STATUS_UPDATE);
+        intent.putExtra(GBDevice.EXTRA_DEVICE, getDevice());
+        intent.putExtra(MultipointPairingActivity.EXTRA_MULTIPOINT_ENABLED, enabled);
+        final Set<String> actions = ((SoundcoreEarbudsCoordinator) getDevice().getDeviceCoordinator())
+                .getSupportedMultipointActions();
+        intent.putExtra(MultipointPairingActivity.EXTRA_MULTIPOINT_DISABLE_SUPPORTED,
+                actions.contains(MultipointPairingActivity.ACTION_MULTIPOINT_DISABLE));
+        intent.putExtra(MultipointPairingActivity.EXTRA_MULTIPOINT_PAIR_SUPPORTED,
+                actions.contains(MultipointPairingActivity.ACTION_MULTIPOINT_START_PAIRING));
+        LocalBroadcastManager.getInstance(GBApplication.getContext()).sendBroadcast(intent);
+    }
+
+    public void broadcastMultipointPairing(final boolean enabled) {
+        final Intent intent = new Intent(MultipointPairingActivity.ACTION_MULTIPOINT_PAIRING_UPDATE);
+        intent.putExtra(GBDevice.EXTRA_DEVICE, getDevice());
+        intent.putExtra(MultipointPairingActivity.EXTRA_PAIRING_ENABLED, enabled);
+        LocalBroadcastManager.getInstance(GBApplication.getContext()).sendBroadcast(intent);
+    }
+
+    public void broadcastMultipointList(final List<MultipointDevice> devices) {
+        final Intent intent = new Intent(MultipointPairingActivity.ACTION_MULTIPOINT_DEVICE_LIST);
+        intent.putExtra(GBDevice.EXTRA_DEVICE, getDevice());
+        intent.putParcelableArrayListExtra(
+                MultipointPairingActivity.EXTRA_DEVICE_LIST, new ArrayList<>(devices));
+        LocalBroadcastManager.getInstance(GBApplication.getContext()).sendBroadcast(intent);
     }
 
     public byte[] encodeDeviceInfoRequest() {

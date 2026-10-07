@@ -126,6 +126,9 @@ abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator(
     override fun getDeviceSupportClass(device: GBDevice): Class<out DeviceSupport> =
         SoundcoreDeviceSupport::class.java
 
+    /** Multipoint activity commands supported by this model. */
+    open fun getSupportedMultipointActions(): Set<String> = emptySet()
+
     /** Creates the protocol implementation for this model. */
     open fun createProtocol(device: GBDevice): SoundcoreProtocolImplV1 =
         throw UnsupportedOperationException("Soundcore coordinator must provide its protocol factory")

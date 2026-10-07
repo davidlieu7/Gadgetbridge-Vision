@@ -1,10 +1,8 @@
 package nodomain.freeyourgadget.gadgetbridge.service.devices.soundcore.sport_x20;
 
-import android.content.Intent;
 import android.content.SharedPreferences;
 import android.widget.Toast;
 
-import androidx.localbroadcastmanager.content.LocalBroadcastManager;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -21,6 +19,7 @@ import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSett
 import nodomain.freeyourgadget.gadgetbridge.activities.multipoint.MultipointDevice;
 import nodomain.freeyourgadget.gadgetbridge.activities.multipoint.MultipointPairingActivity;
 import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEvent;
+import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreEarbudsCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.sony.headphones.prefs.AmbientSoundControlButtonMode;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.soundcore.protocol.impl.v1.SoundcoreProtocolImplV1;
@@ -32,7 +31,6 @@ public class SoundcoreSportX20Protocol extends SoundcoreProtocolImplV1 {
     private static final Logger LOG = LoggerFactory.getLogger(SoundcoreSportX20Protocol.class);
 
     private static final short CMD_SET_EQUALIZER = (short) 0x8703;
-    private static final short CMD_SET_DUAL_CONNECTION = (short) 0x840b;
     private static final short CMD_SET_FIT_TEST = (short) 0x0109;
     private static final int BATTERY_MULTIPLIER = 20;
 
@@ -106,7 +104,7 @@ public class SoundcoreSportX20Protocol extends SoundcoreProtocolImplV1 {
     private final List<MultipointDevice> pairedDevices = new ArrayList<>();
     private String activeSourceAddress;
 
-    protected SoundcoreSportX20Protocol(final GBDevice device) {
+    public SoundcoreSportX20Protocol(final GBDevice device) {
         super(device);
     }
 
@@ -306,7 +304,8 @@ public class SoundcoreSportX20Protocol extends SoundcoreProtocolImplV1 {
             }
             final String name = new String(payload, offset + 8, nameEnd, StandardCharsets.UTF_8);
             LOG.debug("Paired device: addr={} name='{}' connected={}", address, name, connected);
-            devices.add(new MultipointDevice(address, name, connected, false, true));
+            devices.add(new MultipointDevice(address, name, connected, false, ((SoundcoreEarbudsCoordinator) getDevice().getDeviceCoordinator())
+                    .getSupportedMultipointActions().contains(MultipointPairingActivity.ACTION_MULTIPOINT_FORGET_DEVICE)));
             offset += entrySize;
         }
         pairedDevices.clear();
@@ -333,54 +332,6 @@ public class SoundcoreSportX20Protocol extends SoundcoreProtocolImplV1 {
         broadcastMultipointList(devices);
     }
 
-    /** Requests the paired-device list from the device. */
-    public byte[] encodePairedDevicesRequest() {
-        return encodeRequest(CMD_NOTIFY_PAIRED_DEVICES);
-    }
-
-    /** Enables or disables dual connection (multipoint) on the device. */
-    public byte[] encodeDualConnection(final boolean enabled) {
-        return encodeBooleanCommand(CMD_SET_DUAL_CONNECTION, enabled);
-    }
-
-    /** Puts the device into pairing mode so a new device can be paired. */
-    public byte[] encodeStartPairing() {
-        return encodePairingMode();
-    }
-
-    /** Connects the device to the given paired device (address as "AA:BB:CC:DD:EE:FF"). */
-    public byte[] encodeConnectDevice(final String address) {
-        return encodeCommand(CMD_CONNECT_DEVICE, addressToLittleEndian(address));
-    }
-
-    /** Disconnects the device from the given paired device (address as "AA:BB:CC:DD:EE:FF"). */
-    public byte[] encodeDisconnectDevice(final String address) {
-        return encodeCommand(CMD_DISCONNECT_DEVICE, addressToLittleEndian(address));
-    }
-
-    /** Forgets/unpairs the given paired device (address as "AA:BB:CC:DD:EE:FF"). */
-    public byte[] encodeForgetDevice(final String address) {
-        return encodeCommand(CMD_FORGET_DEVICE, addressToLittleEndian(address));
-    }
-
-    /** Requests the current connection/active-audio status from the device. */
-    public byte[] encodeConnectionStatusRequest() {
-        return encodeRequest(CMD_NOTIFY_CONNECTION_STATUS);
-    }
-
-    /**
-     * Converts a Bluetooth address string ("AA:BB:CC:DD:EE:FF") into the 6-byte little-endian
-     * representation used by the device (the same byte order as reported in the paired-device list).
-     */
-    private static byte[] addressToLittleEndian(final String address) {
-        final String[] parts = address.split(":");
-        final byte[] mac = new byte[6];
-        for (int i = 0; i < 6 && i < parts.length; i++) {
-            mac[5 - i] = (byte) Integer.parseInt(parts[i], 16);
-        }
-        return mac;
-    }
-
     public static String formatMacAddress(byte[] payload, int position) {
         StringBuilder mac = new StringBuilder(17);
         for (int i = 5; i >= 0; i--) {
@@ -390,30 +341,6 @@ public class SoundcoreSportX20Protocol extends SoundcoreProtocolImplV1 {
             mac.append(String.format("%02X", payload[position + i] & 0xFF));
         }
         return mac.toString();
-    }
-
-    void broadcastMultipointStatus(final boolean enabled) {
-        final Intent intent = new Intent(MultipointPairingActivity.ACTION_MULTIPOINT_STATUS_UPDATE);
-        intent.putExtra(GBDevice.EXTRA_DEVICE, getDevice());
-        intent.putExtra(MultipointPairingActivity.EXTRA_MULTIPOINT_ENABLED, enabled);
-        intent.putExtra(MultipointPairingActivity.EXTRA_MULTIPOINT_DISABLE_SUPPORTED, true);
-        intent.putExtra(MultipointPairingActivity.EXTRA_MULTIPOINT_PAIR_SUPPORTED, true);
-        LocalBroadcastManager.getInstance(GBApplication.getContext()).sendBroadcast(intent);
-    }
-
-    void broadcastMultipointPairing(final boolean enabled) {
-        final Intent intent = new Intent(MultipointPairingActivity.ACTION_MULTIPOINT_PAIRING_UPDATE);
-        intent.putExtra(GBDevice.EXTRA_DEVICE, getDevice());
-        intent.putExtra(MultipointPairingActivity.EXTRA_PAIRING_ENABLED, enabled);
-        LocalBroadcastManager.getInstance(GBApplication.getContext()).sendBroadcast(intent);
-    }
-
-    void broadcastMultipointList(final List<MultipointDevice> devices) {
-        final Intent intent = new Intent(MultipointPairingActivity.ACTION_MULTIPOINT_DEVICE_LIST);
-        intent.putExtra(GBDevice.EXTRA_DEVICE, getDevice());
-        intent.putParcelableArrayListExtra(
-                MultipointPairingActivity.EXTRA_DEVICE_LIST, new ArrayList<>(devices));
-        LocalBroadcastManager.getInstance(GBApplication.getContext()).sendBroadcast(intent);
     }
 
     /** Maps a low-nibble TapFunction code (0–15) back to the TapFunction enum. */

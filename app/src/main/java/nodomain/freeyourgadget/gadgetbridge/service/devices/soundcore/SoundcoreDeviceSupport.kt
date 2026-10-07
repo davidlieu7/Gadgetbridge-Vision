@@ -17,6 +17,14 @@
 package nodomain.freeyourgadget.gadgetbridge.service.devices.soundcore
 
 import android.bluetooth.BluetoothAdapter
+import android.content.BroadcastReceiver
+import android.content.Intent
+import android.content.IntentFilter
+import androidx.localbroadcastmanager.content.LocalBroadcastManager
+import nodomain.freeyourgadget.gadgetbridge.GBApplication
+import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsPreferenceConst
+import nodomain.freeyourgadget.gadgetbridge.activities.multipoint.MultipointPairingActivity
+import nodomain.freeyourgadget.gadgetbridge.util.kotlin.getParcelableCompat
 import android.content.Context
 import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreEarbudsCoordinator
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice
@@ -26,6 +34,80 @@ import nodomain.freeyourgadget.gadgetbridge.service.serial.AbstractHeadphoneSeri
 import java.util.UUID
 
 open class SoundcoreDeviceSupport : AbstractHeadphoneSerialDeviceSupportV2<SoundcoreProtocolImplV1>() {
+    private var multipointReceiverRegistered = false
+
+    private val multipointReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            val intentDevice = intent.getParcelableCompat<GBDevice>(GBDevice.EXTRA_DEVICE)
+            if (intentDevice?.address != getDevice().address) return
+            val action = intent.action ?: return
+            val actions = (getDevice().deviceCoordinator as SoundcoreEarbudsCoordinator)
+                .getSupportedMultipointActions()
+            if (action !in actions) return
+
+            when (action) {
+                MultipointPairingActivity.ACTION_MULTIPOINT_GET_STATUS -> {
+                    val enabled = GBApplication.getDeviceSpecificSharedPrefs(getDevice().address)
+                        .getBoolean(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_DUAL_CONNECTION, false)
+                    mDeviceProtocol.broadcastMultipointStatus(enabled)
+                }
+                MultipointPairingActivity.ACTION_MULTIPOINT_GET_DEVICES -> refreshMultipointDevices()
+                MultipointPairingActivity.ACTION_MULTIPOINT_ENABLE -> setDualConnection(true)
+                MultipointPairingActivity.ACTION_MULTIPOINT_DISABLE -> setDualConnection(false)
+                MultipointPairingActivity.ACTION_MULTIPOINT_START_PAIRING -> {
+                    val enabled = intent.getBooleanExtra(MultipointPairingActivity.EXTRA_PAIRING_ENABLED, false)
+                    if (enabled) sendMultipointCommand(mDeviceProtocol.encodeStartPairing())
+                    mDeviceProtocol.broadcastMultipointPairing(enabled)
+                }
+                MultipointPairingActivity.ACTION_MULTIPOINT_CONNECT_DEVICE,
+                MultipointPairingActivity.ACTION_MULTIPOINT_DISCONNECT_DEVICE -> {
+                    val address = intent.getStringExtra(MultipointPairingActivity.EXTRA_DEVICE_ADDRESS) ?: return
+                    sendMultipointCommand(if (action == MultipointPairingActivity.ACTION_MULTIPOINT_CONNECT_DEVICE) {
+                        mDeviceProtocol.encodeConnectDevice(address)
+                    } else {
+                        mDeviceProtocol.encodeDisconnectDevice(address)
+                    })
+                    refreshMultipointDevices()
+                }
+                MultipointPairingActivity.ACTION_MULTIPOINT_FORGET_DEVICE -> {
+                    val address = intent.getStringExtra(MultipointPairingActivity.EXTRA_DEVICE_ADDRESS) ?: return
+                    sendMultipointCommand(mDeviceProtocol.encodeForgetDevice(address))
+                    sendMultipointCommand(mDeviceProtocol.encodePairedDevicesRequest())
+                }
+            }
+        }
+    }
+
+    override fun dispose() {
+        synchronized(ConnectionMonitor) {
+            if (multipointReceiverRegistered) {
+                LocalBroadcastManager.getInstance(getContext()).unregisterReceiver(multipointReceiver)
+                multipointReceiverRegistered = false
+            }
+            super.dispose()
+        }
+    }
+
+    private fun setDualConnection(enabled: Boolean) {
+        GBApplication.getDeviceSpecificSharedPrefs(getDevice().address).edit()
+            .putBoolean(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_DUAL_CONNECTION, enabled)
+            .apply()
+        sendMultipointCommand(mDeviceProtocol.encodeDualConnection(enabled))
+        mDeviceProtocol.broadcastMultipointStatus(enabled)
+    }
+
+    private fun refreshMultipointDevices() {
+        sendMultipointCommand(mDeviceProtocol.encodeConnectionStatusRequest())
+        sendMultipointCommand(mDeviceProtocol.encodePairedDevicesRequest())
+    }
+
+    private fun sendMultipointCommand(bytes: ByteArray?) {
+        if (bytes == null) return
+        val builder = createTransactionBuilder("multipoint")
+        builder.write(*bytes)
+        builder.queue()
+    }
+
     override fun setContext(gbDevice: GBDevice, btAdapter: BluetoothAdapter, context: Context) {
         super.setContext(gbDevice, btAdapter, context)
 
@@ -33,6 +115,12 @@ open class SoundcoreDeviceSupport : AbstractHeadphoneSerialDeviceSupportV2<Sound
             ?: throw IllegalArgumentException("Expected a SoundcoreEarbudsCoordinator for Soundcore earbuds support")
 
         addSupportedService(coordinator.getServiceUUID() ?: getServiceUUID(coordinator.getModelName()))
+        val actions = coordinator.getSupportedMultipointActions()
+        if (actions.isNotEmpty() && !multipointReceiverRegistered) {
+            val filter = IntentFilter().apply { actions.forEach { addAction(it) } }
+            LocalBroadcastManager.getInstance(context).registerReceiver(multipointReceiver, filter)
+            multipointReceiverRegistered = true
+        }
     }
 
     protected override fun createDeviceProtocol(): SoundcoreProtocolImplV1 =
