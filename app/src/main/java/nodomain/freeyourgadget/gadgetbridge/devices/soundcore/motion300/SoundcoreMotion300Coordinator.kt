@@ -52,6 +52,8 @@ class SoundcoreMotion300Coordinator : SoundcoreEarbudsCoordinator() {
         Capability.AdaptiveDirection,
     )
 
+    override fun getEqualizerVolumeRange(): IntRange = 0..120
+
     override fun getSupportedEqualizerBands(): IntArray = intArrayOf(
         80, 150, 300, 600, 1200, 2500, 5000, 9000, 13000,
     )

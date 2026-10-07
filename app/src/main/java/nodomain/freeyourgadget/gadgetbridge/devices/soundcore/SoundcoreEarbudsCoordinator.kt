@@ -205,6 +205,8 @@ abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator(
 
     open fun getAutoPowerOffMinutes(): Array<Int> = arrayOf(10, 20, 30, 60)
 
+    open fun getEqualizerVolumeRange(): IntRange = -6..6
+
     open fun getSupportedEqualizerBands(): IntArray = intArrayOf()
 
     /** Per-band frequency choices in protocol index order. */
@@ -419,6 +421,8 @@ abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator(
                                 val equalizerBands = getSupportedEqualizerBands()
                                 val equalizerBandRanges = getSupportedEqualizerBandsRanges()
                                 val adjustableFrequencies = equalizerBandRanges.isNotEmpty()
+                                val equalizerVolumeRange = getEqualizerVolumeRange()
+                                val defaultEqualizerVolume = (equalizerVolumeRange.first + equalizerVolumeRange.last) / 2
                                 val defaultFrequencyIndices = if (adjustableFrequencies) {
                                     require(equalizerBandRanges.size == equalizerBands.size)
                                     equalizerBands.mapIndexed { index, frequency ->
@@ -439,7 +443,7 @@ abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator(
                                             val bandKeys = equalizerBandKeys.take(equalizerBands.size)
                                             val prefs = GBApplication.getDevicePrefs(it).preferences
                                             prefs.edit().apply {
-                                                bandKeys.forEach { key -> putInt(key, if (adjustableFrequencies) 60 else 0) }
+                                                bandKeys.forEach { key -> putInt(key, defaultEqualizerVolume) }
                                                 if (adjustableFrequencies) {
                                                     defaultFrequencyIndices.forEachIndexed { index, frequencyIndex ->
                                                         putString(equalizerFrequencyKeys[index], frequencyIndex.toString())
@@ -453,51 +457,40 @@ abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator(
                                         true
                                     },
                                 )
-                                // Simple Equalizer for Sport X20
-                                if (!adjustableFrequencies) {
-                                    getSupportedEqualizerBands().take(equalizerBandKeys.size).forEachIndexed { index, frequency ->
-                                        val key = equalizerBandKeys[index]
-                                        category(
-                                            key = "${key}_category",
-                                            titleText = "${GBApplication.getContext().getString(R.string.band_index, index + 1)} (${formatEqualizerFrequency(frequency)})",
-                                        ) {
-                                            seekbar(
-                                                key = key,
-                                                title = R.string.soundcore_equalizer_value,
-                                                icon = R.drawable.ic_graphic_eq,
-                                                min = -6,
-                                                max = 6,
-                                                defaultValue = 0,
-                                            )
-                                        }
-                                    }
-                                }
-                                // Equalizer for Motion 300
-                                if (adjustableFrequencies) {
-                                    equalizerBands.forEachIndexed { index, _ ->
-                                        val key = equalizerBandKeys[index]
-                                        category(
-                                            key = "${key}_category",
-                                            titleText = GBApplication.getContext().getString(R.string.band_index, index + 1),
-                                        ) {
-                                            list(
-                                                key = equalizerFrequencyKeys[index],
-                                                title = R.string.soundcore_equalizer_frequency,
-                                                icon = R.drawable.ic_hearing,
-                                                entries = equalizerBandRanges[index].mapIndexed { frequencyIndex, frequency ->
-                                                    ListEntry.Text(frequencyIndex.toString(), formatEqualizerFrequency(frequency))
-                                                },
-                                                defaultValue = defaultFrequencyIndices[index].toString(),
-                                            )
-                                            seekbar(
-                                                key = key,
-                                                title = R.string.soundcore_equalizer_value,
-                                                icon = R.drawable.ic_graphic_eq,
-                                                min = 0,
-                                                max = 120,
-                                                defaultValue = 60,
-                                            )
-                                        }
+                                equalizerBands.take(equalizerBandKeys.size).forEachIndexed { index, frequency ->
+                                    val key = equalizerBandKeys[index]
+                                    val bandTitle = GBApplication.getContext().getString(R.string.band_index, index + 1)
+                                    category(
+                                        key = "${key}_category",
+                                        titleText = bandTitle,
+                                    ) {
+                                        list(
+                                            key = equalizerFrequencyKeys[index],
+                                            title = R.string.soundcore_equalizer_frequency,
+                                            icon = R.drawable.ic_hearing,
+                                            entriesProvider = {
+                                                equalizerBandRanges.getOrNull(index)?.mapIndexed { frequencyIndex, bandFrequency ->
+                                                    ListEntry.Text(frequencyIndex.toString(), formatEqualizerFrequency(bandFrequency))
+                                                }.orEmpty()
+                                            },
+                                            defaultValue = (defaultFrequencyIndices.getOrNull(index) ?: 0).toString(),
+                                            visibleWhen = { adjustableFrequencies },
+                                        )
+                                        info(
+                                            key = "${equalizerFrequencyKeys[index]}_info",
+                                            title = R.string.soundcore_equalizer_frequency,
+                                            icon = R.drawable.ic_hearing,
+                                            summaryProvider = { _, _ -> formatEqualizerFrequency(frequency) },
+                                            visibleWhen = { !adjustableFrequencies },
+                                        )
+                                        seekbar(
+                                            key = key,
+                                            title = R.string.soundcore_equalizer_value,
+                                            icon = R.drawable.ic_graphic_eq,
+                                            min = equalizerVolumeRange.first,
+                                            max = equalizerVolumeRange.last,
+                                            defaultValue = defaultEqualizerVolume,
+                                        )
                                     }
                                 }
                             }
