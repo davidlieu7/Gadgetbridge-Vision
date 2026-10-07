@@ -16,8 +16,10 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 package nodomain.freeyourgadget.gadgetbridge.devices.samsung;
 
+import android.app.Activity;
 import android.content.Context;
 import android.net.Uri;
+import android.os.Bundle;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -29,6 +31,7 @@ import java.util.regex.Pattern;
 import de.greenrobot.dao.AbstractDao;
 import de.greenrobot.dao.Property;
 import nodomain.freeyourgadget.gadgetbridge.R;
+import nodomain.freeyourgadget.gadgetbridge.activities.appmanager.AppManagerActivity;
 import nodomain.freeyourgadget.gadgetbridge.devices.AbstractBLEDeviceCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.InstallHandler;
 import nodomain.freeyourgadget.gadgetbridge.devices.SampleProvider;
@@ -133,6 +136,48 @@ public class SamsungFit3Coordinator extends AbstractBLEDeviceCoordinator {
     @Override
     public ActivitySummaryParser getActivitySummaryParser(final GBDevice device, final Context context) {
         return new SamsungWorkoutParser();
+    }
+
+    @Override
+    public InstallHandler findInstallHandler(Uri uri, Bundle options, Context context) {
+        SamsungFit3InstallHandler handler = new SamsungFit3InstallHandler(uri, context);
+        return handler.isValid() ? handler : null;
+    }
+
+    @Override
+    public boolean supportsFlashing(@NonNull GBDevice device) {
+        return true;
+    }
+
+    /** Watchfaces only - the band has no installable apps. */
+    @Override
+    public boolean supportsAppsManagement(@NonNull GBDevice device) {
+        return true;
+    }
+
+    @Override
+    public boolean supportsInstalledAppManagement(@NonNull GBDevice device) {
+        return false;
+    }
+
+    @Override
+    public boolean supportsCachedAppManagement(@NonNull GBDevice device) {
+        return false;
+    }
+
+    @Override
+    public boolean supportsWatchfaceManagement(@NonNull GBDevice device) {
+        return true;
+    }
+
+    @Override
+    public boolean supportsAppListFetching(@NonNull GBDevice device) {
+        return true;
+    }
+
+    @Override
+    public Class<? extends Activity> getAppsManagementActivity(GBDevice device) {
+        return AppManagerActivity.class;
     }
 
     @Override

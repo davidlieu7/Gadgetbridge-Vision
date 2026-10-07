@@ -17,12 +17,18 @@
 
 package nodomain.freeyourgadget.gadgetbridge.service.devices.samsung;
 
+import android.bluetooth.BluetoothAdapter;
+import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothGatt;
 import android.bluetooth.BluetoothGattCharacteristic;
+import android.bluetooth.BluetoothManager;
+import android.content.Context;
 import android.content.SharedPreferences;
+import android.net.Uri;
 import android.os.Bundle;
 import android.widget.Toast;
 
+import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 import org.slf4j.Logger;
@@ -41,10 +47,12 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 import nodomain.freeyourgadget.gadgetbridge.GBApplication;
+import nodomain.freeyourgadget.gadgetbridge.R;
 import nodomain.freeyourgadget.gadgetbridge.activities.SettingsActivity;
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsPreferenceConst;
 import nodomain.freeyourgadget.gadgetbridge.database.DBHandler;
 import nodomain.freeyourgadget.gadgetbridge.database.DBHelper;
+import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEventAppInfo;
 import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEventBatteryInfo;
 import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEventCallControl;
 import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEventMusicControl;
@@ -58,6 +66,7 @@ import nodomain.freeyourgadget.gadgetbridge.entities.SamsungFit3ActivitySample;
 import nodomain.freeyourgadget.gadgetbridge.entities.SamsungFit3ActivitySampleDao;
 import nodomain.freeyourgadget.gadgetbridge.entities.User;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
+import nodomain.freeyourgadget.gadgetbridge.impl.GBDeviceApp;
 import nodomain.freeyourgadget.gadgetbridge.model.ActivityKind;
 import nodomain.freeyourgadget.gadgetbridge.model.ActivitySample;
 import nodomain.freeyourgadget.gadgetbridge.model.ActivityUser;
@@ -148,6 +157,49 @@ public class SamsungDeviceSupport extends AbstractBTLESingleDeviceSupport {
     });
     /** Shared timestamp for one dump session's file names; reset each run. */
     private String logDumpStamp;
+
+    /** Watchface list/select/delete/install; see {@link Fit3WatchfaceManager}. */
+    private final Fit3WatchfaceManager watchfaceManager = new Fit3WatchfaceManager(new Fit3WatchfaceManager.Listener() {
+        @Override
+        public void sendMessage(int channel, byte[] body, String reason) {
+            SamsungDeviceSupport.this.sendMessage(channel, body, reason);
+        }
+
+        @Override
+        public Context getContext() {
+            return SamsungDeviceSupport.this.getContext();
+        }
+
+        @Override
+        public GBDevice getDevice() {
+            return SamsungDeviceSupport.this.getDevice();
+        }
+
+        @Override
+        public BluetoothDevice getBluetoothDevice() {
+            BluetoothManager manager = SamsungDeviceSupport.this.getContext().getSystemService(BluetoothManager.class);
+            BluetoothAdapter adapter = manager != null ? manager.getAdapter() : null;
+            return adapter != null ? adapter.getRemoteDevice(getDevice().getAddress()) : null;
+        }
+
+        @Override
+        public void onWatchfaceList(List<GBDeviceApp> apps) {
+            GBDeviceEventAppInfo appInfo = new GBDeviceEventAppInfo();
+            appInfo.apps = apps.toArray(new GBDeviceApp[0]);
+            evaluateGBDeviceEvent(appInfo);
+        }
+
+        @Override
+        public void onProgress(int textRes, boolean ongoing, int percent) {
+            try {
+                createTransactionBuilder("watchface-progress")
+                        .setProgress(textRes, ongoing, percent)
+                        .queue();
+            } catch (Exception e) {
+                LOG.error("Samsung Fit 3: failed to update progress notification", e);
+            }
+        }
+    });
     // Package for each id the band might later ask for an icon by, keyed on
     // the exact IMAGE_URL string (see Fit3NotificationIcon); populated as
     // notifications are pushed, since the fetch request only carries the id.
@@ -314,6 +366,17 @@ public class SamsungDeviceSupport extends AbstractBTLESingleDeviceSupport {
         // so route both to the state machine before the request/response split.
         if (channel == SapProtocol.CH_DEBUG) {
             logDump.onMessage(msgId, body);
+            return;
+        }
+        // Watchface and file-transfer replies also come with either type bit
+        // (the band initiates activate/delete too); both belong to one
+        // state machine, see Fit3WatchfaceManager.
+        if (channel == SapProtocol.CH_WATCHFACE) {
+            watchfaceManager.onWatchfaceMessage(body);
+            return;
+        }
+        if (channel == SapProtocol.CH_FILE_TRANSFER) {
+            watchfaceManager.onFileTransferMessage(body);
             return;
         }
 
@@ -1042,9 +1105,10 @@ public class SamsungDeviceSupport extends AbstractBTLESingleDeviceSupport {
 //        sendRawMessage(SapProtocol.CH_IDENTITY, hex("01 09 01"), "identity");
 //        sendRawMessage(SapProtocol.CH_IDENTITY, buildBindingToken(), "binding-token");
 
-        // 5) capability handshake tail
-//        sendRawMessage(SapProtocol.CH_CAP2_06, hex("01"), "cap06-1");
-//        sendRawMessage(SapProtocol.CH_CAP2_06, hex("00"), "cap06-0");
+        // 5) watchface list (01) and all-info (00) reads - see Fit3Watchface;
+        //    the list is fetched on demand by the app manager instead.
+//        sendRawMessage(SapProtocol.CH_WATCHFACE, hex("01"), "watchface-list");
+//        sendRawMessage(SapProtocol.CH_WATCHFACE, hex("00"), "watchface-all-info");
         // end configuration requests
 
         // 6) LICENSE_AGREEMENT - closes out the setup handshake on this channel.
@@ -1515,12 +1579,49 @@ public class SamsungDeviceSupport extends AbstractBTLESingleDeviceSupport {
         logDump.start();
     }
 
+    /**
+     * Install a watchface package picked in the installer (see
+     * {@link nodomain.freeyourgadget.gadgetbridge.devices.samsung.SamsungFit3InstallHandler},
+     * which has already validated it).
+     */
+    @Override
+    public void onInstallApp(Uri uri, @NonNull Bundle options) {
+        Fit3WatchfaceFile file = Fit3WatchfaceFile.fromUri(uri, getContext());
+        if (file == null) {
+            LOG.warn("Samsung Fit 3: {} is not a watchface package", uri);
+            GB.toast(getContext(), R.string.fwinstaller_file_not_compatible_to_device, Toast.LENGTH_LONG, GB.ERROR);
+            return;
+        }
+        watchfaceManager.install(file);
+    }
+
+    @Override
+    public void onAppInfoReq() {
+        watchfaceManager.requestList();
+    }
+
+    @Override
+    public void onAppStart(UUID uuid, boolean start) {
+        if (start && !watchfaceManager.activate(uuid)) {
+            LOG.warn("Samsung Fit 3: {} is not a watchface", uuid);
+        }
+    }
+
+    @Override
+    public void onAppDelete(UUID uuid) {
+        if (!watchfaceManager.delete(uuid)) {
+            LOG.warn("Samsung Fit 3: {} is not a watchface", uuid);
+        }
+    }
+
     @Override
     public void dispose() {
         // A dump in progress can never complete once the link is gone; drop its
         // state here so the next connection starts from a clean slate.
         logDump.cancel();
         logDumpStamp = null;
+        // Same for a watchface install: the band forgets it on disconnect.
+        watchfaceManager.cancel();
         super.dispose();
     }
 
