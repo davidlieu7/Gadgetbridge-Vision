@@ -1984,6 +1984,7 @@
     <string name="this_week_total">This week total</string>
     <string name="last_week_total">Last week total</string>
     <string name="low">Low</string>
+    <string name="medium">Medium</string>
     <string name="optimal">Optimal</string>
     <string name="high">High</string>
     <string name="very_high">Very High</string>
@@ -4015,9 +4016,6 @@
     <string name="soundbrenner_pref_subdivision_triplet">Triplets</string>
     <string name="soundcore_voice_prompts">Voice Prompts</string>
     <string name="soundcore_button_brightness">Button Brightness</string>
-    <string name="soundcore_button_brightness_low">Low</string>
-    <string name="soundcore_button_brightness_medium">Medium</string>
-    <string name="soundcore_button_brightness_high">High</string>
     <string name="soundcore_ldac_mode_title">LDAC Mode</string>
     <string name="soundcore_ldac_mode_summary">Enabling LDAC will decrease the battery life and might lead to connection instability</string>
     <string name="soundcore_auto_power_off_title">Auto Power Off</string>

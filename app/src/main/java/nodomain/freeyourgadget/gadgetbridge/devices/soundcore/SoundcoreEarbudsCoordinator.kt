@@ -650,8 +650,12 @@ abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator(
                             key = DeviceSettingsPreferenceConst.PREF_SOUNDCORE_BUTTON_BRIGHTNESS,
                             title = R.string.soundcore_button_brightness,
                             icon = R.drawable.ic_wb_sunny,
-                            entriesRes = R.array.soundcore_button_brightness_names,
-                            entryValuesRes = R.array.soundcore_button_brightness_values,
+                            entries = listOf(
+                                ListEntry.Res("0", R.string.off),
+                                ListEntry.Res("20", R.string.low),
+                                ListEntry.Res("70", R.string.medium),
+                                ListEntry.Res("100", R.string.high),
+                            ),
                             defaultValue = "70",
                             connectedOnly = false,
                         )
