@@ -19,6 +19,7 @@ package nodomain.freeyourgadget.gadgetbridge.util.healthconnect
 import android.content.Context
 import android.os.Handler
 import android.os.Looper
+import androidx.annotation.VisibleForTesting
 import androidx.core.content.edit
 import androidx.health.connect.client.HealthConnectClient
 import androidx.health.connect.client.records.*
@@ -583,7 +584,8 @@ class HealthConnectUtils {
             HealthConnectWorkoutSync.notifyStateChanged(GBApplication.getContext())
         }
 
-        private fun getSyncTimestampRange(
+        @VisibleForTesting
+        internal fun getSyncTimestampRange(
             context: Context,
             gbDevice: GBDevice,
             deviceCoordinator: DeviceCoordinator,
@@ -646,7 +648,9 @@ class HealthConnectUtils {
             val firstTs = getFirstSampleTimestamp(deviceCoordinator, gbDevice, db, dataType)
             if (firstTs != null) {
                 CompanionLogger.info("$HC_SYNC_TAG Using first sample timestamp for {}({}): {}", gbDevice.aliasOrName, dataType.name, firstTs)
-                return firstTs
+                // Start before the first sample: a range holding a single sample would otherwise
+                // have start == end and be skipped as having nothing new to sync.
+                return firstTs.minusSeconds(1)
             }
 
             return null
