@@ -298,6 +298,8 @@ public class FitExporter {
         // time (walking, running, cycling, on-water…). Stationary sports never get an
         // invented distance from any stray GPS jitter.
         final boolean locomotion = isLocomotionSport(sport, subSport);
+        // Track and summary cadence are steps/min; FIT counts step sports per leg (strides).
+        final boolean perLegCadence = ActivityKind.getCycleUnit(kind) == ActivityKind.CycleUnit.STEPS;
 
         // Sensor-presence pre-pass: when a track-wide cadence or power stream is all
         // zero, the source has no cadence/power sensor — emitting "0" per record
@@ -388,7 +390,7 @@ public class FitExporter {
                 // (same ts, same fields). Keeps multi-record-per-second sources intact.
                 final long sig = pointSignature(p);
                 if (haveLastSig && sig == lastEmittedSig) continue;
-                final RecordData rec = buildRecord(p, trackHasCadence, trackHasPower,
+                final RecordData rec = buildRecord(p, trackHasCadence, trackHasPower, perLegCadence,
                         locomotion ? gpsDistanceForPoint : null);
                 if (rec != null) {
                     records.add(rec);
@@ -423,7 +425,7 @@ public class FitExporter {
             // fallback lap covering the whole session so importers always see numLaps >= 1.
             lapRecords.add(buildLap(summaryData, totalAgg, sport, subSport, startSeconds, elapsedSeconds,
                     0, ActivityTrack.SegmentIntensity.UNKNOWN, true, LapTotals.EMPTY,
-                    totalLengths > 0 ? totalLengths : null));
+                    totalLengths > 0 ? totalLengths : null, perLegCadence));
         } else {
             for (int i = 0; i < lapDescriptors.size(); i++) {
                 final LapDescriptor d = lapDescriptors.get(i);
@@ -444,7 +446,7 @@ public class FitExporter {
                     if (c > 0) lapLengthCount = c;
                 }
                 lapRecords.add(buildLap(summaryData, d.agg, sport, subSport, d.startTs, d.elapsed,
-                        i, d.info.getIntensity(), singleSegment, overrides, lapLengthCount));
+                        i, d.info.getIntensity(), singleSegment, overrides, lapLengthCount, perLegCadence));
             }
         }
         final int emittedLaps = Math.max(1, lapDescriptors.size());
@@ -489,7 +491,8 @@ public class FitExporter {
             sumLapStrokes += s.longValue();
         }
         records.add(buildSession(summaryData, totalAgg, sport, subSport, startSeconds, elapsedSeconds, emittedLaps, sumLapStrokes,
-                track != null ? track.getLengths().size() : 0, predominantSwimStroke(track), summary.getName()));
+                track != null ? track.getLengths().size() : 0, predominantSwimStroke(track), summary.getName(),
+                perLegCadence));
         records.add(buildActivity(endSeconds, elapsedSeconds, utcOffsetSeconds));
 
         final FitFile fitFile = new FitFile(records);
@@ -646,6 +649,7 @@ public class FitExporter {
     private RecordData buildRecord(@NonNull final ActivityPoint p,
                                    final boolean trackHasCadence,
                                    final boolean trackHasPower,
+                                   final boolean perLegCadence,
                                    @Nullable final Double gpsCumulativeDistance) {
         if (p.getTime() == null) {
             return null;
@@ -684,7 +688,11 @@ public class FitExporter {
         // track-wide stream of zeros means the device has no cadence sensor and the
         // zeros are sentinels, not measurements.
         if (trackHasCadence && p.getCadence() >= 0) {
-            b.setCadence(p.getCadence());
+            b.setCadence(fitCadence(p.getCadence(), perLegCadence));
+            final Float fractional = fitFractionalCadence(p.getCadence(), perLegCadence);
+            if (fractional != null) {
+                b.setFractionalCadence(fractional);
+            }
         }
 
         final float speed = p.getSpeed();
@@ -794,7 +802,8 @@ public class FitExporter {
                                 @NonNull final ActivityTrack.SegmentIntensity intensity,
                                 final boolean applySummaryAggregates,
                                 @NonNull final LapTotals overrides,
-                                @Nullable final Integer numLengths) {
+                                @Nullable final Integer numLengths,
+                                final boolean perLegCadence) {
         // summaryData is a session-level aggregate. For multi-lap exports we must NOT
         // splat it onto each lap (would falsely claim each lap has the full-session
         // calorie/ascent/etc.). When applySummaryAggregates is false, the aliased
@@ -911,11 +920,19 @@ public class FitExporter {
         }
         final Integer avgCadence = readInt(data, ActivitySummaryEntries.CADENCE_AVG, agg.getAvgCadence());
         if (avgCadence != null) {
-            b.setAvgCadence(avgCadence);
+            b.setAvgCadence(fitCadence(avgCadence, perLegCadence));
+            final Float fractional = fitFractionalCadence(avgCadence, perLegCadence);
+            if (fractional != null) {
+                b.setAvgFractionalCadence(fractional);
+            }
         }
         final Integer maxCadence = readInt(data, ActivitySummaryEntries.CADENCE_MAX, agg.getMaxCadence());
         if (maxCadence != null) {
-            b.setMaxCadence(maxCadence);
+            b.setMaxCadence(fitCadence(maxCadence, perLegCadence));
+            final Float fractional = fitFractionalCadence(maxCadence, perLegCadence);
+            if (fractional != null) {
+                b.setMaxFractionalCadence(fractional);
+            }
         }
 
         final Integer minHr = readInt(data, ActivitySummaryEntries.HR_MIN, null);
@@ -1019,7 +1036,8 @@ public class FitExporter {
                                     @Nullable final Long lapStrokesFallback,
                                     final int numLengths,
                                     @Nullable final Integer swimStrokeFallback,
-                                    @Nullable final String workoutName) {
+                                    @Nullable final String workoutName,
+                                    final boolean perLegCadence) {
         final FitSession.Builder b = new FitSession.Builder();
         b.setMessageIndex(0);
         b.setTimestamp(startSeconds + elapsedSeconds);
@@ -1100,7 +1118,14 @@ public class FitExporter {
         if (!totalCyclesSet) {
             final Long stepCount = readLong(data, ActivitySummaryEntries.STEPS, null);
             if (stepCount != null) {
-                b.setTotalCycles(stepCount);
+                if (perLegCadence) {
+                    b.setTotalCycles(stepCount / 2);
+                    if (stepCount % 2 != 0) {
+                        b.setTotalFractionalCycles(0.5f);
+                    }
+                } else {
+                    b.setTotalCycles(stepCount);
+                }
                 totalCyclesSet = true;
             }
         }
@@ -1149,11 +1174,19 @@ public class FitExporter {
         }
         final Integer avgCadence = readInt(data, ActivitySummaryEntries.CADENCE_AVG, agg.getAvgCadence());
         if (avgCadence != null) {
-            b.setAvgCadence(avgCadence);
+            b.setAvgCadence(fitCadence(avgCadence, perLegCadence));
+            final Float fractional = fitFractionalCadence(avgCadence, perLegCadence);
+            if (fractional != null) {
+                b.setAvgFractionalCadence(fractional);
+            }
         }
         final Integer maxCadence = readInt(data, ActivitySummaryEntries.CADENCE_MAX, agg.getMaxCadence());
         if (maxCadence != null) {
-            b.setMaxCadence(maxCadence);
+            b.setMaxCadence(fitCadence(maxCadence, perLegCadence));
+            final Float fractional = fitFractionalCadence(maxCadence, perLegCadence);
+            if (fractional != null) {
+                b.setMaxFractionalCadence(fractional);
+            }
         }
 
         // ---- Common extensions ----
@@ -1674,6 +1707,17 @@ public class FitExporter {
         /// absent or constant (e.g. all-zero) so there is no real elevation profile.
         @Nullable Double getGpsAscent()  { return altMax > altMin ? ascentSum : null; }
         @Nullable Double getGpsDescent() { return altMax > altMin ? descentSum : null; }
+    }
+
+    /** Integer part of a FIT cadence field, from steps/min when {@code perLeg}. */
+    static int fitCadence(final int cadence, final boolean perLeg) {
+        return perLeg ? cadence / 2 : cadence;
+    }
+
+    /** FIT fractional cadence (field next to the integer one) carrying the half stride of an odd step rate. */
+    @Nullable
+    static Float fitFractionalCadence(final int cadence, final boolean perLeg) {
+        return perLeg && cadence % 2 != 0 ? 0.5f : null;
     }
 
     @Nullable
