@@ -276,6 +276,7 @@ public class DeviceSpecificSettingsFragment extends AbstractPreferenceFragment i
                             }
                         }
                     }
+                    addDynamicSettings(rootKey);
                     reloadEnabledPreferences();
                     return;
                 }
