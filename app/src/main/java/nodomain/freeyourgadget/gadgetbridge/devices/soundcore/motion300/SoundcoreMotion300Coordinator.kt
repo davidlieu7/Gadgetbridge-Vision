@@ -48,7 +48,7 @@ class SoundcoreMotion300Coordinator : SoundcoreEarbudsCoordinator() {
         Capability.VoicePrompts,
         Capability.ButtonBrightness,
         Capability.LDAC,
-        Capability.AudioEqualizer2,
+        Capability.AudioEqualizer,
         Capability.AdaptiveDirection,
     )
 

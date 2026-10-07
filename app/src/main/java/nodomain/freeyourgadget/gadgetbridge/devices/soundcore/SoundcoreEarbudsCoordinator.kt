@@ -56,7 +56,6 @@ abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator(
         BatteryLowTone,
         TouchTone,
         AudioEqualizer,
-        AudioEqualizer2,
         GamingMode,
         VoicePrompts,
         ButtonBrightness,
@@ -327,7 +326,7 @@ abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator(
                 }
             }
 
-            if (has(arrayOf(Capability.AudioEqualizer, Capability.AudioEqualizer2, Capability.SurroundSound, Capability.GamingMode, Capability.LDAC))) {
+            if (has(arrayOf(Capability.AudioEqualizer, Capability.SurroundSound, Capability.GamingMode, Capability.LDAC))) {
                 screen(
                     key = "pref_soundcore_audio",
                     title = R.string.pref_header_audio,
@@ -357,7 +356,7 @@ abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator(
                             summary = R.string.soundcore_3d_surround_summary,
                         )
                     }
-                    if (has(arrayOf(Capability.AudioEqualizer, Capability.AudioEqualizer2))) {
+                    if (has(Capability.AudioEqualizer)) {
                         val equalizerPresetEntries = getEqualizerPresetEntries()
                         category(key = "pref_header_soundcore_equalizer", title = R.string.pref_header_equalizer) {
                             if (has(Capability.AdaptiveDirection)) {
