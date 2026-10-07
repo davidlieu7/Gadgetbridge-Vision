@@ -130,7 +130,7 @@ open class SoundcoreDeviceSupport : AbstractHeadphoneSerialDeviceSupportV2<Sound
         require(MODEL_ID_PATTERN.matches(modelId)) {
             "Invalid Soundcore model ID for control service UUID: $modelId"
         }
-        val serviceSuffix = 0x10000 + modelId.toInt(radix = 16)
+        val serviceSuffix = modelId.toInt(radix = 16) or 0x10000
         return UUID.fromString("$UUID_DEVICE_CTRL_PREFIX${serviceSuffix.toString(16)}")
     }
 
