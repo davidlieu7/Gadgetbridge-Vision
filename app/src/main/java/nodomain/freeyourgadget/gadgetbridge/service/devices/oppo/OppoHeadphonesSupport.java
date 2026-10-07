@@ -300,6 +300,14 @@ public class OppoHeadphonesSupport extends AbstractHeadphoneBTBRDeviceSupport {
                     OppoHeadphonesPreferences.ANC_TOUCH_CYCLE_MODES,
                     Set.of(AncConfigValue.ON.getPrefId(), AncConfigValue.TRANSPARENCY.getPrefId()));
                 final EnumSet<AncConfigValue> values = AncConfigValue.fromPrefIds(valuePrefIds);
+                if (values.size() < 2) {
+                    queueCommand(getAncConfigModule().encodeReq(AncConfigType.TOUCH_CYCLE_MODES));
+                    LOG.warn("ANC cycle must contain at least 2 values. Current selection: {}", values);
+                    final String message = getContext().getString(
+                        nodomain.freeyourgadget.gadgetbridge.R.string.select_at_least_option, 2);
+                    GB.toast(getContext(), message, Toast.LENGTH_LONG, GB.WARN);
+                    return;
+                }
                 queueCommand(getAncConfigModule().encodeSetTouchCycleModes(values));
             }
             default -> super.onSendConfiguration(config);
@@ -498,7 +506,7 @@ public class OppoHeadphonesSupport extends AbstractHeadphoneBTBRDeviceSupport {
         switch (type) {
             case BATTERY -> {
                 parseBattery(buf.array());
-             }
+            }
             case EARBUDS_STATUS -> {
                 earbudsStatus = getStatusModule().decodeRet(payload);
             }

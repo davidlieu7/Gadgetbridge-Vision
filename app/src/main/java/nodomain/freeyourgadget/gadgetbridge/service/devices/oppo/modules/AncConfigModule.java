@@ -53,10 +53,10 @@ public class AncConfigModule extends AbstractModule {
         return encodeSet(AncConfigType.MODE, value.getCode());
     }
 
+    @NonNull
     public OppoMessage encodeSetTouchCycleModes(@NonNull final EnumSet<AncConfigValue> values) {
         if (values.size() < 2) {
-            LOG.warn("ANC cycle must contain at least 2 values. Current selection: {}", values);
-            return null;
+            throw new IllegalArgumentException("ANC cycle must contain at least 2 values");
         }
         return encodeSet(AncConfigType.TOUCH_CYCLE_MODES, AncConfigValue.toMask(values));
     }
