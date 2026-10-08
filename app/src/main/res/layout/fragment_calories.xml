@@ -42,7 +42,7 @@
             android:layout_width="match_parent"
             android:layout_height="250dp">
 
-            <com.github.mikephil.charting.charts.LineChart
+            <nodomain.freeyourgadget.gadgetbridge.activities.charts.mpchart.GbChartView
                 android:id="@+id/calories_daily_chart"
                 android:layout_width="0dp"
                 android:layout_height="match_parent"
