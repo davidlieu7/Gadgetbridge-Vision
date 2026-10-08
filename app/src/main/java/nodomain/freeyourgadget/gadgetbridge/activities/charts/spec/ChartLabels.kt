@@ -33,6 +33,11 @@ fun labelFor(axis: AxisSpec): (Double) -> String {
     if (axis.format == ChartValueFormat.EPOCH_DAY && isWeekOrLess(axis)) {
         return wholeLabeler(Int.MIN_VALUE..Int.MAX_VALUE) { dayOfWeekLabel(epochDay(it).dayOfWeek.value.toDouble()) }
     }
+    if (axis.format == ChartValueFormat.EPOCH_DAY && isOverTwoMonths(axis)) {
+        return wholeLabeler(Int.MIN_VALUE..Int.MAX_VALUE) {
+            epochDay(it).month.getDisplayName(TextStyle.SHORT_STANDALONE, Locale.getDefault())
+        }
+    }
     return labelFor(axis.format)
 }
 
@@ -44,7 +49,14 @@ private fun isWeekOrLess(axis: AxisSpec): Boolean {
     return max - min < DAYS_PER_WEEK
 }
 
+private fun isOverTwoMonths(axis: AxisSpec): Boolean {
+    val min = axis.minimum ?: return false
+    val max = axis.maximum ?: return false
+    return max - min >= DAYS_IN_TWO_MONTHS
+}
+
 private const val DAYS_PER_WEEK = 7
+private const val DAYS_IN_TWO_MONTHS = 62
 
 private fun wholeLabeler(valid: IntRange, label: (Double) -> String): (Double) -> String = { value ->
     val whole = Math.round(value).toInt()
@@ -135,7 +147,14 @@ fun fixedLabelValues(xAxis: AxisSpec): List<Double>? {
         ChartValueFormat.DAY_OF_WEEK, ChartValueFormat.MONTH_OF_YEAR ->
             (min.toInt()..max.toInt()).map { it.toDouble() }
         ChartValueFormat.EPOCH_DAY -> (min.toLong()..max.toLong())
-            .filter { isWeekOrLess(xAxis) || isLabelledDayOfMonth(LocalDate.ofEpochDay(it).dayOfMonth) }
+            .filter {
+                val dayOfMonth = LocalDate.ofEpochDay(it).dayOfMonth
+                when {
+                    isWeekOrLess(xAxis) -> true
+                    isOverTwoMonths(xAxis) -> dayOfMonth == 1
+                    else -> isLabelledDayOfMonth(dayOfMonth)
+                }
+            }
             .map { it.toDouble() }
         else -> null
     }

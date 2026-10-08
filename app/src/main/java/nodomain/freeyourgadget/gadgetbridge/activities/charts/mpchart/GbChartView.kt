@@ -14,8 +14,10 @@ import android.view.KeyEvent
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewConfiguration
+import android.widget.ScrollView
 import androidx.core.graphics.ColorUtils
 import androidx.core.view.ViewCompat
+import androidx.core.widget.NestedScrollView
 import com.github.mikephil.charting.charts.CombinedChart
 import com.github.mikephil.charting.components.LimitLine
 import com.github.mikephil.charting.components.XAxis.XAxisPosition
@@ -181,11 +183,13 @@ class GbChartView @JvmOverloads constructor(
     fun dismissSelectionOnTapOutside(container: View) {
         var downX = 0f
         var downY = 0f
+        val handlesOwnTouches = container is ScrollView || container is NestedScrollView || container.isClickable
         container.setOnTouchListener { _, event ->
             when (event.actionMasked) {
                 MotionEvent.ACTION_DOWN -> {
                     downX = event.x
                     downY = event.y
+                    return@setOnTouchListener !handlesOwnTouches
                 }
                 MotionEvent.ACTION_UP -> {
                     if (abs(event.x - downX) <= touchSlop && abs(event.y - downY) <= touchSlop) {

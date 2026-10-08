@@ -78,7 +78,7 @@ enum class ChartValueFormat {
     MONTH_OF_YEAR,
 
     /**
-     * [java.time.LocalDate.toEpochDay]. Day names up to a week, day of month beyond.
+     * [java.time.LocalDate.toEpochDay]. Day names up to a week, day of month up to two months, months beyond.
      */
     EPOCH_DAY,
 }
