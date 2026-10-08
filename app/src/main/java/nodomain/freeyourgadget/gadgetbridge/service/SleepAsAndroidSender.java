@@ -189,15 +189,20 @@ public class SleepAsAndroidSender {
     }
 
     /**
-     * Stop tracking
+     * Stop tracking.
+     * <p>
+     * The schedulers are shut down before anything else is considered: a session interrupted by a
+     * dropped link is stopped while the device no longer counts as the provider, and a timer left
+     * running then outlives the session that started it.
      */
     public void stopTracking() {
-        if (!isDeviceDefault() || !trackingOngoing) return;
         if (accDataScheduler != null) {
             accDataScheduler.shutdownNow();
             accDataScheduler = null;
         }
         enableSpo2AutoFetch(false);
+
+        if (!trackingOngoing) return;
 
         this.trackingOngoing = false;
         synchronized (accelLock) {
