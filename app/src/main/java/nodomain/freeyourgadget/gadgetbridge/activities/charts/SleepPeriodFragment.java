@@ -26,19 +26,8 @@ import android.view.ViewGroup;
 
 import androidx.core.content.ContextCompat;
 
-import com.github.mikephil.charting.charts.BarChart;
 import com.github.mikephil.charting.charts.Chart;
-import com.github.mikephil.charting.components.Legend;
-import com.github.mikephil.charting.components.LegendEntry;
-import com.github.mikephil.charting.components.LimitLine;
-import com.github.mikephil.charting.components.XAxis;
-import com.github.mikephil.charting.components.YAxis;
-import com.github.mikephil.charting.data.BarData;
-import com.github.mikephil.charting.data.BarDataSet;
-import com.github.mikephil.charting.data.BarEntry;
-import com.github.mikephil.charting.data.ChartData;
 import com.github.mikephil.charting.data.Entry;
-import com.github.mikephil.charting.formatter.IAxisValueFormatter;
 import com.github.mikephil.charting.utils.ViewPortHandler;
 
 import org.apache.commons.lang3.ArrayUtils;
@@ -50,15 +39,18 @@ import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Collections;
 import java.util.List;
-import java.util.Locale;
 import java.util.concurrent.TimeUnit;
 
 import kotlin.jvm.functions.Function1;
 
 import nodomain.freeyourgadget.gadgetbridge.GBApplication;
 import nodomain.freeyourgadget.gadgetbridge.R;
+import nodomain.freeyourgadget.gadgetbridge.activities.charts.mpchart.ChartLegendView;
 import nodomain.freeyourgadget.gadgetbridge.activities.charts.mpchart.DaySelections;
+import nodomain.freeyourgadget.gadgetbridge.activities.charts.sleep.SleepPeriodChartData;
 import nodomain.freeyourgadget.gadgetbridge.activities.charts.sleep.SleepScoreChartData;
+import nodomain.freeyourgadget.gadgetbridge.activities.charts.spec.ChartSeries;
+import nodomain.freeyourgadget.gadgetbridge.activities.charts.spec.ChartSpec;
 import nodomain.freeyourgadget.gadgetbridge.activities.workouts.StatTileData;
 import nodomain.freeyourgadget.gadgetbridge.activities.workouts.StatTileGridUtilKt;
 import nodomain.freeyourgadget.gadgetbridge.database.DBHandler;
@@ -80,7 +72,6 @@ public class SleepPeriodFragment extends SleepFragment<SleepPeriodFragment.MyCha
     protected int TOTAL_DAYS = getRangeDays();
 
     private FragmentWeeksleepChartBinding binding;
-    protected Locale mLocale;
     protected int mTargetValue = 0;
 
     private final int mCutOffHour = GBApplication.getPrefs().getString("chart_sleep_range_mode", "18:00").equals("18:00") ? 18 : 12;
@@ -141,7 +132,6 @@ public class SleepPeriodFragment extends SleepFragment<SleepPeriodFragment.MyCha
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container,
                              Bundle savedInstanceState) {
-        mLocale = getResources().getConfiguration().locale;
         binding = FragmentWeeksleepChartBinding.inflate(inflater, container, false);
 
         View rootView = binding.getRoot();
@@ -167,67 +157,17 @@ public class SleepPeriodFragment extends SleepFragment<SleepPeriodFragment.MyCha
             binding.sleepScoreChart.dismissSelectionOnTapOutside(rootView);
         }
 
-        setupWeekChart();
+        binding.weekSleepChart.dismissSelectionOnTapOutside(rootView);
         // refresh immediately instead of use refreshIfVisible(), for perceived performance
         refresh();
 
         return rootView;
     }
 
-    protected void setupWeekChart() {
-        BarChart weekSleepChart = binding.weekSleepChart;
-        weekSleepChart.setBackgroundColor(BACKGROUND_COLOR);
-        weekSleepChart.getDescription().setTextColor(DESCRIPTION_COLOR);
-        weekSleepChart.getDescription().setText("");
-        weekSleepChart.setFitBarsEnabled(true);
-
-        configureBarLineChartDefaults(weekSleepChart);
-
-        XAxis x = weekSleepChart.getXAxis();
-        x.setDrawLabelsEnabled(true);
-        x.setDrawGridLinesEnabled(false);
-        x.setEnabled(true);
-        x.setTextColor(CHART_TEXT_COLOR);
-        x.setDrawLimitLinesBehindDataEnabled(true);
-        x.setPosition(XAxis.XAxisPosition.BOTTOM);
-
-        YAxis y = weekSleepChart.getAxisLeft();
-        y.setDrawGridLinesEnabled(false);
-        y.setDrawTopYLabelEntryEnabled(false);
-        y.setTextColor(CHART_TEXT_COLOR);
-        y.setDrawZeroLineEnabled(true);
-        y.setSpaceBottom(0);
-        y.setAxisMinimum(0);
-        y.setValueFormatter(getYAxisFormatter());
-        y.setEnabled(true);
-
-        YAxis yAxisRight = weekSleepChart.getAxisRight();
-        yAxisRight.setDrawGridLinesEnabled(false);
-        yAxisRight.setEnabled(false);
-        yAxisRight.setDrawLabelsEnabled(false);
-        yAxisRight.setDrawTopYLabelEntryEnabled(false);
-        yAxisRight.setTextColor(CHART_TEXT_COLOR);
-
-        if (TOTAL_DAYS > 7) {
-            weekSleepChart.setRenderer(new AngledLabelsChartRenderer(weekSleepChart, weekSleepChart.getAnimator(), weekSleepChart.getViewPortHandler()));
-        } else {
-            weekSleepChart.setScaleEnabled(false);
-            weekSleepChart.setTouchEnabled(false);
-        }
-    }
-
     @Override
     protected void updateChartsnUIThread(MyChartsData mcd) {
-        BarChart weekSleepChart = binding.weekSleepChart;
-        setupLegend(weekSleepChart);
-
-        WeekChartsData<BarData> weekBeforeData = mcd.getWeekBeforeData();
-        weekSleepChart.setData(null); // workaround for https://github.com/PhilJay/MPAndroidChart/issues/2317
-        weekSleepChart.setData(weekBeforeData.getData());
-        weekSleepChart.getXAxis().setValueFormatter(mcd.getWeekBeforeData().getXValueFormatter());
-        weekSleepChart.getBarData().setValueTextSize(10f);
-        weekSleepChart.getBarData().setValueTextColor(LEGEND_TEXT_COLOR);
-        updateLimitLines(weekSleepChart, weekBeforeData);
+        final WeekChartsData weekBeforeData = mcd.getWeekBeforeData();
+        updateWeekChart(weekBeforeData);
 
         if (supportsSleepScore()) {
             updateSleepScoreChart(weekBeforeData);
@@ -235,10 +175,6 @@ public class SleepPeriodFragment extends SleepFragment<SleepPeriodFragment.MyCha
             binding.sleepScoreLowest.setText(weekBeforeData.getLowestSleepScore() > 0 ? String.valueOf(weekBeforeData.getLowestSleepScore()) : getString(R.string.stats_empty_value));
             binding.sleepScoreAverage.setText(weekBeforeData.getAvgSleepScore() > 0 ? String.valueOf(weekBeforeData.getAvgSleepScore()) : getString(R.string.stats_empty_value));
         }
-
-        // The last value is for awake time, which we do not want to include in the "total sleep time"
-        final int barIgnoreLast = supportsAwakeSleep(getChartsHost().getDevice()) ? 1 : 0;
-        weekSleepChart.getBarData().setValueFormatter(new BarChartStackedTimeValueFormatter(barIgnoreLast));
 
         final MySleepWeeklyData sleepWeeklyData = mcd.getSleepWeeklyData();
         final int totalDaysForAverage = sleepWeeklyData.getTotalDaysForAverage();
@@ -283,22 +219,21 @@ public class SleepPeriodFragment extends SleepFragment<SleepPeriodFragment.MyCha
         Calendar day = Calendar.getInstance();
         day.setTime(chartsHost.getEndDate());
         //NB: we could have omitted the day, but this way we can move things to the past easily
-        WeekChartsData<BarData> weekBeforeData = refreshWeekBeforeData(db, day, device);
+        WeekChartsData weekBeforeData = refreshWeekBeforeData(db, day, device);
         MySleepWeeklyData sleepWeeklyData = getMySleepWeeklyData(db, day, device);
 
         return new MyChartsData(weekBeforeData, sleepWeeklyData);
     }
 
-    protected WeekChartsData<BarData> refreshWeekBeforeData(DBHandler db, Calendar day, GBDevice device) {
+    protected WeekChartsData refreshWeekBeforeData(DBHandler db, Calendar day, GBDevice device) {
         day = (Calendar) day.clone(); // do not modify the caller's argument
         day.add(Calendar.DATE, -TOTAL_DAYS + 1);
-        List<BarEntry> entries = new ArrayList<>();
-        ArrayList<String> labels = new ArrayList<String>();
 
         long balance = 0;
         long daily_balance = 0;
         int totalDaysForAverage = 0;
         final long[] epochDays = new long[TOTAL_DAYS];
+        final List<List<Float>> stageMinutes = new ArrayList<>(TOTAL_DAYS);
         final int[] sleepScores = new int[TOTAL_DAYS];
         final Accumulator sleepScoreAccumulator = new Accumulator();
         for (int counter = 0; counter < TOTAL_DAYS; counter++) {
@@ -309,8 +244,7 @@ public class SleepPeriodFragment extends SleepFragment<SleepPeriodFragment.MyCha
                 totalDaysForAverage++;
             }
             balance += daily_balance;
-            entries.add(new BarEntry<>(counter, getTotalsForActivityAmounts(amounts), null, null));
-            labels.add(getWeeksChartsLabel(day));
+            stageMinutes.add(getTotalsForActivityAmounts(amounts));
             epochDays[counter] = LocalDate.of(day.get(Calendar.YEAR), day.get(Calendar.MONTH) + 1, day.get(Calendar.DAY_OF_MONTH)).toEpochDay();
             // Sleep score
             if (supportsSleepScore()) {
@@ -323,74 +257,97 @@ public class SleepPeriodFragment extends SleepFragment<SleepPeriodFragment.MyCha
             }
             day.add(Calendar.DATE, 1);
         }
-        BarDataSet set = new BarDataSet(entries, "");
-        set.setColors(getColors());
-        set.setValueFormatter(getBarValueFormatter());
 
-        BarData barData = new BarData(set);
-        barData.setValueTextColor(Color.GRAY); //prevent tearing other graph elements with the black text. Another approach would be to hide the values completely with data.setDrawValues(false);
-        barData.setValueTextSize(10f);
+        final double[][] minutes = new double[stageMinutes.isEmpty() ? 0 : stageMinutes.get(0).size()][TOTAL_DAYS];
+        for (int dayIndex = 0; dayIndex < TOTAL_DAYS; dayIndex++) {
+            for (int stage = 0; stage < minutes.length; stage++) {
+                minutes[stage][dayIndex] = stageMinutes.get(dayIndex).get(stage);
+            }
+        }
 
         float average = 0;
         if (totalDaysForAverage > 0) {
             average = Math.abs(balance / totalDaysForAverage);
         }
-        if (supportsSleepScore()) {
-            return new WeekChartsData(
-                    barData,
-                    new PreformattedXIndexLabelFormatter(labels),
-                    getBalanceMessage(balance, mTargetValue, totalDaysForAverage),
-                    average,
-                    epochDays,
-                    sleepScores,
-                    (int) Math.round(sleepScoreAccumulator.getAverage()),
-                    (int) Math.round(sleepScoreAccumulator.getMax()),
-                    (int) Math.round(sleepScoreAccumulator.getMin())
-            );
-        }
         return new WeekChartsData(
-                barData,
-                new PreformattedXIndexLabelFormatter(labels),
+                epochDays,
+                minutes,
                 getBalanceMessage(balance, mTargetValue, totalDaysForAverage),
-                average);
+                average,
+                sleepScores,
+                (int) Math.round(sleepScoreAccumulator.getAverage()),
+                (int) Math.round(sleepScoreAccumulator.getMax()),
+                (int) Math.round(sleepScoreAccumulator.getMin())
+        );
     }
 
-    private void updateLimitLines(final BarChart chart, final WeekChartsData<BarData> data) {
-        final YAxis yAxis = chart.getAxisLeft();
-        yAxis.setAxisMaximum(Math.max(data.getData().getYMax(), mTargetValue) + 60);
-        yAxis.removeAllLimitLines();
+    private void updateWeekChart(final WeekChartsData data) {
+        final String[] labels = getStageLabels();
+        final int[] colors = getColors();
+        final int averageColor = data.getAverage() > mTargetValue ? Color.GREEN : Color.RED;
+        final boolean showAverage = GBApplication.getPrefs().getBoolean("charts_show_average", true);
+        final int targetColor = getResources().getColor(R.color.chart_deep_sleep_dark);
+        final ChartSpec spec = SleepPeriodChartData.periodSpec(
+                data.epochDays, data.stageMinutes, labels, colors,
+                mTargetValue, targetColor, data.getAverage(), showAverage, averageColor
+        );
 
-        final LimitLine target = new LimitLine(mTargetValue, "");
-        target.setLineWidth(1.5f);
-        target.enableDashedLine(15f, 10f, 0f);
-        target.setLineColor(getResources().getColor(R.color.chart_deep_sleep_dark));
-        yAxis.addLimitLine(target);
-
-        if (data.getAverage() <= 0 || !GBApplication.getPrefs().getBoolean("charts_show_average", true)) {
-            return;
+        // The last stage is awake time, which does not count towards the total sleep time
+        final int sleepStages = supportsAwakeSleep(getChartsHost().getDevice()) ? labels.length - 1 : labels.length;
+        final String emptyValue = getString(R.string.stats_empty_value);
+        final List<String> rowLabels = new ArrayList<>();
+        final List<Integer> rowColors = new ArrayList<>();
+        final List<Function1<Integer, String>> rowTexts = new ArrayList<>();
+        rowLabels.add(getString(R.string.menuitem_sleep));
+        rowColors.add(CHART_TEXT_COLOR);
+        rowTexts.add(i -> {
+            double total = 0;
+            for (int stage = 0; stage < sleepStages; stage++) {
+                total += data.stageMinutes[stage][i];
+            }
+            return total > 0 ? getHM((long) total) : emptyValue;
+        });
+        for (int stage = 0; stage < labels.length; stage++) {
+            final int index = stage;
+            rowLabels.add(labels[stage]);
+            rowColors.add(colors[stage]);
+            rowTexts.add(i -> data.stageMinutes[index][i] > 0 ? getHM((long) data.stageMinutes[index][i]) : emptyValue);
         }
+        binding.weekSleepChart.setSelectionContent(x -> DaySelections.of(
+                data.epochDays, x, rowLabels, rowColors, rowTexts, emptyValue
+        ));
+        binding.weekSleepChart.setSpec(spec);
 
-        final LimitLine average = new LimitLine(data.getAverage(), "");
-        average.setLineWidth(1.5f);
-        average.enableDashedLine(15f, 10f, 0f);
-        average.setLabel(getString(R.string.average, getAverage(data.getAverage())));
-        final int color = data.getAverage() > mTargetValue ? Color.GREEN : Color.RED;
-        average.setLineColor(color);
-        average.setTextColor(color);
-        yAxis.addLimitLine(average);
-    }
-
-    protected String getWeeksChartsLabel(Calendar day) {
-        if (TOTAL_DAYS > 7) {
-            //month, show day date
-            return String.valueOf(day.get(Calendar.DAY_OF_MONTH));
-        } else {
-            //week, show short day name
-            return day.getDisplayName(Calendar.DAY_OF_WEEK, Calendar.SHORT, mLocale);
+        final List<ChartSeries> legend = new ArrayList<>();
+        if (!spec.isEmpty()) {
+            for (int stage = 0; stage < labels.length; stage++) {
+                legend.add(ChartLegendView.squareItem(labels[stage], colors[stage]));
+            }
+            if (mTargetValue > 0) {
+                legend.add(ChartLegendView.lineItem(getString(R.string.target), targetColor));
+            }
+            if (showAverage && data.getAverage() > 0) {
+                legend.add(ChartLegendView.lineItem(getString(R.string.stress_average), averageColor));
+            }
         }
+        binding.weekSleepChartLegend.setSeries(legend);
     }
 
-    private void updateSleepScoreChart(final WeekChartsData<BarData> data) {
+    private String[] getStageLabels() {
+        String[] labels = {
+                getString(R.string.sleep_colored_stats_deep),
+                getString(R.string.sleep_colored_stats_light)
+        };
+        if (supportsRemSleep(getChartsHost().getDevice())) {
+            labels = ArrayUtils.add(labels, getString(R.string.sleep_colored_stats_rem));
+        }
+        if (supportsAwakeSleep(getChartsHost().getDevice())) {
+            labels = ArrayUtils.add(labels, getString(R.string.abstract_chart_fragment_kind_awake_sleep));
+        }
+        return labels;
+    }
+
+    private void updateSleepScoreChart(final WeekChartsData data) {
         final int color = getResources().getColor(R.color.chart_light_sleep_light);
         final String label = getString(R.string.sleep_score);
         final String emptyValue = getString(R.string.stats_empty_value);
@@ -515,19 +472,6 @@ public class SleepPeriodFragment extends SleepFragment<SleepPeriodFragment.MyCha
         };
     }
 
-    DataSetValueFormatter getBarValueFormatter() {
-        return new DataSetValueFormatter() {
-            @Override
-            public String getFormattedValue(final float value, final Entry<?> entry, final int dataSetIndex, final ViewPortHandler viewPortHandler) {
-                return DateTimeUtils.minutesToHHMM((int) value);
-            }
-        };
-    }
-
-    IAxisValueFormatter getYAxisFormatter() {
-        return (value, axis) -> DateTimeUtils.minutesToHHMM((int) value);
-    }
-
     int[] getColors() {
         int[] colors = {akDeepSleep.color, akLightSleep.color};
         if (supportsRemSleep(getChartsHost().getDevice())) {
@@ -541,12 +485,6 @@ public class SleepPeriodFragment extends SleepFragment<SleepPeriodFragment.MyCha
 
     @Override
     protected void setupLegend(Chart<?> chart) {
-        List<LegendEntry> legendEntries = super.createLegendEntries(chart);
-        chart.getLegend().setEntries(legendEntries);
-
-        chart.getLegend().setTextColor(LEGEND_TEXT_COLOR);
-        chart.getLegend().setWordWrapEnabled(true);
-        chart.getLegend().setHorizontalAlignment(Legend.LegendHorizontalAlignment.CENTER);
     }
 
     private String getHM(long value) {
@@ -562,15 +500,15 @@ public class SleepPeriodFragment extends SleepFragment<SleepPeriodFragment.MyCha
     }
 
     protected static class MyChartsData extends ChartsData {
-        private final WeekChartsData<BarData> weekBeforeData;
+        private final WeekChartsData weekBeforeData;
         private final MySleepWeeklyData sleepWeeklyData;
 
-        MyChartsData(WeekChartsData<BarData> weekBeforeData, MySleepWeeklyData sleepWeeklyData) {
+        MyChartsData(WeekChartsData weekBeforeData, MySleepWeeklyData sleepWeeklyData) {
             this.weekBeforeData = weekBeforeData;
             this.sleepWeeklyData = sleepWeeklyData;
         }
 
-        WeekChartsData<BarData> getWeekBeforeData() {
+        WeekChartsData getWeekBeforeData() {
             return weekBeforeData;
         }
 
@@ -628,26 +566,21 @@ public class SleepPeriodFragment extends SleepFragment<SleepPeriodFragment.MyCha
         }
     }
 
-    protected class WeekChartsData<T extends ChartData<?>> extends DefaultChartsData<T> {
+    protected static class WeekChartsData {
+        private final long[] epochDays;
+        private final double[][] stageMinutes;
         private final String balanceMessage;
         private final float average;
-        private long[] epochDays;
-        private int[] sleepScores;
-        private int avgSleepScore;
-        private int highestSleepScore;
-        private int lowestSleepScore;
+        private final int[] sleepScores;
+        private final int avgSleepScore;
+        private final int highestSleepScore;
+        private final int lowestSleepScore;
 
-        public WeekChartsData(T data, PreformattedXIndexLabelFormatter xIndexLabelFormatter, String balanceMessage, float average) {
-            super(data, xIndexLabelFormatter);
-            this.balanceMessage = balanceMessage;
-            this.average = average;
-        }
-
-        public WeekChartsData(T data, PreformattedXIndexLabelFormatter xIndexLabelFormatter, String balanceMessage, float average, long[] epochDays, int[] sleepScores, int avgSleepScore, int highestSleepScore, int lowestSleepScore) {
-            super(data, xIndexLabelFormatter);
-            this.balanceMessage = balanceMessage;
-            this.average = average;
+        public WeekChartsData(long[] epochDays, double[][] stageMinutes, String balanceMessage, float average, int[] sleepScores, int avgSleepScore, int highestSleepScore, int lowestSleepScore) {
             this.epochDays = epochDays;
+            this.stageMinutes = stageMinutes;
+            this.balanceMessage = balanceMessage;
+            this.average = average;
             this.sleepScores = sleepScores;
             this.avgSleepScore = avgSleepScore;
             this.highestSleepScore = highestSleepScore;
