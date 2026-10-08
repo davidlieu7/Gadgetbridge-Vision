@@ -65,11 +65,18 @@ internal object ChartDataBuilder {
     private const val POINT_RADIUS_DP = 3.5f
     private const val AREA_FILL_ALPHA = 0.45f
     private const val MAX_CANDLE_SPACE = 0.45f
+    private const val SOLID_FILL_ALPHA = 255
 
     fun columns(spec: ChartSpec) = spec.series.filter { it.style is SeriesStyle.Column && it.points.isNotEmpty() }
 
+    /**
+     * Columns drawn side by side at one x; series sharing a [SeriesStyle.Column.stackKey] stack into one.
+     */
+    fun columnGroups(spec: ChartSpec): List<List<ChartSeries>> =
+        columns(spec).groupBy { (it.style as SeriesStyle.Column).stackKey ?: it.key }.values.toList()
+
     fun build(spec: ChartSpec, layout: BarLayout, cornerRadiusPx: Float): CombinedData {
-        val columns = columns(spec)
+        val columns = columnGroups(spec)
         val ranges = spec.series.filter { it.style is SeriesStyle.Range && it.points.isNotEmpty() }
         val bands = ranges.filter { (it.style as SeriesStyle.Range).width == null }
         val candles = ranges - bands.toSet()
@@ -78,8 +85,9 @@ internal object ChartDataBuilder {
         val step = layout.width + layout.gap
         return CombinedData().apply {
             if (columns.isNotEmpty()) {
-                barData = BarData(columns.mapIndexed { index, series ->
-                    barDataSet(series, (index - (columns.size - 1) / 2f) * step, cornerRadiusPx)
+                barData = BarData(columns.mapIndexed { index, group ->
+                    val offset = (index - (columns.size - 1) / 2f) * step
+                    if (group.size == 1) barDataSet(group.single(), offset, cornerRadiusPx) else stackedDataSet(group, offset)
                 }).apply { barWidth = layout.width }
             }
             if (bands.isNotEmpty()) {
@@ -103,6 +111,20 @@ internal object ChartDataBuilder {
             highlightAlpha = 0
             isDrawValuesEnabled = false
             axisDependency = axisDependency(series)
+        }
+    }
+
+    private fun stackedDataSet(group: List<ChartSeries>, offset: Float): BarDataSet<Float> {
+        val xs = group.flatMap { series -> series.points.map { it.x } }.distinct().sorted()
+        val entries = xs.map { x ->
+            val values = group.map { series -> (series.points.firstOrNull { it.x == x }?.y ?: 0.0).toFloat() }
+            BarEntry(x = x.toFloat() + offset, stackValues = values, data = x.toFloat())
+        }
+        return BarDataSet(entries, group.first().label).apply {
+            colors = group.map { (it.style as SeriesStyle.Column).color }
+            highlightAlpha = 0
+            isDrawValuesEnabled = false
+            axisDependency = axisDependency(group.first())
         }
     }
 
@@ -170,7 +192,10 @@ internal object ChartDataBuilder {
             isDrawCircleHoleEnabled = false
             mode = if (style.curved) LineDataSet.Mode.CUBIC_BEZIER else LineDataSet.Mode.LINEAR
             isDrawFilledEnabled = style.filled
-            if (style.filled) {
+            if (style.filled && style.solidFill) {
+                fillColor = style.color
+                fillAlpha = SOLID_FILL_ALPHA
+            } else if (style.filled) {
                 fillDrawable = GradientDrawable(
                     GradientDrawable.Orientation.TOP_BOTTOM,
                     intArrayOf(ColorUtils.setAlphaComponent(style.color, (AREA_FILL_ALPHA * 255).toInt()), 0),

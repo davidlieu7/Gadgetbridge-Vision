@@ -345,7 +345,7 @@ class GbChartView @JvmOverloads constructor(
         pxPerX = pxPerX,
         pxPerDp = Utils.convertDpToPixel(1f),
         barCount = targets.size,
-        grouped = ChartDataBuilder.columns(spec).size > 1,
+        grouped = ChartDataBuilder.columnGroups(spec).size > 1,
     )
 
     private fun cornerRadiusPx() = Utils.convertDpToPixel(BAR_CORNER_DP)

@@ -24,6 +24,7 @@ fun labelFor(format: ChartValueFormat): (Double) -> String = when (format) {
     ChartValueFormat.DAY_OF_MONTH -> wholeLabeler(1..31, ::dayOfMonthLabel)
     ChartValueFormat.MONTH_OF_YEAR -> wholeLabeler(1..12) { monthOfYearLabel(it) }
     ChartValueFormat.EPOCH_DAY -> wholeLabeler(Int.MIN_VALUE..Int.MAX_VALUE) { dayOfMonthLabel(epochDay(it).dayOfMonth.toDouble()) }
+    ChartValueFormat.DURATION_MINUTES -> { value -> minutesLabel(value) }
 }
 
 /**
@@ -89,6 +90,11 @@ fun durationLabel(value: Double): String {
     } else {
         String.format(Locale.getDefault(), "%d:%02d", minutes, seconds)
     }
+}
+
+fun minutesLabel(value: Double): String {
+    val minutes = Math.round(value)
+    return String.format(Locale.getDefault(), "%d:%02d", minutes / 60, minutes % 60)
 }
 
 /**

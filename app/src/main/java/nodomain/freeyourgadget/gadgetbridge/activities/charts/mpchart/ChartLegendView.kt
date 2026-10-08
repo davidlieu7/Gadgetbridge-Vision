@@ -83,5 +83,8 @@ class ChartLegendView @JvmOverloads constructor(
          */
         @JvmStatic
         fun lineItem(label: String, color: Int) = ChartSeries(label, label, emptyList(), SeriesStyle.Line(color))
+
+        @JvmStatic
+        fun squareItem(label: String, color: Int) = ChartSeries(label, label, emptyList(), SeriesStyle.Column(color))
     }
 }

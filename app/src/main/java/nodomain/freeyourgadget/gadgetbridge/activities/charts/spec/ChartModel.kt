@@ -19,6 +19,7 @@ sealed interface SeriesStyle {
         val showPoints: Boolean = false,
         val maxGap: Double? = null,
         val showLine: Boolean = true,
+        val solidFill: Boolean = false,
     ) : SeriesStyle
 
     /**
@@ -83,6 +84,11 @@ enum class ChartValueFormat {
      * [java.time.LocalDate.toEpochDay]. Day names up to a week, day of month up to two months, months beyond.
      */
     EPOCH_DAY,
+
+    /**
+     * A duration in minutes, as `H:MM`.
+     */
+    DURATION_MINUTES,
 }
 
 data class AxisSpec(

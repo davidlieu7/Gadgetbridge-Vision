@@ -34,11 +34,17 @@
             android:layout_marginEnd="15dp"
             android:orientation="vertical" />
 
-        <com.github.mikephil.charting.charts.BarChart
+        <nodomain.freeyourgadget.gadgetbridge.activities.charts.mpchart.GbChartView
             android:id="@+id/weekstresschart"
             android:layout_width="fill_parent"
             android:layout_height="350dp"
             android:layout_marginTop="@dimen/chart_section_spacing" />
+
+        <nodomain.freeyourgadget.gadgetbridge.activities.charts.mpchart.ChartLegendView
+            android:id="@+id/weekstress_chart_legend"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp" />
 
     </LinearLayout>
 </ScrollView>
