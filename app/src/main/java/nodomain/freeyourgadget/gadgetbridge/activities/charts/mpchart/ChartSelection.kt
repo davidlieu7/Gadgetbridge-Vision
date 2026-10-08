@@ -31,7 +31,7 @@ internal object ChartSlots {
      */
     fun targets(spec: ChartSpec): DoubleArray {
         of(spec.xAxis)?.let { slots -> return DoubleArray(slots.count()) { (slots.first + it).toDouble() } }
-        return spec.series.flatMap { series -> series.points.map { it.x } }.distinct().sorted().toDoubleArray()
+        return spec.series.filter { it.selectable }.flatMap { series -> series.points.map { it.x } }.distinct().sorted().toDoubleArray()
     }
 
     fun nearest(x: Double, targets: DoubleArray): Double? {

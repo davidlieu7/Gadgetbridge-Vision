@@ -307,7 +307,7 @@ class GbChartView @JvmOverloads constructor(
     }
 
     private fun drawSelectedPoints(canvas: Canvas, spec: ChartSpec, selected: Double) {
-        for (series in spec.series) {
+        for (series in spec.series.filter { it.selectable }) {
             val style = series.style as? SeriesStyle.Line ?: continue
             val point = series.points.firstOrNull { it.x == selected }?.takeIf { it.y > 0.0 } ?: continue
             val axis = if (series.axis == AxisSide.END) AxisDependency.RIGHT else AxisDependency.LEFT

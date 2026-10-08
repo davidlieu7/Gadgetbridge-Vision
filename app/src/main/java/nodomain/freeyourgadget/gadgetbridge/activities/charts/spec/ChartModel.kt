@@ -49,6 +49,7 @@ data class ChartSeries(
     val points: List<ChartPoint>,
     val style: SeriesStyle,
     val axis: AxisSide = AxisSide.START,
+    val selectable: Boolean = true,
 )
 
 /**
