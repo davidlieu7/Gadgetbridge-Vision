@@ -85,6 +85,7 @@ public class StepsPeriodFragment extends StepsFragment<StepsPeriodFragment.Steps
 
         mDateView = rootView.findViewById(R.id.steps_date_view);
         stepsChart = rootView.findViewById(R.id.steps_chart);
+        stepsChart.dismissSelectionOnTapOutside(rootView);
         stepsPeriodStatsContainer = rootView.findViewById(R.id.steps_period_stats_container);
         STEPS_GOAL = GBApplication.getPrefs().getInt(ActivityUser.PREF_USER_STEPS_GOAL, ActivityUser.defaultUserStepsGoal);
 

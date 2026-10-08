@@ -68,6 +68,7 @@ class SportStatisticsFragment : Fragment() {
         savedInstanceState: Bundle?,
     ): View {
         _binding = FragmentSportStatisticsBinding.inflate(inflater, container, false)
+        binding.sportChart.dismissSelectionOnTapOutside(binding.sportContent)
 
         PeriodKind.entries.forEach { periodKind ->
             val tab = binding.sportPeriodTabs.newTab().setText(tabLabel(periodKind)).setTag(periodKind)

@@ -1,5 +1,6 @@
 package nodomain.freeyourgadget.gadgetbridge.activities.charts.mpchart
 
+import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.Canvas
 import android.graphics.Color
@@ -11,6 +12,7 @@ import android.view.GestureDetector
 import android.view.HapticFeedbackConstants
 import android.view.KeyEvent
 import android.view.MotionEvent
+import android.view.View
 import android.view.ViewConfiguration
 import androidx.core.graphics.ColorUtils
 import androidx.core.view.ViewCompat
@@ -50,9 +52,9 @@ class GbChartView @JvmOverloads constructor(
         override fun onDown(e: MotionEvent) = true
 
         override fun onSingleTapUp(e: MotionEvent): Boolean {
-            val x = targetAt(e.x, e.y) ?: return false
             performClick()
-            toggle(x)
+            val x = targetAt(e.x, e.y)
+            if (x == null) select(null) else toggle(x)
             return true
         }
     })
@@ -153,6 +155,29 @@ class GbChartView @JvmOverloads constructor(
     internal fun selectionAt(x: Double): ChartSelection? = selectionContent?.invoke(x)
 
     internal fun toggle(x: Double) = select(ChartSlots.toggle(selectedX, x))
+
+    /**
+     * Dismiss the marker on taps that reach outside this chart.
+     */
+    @SuppressLint("ClickableViewAccessibility")
+    fun dismissSelectionOnTapOutside(container: View) {
+        var downX = 0f
+        var downY = 0f
+        container.setOnTouchListener { _, event ->
+            when (event.actionMasked) {
+                MotionEvent.ACTION_DOWN -> {
+                    downX = event.x
+                    downY = event.y
+                }
+                MotionEvent.ACTION_UP -> {
+                    if (abs(event.x - downX) <= touchSlop && abs(event.y - downY) <= touchSlop) {
+                        select(null)
+                    }
+                }
+            }
+            false
+        }
+    }
 
     private fun select(selected: Double?) {
         if (selected == selectedX) return
