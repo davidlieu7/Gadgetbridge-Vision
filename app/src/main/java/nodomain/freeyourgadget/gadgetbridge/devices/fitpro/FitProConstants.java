@@ -122,6 +122,9 @@ public class FitProConstants {
 
     //group request data 0x1a
     public static final byte CMD_GET_STEPS_TARGET = 0x2;
+    public static final byte CMD_GET_LONG_SIT_REMINDER = 0x3;
+    public static final byte CMD_GET_DEVICE_VIBRATIONS = 0x6;
+    public static final byte CMD_GET_DISPLAY_ON_LIFT = 0x7;
     public static final byte CMD_GET_HW_INFO = 0x10;
     public static final byte CMD_GET_AUTO_HR = 0x8;
     public static final byte CMD_GET_CONTACTS = 0xd;

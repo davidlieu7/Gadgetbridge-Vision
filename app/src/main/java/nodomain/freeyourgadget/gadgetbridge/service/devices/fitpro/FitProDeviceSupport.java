@@ -20,7 +20,10 @@ package nodomain.freeyourgadget.gadgetbridge.service.devices.fitpro;
 import static nodomain.freeyourgadget.gadgetbridge.devices.fitpro.FitProConstants.CMD_ALARM;
 import static nodomain.freeyourgadget.gadgetbridge.devices.fitpro.FitProConstants.CMD_DND;
 import static nodomain.freeyourgadget.gadgetbridge.devices.fitpro.FitProConstants.CMD_FIND_BAND;
+import static nodomain.freeyourgadget.gadgetbridge.devices.fitpro.FitProConstants.CMD_GET_DEVICE_VIBRATIONS;
+import static nodomain.freeyourgadget.gadgetbridge.devices.fitpro.FitProConstants.CMD_GET_DISPLAY_ON_LIFT;
 import static nodomain.freeyourgadget.gadgetbridge.devices.fitpro.FitProConstants.CMD_GET_HW_INFO;
+import static nodomain.freeyourgadget.gadgetbridge.devices.fitpro.FitProConstants.CMD_GET_LONG_SIT_REMINDER;
 import static nodomain.freeyourgadget.gadgetbridge.devices.fitpro.FitProConstants.CMD_GROUP_BAND_INFO;
 import static nodomain.freeyourgadget.gadgetbridge.devices.fitpro.FitProConstants.CMD_GROUP_BIND;
 import static nodomain.freeyourgadget.gadgetbridge.devices.fitpro.FitProConstants.CMD_GROUP_GENERAL;
@@ -113,6 +116,7 @@ import java.util.Date;
 import java.util.GregorianCalendar;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.UUID;
 
 import lineageos.weather.util.TemperatureUtils;
@@ -126,6 +130,7 @@ import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEventBatteryInf
 import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEventCameraRemote;
 import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEventFindPhone;
 import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEventMusicControl;
+import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEventUpdatePreferences;
 import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEventVersionInfo;
 import nodomain.freeyourgadget.gadgetbridge.devices.fitpro.FitProConstants;
 import nodomain.freeyourgadget.gadgetbridge.devices.fitpro.FitProSampleProvider;
@@ -236,6 +241,12 @@ public class FitProDeviceSupport extends AbstractBTLESingleDeviceSupport {
         builder.sleep(200);
         builder.write(writeCharacteristic, craftData(CMD_GROUP_BAND_INFO, CMD_RX_BAND_INFO));
         builder.sleep(200);
+        builder.write(writeCharacteristic, craftData(CMD_GROUP_REQUEST_DATA, CMD_GET_DISPLAY_ON_LIFT));
+        builder.sleep(200);
+        builder.write(writeCharacteristic, craftData(CMD_GROUP_REQUEST_DATA, CMD_GET_LONG_SIT_REMINDER));
+        builder.sleep(200);
+        builder.write(writeCharacteristic, craftData(CMD_GROUP_REQUEST_DATA, CMD_GET_DEVICE_VIBRATIONS));
+        builder.sleep(200);
 
         builder.setDeviceState(GBDevice.State.INITIALIZED);
         return builder;
@@ -309,6 +320,7 @@ public class FitProDeviceSupport extends AbstractBTLESingleDeviceSupport {
                         case RX_CAMERA1:
                         case RX_CAMERA2:
                         case RX_CAMERA3:
+                            sendAck(data[3], data[1], data[2], data[5]);
                             handleCamera(param);
                             break;
                         default:
@@ -352,6 +364,14 @@ public class FitProDeviceSupport extends AbstractBTLESingleDeviceSupport {
                     break;
                 case CMD_GROUP_REQUEST_DATA:
                     switch (param) {
+                        case CMD_GET_LONG_SIT_REMINDER:
+                        case CMD_GET_DISPLAY_ON_LIFT:
+                        case CMD_GET_DEVICE_VIBRATIONS:
+                            final Map<String, Object> preferences = FitProSettings.decode(data);
+                            if (!preferences.isEmpty()) {
+                                evaluateGBDeviceEvent(new GBDeviceEventUpdatePreferences(preferences));
+                            }
+                            break;
                         case CMD_GET_HW_INFO:
                             handleHardwareDetails(data);
                             break;
@@ -790,6 +810,36 @@ public class FitProDeviceSupport extends AbstractBTLESingleDeviceSupport {
        }
 
      */
+
+    @Override
+    public void onReadConfiguration(final String config) {
+        final TransactionBuilder builder = createTransactionBuilder("Read settings");
+        for (final byte command : new byte[]{
+            CMD_GET_DISPLAY_ON_LIFT,
+            CMD_GET_LONG_SIT_REMINDER,
+            CMD_GET_DEVICE_VIBRATIONS
+        }) {
+            builder.write(writeCharacteristic, craftData(CMD_GROUP_REQUEST_DATA, command));
+            builder.sleep(200);
+        }
+        builder.queue();
+    }
+
+    @Override
+    public void onCameraStatusChange(final GBDeviceEventCameraRemote.Event event, final String filename) {
+        final byte enabled;
+        if (event == GBDeviceEventCameraRemote.Event.OPEN_CAMERA) {
+            enabled = VALUE_ON;
+        } else if (event == GBDeviceEventCameraRemote.Event.CLOSE_CAMERA) {
+            enabled = VALUE_OFF;
+        } else {
+            return;
+        }
+        final TransactionBuilder builder = createTransactionBuilder("Camera status");
+        builder.write(writeCharacteristic, craftData(CMD_GROUP_GENERAL, FitProConstants.CMD_CAMERA, enabled));
+        builder.queue();
+    }
+
     public void handleCamera(byte command) {
         LOG.debug("Got camera button: {}", String.format("0x%02x", command));
         final GBDeviceEventCameraRemote cameraEvent = new GBDeviceEventCameraRemote();
