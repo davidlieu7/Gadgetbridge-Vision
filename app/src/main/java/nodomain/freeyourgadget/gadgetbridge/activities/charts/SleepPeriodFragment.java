@@ -171,9 +171,13 @@ public class SleepPeriodFragment extends SleepFragment<SleepPeriodFragment.MyCha
 
         if (supportsSleepScore()) {
             updateSleepScoreChart(weekBeforeData);
-            binding.sleepScoreHighest.setText(weekBeforeData.getHighestSleepScore() > 0 ? String.valueOf(weekBeforeData.getHighestSleepScore()) : getString(R.string.stats_empty_value));
-            binding.sleepScoreLowest.setText(weekBeforeData.getLowestSleepScore() > 0 ? String.valueOf(weekBeforeData.getLowestSleepScore()) : getString(R.string.stats_empty_value));
-            binding.sleepScoreAverage.setText(weekBeforeData.getAvgSleepScore() > 0 ? String.valueOf(weekBeforeData.getAvgSleepScore()) : getString(R.string.stats_empty_value));
+            final String emptyValue = getString(R.string.stats_empty_value);
+            final List<StatTileData> scoreStats = new ArrayList<>();
+            scoreStats.add(new StatTileData(weekBeforeData.getHighestSleepScore() > 0 ? String.valueOf(weekBeforeData.getHighestSleepScore()) : emptyValue, getString(R.string.highest)));
+            scoreStats.add(new StatTileData(weekBeforeData.getLowestSleepScore() > 0 ? String.valueOf(weekBeforeData.getLowestSleepScore()) : emptyValue, getString(R.string.lowest)));
+            scoreStats.add(new StatTileData(weekBeforeData.getAvgSleepScore() > 0 ? String.valueOf(weekBeforeData.getAvgSleepScore()) : emptyValue, getString(R.string.hr_average)));
+            binding.sleepScoreStatsContainer.removeAllViews();
+            StatTileGridUtilKt.addStatTileGrid(binding.sleepScoreStatsContainer, requireContext(), scoreStats, 0);
         }
 
         final MySleepWeeklyData sleepWeeklyData = mcd.getSleepWeeklyData();
@@ -298,14 +302,14 @@ public class SleepPeriodFragment extends SleepFragment<SleepPeriodFragment.MyCha
         final List<String> rowLabels = new ArrayList<>();
         final List<Integer> rowColors = new ArrayList<>();
         final List<Function1<Integer, String>> rowTexts = new ArrayList<>();
-        rowLabels.add(getString(R.string.menuitem_sleep));
-        rowColors.add(CHART_TEXT_COLOR);
+        rowLabels.add("");
+        rowColors.add(null);
         rowTexts.add(i -> {
             double total = 0;
             for (int stage = 0; stage < sleepStages; stage++) {
                 total += data.stageMinutes[stage][i];
             }
-            return total > 0 ? getHM((long) total) : emptyValue;
+            return total > 0 ? getString(R.string.sleep_total_value, getHM((long) total)) : emptyValue;
         });
         for (int stage = 0; stage < labels.length; stage++) {
             final int index = stage;
