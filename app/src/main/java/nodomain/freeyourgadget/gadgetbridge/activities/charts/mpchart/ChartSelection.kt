@@ -14,7 +14,10 @@ import kotlin.math.roundToInt
  * Tooltip content for a selected x. [description] is for accessibility.
  */
 data class ChartSelection(val title: String, val rows: List<Row>, val description: String) {
-    data class Row(val color: Int, val text: String)
+    /**
+     * A row without a [color] is drawn without a swatch, e.g. for a total.
+     */
+    data class Row(val color: Int?, val text: String)
 }
 
 internal object ChartSlots {
@@ -69,7 +72,7 @@ object DaySelections {
         epochDays: LongArray,
         x: Double,
         labels: List<String>,
-        colors: List<Int>,
+        colors: List<Int?>,
         texts: List<(Int) -> String>,
         emptyText: String,
     ): ChartSelection {
@@ -84,7 +87,7 @@ object DaySelections {
         return ChartSelection(
             title = title,
             rows = shown.map { ChartSelection.Row(it.second, it.third) },
-            description = (listOf(title) + shown.map { "${it.first} ${it.third}" }).joinToString(". ", postfix = "."),
+            description = (listOf(title) + shown.map { "${it.first} ${it.third}".trim() }).joinToString(". ", postfix = "."),
         )
     }
 }

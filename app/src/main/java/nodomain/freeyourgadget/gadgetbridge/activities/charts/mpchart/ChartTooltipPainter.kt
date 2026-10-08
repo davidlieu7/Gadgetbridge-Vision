@@ -48,9 +48,11 @@ internal class ChartTooltipPainter(context: Context, theme: ChartTheme) {
 
     fun width(selection: ChartSelection): Float {
         val title = titlePaint.measureText(selection.title)
-        val rows = selection.rows.maxOfOrNull { swatchSize + swatchGap + valuePaint.measureText(it.text) } ?: 0f
+        val rows = selection.rows.maxOfOrNull { textLeft(it) + valuePaint.measureText(it.text) } ?: 0f
         return maxOf(title, rows) + paddingHorizontal * 2
     }
+
+    private fun textLeft(row: ChartSelection.Row) = if (row.color == null) 0f else swatchSize + swatchGap
 
     fun height(selection: ChartSelection): Float =
         paddingVertical * 2 + lineHeight(titlePaint) + selection.rows.size * (lineGap + rowHeight())
@@ -71,11 +73,13 @@ internal class ChartTooltipPainter(context: Context, theme: ChartTheme) {
         for (row in selection.rows) {
             y += lineGap
             val centerY = y + rowHeight / 2f
-            swatchPaint.color = row.color
-            rect.set(x, centerY - swatchSize / 2f, x + swatchSize, centerY + swatchSize / 2f)
-            canvas.drawRoundRect(rect, swatchRadius, swatchRadius, swatchPaint)
+            row.color?.let {
+                swatchPaint.color = it
+                rect.set(x, centerY - swatchSize / 2f, x + swatchSize, centerY + swatchSize / 2f)
+                canvas.drawRoundRect(rect, swatchRadius, swatchRadius, swatchPaint)
+            }
             val baseline = centerY - (valuePaint.fontMetrics.ascent + valuePaint.fontMetrics.descent) / 2f
-            canvas.drawText(row.text, x + swatchSize + swatchGap, baseline, valuePaint)
+            canvas.drawText(row.text, x + textLeft(row), baseline, valuePaint)
             y += rowHeight
         }
     }
