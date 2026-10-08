@@ -65,6 +65,8 @@ import java.util.TimeZone;
 import java.util.UUID;
 import java.util.zip.CRC32;
 import nodomain.freeyourgadget.gadgetbridge.GBApplication;
+import androidx.core.app.NotificationCompat;
+
 import nodomain.freeyourgadget.gadgetbridge.R;
 import nodomain.freeyourgadget.gadgetbridge.activities.CameraActivity;
 import nodomain.freeyourgadget.gadgetbridge.activities.SettingsActivity;
@@ -2311,13 +2313,71 @@ public class SamsungDeviceSupport extends AbstractBTLESingleDeviceSupport {
     private void onSosRequest(int msgId, byte[] body) {
         Fit3Sos request = Fit3Sos.parse(body);
         if (request == null) {
-            // Emergency triggered / cancelled and friends: not handled yet.
             LOG.warn("Samsung Fit 3: unhandled SOS request msgId={} {}", msgId, GB.hexdump(body));
             return;
+        }
+        switch (msgId) {
+            case Fit3Sos.MSG_ID_ALERT_RAISED:
+                onSosAlertRaised(request);
+                return;
+            case Fit3Sos.MSG_ID_ALERT_CANCELLED:
+                onSosAlertCancelled();
+                return;
+            case Fit3Sos.MSG_ID_ALERT_BATTERY:
+                LOG.warn("Samsung Fit 3: SOS battery report: {}", request.get(Fit3Sos.PARAM_BATTERY));
+                sendMessage(Fit3Sos.CHANNEL, Fit3Sos.buildResult(msgId), "sos-alert-battery");
+                return;
         }
         LOG.info("Samsung Fit 3: SOS setting changed on the band: {}", request);
         adoptSosSettings(request);
         sendMessage(Fit3Sos.CHANNEL, Fit3Sos.buildResult(msgId), "sos-result");
+    }
+
+    /** Notification id for the SOS alert on the phone; one at a time. */
+    private static final int NOTIFICATION_ID_SOS = 0x534F53;
+
+    /**
+     * The band raised an alert. Gadgetbridge sends no SMS and shares no
+     * location yet, so it only acknowledges the alert, says so on the band
+     * and puts a notification on the phone - nobody else is told.
+     */
+    private void onSosAlertRaised(Fit3Sos alert) {
+        Integer reason = alert.get(Fit3Sos.PARAM_REASON);
+        boolean fall = reason != null && reason == Fit3Sos.REASON_FALL;
+        LOG.warn("Samsung Fit 3: SOS raised on the band ({}, user responded: {}) - no message is sent",
+                fall ? "fall" : "button", alert.getBoolean(Fit3Sos.PARAM_USER_RESPONDED));
+        sendMessage(Fit3Sos.CHANNEL, Fit3Sos.buildResult(Fit3Sos.MSG_ID_ALERT_RAISED), "sos-alert-raised");
+        sendMessage(Fit3Sos.CHANNEL,
+                Fit3Sos.buildAlertText(getContext().getString(R.string.samsung_fit3_sos_band_not_sent)),
+                "sos-alert-text");
+        showSosNotification(getContext().getString(fall
+                        ? R.string.samsung_fit3_sos_notification_fall
+                        : R.string.samsung_fit3_sos_notification_button, getDevice().getAliasOrName()),
+                getContext().getString(R.string.samsung_fit3_sos_notification_not_sent));
+    }
+
+    private void onSosAlertCancelled() {
+        LOG.warn("Samsung Fit 3: SOS cancelled on the band");
+        sendMessage(Fit3Sos.CHANNEL, Fit3Sos.buildResult(Fit3Sos.MSG_ID_ALERT_CANCELLED), "sos-alert-cancelled");
+        sendMessage(Fit3Sos.CHANNEL,
+                Fit3Sos.buildAlertText(getContext().getString(R.string.samsung_fit3_sos_band_cancelled)),
+                "sos-alert-text");
+        showSosNotification(getContext().getString(R.string.samsung_fit3_sos_notification_cancelled,
+                        getDevice().getAliasOrName()),
+                getContext().getString(R.string.samsung_fit3_sos_notification_not_sent));
+    }
+
+    private void showSosNotification(String title, String text) {
+        NotificationCompat.Builder notification = new NotificationCompat.Builder(getContext(),
+                GB.NOTIFICATION_CHANNEL_HIGH_PRIORITY_ID)
+                .setSmallIcon(R.drawable.ic_emergency)
+                .setPriority(NotificationCompat.PRIORITY_HIGH)
+                .setCategory(NotificationCompat.CATEGORY_ALARM)
+                .setContentTitle(title)
+                .setContentText(text)
+                .setStyle(new NotificationCompat.BigTextStyle().bigText(text))
+                .setAutoCancel(true);
+        GB.notify(NOTIFICATION_ID_SOS, notification.build(), getContext());
     }
 
     private void adoptSosSettings(Fit3Sos sos) {

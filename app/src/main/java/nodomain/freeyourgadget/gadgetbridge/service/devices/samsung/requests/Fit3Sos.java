@@ -19,6 +19,8 @@ package nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests;
 
 import androidx.annotation.Nullable;
 
+import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
@@ -47,8 +49,23 @@ import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.SapProtocol;
  * when-to-detect writes follow the same rules but were never captured; the
  * when-to-detect value is an int on the way out and a byte on the way back.
  *
- * <p>The emergency messages themselves (triggered, cancelled, battery, medical
- * info) are not handled here.
+ * <p>An alert raised on the band (button presses or a fall) goes the same way:
+ *
+ * <pre>
+ *   band -&gt; phone                          phone -&gt; band
+ *   13 36 [reason] 39 [responded]   raised    53 02 01
+ *   14                              cancelled 54 02 01
+ *   18 03 [battery %]               battery   58 02 01
+ *                                             15 35 [len:1] [utf8]   text shown on the band
+ * </pre>
+ *
+ * <p>Reason is 0 for the button and 1 for a fall; "responded" says whether the
+ * user reacted on the band. The phone is expected to do the alerting and
+ * report each step back as a text the band shows.
+ *
+ * <p>Confidence: raised (reason 1), cancelled and the texts match a capture
+ * of a fall triggered from the band's developer menu. The button reason and
+ * the battery message were not captured.
  */
 public final class Fit3Sos {
 
@@ -66,6 +83,10 @@ public final class Fit3Sos {
     public static final int MSG_ID_HAS_CONTACTS = 22;
     public static final int MSG_ID_SEND_SOS = 26;
     public static final int MSG_ID_COUNTDOWN = 27;
+    public static final int MSG_ID_ALERT_RAISED = 19;
+    public static final int MSG_ID_ALERT_CANCELLED = 20;
+    public static final int MSG_ID_ALERT_TEXT = 21;
+    public static final int MSG_ID_ALERT_BATTERY = 24;
 
     public static final int PARAM_FALL_DETECTION = 0x01;
     public static final int PARAM_RESULT = 0x02;
@@ -76,6 +97,17 @@ public final class Fit3Sos {
     /** True when the phone holds at least one emergency contact. */
     public static final int PARAM_HAS_CONTACTS = 0x37;
     public static final int PARAM_PERMISSION = 0x38;
+    public static final int PARAM_BATTERY = 0x03;
+    public static final int PARAM_ALERT_TEXT = 0x35;
+    public static final int PARAM_REASON = 0x36;
+    public static final int PARAM_USER_RESPONDED = 0x39;
+
+    /** Alert reasons. */
+    public static final int REASON_BUTTON = 0;
+    public static final int REASON_FALL = 1;
+
+    /** The text's length field is one byte. */
+    private static final int MAX_TEXT_BYTES = 255;
 
     /** When-to-detect values: always, during physical activity, only during workouts. */
     public static final int WHEN_TO_DETECT_MAX = 2;
@@ -135,6 +167,22 @@ public final class Fit3Sos {
                 .build();
     }
 
+    /** A text the band shows during an alert. Wire: {@code 15 35 [len:1] [utf8]}. */
+    public static byte[] buildAlertText(final String text) {
+        byte[] utf8 = text.getBytes(StandardCharsets.UTF_8);
+        if (utf8.length > MAX_TEXT_BYTES) {
+            int end = MAX_TEXT_BYTES;
+            // Don't cut a character in half: back off continuation bytes.
+            while (end > 0 && (utf8[end] & 0xC0) == 0x80) {
+                end--;
+            }
+            utf8 = Arrays.copyOf(utf8, end);
+        }
+        return SapPayloadBuilder.fixed(MSG_ID_ALERT_TEXT)
+                .addRawParam(PARAM_ALERT_TEXT, utf8)
+                .build();
+    }
+
     // ---- incoming ----
 
     public final int msgId;
@@ -148,8 +196,9 @@ public final class Fit3Sos {
     }
 
     /**
-     * Decode a settings reply, a write reply or a band-side setting change:
-     * all of them are {@code [id][value:1]} pairs on the way in.
+     * Decode a settings reply, a write reply, a band-side setting change or
+     * an alert message: all of them are {@code [id][value:1]} pairs on the way
+     * in.
      *
      * @return the message, or {@code null} for anything else on the channel
      */
@@ -166,6 +215,10 @@ public final class Fit3Sos {
             case MSG_ID_HAS_CONTACTS:
             case MSG_ID_SEND_SOS:
             case MSG_ID_COUNTDOWN:
+            case MSG_ID_ALERT_RAISED:
+            case MSG_ID_ALERT_CANCELLED:
+            case MSG_ID_ALERT_TEXT:
+            case MSG_ID_ALERT_BATTERY:
                 break;
             default:
                 return null;

@@ -6053,8 +6053,8 @@
     <string name="pref_samsung_fit3_status_indicator_title">Status indicator</string>
     <string name="samsung_fit3_status_indicator_always">Show always</string>
     <string name="samsung_fit3_status_indicator_hide">Hide after 2 seconds</string>
-    <string name="pref_samsung_fit3_sos_title">Safety</string>
-    <string name="pref_samsung_fit3_sos_warning">Experimental. Gadgetbridge does not yet alert anyone when the band raises an SOS or detects a fall - do not rely on these features.</string>
+    <string name="pref_samsung_fit3_sos_title">Safety (experimental)</string>
+    <string name="pref_samsung_fit3_sos_warning">Experimental. When the band raises an SOS or detects a fall, Gadgetbridge only shows a notification on this phone. It does not send any SMS, share your location or alert your SOS contact - do not rely on these features.</string>
     <string name="pref_samsung_fit3_fall_detection_title">Fall detection</string>
     <string name="pref_samsung_fit3_fall_detection_when_title">When to detect falls</string>
     <string name="samsung_fit3_fall_detection_always">Always</string>
@@ -6063,6 +6063,12 @@
     <string name="pref_samsung_fit3_send_sos_title">Send SOS</string>
     <string name="pref_samsung_fit3_send_sos_summary">Press the button repeatedly to raise an SOS</string>
     <string name="pref_samsung_fit3_sos_countdown_title">Count down before sending</string>
+    <string name="samsung_fit3_sos_notification_button">SOS raised on %1$s</string>
+    <string name="samsung_fit3_sos_notification_fall">Fall detected by %1$s</string>
+    <string name="samsung_fit3_sos_notification_cancelled">SOS cancelled on %1$s</string>
+    <string name="samsung_fit3_sos_notification_not_sent">Gadgetbridge did not send any message or location. Nobody was alerted.</string>
+    <string name="samsung_fit3_sos_band_not_sent">Gadgetbridge cannot send SOS messages. Nobody was alerted.</string>
+    <string name="samsung_fit3_sos_band_cancelled">SOS cancelled</string>
     <string name="pref_samsung_fit3_cycle_title">Cycle tracking</string>
     <string name="pref_samsung_fit3_cycle_enable_title">Cycle tracking (experimental)</string>
     <string name="pref_samsung_fit3_cycle_enable_summary">Show the period and predicted fertile window on the band. Needs the user\'s gender set to female. Predictions are a simple calendar estimate - do not rely on them for contraception.</string>

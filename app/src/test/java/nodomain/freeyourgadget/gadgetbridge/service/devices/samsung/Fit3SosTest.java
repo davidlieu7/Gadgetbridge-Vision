@@ -91,8 +91,42 @@ public class Fit3SosTest {
         assertArrayEquals(hex("41 02 01"), Fit3Sos.buildResult(Fit3Sos.MSG_ID_FALL_DETECTION));
     }
 
+    /** A fall triggered from the band's developer menu, then cancelled. */
     @Test
-    public void emergencyMessagesAreNotSettings() {
-        assertNull(Fit3Sos.parse(hex("13 36 00 39 01")));
+    public void alertRaisedAndCancelled() {
+        Fit3Sos raised = Fit3Sos.parse(hex("13 36 01 39 01"));
+        assertNotNull(raised);
+        assertEquals(Fit3Sos.MSG_ID_ALERT_RAISED, raised.msgId);
+        assertFalse(raised.response);
+        assertEquals(Integer.valueOf(Fit3Sos.REASON_FALL), raised.get(Fit3Sos.PARAM_REASON));
+        assertTrue(raised.getBoolean(Fit3Sos.PARAM_USER_RESPONDED));
+        assertArrayEquals(hex("53 02 01"), Fit3Sos.buildResult(Fit3Sos.MSG_ID_ALERT_RAISED));
+
+        Fit3Sos cancelled = Fit3Sos.parse(hex("14"));
+        assertNotNull(cancelled);
+        assertEquals(Fit3Sos.MSG_ID_ALERT_CANCELLED, cancelled.msgId);
+        assertArrayEquals(hex("54 02 01"), Fit3Sos.buildResult(Fit3Sos.MSG_ID_ALERT_CANCELLED));
+
+        // The band's ack of one of our texts.
+        Fit3Sos textAck = Fit3Sos.parse(hex("55 02 01"));
+        assertNotNull(textAck);
+        assertTrue(textAck.succeeded());
+    }
+
+    @Test
+    public void alertText() {
+        // Captured: "Экстренная отправка остановлена", 60 UTF-8 bytes.
+        byte[] body = Fit3Sos.buildAlertText("Экстренная отправка остановлена");
+        assertArrayEquals(hex("15 35 3c"), java.util.Arrays.copyOf(body, 3));
+        assertEquals(63, body.length);
+    }
+
+    @Test
+    public void alertTextIsCutOnACharacterBoundary() {
+        // 200 two-byte characters = 400 bytes; 255 would split one.
+        String text = new String(new char[200]).replace('\0', 'ж');
+        byte[] body = Fit3Sos.buildAlertText(text);
+        assertEquals(254, body[2] & 0xFF);
+        assertEquals(3 + 254, body.length);
     }
 }
