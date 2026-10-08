@@ -3,7 +3,7 @@ package nodomain.freeyourgadget.gadgetbridge.activities.charts.spec
 /**
  * A (x, y) data point. [x] is usually an epoch-second timestamp.
  */
-data class ChartPoint(val x: Double, val y: Double)
+data class ChartPoint(val x: Double, val y: Double, val low: Double? = null)
 
 /**
  * How one [ChartSeries] should be drawn.
@@ -26,6 +26,12 @@ sealed interface SeriesStyle {
         val color: Int,
         val stackKey: String? = null,
     ) : SeriesStyle
+
+    /**
+     * A filled band from each point's [ChartPoint.low] to its y, behind the other series. Can't be combined with
+     * [Column] series on one chart.
+     */
+    data class Range(val color: Int) : SeriesStyle
 }
 
 /**

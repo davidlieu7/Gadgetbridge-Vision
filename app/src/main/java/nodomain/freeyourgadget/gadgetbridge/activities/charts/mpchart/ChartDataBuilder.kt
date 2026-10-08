@@ -1,5 +1,6 @@
 package nodomain.freeyourgadget.gadgetbridge.activities.charts.mpchart
 
+import android.graphics.Color
 import android.graphics.drawable.GradientDrawable
 import androidx.core.graphics.ColorUtils
 import com.github.mikephil.charting.components.YAxis.AxisDependency
@@ -63,13 +64,18 @@ internal object ChartDataBuilder {
 
     fun build(spec: ChartSpec, layout: BarLayout, cornerRadiusPx: Float): CombinedData {
         val columns = columns(spec)
+        val ranges = spec.series.filter { it.style is SeriesStyle.Range && it.points.isNotEmpty() }
         val lines = spec.series.filter { it.style is SeriesStyle.Line && it.points.isNotEmpty() }
+        require(columns.isEmpty() || ranges.isEmpty()) { "Range and column series can't share a chart" }
         val step = layout.width + layout.gap
         return CombinedData().apply {
             if (columns.isNotEmpty()) {
                 barData = BarData(columns.mapIndexed { index, series ->
                     barDataSet(series, (index - (columns.size - 1) / 2f) * step, cornerRadiusPx)
                 }).apply { barWidth = layout.width }
+            }
+            if (ranges.isNotEmpty()) {
+                barData = BarData(ranges.map { rangeDataSet(it) }).apply { barWidth = 1f }
             }
             if (lines.isNotEmpty()) {
                 lineData = LineData(lines.map { lineDataSet(it) })
@@ -84,6 +90,20 @@ internal object ChartDataBuilder {
             color = style.color
             fills = listOf(Fill(topRounded(style.color, cornerRadiusPx)))
             highlightAlpha = 0
+            isDrawValuesEnabled = false
+            axisDependency = axisDependency(series)
+        }
+    }
+
+    private fun rangeDataSet(series: ChartSeries): BarDataSet<Float> {
+        val style = series.style as SeriesStyle.Range
+        val entries = series.points.map { point ->
+            val low = (point.low ?: 0.0).toFloat()
+            BarEntry(x = point.x.toFloat(), stackValues = listOf(low, point.y.toFloat() - low), data = point.x.toFloat())
+        }
+        return BarDataSet(entries, series.label).apply {
+            colors = listOf(Color.TRANSPARENT, style.color)
+            isHighlightEnabled = false
             isDrawValuesEnabled = false
             axisDependency = axisDependency(series)
         }

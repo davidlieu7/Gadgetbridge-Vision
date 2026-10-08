@@ -67,7 +67,12 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 app:sectionTitle="@string/training_acute_load" />
-            <com.github.mikephil.charting.charts.CombinedChart
+            <nodomain.freeyourgadget.gadgetbridge.activities.charts.mpchart.ChartLegendView
+                android:id="@+id/acute_load_legend"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="8dp" />
+            <nodomain.freeyourgadget.gadgetbridge.activities.charts.mpchart.GbChartView
                 android:id="@+id/acute_load_chart"
                 android:layout_width="fill_parent"
                 android:layout_height="250sp"
@@ -100,7 +105,7 @@
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="250sp">
-            <com.github.mikephil.charting.charts.BarChart
+            <nodomain.freeyourgadget.gadgetbridge.activities.charts.mpchart.GbChartView
                 android:id="@+id/daily_load_chart"
                 android:layout_width="fill_parent"
                 android:layout_height="fill_parent"

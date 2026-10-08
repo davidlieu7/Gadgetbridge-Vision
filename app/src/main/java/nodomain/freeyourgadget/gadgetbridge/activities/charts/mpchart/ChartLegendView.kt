@@ -33,11 +33,12 @@ class ChartLegendView @JvmOverloads constructor(
             val color = when (style) {
                 is SeriesStyle.Column -> style.color
                 is SeriesStyle.Line -> style.color
+                is SeriesStyle.Range -> style.color
             }
             val swatch = View(context).apply {
                 background = GradientDrawable().apply {
                     setColor(color)
-                    if (style is SeriesStyle.Column) {
+                    if (style !is SeriesStyle.Line) {
                         cornerRadius = dp(SWATCH_CORNER_DP)
                     } else {
                         shape = GradientDrawable.OVAL
