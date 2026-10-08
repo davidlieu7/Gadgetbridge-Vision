@@ -5721,6 +5721,13 @@
     <string name="punches">Punches</string>
     <string name="Throws">Throws</string>
 
+    <!-- Workout comparison (WorkoutCompareActivity) -->
+    <string name="compare_workouts">Compare</string>
+    <string name="compare_workouts_title">Compare workouts</string>
+    <string name="compare_workouts_select_at_least_two">Select at least two workouts to compare.</string>
+    <string name="compare_workouts_no_metrics">These workouts have no comparable metrics.</string>
+    <string name="compare_workouts_delta">Δ</string>
+
     <!-- Workout summary field labels (Xiaomi parsers and generic) -->
     <string name="vitality_gain">Vitality gain</string>
     <string name="v02maxLevel">VO₂max level</string>

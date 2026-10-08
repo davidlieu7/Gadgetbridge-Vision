@@ -801,6 +801,10 @@
             android:parentActivityName=".activities.workouts.WorkoutListActivity"
             android:windowSoftInputMode="stateHidden" />
         <activity
+            android:name=".activities.workouts.WorkoutCompareActivity"
+            android:label="@string/compare_workouts_title"
+            android:parentActivityName=".activities.workouts.WorkoutListActivity" />
+        <activity
             android:name=".activities.ActivitySummariesFilter"
             android:label="@string/activity_filter_filter_title"
             android:parentActivityName=".activities.workouts.WorkoutListActivity"

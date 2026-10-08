@@ -309,7 +309,16 @@ class WorkoutListActivity : AbstractListActivity<BaseActivitySummary>() {
                 return true
             }
 
-            override fun onPrepareActionMode(mode: ActionMode, menu: Menu) = false
+            override fun onPrepareActionMode(mode: ActionMode, menu: Menu): Boolean {
+                // Comparing needs at least two workouts; hide the action for a single selection.
+                val compareItem = menu.findItem(R.id.activity_action_compare) ?: return false
+                val shouldBeVisible = selectedItems?.let { it.cardinality() >= 2 } == true
+                if (compareItem.isVisible != shouldBeVisible) {
+                    compareItem.isVisible = shouldBeVisible
+                    return true
+                }
+                return false
+            }
 
             override fun onActionItemClicked(mode: ActionMode, menuItem: MenuItem): Boolean {
                 when (menuItem.itemId) {
@@ -339,6 +348,30 @@ class WorkoutListActivity : AbstractListActivity<BaseActivitySummary>() {
                             }
                         }
                         showExportDialog(toExport)
+                        return true
+                    }
+                    R.id.activity_action_compare -> {
+                        val toCompare = ArrayList<Long>()
+                        for (i in 0 until selectedItems!!.length()) {
+                            if (selectedItems!!.get(i)) {
+                                itemAdapter?.getItem(i)?.id?.let { id -> toCompare.add(id) }
+                            }
+                        }
+                        if (toCompare.size < 2) {
+                            GB.toast(
+                                this@WorkoutListActivity,
+                                getString(R.string.compare_workouts_select_at_least_two),
+                                Toast.LENGTH_SHORT,
+                                GB.WARN
+                            )
+                        } else {
+                            startActivity(
+                                WorkoutCompareActivity.createIntent(
+                                    this@WorkoutListActivity,
+                                    toCompare.toLongArray()
+                                )
+                            )
+                        }
                         return true
                     }
                     R.id.activity_action_select_all -> {
