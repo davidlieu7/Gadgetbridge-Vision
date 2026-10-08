@@ -164,9 +164,10 @@ public class StepsPeriodFragment extends StepsFragment<StepsPeriodFragment.Steps
                 daySteps = steps[i];
             }
         }
-        final String value = daySteps == 0
-                ? getString(R.string.stats_empty_value)
-                : new WorkoutValueFormatter().formatValue(daySteps, ActivitySummaryEntries.UNIT_STEPS);
+        if (daySteps == 0) {
+            return new ChartSelection(title, Collections.emptyList(), title + ".");
+        }
+        final String value = new WorkoutValueFormatter().formatValue(daySteps, ActivitySummaryEntries.UNIT_STEPS);
         return new ChartSelection(
                 title,
                 Collections.singletonList(new ChartSelection.Row(stepsColor, value)),

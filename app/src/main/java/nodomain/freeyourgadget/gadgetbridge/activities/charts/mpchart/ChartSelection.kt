@@ -61,7 +61,8 @@ internal object ChartSlots {
 
 object DaySelections {
     /**
-     * Tooltip for epoch day [x]: its date, then one row per label. [texts] format the value at a day's index.
+     * Tooltip for epoch day [x]: its date, then a row per label with a value. [texts] format the value at a day's
+     * index, or give [emptyText] for none.
      */
     @JvmStatic
     fun of(
@@ -77,11 +78,13 @@ object DaySelections {
         val title = DateTimeFormatter.ofPattern(DateFormat.getBestDateTimePattern(locale, "EEEMMMd"), locale)
             .format(LocalDate.ofEpochDay(day))
         val index = epochDays.indexOf(day)
-        val values = texts.map { if (index >= 0) it(index) else emptyText }
+        val shown = labels.indices
+            .map { Triple(labels[it], colors[it], if (index >= 0) texts[it](index) else emptyText) }
+            .filter { it.third != emptyText }
         return ChartSelection(
             title = title,
-            rows = colors.zip(values) { color, value -> ChartSelection.Row(color, value) },
-            description = (listOf(title) + labels.zip(values) { label, value -> "$label $value" }).joinToString(". ", postfix = "."),
+            rows = shown.map { ChartSelection.Row(it.second, it.third) },
+            description = (listOf(title) + shown.map { "${it.first} ${it.third}" }).joinToString(". ", postfix = "."),
         )
     }
 }

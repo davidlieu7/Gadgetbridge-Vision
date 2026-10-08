@@ -270,14 +270,14 @@ class SportStatisticsFragment : Fragment() {
     ): ChartSelection {
         val title = slotTitle(stats.period, slot)
         val totals = stats.bars.firstOrNull { it.x == slot.toDouble() }?.totals
-        val values = charts.map { chart ->
+        val shown = charts.mapNotNull { chart ->
             val raw = totals?.let { chart.metric.valueOf(it) } ?: 0.0
-            if (raw == 0.0) getString(R.string.stats_empty_value) else formatMetric(chart.metric, raw, formatter)
+            if (raw == 0.0) null else chart to formatMetric(chart.metric, raw, formatter)
         }
         return ChartSelection(
             title = title,
-            rows = charts.zip(values) { chart, value -> ChartSelection.Row(chart.color, value) },
-            description = (listOf(title) + charts.zip(values) { chart, value -> "${chart.label} $value" })
+            rows = shown.map { (chart, value) -> ChartSelection.Row(chart.color, value) },
+            description = (listOf(title) + shown.map { (chart, value) -> "${chart.label} $value" })
                 .joinToString(". ", postfix = "."),
         )
     }
