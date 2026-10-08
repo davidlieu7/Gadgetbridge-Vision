@@ -2,7 +2,6 @@ package nodomain.freeyourgadget.gadgetbridge.activities.charts.mpchart
 
 import android.content.Context
 import android.graphics.Canvas
-import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.RectF
 import android.graphics.Typeface
@@ -24,7 +23,11 @@ internal class ChartTooltipPainter(context: Context, theme: ChartTheme) {
 
     private val boxPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = theme.markerBackgroundColor
-        setShadowLayer(dp(SHADOW_BLUR_DP) / 2f, 0f, dp(SHADOW_OFFSET_DP), SHADOW_COLOR)
+    }
+    private val borderPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+        strokeWidth = dp(0.5f)
+        color = theme.markerBorderColor
     }
     private val titlePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
         color = theme.markerTitleColor
@@ -55,6 +58,9 @@ internal class ChartTooltipPainter(context: Context, theme: ChartTheme) {
     fun draw(canvas: Canvas, selection: ChartSelection, left: Float, top: Float) {
         rect.set(left, top, left + width(selection), top + height(selection))
         canvas.drawRoundRect(rect, cornerRadius, cornerRadius, boxPaint)
+        val inset = borderPaint.strokeWidth / 2f
+        rect.inset(inset, inset)
+        canvas.drawRoundRect(rect, cornerRadius - inset, cornerRadius - inset, borderPaint)
 
         val x = left + paddingHorizontal
         var y = top + paddingVertical
@@ -72,11 +78,5 @@ internal class ChartTooltipPainter(context: Context, theme: ChartTheme) {
             canvas.drawText(row.text, x + swatchSize + swatchGap, baseline, valuePaint)
             y += rowHeight
         }
-    }
-
-    private companion object {
-        val SHADOW_COLOR = Color.argb(153, 0, 0, 0)
-        const val SHADOW_BLUR_DP = 18f
-        const val SHADOW_OFFSET_DP = 6f
     }
 }

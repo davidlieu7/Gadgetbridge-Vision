@@ -160,6 +160,7 @@ class WorkoutStatisticsViewModel : ViewModel() {
             avgSpeedMetersPerSecond = speed(ActivitySummaryEntries.PACE_AVG_SECONDS_KM, ActivitySummaryEntries.SPEED_AVG),
             avgHeartRate = number(ActivitySummaryEntries.HR_AVG),
             avgPowerWatts = number(ActivitySummaryEntries.AVG_POWER),
+            avgSwolf = number(ActivitySummaryEntries.SWOLF_AVG, ActivitySummaryEntries.SWOLF_INDEX),
             aerobicEffect = number(ActivitySummaryEntries.TRAINING_EFFECT_AEROBIC),
             anaerobicEffect = number(ActivitySummaryEntries.TRAINING_EFFECT_ANAEROBIC),
             trainingLoad = number(ActivitySummaryEntries.TRAINING_LOAD),

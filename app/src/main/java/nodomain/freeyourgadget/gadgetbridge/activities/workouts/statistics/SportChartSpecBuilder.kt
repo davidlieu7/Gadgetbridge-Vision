@@ -97,6 +97,7 @@ object SportChartSpecBuilder {
             SportMetric.AVG_PACE -> PACE_AXIS_STEP
             SportMetric.AVG_SPEED -> SPEED_AXIS_STEP
             SportMetric.AVG_HEART_RATE -> HEART_RATE_AXIS_STEP
+            SportMetric.AVG_SWOLF -> SWOLF_AXIS_STEP
             else -> POWER_AXIS_STEP
         }
         val lowest = points.minOf { it.y }
@@ -114,5 +115,6 @@ object SportChartSpecBuilder {
     private const val SPEED_AXIS_STEP = 1.0
     private const val HEART_RATE_AXIS_STEP = 5.0
     private const val POWER_AXIS_STEP = 10.0
+    private const val SWOLF_AXIS_STEP = 5.0
     private const val TRAINING_EFFECT_MAXIMUM = 5.0
 }

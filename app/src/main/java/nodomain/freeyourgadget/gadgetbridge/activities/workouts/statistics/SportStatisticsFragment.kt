@@ -311,7 +311,7 @@ class SportStatisticsFragment : Fragment() {
         SportMetric.AVG_PACE ->
             formatter.convert(raw, ActivitySummaryEntries.UNIT_SECONDS_PER_M, true).value * SECONDS_PER_MINUTE
         SportMetric.AVG_SPEED -> formatter.convert(raw, ActivitySummaryEntries.UNIT_METERS_PER_SECOND, true).value
-        SportMetric.AVG_HEART_RATE, SportMetric.AVG_POWER,
+        SportMetric.AVG_HEART_RATE, SportMetric.AVG_POWER, SportMetric.AVG_SWOLF,
         SportMetric.AVG_AEROBIC_EFFECT, SportMetric.AVG_ANAEROBIC_EFFECT -> raw
         SportMetric.ASCENT, SportMetric.DESCENT ->
             formatter.convert(raw, ActivitySummaryEntries.UNIT_METERS, true).value
@@ -322,7 +322,7 @@ class SportStatisticsFragment : Fragment() {
         SportMetric.DISTANCE -> 10.0
         SportMetric.DURATION -> 1.0
         SportMetric.AVG_PACE, SportMetric.AVG_SPEED, SportMetric.AVG_HEART_RATE, SportMetric.AVG_POWER,
-        SportMetric.AVG_AEROBIC_EFFECT, SportMetric.AVG_ANAEROBIC_EFFECT -> 0.0
+        SportMetric.AVG_SWOLF, SportMetric.AVG_AEROBIC_EFFECT, SportMetric.AVG_ANAEROBIC_EFFECT -> 0.0
         SportMetric.CALORIES -> 500.0
         SportMetric.ASCENT, SportMetric.DESCENT -> 100.0
         SportMetric.STEPS -> 1000.0
@@ -346,7 +346,7 @@ class SportStatisticsFragment : Fragment() {
         SportMetric.ASCENT, SportMetric.DESCENT ->
             formatter.formatValue(raw.roundToLong(), ActivitySummaryEntries.UNIT_METERS)
         SportMetric.STEPS -> formatter.formatValue(raw.roundToLong(), ActivitySummaryEntries.UNIT_STEPS)
-        SportMetric.TRAINING_LOAD, SportMetric.SETS -> raw.roundToLong().toString()
+        SportMetric.AVG_SWOLF, SportMetric.TRAINING_LOAD, SportMetric.SETS -> raw.roundToLong().toString()
     }
 
     private fun renderSummary(stats: PeriodStats) {

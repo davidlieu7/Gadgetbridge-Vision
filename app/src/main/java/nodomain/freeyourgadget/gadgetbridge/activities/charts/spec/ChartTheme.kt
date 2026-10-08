@@ -25,6 +25,7 @@ data class ChartTheme(
     val awakeSleepColor: Int,
     val notWornColor: Int,
     val markerBackgroundColor: Int,
+    val markerBorderColor: Int,
     val markerTitleColor: Int,
     val markerValueColor: Int,
     val markerDotGapColor: Int,
@@ -70,6 +71,7 @@ data class ChartTheme(
                 } else {
                     MaterialColors.getColor(context, R.attr.stat_tile_bg, surface)
                 },
+                markerBorderColor = MaterialColors.getColor(context, R.attr.stat_tile_border, Color.GRAY),
                 markerTitleColor = if (dark) {
                     DARK_MARKER_TITLE
                 } else {
