@@ -260,6 +260,14 @@ class WorkoutCompareActivity : AbstractGBActivity() {
         }
         val headerRow = ActivitySummaryTableRowEntry(null, headerCells, true, true)
 
+        // Title each column in the workout's own colour, the one it has in the legend,
+        // the charts and the map; the label and delta columns stay muted.
+        val headerColors = mutableListOf<Int?>(null)
+        workouts.forEachIndexed { index, _ -> headerColors.add(colorFor(index, workouts.size)) }
+        if (withDelta) {
+            headerColors.add(null)
+        }
+
         // Collect the whole table first: one TableSpec for everything, so the column
         // header, every group's rows and the delta column all line up.
         val tableGroups = ArrayList<Pair<String, ArrayList<ActivitySummaryTableRowEntry>>>()
@@ -302,8 +310,12 @@ class WorkoutCompareActivity : AbstractGBActivity() {
         }
 
         // The header decides nothing: only the data rows give each column its kind.
+        // Columns are centred: the values sit under their workout's header as a block,
+        // rather than some right-aligned and some left-aligned column fighting each other.
         val spec = TableSpec.from(
-            listOf(headerRow) + tableGroups.flatMap { it.second }
+            listOf(headerRow) + tableGroups.flatMap { it.second },
+            centered = true,
+            headerColors = headerColors
         )
         populateTableRow(headerRow, binding.summaryTable, workoutValueFormatter, spec, false)
 

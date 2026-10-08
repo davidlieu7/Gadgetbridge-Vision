@@ -73,10 +73,14 @@ fun populateTableRow(
 
     entry.columns.forEachIndexed { index, cell ->
         val column = spec.column(index)
+        // Column 0 keeps the default (it carries the row labels); a table that asks for it
+        // can centre every other column instead of start- or end-aligning them.
+        val cellGravity =
+            if (spec.centered && index > 0) Gravity.CENTER_HORIZONTAL else horizontalGravity(column)
         val textView = if (entry.isHeader) {
-            buildHeaderCell(context, cell, column, formatter, mutedColor)
+            buildHeaderCell(context, cell, column, formatter, mutedColor, cellGravity, spec.headerColor(index) ?: mutedColor)
         } else {
-            buildDataCell(context, cell, column, formatter, primaryColor, mutedColor)
+            buildDataCell(context, cell, column, formatter, primaryColor, mutedColor, cellGravity)
         }
         val params = if (column.fixedWidth) {
             LinearLayout.LayoutParams(dpToPx(context, INDEX_COLUMN_WIDTH_DP), LinearLayout.LayoutParams.WRAP_CONTENT)
@@ -106,7 +110,9 @@ private fun buildHeaderCell(
     cell: ActivitySummaryValue,
     column: TableColumnSpec,
     formatter: WorkoutValueFormatter,
-    mutedColor: Int
+    mutedColor: Int,
+    cellGravity: Int,
+    titleColor: Int
 ): View {
     val name = if (cell.value() == HEART_RATE_HEADER_KEY) {
         context.getString(R.string.table_header_hr)
@@ -119,8 +125,8 @@ private fun buildHeaderCell(
         typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
         // letterSpacing is in em, the design value is in sp
         letterSpacing = HEADER_LETTER_SPACING_SP / HEADER_TEXT_SIZE_SP
-        setTextColor(mutedColor)
-        gravity = horizontalGravity(column)
+        setTextColor(titleColor)
+        gravity = cellGravity
         maxLines = 2
         ellipsize = TextUtils.TruncateAt.END
     }
@@ -131,7 +137,7 @@ private fun buildHeaderCell(
         text = unit
         textSize = HEADER_UNIT_TEXT_SIZE_SP
         setTextColor(mutedColor)
-        gravity = horizontalGravity(column)
+        gravity = cellGravity
         maxLines = 1
         ellipsize = TextUtils.TruncateAt.END
     }
@@ -148,13 +154,14 @@ private fun buildDataCell(
     column: TableColumnSpec,
     formatter: WorkoutValueFormatter,
     primaryColor: Int,
-    mutedColor: Int
+    mutedColor: Int,
+    cellGravity: Int
 ): TextView {
     return TextView(context).apply {
         text = formatCell(cell, column, formatter, mutedColor)
         textSize = if (column.fixedWidth) INDEX_TEXT_SIZE_SP else CELL_TEXT_SIZE_SP
         setTextColor(if (column.fixedWidth) mutedColor else primaryColor)
-        gravity = horizontalGravity(column)
+        gravity = cellGravity
         if (column.numeric) {
             // tabular figures, so digits (and decimal points) line up between rows
             fontFeatureSettings = "tnum"

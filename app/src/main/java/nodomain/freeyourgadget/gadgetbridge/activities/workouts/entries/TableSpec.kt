@@ -45,16 +45,36 @@ data class TableColumnSpec(
  * Column layout for a whole table, worked out from all of its rows at once so every row lines up
  * and the decisions (alignment, unit dropping) are the same for each cell in a column.
  */
-class TableSpec private constructor(private val columns: List<TableColumnSpec>) {
+class TableSpec private constructor(
+    private val columns: List<TableColumnSpec>,
+    /**
+     * Centres every column after the label one instead of start- or end-aligning it, for
+     * tables whose cells compare values side by side (the compare screen) rather than list
+     * them. Column 0 keeps the default so the row labels stay start-aligned.
+     */
+    val centered: Boolean,
+    /**
+     * Optional per-column header colours, so a column can be titled in the colour it has
+     * everywhere else on the screen; null (or a null entry) keeps the muted header colour.
+     */
+    private val headerColors: List<Int?>?,
+) {
 
     fun column(index: Int): TableColumnSpec = columns.getOrElse(index) { DEFAULT_COLUMN }
+
+    fun headerColor(index: Int): Int? = headerColors?.getOrNull(index)
 
     companion object {
         private val DEFAULT_COLUMN = TableColumnSpec(numeric = false, fixedWidth = false, weight = 1f, impliedUnit = null)
 
         /** [rows] are the table's header and data rows; only the data rows decide the column kinds. */
         @JvmStatic
-        fun from(rows: List<ActivitySummaryTableRowEntry>): TableSpec {
+        @JvmOverloads
+        fun from(
+            rows: List<ActivitySummaryTableRowEntry>,
+            centered: Boolean = false,
+            headerColors: List<Int?>? = null
+        ): TableSpec {
             val dataRows = rows.filter { !it.isHeader }
             val columnCount = rows.maxOfOrNull { it.columns.size } ?: 0
 
@@ -70,7 +90,7 @@ class TableSpec private constructor(private val columns: List<TableColumnSpec>) 
 
                 TableColumnSpec(numeric, fixedWidth, weight, impliedUnit)
             }
-            return TableSpec(columns)
+            return TableSpec(columns, centered, headerColors)
         }
     }
 }
