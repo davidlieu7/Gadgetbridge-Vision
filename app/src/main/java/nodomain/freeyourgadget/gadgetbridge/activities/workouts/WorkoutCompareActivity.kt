@@ -49,6 +49,9 @@ import nodomain.freeyourgadget.gadgetbridge.activities.charts.HeartRateZoneChart
 import nodomain.freeyourgadget.gadgetbridge.activities.workouts.charts.DefaultWorkoutCharts
 import nodomain.freeyourgadget.gadgetbridge.activities.workouts.entries.ActivitySummaryGroup
 import nodomain.freeyourgadget.gadgetbridge.activities.workouts.entries.ActivitySummarySimpleEntry
+import nodomain.freeyourgadget.gadgetbridge.activities.workouts.entries.ActivitySummaryTableRowEntry
+import nodomain.freeyourgadget.gadgetbridge.activities.workouts.entries.ActivitySummaryValue
+import nodomain.freeyourgadget.gadgetbridge.activities.workouts.entries.TableSpec
 import nodomain.freeyourgadget.gadgetbridge.databinding.ActivityWorkoutCompareBinding
 import nodomain.freeyourgadget.gadgetbridge.model.ActivityKind
 import nodomain.freeyourgadget.gadgetbridge.model.ActivitySummaryData
@@ -231,6 +234,7 @@ class WorkoutCompareActivity : AbstractGBActivity() {
 
     private fun addSummaryTable(workouts: List<Workout>) {
         binding.summaryTable.removeAllViews()
+        binding.summaryTable.visibility = View.VISIBLE
 
         val groupsPerWorkout = workouts.map { ActivitySummaryGroup.buildGroupedList(it.data) }
         val groupOrder = mutableListOf<String>()
@@ -247,15 +251,18 @@ class WorkoutCompareActivity : AbstractGBActivity() {
         }
 
         // Column headers: one per workout, plus the delta column when comparing exactly two.
-        addTableRow(
-            label = "",
-            cells = workouts.map { workoutLabel(it) },
-            delta = if (workouts.size == 2) getString(R.string.compare_workouts_delta) else null,
-            isHeader = true
-        )
+        val withDelta = workouts.size == 2
+        val headerCells = ArrayList<ActivitySummaryValue>(workouts.size + 2)
+        headerCells.add(raw(""))
+        workouts.forEach { headerCells.add(raw(workoutLabel(it))) }
+        if (withDelta) {
+            headerCells.add(raw(getString(R.string.compare_workouts_delta)))
+        }
+        val headerRow = ActivitySummaryTableRowEntry(null, headerCells, true, true)
 
-        val emptyValue = getString(R.string.stats_empty_value)
-        var rowsAdded = 0
+        // Collect the whole table first: one TableSpec for everything, so the column
+        // header, every group's rows and the delta column all line up.
+        val tableGroups = ArrayList<Pair<String, ArrayList<ActivitySummaryTableRowEntry>>>()
         for (group in groupOrder) {
             val rows = ArrayList<Pair<String, List<ActivitySummarySimpleEntry?>>>()
             for (key in keysByGroup.getValue(group)) {
@@ -268,25 +275,48 @@ class WorkoutCompareActivity : AbstractGBActivity() {
             }
             if (rows.isEmpty()) continue
 
-            addGroupHeader(workoutValueFormatter.getStringResourceByName(group))
+            val tableRows = ArrayList<ActivitySummaryTableRowEntry>(rows.size)
             for ((key, cells) in rows) {
-                val formatted = cells.map { cell ->
-                    if (cell == null) emptyValue
-                    else workoutValueFormatter.formatValue(cell.value, cell.unit, false)
+                val values = ArrayList<ActivitySummaryValue>(headerCells.size)
+                values.add(raw(safeLabel(key)))
+                for (cell in cells) {
+                    values.add(
+                        if (cell == null) ActivitySummaryValue(null, "")
+                        else ActivitySummaryValue(cell.value, cell.unit)
+                    )
                 }
-                if (formatted.all { it == emptyValue }) continue
-                addTableRow(
-                    label = safeLabel(key),
-                    cells = formatted,
-                    delta = if (workouts.size == 2) formatDelta(cells) else null,
-                    isHeader = false
-                )
-                rowsAdded++
+                if (withDelta) {
+                    val delta = formatDelta(cells)
+                    values.add(raw(if (delta.isEmpty()) null else delta))
+                }
+                tableRows.add(ActivitySummaryTableRowEntry(null, values, false, true))
+            }
+            if (tableRows.isNotEmpty()) {
+                tableGroups.add(group to tableRows)
             }
         }
 
-        if (rowsAdded == 0) {
+        if (tableGroups.isEmpty()) {
             binding.summaryTable.visibility = View.GONE
+            return
+        }
+
+        // The header decides nothing: only the data rows give each column its kind.
+        val spec = TableSpec.from(
+            listOf(headerRow) + tableGroups.flatMap { it.second }
+        )
+        populateTableRow(headerRow, binding.summaryTable, workoutValueFormatter, spec, false)
+
+        for ((group, tableRows) in tableGroups) {
+            // Every group's last row ends on its own, so the section header's rule below
+            // it is the only line — the same way grouped tables look on the overview tab.
+            addSectionHeader(binding.summaryTable, this, workoutValueFormatter.getStringResourceByName(group), true)
+            tableRows.forEachIndexed { index, row ->
+                populateTableRow(
+                    row, binding.summaryTable, workoutValueFormatter, spec,
+                    index == tableRows.lastIndex
+                )
+            }
         }
     }
 
@@ -310,67 +340,9 @@ class WorkoutCompareActivity : AbstractGBActivity() {
         }
     }
 
-    private fun addGroupHeader(title: String) {
-        binding.summaryTable.addView(TextView(this).apply {
-            setPadding(dp(4), dp(16), dp(4), dp(4))
-            textSize = 16f
-            typeface = Typeface.DEFAULT_BOLD
-            setTextColor(GBApplication.getTextColor(this@WorkoutCompareActivity))
-            text = title
-        })
-    }
-
-    private fun addTableRow(label: String, cells: List<String>, delta: String?, isHeader: Boolean) {
-        val row = LinearLayout(this).apply {
-            orientation = LinearLayout.HORIZONTAL
-            gravity = Gravity.CENTER_VERTICAL
-            setPadding(dp(4), dp(6), dp(4), dp(6))
-        }
-        val textColor = GBApplication.getTextColor(this@WorkoutCompareActivity)
-        val secondaryColor = GBApplication.getSecondaryTextColor(this@WorkoutCompareActivity)
-
-        row.addView(TextView(this).apply {
-            layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, LABEL_WEIGHT)
-            minWidth = dp(96)
-            textSize = 13f
-            setTextColor(if (isHeader) textColor else secondaryColor)
-            if (isHeader) typeface = Typeface.DEFAULT_BOLD
-            text = label
-        })
-        for (cell in cells) {
-            row.addView(TextView(this).apply {
-                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
-                minWidth = dp(80)
-                gravity = Gravity.END
-                textSize = 13f
-                setTextColor(textColor)
-                if (isHeader) {
-                    typeface = Typeface.DEFAULT_BOLD
-                    maxLines = 3
-                }
-                text = cell
-            })
-        }
-        if (delta != null) {
-            row.addView(TextView(this).apply {
-                layoutParams = LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f)
-                minWidth = dp(64)
-                gravity = Gravity.END
-                textSize = 13f
-                setTextColor(textColor)
-                if (isHeader) {
-                    typeface = Typeface.DEFAULT_BOLD
-                    text = delta
-                } else {
-                    text = delta.ifEmpty { secondaryDash() }
-                    setTextColor(secondaryColor)
-                }
-            })
-        }
-        binding.summaryTable.addView(row)
-    }
-
-    private fun secondaryDash(): String = getString(R.string.stats_empty_value)
+/** A literal cell: dates and metric labels must not be looked up as string resources. */
+    private fun raw(value: String?): ActivitySummaryValue =
+        ActivitySummaryValue(value, ActivitySummaryEntries.UNIT_RAW_STRING)
 
     // endregion
 
@@ -470,14 +442,7 @@ class WorkoutCompareActivity : AbstractGBActivity() {
                 LinearLayout.LayoutParams.WRAP_CONTENT
             ).apply { topMargin = dp(8) }
         }
-        val title = TextView(this).apply {
-            setPadding(dp(4), dp(16), dp(4), dp(8))
-            textSize = 16f
-            typeface = Typeface.DEFAULT_BOLD
-            setTextColor(GBApplication.getTextColor(this@WorkoutCompareActivity))
-            text = series.first().second.title
-        }
-        container.addView(title)
+        addSectionHeader(container, this, series.first().second.title, true)
 
         val chartTextColor = GBApplication.getSecondaryTextColor(this)
         val chart = CombinedChart(this).apply {
@@ -584,7 +549,6 @@ class WorkoutCompareActivity : AbstractGBActivity() {
             ActivitySummaryEntries.GROUP_HEART_RATE_ZONES
         )
 
-        private const val LABEL_WEIGHT = 2f
         private const val MIN_TRACKS_FOR_MAP = 2
         private const val CHART_HEIGHT_DP = 300
         private const val X_LABEL_COUNT = 5
