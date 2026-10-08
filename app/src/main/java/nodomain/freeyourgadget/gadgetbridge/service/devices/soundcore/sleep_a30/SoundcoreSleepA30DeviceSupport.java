@@ -24,7 +24,6 @@ import android.os.Bundle;
 import androidx.localbroadcastmanager.content.LocalBroadcastManager;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.util.Arrays;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
@@ -82,11 +81,7 @@ public final class SoundcoreSleepA30DeviceSupport extends SoundcoreDeviceSupport
         boolean success = false;
         String error = null;
         try {
-            SoundcoreSleepA30Audio audio;
-            try (InputStream input = getContext().getContentResolver().openInputStream(uri)) {
-                if (input == null) throw new IOException("Unable to open native audio package");
-                audio = SoundcoreSleepA30Audio.read(input);
-            }
+            SoundcoreSleepA30Audio audio = SoundcoreSleepA30AudioInstallHandler.readAudio(uri, getContext());
             audio.requireApprovedDigest(approvedDigest);
             checkActive(upload);
             synchronized (this) {

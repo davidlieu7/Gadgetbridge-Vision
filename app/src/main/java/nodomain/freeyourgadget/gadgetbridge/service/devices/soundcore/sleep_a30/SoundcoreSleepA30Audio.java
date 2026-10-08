@@ -19,13 +19,18 @@ package nodomain.freeyourgadget.gadgetbridge.service.devices.soundcore.sleep_a30
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.ByteBuffer;
+import java.nio.CharBuffer;
+import java.nio.charset.CharacterCodingException;
+import java.nio.charset.CodingErrorAction;
 import java.nio.charset.StandardCharsets;
-import java.util.Arrays;
-import java.util.zip.CRC32;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.util.Arrays;
+import java.util.Locale;
+import java.util.zip.CRC32;
 
-/** A captured native audio package, not an arbitrary SBC recording. */
+/** A validated native audio package, including packages generated from supported raw SBC. */
 public final class SoundcoreSleepA30Audio {
     // Conservative implementation policy, not established hardware limits.
     public static final int MAX_BYTES = 960256;
@@ -35,20 +40,23 @@ public final class SoundcoreSleepA30Audio {
 
     public SoundcoreSleepA30Audio(byte[] input) throws IOException {
         bytes = input.clone();
-        if (bytes.length < 320 || bytes.length > MAX_BYTES || !Arrays.equals(Arrays.copyOf(bytes, 4), "1166".getBytes(StandardCharsets.US_ASCII))) {
-            throw new IOException("Select a native 1166 audio package (up to 960256 bytes), not raw audio");
+        if (bytes.length < 320 || bytes.length > MAX_BYTES || !isNative(bytes)) {
+            throw new IOException("Invalid native 1166 audio package (policy: up to 960256 bytes)");
         }
         if (u32(bytes, 104) != 256 || u32(bytes, 88) != bytes.length - 256 || u32(bytes, 92) != 128) {
             throw new IOException("Invalid native audio body offset, size or bitrate");
         }
         int end = 24;
-        while (end < 88 && bytes[end] != 0) {
-            if (bytes[end] < 32 || bytes[end] > 126) throw new IOException("Unsupported native audio title");
-            end++;
-        }
+        while (end < 88 && bytes[end] != 0) end++;
         if (end == 24 || end == 88) throw new IOException("Invalid native audio title");
         for (int i = end; i < 88; i++) if (bytes[i] != 0) throw new IOException("Invalid native audio title padding");
-        title = new String(bytes, 24, end - 24, StandardCharsets.US_ASCII);
+        try {
+            title = StandardCharsets.UTF_8.newDecoder().onMalformedInput(CodingErrorAction.REPORT)
+                .onUnmappableCharacter(CodingErrorAction.REPORT).decode(ByteBuffer.wrap(bytes, 24, end - 24)).toString();
+        } catch (CharacterCodingException e) {
+            throw new IOException("Invalid UTF-8 audio title", e);
+        }
+        if (containsControlCharacters(title)) throw new IOException("Invalid audio title");
         trackId = u32(bytes, 8);
         int parameter = bytes[257] & 255;
         int bitpool = bytes[258] & 255;
@@ -71,9 +79,76 @@ public final class SoundcoreSleepA30Audio {
             }
             if (crc != (bytes[p + 3] & 255)) throw new IOException("SBC frame CRC mismatch");
         }
+        if (u16(bytes, 108) != crc16(bytes, 256, bodySize) || u16(bytes, 110) != crc16(bytes, 0, 110)) {
+            throw new IOException("Native audio body or header CRC16 mismatch");
+        }
+    }
+
+    public static SoundcoreSleepA30Audio fromSbc(byte[] body, String title, long trackId) throws IOException {
+        if (body.length < 64 || body.length > MAX_BYTES - 256) throw new IOException("Raw SBC exceeds audio upload size policy or is empty");
+        if (trackId < 0 || trackId > 0xffffffffL) throw new IOException("Track ID must fit the control-service readback");
+        byte[] titleBytes = encodeTitle(title);
+        byte[] packageBytes = new byte[256 + body.length];
+        System.arraycopy("1166".getBytes(StandardCharsets.US_ASCII), 0, packageBytes, 0, 4);
+        packageBytes[5] = 0x10;
+        packageBytes[6] = 0x01;
+        put32(packageBytes, 8, trackId);
+        int rate = (body[1] & 255) == 0x31 ? 16000 : 32000;
+        packageBytes[16] = (byte) (rate == 16000 ? 2 : 3);
+        System.arraycopy(titleBytes, 0, packageBytes, 24, titleBytes.length);
+        put32(packageBytes, 88, body.length);
+        put32(packageBytes, 92, 128);
+        put32(packageBytes, 96, rate);
+        put32(packageBytes, 104, 256);
+        System.arraycopy(body, 0, packageBytes, 256, body.length);
+        put16(packageBytes, 108, crc16(body, 0, body.length));
+        put16(packageBytes, 110, crc16(packageBytes, 0, 110));
+        return new SoundcoreSleepA30Audio(packageBytes);
+    }
+
+    /** Gadgetbridge metadata policy; the official native function receives title and ID from its caller. */
+    public static SoundcoreSleepA30Audio fromFileBytes(byte[] input, String displayName) throws IOException {
+        if (input.length > MAX_BYTES) throw new IOException("Audio exceeds upload size policy");
+        if (isNative(input)) return new SoundcoreSleepA30Audio(input);
+        String title = displayName;
+        if (title != null && title.toLowerCase(Locale.ROOT).endsWith(".sbc")) title = title.substring(0, title.length() - 4);
+        long trackId = crc32(input, 0, input.length);
+        // Zero can also describe an empty slot in ID-only control readback.
+        return fromSbc(input, title, trackId == 0 ? 1 : trackId);
+    }
+
+    private static boolean isNative(byte[] input) {
+        return input.length >= 4 && input[0] == '1' && input[1] == '1' && input[2] == '6' && input[3] == '6';
+    }
+
+    private static boolean containsControlCharacters(String title) {
+        for (int i = 0; i < title.length(); i++) if (Character.isISOControl(title.charAt(i))) return true;
+        return false;
+    }
+
+    private static byte[] encodeTitle(String input) throws IOException {
+        String title = input == null || input.trim().isEmpty() ? "Local audio" : input.trim();
+        if (containsControlCharacters(title)) throw new IOException("Invalid audio title");
+        byte[] bytes;
+        try {
+            ByteBuffer encoded = StandardCharsets.UTF_8.newEncoder().onMalformedInput(CodingErrorAction.REPORT)
+                .onUnmappableCharacter(CodingErrorAction.REPORT).encode(CharBuffer.wrap(title));
+            bytes = new byte[encoded.remaining()];
+            encoded.get(bytes);
+        } catch (CharacterCodingException e) {
+            throw new IOException("Invalid UTF-8 audio title", e);
+        }
+        int length = Math.min(63, bytes.length);
+        // The first excluded byte tells whether the boundary splits a multi-byte code point.
+        while (length > 0 && length < bytes.length && (bytes[length] & 0xc0) == 0x80) length--;
+        return Arrays.copyOf(bytes, length);
     }
 
     public static SoundcoreSleepA30Audio read(InputStream input) throws IOException {
+        return read(input, null);
+    }
+
+    public static SoundcoreSleepA30Audio read(InputStream input, String displayName) throws IOException {
         ByteArrayOutputStream output = new ByteArrayOutputStream();
         byte[] buffer = new byte[8192];
         int n;
@@ -81,7 +156,7 @@ public final class SoundcoreSleepA30Audio {
             if (output.size() + n > MAX_BYTES) throw new IOException("Audio package exceeds upload size policy");
             output.write(buffer, 0, n);
         }
-        return new SoundcoreSleepA30Audio(output.toByteArray());
+        return fromFileBytes(output.toByteArray(), displayName);
     }
 
     public static boolean matchesTarget(byte[] payload, long track) {
@@ -115,6 +190,24 @@ public final class SoundcoreSleepA30Audio {
         System.arraycopy(bytes, bytes.length - 4, result, 4, 3);
         put32(result, 88, crc32(result, 0, 88));
         return result;
+    }
+
+    public static int crc16(byte[] data, int offset, int length) {
+        int crc = 0;
+        for (int i = offset; i < offset + length; i++) {
+            crc ^= (data[i] & 255) << 8;
+            for (int bit = 0; bit < 8; bit++) crc = ((crc << 1) ^ ((crc & 0x8000) != 0 ? 0x1021 : 0)) & 0xffff;
+        }
+        return crc;
+    }
+
+    private static int u16(byte[] data, int offset) {
+        return (data[offset] & 255) | ((data[offset + 1] & 255) << 8);
+    }
+
+    private static void put16(byte[] data, int offset, int value) {
+        data[offset] = (byte) value;
+        data[offset + 1] = (byte) (value >> 8);
     }
 
     public static long crc32(byte[] data, int offset, int length) {

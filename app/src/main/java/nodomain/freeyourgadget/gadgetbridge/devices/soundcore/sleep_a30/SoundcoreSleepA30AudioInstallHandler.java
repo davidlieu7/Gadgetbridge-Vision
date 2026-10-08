@@ -18,15 +18,20 @@ package nodomain.freeyourgadget.gadgetbridge.devices.soundcore.sleep_a30;
 
 import android.app.Activity;
 import android.content.Context;
+import android.database.Cursor;
 import android.net.Uri;
 import android.os.Bundle;
-import nodomain.freeyourgadget.gadgetbridge.model.DeviceService;
+import android.provider.OpenableColumns;
+
+import java.io.IOException;
 import java.io.InputStream;
+
 import nodomain.freeyourgadget.gadgetbridge.R;
 import nodomain.freeyourgadget.gadgetbridge.activities.install.FwAppInstallerActivity;
 import nodomain.freeyourgadget.gadgetbridge.activities.install.InstallActivity;
 import nodomain.freeyourgadget.gadgetbridge.devices.InstallHandler;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
+import nodomain.freeyourgadget.gadgetbridge.model.DeviceService;
 import nodomain.freeyourgadget.gadgetbridge.model.GenericItem;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.soundcore.sleep_a30.SoundcoreSleepA30Audio;
 
@@ -37,10 +42,27 @@ public final class SoundcoreSleepA30AudioInstallHandler implements InstallHandle
 
     public SoundcoreSleepA30AudioInstallHandler(Uri uri, Context context) {
         this.context = context;
-        try (InputStream input = context.getContentResolver().openInputStream(uri)) {
-            if (input != null) audio = SoundcoreSleepA30Audio.read(input);
+        try {
+            audio = readAudio(uri, context);
         } catch (Exception ignored) {
-            // An invalid native package is not an installable file.
+            // An unsupported package or raw SBC file is not installable.
+        }
+    }
+
+    public static SoundcoreSleepA30Audio readAudio(Uri uri, Context context) throws IOException {
+        String displayName = null;
+        try (Cursor cursor = context.getContentResolver().query(uri,
+                new String[]{OpenableColumns.DISPLAY_NAME}, null, null, null)) {
+            if (cursor != null && cursor.moveToFirst()) {
+                int column = cursor.getColumnIndex(OpenableColumns.DISPLAY_NAME);
+                if (column >= 0) displayName = cursor.getString(column);
+            }
+        } catch (Exception ignored) {
+            // Providers without a display name use the same stable fallback on both reads.
+        }
+        try (InputStream input = context.getContentResolver().openInputStream(uri)) {
+            if (input == null) throw new IOException("Unable to open audio file");
+            return SoundcoreSleepA30Audio.read(input, displayName);
         }
     }
 
