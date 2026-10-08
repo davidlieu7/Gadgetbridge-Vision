@@ -55,6 +55,7 @@ abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator(
         LocalAudioPlayback,
         LocalAudioVolume,
         LocalAudioAutoStop,
+        LocalAudioUpload,
         DynamicSnoreMasking,
         SleepAudioAutoSwitch,
         BluetoothCalls,
@@ -516,6 +517,27 @@ abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator(
                                 true
                             },
                         )
+                    }
+                    if (has(Capability.LocalAudioUpload)) {
+                        filePicker(
+                            key = "soundcore_local_audio_upload",
+                            title = R.string.soundcore_audio_upload,
+                            summary = R.string.soundcore_audio_upload_summary,
+                            icon = R.drawable.ic_file_upload,
+                        ) { context, selectedDevice, uris ->
+                            if (selectedDevice != null && uris.size == 1) {
+                                context.startActivity(android.content.Intent(context,
+                                    nodomain.freeyourgadget.gadgetbridge.activities.install.FwAppInstallerActivity::class.java).apply {
+                                    action = android.content.Intent.ACTION_VIEW
+                                    data = uris.single()
+                                    putExtra(GBDevice.EXTRA_DEVICE, selectedDevice)
+                                    addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                })
+                            } else if (uris.size != 1) {
+                                android.widget.Toast.makeText(context, R.string.soundcore_audio_select_one,
+                                    android.widget.Toast.LENGTH_LONG).show()
+                            }
+                        }
                     }
                     if (has(Capability.LocalAudioVolume)) {
                         val volumeRange: IntRange = 0..65

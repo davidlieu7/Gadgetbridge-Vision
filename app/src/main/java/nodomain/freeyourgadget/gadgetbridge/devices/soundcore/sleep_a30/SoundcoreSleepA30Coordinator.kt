@@ -25,7 +25,9 @@ import nodomain.freeyourgadget.gadgetbridge.devices.DeviceCardAction
 import nodomain.freeyourgadget.gadgetbridge.devices.deviceCardAction
 import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreEarbudsCoordinator
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice
+import nodomain.freeyourgadget.gadgetbridge.service.DeviceSupport
 import nodomain.freeyourgadget.gadgetbridge.service.devices.soundcore.sleep_a30.SoundcoreSleepA30Protocol
+import nodomain.freeyourgadget.gadgetbridge.service.devices.soundcore.sleep_a30.SoundcoreSleepA30DeviceSupport
 
 class SoundcoreSleepA30Coordinator : SoundcoreEarbudsCoordinator() {
     override fun getModelName(): String = "D1301"
@@ -35,6 +37,12 @@ class SoundcoreSleepA30Coordinator : SoundcoreEarbudsCoordinator() {
     override fun getDeviceNameResource(): Int = R.string.devicetype_soundcore_sleep_a30
 
     override fun getServiceUUID(): UUID = UUID.fromString("0cf12d31-fac3-4553-bd80-d6832e7d1301")
+
+    override fun getDeviceSupportClass(device: GBDevice): Class<out DeviceSupport> =
+        SoundcoreSleepA30DeviceSupport::class.java
+
+    override fun findInstallHandler(uri: android.net.Uri, options: android.os.Bundle, context: android.content.Context): nodomain.freeyourgadget.gadgetbridge.devices.InstallHandler? =
+        SoundcoreSleepA30AudioInstallHandler(uri, context).takeIf { it.isValid }
 
     override fun getAlarmSlotCount(device: GBDevice): Int = 5
 
@@ -85,6 +93,7 @@ class SoundcoreSleepA30Coordinator : SoundcoreEarbudsCoordinator() {
         Capability.DefaultListeningMode,
         Capability.LocalAudioPlayback,
         Capability.LocalAudioVolume,
+        Capability.LocalAudioUpload,
         Capability.LocalAudioAutoStop,
         Capability.DynamicSnoreMasking,
         Capability.SleepAudioAutoSwitch,

@@ -6247,4 +6247,8 @@
     <string name="soundcore_control_reset">Reset tap controls</string>
     <string name="soundcore_local_playback_pause">Pause local audio</string>
     <string name="soundcore_control_reset_confirmation">Reset all touch controls to their defaults?</string>
+    <string name="soundcore_audio_upload">Download audio to earbuds</string>
+    <string name="soundcore_audio_upload_summary">Replace local audio slot 2 package. Raw SBC and other audio formats are not supported.</string>
+    <string name="soundcore_audio_upload_warning">This replaces local audio slot 2 on your earbuds. Only native packages are supported, up to 960256 bytes and 60 seconds. Keep the earbuds connected until verification completes.</string>
+    <string name="soundcore_audio_select_one">Select one audio package.</string>
 </resources>
