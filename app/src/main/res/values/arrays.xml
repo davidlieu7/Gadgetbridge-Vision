@@ -3285,6 +3285,17 @@
         <item>2</item>
     </string-array>
 
+    <string-array name="samsung_fit3_fall_detection_when">
+        <item>@string/samsung_fit3_fall_detection_always</item>
+        <item>@string/samsung_fit3_fall_detection_activity</item>
+        <item>@string/samsung_fit3_fall_detection_workouts</item>
+    </string-array>
+    <string-array name="samsung_fit3_fall_detection_when_values" translatable="false">
+        <item>0</item>
+        <item>1</item>
+        <item>2</item>
+    </string-array>
+
     <string-array name="samsung_fit3_status_indicator">
         <item>@string/samsung_fit3_status_indicator_always</item>
         <item>@string/samsung_fit3_status_indicator_hide</item>

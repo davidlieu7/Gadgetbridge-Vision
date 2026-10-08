@@ -30,13 +30,15 @@ import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSpec
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSpecificSettingsHandler;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3MenuOrder;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3Settings;
+import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3Sos;
 import nodomain.freeyourgadget.gadgetbridge.util.Prefs;
 
 /**
  * Fills the tiles / quick panel / apps sortable lists with the items the band
  * itself reported (stored by the device support as possible values and
  * labels), hides any the band hasn't reported yet, and forwards changes - for
- * those and for the other device-specific keys in {@link Fit3Settings}.
+ * those and for the other device-specific keys in {@link Fit3Settings} and
+ * {@link Fit3Sos}.
  */
 public class SamsungFit3SettingsCustomizer implements DeviceSpecificSettingsCustomizer {
     public static final Creator<SamsungFit3SettingsCustomizer> CREATOR = new Creator<SamsungFit3SettingsCustomizer>() {
@@ -64,6 +66,10 @@ public class SamsungFit3SettingsCustomizer implements DeviceSpecificSettingsCust
         handler.addPreferenceHandlerFor(Fit3Settings.PREF_DOUBLE_PRESS);
         handler.addPreferenceHandlerFor(Fit3Settings.PREF_DISCONNECTION_ALERT);
         handler.addPreferenceHandlerFor(Fit3Settings.PREF_STATUS_INDICATOR);
+        handler.addPreferenceHandlerFor(Fit3Sos.PREF_FALL_DETECTION);
+        handler.addPreferenceHandlerFor(Fit3Sos.PREF_WHEN_TO_DETECT);
+        handler.addPreferenceHandlerFor(Fit3Sos.PREF_SEND_SOS);
+        handler.addPreferenceHandlerFor(Fit3Sos.PREF_COUNTDOWN);
     }
 
     @Override

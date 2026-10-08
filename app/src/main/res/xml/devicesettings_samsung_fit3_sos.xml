@@ -1,0 +1,52 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.preference.PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <!-- Device-specific keys: SamsungFit3SettingsCustomizer registers a change
+         handler for each. The band reports them at connect. -->
+    <PreferenceCategory
+        android:key="pref_header_samsung_fit3_sos"
+        android:title="@string/pref_samsung_fit3_sos_title"
+        app:iconSpaceReserved="false">
+
+        <Preference
+            android:key="samsung_fit3_sos_warning"
+            android:selectable="false"
+            android:summary="@string/pref_samsung_fit3_sos_warning"
+            app:iconSpaceReserved="false" />
+
+        <SwitchPreferenceCompat
+            android:defaultValue="false"
+            android:icon="@drawable/ic_emergency"
+            android:key="samsung_fit3_fall_detection"
+            android:layout="@layout/preference_checkbox"
+            android:title="@string/pref_samsung_fit3_fall_detection_title" />
+
+        <ListPreference
+            android:defaultValue="0"
+            android:dependency="samsung_fit3_fall_detection"
+            android:entries="@array/samsung_fit3_fall_detection_when"
+            android:entryValues="@array/samsung_fit3_fall_detection_when_values"
+            android:key="samsung_fit3_fall_detection_when"
+            app:iconSpaceReserved="true"
+            app:useSimpleSummaryProvider="true"
+            android:title="@string/pref_samsung_fit3_fall_detection_when_title" />
+
+        <SwitchPreferenceCompat
+            android:defaultValue="false"
+            android:icon="@drawable/ic_smart_button"
+            android:key="samsung_fit3_send_sos"
+            android:layout="@layout/preference_checkbox"
+            android:summary="@string/pref_samsung_fit3_send_sos_summary"
+            android:title="@string/pref_samsung_fit3_send_sos_title" />
+
+        <SwitchPreferenceCompat
+            android:defaultValue="true"
+            android:dependency="samsung_fit3_send_sos"
+            android:key="samsung_fit3_sos_countdown"
+            android:layout="@layout/preference_checkbox"
+            app:iconSpaceReserved="true"
+            android:title="@string/pref_samsung_fit3_sos_countdown_title" />
+
+    </PreferenceCategory>
+</androidx.preference.PreferenceScreen>

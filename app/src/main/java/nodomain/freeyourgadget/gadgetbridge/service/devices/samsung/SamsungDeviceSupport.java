@@ -119,6 +119,7 @@ import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3NotificationCapability;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3NotificationIcon;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3Settings;
+import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3Sos;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3Calendar;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3MenuOrder;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3NotificationAction;
@@ -499,6 +500,9 @@ public class SamsungDeviceSupport extends AbstractBTLESingleDeviceSupport {
                                 msgId, body.length);
                     }
                     return;
+                case SapProtocol.CH_SOS:                 // 0x19: /9 settings, write results
+                    onSosResponse(Fit3Sos.parse(body));
+                    return;
                 case SapProtocol.CH_CONTROL:
                     if (msgId == Fit3InitSetting.MSG_ID_INIT_SETTING) {
                         handleInitSettingInfo(Fit3InitSetting.parse(body));
@@ -536,6 +540,9 @@ public class SamsungDeviceSupport extends AbstractBTLESingleDeviceSupport {
                     return;
                 case SapProtocol.CH_NOTIFICATION:         // 0x07: /3 icon fetch, /0x3e big-data-chunk upload ack
                     onNotificationRequest(msgId, body);
+                    return;
+                case SapProtocol.CH_SOS:                  // 0x19: setting changed on the band
+                    onSosRequest(msgId, body);
                     return;
                 case SapProtocol.CH_SETTINGS:             // 0x0b: /2 unsolicited battery push
                     if (msgId == Fit3BatteryInfo.MSG_ID_BATTERY) {
@@ -1475,6 +1482,10 @@ public class SamsungDeviceSupport extends AbstractBTLESingleDeviceSupport {
         sendRawMessage(Fit3NotificationCapability.CHANNEL, Fit3NotificationCapability.buildRequest(),
                 "notification-capability");
 
+        // SOS / fall-detection settings, same idea as the snapshot below.
+        sendRawMessage(Fit3Sos.CHANNEL, Fit3Sos.buildSettingsRequest(hasSosContact(), true),
+                "sos-settings-request");
+
         // 7) full settings snapshot - the band tells us what it is actually set
         //    to, so the settings screen starts from its state and not ours.
         sendRawMessage(Fit3FullSettings.CHANNEL, Fit3FullSettings.buildRequest(), "full-settings-request");
@@ -1919,6 +1930,29 @@ public class SamsungDeviceSupport extends AbstractBTLESingleDeviceSupport {
                 }
                 break;
             }
+            case Fit3Sos.PREF_FALL_DETECTION:
+                sendMessage(Fit3Sos.CHANNEL,
+                        Fit3Sos.fallDetection(prefs.getBoolean(config, false)), "sos-fall-detection");
+                break;
+            case Fit3Sos.PREF_WHEN_TO_DETECT: {
+                Integer mode = parseListIndex(prefs, config);
+                if (mode != null) {
+                    sendMessage(Fit3Sos.CHANNEL, Fit3Sos.whenToDetect(mode), "sos-when-to-detect");
+                }
+                break;
+            }
+            case Fit3Sos.PREF_SEND_SOS:
+                sendMessage(Fit3Sos.CHANNEL,
+                        Fit3Sos.sendSos(prefs.getBoolean(config, false)), "sos-send-sos");
+                break;
+            case Fit3Sos.PREF_COUNTDOWN:
+                sendMessage(Fit3Sos.CHANNEL,
+                        Fit3Sos.countdown(prefs.getBoolean(config, true)), "sos-countdown");
+                break;
+            case DeviceSettingsPreferenceConst.PREF_SOS_CONTACT_NUMBER:
+                // The band never sees the contact itself, only whether one exists.
+                sendMessage(Fit3Sos.CHANNEL, Fit3Sos.hasContacts(hasSosContact()), "sos-has-contacts");
+                break;
             case ActivityUser.PREF_USER_GENDER:
             case ActivityUser.PREF_USER_DATE_OF_BIRTH:
             case ActivityUser.PREF_USER_HEIGHT_CM:
@@ -1960,6 +1994,68 @@ public class SamsungDeviceSupport extends AbstractBTLESingleDeviceSupport {
         } catch (NumberFormatException e) {
             LOG.warn("Samsung Fit 3: bad {} preference '{}'", key, value);
             return null;
+        }
+    }
+
+    private boolean hasSosContact() {
+        String number = getDevicePrefs().getString(DeviceSettingsPreferenceConst.PREF_SOS_CONTACT_NUMBER, "");
+        return number != null && !number.trim().isEmpty();
+    }
+
+    /** The band's SOS settings, or the result of one of our writes. */
+    private void onSosResponse(@Nullable Fit3Sos reply) {
+        if (reply == null) {
+            LOG.debug("Samsung Fit 3: unhandled SOS reply");
+            return;
+        }
+        if (Boolean.FALSE.equals(reply.succeeded())) {
+            LOG.warn("Samsung Fit 3: band refused SOS message: {}", reply);
+            return;
+        }
+        if (reply.msgId != Fit3Sos.MSG_ID_GET_SETTINGS) {
+            LOG.debug("Samsung Fit 3: SOS write acked: {}", reply);
+            return;
+        }
+        LOG.info("Samsung Fit 3 SOS settings: {}", reply);
+        adoptSosSettings(reply);
+    }
+
+    /**
+     * A setting changed on the band itself. Take it into the preferences and
+     * answer, as the band expects every request on this channel to be.
+     */
+    private void onSosRequest(int msgId, byte[] body) {
+        Fit3Sos request = Fit3Sos.parse(body);
+        if (request == null) {
+            // Emergency triggered / cancelled and friends: not handled yet.
+            LOG.warn("Samsung Fit 3: unhandled SOS request msgId={} {}", msgId, GB.hexdump(body));
+            return;
+        }
+        LOG.info("Samsung Fit 3: SOS setting changed on the band: {}", request);
+        adoptSosSettings(request);
+        sendMessage(Fit3Sos.CHANNEL, Fit3Sos.buildResult(msgId), "sos-result");
+    }
+
+    private void adoptSosSettings(Fit3Sos sos) {
+        GBDeviceEventUpdatePreferences event = new GBDeviceEventUpdatePreferences();
+        Boolean fall = sos.getBoolean(Fit3Sos.PARAM_FALL_DETECTION);
+        if (fall != null) {
+            event.withPreference(Fit3Sos.PREF_FALL_DETECTION, fall);
+        }
+        Integer when = sos.get(Fit3Sos.PARAM_WHEN_TO_DETECT);
+        if (when != null && when <= Fit3Sos.WHEN_TO_DETECT_MAX) {
+            event.withPreference(Fit3Sos.PREF_WHEN_TO_DETECT, String.valueOf(when));
+        }
+        Boolean sendSos = sos.getBoolean(Fit3Sos.PARAM_SEND_SOS);
+        if (sendSos != null) {
+            event.withPreference(Fit3Sos.PREF_SEND_SOS, sendSos);
+        }
+        Boolean countdown = sos.getBoolean(Fit3Sos.PARAM_COUNTDOWN);
+        if (countdown != null) {
+            event.withPreference(Fit3Sos.PREF_COUNTDOWN, countdown);
+        }
+        if (!event.preferences.isEmpty()) {
+            evaluateGBDeviceEvent(event);
         }
     }
 

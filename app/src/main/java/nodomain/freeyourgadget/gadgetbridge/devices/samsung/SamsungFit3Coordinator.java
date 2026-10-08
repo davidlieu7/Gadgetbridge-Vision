@@ -196,6 +196,8 @@ public class SamsungFit3Coordinator extends AbstractBLEDeviceCoordinator {
                 R.xml.devicesettings_canned_reply_16,
                 R.xml.devicesettings_canned_dismisscall_16,
                 R.xml.devicesettings_sync_calendar,
+                R.xml.devicesettings_samsung_fit3_sos,
+                R.xml.devicesettings_sos_contact,
         };
     }
 

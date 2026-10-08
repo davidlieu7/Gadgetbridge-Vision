@@ -6053,4 +6053,14 @@
     <string name="pref_samsung_fit3_status_indicator_title">Status indicator</string>
     <string name="samsung_fit3_status_indicator_always">Show always</string>
     <string name="samsung_fit3_status_indicator_hide">Hide after 2 seconds</string>
+    <string name="pref_samsung_fit3_sos_title">Safety</string>
+    <string name="pref_samsung_fit3_sos_warning">Experimental. Gadgetbridge does not yet alert anyone when the band raises an SOS or detects a fall - do not rely on these features.</string>
+    <string name="pref_samsung_fit3_fall_detection_title">Fall detection</string>
+    <string name="pref_samsung_fit3_fall_detection_when_title">When to detect falls</string>
+    <string name="samsung_fit3_fall_detection_always">Always</string>
+    <string name="samsung_fit3_fall_detection_activity">During physical activity</string>
+    <string name="samsung_fit3_fall_detection_workouts">Only during workouts</string>
+    <string name="pref_samsung_fit3_send_sos_title">Send SOS</string>
+    <string name="pref_samsung_fit3_send_sos_summary">Press the button repeatedly to raise an SOS</string>
+    <string name="pref_samsung_fit3_sos_countdown_title">Count down before sending</string>
 </resources>

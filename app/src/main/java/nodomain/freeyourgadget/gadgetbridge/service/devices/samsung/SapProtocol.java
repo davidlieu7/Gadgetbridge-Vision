@@ -49,6 +49,7 @@ public final class SapProtocol {
     public static final int CH_QUICK_REPLY  = 0x12;
     public static final int CH_QUICK_PANEL  = 0x13;   // quick-panel button list + order
     public static final int CH_APPS         = 0x18;   // app list order
+    public static final int CH_SOS          = 0x19;   // SOS + fall-detection settings
     public static final int CH_WATCHFACE    = 0x06;   // watchface list/select/install
     public static final int CH_IDENTITY     = 0x1A;   // identity + binding token
     public static final int CH_FILE_TRANSFER = 0x1E;  // bulk file upload control; bytes go over RFCOMM
