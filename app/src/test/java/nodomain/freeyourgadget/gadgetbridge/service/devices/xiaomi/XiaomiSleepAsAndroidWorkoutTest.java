@@ -16,6 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 package nodomain.freeyourgadget.gadgetbridge.service.devices.xiaomi;
 
+import android.content.SharedPreferences;
 import android.os.Looper;
 
 import org.junit.Assert;
@@ -29,6 +30,7 @@ import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 
+import nodomain.freeyourgadget.gadgetbridge.GBApplication;
 import nodomain.freeyourgadget.gadgetbridge.proto.xiaomi.AxisSensor;
 import nodomain.freeyourgadget.gadgetbridge.proto.xiaomi.Health;
 import nodomain.freeyourgadget.gadgetbridge.proto.xiaomi.RawSensorBatch;
@@ -474,5 +476,73 @@ public class XiaomiSleepAsAndroidWorkoutTest extends TestBase {
         // With phone GPS off this is the "no location" reply, not the synthetic (0, 2, 2).
         Assert.assertNotEquals("the synthetic ack must not leak into a real workout",
                 0, replies.get(0).getHealth().getWorkoutOpenReply().getCode());
+    }
+
+    // --- the window the band billed as a workout ------------------------------------------------
+
+    /** Backdate the stored session so it looks like it started {@code millis} ago. */
+    private void ageTheStoredSession(final long millis) {
+        final String key = "xiaomi_saa_session_started_ts";
+        final SharedPreferences prefs =
+                GBApplication.getDeviceSpecificSharedPrefs(support.getDevice().getAddress());
+        prefs.edit().putLong(key, prefs.getLong(key, 0L) - millis).apply();
+    }
+
+    private List<long[]> recordedWindows() {
+        return XiaomiPreferences.sleepAsAndroidWindows(support.getDevice().getAddress());
+    }
+
+    @Test
+    public void stoppingASessionRecordsTheWindowItCovered() {
+        openSession(true);
+        ageTheStoredSession(60_000);
+
+        health.getSleepAsAndroidManager().stop();
+        idle(OPEN_DELAY_MS);
+
+        final List<long[]> windows = recordedWindows();
+        Assert.assertEquals(1, windows.size());
+        Assert.assertTrue("the window must span the session",
+                windows.get(0)[1] - windows.get(0)[0] >= 60_000);
+    }
+
+    @Test
+    public void theWatchdogRestartKeepsTheSessionStart() {
+        openSession(true);
+        ageTheStoredSession(60 * 60_000L);
+
+        // Sleep as Android repeats START_TRACKING as its own watchdog.
+        openSession(true);
+        health.getSleepAsAndroidManager().stop();
+        idle(OPEN_DELAY_MS);
+
+        final List<long[]> windows = recordedWindows();
+        Assert.assertEquals(1, windows.size());
+        Assert.assertTrue("the window must start with the first START_TRACKING",
+                windows.get(0)[1] - windows.get(0)[0] >= 60 * 60_000L);
+    }
+
+    @Test
+    public void aSessionThatNeverRanRecordsNothing() {
+        health.getSleepAsAndroidManager().stop();
+        idle(OPEN_DELAY_MS);
+
+        Assert.assertTrue(recordedWindows().isEmpty());
+    }
+
+    @Test
+    public void aStoredStartTooOldToBelongToTheSessionIsReplaced() {
+        openSession(true);
+        // Past the twelve hours a session is kept, so it ended at some unknown time.
+        ageTheStoredSession(13 * 60 * 60_000L);
+
+        openSession(true);
+        health.getSleepAsAndroidManager().stop();
+        idle(OPEN_DELAY_MS);
+
+        final List<long[]> windows = recordedWindows();
+        Assert.assertEquals(1, windows.size());
+        Assert.assertTrue("only the session in progress is billed",
+                windows.get(0)[1] - windows.get(0)[0] < 60_000);
     }
 }
