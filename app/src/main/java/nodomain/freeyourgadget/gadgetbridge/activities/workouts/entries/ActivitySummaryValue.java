@@ -21,14 +21,23 @@ import androidx.annotation.Nullable;
 import nodomain.freeyourgadget.gadgetbridge.activities.workouts.WorkoutValueFormatter;
 import nodomain.freeyourgadget.gadgetbridge.model.ActivitySummaryEntries;
 
-public record ActivitySummaryValue(@Nullable Object value, String unit, String prefix) {
+public record ActivitySummaryValue(@Nullable Object value, String unit, String prefix, int color) {
     public ActivitySummaryValue(@Nullable Object value, String unit) {
-        this(value, unit, "");
+        this(value, unit, "", 0);
     }
 
     public ActivitySummaryValue(@Nullable Object value, String unit, String prefix) {
+        this(value, unit, prefix, 0);
+    }
+
+    /**
+     * @param color a colour resource to mark the cell's row with (a colour swatch in front of
+     *              the label, e.g. the heart rate zone's colour), or 0 for no marking.
+     */
+    public ActivitySummaryValue(@Nullable Object value, String unit, String prefix, int color) {
         this.unit = unit;
         this.prefix = prefix == null ? "" : prefix;
+        this.color = color;
         if (value instanceof Number number) {
             this.value = Double.isFinite(number.doubleValue()) ? value : null;
         } else {

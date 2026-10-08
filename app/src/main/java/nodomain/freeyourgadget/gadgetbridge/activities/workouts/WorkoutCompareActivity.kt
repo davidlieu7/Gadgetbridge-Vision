@@ -286,7 +286,7 @@ class WorkoutCompareActivity : AbstractGBActivity() {
             val tableRows = ArrayList<ActivitySummaryTableRowEntry>(rows.size)
             for ((key, cells) in rows) {
                 val values = ArrayList<ActivitySummaryValue>(headerCells.size)
-                values.add(raw(safeLabel(key)))
+                values.add(labelCell(key))
                 for (cell in cells) {
                     values.add(
                         if (cell == null) ActivitySummaryValue(null, "")
@@ -356,8 +356,20 @@ class WorkoutCompareActivity : AbstractGBActivity() {
     }
 
 /** A literal cell: dates and metric labels must not be looked up as string resources. */
-    private fun raw(value: String?): ActivitySummaryValue =
-        ActivitySummaryValue(value, ActivitySummaryEntries.UNIT_RAW_STRING)
+private fun raw(value: String?): ActivitySummaryValue =
+    ActivitySummaryValue(value, ActivitySummaryEntries.UNIT_RAW_STRING)
+
+/**
+ * The row's label, marked with the zone colour when the key is a heart rate zone —
+ * the same colour resources the rest of the app uses for zone rows.
+ */
+private fun labelCell(key: String): ActivitySummaryValue =
+    ActivitySummaryValue(
+        safeLabel(key),
+        ActivitySummaryEntries.UNIT_RAW_STRING,
+        "",
+        ActivitySummaryEntries.HR_ZONES[key] ?: 0
+    )
 
     // endregion
 

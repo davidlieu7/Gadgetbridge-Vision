@@ -2,6 +2,7 @@ package nodomain.freeyourgadget.gadgetbridge.activities.workouts
 
 import android.content.Context
 import android.graphics.Typeface
+import android.graphics.drawable.GradientDrawable
 import android.text.SpannableStringBuilder
 import android.text.Spanned
 import android.text.TextUtils
@@ -11,6 +12,7 @@ import android.view.Gravity
 import android.view.View
 import android.widget.LinearLayout
 import android.widget.TextView
+import androidx.core.content.ContextCompat
 import com.google.android.material.color.MaterialColors
 import nodomain.freeyourgadget.gadgetbridge.R
 import nodomain.freeyourgadget.gadgetbridge.activities.workouts.entries.ActivitySummaryTableRowEntry
@@ -32,6 +34,9 @@ private const val HEADER_UNIT_TEXT_SIZE_SP = 10f
 private const val CELL_TEXT_SIZE_SP = 14f
 private const val INDEX_TEXT_SIZE_SP = 13f
 private const val UNIT_TEXT_SIZE_SP = 11
+private const val ZONE_SWATCH_SIZE_DP = 10
+private const val ZONE_SWATCH_RADIUS_DP = 3
+private const val ZONE_SWATCH_GAP_DP = 6
 
 /** The heart rate column header is too wide for its column as a full word. */
 private const val HEART_RATE_HEADER_KEY = "heart_rate"
@@ -162,6 +167,19 @@ private fun buildDataCell(
         textSize = if (column.fixedWidth) INDEX_TEXT_SIZE_SP else CELL_TEXT_SIZE_SP
         setTextColor(if (column.fixedWidth) mutedColor else primaryColor)
         gravity = cellGravity
+        if (cell.color() != 0) {
+            // A colour swatch in front of the label, the way zone rows are marked
+            // everywhere else in the app: the text itself stays on the normal colour.
+            val sizePx = dpToPx(context, ZONE_SWATCH_SIZE_DP)
+            val swatch = GradientDrawable().apply {
+                shape = GradientDrawable.RECTANGLE
+                cornerRadius = dpToPx(context, ZONE_SWATCH_RADIUS_DP).toFloat()
+                setColor(ContextCompat.getColor(context, cell.color()))
+                setBounds(0, 0, sizePx, sizePx)
+            }
+            setCompoundDrawablesRelative(swatch, null, null, null)
+            compoundDrawablePadding = dpToPx(context, ZONE_SWATCH_GAP_DP)
+        }
         if (column.numeric) {
             // tabular figures, so digits (and decimal points) line up between rows
             fontFeatureSettings = "tnum"
