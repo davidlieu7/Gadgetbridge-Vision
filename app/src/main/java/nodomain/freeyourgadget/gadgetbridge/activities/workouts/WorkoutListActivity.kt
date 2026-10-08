@@ -288,6 +288,9 @@ class WorkoutListActivity : AbstractListActivity<BaseActivitySummary>() {
         if (actionMode != null) {
             // already in action mode
             actionMode?.title = getString(R.string.number_selected_items, numSelected)
+            // Re-run onPrepareActionMode: the Compare action only appears from two
+            // selections on, so its visibility has to be re-evaluated on every change.
+            actionMode?.invalidate()
             return
         }
 

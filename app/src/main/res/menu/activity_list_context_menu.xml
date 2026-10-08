@@ -28,7 +28,7 @@
         android:icon="@drawable/ic_show_chart"
         android:title="@string/compare_workouts"
         app:iconTint="?attr/actionmenu_icon_color"
-        app:showAsAction="never" />
+        app:showAsAction="always" />
 
     <item
         android:id="@+id/activity_action_delete"
