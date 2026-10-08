@@ -73,6 +73,7 @@ import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSett
 import nodomain.freeyourgadget.gadgetbridge.database.DBHandler;
 import nodomain.freeyourgadget.gadgetbridge.database.DBHelper;
 import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEventCameraRemote;
+import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEventFindPhone;
 import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEventAppInfo;
 import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEventBatteryInfo;
 import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEventCallControl;
@@ -136,6 +137,7 @@ import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3Sos;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3Calendar;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3CameraRemote;
+import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3FindDevice;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3MenuOrder;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3NotificationAction;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3PhoneAlarm;
@@ -480,6 +482,12 @@ public class SamsungDeviceSupport extends AbstractBTLESingleDeviceSupport {
         }
         if (channel == SapProtocol.CH_FILE_TRANSFER) {
             watchfaceManager.onFileTransferMessage(body);
+            return;
+        }
+        // Find phone / ring the band: requests and replies in both directions,
+        // and the type bit is set on some messages that aren't replies.
+        if (channel == Fit3FindDevice.CHANNEL) {
+            onFindMessage(msgId, isResponse, body);
             return;
         }
         // Tiles, quick panel, apps: the band's arrangement of each menu. None
@@ -1951,11 +1959,60 @@ public class SamsungDeviceSupport extends AbstractBTLESingleDeviceSupport {
 
     @Override
     public void onFindDevice(boolean start) {
-        LOG.debug("Samsung find device");
-        /** Ring the band to find it (channel 0x02, MSG_ID 3). */
-        byte[] body = SapPayloadBuilder.fixed(3).raw(0x01).rawLe16(0x02b4).raw(0x00).build();
-        sendMessage(SapProtocol.CH_FIND_BAND, body, "find-band");
+        LOG.debug("Samsung Fit 3: find band {}", start);
+        sendMessage(Fit3FindDevice.CHANNEL,
+                start ? Fit3FindDevice.buildBandStart(false) : Fit3FindDevice.buildBandStop(),
+                start ? "find-band" : "find-band-stop");
+    }
 
+    /** The band asked us to ring and the ring hasn't ended yet. */
+    private boolean findPhoneActive;
+
+    private void onFindMessage(int msgId, boolean isResponse, byte[] body) {
+        switch (msgId) {
+            case Fit3FindDevice.MSG_ID_PHONE_START:
+                if (isResponse) break;
+                LOG.info("Samsung Fit 3: band asks to find the phone");
+                findPhoneActive = true;
+                sendMessage(Fit3FindDevice.CHANNEL, Fit3FindDevice.buildPhoneStartReply(true), "find-phone-start");
+                GBDeviceEventFindPhone start = new GBDeviceEventFindPhone();
+                start.event = GBDeviceEventFindPhone.Event.START;
+                evaluateGBDeviceEvent(start);
+                return;
+            case Fit3FindDevice.MSG_ID_PHONE_STOP:
+                if (isResponse) break;
+                LOG.info("Samsung Fit 3: band stopped finding the phone");
+                // Cleared first, so closing the ring screen doesn't report
+                // "stopped on the phone" back to the band (see onFindPhone).
+                findPhoneActive = false;
+                sendMessage(Fit3FindDevice.CHANNEL, Fit3FindDevice.buildPhoneStopReply(true), "find-phone-stop");
+                GBDeviceEventFindPhone stop = new GBDeviceEventFindPhone();
+                stop.event = GBDeviceEventFindPhone.Event.STOP;
+                evaluateGBDeviceEvent(stop);
+                return;
+            case Fit3FindDevice.MSG_ID_PHONE_FOUND:
+                LOG.debug("Samsung Fit 3: band acked the phone being found");
+                return;
+            case Fit3FindDevice.MSG_ID_BAND_START:
+                LOG.debug("Samsung Fit 3: find band reply {}", GB.hexdump(body));
+                return;
+            case Fit3FindDevice.MSG_ID_BAND_STOP:
+                LOG.info("Samsung Fit 3: band stopped ringing {}", GB.hexdump(body));
+                return;
+        }
+        LOG.debug("Samsung Fit 3: find msgId={} ignored: {}", msgId, GB.hexdump(body));
+    }
+
+    @Override
+    public void onFindPhone(boolean start) {
+        // Called with true when the ring screen opens and false when it closes,
+        // whoever closed it. Only a close by the user is reported to the band.
+        if (start || !findPhoneActive) {
+            return;
+        }
+        findPhoneActive = false;
+        LOG.info("Samsung Fit 3: phone found, telling the band");
+        sendMessage(Fit3FindDevice.CHANNEL, Fit3FindDevice.buildPhoneFound(), "find-phone-found");
     }
 
     @Override
@@ -2805,6 +2862,7 @@ public class SamsungDeviceSupport extends AbstractBTLESingleDeviceSupport {
         mainHandler.removeCallbacks(alarmRing);
         mainHandler.removeCallbacks(snoozeRing);
         fetchInProgress = false;
+        findPhoneActive = false;
         super.dispose();
     }
 

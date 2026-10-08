@@ -36,7 +36,7 @@ public final class SapProtocol {
 
     /** Channel ids. */
     public static final int CH_CONTROL      = 0x01;
-    public static final int CH_FIND_BAND    = 0x02;
+    public static final int CH_FIND         = 0x02;   // find the phone / ring the band
     public static final int CH_CALL         = 0x03;
     public static final int CH_WEATHER      = 0x05;
     public static final int CH_NOTIFICATION = 0x07;
