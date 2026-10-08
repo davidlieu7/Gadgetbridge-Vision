@@ -16,38 +16,35 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 package nodomain.freeyourgadget.gadgetbridge.activities.charts;
 
+import android.graphics.Color;
 import android.os.Bundle;
+import android.text.format.DateFormat;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.TextView;
 
 import androidx.annotation.Nullable;
+import androidx.core.content.ContextCompat;
 
-import com.github.mikephil.charting.animation.Easing;
 import com.github.mikephil.charting.charts.Chart;
-import com.github.mikephil.charting.charts.LineChart;
-import com.github.mikephil.charting.components.AxisBase;
-import com.github.mikephil.charting.components.LimitLine;
-import com.github.mikephil.charting.components.XAxis;
-import com.github.mikephil.charting.components.YAxis;
-import com.github.mikephil.charting.data.Entry;
-import com.github.mikephil.charting.data.LineData;
-import com.github.mikephil.charting.data.LineDataSet;
-import com.github.mikephil.charting.formatter.IAxisValueFormatter;
-import com.github.mikephil.charting.utils.ViewPortHandler;
 
-import java.text.SimpleDateFormat;
 import java.util.ArrayList;
-import java.util.Calendar;
-import java.util.GregorianCalendar;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.Date;
 import java.util.HashSet;
-import java.util.Set;
 import java.util.List;
+import java.util.Set;
 
 import nodomain.freeyourgadget.gadgetbridge.GBApplication;
 import nodomain.freeyourgadget.gadgetbridge.R;
+import nodomain.freeyourgadget.gadgetbridge.activities.charts.mpchart.ChartLegendView;
+import nodomain.freeyourgadget.gadgetbridge.activities.charts.mpchart.ChartSelection;
+import nodomain.freeyourgadget.gadgetbridge.activities.charts.mpchart.GbChartView;
+import nodomain.freeyourgadget.gadgetbridge.activities.charts.spec.ChartSeries;
+import nodomain.freeyourgadget.gadgetbridge.activities.charts.spec.ChartSpec;
+import nodomain.freeyourgadget.gadgetbridge.activities.charts.weight.WeightChartData;
 import nodomain.freeyourgadget.gadgetbridge.database.DBHandler;
 import nodomain.freeyourgadget.gadgetbridge.devices.DeviceCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.TimeSampleProvider;
@@ -61,14 +58,12 @@ import nodomain.freeyourgadget.gadgetbridge.util.DateTimeUtils;
 import nodomain.freeyourgadget.gadgetbridge.util.GBPrefs;
 
 public class WeightChartFragment extends AbstractChartFragment<WeightChartFragment.WeightChartsData> {
-    private int colorBackground;
-    private int colorSecondaryText;
-
     private int totalDays;
     private WeightUnit weightUnit = WeightUnit.KILOGRAM;
     private int weightTargetKg;
 
-    private LineChart chart;
+    private GbChartView chart;
+    private ChartLegendView legend;
     private TextView textTimeSpan;
     private TextView textWeightLatest;
     private static final String PREF_BODY_COMPOSITION_VALUES = "chart_weight_body_composition";
@@ -90,9 +85,6 @@ public class WeightChartFragment extends AbstractChartFragment<WeightChartFragme
     @Override
     protected void init() {
         GBPrefs prefs = GBApplication.getPrefs();
-
-        colorBackground = GBApplication.getBackgroundColor(requireContext());
-        colorSecondaryText = GBApplication.getSecondaryTextColor(requireContext());
 
         if (prefs.getBoolean("charts_range", true))
             totalDays = 30;
@@ -120,12 +112,12 @@ public class WeightChartFragment extends AbstractChartFragment<WeightChartFragme
         WeightSample latestSample = provider.getLatestSample();
         BodyCompositionCalculator.BodyComposition composition = BodyCompositionEstimates.composition(db.getDaoSession(), latestSample);
         Float bmi = BodyCompositionEstimates.bmi(db.getDaoSession(), latestSample);
-        return createChartsData(samples, latestSample, composition, bmi);
+        return new WeightChartsData(samples, latestSample, composition, bmi);
     }
 
     @Override
     protected void renderCharts() {
-        chart.animateX(ANIM_TIME, Easing.INSTANCE.getEaseInOutQuart());
+        chart.invalidate();
     }
 
     @Override
@@ -133,10 +125,7 @@ public class WeightChartFragment extends AbstractChartFragment<WeightChartFragme
 
     @Override
     protected void updateChartsnUIThread(WeightChartsData chartsData) {
-        chart.setData(null); // workaround for https://github.com/PhilJay/MPAndroidChart/issues/2317
-        chart.getXAxis().setValueFormatter(chartsData.getXValueFormatter());
-        chart.getXAxis().setAvoidFirstLastClippingEnabled(true);
-        chart.setData(chartsData.getData());
+        updateChart(chartsData.samples);
         textTimeSpan.setText(DateTimeUtils.formatDaysUntil(totalDays, getTSEnd()));
 
         WeightSample latestSample = chartsData.getLatestSample();
@@ -145,6 +134,43 @@ public class WeightChartFragment extends AbstractChartFragment<WeightChartFragme
 
         textWeightTarget.setText(formatWeight(weightFromKg(weightTargetKg)));
         updateBodyComposition(latestSample, chartsData.getComposition(), chartsData.getBmi());
+    }
+
+    private void updateChart(final List<? extends WeightSample> samples) {
+        final int n = samples.size();
+        final long[] seconds = new long[n];
+        final double[] weights = new double[n];
+        for (int i = 0; i < n; i++) {
+            seconds[i] = samples.get(i).getTimestamp() / 1000L;
+            weights[i] = weightFromKg(samples.get(i).getWeightKg());
+        }
+        final int color = ContextCompat.getColor(requireContext(), R.color.accent);
+        final String label = getString(R.string.menuitem_weight);
+        final ChartSpec spec = WeightChartData.spec(
+                getTSStart(), getTSEnd(), seconds, weights, weightFromKg(weightTargetKg), label, color, Color.GRAY
+        );
+        chart.setSelectionContent(x -> {
+            final long time = Math.round(x);
+            final String title = DateFormat.getDateFormat(requireContext()).format(new Date(time * 1000L));
+            for (int i = 0; i < n; i++) {
+                if (seconds[i] == time && weights[i] > 0) {
+                    final String text = formatWeight((float) weights[i]);
+                    return new ChartSelection(
+                            title,
+                            Collections.singletonList(new ChartSelection.Row(color, text)),
+                            title + ". " + label + " " + text + "."
+                    );
+                }
+            }
+            return new ChartSelection(title, Collections.emptyList(), title + ".");
+        });
+        chart.setSpec(spec);
+
+        final List<ChartSeries> legendSeries = new ArrayList<>(spec.getSeries());
+        if (!spec.getSeries().isEmpty() && !spec.getLimitLines().isEmpty()) {
+            legendSeries.add(ChartLegendView.lineItem(getString(R.string.target), Color.GRAY));
+        }
+        legend.setSeries(legendSeries.size() > 1 ? legendSeries : Collections.emptyList());
     }
 
     private void updateBodyComposition(@Nullable final WeightSample sample,
@@ -202,6 +228,7 @@ public class WeightChartFragment extends AbstractChartFragment<WeightChartFragme
         View rootView = inflater.inflate(R.layout.fragment_weightchart, container, false);
 
         chart = rootView.findViewById(R.id.weight_chart);
+        legend = rootView.findViewById(R.id.weight_chart_legend);
         textTimeSpan = rootView.findViewById(R.id.weight_time_span_text);
         textWeightLatest = rootView.findViewById(R.id.weight_latest_text);
         textWeightTarget = rootView.findViewById(R.id.weight_target_text);
@@ -213,61 +240,11 @@ public class WeightChartFragment extends AbstractChartFragment<WeightChartFragme
         textBmr = rootView.findViewById(R.id.weight_bmr_text);
         textImpedance = rootView.findViewById(R.id.weight_impedance_text);
 
-        configureBarLineChartDefaults(chart);
-        chart.setBackgroundColor(colorBackground);
-        chart.getDescription().setEnabled(false);
-        chart.getLegend().setEnabled(false);
-        chart.getAxisRight().setEnabled(false);
-        chart.setDoubleTapToZoomEnabled(false);
-
-        LimitLine targetLine = new LimitLine(weightFromKg(weightTargetKg), "");
-        targetLine.setTextColor(colorSecondaryText);
-
-        XAxis xAxis = chart.getXAxis();
-        xAxis.setTextColor(colorSecondaryText);
-        xAxis.setDrawLabelsEnabled(true);
-        xAxis.setDrawLimitLinesBehindDataEnabled(true);
-
-        YAxis yAxis = chart.getAxisLeft();
-        yAxis.setTextColor(colorSecondaryText);
-        yAxis.addLimitLine(targetLine);
-        yAxis.setDrawGridLinesEnabled(true);
+        chart.dismissSelectionOnTapOutside(rootView);
 
         refresh();
 
         return rootView;
-    }
-
-    private WeightChartsData createChartsData(List<? extends WeightSample> samples, WeightSample latestSample,
-                                              @Nullable BodyCompositionCalculator.BodyComposition composition,
-                                              @Nullable Float bmi) {
-        List<Entry> entries = new ArrayList<>();
-        TimestampTranslation tsTranslation = new TimestampTranslation();
-
-        for (WeightSample sample : samples) {
-            int tsSeconds = (int)(sample.getTimestamp() / 1000L);
-            float weight = weightFromKg(sample.getWeightKg());
-
-            entries.add(new Entry<>(tsTranslation.shorten(tsSeconds), weight, null, null));
-        }
-
-        LineDataSet dataSet = new LineDataSet(entries, getString(R.string.menuitem_weight));
-        dataSet.setLineWidth(2.2f);
-        dataSet.setMode(LineDataSet.Mode.HORIZONTAL_BEZIER);
-        dataSet.setCubicIntensity(0.1f);
-        dataSet.setCircleRadius(5);
-        dataSet.setDrawCircleHoleEnabled(false);
-        dataSet.setDrawValuesEnabled(true);
-        dataSet.setValueTextSize(10);
-        dataSet.setValueTextColor(colorSecondaryText);
-        dataSet.setValueFormatter(new DataSetValueFormatter() {
-            @Override
-            public String getFormattedValue(final float value, final Entry<?> entry, final int dataSetIndex, final ViewPortHandler viewPortHandler) {
-                return formatWeight(entry.getY());
-            }
-        });
-
-        return new WeightChartsData(new LineData(dataSet), tsTranslation, latestSample, composition, bmi);
     }
 
     private float weightFromKg(float weight) {
@@ -278,14 +255,15 @@ public class WeightChartFragment extends AbstractChartFragment<WeightChartFragme
         return WeightUnit.Companion.formatConvertedWeight(requireContext(), convertedWeight, weightUnit);
     }
 
-    protected static class WeightChartsData extends DefaultChartsData<LineData> {
+    protected static class WeightChartsData extends ChartsData {
+        private final List<? extends WeightSample> samples;
         private final WeightSample latestSample;
         private final BodyCompositionCalculator.BodyComposition composition;
         private final Float bmi;
 
-        public WeightChartsData(LineData lineData, TimestampTranslation tsTranslation, WeightSample latestSample,
+        public WeightChartsData(List<? extends WeightSample> samples, WeightSample latestSample,
                                 @Nullable BodyCompositionCalculator.BodyComposition composition, @Nullable Float bmi) {
-            super(lineData, new DateFormatter(tsTranslation));
+            this.samples = samples;
             this.latestSample = latestSample;
             this.composition = composition;
             this.bmi = bmi;
@@ -303,24 +281,6 @@ public class WeightChartFragment extends AbstractChartFragment<WeightChartFragme
         @Nullable
         private BodyCompositionCalculator.BodyComposition getComposition() {
             return composition;
-        }
-    }
-
-    private static class DateFormatter implements IAxisValueFormatter {
-        private TimestampTranslation translation;
-        private SimpleDateFormat format = new SimpleDateFormat("dd.MM.");
-        private Calendar calendar = GregorianCalendar.getInstance();
-
-        public DateFormatter(TimestampTranslation translation) {
-            this.translation = translation;
-        }
-
-        @Override
-        public String getFormattedValue(final float value, final AxisBase axis) {
-            calendar.clear();
-            calendar.setTimeInMillis(translation.toOriginalValue((int)value) * 1000L);
-
-            return format.format(calendar.getTime());
         }
     }
 
