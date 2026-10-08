@@ -40,8 +40,12 @@ import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.security.SecureRandom;
 import java.text.SimpleDateFormat;
 import java.time.LocalDate;
+import java.time.ZoneId;
+import java.time.format.DateTimeParseException;
+import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Collections;
@@ -107,6 +111,7 @@ import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3HealthRequestData;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3HealthSleepRecord;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3HealthSyncData;
+import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3HealthCycle;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3HealthUserProfile;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3HealthWearableMsg;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3HealthWorkout;
@@ -734,6 +739,7 @@ public class SamsungDeviceSupport extends AbstractBTLESingleDeviceSupport {
             if (!userProfileSent) {
                 userProfileSent = true;
                 sendUserProfile();
+                sendCycleData();
             }
             return;
         }
@@ -1680,6 +1686,161 @@ public class SamsungDeviceSupport extends AbstractBTLESingleDeviceSupport {
         GB.signalActivityDataFinish(device);
     }
 
+    // What the band holds of the cycle data we sent, kept across connections
+    // so it can be replaced: record uuids as "type:hex", the profile's uuid,
+    // the last factor and a signature of the inputs.
+    private static final String PREF_CYCLE_SENT_UUIDS = "samsung_fit3_cycle_sent_uuids";
+    private static final String PREF_CYCLE_PROFILE_UUID = "samsung_fit3_cycle_profile_uuid";
+    private static final String PREF_CYCLE_SENT_FACTOR = "samsung_fit3_cycle_sent_factor";
+    private static final String PREF_CYCLE_SENT_SIGNATURE = "samsung_fit3_cycle_sent_signature";
+
+    /**
+     * Push cycle-tracking data (see {@link Fit3HealthCycle}): period days,
+     * predictions and the cycle profile, worked out from the preferences.
+     * Whatever was sent before is deleted first, by uuid. Nothing is sent when
+     * the inputs and the current cycle haven't changed since the last push.
+     * Turning the feature off (or a non-female profile) deletes it all.
+     *
+     * <p>Only once the health channel is up - before that the connect-time
+     * push will pick the change up.
+     */
+    private void sendCycleData() {
+        if (!userProfileSent) {
+            return;
+        }
+        SharedPreferences prefs = GBApplication.getDeviceSpecificSharedPrefs(getDevice().getAddress());
+        List<Fit3HealthCycle.Deletion> previous = parseCycleUuids(prefs.getString(PREF_CYCLE_SENT_UUIDS, ""));
+        String profileUuid = prefs.getString(PREF_CYCLE_PROFILE_UUID, null);
+        boolean female = new ActivityUser().getGender() == ActivityUser.GENDER_FEMALE;
+        Fit3HealthCycle.Push push = new Fit3HealthCycle.Push();
+
+        if (!prefs.getBoolean(Fit3HealthCycle.PREF_ENABLE, false) || !female) {
+            if (previous.isEmpty() && profileUuid == null) {
+                return;
+            }
+            LOG.info("Samsung Fit 3: cycle tracking off (female={}), removing it from the band", female);
+            push.deletions.addAll(previous);
+            if (profileUuid != null) {
+                push.deletions.add(new Fit3HealthCycle.Deletion(
+                        GB.hexStringToByteArray(profileUuid), Fit3HealthCycle.TYPE_PROFILE));
+            }
+            sendCyclePush(push);
+            prefs.edit().remove(PREF_CYCLE_SENT_UUIDS).remove(PREF_CYCLE_PROFILE_UUID)
+                    .remove(PREF_CYCLE_SENT_FACTOR).remove(PREF_CYCLE_SENT_SIGNATURE).apply();
+            return;
+        }
+
+        LocalDate lastStart;
+        try {
+            lastStart = LocalDate.parse(prefs.getString(Fit3HealthCycle.PREF_LAST_START, ""));
+        } catch (DateTimeParseException e) {
+            LOG.warn("Samsung Fit 3: no last period start set, not sending cycle data");
+            return;
+        }
+        int periodDays = prefs.getInt(Fit3HealthCycle.PREF_PERIOD_DAYS, Fit3HealthCycle.DEFAULT_PERIOD_DAYS);
+        int cycleDays = prefs.getInt(Fit3HealthCycle.PREF_CYCLE_DAYS, Fit3HealthCycle.DEFAULT_CYCLE_DAYS);
+        Integer factor = parseListIndex(prefs, Fit3HealthCycle.PREF_FACTOR);
+        if (factor == null) {
+            factor = Fit3HealthCycle.FACTOR_NONE;
+        }
+        if (periodDays < 1 || cycleDays <= periodDays) {
+            LOG.warn("Samsung Fit 3: implausible cycle ({} / {} days), not sending", periodDays, cycleDays);
+            return;
+        }
+        LocalDate today = LocalDate.now();
+        // The date preference holds a placeholder until the user picks a date.
+        if (lastStart.isAfter(today) || lastStart.isBefore(today.minusYears(1))) {
+            LOG.warn("Samsung Fit 3: last period start {} is not within the past year, not sending", lastStart);
+            return;
+        }
+        // The current cycle is part of the signature so predictions roll forward.
+        long cycleIndex = Math.max(0, ChronoUnit.DAYS.between(lastStart, today) / cycleDays);
+        String signature = lastStart + "/" + periodDays + "/" + cycleDays + "/" + factor + "/" + cycleIndex;
+        if (signature.equals(prefs.getString(PREF_CYCLE_SENT_SIGNATURE, null))) {
+            LOG.debug("Samsung Fit 3: cycle data unchanged ({}), not re-sending", signature);
+            return;
+        }
+
+        push.deletions.addAll(previous);
+        if (factor != prefs.getInt(PREF_CYCLE_SENT_FACTOR, Fit3HealthCycle.FACTOR_NONE)) {
+            push.factorUuid = randomCycleUuid();
+            push.factor = factor;
+        }
+        List<Fit3HealthCycle.Deletion> sent = new ArrayList<>();
+        for (int d = 0; d < periodDays; d++) {
+            LocalDate day = lastStart.plusDays(d);
+            if (day.isAfter(today)) {
+                break;
+            }
+            byte[] uuid = randomCycleUuid();
+            push.flows.add(new Fit3HealthCycle.Flow(uuid, day));
+            sent.add(new Fit3HealthCycle.Deletion(uuid, Fit3HealthCycle.TYPE_FLOW));
+        }
+        if (Fit3HealthCycle.factorAllowsPredictions(factor)) {
+            for (Fit3HealthCycle.Prediction p : Fit3HealthCycle.predict(lastStart, periodDays, cycleDays,
+                    today, SamsungDeviceSupport::randomCycleUuid)) {
+                push.predictions.add(p);
+                sent.add(new Fit3HealthCycle.Deletion(p.uuid, Fit3HealthCycle.TYPE_PREDICTION));
+            }
+        }
+        if (profileUuid == null) {
+            profileUuid = GB.hexdump(randomCycleUuid()).toLowerCase(Locale.ROOT);
+        }
+        push.profileUuid = GB.hexStringToByteArray(profileUuid);
+        push.lastPeriodStart = lastStart;
+        push.periodDays = periodDays;
+        push.cycleDays = cycleDays;
+
+        LOG.info("Samsung Fit 3: sending cycle data {} - {} deletion(s), factor {}, {} flow day(s), {} prediction(s)",
+                signature, push.deletions.size(), push.factorUuid != null ? factor : "unchanged",
+                push.flows.size(), push.predictions.size());
+        sendCyclePush(push);
+        prefs.edit()
+                .putString(PREF_CYCLE_SENT_UUIDS, joinCycleUuids(sent))
+                .putString(PREF_CYCLE_PROFILE_UUID, profileUuid)
+                .putInt(PREF_CYCLE_SENT_FACTOR, factor)
+                .putString(PREF_CYCLE_SENT_SIGNATURE, signature)
+                .apply();
+    }
+
+    private void sendCyclePush(Fit3HealthCycle.Push push) {
+        int now = (int) (System.currentTimeMillis() / 1000L) - Fit3HealthPedometerRecord.EPOCH_1990_OFFSET_SECONDS;
+        sendMessage(Fit3HealthCycle.CHANNEL,
+                Fit3HealthCycle.buildRequest(healthRequestSequence++, now, ZoneId.systemDefault(), push),
+                "health-cycle");
+    }
+
+    private static byte[] randomCycleUuid() {
+        byte[] uuid = new byte[Fit3HealthCycle.UUID_LENGTH];
+        new SecureRandom().nextBytes(uuid);
+        return uuid;
+    }
+
+    private static String joinCycleUuids(List<Fit3HealthCycle.Deletion> records) {
+        List<String> parts = new ArrayList<>(records.size());
+        for (Fit3HealthCycle.Deletion d : records) {
+            parts.add(d.type + ":" + GB.hexdump(d.uuid).toLowerCase(Locale.ROOT));
+        }
+        return TextUtils.join(",", parts);
+    }
+
+    private static List<Fit3HealthCycle.Deletion> parseCycleUuids(String value) {
+        List<Fit3HealthCycle.Deletion> out = new ArrayList<>();
+        for (String part : value.split(",")) {
+            String[] typeAndUuid = part.trim().split(":");
+            if (typeAndUuid.length != 2 || typeAndUuid[1].length() != 2 * Fit3HealthCycle.UUID_LENGTH) {
+                continue;
+            }
+            try {
+                out.add(new Fit3HealthCycle.Deletion(GB.hexStringToByteArray(typeAndUuid[1]),
+                        Integer.parseInt(typeAndUuid[0])));
+            } catch (IllegalArgumentException e) {
+                LOG.warn("Samsung Fit 3: ignoring bad stored cycle record '{}'", part);
+            }
+        }
+        return out;
+    }
+
     /**
      * Push the user's profile - gender, birth date, height, weight, unit
      * preferences - to the band (see {@link Fit3HealthUserProfile}). Sent once
@@ -1962,6 +2123,16 @@ public class SamsungDeviceSupport extends AbstractBTLESingleDeviceSupport {
                 // all of them in a single message - so any of them re-sends the
                 // whole profile.
                 sendUserProfile();
+                if (ActivityUser.PREF_USER_GENDER.equals(config)) {
+                    sendCycleData();  // cycle tracking needs a female profile
+                }
+                break;
+            case Fit3HealthCycle.PREF_ENABLE:
+            case Fit3HealthCycle.PREF_LAST_START:
+            case Fit3HealthCycle.PREF_PERIOD_DAYS:
+            case Fit3HealthCycle.PREF_CYCLE_DAYS:
+            case Fit3HealthCycle.PREF_FACTOR:
+                sendCycleData();
                 break;
             case "samsung_fit3_tiles_sortable":
             case "samsung_fit3_quick_panel_sortable":

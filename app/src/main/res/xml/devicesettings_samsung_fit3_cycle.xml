@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.preference.PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <!-- Device-specific keys: SamsungFit3SettingsCustomizer registers a change
+         handler for each. Phone-side only - the band never reports these. -->
+    <PreferenceCategory
+        android:key="pref_header_samsung_fit3_cycle"
+        android:title="@string/pref_samsung_fit3_cycle_title"
+        app:iconSpaceReserved="false">
+
+        <SwitchPreferenceCompat
+            android:defaultValue="false"
+            android:icon="@drawable/ic_calendar_month"
+            android:key="samsung_fit3_cycle_enable"
+            android:layout="@layout/preference_checkbox"
+            android:summary="@string/pref_samsung_fit3_cycle_enable_summary"
+            android:title="@string/pref_samsung_fit3_cycle_enable_title" />
+
+        <nodomain.freeyourgadget.gadgetbridge.util.XDatePreference
+            android:dependency="samsung_fit3_cycle_enable"
+            android:key="samsung_fit3_cycle_last_start"
+            android:title="@string/pref_samsung_fit3_cycle_last_start_title"
+            app:iconSpaceReserved="true" />
+
+        <SeekBarPreference
+            android:defaultValue="5"
+            android:dependency="samsung_fit3_cycle_enable"
+            android:key="samsung_fit3_cycle_period_days"
+            android:max="10"
+            android:title="@string/pref_samsung_fit3_cycle_period_days_title"
+            app:iconSpaceReserved="true"
+            app:min="2"
+            app:showSeekBarValue="true" />
+
+        <SeekBarPreference
+            android:defaultValue="28"
+            android:dependency="samsung_fit3_cycle_enable"
+            android:key="samsung_fit3_cycle_days"
+            android:max="45"
+            android:title="@string/pref_samsung_fit3_cycle_days_title"
+            app:iconSpaceReserved="true"
+            app:min="20"
+            app:showSeekBarValue="true" />
+
+        <ListPreference
+            android:defaultValue="0"
+            android:dependency="samsung_fit3_cycle_enable"
+            android:entries="@array/samsung_fit3_cycle_factor"
+            android:entryValues="@array/samsung_fit3_cycle_factor_values"
+            android:key="samsung_fit3_cycle_factor"
+            android:title="@string/pref_samsung_fit3_cycle_factor_title"
+            app:iconSpaceReserved="true"
+            app:useSimpleSummaryProvider="true" />
+
+    </PreferenceCategory>
+</androidx.preference.PreferenceScreen>

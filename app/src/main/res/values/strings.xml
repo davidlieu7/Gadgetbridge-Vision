@@ -6063,4 +6063,14 @@
     <string name="pref_samsung_fit3_send_sos_title">Send SOS</string>
     <string name="pref_samsung_fit3_send_sos_summary">Press the button repeatedly to raise an SOS</string>
     <string name="pref_samsung_fit3_sos_countdown_title">Count down before sending</string>
+    <string name="pref_samsung_fit3_cycle_title">Cycle tracking</string>
+    <string name="pref_samsung_fit3_cycle_enable_title">Cycle tracking (experimental)</string>
+    <string name="pref_samsung_fit3_cycle_enable_summary">Show the period and predicted fertile window on the band. Needs the user\'s gender set to female. Predictions are a simple calendar estimate - do not rely on them for contraception.</string>
+    <string name="pref_samsung_fit3_cycle_last_start_title">Last period started</string>
+    <string name="pref_samsung_fit3_cycle_period_days_title">Period length, days</string>
+    <string name="pref_samsung_fit3_cycle_days_title">Cycle length, days</string>
+    <string name="pref_samsung_fit3_cycle_factor_title">Factor</string>
+    <string name="samsung_fit3_cycle_factor_pregnancy">Pregnancy</string>
+    <string name="samsung_fit3_cycle_factor_breastfeeding">Breastfeeding</string>
+    <string name="samsung_fit3_cycle_factor_menopause">Menopause</string>
 </resources>

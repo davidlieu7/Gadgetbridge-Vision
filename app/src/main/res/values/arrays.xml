@@ -3296,6 +3296,20 @@
         <item>2</item>
     </string-array>
 
+    <!-- Values are the band's own factor codes; there is no 2. -->
+    <string-array name="samsung_fit3_cycle_factor">
+        <item>@string/none</item>
+        <item>@string/samsung_fit3_cycle_factor_pregnancy</item>
+        <item>@string/samsung_fit3_cycle_factor_breastfeeding</item>
+        <item>@string/samsung_fit3_cycle_factor_menopause</item>
+    </string-array>
+    <string-array name="samsung_fit3_cycle_factor_values" translatable="false">
+        <item>0</item>
+        <item>1</item>
+        <item>4</item>
+        <item>3</item>
+    </string-array>
+
     <string-array name="samsung_fit3_status_indicator">
         <item>@string/samsung_fit3_status_indicator_always</item>
         <item>@string/samsung_fit3_status_indicator_hide</item>

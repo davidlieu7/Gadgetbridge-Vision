@@ -198,6 +198,7 @@ public class SamsungFit3Coordinator extends AbstractBLEDeviceCoordinator {
                 R.xml.devicesettings_sync_calendar,
                 R.xml.devicesettings_samsung_fit3_sos,
                 R.xml.devicesettings_sos_contact,
+                R.xml.devicesettings_samsung_fit3_cycle,
         };
     }
 
