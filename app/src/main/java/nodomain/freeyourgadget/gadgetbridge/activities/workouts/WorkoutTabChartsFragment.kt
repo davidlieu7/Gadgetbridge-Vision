@@ -3,7 +3,6 @@ package nodomain.freeyourgadget.gadgetbridge.activities.workouts
 import android.content.Intent
 import android.os.Bundle
 import android.view.LayoutInflater
-import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
 import android.widget.FrameLayout
@@ -11,20 +10,13 @@ import android.widget.LinearLayout
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.distinctUntilChanged
-import com.github.mikephil.charting.charts.BarLineChartBase
-import com.github.mikephil.charting.charts.LineChart
-import com.github.mikephil.charting.charts.ScatterChart
-import com.github.mikephil.charting.components.LimitLine
-import com.github.mikephil.charting.components.XAxis
-import com.github.mikephil.charting.data.LineData
-import com.github.mikephil.charting.data.ScatterData
-import com.github.mikephil.charting.listener.OnChartGestureListener
 import nodomain.freeyourgadget.gadgetbridge.GBApplication
 import nodomain.freeyourgadget.gadgetbridge.R
 import nodomain.freeyourgadget.gadgetbridge.activities.ActivitySummariesChartFragment
-import nodomain.freeyourgadget.gadgetbridge.activities.charts.DurationXLabelFormatter
 import nodomain.freeyourgadget.gadgetbridge.activities.charts.HeartRateZoneChartUtils
+import nodomain.freeyourgadget.gadgetbridge.activities.charts.mpchart.GbChartView
 import nodomain.freeyourgadget.gadgetbridge.activities.workouts.charts.ChartDataRepository
+import nodomain.freeyourgadget.gadgetbridge.activities.workouts.charts.WorkoutChartSpecs
 import nodomain.freeyourgadget.gadgetbridge.activities.workouts.charts.WorkoutChartsActivity
 import nodomain.freeyourgadget.gadgetbridge.activities.workouts.entries.ActivitySummaryEntry
 import nodomain.freeyourgadget.gadgetbridge.activities.workouts.entries.ActivitySummaryGroup
@@ -34,7 +26,6 @@ import nodomain.freeyourgadget.gadgetbridge.entities.Device
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice
 import nodomain.freeyourgadget.gadgetbridge.model.ActivityKind
 import nodomain.freeyourgadget.gadgetbridge.model.ActivitySummaryEntries
-import nodomain.freeyourgadget.gadgetbridge.model.heartratezones.HeartRateZonesResolver
 import nodomain.freeyourgadget.gadgetbridge.model.workout.Workout
 import nodomain.freeyourgadget.gadgetbridge.model.workout.WorkoutChart
 import nodomain.freeyourgadget.gadgetbridge.model.workout.WorkoutViewModel
@@ -176,75 +167,28 @@ class WorkoutTabChartsFragment : Fragment(), WorkoutTabScreenshotProvider {
             }
         }
 
-        val chartTextColor = GBApplication.getSecondaryTextColor(context)
-        val lineChart: BarLineChartBase<*> = when (chart.chartData) {
-            is ScatterData -> ScatterChart(requireContext())
-            else -> LineChart(requireContext())
-        }.apply {
+        val lineChart = GbChartView(requireContext()).apply {
             layoutParams = FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.MATCH_PARENT,
                 FrameLayout.LayoutParams.MATCH_PARENT
             )
-            legend.textColor = GBApplication.getTextColor(context)
-            isScaleXEnabled = false
-            isScaleYEnabled = false
-            isHighlightPerDragEnabled = false
-            isHighlightPerTapEnabled = false
-            isDragEnabled = false
         }
-        lineChart.xAxis.apply {
-            isDrawLabelsEnabled = true
-            isDrawGridLinesEnabled = false
-            isDrawLimitLinesBehindDataEnabled = true
-            isEnabled = true
-            textColor = chartTextColor
-            position = XAxis.XAxisPosition.BOTTOM
-            valueFormatter = DurationXLabelFormatter()
-        }
-        lineChart.axisLeft.apply {
-            isDrawGridLinesEnabled = false
-            isDrawTopYLabelEntryEnabled = true
-            textColor = chartTextColor
-            isEnabled = true
-            chart.chartYLabelFormatter?.let { valueFormatter = it }
-        }
-        lineChart.axisRight.apply {
-            isEnabled = false
-        }
-        chart.zoneThresholds?.let { zones ->
-            lineChart.axisLeft.isDrawLimitLinesBehindDataEnabled = true
-            for ((zoneIdx, hr) in listOf(2 to zones.zone2, 3 to zones.zone3, 4 to zones.zone4, 5 to zones.zone5)) {
-                if (hr <= 0) continue
-                lineChart.axisLeft.addLimitLine(LimitLine(hr.toFloat()).apply {
-                    lineColor = HeartRateZonesResolver.colorForZone(requireContext(), zoneIdx)
-                    lineWidth = 0.7f
-                    enableDashedLine(6f, 6f, 0f)
-                })
-            }
-        }
-        chart.lineChart(lineChart);
-        when {
-            lineChart is LineChart && chart.chartData is LineData -> {
-                lineChart.data = chart.chartData
-            }
-            lineChart is ScatterChart && chart.chartData is ScatterData -> {
-                lineChart.data = chart.chartData
-            }
-        }
-        lineChart.description.isEnabled = false;
-        lineChart.onChartGestureListener = object : OnChartGestureListener {
-            override fun onChartSingleTapped(me: MotionEvent) {
-                ChartDataRepository.chartData = workout.charts
-                val intent = Intent(requireContext(), WorkoutChartsActivity::class.java).apply {
-                    putExtra(WorkoutChartsActivity.INIT_CHART_ID, chart.id)
-                    workoutLabel()?.let {
-                        putExtra(WorkoutChartsActivity.EXTRA_TITLE, "${getString(R.string.charts)} · $it")
-                    }
+        val charts = listOf(chart)
+        lineChart.selectionContent = WorkoutChartSpecs.selection(charts, lineChart)
+        lineChart.setSpec(WorkoutChartSpecs.spec(requireContext(), charts, chart.zoneThresholds != null, lineChart))
+        chart.lineChart(lineChart)
+        lineChart.notifyDataSetChanged()
+        lineChart.dismissSelectionOnTapOutside(binding.root)
+        lineChart.setOnClickListener {
+            ChartDataRepository.chartData = workout.charts
+            val intent = Intent(requireContext(), WorkoutChartsActivity::class.java).apply {
+                putExtra(WorkoutChartsActivity.INIT_CHART_ID, chart.id)
+                workoutLabel()?.let {
+                    putExtra(WorkoutChartsActivity.EXTRA_TITLE, "${getString(R.string.charts)} · $it")
                 }
-                startActivity(intent)
             }
+            startActivity(intent)
         }
-        lineChart.invalidate()
         chartsFragmentHolder.addView(lineChart)
 
         chartsLayout.addView(chartsFragmentHolder)
