@@ -51,6 +51,15 @@ import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit
  */
 public class Fit3MessagesTest {
 
+    private static byte[] hex(String s) {
+        s = s.replace(" ", "");
+        byte[] b = new byte[s.length() / 2];
+        for (int i = 0; i < b.length; i++) {
+            b[i] = (byte) Integer.parseInt(s.substring(i * 2, i * 2 + 2), 16);
+        }
+        return b;
+    }
+
     // ---- Fit3Settings (CH_SETTINGS, one param per message, no count byte) ----
 
     @Test
@@ -80,6 +89,31 @@ public class Fit3MessagesTest {
     public void screenTimeoutIsALittleEndianShort() {
         assertArrayEquals(new byte[]{0x07, 0x0e, 0x04, 0x00}, Fit3Settings.screenTimeout(4));
         assertArrayEquals(new byte[]{0x07, 0x0e, 0x1e, 0x00}, Fit3Settings.screenTimeout(30));
+    }
+
+    @Test
+    public void advancedSettingsAreLittleEndianShorts() {
+        // Captured in a settings session: every value answered with a bare 48.
+        assertArrayEquals(new byte[]{0x08, 0x10, 0x02, 0x00}, Fit3Settings.disconnectionAlert(2));
+        assertArrayEquals(new byte[]{0x08, 0x11, 0x00, 0x00}, Fit3Settings.doublePress(0));
+        assertArrayEquals(new byte[]{0x08, 0x11, 0x0c, 0x00}, Fit3Settings.doublePress(12));
+        assertArrayEquals(new byte[]{0x08, 0x12, 0x01, 0x00}, Fit3Settings.statusIndicator(1));
+        assertArrayEquals(new byte[]{0x08, 0x12, 0x00, 0x00}, Fit3Settings.statusIndicator(0));
+    }
+
+    @Test
+    public void advancedSettingsClampToTheBandsTables() {
+        assertArrayEquals(new byte[]{0x08, 0x11, 0x0d, 0x00}, Fit3Settings.doublePress(14));
+        assertArrayEquals(new byte[]{0x08, 0x10, 0x00, 0x00}, Fit3Settings.disconnectionAlert(-1));
+        assertArrayEquals(new byte[]{0x08, 0x12, 0x01, 0x00}, Fit3Settings.statusIndicator(5));
+    }
+
+    @Test
+    public void wristAndButtonSideAreOneByteBools() {
+        assertArrayEquals(new byte[]{0x0a, 0x14, 0x01}, Fit3Settings.wrist(true));
+        assertArrayEquals(new byte[]{0x0a, 0x14, 0x00}, Fit3Settings.wrist(false));
+        assertArrayEquals(new byte[]{0x0a, 0x15, 0x01}, Fit3Settings.buttonSide(true));
+        assertArrayEquals(new byte[]{0x0a, 0x15, 0x00}, Fit3Settings.buttonSide(false));
     }
 
     // ---- Fit3InitSetting (CH_CONTROL / MSG_ID 3) ----
@@ -143,6 +177,23 @@ public class Fit3MessagesTest {
         assertEquals(Integer.valueOf(30), settings.get(Fit3FullSettings.PARAM_SCREEN_TIMEOUT));
         assertNull("absent params stay absent", settings.get(Fit3FullSettings.PARAM_ALWAYS_ON_DISPLAY));
         assertNull(settings.getBoolean(Fit3FullSettings.PARAM_ALWAYS_ON_DISPLAY));
+    }
+
+    @Test
+    public void fullSettingsDecodesTheCapturedReply() {
+        // A live band's whole reply to 20: 22 params, ids 0..21.
+        byte[] body = hex("60 16 0000 0100 0201 0301 0401 050100 060100 0703"
+                + "0801 0900 0a01 0b00 0c00 0d01 0e0700 0f1400 100000"
+                + "110100 120000 1301 1400 1501");
+        Fit3FullSettings settings = Fit3FullSettings.parse(body);
+        assertNotNull(settings);
+        assertEquals(22, settings.size());
+        assertEquals(Integer.valueOf(7), settings.get(Fit3FullSettings.PARAM_SCREEN_TIMEOUT));
+        assertEquals(Integer.valueOf(0), settings.get(Fit3FullSettings.PARAM_DISCONNECTION_ALERT));
+        assertEquals(Integer.valueOf(1), settings.get(Fit3FullSettings.PARAM_DOUBLE_PRESS));
+        assertEquals(Integer.valueOf(0), settings.get(Fit3FullSettings.PARAM_STATUS_INDICATOR));
+        assertEquals(Boolean.FALSE, settings.getBoolean(Fit3FullSettings.PARAM_WRIST_ORIENTATION));
+        assertEquals(Boolean.TRUE, settings.getBoolean(Fit3FullSettings.PARAM_BUTTON_POSITION));
     }
 
     @Test
@@ -378,9 +429,17 @@ public class Fit3MessagesTest {
 
     @Test
     public void batteryParseRejectsOtherMessages() {
-        assertNull("a request, not a reply", Fit3BatteryInfo.parse(new byte[]{0x02}));
         assertNull("another MSG_ID", Fit3BatteryInfo.parse(new byte[]{0x43, 0x05, 0x29}));
         assertNull("variable format", Fit3BatteryInfo.parse(new byte[]{(byte) 0xc2, 0x01, 0x05, 0x29}));
+    }
+
+    @Test
+    public void unsolicitedBatteryPushIsARequestWithTheReplyShape() {
+        // Captured push, header 0x02 (request): not charging, 96 %.
+        Fit3BatteryInfo info = Fit3BatteryInfo.parse(new byte[]{0x02, 0x06, 0x00, 0x05, 0x60});
+        assertNotNull(info);
+        assertEquals(96, info.level);
+        assertFalse(info.charging);
     }
 
     @Test

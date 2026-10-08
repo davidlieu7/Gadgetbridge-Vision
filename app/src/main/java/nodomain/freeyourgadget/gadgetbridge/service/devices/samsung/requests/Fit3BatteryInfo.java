@@ -36,7 +36,9 @@ import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.SapProtocol;
  * </pre>
  *
  * The response body is a fixed-format flat list of {@code [param_id:1][value:1]}
- * pairs. Both battery params are 1 byte here; do NOT borrow widths from the
+ * pairs. The band also pushes the same body unasked whenever its battery
+ * changes, as a <i>request</i> - {@code 02 06 00 05 60} - so {@link #parse}
+ * takes either type. Both battery params are 1 byte here; do NOT borrow widths from the
  * settings table (there param 0x05 is 2 bytes) — param ids are keyed on
  * (MSG_ID, param_id), not global.
  */
@@ -74,11 +76,14 @@ public final class Fit3BatteryInfo {
         this.charging = charging;
     }
 
-    /** @return decoded info, or {@code null} if this body is not a BATTERY_INFO reply. */
+    /**
+     * @return decoded info, or {@code null} if this body is not a BATTERY_INFO
+     *     reply or unsolicited push.
+     */
     public static Fit3BatteryInfo parse(byte[] body) {
         SapPayloadParser p = new SapPayloadParser(body);
-        if (p.msgId != MSG_ID_BATTERY || p.variable || !p.response) {
-            return null; // not the fixed BATTERY_INFO reply we expect
+        if (p.msgId != MSG_ID_BATTERY || p.variable) {
+            return null; // not the fixed BATTERY_INFO body we expect
         }
 
         int level = -1;

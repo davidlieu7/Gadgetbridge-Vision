@@ -3239,6 +3239,61 @@
         <item>30</item>
     </string-array>
 
+    <!-- The band's double-press table for a Samsung phone, which is what the
+         HELLO announces: 12 is the camera remote, 13 the calculator. -->
+    <string-array name="samsung_fit3_double_press">
+        <item>@string/samsung_fit3_double_press_recent_apps</item>
+        <item>@string/menuitem_workout</item>
+        <item>@string/pref_header_health</item>
+        <item>@string/prefs_media_controls</item>
+        <item>@string/menuitem_findphone</item>
+        <item>@string/menuitem_weather</item>
+        <item>@string/pref_header_calendar</item>
+        <item>@string/menuitem_settings</item>
+        <item>@string/menuitem_timer</item>
+        <item>@string/menuitem_alarm</item>
+        <item>@string/menuitem_stopwatch</item>
+        <item>@string/menuitem_worldclock</item>
+        <item>@string/pref_camera_remote_title</item>
+        <item>@string/menuitem_calculator</item>
+    </string-array>
+    <string-array name="samsung_fit3_double_press_values" translatable="false">
+        <item>0</item>
+        <item>1</item>
+        <item>2</item>
+        <item>3</item>
+        <item>4</item>
+        <item>5</item>
+        <item>6</item>
+        <item>7</item>
+        <item>8</item>
+        <item>9</item>
+        <item>10</item>
+        <item>11</item>
+        <item>12</item>
+        <item>13</item>
+    </string-array>
+
+    <string-array name="samsung_fit3_disconnection_alert">
+        <item>@string/none</item>
+        <item>@string/samsung_fit3_disconnection_alert_vibrate</item>
+        <item>@string/samsung_fit3_disconnection_alert_screen</item>
+    </string-array>
+    <string-array name="samsung_fit3_disconnection_alert_values" translatable="false">
+        <item>0</item>
+        <item>1</item>
+        <item>2</item>
+    </string-array>
+
+    <string-array name="samsung_fit3_status_indicator">
+        <item>@string/samsung_fit3_status_indicator_always</item>
+        <item>@string/samsung_fit3_status_indicator_hide</item>
+    </string-array>
+    <string-array name="samsung_fit3_status_indicator_values" translatable="false">
+        <item>0</item>
+        <item>1</item>
+    </string-array>
+
     <string-array name="screen_timeout">
         <item>@string/seconds_5</item>
         <item>@string/seconds_6</item>

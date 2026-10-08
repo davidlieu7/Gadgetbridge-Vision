@@ -51,4 +51,34 @@
         app:useSimpleSummaryProvider="true"
         android:title="@string/prefs_screen_timeout" />
 
+    <!-- Device-specific keys from here on: SamsungFit3SettingsCustomizer
+         registers a change handler for each. Values are the band's own list
+         indices. -->
+    <ListPreference
+        android:defaultValue="1"
+        android:entries="@array/samsung_fit3_double_press"
+        android:entryValues="@array/samsung_fit3_double_press_values"
+        android:icon="@drawable/ic_touch_double"
+        android:key="samsung_fit3_double_press"
+        app:useSimpleSummaryProvider="true"
+        android:title="@string/pref_samsung_fit3_double_press_title" />
+
+    <ListPreference
+        android:defaultValue="0"
+        android:entries="@array/samsung_fit3_disconnection_alert"
+        android:entryValues="@array/samsung_fit3_disconnection_alert_values"
+        android:icon="@drawable/ic_bluetooth_disabled"
+        android:key="samsung_fit3_disconnection_alert"
+        app:useSimpleSummaryProvider="true"
+        android:title="@string/pref_samsung_fit3_disconnection_alert_title" />
+
+    <ListPreference
+        android:defaultValue="0"
+        android:entries="@array/samsung_fit3_status_indicator"
+        android:entryValues="@array/samsung_fit3_status_indicator_values"
+        android:icon="@drawable/ic_notifications"
+        android:key="samsung_fit3_status_indicator"
+        app:useSimpleSummaryProvider="true"
+        android:title="@string/pref_samsung_fit3_status_indicator_title" />
+
 </androidx.preference.PreferenceScreen>

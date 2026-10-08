@@ -34,9 +34,9 @@ import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.SapProtocol;
  * bool/level or 2 bytes little-endian, per param - this differs by param, not
  * by a MSG-wide rule, so each builder below encodes the width its param needs.
  *
- * <p>This class covers the single-param writes that map onto a preference key
- * Gadgetbridge already knows (see the key constants below); add more as they
- * are wired into {@code onSendConfiguration}. Every builder names its MSG_ID
+ * <p>This class covers the single-param writes that have a preference (see the
+ * key constants below); add more as they are wired into
+ * {@code onSendConfiguration}. Every builder names its MSG_ID
  * and param id explicitly so the mapping stays checkable.
  *
  * <p>Every write here is confirmed against a live band: the band acks each one
@@ -67,6 +67,24 @@ public final class Fit3Settings {
     public static final String PREF_ALWAYS_ON_DISPLAY = DeviceSettingsPreferenceConst.PREF_ALWAYS_ON_DISPLAY;
     public static final String PREF_LIFTWRIST_NOSHED = DeviceSettingsPreferenceConst.PREF_LIFTWRIST_NOSHED;
     public static final String PREF_SCREEN_TIMEOUT = DeviceSettingsPreferenceConst.PREF_SCREEN_TIMEOUT;
+    public static final String PREF_WEARLOCATION = DeviceSettingsPreferenceConst.PREF_WEARLOCATION;
+    public static final String PREF_WEARDIRECTION = DeviceSettingsPreferenceConst.PREF_WEARDIRECTION;
+
+    /**
+     * Device-specific keys, for settings no generic preference fits. These
+     * only reach {@code onSendConfiguration} because
+     * {@code SamsungFit3SettingsCustomizer} registers a handler for each.
+     * Their values are the band's list indices, as strings.
+     */
+    public static final String PREF_DOUBLE_PRESS = "samsung_fit3_double_press";
+    public static final String PREF_DISCONNECTION_ALERT = "samsung_fit3_disconnection_alert";
+    public static final String PREF_STATUS_INDICATOR = "samsung_fit3_status_indicator";
+
+    /** Values of the generic wear-location and wear-direction lists. */
+    public static final String WEARLOCATION_RIGHT = "right";
+    public static final String WEARLOCATION_LEFT = "left";
+    public static final String WEARDIRECTION_BUTTONS_RIGHT = "buttons_on_right";
+    public static final String WEARDIRECTION_BUTTONS_LEFT = "buttons_on_left";
 
     /**
      * The two values of {@code @array/vibration_intensity_values}. The band's
@@ -190,5 +208,87 @@ public final class Fit3Settings {
                 .raw(PARAM_SCREEN_TIMEOUT)
                 .rawLe16(seconds)
                 .build();
+    }
+
+    // ---- Advanced (MSG_ID 8, one param per message, no count byte) ----
+
+    private static final int MSG_ID_ADVANCED = 8;
+    private static final int PARAM_DISCONNECTION_ALERT = 16;  // short: list index
+    private static final int PARAM_DOUBLE_PRESS = 17;         // short: list index
+    private static final int PARAM_STATUS_INDICATOR = 18;     // short: list index
+
+    /** Disconnection alert values: none, vibrate, full screen + vibrate. */
+    public static final int DISCONNECTION_ALERT_MAX = 2;
+    /**
+     * Highest double-press action. The band uses its full table for a Samsung
+     * phone, which is what the HELLO announces: 12 is the camera remote and
+     * 13 the calculator. (A non-Samsung phone gets the table without the
+     * camera remote, 12 = calculator.)
+     */
+    public static final int DOUBLE_PRESS_MAX = 13;
+    /** Status indicator values: show always, hide after 2 seconds. */
+    public static final int STATUS_INDICATOR_MAX = 1;
+
+    /**
+     * MSG_ID 8 / param 16: what the band does when the phone disconnects -
+     * 0 nothing, 1 vibrate, 2 full screen + vibrate. Wire: {@code 08 10 xx 00}.
+     */
+    public static byte[] disconnectionAlert(final int mode) {
+        return SapPayloadBuilder.fixed(MSG_ID_ADVANCED)
+                .raw(PARAM_DISCONNECTION_ALERT)
+                .rawLe16(clamp(mode, DISCONNECTION_ALERT_MAX))
+                .build();
+    }
+
+    /**
+     * MSG_ID 8 / param 17: the app a double press of the button opens, as an
+     * index into the band's own table (0 recent apps ... 13 calculator, see
+     * {@code @array/samsung_fit3_double_press_values}). Wire: {@code 08 11 xx 00}.
+     */
+    public static byte[] doublePress(final int action) {
+        return SapPayloadBuilder.fixed(MSG_ID_ADVANCED)
+                .raw(PARAM_DOUBLE_PRESS)
+                .rawLe16(clamp(action, DOUBLE_PRESS_MAX))
+                .build();
+    }
+
+    /**
+     * MSG_ID 8 / param 18: the notification dot - 0 show always, 1 hide after
+     * two seconds. Wire: {@code 08 12 xx 00}.
+     */
+    public static byte[] statusIndicator(final int mode) {
+        return SapPayloadBuilder.fixed(MSG_ID_ADVANCED)
+                .raw(PARAM_STATUS_INDICATOR)
+                .rawLe16(clamp(mode, STATUS_INDICATOR_MAX))
+                .build();
+    }
+
+    // ---- General (MSG_ID 10, one param per message, no count byte) ----
+
+    private static final int MSG_ID_GENERAL = 10;
+    private static final int PARAM_WRIST = 20;        // byte(bool): 1 = right wrist
+    private static final int PARAM_BUTTON_SIDE = 21;  // byte(bool): 1 = button right of the screen
+
+    /** MSG_ID 10 / param 20: the wrist the band is worn on. Wire: {@code 0a 14 xx}. */
+    public static byte[] wrist(final boolean right) {
+        return SapPayloadBuilder.fixed(MSG_ID_GENERAL)
+                .raw(PARAM_WRIST)
+                .raw(right ? 1 : 0)
+                .build();
+    }
+
+    /**
+     * MSG_ID 10 / param 21: which side of the screen the button is on, which
+     * flips the display. Independent of {@link #wrist}. Wire: {@code 0a 15 xx}.
+     */
+    public static byte[] buttonSide(final boolean right) {
+        return SapPayloadBuilder.fixed(MSG_ID_GENERAL)
+                .raw(PARAM_BUTTON_SIDE)
+                .raw(right ? 1 : 0)
+                .build();
+    }
+
+    private static int clamp(final int value, final int max) {
+        return Math.max(0, Math.min(max, value));
     }
 }

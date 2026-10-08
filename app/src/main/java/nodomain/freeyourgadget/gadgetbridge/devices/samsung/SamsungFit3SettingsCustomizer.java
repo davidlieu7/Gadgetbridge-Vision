@@ -29,12 +29,14 @@ import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSett
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSpecificSettingsCustomizer;
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSpecificSettingsHandler;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3MenuOrder;
+import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3Settings;
 import nodomain.freeyourgadget.gadgetbridge.util.Prefs;
 
 /**
  * Fills the tiles / quick panel / apps sortable lists with the items the band
  * itself reported (stored by the device support as possible values and
- * labels), hides any the band hasn't reported yet, and forwards changes.
+ * labels), hides any the band hasn't reported yet, and forwards changes - for
+ * those and for the other device-specific keys in {@link Fit3Settings}.
  */
 public class SamsungFit3SettingsCustomizer implements DeviceSpecificSettingsCustomizer {
     public static final Creator<SamsungFit3SettingsCustomizer> CREATOR = new Creator<SamsungFit3SettingsCustomizer>() {
@@ -59,6 +61,9 @@ public class SamsungFit3SettingsCustomizer implements DeviceSpecificSettingsCust
             DeviceSettingsUtils.populateOrHideListPreference(menu.prefKey, handler, prefs);
             handler.addPreferenceHandlerFor(menu.prefKey);
         }
+        handler.addPreferenceHandlerFor(Fit3Settings.PREF_DOUBLE_PRESS);
+        handler.addPreferenceHandlerFor(Fit3Settings.PREF_DISCONNECTION_ALERT);
+        handler.addPreferenceHandlerFor(Fit3Settings.PREF_STATUS_INDICATOR);
     }
 
     @Override

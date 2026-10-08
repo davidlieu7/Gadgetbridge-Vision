@@ -6045,4 +6045,12 @@
     <string name="pref_samsung_fit3_quick_panel_summary">Choose and order the quick panel buttons</string>
     <string name="pref_samsung_fit3_apps_title">Apps order</string>
     <string name="pref_samsung_fit3_apps_summary">Order the apps list; every app stays on the band</string>
+    <string name="pref_samsung_fit3_double_press_title">Double press button</string>
+    <string name="samsung_fit3_double_press_recent_apps">Recent apps</string>
+    <string name="pref_samsung_fit3_disconnection_alert_title">Disconnection alert</string>
+    <string name="samsung_fit3_disconnection_alert_vibrate">Vibrate</string>
+    <string name="samsung_fit3_disconnection_alert_screen">Full screen and vibrate</string>
+    <string name="pref_samsung_fit3_status_indicator_title">Status indicator</string>
+    <string name="samsung_fit3_status_indicator_always">Show always</string>
+    <string name="samsung_fit3_status_indicator_hide">Hide after 2 seconds</string>
 </resources>

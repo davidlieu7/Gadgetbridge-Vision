@@ -489,6 +489,14 @@ public class SamsungDeviceSupport extends AbstractBTLESingleDeviceSupport {
                         handleBatteryInfo(Fit3BatteryInfo.parse(body));
                     } else if (msgId == Fit3FullSettings.MSG_ID) {
                         handleFullSettings(Fit3FullSettings.parse(body));
+                    } else if (msgId == MSG_ID_WEAR_STATUS) {
+                        // 62 21 xx, pushed as the band is put on / taken off.
+                        LOG.debug("Samsung Fit 3: wear status {}", body.length > 2 ? body[2] : -1);
+                    } else {
+                        // Most writes are answered on the channel too: a bare
+                        // header (46, 48, 4a) or an echo of the value (45 07 xx).
+                        LOG.debug("Samsung Fit 3: settings write acked, msgId={} ({} bytes)",
+                                msgId, body.length);
                     }
                     return;
                 case SapProtocol.CH_CONTROL:
@@ -528,6 +536,13 @@ public class SamsungDeviceSupport extends AbstractBTLESingleDeviceSupport {
                     return;
                 case SapProtocol.CH_NOTIFICATION:         // 0x07: /3 icon fetch, /0x3e big-data-chunk upload ack
                     onNotificationRequest(msgId, body);
+                    return;
+                case SapProtocol.CH_SETTINGS:             // 0x0b: /2 unsolicited battery push
+                    if (msgId == Fit3BatteryInfo.MSG_ID_BATTERY) {
+                        handleBatteryInfo(Fit3BatteryInfo.parse(body));
+                    } else {
+                        LOG.debug("band request ch=0x0b msgId={} unhandled", msgId);
+                    }
                     return;
 
                 default:
@@ -1797,11 +1812,14 @@ public class SamsungDeviceSupport extends AbstractBTLESingleDeviceSupport {
         sendMessage(Fit3MediaInfo.CHANNEL, Fit3MediaInfo.buildPlaybackState(stateSpec), "media-playback-state");
     }
 
+    /** CH_SETTINGS band push: worn / not worn. */
+    private static final int MSG_ID_WEAR_STATUS = 34;
+
     /**
-     * Push one changed device-specific preference to the band. The keys are the
-     * {@code android:key}s of devicesettings_samsung_fit3.xml, mirrored as
-     * constants on {@link Fit3Settings} - generic Gadgetbridge keys, since only
-     * those are reported here at all (see the note on those constants).
+     * Push one changed device-specific preference to the band. The keys are
+     * mirrored as constants on {@link Fit3Settings}: mostly generic Gadgetbridge
+     * keys, plus a few device-specific ones that the settings customizer
+     * registers (see the notes on those constants).
      */
     @Override
     public void onSendConfiguration(String config) {
@@ -1865,6 +1883,42 @@ public class SamsungDeviceSupport extends AbstractBTLESingleDeviceSupport {
                 }
                 break;
             }
+            case Fit3Settings.PREF_WEARLOCATION: {
+                boolean right = Fit3Settings.WEARLOCATION_RIGHT.equals(
+                        prefs.getString(Fit3Settings.PREF_WEARLOCATION, Fit3Settings.WEARLOCATION_LEFT));
+                sendMessage(Fit3Settings.CHANNEL, Fit3Settings.wrist(right), "settings-wrist");
+                break;
+            }
+            case Fit3Settings.PREF_WEARDIRECTION: {
+                boolean right = Fit3Settings.WEARDIRECTION_BUTTONS_RIGHT.equals(
+                        prefs.getString(Fit3Settings.PREF_WEARDIRECTION,
+                                Fit3Settings.WEARDIRECTION_BUTTONS_RIGHT));
+                sendMessage(Fit3Settings.CHANNEL, Fit3Settings.buttonSide(right), "settings-button-side");
+                break;
+            }
+            case Fit3Settings.PREF_DOUBLE_PRESS: {
+                Integer action = parseListIndex(prefs, config);
+                if (action != null) {
+                    sendMessage(Fit3Settings.CHANNEL, Fit3Settings.doublePress(action), "settings-double-press");
+                }
+                break;
+            }
+            case Fit3Settings.PREF_DISCONNECTION_ALERT: {
+                Integer mode = parseListIndex(prefs, config);
+                if (mode != null) {
+                    sendMessage(Fit3Settings.CHANNEL, Fit3Settings.disconnectionAlert(mode),
+                            "settings-disconnection-alert");
+                }
+                break;
+            }
+            case Fit3Settings.PREF_STATUS_INDICATOR: {
+                Integer mode = parseListIndex(prefs, config);
+                if (mode != null) {
+                    sendMessage(Fit3Settings.CHANNEL, Fit3Settings.statusIndicator(mode),
+                            "settings-status-indicator");
+                }
+                break;
+            }
             case ActivityUser.PREF_USER_GENDER:
             case ActivityUser.PREF_USER_DATE_OF_BIRTH:
             case ActivityUser.PREF_USER_HEIGHT_CM:
@@ -1891,6 +1945,21 @@ public class SamsungDeviceSupport extends AbstractBTLESingleDeviceSupport {
                 break;
             default:
                 super.onSendConfiguration(config);
+        }
+    }
+
+    /** A ListPreference holding one of the band's list indices, or null if unset or bad. */
+    @Nullable
+    private static Integer parseListIndex(SharedPreferences prefs, String key) {
+        String value = prefs.getString(key, null);
+        if (value == null) {
+            return null;
+        }
+        try {
+            return Integer.parseInt(value);
+        } catch (NumberFormatException e) {
+            LOG.warn("Samsung Fit 3: bad {} preference '{}'", key, value);
+            return null;
         }
     }
 
@@ -1969,6 +2038,10 @@ public class SamsungDeviceSupport extends AbstractBTLESingleDeviceSupport {
     }
 
     private void handleBatteryInfo(Fit3BatteryInfo info) {
+        if (info == null || info.level < 0) {
+            LOG.warn("Samsung Fit 3: battery info could not be parsed: {}", info);
+            return;
+        }
         LOG.info("Samsung Fit 3 battery info: " + info);
         batteryCmd.level = info.level;
         batteryCmd.state = info.charging ? BatteryState.BATTERY_CHARGING
@@ -2031,6 +2104,32 @@ public class SamsungDeviceSupport extends AbstractBTLESingleDeviceSupport {
             // The preference is a ListPreference, so its value is a string -
             // storing an int here would blow up when the screen reads it back.
             event.withPreference(Fit3Settings.PREF_SCREEN_TIMEOUT, String.valueOf(screenTimeout));
+        }
+
+        Integer disconnectionAlert = settings.get(Fit3FullSettings.PARAM_DISCONNECTION_ALERT);
+        if (disconnectionAlert != null && disconnectionAlert <= Fit3Settings.DISCONNECTION_ALERT_MAX) {
+            event.withPreference(Fit3Settings.PREF_DISCONNECTION_ALERT, String.valueOf(disconnectionAlert));
+        }
+        // An action outside our table would leave the list with no selected
+        // entry, so it is not adopted.
+        Integer doublePress = settings.get(Fit3FullSettings.PARAM_DOUBLE_PRESS);
+        if (doublePress != null && doublePress <= Fit3Settings.DOUBLE_PRESS_MAX) {
+            event.withPreference(Fit3Settings.PREF_DOUBLE_PRESS, String.valueOf(doublePress));
+        }
+        Integer statusIndicator = settings.get(Fit3FullSettings.PARAM_STATUS_INDICATOR);
+        if (statusIndicator != null && statusIndicator <= Fit3Settings.STATUS_INDICATOR_MAX) {
+            event.withPreference(Fit3Settings.PREF_STATUS_INDICATOR, String.valueOf(statusIndicator));
+        }
+        Boolean rightWrist = settings.getBoolean(Fit3FullSettings.PARAM_WRIST_ORIENTATION);
+        if (rightWrist != null) {
+            event.withPreference(Fit3Settings.PREF_WEARLOCATION,
+                    rightWrist ? Fit3Settings.WEARLOCATION_RIGHT : Fit3Settings.WEARLOCATION_LEFT);
+        }
+        Boolean buttonRight = settings.getBoolean(Fit3FullSettings.PARAM_BUTTON_POSITION);
+        if (buttonRight != null) {
+            event.withPreference(Fit3Settings.PREF_WEARDIRECTION,
+                    buttonRight ? Fit3Settings.WEARDIRECTION_BUTTONS_RIGHT
+                            : Fit3Settings.WEARDIRECTION_BUTTONS_LEFT);
         }
 
         if (event.preferences.isEmpty()) {
