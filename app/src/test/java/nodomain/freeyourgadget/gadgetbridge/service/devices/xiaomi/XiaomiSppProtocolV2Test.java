@@ -39,7 +39,7 @@ import nodomain.freeyourgadget.gadgetbridge.test.TestBase;
 import nodomain.freeyourgadget.gadgetbridge.util.GB;
 
 /**
- * Drives {@link XiaomiSppProtocolV2} with a link that runs every queued action at once on a socket
+ * Drives {@link XiaomiSppProtocolV2} with overrides that run every queued action at once on a socket
  * recording each write, standing in for the queue's single write thread.
  */
 public class XiaomiSppProtocolV2Test extends TestBase {
@@ -68,22 +68,22 @@ public class XiaomiSppProtocolV2Test extends TestBase {
             }
         });
 
-        protocol = new XiaomiSppProtocolV2(mock(XiaomiSppSupport.class), new XiaomiSppProtocolV2.Link() {
+        protocol = new XiaomiSppProtocolV2(mock(XiaomiSppSupport.class)) {
             @Override
-            public void queue(final String taskName, final BtBRAction action) {
+            protected void queue(final String taskName, final BtBRAction action) {
                 action.run(socket);
             }
 
             @Override
-            public void dropConnection() {
+            protected void dropConnection() {
                 connectionDropped = true;
             }
 
             @Override
-            public boolean simulatePacketLoss(final boolean outbound) {
+            protected boolean simulatePacketLoss(final boolean outbound) {
                 return outbound ? dropOutbound : dropInbound;
             }
-        });
+        };
     }
 
     /** Sends data packets with sequence numbers 0 to count - 1 and returns their frames. */

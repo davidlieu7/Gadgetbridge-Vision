@@ -20,6 +20,8 @@ import android.bluetooth.BluetoothSocket;
 import android.os.Handler;
 import android.os.Looper;
 
+import androidx.annotation.VisibleForTesting;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -56,18 +58,7 @@ public class XiaomiSppProtocolV2 extends AbstractXiaomiSppProtocol {
     /// Resend timeouts in a row without any ack before the link is considered dead.
     static final int MAX_TIMEOUTS_WITHOUT_ACK = 3;
 
-    interface Link {
-        void queue(String taskName, BtBRAction action);
-
-        /// Ends the connection so the regular reconnect logic takes over.
-        void dropConnection();
-
-        /// Whether to pretend the next frame in the given direction got lost (debug builds only).
-        boolean simulatePacketLoss(boolean outbound);
-    }
-
     private final XiaomiSppSupport support;
-    private final Link link;
     private final XiaomiSppV2SendWindow sendWindow = new XiaomiSppV2SendWindow();
     private final Handler timeoutHandler = new Handler(Looper.getMainLooper());
     private final Runnable timeoutRunnable = this::onResendTimeout;
@@ -75,36 +66,33 @@ public class XiaomiSppProtocolV2 extends AbstractXiaomiSppProtocol {
     private int timeoutsWithoutAck = 0;
 
     public XiaomiSppProtocolV2(final XiaomiSppSupport support) {
-        this(support, new Link() {
-            @Override
-            public void queue(final String taskName, final BtBRAction action) {
-                support.commsSupport.createTransactionBuilder(taskName)
-                        .add(action)
-                        .queue();
-            }
-
-            @Override
-            public void dropConnection() {
-                support.commsSupport.dropConnection();
-            }
-
-            @Override
-            public boolean simulatePacketLoss(final boolean outbound) {
-                if (!BuildConfig.DEBUG) {
-                    return false;
-                }
-                final int percentage = support.commsSupport.getDevicePrefs().getInt(
-                        outbound ? "pref_debug_drop_packet_percentage_out" : "pref_debug_drop_packet_percentage_in",
-                        0
-                );
-                return percentage > 0 && ThreadLocalRandom.current().nextInt(100) < percentage;
-            }
-        });
+        this.support = support;
     }
 
-    XiaomiSppProtocolV2(final XiaomiSppSupport support, final Link link) {
-        this.support = support;
-        this.link = link;
+    @VisibleForTesting
+    protected void queue(final String taskName, final BtBRAction action) {
+        support.commsSupport.createTransactionBuilder(taskName)
+                .add(action)
+                .queue();
+    }
+
+    /// Ends the connection so the regular reconnect logic takes over.
+    @VisibleForTesting
+    protected void dropConnection() {
+        support.commsSupport.dropConnection();
+    }
+
+    /// Whether to pretend the next frame in the given direction got lost (debug builds only).
+    @VisibleForTesting
+    protected boolean simulatePacketLoss(final boolean outbound) {
+        if (!BuildConfig.DEBUG) {
+            return false;
+        }
+        final int percentage = support.commsSupport.getDevicePrefs().getInt(
+                outbound ? "pref_debug_drop_packet_percentage_out" : "pref_debug_drop_packet_percentage_in",
+                0
+        );
+        return percentage > 0 && ThreadLocalRandom.current().nextInt(100) < percentage;
     }
 
     private void sendAck(final int sequenceNumber) {
@@ -112,12 +100,12 @@ public class XiaomiSppProtocolV2 extends AbstractXiaomiSppProtocol {
                 .setSequenceNumber(sequenceNumber)
                 .build()
                 .encode(null);
-        link.queue(String.format(Locale.ROOT, "send ack for %d", sequenceNumber),
+        queue(String.format(Locale.ROOT, "send ack for %d", sequenceNumber),
                 new FunctionAction(socket -> writeFrame(socket, frame)));
     }
 
     private boolean writeFrame(final BluetoothSocket socket, final byte[] frame) {
-        if (link.simulatePacketLoss(true)) {
+        if (simulatePacketLoss(true)) {
             LOG.warn("Simulating dropped outbound packet type={} seq={}", frame[2] & 0x0f, frame[3] & 0xff);
             return true;
         }
@@ -183,7 +171,7 @@ public class XiaomiSppProtocolV2 extends AbstractXiaomiSppProtocol {
         }
 
         final XiaomiSppPacketV2 decodedPacket = XiaomiSppPacketV2.decode(rxBuf);
-        if (decodedPacket != null && link.simulatePacketLoss(false)) {
+        if (decodedPacket != null && simulatePacketLoss(false)) {
             LOG.warn("Simulating dropped inbound packet type={} seq={}",
                     decodedPacket.getPacketType(),
                     decodedPacket.getSequenceNumber());
@@ -239,7 +227,7 @@ public class XiaomiSppProtocolV2 extends AbstractXiaomiSppProtocol {
     }
 
     private void queueResend(final String taskName) {
-        link.queue(taskName, new FunctionAction(this::resendUnacked));
+        queue(taskName, new FunctionAction(this::resendUnacked));
     }
 
     private boolean resendUnacked(final BluetoothSocket socket) {
@@ -288,7 +276,7 @@ public class XiaomiSppProtocolV2 extends AbstractXiaomiSppProtocol {
         if (timeouts >= MAX_TIMEOUTS_WITHOUT_ACK) {
             LOG.warn("no ack for packet {} after {} timeouts, dropping the connection", sendWindow.getOldestUnacked(), timeouts);
             dispose();
-            link.dropConnection();
+            dropConnection();
             return;
         }
 
@@ -299,7 +287,7 @@ public class XiaomiSppProtocolV2 extends AbstractXiaomiSppProtocol {
     @Override
     public boolean initializeSession() {
         dispose();
-        link.queue("send session config", new WriteAction(XiaomiSppPacketV2.newSessionConfigPacketBuilder()
+        queue("send session config", new WriteAction(XiaomiSppPacketV2.newSessionConfigPacketBuilder()
                 .setOpCode(XiaomiSppPacketV2.SessionConfigPacket.OPCODE_START_SESSION_REQUEST)
                 .setSequenceNumber(0)
                 .build()
