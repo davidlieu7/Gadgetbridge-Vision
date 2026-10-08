@@ -560,8 +560,7 @@ class WorkoutCompareActivity : AbstractGBActivity() {
         /** Groups that are lists (laps, intervals, sets...) rather than comparable stats. */
         private val SKIP_GROUPS = setOf(
             ActivitySummaryEntries.GROUP_LAPS,
-            ActivitySummaryEntries.GROUP_INTERVALS,
-            ActivitySummaryEntries.GROUP_HEART_RATE_ZONES
+            ActivitySummaryEntries.GROUP_INTERVALS
         )
 
         private const val MIN_TRACKS_FOR_MAP = 2
