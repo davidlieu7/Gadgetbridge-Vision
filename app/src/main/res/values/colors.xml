@@ -169,6 +169,9 @@
     <color name="chart_battery_current" type="color">#00796B</color>
     <color name="chart_battery_power" type="color">#6A0DAD</color>
     <color name="chart_battery_temperature" type="color">#ff8f00</color>
+    <color name="chart_sport_statistics_second" type="color">#2F8FE8</color>
+
+    <!-- Fixed dark blue for the sport statistics bar chart, independent of theme/accent. -->
 
     <attr name="row_separator" format="color" />
     <attr name="stat_tile_bg" format="color" />

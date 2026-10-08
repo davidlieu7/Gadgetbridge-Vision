@@ -22,6 +22,7 @@ import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import nodomain.freeyourgadget.gadgetbridge.R
 import nodomain.freeyourgadget.gadgetbridge.activities.AbstractGBFragment
 import nodomain.freeyourgadget.gadgetbridge.activities.charts.ChartDataRange
+import nodomain.freeyourgadget.gadgetbridge.activities.charts.ChartDataScope
 import nodomain.freeyourgadget.gadgetbridge.activities.charts.ChartsHost
 import nodomain.freeyourgadget.gadgetbridge.database.DBHandler
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice

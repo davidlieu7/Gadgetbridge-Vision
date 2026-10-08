@@ -27,6 +27,7 @@ import nodomain.freeyourgadget.gadgetbridge.GBApplication
 import nodomain.freeyourgadget.gadgetbridge.R
 import nodomain.freeyourgadget.gadgetbridge.activities.AbstractListActivity
 import nodomain.freeyourgadget.gadgetbridge.activities.ActivitySummariesFilter
+import nodomain.freeyourgadget.gadgetbridge.activities.workouts.statistics.WorkoutStatisticsActivity
 import nodomain.freeyourgadget.gadgetbridge.adapter.WorkoutSummariesAdapter
 import nodomain.freeyourgadget.gadgetbridge.database.DBHelper
 import nodomain.freeyourgadget.gadgetbridge.entities.BaseActivitySummary
@@ -132,6 +133,13 @@ class WorkoutListActivity : AbstractListActivity<BaseActivitySummary>() {
         return when (item.itemId) {
             android.R.id.home -> {
                 finish()
+                true
+            }
+            R.id.activity_action_statistics -> {
+                startActivity(
+                    Intent(this, WorkoutStatisticsActivity::class.java)
+                        .putExtra(GBDevice.EXTRA_DEVICE, gbDevice)
+                )
                 true
             }
             R.id.activity_action_manage_timestamp -> {

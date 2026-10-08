@@ -604,6 +604,48 @@
         <item name="rippleColor">?attr/subtab_pill</item>
     </style>
 
+    <!-- Single-select metric chips above the sport statistics chart: a solid on-surface fill when
+         selected, an outline otherwise -->
+    <style name="ThemeOverlay.App.ChartConfigSheet" parent="ThemeOverlay.Material3.BottomSheetDialog">
+        <item name="bottomSheetStyle">@style/Widget.App.ChartConfigSheet</item>
+        <item name="android:backgroundDimAmount">0.6</item>
+    </style>
+
+    <style name="Widget.App.ChartConfigSheet" parent="Widget.Material3.BottomSheet.Modal">
+        <item name="backgroundTint">?attr/colorSurfaceContainerLow</item>
+        <item name="shapeAppearance">@style/ShapeAppearance.App.ChartConfigSheet</item>
+    </style>
+
+    <style name="ShapeAppearance.App.ChartConfigSheet" parent="">
+        <item name="cornerFamily">rounded</item>
+        <item name="cornerSizeTopLeft">28dp</item>
+        <item name="cornerSizeTopRight">28dp</item>
+        <item name="cornerSizeBottomLeft">0dp</item>
+        <item name="cornerSizeBottomRight">0dp</item>
+    </style>
+
+    <style name="Widget.App.ChartTypeSegment" parent="Widget.Material3.Button.OutlinedButton">
+        <item name="android:minWidth">0dp</item>
+        <item name="android:minHeight">0dp</item>
+        <item name="android:insetTop">0dp</item>
+        <item name="android:insetBottom">0dp</item>
+        <item name="android:padding">0dp</item>
+        <item name="iconGravity">textStart</item>
+        <item name="iconPadding">0dp</item>
+        <item name="iconSize">20dp</item>
+        <item name="iconTint">@color/chart_type_segment_icon</item>
+        <item name="backgroundTint">@color/chart_type_segment_bg</item>
+        <item name="strokeColor">?attr/colorOutline</item>
+        <item name="strokeWidth">1.5dp</item>
+        <item name="cornerRadius">8dp</item>
+    </style>
+
+    <!-- Plain chevron buttons either side of a period label -->
+    <style name="Widget.App.PeriodStep" parent="Widget.Material3.Button.IconButton">
+        <item name="iconSize">24dp</item>
+        <item name="iconTint">@color/period_step_icon</item>
+    </style>
+
     <!-- Date-step pill buttons (charts date bar, dashboard day arrows) -->
     <style name="TextAppearance.App.DateLabel" parent="TextAppearance.Material3.TitleSmall">
         <item name="android:textSize">13sp</item>

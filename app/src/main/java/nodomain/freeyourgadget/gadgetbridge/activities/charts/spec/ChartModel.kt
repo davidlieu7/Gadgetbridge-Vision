@@ -1,4 +1,4 @@
-package nodomain.freeyourgadget.gadgetbridge.activities.charts.vico
+package nodomain.freeyourgadget.gadgetbridge.activities.charts.spec
 
 /**
  * A (x, y) data point. [x] is usually an epoch-second timestamp.
@@ -10,12 +10,13 @@ data class ChartPoint(val x: Double, val y: Double)
  */
 sealed interface SeriesStyle {
     /**
-     * A line, optionally filled underneath (an area chart) or curved.
+     * A line, optionally filled underneath (an area chart), curved, or with a dot on every point.
      */
     data class Line(
         val color: Int,
         val filled: Boolean = false,
         val curved: Boolean = false,
+        val showPoints: Boolean = false,
     ) : SeriesStyle
 
     /**
@@ -28,6 +29,11 @@ sealed interface SeriesStyle {
 }
 
 /**
+ * Which y axis a [ChartSeries] is plotted against.
+ */
+enum class AxisSide { START, END }
+
+/**
  * One drawable series: a label, its points, and the style to draw them.
  */
 data class ChartSeries(
@@ -35,6 +41,7 @@ data class ChartSeries(
     val label: String,
     val points: List<ChartPoint>,
     val style: SeriesStyle,
+    val axis: AxisSide = AxisSide.START,
 )
 
 /**
@@ -45,7 +52,28 @@ enum class ChartValueFormat {
     DATE,
     DURATION_SECONDS,
     DECIMAL,
+    ONE_DECIMAL,
     INTEGER,
+
+    /**
+     * An ISO day of the week, 1 (Monday) to 7 (Sunday), shown as its short name.
+     */
+    DAY_OF_WEEK,
+
+    /**
+     * A day of the month, 1 to 31. See [dayOfMonthValues] for the days that get a label.
+     */
+    DAY_OF_MONTH,
+
+    /**
+     * A month of the year, 1 to 12, shown as its narrow name (a single letter in most locales).
+     */
+    MONTH_OF_YEAR,
+
+    /**
+     * [java.time.LocalDate.toEpochDay]. Day names up to a week, day of month beyond.
+     */
+    EPOCH_DAY,
 }
 
 data class AxisSpec(
@@ -72,12 +100,13 @@ data class LegendItemSpec(
 )
 
 /**
- * A library-independent chart specification.
+ * A library-independent chart specification. [endYAxis] is the axis of the [AxisSide.END] series, if any.
  */
 data class ChartSpec(
     val series: List<ChartSeries>,
     val xAxis: AxisSpec = AxisSpec(format = ChartValueFormat.TIME_OF_DAY),
     val yAxis: AxisSpec = AxisSpec(),
+    val endYAxis: AxisSpec? = null,
     val limitLines: List<LimitLineSpec> = emptyList(),
     val legend: List<LegendItemSpec> = emptyList(),
 ) {

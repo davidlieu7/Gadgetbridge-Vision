@@ -9,6 +9,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
+import nodomain.freeyourgadget.gadgetbridge.activities.charts.ChartDataScope
 import org.slf4j.LoggerFactory
 
 sealed interface ChartUiState<out T> {

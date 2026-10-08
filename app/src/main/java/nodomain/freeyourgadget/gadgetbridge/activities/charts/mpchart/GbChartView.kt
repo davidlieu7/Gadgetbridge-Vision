@@ -1,0 +1,366 @@
+package nodomain.freeyourgadget.gadgetbridge.activities.charts.mpchart
+
+import android.content.Context
+import android.graphics.Canvas
+import android.graphics.Color
+import android.graphics.Paint
+import android.graphics.Rect
+import android.os.Build
+import android.util.AttributeSet
+import android.view.GestureDetector
+import android.view.HapticFeedbackConstants
+import android.view.KeyEvent
+import android.view.MotionEvent
+import android.view.ViewConfiguration
+import androidx.core.graphics.ColorUtils
+import androidx.core.view.ViewCompat
+import com.github.mikephil.charting.charts.CombinedChart
+import com.github.mikephil.charting.components.LimitLine
+import com.github.mikephil.charting.components.XAxis.XAxisPosition
+import com.github.mikephil.charting.components.YAxis
+import com.github.mikephil.charting.components.YAxis.AxisDependency
+import com.github.mikephil.charting.formatter.IAxisValueFormatter
+import com.github.mikephil.charting.utils.Utils
+import nodomain.freeyourgadget.gadgetbridge.R
+import nodomain.freeyourgadget.gadgetbridge.activities.charts.spec.AxisSide
+import nodomain.freeyourgadget.gadgetbridge.activities.charts.spec.AxisSpec
+import nodomain.freeyourgadget.gadgetbridge.activities.charts.spec.ChartSpec
+import nodomain.freeyourgadget.gadgetbridge.activities.charts.spec.ChartTheme
+import nodomain.freeyourgadget.gadgetbridge.activities.charts.spec.ChartValueFormat
+import nodomain.freeyourgadget.gadgetbridge.activities.charts.spec.SeriesStyle
+import nodomain.freeyourgadget.gadgetbridge.activities.charts.spec.fixedLabelValues
+import nodomain.freeyourgadget.gadgetbridge.activities.charts.spec.labelFor
+import nodomain.freeyourgadget.gadgetbridge.activities.charts.spec.timeLabelValues
+import kotlin.math.abs
+
+/**
+ * Renders a [ChartSpec]. No zoom or scroll. Tap or drag sideways to select an x.
+ */
+class GbChartView @JvmOverloads constructor(
+    context: Context,
+    attrs: AttributeSet? = null,
+    defStyle: Int = 0,
+) : CombinedChart(context, attrs, defStyle) {
+    private val theme = ChartTheme.from(context)
+    private val xAxisLabels = FixedValuesXAxisRenderer(viewPortHandler, xAxis, getTransformer(AxisDependency.LEFT))
+    private val tooltip = ChartTooltipPainter(context, theme)
+    private val accessibility = ChartSlotAccessibilityHelper(this)
+    private val pointPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val gestures = GestureDetector(context, object : GestureDetector.SimpleOnGestureListener() {
+        override fun onDown(e: MotionEvent) = true
+
+        override fun onSingleTapUp(e: MotionEvent): Boolean {
+            val x = targetAt(e.x, e.y) ?: return false
+            performClick()
+            toggle(x)
+            return true
+        }
+    })
+    private var spec: ChartSpec? = null
+    private var barLayout: BarLayout? = null
+    private var selection: ChartSelection? = null
+    private var targets = DoubleArray(0)
+    private val touchSlop = ViewConfiguration.get(context).scaledTouchSlop
+    private var scrubStartX = 0f
+    private var scrubStartY = 0f
+    private var scrubbing = false
+
+    var selectionContent: ((Double) -> ChartSelection)? = null
+
+    var selectedX: Double? = null
+        private set
+
+    init {
+        rendererXAxis = xAxisLabels
+        description.isEnabled = false
+        legend.isEnabled = false
+        isDragEnabled = false
+        isScaleXEnabled = false
+        isScaleYEnabled = false
+        isPinchZoomEnabled = false
+        isDoubleTapToZoomEnabled = false
+        isHighlightPerTapEnabled = false
+        isHighlightPerDragEnabled = false
+        isNoDataIconEnabled = false
+        noDataTextColor = theme.secondaryTextColor
+        drawOrder = listOf(CombinedChart.DrawOrder.BAR, CombinedChart.DrawOrder.LINE)
+
+        val gridColor = ColorUtils.setAlphaComponent(theme.secondaryTextColor, GRID_ALPHA)
+        xAxis.position = XAxisPosition.BOTTOM
+        xAxis.textColor = theme.textColor
+        xAxis.gridColor = gridColor
+        xAxis.axisLineColor = theme.secondaryTextColor
+        xAxis.isDrawLimitLinesBehindDataEnabled = true
+        for (axis in listOf(axisLeft, axisRight)) {
+            axis.textColor = theme.textColor
+            axis.gridColor = gridColor
+            axis.isDrawAxisLineEnabled = false
+        }
+        axisRight.isDrawGridLinesEnabled = false
+
+        ViewCompat.setAccessibilityDelegate(this, accessibility)
+    }
+
+    fun setSpec(spec: ChartSpec) {
+        if (spec.isEmpty) {
+            showMessage(context.getString(R.string.no_data))
+            return
+        }
+        this.spec = spec
+        targets = ChartSlots.targets(spec)
+        clearSelection()
+        configureXAxis(spec.xAxis)
+        configureYAxis(axisLeft, spec.yAxis)
+        configureYAxis(axisRight, spec.endYAxis)
+        configureLimitLines(spec)
+        barLayout = barLayoutFor(spec, 0f)
+        data = ChartDataBuilder.build(spec, barLayout!!, cornerRadiusPx())
+        accessibility.invalidateRoot()
+    }
+
+    fun showMessage(text: String) {
+        spec = null
+        barLayout = null
+        targets = DoubleArray(0)
+        clearSelection()
+        noDataText = text
+        clear()
+        accessibility.invalidateRoot()
+    }
+
+    internal fun slots(): IntRange? = spec?.let { ChartSlots.of(it.xAxis) }
+
+    internal fun hasSlotBounds() = data != null && viewPortHandler.contentWidth > 0f
+
+    private fun targetAt(x: Float, y: Float): Double? {
+        if (!hasSlotBounds() || !viewPortHandler.isInBounds(x, y)) return null
+        return ChartSlots.nearest(getValuesByTouchPoint(x, y, AxisDependency.LEFT).x, targets)
+    }
+
+    internal fun slotAt(x: Float, y: Float): Int? = if (slots() == null) null else targetAt(x, y)?.toInt()
+
+    internal fun slotBounds(slot: Int): Rect {
+        val left = pixelX(slot - 0.5)
+        val right = pixelX(slot + 0.5)
+        return Rect(
+            maxOf(left, viewPortHandler.contentLeft).toInt(),
+            viewPortHandler.contentTop.toInt(),
+            minOf(right, viewPortHandler.contentRight).toInt(),
+            viewPortHandler.contentBottom.toInt(),
+        )
+    }
+
+    internal fun selectionAt(x: Double): ChartSelection? = selectionContent?.invoke(x)
+
+    internal fun toggle(x: Double) = select(ChartSlots.toggle(selectedX, x))
+
+    private fun select(selected: Double?) {
+        if (selected == selectedX) return
+        selectedX = selected
+        selection = selected?.let { selectionAt(it) }
+        xAxis.removeAllLimitLines()
+        if (selected != null) {
+            xAxis.addLimitLine(guide(selected))
+            performHapticFeedback(
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
+                    HapticFeedbackConstants.TEXT_HANDLE_MOVE
+                } else {
+                    HapticFeedbackConstants.CLOCK_TICK
+                }
+            )
+            selection?.let { announceForAccessibility(it.description) }
+        }
+        accessibility.invalidateRoot()
+        invalidate()
+    }
+
+    private fun clearSelection() {
+        selectedX = null
+        selection = null
+        xAxis.removeAllLimitLines()
+    }
+
+    private fun guide(x: Double) = LimitLine(x.toFloat()).apply {
+        lineColor = GUIDE_COLOR
+        lineWidth = GUIDE_WIDTH_DP
+        val dash = Utils.convertDpToPixel(GUIDE_DASH_DP)
+        enableDashedLine(dash, dash, 0f)
+    }
+
+    override fun onTouchEvent(event: MotionEvent): Boolean {
+        val handled = gestures.onTouchEvent(event)
+        scrub(event)
+        return super.onTouchEvent(event) || handled
+    }
+
+    /**
+     * Horizontal drags move the selection, vertical ones go to the scrolling parent.
+     */
+    private fun scrub(event: MotionEvent) {
+        when (event.actionMasked) {
+            MotionEvent.ACTION_DOWN -> {
+                scrubStartX = event.x
+                scrubStartY = event.y
+                scrubbing = false
+            }
+            MotionEvent.ACTION_MOVE -> {
+                if (!scrubbing) {
+                    val dx = abs(event.x - scrubStartX)
+                    val dy = abs(event.y - scrubStartY)
+                    if (dx <= touchSlop || dx <= dy || targetAt(scrubStartX, scrubStartY) == null) return
+                    scrubbing = true
+                    parent?.requestDisallowInterceptTouchEvent(true)
+                }
+                val x = event.x.coerceIn(viewPortHandler.contentLeft, viewPortHandler.contentRight)
+                targetAt(x, viewPortHandler.contentCenter.y)?.let { select(it) }
+            }
+            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                if (scrubbing) {
+                    scrubbing = false
+                    parent?.requestDisallowInterceptTouchEvent(false)
+                }
+            }
+        }
+    }
+
+    override fun performClick(): Boolean = super.performClick()
+
+    override fun dispatchHoverEvent(event: MotionEvent): Boolean =
+        accessibility.dispatchHoverEvent(event) || super.dispatchHoverEvent(event)
+
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean =
+        accessibility.dispatchKeyEvent(event) || super.dispatchKeyEvent(event)
+
+    override fun onFocusChanged(gainFocus: Boolean, direction: Int, previouslyFocusedRect: Rect?) {
+        super.onFocusChanged(gainFocus, direction, previouslyFocusedRect)
+        accessibility.onFocusChanged(gainFocus, direction, previouslyFocusedRect)
+    }
+
+    override fun onDraw(canvas: Canvas) {
+        val spec = spec
+        if (spec != null && xAxis.axisRange > 0f) {
+            val layout = barLayoutFor(spec, viewPortHandler.contentWidth / xAxis.axisRange)
+            if (layout != barLayout) {
+                barLayout = layout
+                data = ChartDataBuilder.build(spec, layout, cornerRadiusPx())
+            }
+            timeLabelsFor(spec.xAxis)?.let { xAxisLabels.values = it }
+        }
+        super.onDraw(canvas)
+
+        val selected = selectedX ?: return
+        if (spec == null || data == null) return
+        drawSelectedPoints(canvas, spec, selected)
+        selection?.let { drawTooltip(canvas, it, selected) }
+    }
+
+    private fun timeLabelsFor(spec: AxisSpec): List<Double>? {
+        if (spec.format != ChartValueFormat.TIME_OF_DAY && spec.format != ChartValueFormat.DATE) return null
+        val min = spec.minimum ?: return null
+        val max = spec.maximum ?: return null
+        val labelSpace = maxOf(xAxis.labelWidth.toFloat(), Utils.convertDpToPixel(MIN_TIME_LABEL_WIDTH_DP)) +
+            Utils.convertDpToPixel(TIME_LABEL_GAP_DP)
+        return timeLabelValues(min, max, (viewPortHandler.contentWidth / labelSpace).toInt())
+    }
+
+    private fun drawSelectedPoints(canvas: Canvas, spec: ChartSpec, selected: Double) {
+        for (series in spec.series) {
+            val style = series.style as? SeriesStyle.Line ?: continue
+            val point = series.points.firstOrNull { it.x == selected }?.takeIf { it.y > 0.0 } ?: continue
+            val axis = if (series.axis == AxisSide.END) AxisDependency.RIGHT else AxisDependency.LEFT
+            val pixel = getPixelForValues(point.x.toFloat(), point.y.toFloat(), axis)
+            val x = pixel.x.toFloat()
+            val y = pixel.y.toFloat()
+
+            val dotRadius = Utils.convertDpToPixel(SELECTED_DOT_DP / 2f)
+            val gapRadius = dotRadius + Utils.convertDpToPixel(SELECTED_GAP_DP)
+            pointPaint.color = style.color
+            canvas.drawCircle(x, y, gapRadius + Utils.convertDpToPixel(SELECTED_RING_DP), pointPaint)
+            pointPaint.color = theme.markerDotGapColor
+            canvas.drawCircle(x, y, gapRadius, pointPaint)
+            pointPaint.color = style.color
+            canvas.drawCircle(x, y, dotRadius, pointPaint)
+        }
+    }
+
+    private fun drawTooltip(canvas: Canvas, selection: ChartSelection, selected: Double) {
+        val guideX = pixelX(selected)
+        val left = ChartSlots.tooltipLeft(
+            guideX = guideX,
+            centerX = viewPortHandler.contentCenter.x,
+            width = tooltip.width(selection),
+            gap = Utils.convertDpToPixel(TOOLTIP_GAP_DP),
+            minLeft = paddingLeft.toFloat(),
+            maxRight = (width - paddingRight).toFloat(),
+        )
+        tooltip.draw(canvas, selection, left, viewPortHandler.contentTop)
+    }
+
+    private fun pixelX(x: Double): Float = getPixelForValues(x.toFloat(), 0f, AxisDependency.LEFT).x.toFloat()
+
+    private fun barLayoutFor(spec: ChartSpec, pxPerX: Float) = BarLayout.of(
+        pxPerX = pxPerX,
+        pxPerDp = Utils.convertDpToPixel(1f),
+        barCount = targets.size,
+        grouped = ChartDataBuilder.columns(spec).size > 1,
+    )
+
+    private fun cornerRadiusPx() = Utils.convertDpToPixel(BAR_CORNER_DP)
+
+    private fun configureXAxis(spec: AxisSpec) {
+        val labels = fixedLabelValues(spec)
+        val padding = if (labels != null) PERIOD_X_PADDING else 0.0
+        xAxisLabels.values = labels
+        xAxis.valueFormatter = formatterFor(labelFor(spec))
+        spec.minimum?.let { xAxis.axisMinimum = (it - padding).toFloat() } ?: xAxis.resetAxisMinimum()
+        spec.maximum?.let { xAxis.axisMaximum = (it + padding).toFloat() } ?: xAxis.resetAxisMaximum()
+    }
+
+    private fun configureLimitLines(spec: ChartSpec) {
+        axisLeft.removeAllLimitLines()
+        for (limit in spec.limitLines) {
+            axisLeft.addLimitLine(LimitLine(limit.value.toFloat()).apply {
+                lineColor = limit.color
+                lineWidth = LIMIT_LINE_WIDTH_DP
+                if (limit.dashed) {
+                    enableDashedLine(
+                        Utils.convertDpToPixel(LIMIT_LINE_DASH_DP),
+                        Utils.convertDpToPixel(LIMIT_LINE_GAP_DP),
+                        0f,
+                    )
+                }
+            })
+        }
+    }
+
+    private fun configureYAxis(axis: YAxis, spec: AxisSpec?) {
+        axis.isEnabled = spec != null
+        if (spec == null) {
+            return
+        }
+        axis.valueFormatter = formatterFor(labelFor(spec.format))
+        axis.isGranularityEnabled = spec.format == ChartValueFormat.INTEGER
+        spec.minimum?.let { axis.axisMinimum = it.toFloat() } ?: axis.resetAxisMinimum()
+        spec.maximum?.let { axis.axisMaximum = it.toFloat() } ?: axis.resetAxisMaximum()
+    }
+
+    private fun formatterFor(label: (Double) -> String) = IAxisValueFormatter { value, _ -> label(value.toDouble()) }
+
+    private companion object {
+        const val BAR_CORNER_DP = 4f
+        const val PERIOD_X_PADDING = 0.5
+        const val GRID_ALPHA = 0x40
+        const val GUIDE_WIDTH_DP = 1f
+        const val GUIDE_DASH_DP = 3f
+        const val TOOLTIP_GAP_DP = 10f
+        const val SELECTED_DOT_DP = 11f
+        const val SELECTED_GAP_DP = 2f
+        const val SELECTED_RING_DP = 1.5f
+        const val LIMIT_LINE_WIDTH_DP = 1.5f
+        const val LIMIT_LINE_DASH_DP = 6f
+        const val LIMIT_LINE_GAP_DP = 4f
+        const val MIN_TIME_LABEL_WIDTH_DP = 32f
+        const val TIME_LABEL_GAP_DP = 16f
+        val GUIDE_COLOR = Color.parseColor("#8F8F8F")
+    }
+}

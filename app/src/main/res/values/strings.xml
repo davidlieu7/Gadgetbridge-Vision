@@ -2998,6 +2998,12 @@
     <string name="ascentDistance">Uphill distance</string>
     <string name="activityTotalAscent">Total ascent</string>
     <string name="activityTotalDescent">Total descent</string>
+    <string name="ascent">Ascent</string>
+    <string name="descent">Descent</string>
+    <string name="avg_speed">Avg Speed</string>
+    <string name="avg_power">Avg Power</string>
+    <string name="avg_aerobic_effect">Avg Aerobic Effect</string>
+    <string name="avg_anaerobic_effect">Avg Anaerobic Effect</string>
     <string name="average_ascent_velocity">Avg ascent velocity</string>
     <string name="descentDistance">Downhill distance</string>
     <string name="flatDistance">Flat distance</string>
@@ -3348,6 +3354,36 @@
         <item quantity="one">%d activity</item>
         <item quantity="other">%d activities</item>
     </plurals>
+    <!-- Title of the per-sport statistics screen, e.g. "Running statistics" -->
+    <string name="statistics_sport_title">%1$s statistics</string>
+    <string name="sports">Sports</string>
+    <string name="statistics_empty_title">No statistics yet</string>
+    <string name="statistics_empty_body">Record an activity and it will show up here.</string>
+    <string name="statistics_load_failed">Could not load statistics</string>
+    <string name="retry">Retry</string>
+    <string name="statistics_summary">Summary</string>
+    <string name="statistics_chart_edit">Edit chart</string>
+    <string name="statistics_chart_editor_title">Chart data</string>
+    <string name="statistics_chart_editor_subtitle">Show up to two data sets.</string>
+    <string name="statistics_chart_data_set_1">Data set 1</string>
+    <string name="statistics_chart_data_set_2">Data set 2</string>
+    <string name="statistics_chart_set_1">Set 1</string>
+    <string name="statistics_chart_set_2">Set 2</string>
+    <string name="statistics_chart_type_bar">Bar</string>
+    <string name="statistics_chart_type_line">Line</string>
+    <string name="statistics_chart_average_hint">Averages are always shown as a line.</string>
+    <string name="statistics_chart_apply">Apply</string>
+    <!-- Accessibility description of the statistics chart, e.g. "Distance per day, Sep 22 – 28, 2026, total 31.4 km" -->
+    <string name="statistics_chart_description_daily">%1$s per day, %2$s, total %3$s</string>
+    <!-- Accessibility description of the statistics chart, e.g. "Distance per month, 2026, total 1,204 km" -->
+    <string name="statistics_chart_description_monthly">%1$s per month, %2$s, total %3$s</string>
+    <!-- Accessibility description of the statistics chart, e.g. "Avg Pace per day, Sep 22 – 28, 2026, average 5:30 min/km" -->
+    <string name="statistics_chart_description_daily_average">%1$s per day, %2$s, average %3$s</string>
+    <!-- Accessibility description of the statistics chart, e.g. "Power per month, 2026, average 215 W" -->
+    <string name="statistics_chart_description_monthly_average">%1$s per month, %2$s, average %3$s</string>
+    <string name="statistics_sessions">Sessions</string>
+    <string name="statistics_previous_period">Previous period</string>
+    <string name="statistics_next_period">Next period</string>
     <string name="sports_activity_quick_filter_this_week">This week</string>
     <string name="sports_activity_quick_filter_last_week">Previous week</string>
     <string name="sports_activity_quick_filter_this_month">This month</string>

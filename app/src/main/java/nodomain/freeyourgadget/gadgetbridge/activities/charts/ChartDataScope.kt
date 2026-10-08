@@ -1,4 +1,4 @@
-package nodomain.freeyourgadget.gadgetbridge.activities.charts.vico
+package nodomain.freeyourgadget.gadgetbridge.activities.charts
 
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext

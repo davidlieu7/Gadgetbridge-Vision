@@ -337,6 +337,10 @@
             android:label="@string/activity_summaries"
             android:parentActivityName=".activities.ControlCenterv2" />
         <activity
+            android:name=".activities.workouts.statistics.WorkoutStatisticsActivity"
+            android:label="@string/activity_summaries_statistics"
+            android:parentActivityName=".activities.workouts.WorkoutListActivity" />
+        <activity
             android:name=".activities.appmanager.AppManagerActivity"
             android:label="@string/title_activity_appmanager"
             android:launchMode="singleTop"
