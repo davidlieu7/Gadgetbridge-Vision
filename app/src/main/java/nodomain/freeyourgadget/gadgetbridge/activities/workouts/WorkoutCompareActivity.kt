@@ -328,7 +328,9 @@ class WorkoutCompareActivity : AbstractGBActivity() {
         val secondValue = second.value as? Number ?: return ""
         if (first.unit != second.unit) return ""
         val delta = secondValue.toDouble() - firstValue.toDouble()
-        val formatted = workoutValueFormatter.formatValue(delta, first.unit, false)
+        // The delta column is literal text, so the unit has to ride along in the string
+        // (the table only lifts a unit into a column header when every row shares one).
+        val formatted = workoutValueFormatter.formatValue(delta, first.unit)
         return if (delta > 0 && !formatted.startsWith("-")) "+$formatted" else formatted
     }
 
