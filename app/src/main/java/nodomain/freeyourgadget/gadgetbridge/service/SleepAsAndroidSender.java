@@ -99,34 +99,39 @@ public class SleepAsAndroidSender {
     }
 
     /**
-     * Check if a SleepAsAndroid feature is enabled
-     * @param feature
-     * @return
+     * Check if a SleepAsAndroid feature is enabled.
+     *
+     * <p>The per-feature toggles default to true, matching sleepasandroid_preferences.xml. Those
+     * defaults are only written once the settings screen has been shown, so a false fallback
+     * reports every feature as disabled until then.
+     *
+     * @param feature the feature
+     * @return true if the feature is enabled
      */
     public boolean isFeatureEnabled(SleepAsAndroidFeature feature) {
         boolean enabled = isSleepAsAndroidEnabled();
         if (enabled) {
             switch (feature) {
                 case ACCELEROMETER:
-                    enabled = GBApplication.getPrefs().getBoolean("pref_key_sleepasandroid_feat_movement", false);
+                    enabled = GBApplication.getPrefs().getBoolean("pref_key_sleepasandroid_feat_movement", true);
                     break;
                 case HEART_RATE:
-                    enabled = GBApplication.getPrefs().getBoolean("pref_key_sleepasandroid_feat_hr", false);
+                    enabled = GBApplication.getPrefs().getBoolean("pref_key_sleepasandroid_feat_hr", true);
                     break;
                 case RR_INTERVALS:
-                    enabled = GBApplication.getPrefs().getBoolean("pref_key_sleepasandroid_feat_rr_intervals", false);
+                    enabled = GBApplication.getPrefs().getBoolean("pref_key_sleepasandroid_feat_rr_intervals", true);
                     break;
                 case SPO2:
-                    enabled = GBApplication.getPrefs().getBoolean("pref_key_sleepasandroid_feat_spo2", false);
+                    enabled = GBApplication.getPrefs().getBoolean("pref_key_sleepasandroid_feat_spo2", true);
                     break;
                 case OXIMETRY:
-                    enabled = GBApplication.getPrefs().getBoolean("pref_key_sleepasandroid_feat_oximetry", false);
+                    enabled = GBApplication.getPrefs().getBoolean("pref_key_sleepasandroid_feat_oximetry", true);
                     break;
                 case NOTIFICATIONS:
-                    enabled = GBApplication.getPrefs().getBoolean("pref_key_sleepasandroid_feat_notifications", false);
+                    enabled = GBApplication.getPrefs().getBoolean("pref_key_sleepasandroid_feat_notifications", true);
                     break;
                 case ALARMS:
-                    enabled = GBApplication.getPrefs().getBoolean("pref_key_sleepasandroid_feat_alarms", false);
+                    enabled = GBApplication.getPrefs().getBoolean("pref_key_sleepasandroid_feat_alarms", true);
                     break;
                 default:
                     break;

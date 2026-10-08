@@ -131,14 +131,41 @@ public class SleepAsAndroidSenderSessionTest extends TestBase {
         // Sleep as Android ends the session while the link is down, so the stop arrives for a
         // device that is no longer the provider. Whatever it left running would otherwise come
         // back with the next connection and feed a session nobody is recording.
-        GBApplication.getPrefs().getPreferences().edit()
-                .putBoolean("pref_key_sleepasandroid_feat_hr", true)
-                .apply();
         sender.startTracking(trackingExtras(true));
         device.setState(GBDevice.State.NOT_CONNECTED);
 
         sender.stopTracking();
         device.setState(GBDevice.State.INITIALIZED);
+        clearBroadcasts();
+
+        sender.onHrChanged(72f, 0);
+
+        Assert.assertEquals(0, countBroadcasts(ACTION_HEART_RATE_DATA_UPDATE));
+    }
+
+    @Test
+    public void featuresDefaultToEnabledBeforeTheSettingsScreenIsOpened() {
+        for (final SleepAsAndroidFeature feature : EnumSet.allOf(SleepAsAndroidFeature.class)) {
+            Assert.assertTrue(feature + " should default to enabled", sender.isFeatureEnabled(feature));
+        }
+    }
+
+    @Test
+    public void heartRateIsSentWithoutTouchingTheSettings() {
+        sender.startTracking(trackingExtras(true));
+        clearBroadcasts();
+
+        sender.onHrChanged(72f, 0);
+
+        Assert.assertEquals(1, countBroadcasts(ACTION_HEART_RATE_DATA_UPDATE));
+    }
+
+    @Test
+    public void disablingAFeaturePrefSuppressesIt() {
+        GBApplication.getPrefs().getPreferences().edit()
+                .putBoolean("pref_key_sleepasandroid_feat_hr", false)
+                .apply();
+        sender.startTracking(trackingExtras(true));
         clearBroadcasts();
 
         sender.onHrChanged(72f, 0);
