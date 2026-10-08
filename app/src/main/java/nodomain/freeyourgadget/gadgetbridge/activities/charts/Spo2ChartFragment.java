@@ -199,8 +199,6 @@ public class Spo2ChartFragment extends AbstractChartFragment<Spo2ChartFragment.S
                     .setVisibility(View.GONE);
             binding.manualMeasurements.setVisibility(View.VISIBLE);
         }
-
-        binding.spo2LineChart.setData(lineData);
     }
 
     @Override
