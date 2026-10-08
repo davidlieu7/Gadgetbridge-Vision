@@ -3,6 +3,7 @@ package nodomain.freeyourgadget.gadgetbridge.service;
 import android.content.Context;
 import android.content.Intent;
 import android.os.Bundle;
+import android.os.SystemClock;
 
 import androidx.annotation.Nullable;
 
@@ -179,8 +180,8 @@ public class SleepAsAndroidSender {
             }
         }, ACCEL_AGGREGATE_INTERVAL_MS, ACCEL_AGGREGATE_INTERVAL_MS, TimeUnit.MILLISECONDS);
 
-        lastRawDataMs = System.currentTimeMillis();
-        lastHrDataMs = System.currentTimeMillis();
+        lastRawDataMs = SystemClock.elapsedRealtime();
+        lastHrDataMs = SystemClock.elapsedRealtime();
 
         this.trackingOngoing = true;
 
@@ -493,9 +494,9 @@ public class SleepAsAndroidSender {
         updateLastHrData(hr);
 
         if (lastHrDataMs == 0) {
-            lastHrDataMs = System.currentTimeMillis();
+            lastHrDataMs = SystemClock.elapsedRealtime();
         }
-        long ms = System.currentTimeMillis();
+        long ms = SystemClock.elapsedRealtime();
         if (ms - lastHrDataMs >= sendDelay) {
             lastHrDataMs = ms;
             sendHrData();
