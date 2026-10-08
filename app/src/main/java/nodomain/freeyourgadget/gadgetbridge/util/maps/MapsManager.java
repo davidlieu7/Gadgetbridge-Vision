@@ -33,8 +33,9 @@ import org.mapsforge.map.layer.renderer.TileRendererLayer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
-import java.util.stream.Collectors;
 
 import nodomain.freeyourgadget.gadgetbridge.GBApplication;
 import nodomain.freeyourgadget.gadgetbridge.model.GPSCoordinate;
@@ -54,7 +55,10 @@ public final class MapsManager {
     private final Context mContext;
     private final MapView mapView;
     private final MapDataLoader mapDataLoader;
+    /** The track drawn with the configured track color; recolored by {@link #reload()}. */
     private Polyline polyline;
+    /** Every track currently on the map, in drawing order. */
+    private final List<Polyline> trackPolylines = new ArrayList<>();
 
     private TileRendererLayer tileRendererLayer;
     private boolean tileRenderedAdded;
@@ -112,11 +116,12 @@ public final class MapsManager {
     }
 
     public void onDestroy() {
-        if (polyline != null) {
-            mapView.getLayerManager().getLayers().remove(polyline);
-            polyline.onDestroy();
-            polyline = null;
+        for (final Polyline trackPolyline : trackPolylines) {
+            mapView.getLayerManager().getLayers().remove(trackPolyline);
+            trackPolyline.onDestroy();
         }
+        trackPolylines.clear();
+        polyline = null;
 
         if (tileRendererLayer != null) {
             if (tileRenderedAdded) {
@@ -147,33 +152,63 @@ public final class MapsManager {
     }
 
     public void setTrack(final List<? extends GPSCoordinate> trackPoints) {
+        setTracks(Collections.singletonList(trackPoints), null);
+    }
+
+    /**
+     * Draws several tracks at once, each in its own color, and fits the view to their
+     * common bounding box. Pass {@code null} to color every track with the configured
+     * track color; otherwise {@code colors[i]} colors {@code tracks.get(i)}.
+     */
+    public void setTracks(final List<? extends List<? extends GPSCoordinate>> tracks, final int[] colors) {
+        for (final Polyline trackPolyline : trackPolylines) {
+            mapView.getLayerManager().getLayers().remove(trackPolyline);
+            trackPolyline.onDestroy();
+        }
+        trackPolylines.clear();
+        polyline = null;
+
         final Accumulator latitudeAccumulator = new Accumulator();
         final Accumulator longitudeAccumulator = new Accumulator();
-        for (GPSCoordinate trackPoint : trackPoints) {
-            latitudeAccumulator.add(trackPoint.getLatitude());
-            longitudeAccumulator.add(trackPoint.getLongitude());
+        final List<List<LatLong>> allPoints = new ArrayList<>(tracks.size());
+        boolean anyPoints = false;
+        for (final List<? extends GPSCoordinate> trackPoints : tracks) {
+            final List<LatLong> points = new ArrayList<>(trackPoints.size());
+            for (final GPSCoordinate trackPoint : trackPoints) {
+                latitudeAccumulator.add(trackPoint.getLatitude());
+                longitudeAccumulator.add(trackPoint.getLongitude());
+                points.add(new LatLong(trackPoint.getLatitude(), trackPoint.getLongitude()));
+                anyPoints = true;
+            }
+            allPoints.add(points);
         }
+        if (!anyPoints) {
+            return;
+        }
+
         final double maxLat = latitudeAccumulator.getMax();
         final double minLat = latitudeAccumulator.getMin();
         final double maxLon = longitudeAccumulator.getMax();
         final double minLon = longitudeAccumulator.getMin();
         final LatLong center = new LatLong(minLat + (maxLat - minLat) / 2, minLon + (maxLon - minLon) / 2);
 
-        final List<LatLong> points = trackPoints.stream()
-                .map(p -> new LatLong(p.getLatitude(), p.getLongitude()))
-                .collect(Collectors.toList());
-
-        if (polyline == null) {
+        for (int i = 0; i < allPoints.size(); i++) {
             final Paint paint = AndroidGraphicFactory.INSTANCE.createPaint();
-            final int trackColor = mapDataLoader.resolveTrackColor();
+            final int trackColor = colors != null && i < colors.length
+                    ? colors[i]
+                    : mapDataLoader.resolveTrackColor();
             paint.setColor(trackColor);
             paint.setStrokeWidth(8);
             paint.setStyle(Style.STROKE);
 
-            polyline = new Polyline(paint, AndroidGraphicFactory.INSTANCE);
-            mapView.addLayer(polyline);
+            final Polyline trackPolyline = new Polyline(paint, AndroidGraphicFactory.INSTANCE);
+            trackPolyline.setPoints(allPoints.get(i));
+            mapView.addLayer(trackPolyline);
+            trackPolylines.add(trackPolyline);
+            if (colors == null && polyline == null) {
+                polyline = trackPolyline;
+            }
         }
-        polyline.setPoints(points);
 
         mapView.setCenter(center);
 

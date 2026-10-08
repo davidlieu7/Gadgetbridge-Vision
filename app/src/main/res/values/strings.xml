@@ -5727,6 +5727,7 @@
     <string name="compare_workouts_select_at_least_two">Select at least two workouts to compare.</string>
     <string name="compare_workouts_no_metrics">These workouts have no comparable metrics.</string>
     <string name="compare_workouts_delta">Δ</string>
+    <string name="compare_workouts_routes">Routes</string>
 
     <!-- Workout summary field labels (Xiaomi parsers and generic) -->
     <string name="vitality_gain">Vitality gain</string>

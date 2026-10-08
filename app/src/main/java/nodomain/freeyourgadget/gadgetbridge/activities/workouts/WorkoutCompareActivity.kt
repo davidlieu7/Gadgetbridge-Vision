@@ -53,9 +53,11 @@ import nodomain.freeyourgadget.gadgetbridge.databinding.ActivityWorkoutCompareBi
 import nodomain.freeyourgadget.gadgetbridge.model.ActivityKind
 import nodomain.freeyourgadget.gadgetbridge.model.ActivitySummaryData
 import nodomain.freeyourgadget.gadgetbridge.model.ActivitySummaryEntries
+import nodomain.freeyourgadget.gadgetbridge.model.GPSCoordinate
 import nodomain.freeyourgadget.gadgetbridge.model.workout.Workout
 import nodomain.freeyourgadget.gadgetbridge.model.workout.WorkoutChart
 import nodomain.freeyourgadget.gadgetbridge.util.DateTimeUtils
+import nodomain.freeyourgadget.gadgetbridge.util.maps.MapsManager
 import org.apache.commons.lang3.StringUtils
 import org.slf4j.LoggerFactory
 
@@ -70,11 +72,15 @@ import org.slf4j.LoggerFactory
 class WorkoutCompareActivity : AbstractGBActivity() {
     private lateinit var binding: ActivityWorkoutCompareBinding
     private val workoutValueFormatter = WorkoutValueFormatter()
+    private var mapsManager: MapsManager? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityWorkoutCompareBinding.inflate(layoutInflater)
         setContentView(binding.root)
+        // Pan and pinch zoom come from the map's touch gesture handler; the on-screen
+        // zoom buttons would just cover part of the small preview.
+        binding.mapView.setBuiltInZoomControls(false)
         supportActionBar?.title = getString(R.string.compare_workouts_title)
 
         val ids = intent.getLongArrayExtra(EXTRA_WORKOUT_IDS)
@@ -165,7 +171,14 @@ class WorkoutCompareActivity : AbstractGBActivity() {
         binding.compareScroll.visibility = View.VISIBLE
         addLegend(workouts)
         addSummaryTable(workouts)
+        addMapSection(workouts)
         addCharts(workouts)
+    }
+
+    override fun onDestroy() {
+        mapsManager?.onDestroy()
+        mapsManager = null
+        super.onDestroy()
     }
 
     private fun showError(message: String) {
@@ -361,6 +374,69 @@ class WorkoutCompareActivity : AbstractGBActivity() {
 
     // endregion
 
+    // region map
+
+    /**
+     * Draws every compared workout's GPS route on one map, each in the workout's color.
+     * Hidden when fewer than two workouts have a usable track.
+     */
+    private fun addMapSection(workouts: List<Workout>) {
+        binding.mapSection.visibility = View.GONE
+        lifecycleScope.launch {
+            val tracks = loadTracks(workouts)
+            if (tracks.size < MIN_TRACKS_FOR_MAP) {
+                return@launch
+            }
+
+            val manager = mapsManager ?: MapsManager(this@WorkoutCompareActivity, binding.mapView).also {
+                it.loadMaps()
+                mapsManager = it
+                binding.missingMapsWarning.visibility = if (it.isMapLoaded) View.GONE else View.VISIBLE
+            }
+            binding.mapSection.visibility = View.VISIBLE
+
+            val colors = IntArray(tracks.size) { i ->
+                val position = workouts.indexOfFirst { workout -> workout === tracks[i].first }
+                colorFor(if (position >= 0) position else i, workouts.size)
+            }
+            // Draw after layout: the zoom level depends on the view's pixel size.
+            binding.mapSection.post {
+                try {
+                    manager.setTracks(tracks.map { it.second }, colors)
+                } catch (e: Exception) {
+                    LOG.error("Failed to draw compared tracks", e)
+                    binding.mapSection.visibility = View.GONE
+                }
+            }
+        }
+    }
+
+    private suspend fun loadTracks(workouts: List<Workout>): List<Pair<Workout, List<GPSCoordinate>>> {
+        return withContext(Dispatchers.IO) {
+            val tracks = ArrayList<Pair<Workout, List<GPSCoordinate>>>()
+            for (workout in workouts) {
+                try {
+                    val summary = workout.summary
+                    val device = summary.device ?: continue
+                    val gbDevice = GBApplication.app().deviceManager.devices
+                        .firstOrNull { it.address.equals(device.identifier, true) } ?: continue
+                    val trackProvider = gbDevice.deviceCoordinator
+                        .getActivityTrackProvider(gbDevice, this@WorkoutCompareActivity) ?: continue
+                    val points = trackProvider.getActivityTrack(summary)?.allPoints
+                        ?.mapNotNull { it.location }
+                    if (!points.isNullOrEmpty()) {
+                        tracks.add(workout to points)
+                    }
+                } catch (e: Exception) {
+                    LOG.warn("Failed to load a track for comparison", e)
+                }
+            }
+            tracks
+        }
+    }
+
+    // endregion
+
     // region charts
 
     private fun addCharts(workouts: List<Workout>) {
@@ -509,6 +585,7 @@ class WorkoutCompareActivity : AbstractGBActivity() {
         )
 
         private const val LABEL_WEIGHT = 2f
+        private const val MIN_TRACKS_FOR_MAP = 2
         private const val CHART_HEIGHT_DP = 300
         private const val X_LABEL_COUNT = 5
         private const val FIRST_HUE = 210f
