@@ -33,7 +33,7 @@
             android:layout_width="match_parent"
             android:layout_height="250sp">
 
-            <com.github.mikephil.charting.charts.LineChart
+            <nodomain.freeyourgadget.gadgetbridge.activities.charts.mpchart.GbChartView
                 android:id="@+id/solar_charging_chart"
                 android:layout_width="fill_parent"
                 android:layout_height="fill_parent"
