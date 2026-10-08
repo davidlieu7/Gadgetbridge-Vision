@@ -67,12 +67,6 @@
             android:layout_marginEnd="15dp"
             android:orientation="vertical" />
 
-        <nodomain.freeyourgadget.gadgetbridge.activities.charts.mpchart.ChartLegendView
-            android:id="@+id/hrv_chart_legend"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginBottom="8dp" />
-
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="250sp">
@@ -83,6 +77,12 @@
                 android:layout_height="fill_parent"
                 android:layout_weight="2" />
         </LinearLayout>
+
+        <nodomain.freeyourgadget.gadgetbridge.activities.charts.mpchart.ChartLegendView
+            android:id="@+id/hrv_chart_legend"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp" />
 
         <com.google.android.material.chip.ChipGroup
             android:id="@+id/hrv_status_chart_data_type_group"
