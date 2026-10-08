@@ -195,21 +195,21 @@ private fun formatCell(
 
     val unit = cell.unit()
     if (column.dropUnit) {
-        return formatter.formatValue(value, unit, false)
+        return cell.prefix() + formatter.formatValue(value, unit, false)
     }
 
     val full = formatter.formatValue(value, unit)
     val number = formatter.formatValue(value, unit, false)
     // Durations and the like format to something that isn't "number + unit", leave those alone.
     if (full == number || !full.startsWith(number)) {
-        return full
+        return cell.prefix() + full
     }
     val unitText = full.substring(number.length).trim()
     if (unitText.isEmpty()) {
-        return number
+        return cell.prefix() + number
     }
 
-    return SpannableStringBuilder(number).apply {
+    return SpannableStringBuilder(cell.prefix() + number).apply {
         append(' ')
         val unitStart = length
         append(unitText)

@@ -294,8 +294,7 @@ class WorkoutCompareActivity : AbstractGBActivity() {
                     )
                 }
                 if (withDelta) {
-                    val delta = formatDelta(cells)
-                    values.add(raw(if (delta.isEmpty()) null else delta))
+                    values.add(formatDelta(cells) ?: ActivitySummaryValue(null, ""))
                 }
                 tableRows.add(ActivitySummaryTableRowEntry(null, values, false, true))
             }
@@ -332,18 +331,20 @@ class WorkoutCompareActivity : AbstractGBActivity() {
         }
     }
 
-    /** Signed difference between the two workouts, when both report the same unit numerically. */
-    private fun formatDelta(cells: List<ActivitySummarySimpleEntry?>): String {
-        val first = cells.getOrNull(0) ?: return ""
-        val second = cells.getOrNull(1) ?: return ""
-        val firstValue = first.value as? Number ?: return ""
-        val secondValue = second.value as? Number ?: return ""
-        if (first.unit != second.unit) return ""
+    /**
+     * Signed difference between the two workouts, when both report the same unit numerically.
+     * Returned as a numeric cell (not a formatted string) so the table renders it like every
+     * other value — unit small and muted after the number; positive deltas keep a "+", which
+     * the formatter never produces on its own.
+     */
+    private fun formatDelta(cells: List<ActivitySummarySimpleEntry?>): ActivitySummaryValue? {
+        val first = cells.getOrNull(0) ?: return null
+        val second = cells.getOrNull(1) ?: return null
+        val firstValue = first.value as? Number ?: return null
+        val secondValue = second.value as? Number ?: return null
+        if (first.unit != second.unit) return null
         val delta = secondValue.toDouble() - firstValue.toDouble()
-        // The delta column is literal text, so the unit has to ride along in the string
-        // (the table only lifts a unit into a column header when every row shares one).
-        val formatted = workoutValueFormatter.formatValue(delta, first.unit)
-        return if (delta > 0 && !formatted.startsWith("-")) "+$formatted" else formatted
+        return ActivitySummaryValue(delta, first.unit, if (delta > 0) "+" else "")
     }
 
     private fun safeLabel(key: String): String {

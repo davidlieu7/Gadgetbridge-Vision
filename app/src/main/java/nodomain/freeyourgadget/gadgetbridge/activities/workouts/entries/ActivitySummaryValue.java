@@ -21,9 +21,14 @@ import androidx.annotation.Nullable;
 import nodomain.freeyourgadget.gadgetbridge.activities.workouts.WorkoutValueFormatter;
 import nodomain.freeyourgadget.gadgetbridge.model.ActivitySummaryEntries;
 
-public record ActivitySummaryValue(@Nullable Object value, String unit) {
+public record ActivitySummaryValue(@Nullable Object value, String unit, String prefix) {
     public ActivitySummaryValue(@Nullable Object value, String unit) {
+        this(value, unit, "");
+    }
+
+    public ActivitySummaryValue(@Nullable Object value, String unit, String prefix) {
         this.unit = unit;
+        this.prefix = prefix == null ? "" : prefix;
         if (value instanceof Number number) {
             this.value = Double.isFinite(number.doubleValue()) ? value : null;
         } else {
@@ -36,6 +41,7 @@ public record ActivitySummaryValue(@Nullable Object value, String unit) {
     }
 
     public String format(final WorkoutValueFormatter formatter) {
-        return formatter.formatValue(value, unit);
+        // A missing value renders as "-", where a prefix would read as "+-".
+        return (value == null ? "" : prefix) + formatter.formatValue(value, unit);
     }
 }
