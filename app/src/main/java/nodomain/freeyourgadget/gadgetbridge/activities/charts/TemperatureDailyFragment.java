@@ -48,7 +48,6 @@ import nodomain.freeyourgadget.gadgetbridge.activities.charts.mpchart.ChartSelec
 import nodomain.freeyourgadget.gadgetbridge.activities.charts.mpchart.GbChartView;
 import nodomain.freeyourgadget.gadgetbridge.activities.charts.spec.ChartSeries;
 import nodomain.freeyourgadget.gadgetbridge.activities.charts.spec.ChartSpec;
-import nodomain.freeyourgadget.gadgetbridge.activities.charts.temperature.TemperatureChartData;
 import nodomain.freeyourgadget.gadgetbridge.activities.workouts.StatTileData;
 import nodomain.freeyourgadget.gadgetbridge.activities.workouts.StatTileGridUtilKt;
 import nodomain.freeyourgadget.gadgetbridge.database.DBHandler;
@@ -163,7 +162,7 @@ public class TemperatureDailyFragment extends AbstractChartFragment<TemperatureD
         StatTileGridUtilKt.addStatTileGrid(statsContainer, requireContext(), stats, 0);
 
         final long dayStart = DateTimeUtils.dayStart(date).getTime() / 1000L;
-        final ChartSpec spec = TemperatureChartData.daySpec(
+        final ChartSpec spec = nodomain.freeyourgadget.gadgetbridge.activities.charts.temperature.TemperatureChartData.daySpec(
                 dayStart, seconds, values, average, GBApplication.getPrefs().getBoolean("charts_show_average", true),
                 temperatureUnit == TemperatureUnit.CELSIUS ? 3 : 6, getTitle(), TEMPERATURE_COLOR, Color.CYAN
         );
