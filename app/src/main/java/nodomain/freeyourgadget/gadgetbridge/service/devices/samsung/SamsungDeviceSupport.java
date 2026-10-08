@@ -23,6 +23,7 @@ import android.bluetooth.BluetoothGatt;
 import android.bluetooth.BluetoothGattCharacteristic;
 import android.bluetooth.BluetoothManager;
 import android.content.Context;
+import android.content.Intent;
 import android.content.SharedPreferences;
 import android.net.Uri;
 import android.os.Bundle;
@@ -33,6 +34,7 @@ import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
+import androidx.localbroadcastmanager.content.LocalBroadcastManager;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -46,6 +48,7 @@ import java.time.DateTimeException;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
+import java.time.ZonedDateTime;
 import java.time.format.DateTimeParseException;
 import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
@@ -93,6 +96,7 @@ import nodomain.freeyourgadget.gadgetbridge.model.BatteryState;
 import nodomain.freeyourgadget.gadgetbridge.model.CalendarEventSpec;
 import nodomain.freeyourgadget.gadgetbridge.model.CallSpec;
 import nodomain.freeyourgadget.gadgetbridge.model.CannedMessagesSpec;
+import nodomain.freeyourgadget.gadgetbridge.model.DeviceService;
 import nodomain.freeyourgadget.gadgetbridge.model.MusicSpec;
 import nodomain.freeyourgadget.gadgetbridge.model.MusicStateSpec;
 import nodomain.freeyourgadget.gadgetbridge.model.NotificationSpec;
@@ -131,6 +135,7 @@ import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3Calendar;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3MenuOrder;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3NotificationAction;
+import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3PhoneAlarm;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3QuickReplies;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3WeatherInfo;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3WorldClock;
@@ -549,6 +554,9 @@ public class SamsungDeviceSupport extends AbstractBTLESingleDeviceSupport {
                     return;
                 case SapProtocol.CH_NOTIFICATION:         // 0x07: /3 icon fetch, /0x3e big-data-chunk upload ack
                     onNotificationRequest(msgId, body);
+                    return;
+                case SapProtocol.CH_PHONE_ALARM:          // 0x0d: alarm switched / deleted / dismissed on the band
+                    onPhoneAlarmRequest(Fit3PhoneAlarm.parse(body));
                     return;
                 case SapProtocol.CH_WORLD_CLOCK:          // 0x1b: /2,/3 edit or add a city on the phone
                     LOG.info("Samsung Fit 3: band asks to edit world clocks on the phone (msgId={})", msgId);
@@ -1495,6 +1503,10 @@ public class SamsungDeviceSupport extends AbstractBTLESingleDeviceSupport {
         sendRawMessage(Fit3NotificationCapability.CHANNEL, Fit3NotificationCapability.buildRequest(),
                 "notification-capability");
 
+        // Alarms, through the phone-alarm service (the band's own alarm
+        // service rejects writes).
+        sendPhoneAlarms();
+
         // World clock cities. Only a Samsung phone's vendor app sends these;
         // the band may show its World clock app only once it has them.
         sendWorldClocks(DBHelper.getWorldClocks(getDevice()));
@@ -2138,6 +2150,19 @@ public class SamsungDeviceSupport extends AbstractBTLESingleDeviceSupport {
                     sendCycleData();  // cycle tracking needs a female profile
                 }
                 break;
+            case Fit3PhoneAlarm.PREF_ENABLE:
+                if (getDevice().getDeviceCoordinator().getAlarmSlotCount(getDevice()) == 0) {
+                    LOG.info("Samsung Fit 3: phone alarms switched off");
+                    mainHandler.removeCallbacks(alarmRing);
+                    mainHandler.removeCallbacks(snoozeRing);
+                    nextAlarm = null;
+                    ringingAlarm = null;
+                } else {
+                    sendPhoneAlarms();
+                }
+                // The alarm button on the device card follows the slot count.
+                getDevice().sendDeviceUpdateIntent(getContext());
+                break;
             case Fit3HealthCycle.PREF_ENABLE:
             case Fit3HealthCycle.PREF_LAST_START:
             case Fit3HealthCycle.PREF_PERIOD_DAYS:
@@ -2238,6 +2263,150 @@ public class SamsungDeviceSupport extends AbstractBTLESingleDeviceSupport {
         }
         if (!event.preferences.isEmpty()) {
             evaluateGBDeviceEvent(event);
+        }
+    }
+
+    @Override
+    public void onSetAlarms(ArrayList<? extends nodomain.freeyourgadget.gadgetbridge.model.Alarm> alarms) {
+        sendPhoneAlarms();
+    }
+
+    /** Snooze length for an alert, minutes. */
+    private static final int ALARM_SNOOZE_MINUTES = 10;
+
+    /** The alarm {@link #alarmRing} will ring next, or null. */
+    @Nullable
+    private nodomain.freeyourgadget.gadgetbridge.entities.Alarm nextAlarm;
+
+    /**
+     * Rings {@link #nextAlarm} on the band: the alert message is what makes the
+     * band show and vibrate a phone alarm. Nothing on the phone rings, so this
+     * only works while connected and while this process is awake.
+     */
+    private final Runnable alarmRing = new Runnable() {
+        @Override
+        public void run() {
+            nodomain.freeyourgadget.gadgetbridge.entities.Alarm alarm = nextAlarm;
+            if (alarm != null) {
+                ringAlarm(alarm);
+                if (!alarm.isRepetitive()) {
+                    // A one-off alarm turns itself off once it has rung.
+                    alarm.setEnabled(false);
+                    DBHelper.store(alarm);
+                    LocalBroadcastManager.getInstance(getContext())
+                            .sendBroadcast(new Intent(DeviceService.ACTION_SAVE_ALARMS));
+                }
+            }
+            scheduleNextAlarm();
+        }
+    };
+
+    /** The alarm last rung, for a snooze. */
+    @Nullable
+    private nodomain.freeyourgadget.gadgetbridge.entities.Alarm ringingAlarm;
+
+    private final Runnable snoozeRing = () -> {
+        if (ringingAlarm != null) {
+            ringAlarm(ringingAlarm);
+        }
+    };
+
+    private void ringAlarm(nodomain.freeyourgadget.gadgetbridge.entities.Alarm alarm) {
+        ringingAlarm = alarm;
+        String name = alarm.getTitle() != null ? alarm.getTitle() : "";
+        LOG.info("Samsung Fit 3: ringing alarm {} ({}:{}) on the band",
+                Fit3PhoneAlarm.idFor(alarm), alarm.getHour(), alarm.getMinute());
+        sendMessage(Fit3PhoneAlarm.CHANNEL, Fit3PhoneAlarm.buildAlertStart(alarm, name,
+                ALARM_SNOOZE_MINUTES, ZonedDateTime.now()), "phone-alarm-ring");
+    }
+
+    /** Time the next enabled alarm (see {@link #alarmRing}). */
+    private void scheduleNextAlarm() {
+        mainHandler.removeCallbacks(alarmRing);
+        nextAlarm = null;
+        ZonedDateTime now = ZonedDateTime.now();
+        ZonedDateTime soonest = null;
+        for (nodomain.freeyourgadget.gadgetbridge.entities.Alarm alarm : DBHelper.getAlarms(getDevice())) {
+            if (alarm.getUnused() || !alarm.getEnabled()) {
+                continue;
+            }
+            ZonedDateTime ring = Fit3PhoneAlarm.nextRing(alarm, now);
+            if (soonest == null || ring.isBefore(soonest)) {
+                soonest = ring;
+                nextAlarm = alarm;
+            }
+        }
+        if (soonest == null) {
+            return;
+        }
+        long delay = soonest.toInstant().toEpochMilli() - System.currentTimeMillis();
+        LOG.info("Samsung Fit 3: next alarm rings at {} (in {} s)", soonest, delay / 1000);
+        mainHandler.postDelayed(alarmRing, Math.max(0, delay));
+    }
+
+    /** Send the clock-app flag, alert forwarding and the whole alarm list (see {@link Fit3PhoneAlarm}). */
+    private void sendPhoneAlarms() {
+        if (getDevice().getDeviceCoordinator().getAlarmSlotCount(getDevice()) == 0) {
+            return;  // switched off, see SamsungFit3Coordinator#getAlarmSlotCount
+        }
+        scheduleNextAlarm();
+        List<nodomain.freeyourgadget.gadgetbridge.entities.Alarm> alarms = DBHelper.getAlarms(getDevice());
+        LOG.info("Samsung Fit 3: sending {} alarm slot(s)", alarms.size());
+        sendMessage(Fit3PhoneAlarm.CHANNEL, Fit3PhoneAlarm.buildClockApp(true), "phone-alarm-app");
+        sendMessage(Fit3PhoneAlarm.CHANNEL, Fit3PhoneAlarm.buildNotificationSetting(true), "phone-alarm-alerts");
+        sendMessage(Fit3PhoneAlarm.CHANNEL, Fit3PhoneAlarm.buildSyncAll(alarms, ZonedDateTime.now()),
+                "phone-alarm-list");
+    }
+
+    /** The band changed an alarm, or wants the list again. */
+    private void onPhoneAlarmRequest(@Nullable Fit3PhoneAlarm request) {
+        if (request == null) {
+            LOG.warn("Samsung Fit 3: unhandled phone-alarm request");
+            return;
+        }
+        LOG.info("Samsung Fit 3: phone-alarm request from the band: {}", request);
+        switch (request.msgId) {
+            case Fit3PhoneAlarm.MSG_ID_SYNC_ALL:
+                sendPhoneAlarms();
+                return;
+            case Fit3PhoneAlarm.MSG_ID_ADD_UPDATE:
+            case Fit3PhoneAlarm.MSG_ID_DELETE:
+                if (request.id == null) {
+                    return;
+                }
+                for (nodomain.freeyourgadget.gadgetbridge.entities.Alarm alarm : DBHelper.getAlarms(getDevice())) {
+                    if (Fit3PhoneAlarm.idFor(alarm) != request.id) {
+                        continue;
+                    }
+                    if (request.msgId == Fit3PhoneAlarm.MSG_ID_DELETE) {
+                        alarm.setUnused(true);
+                        alarm.setEnabled(false);
+                    } else if (request.flag != null) {
+                        alarm.setEnabled(request.flag);
+                    }
+                    DBHelper.store(alarm);
+                    LocalBroadcastManager.getInstance(getContext())
+                            .sendBroadcast(new Intent(DeviceService.ACTION_SAVE_ALARMS));
+                }
+                // The band expects the phone to apply the change and report back.
+                sendPhoneAlarms();
+                return;
+            case Fit3PhoneAlarm.MSG_ID_ALERT_ACTION:
+                // Close the alert, as a phone's clock app does once it has
+                // stopped ringing; the band ignores a new alert until then.
+                sendMessage(Fit3PhoneAlarm.CHANNEL, Fit3PhoneAlarm.buildAlertStop(), "phone-alarm-stop");
+                mainHandler.removeCallbacks(snoozeRing);
+                if (Boolean.TRUE.equals(request.flag) && ringingAlarm != null) {
+                    // Snoozed on the band: ring the same alarm again later.
+                    LOG.info("Samsung Fit 3: alarm snoozed for {} min", ALARM_SNOOZE_MINUTES);
+                    mainHandler.postDelayed(snoozeRing, ALARM_SNOOZE_MINUTES * 60_000L);
+                } else {
+                    ringingAlarm = null;
+                }
+                return;
+            default:
+                // Edit on the phone: there is no clock app to open.
+                return;
         }
     }
 
@@ -2528,6 +2697,8 @@ public class SamsungDeviceSupport extends AbstractBTLESingleDeviceSupport {
         iconUploader.cancel();
         mainHandler.removeCallbacks(calendarPoke);
         mainHandler.removeCallbacks(fetchDone);
+        mainHandler.removeCallbacks(alarmRing);
+        mainHandler.removeCallbacks(snoozeRing);
         fetchInProgress = false;
         super.dispose();
     }

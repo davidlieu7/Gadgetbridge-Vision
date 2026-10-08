@@ -45,6 +45,7 @@ public final class SapProtocol {
     public static final int CH_HEALTH       = 0x0A;
     public static final int CH_SETTINGS     = 0x0B;
     public static final int CH_DEBUG        = 0x0C;   // log-file pull
+    public static final int CH_PHONE_ALARM  = 0x0D;   // phone alarms mirrored to the band
     public static final int CH_TILES        = 0x0F;   // tile list + carousel order
     public static final int CH_QUICK_REPLY  = 0x12;
     public static final int CH_QUICK_PANEL  = 0x13;   // quick-panel button list + order

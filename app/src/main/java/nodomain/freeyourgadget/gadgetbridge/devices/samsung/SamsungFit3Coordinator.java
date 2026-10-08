@@ -30,9 +30,12 @@ import java.util.regex.Pattern;
 
 import de.greenrobot.dao.AbstractDao;
 import de.greenrobot.dao.Property;
+import nodomain.freeyourgadget.gadgetbridge.GBApplication;
 import nodomain.freeyourgadget.gadgetbridge.R;
 import nodomain.freeyourgadget.gadgetbridge.activities.appmanager.AppManagerActivity;
+import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSpecificSettings;
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSpecificSettingsCustomizer;
+import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSpecificSettingsScreen;
 import nodomain.freeyourgadget.gadgetbridge.devices.AbstractBLEDeviceCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.InstallHandler;
 import nodomain.freeyourgadget.gadgetbridge.devices.SampleProvider;
@@ -45,6 +48,7 @@ import nodomain.freeyourgadget.gadgetbridge.model.ActivitySummaryParser;
 import nodomain.freeyourgadget.gadgetbridge.model.ActivityUser;
 import nodomain.freeyourgadget.gadgetbridge.service.DeviceSupport;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.SamsungDeviceSupport;
+import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3PhoneAlarm;
 
 public class SamsungFit3Coordinator extends AbstractBLEDeviceCoordinator {
 
@@ -182,8 +186,8 @@ public class SamsungFit3Coordinator extends AbstractBLEDeviceCoordinator {
     }
 
     @Override
-    public int[] getSupportedDeviceSpecificSettings(GBDevice device) {
-        return new int[]{
+    public DeviceSpecificSettings getDeviceSpecificSettings(@NonNull GBDevice device) {
+        DeviceSpecificSettings settings = new DeviceSpecificSettings(new int[]{
                 R.xml.devicesettings_samsung_fit3,
                 R.xml.devicesettings_key_vibration,
                 R.xml.devicesettings_always_on_display,
@@ -200,7 +204,23 @@ public class SamsungFit3Coordinator extends AbstractBLEDeviceCoordinator {
                 R.xml.devicesettings_samsung_fit3_sos,
                 R.xml.devicesettings_sos_contact,
                 R.xml.devicesettings_samsung_fit3_cycle,
-        };
+        });
+        settings.addRootScreen(DeviceSpecificSettingsScreen.DEVELOPER,
+                R.xml.devicesettings_samsung_fit3_developer);
+        return settings;
+    }
+
+    /**
+     * Phone alarms (Fit3PhoneAlarm) ring only on Gadgetbridge's own in-process
+     * timer, which is not reliable enough to wake up to, so they sit behind a
+     * developer switch. Zero slots hides the alarm screen, and the device
+     * support sends and rings nothing while this is zero.
+     */
+    @Override
+    public int getAlarmSlotCount(@NonNull GBDevice device) {
+        boolean enabled = GBApplication.getDeviceSpecificSharedPrefs(device.getAddress())
+                .getBoolean(Fit3PhoneAlarm.PREF_ENABLE, false);
+        return enabled ? Fit3PhoneAlarm.SLOT_COUNT : 0;
     }
 
     @Override

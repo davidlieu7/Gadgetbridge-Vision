@@ -6073,4 +6073,6 @@
     <string name="samsung_fit3_cycle_factor_pregnancy">Pregnancy</string>
     <string name="samsung_fit3_cycle_factor_breastfeeding">Breastfeeding</string>
     <string name="samsung_fit3_cycle_factor_menopause">Menopause</string>
+    <string name="pref_samsung_fit3_phone_alarms_title">Phone-timed alarms (experimental)</string>
+    <string name="pref_samsung_fit3_phone_alarms_summary">Ring Gadgetbridge alarms on the band. Gadgetbridge has to stay running and connected at alarm time, and may ring late while the phone sleeps - do not rely on it to wake up.</string>
 </resources>

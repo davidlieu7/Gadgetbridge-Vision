@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.preference.PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- Device-specific key: SamsungFit3SettingsCustomizer registers its
+         change handler. Off by default, see Fit3PhoneAlarm. -->
+    <SwitchPreferenceCompat
+        android:defaultValue="false"
+        android:icon="@drawable/ic_access_alarms"
+        android:key="samsung_fit3_phone_alarms"
+        android:layout="@layout/preference_checkbox"
+        android:summary="@string/pref_samsung_fit3_phone_alarms_summary"
+        android:title="@string/pref_samsung_fit3_phone_alarms_title" />
+
+</androidx.preference.PreferenceScreen>
