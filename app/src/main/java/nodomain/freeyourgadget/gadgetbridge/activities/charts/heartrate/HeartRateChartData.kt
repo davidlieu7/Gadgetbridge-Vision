@@ -95,12 +95,6 @@ object HeartRateChartData {
         )
     }
 
-    /**
-     * A legend entry for a line that isn't a series, like the average limit line.
-     */
-    @JvmStatic
-    fun legendLine(label: String, color: Int) = ChartSeries(label, label, emptyList(), SeriesStyle.Line(color))
-
     private fun yAxis(values: List<Double>) = AxisSpec(
         format = ChartValueFormat.INTEGER,
         minimum = maxOf(0.0, values.min() - Y_PADDING),

@@ -70,12 +70,18 @@ class ChartLegendView @JvmOverloads constructor(
 
     private fun dp(value: Float) = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, value, resources.displayMetrics)
 
-    private companion object {
-        const val SWATCH_DP = 10f
-        const val SWATCH_CORNER_DP = 2f
-        const val TEXT_SP = 14f
-        const val LABEL_SPACING_DP = 8f
-        const val ITEM_SPACING_DP = 16f
-        const val ROW_SPACING_DP = 2f
+    companion object {
+        private const val SWATCH_DP = 10f
+        private const val SWATCH_CORNER_DP = 2f
+        private const val TEXT_SP = 14f
+        private const val LABEL_SPACING_DP = 8f
+        private const val ITEM_SPACING_DP = 16f
+        private const val ROW_SPACING_DP = 2f
+
+        /**
+         * A legend entry for a line that isn't a series, like an average limit line.
+         */
+        @JvmStatic
+        fun lineItem(label: String, color: Int) = ChartSeries(label, label, emptyList(), SeriesStyle.Line(color))
     }
 }

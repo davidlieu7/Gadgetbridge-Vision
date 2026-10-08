@@ -18,6 +18,7 @@ sealed interface SeriesStyle {
         val curved: Boolean = false,
         val showPoints: Boolean = false,
         val maxGap: Double? = null,
+        val showLine: Boolean = true,
     ) : SeriesStyle
 
     /**

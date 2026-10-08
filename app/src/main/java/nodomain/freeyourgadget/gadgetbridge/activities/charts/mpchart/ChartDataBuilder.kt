@@ -162,7 +162,7 @@ internal object ChartDataBuilder {
         val style = series.style as SeriesStyle.Line
         val entries = points.map { Entry(x = it.x.toFloat(), y = it.y.toFloat(), data = it.x.toFloat()) }
         return LineDataSet(entries, series.label).apply {
-            color = style.color
+            color = if (style.showLine) style.color else Color.TRANSPARENT
             lineWidth = LINE_WIDTH_DP
             isDrawCirclesEnabled = style.showPoints
             circleColor = style.color

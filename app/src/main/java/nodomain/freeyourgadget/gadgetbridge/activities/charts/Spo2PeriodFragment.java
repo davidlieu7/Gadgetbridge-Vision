@@ -16,7 +16,6 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 package nodomain.freeyourgadget.gadgetbridge.activities.charts;
 
-import android.graphics.Paint;
 import android.os.Bundle;
 import android.util.TypedValue;
 import android.view.LayoutInflater;
@@ -29,34 +28,26 @@ import androidx.annotation.Nullable;
 import androidx.core.content.ContextCompat;
 
 import com.github.mikephil.charting.charts.Chart;
-import com.github.mikephil.charting.charts.CombinedChart;
-import com.github.mikephil.charting.charts.ScatterChart;
-import com.github.mikephil.charting.components.Legend;
-import com.github.mikephil.charting.components.LegendEntry;
-import com.github.mikephil.charting.components.XAxis;
-import com.github.mikephil.charting.components.YAxis;
-import com.github.mikephil.charting.data.CandleData;
-import com.github.mikephil.charting.data.CandleDataSet;
-import com.github.mikephil.charting.data.CandleEntry;
-import com.github.mikephil.charting.data.CombinedData;
-import com.github.mikephil.charting.data.Entry;
-import com.github.mikephil.charting.data.ScatterData;
-import com.github.mikephil.charting.data.ScatterDataSet;
-import com.github.mikephil.charting.formatter.IAxisValueFormatter;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.text.SimpleDateFormat;
+import java.time.Instant;
+import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Calendar;
-import java.util.Date;
 import java.util.List;
-import java.util.Locale;
+
+import kotlin.jvm.functions.Function1;
 
 import nodomain.freeyourgadget.gadgetbridge.GBApplication;
 import nodomain.freeyourgadget.gadgetbridge.R;
+import nodomain.freeyourgadget.gadgetbridge.activities.charts.mpchart.ChartLegendView;
+import nodomain.freeyourgadget.gadgetbridge.activities.charts.mpchart.DaySelections;
+import nodomain.freeyourgadget.gadgetbridge.activities.charts.mpchart.GbChartView;
+import nodomain.freeyourgadget.gadgetbridge.activities.charts.spec.ChartSpec;
+import nodomain.freeyourgadget.gadgetbridge.activities.charts.spo2.Spo2ChartData;
 import nodomain.freeyourgadget.gadgetbridge.activities.workouts.StatTileData;
 import nodomain.freeyourgadget.gadgetbridge.activities.workouts.StatTileGridUtilKt;
 import nodomain.freeyourgadget.gadgetbridge.database.DBHandler;
@@ -66,6 +57,7 @@ import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
 import nodomain.freeyourgadget.gadgetbridge.model.Spo2Sample;
 import nodomain.freeyourgadget.gadgetbridge.util.Accumulator;
 import nodomain.freeyourgadget.gadgetbridge.util.DateTimeUtils;
+
 
 public class Spo2PeriodFragment extends AbstractChartFragment<Spo2PeriodFragment.Spo2PeriodData> {
     protected static final Logger LOG = LoggerFactory.getLogger(Spo2PeriodFragment.class);
@@ -81,7 +73,8 @@ public class Spo2PeriodFragment extends AbstractChartFragment<Spo2PeriodFragment
 
     private TextView mDateView;
     private LinearLayout spo2StatsContainer;
-    private CombinedChart spo2Chart;
+    private GbChartView spo2Chart;
+    private ChartLegendView spo2Legend;
     private int TOTAL_DAYS;
 
     @Override
@@ -125,10 +118,10 @@ public class Spo2PeriodFragment extends AbstractChartFragment<Spo2PeriodFragment
         mDateView = rootView.findViewById(R.id.date_view);
         spo2StatsContainer = rootView.findViewById(R.id.spo2_period_stats_container);
         spo2Chart = rootView.findViewById(R.id.spo2_chart);
+        spo2Chart.dismissSelectionOnTapOutside(rootView);
+        spo2Legend = rootView.findViewById(R.id.spo2_chart_legend);
 
-        setupChart();
         refresh();
-        setupLegend(spo2Chart);
 
         return rootView;
     }
@@ -192,19 +185,22 @@ public class Spo2PeriodFragment extends AbstractChartFragment<Spo2PeriodFragment
         final Accumulator minAccumulator = new Accumulator();
         final Accumulator maxAccumulator = new Accumulator();
 
-        final ArrayList<CandleEntry> candleEntries = new ArrayList<>();
-        final ArrayList<Entry> avgEntries = new ArrayList<>();
-
-        for (int i = 0; i < data.days.size(); i++) {
+        final int n = data.days.size();
+        final long firstDay = Instant.ofEpochSecond(startTs).atZone(ZoneId.systemDefault()).toLocalDate().toEpochDay();
+        final long[] epochDays = new long[n];
+        final int[] dayMinimum = new int[n];
+        final int[] dayMaximum = new int[n];
+        final int[] dayAverage = new int[n];
+        for (int i = 0; i < n; i++) {
             final Spo2DayData dayData = data.days.get(i);
+            epochDays[i] = firstDay + i;
             if (dayData.minimum > 0 && dayData.maximum > 0) {
                 avgAccumulator.add(dayData.average);
                 minAccumulator.add(dayData.minimum);
                 maxAccumulator.add(dayData.maximum);
-                // CandleEntry: x, shadowH (high), shadowL (low), open, close
-                candleEntries.add(new CandleEntry<>(i, dayData.maximum, dayData.minimum, dayData.minimum, dayData.maximum, null, null));
-                // Scatter entry for daily average
-                avgEntries.add(new Entry<>(i, dayData.average, null, null));
+                dayMinimum[i] = dayData.minimum;
+                dayMaximum[i] = dayData.maximum;
+                dayAverage[i] = Math.max(dayData.average, 0);
             }
         }
 
@@ -229,117 +225,28 @@ public class Spo2PeriodFragment extends AbstractChartFragment<Spo2PeriodFragment
         spo2StatsContainer.removeAllViews();
         StatTileGridUtilKt.addStatTileGrid(spo2StatsContainer, requireContext(), stats, 0);
 
-        final String fmt = TOTAL_DAYS == 7 ? "EEE" : "dd";
-        SimpleDateFormat formatDay = new SimpleDateFormat(fmt, Locale.getDefault());
-        IAxisValueFormatter formatter = (value, axis) -> {
-            int dayIndex = Math.round(value);
-            if (dayIndex < 0 || dayIndex >= TOTAL_DAYS) {
-                return "";
-            }
-            int ts = startTs + SEC_PER_DAY * dayIndex;
-            return formatDay.format(new Date(ts * 1000L));
-        };
-        spo2Chart.getXAxis().setValueFormatter(formatter);
-
-        if (minimum > 0) {
-            spo2Chart.getAxisLeft().setAxisMinimum(Math.max(5 * ((minimum - 5) / 5), 0));
-        }
-
-        final CombinedData combinedData = new CombinedData();
-
-        // Candle data for range bars
-        if (!candleEntries.isEmpty()) {
-            CandleDataSet candleDataSet = new CandleDataSet(candleEntries, getString(R.string.pref_header_spo2));
-            candleDataSet.setDrawValuesEnabled(false);
-            candleDataSet.setDrawIconsEnabled(false);
-            candleDataSet.setAxisDependency(YAxis.AxisDependency.LEFT);
-            candleDataSet.setShadowColor(SPO2_COLOR);
-            candleDataSet.setShadowWidth(2f);
-            candleDataSet.setDecreasingColor(SPO2_COLOR);
-            candleDataSet.setDecreasingPaintStyle(Paint.Style.FILL);
-            candleDataSet.setIncreasingColor(SPO2_COLOR);
-            candleDataSet.setIncreasingPaintStyle(Paint.Style.FILL);
-            candleDataSet.setNeutralColor(SPO2_COLOR);
-            candleDataSet.setBarSpace(0.15f);
-            candleDataSet.setShowCandleBar(true);
-            combinedData.setCandleData(new CandleData(candleDataSet));
-        }
-
-        // Scatter data for daily average markers
-        if (!avgEntries.isEmpty()) {
-            ScatterDataSet scatterDataSet = new ScatterDataSet(avgEntries, getString(R.string.hr_average));
-            scatterDataSet.setScatterShape(ScatterChart.ScatterShape.CIRCLE);
-            scatterDataSet.setScatterShapeSize(7.5f);
-            scatterDataSet.setColor(SPO2_AVG_COLOR);
-            scatterDataSet.setDrawValuesEnabled(false);
-            scatterDataSet.setAxisDependency(YAxis.AxisDependency.LEFT);
-            combinedData.setScatterData(new ScatterData(scatterDataSet));
-        }
-
-        spo2Chart.setData(combinedData);
-    }
-
-    private void setupChart() {
-        spo2Chart.setBackgroundColor(BACKGROUND_COLOR);
-        spo2Chart.getDescription().setEnabled(false);
-        spo2Chart.setDrawOrder(Arrays.asList(
-                CombinedChart.DrawOrder.CANDLE,
-                CombinedChart.DrawOrder.SCATTER
+        final String rangeLabel = getString(R.string.pref_header_spo2);
+        final String averageLabel = getString(R.string.hr_average);
+        final ChartSpec spec = Spo2ChartData.periodSpec(
+                epochDays, dayMinimum, dayMaximum, dayAverage, rangeLabel, SPO2_COLOR, averageLabel, SPO2_AVG_COLOR
+        );
+        final List<Function1<Integer, String>> rowTexts = new ArrayList<>();
+        rowTexts.add(i -> dayMinimum[i] > 0
+                ? dayMinimum[i] + " – " + getString(R.string.battery_percentage_str, String.valueOf(dayMaximum[i]))
+                : getString(R.string.stats_empty_value));
+        rowTexts.add(i -> dayAverage[i] > 0
+                ? getString(R.string.battery_percentage_str, String.valueOf(dayAverage[i]))
+                : getString(R.string.stats_empty_value));
+        spo2Chart.setSelectionContent(x -> DaySelections.of(
+                epochDays, x, Arrays.asList(rangeLabel, averageLabel), Arrays.asList(SPO2_COLOR, SPO2_AVG_COLOR),
+                rowTexts, getString(R.string.stats_empty_value)
         ));
-
-        if (TOTAL_DAYS <= 7) {
-            spo2Chart.setTouchEnabled(false);
-            spo2Chart.setPinchZoomEnabled(false);
-        }
-        spo2Chart.setDoubleTapToZoomEnabled(false);
-
-        final XAxis xAxisBottom = spo2Chart.getXAxis();
-        xAxisBottom.setPosition(XAxis.XAxisPosition.BOTTOM);
-        xAxisBottom.setDrawLabelsEnabled(true);
-        xAxisBottom.setDrawGridLinesEnabled(false);
-        xAxisBottom.setEnabled(true);
-        xAxisBottom.setDrawLimitLinesBehindDataEnabled(true);
-        xAxisBottom.setTextColor(CHART_TEXT_COLOR);
-        xAxisBottom.setGranularity(1f);
-        xAxisBottom.setGranularityEnabled(true);
-        xAxisBottom.setAxisMinimum(-0.5f);
-        xAxisBottom.setAxisMaximum(TOTAL_DAYS - 0.5f);
-
-        final YAxis yAxisLeft = spo2Chart.getAxisLeft();
-        yAxisLeft.setDrawGridLinesEnabled(true);
-        yAxisLeft.setAxisMaximum(100f);
-        yAxisLeft.setAxisMinimum(85f);
-        yAxisLeft.setDrawTopYLabelEntryEnabled(true);
-        yAxisLeft.setTextColor(CHART_TEXT_COLOR);
-        yAxisLeft.setEnabled(true);
-        yAxisLeft.setGranularity(5f);
-        yAxisLeft.setGranularityEnabled(true);
-
-        final YAxis yAxisRight = spo2Chart.getAxisRight();
-        yAxisRight.setEnabled(true);
-        yAxisRight.setDrawLabelsEnabled(false);
-        yAxisRight.setDrawGridLinesEnabled(false);
-        yAxisRight.setDrawAxisLineEnabled(true);
+        spo2Chart.setSpec(spec);
+        spo2Legend.setSeries(spec.getSeries());
     }
 
     @Override
     protected void setupLegend(Chart<?> chart) {
-        List<LegendEntry> legendEntries = new ArrayList<>(2);
-
-        LegendEntry rangeEntry = new LegendEntry();
-        rangeEntry.setLabel(getString(R.string.pref_header_spo2));
-        rangeEntry.setFormColor(SPO2_COLOR);
-        legendEntries.add(rangeEntry);
-
-        LegendEntry avgEntry = new LegendEntry();
-        avgEntry.setLabel(getString(R.string.hr_average));
-        avgEntry.setFormColor(SPO2_AVG_COLOR);
-        avgEntry.setForm(Legend.LegendForm.CIRCLE);
-        legendEntries.add(avgEntry);
-
-        spo2Chart.getLegend().setEntries(legendEntries);
-        spo2Chart.getLegend().setTextColor(LEGEND_TEXT_COLOR);
-        spo2Chart.getLegend().setWordWrapEnabled(true);
     }
 
     @Override

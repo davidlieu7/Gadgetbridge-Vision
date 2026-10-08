@@ -296,7 +296,7 @@ public class HeartRatePeriodFragment extends AbstractChartFragment<HeartRatePeri
 
         final List<ChartSeries> legendSeries = new ArrayList<>(spec.getSeries());
         if (!spec.getSeries().isEmpty() && !spec.getLimitLines().isEmpty()) {
-            legendSeries.add(HeartRateChartData.legendLine(getString(R.string.hr_average), Color.RED));
+            legendSeries.add(ChartLegendView.lineItem(getString(R.string.hr_average), Color.RED));
         }
         hrLegend.setSeries(legendSeries);
     }
