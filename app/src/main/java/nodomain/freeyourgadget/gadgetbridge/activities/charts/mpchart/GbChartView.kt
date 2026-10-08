@@ -384,8 +384,10 @@ class GbChartView @JvmOverloads constructor(
 
     private fun configureLimitLines(spec: ChartSpec) {
         axisLeft.removeAllLimitLines()
+        axisRight.removeAllLimitLines()
         for (limit in spec.limitLines) {
-            axisLeft.addLimitLine(LimitLine(limit.value.toFloat()).apply {
+            val axis = if (limit.axis == AxisSide.END) axisRight else axisLeft
+            axis.addLimitLine(LimitLine(limit.value.toFloat()).apply {
                 lineColor = limit.color
                 lineWidth = LIMIT_LINE_WIDTH_DP
                 if (limit.dashed) {
@@ -406,6 +408,7 @@ class GbChartView @JvmOverloads constructor(
         }
         val label = labelFor(spec.format)
         val unit = spec.unit
+        axis.isDrawLabelsEnabled = spec.showLabels
         axis.valueFormatter = formatterFor { value -> if (unit == null) label(value) else "${label(value)} $unit" }
         axis.isGranularityEnabled = spec.format == ChartValueFormat.INTEGER
         spec.minimum?.let { axis.axisMinimum = it.toFloat() } ?: axis.resetAxisMinimum()

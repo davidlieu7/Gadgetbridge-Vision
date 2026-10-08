@@ -96,6 +96,7 @@ data class AxisSpec(
     val minimum: Double? = null,
     val maximum: Double? = null,
     val unit: String? = null,
+    val showLabels: Boolean = true,
 )
 
 /**
@@ -105,6 +106,7 @@ data class LimitLineSpec(
     val value: Double,
     val color: Int,
     val dashed: Boolean = true,
+    val axis: AxisSide = AxisSide.START,
 )
 
 /**

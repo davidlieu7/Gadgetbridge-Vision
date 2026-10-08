@@ -237,22 +237,7 @@ public abstract class AbstractActivityChartFragment<D extends ChartsData> extend
             ActivitySample sample = samples.get(i);
             ActivityKind type = sample.getKind();
             int ts = tsTranslation.shorten(sample.getTimestamp());
-            final float value;
-            if (type != ActivityKind.NOT_WORN) {
-                if (ActivityKind.isSleep(type) && sample.getIntensity() < 0) {
-                    value = switch (type) {
-                        case SLEEP_ANY, AWAKE_SLEEP -> 0.25f;
-                        case DEEP_SLEEP -> 0.10f;
-                        case LIGHT_SLEEP -> 0.15f;
-                        case REM_SLEEP -> 0.20f;
-                        default -> Y_VALUE_DEEP_SLEEP;
-                    };
-                } else {
-                    value = sample.getIntensity();
-                }
-            } else {
-                value = Y_VALUE_DEEP_SLEEP;
-            }
+            final float value = chartValueOf(sample);
 
             // do not interpolate NOT_WORN on any side
             boolean interpolate = !(last_type == ActivityKind.NOT_WORN || type == ActivityKind.NOT_WORN);
@@ -336,6 +321,23 @@ public abstract class AbstractActivityChartFragment<D extends ChartsData> extend
 
         IAxisValueFormatter xValueFormatter = new SampleXLabelFormatter(tsTranslation, "HH:mm");
         return new DefaultChartsData<>(lineData, xValueFormatter);
+    }
+
+    protected static float chartValueOf(final ActivitySample sample) {
+        final ActivityKind type = sample.getKind();
+        if (type == ActivityKind.NOT_WORN) {
+            return Y_VALUE_DEEP_SLEEP;
+        }
+        if (ActivityKind.isSleep(type) && sample.getIntensity() < 0) {
+            return switch (type) {
+                case SLEEP_ANY, AWAKE_SLEEP -> 0.25f;
+                case DEEP_SLEEP -> 0.10f;
+                case LIGHT_SLEEP -> 0.15f;
+                case REM_SLEEP -> 0.20f;
+                default -> Y_VALUE_DEEP_SLEEP;
+            };
+        }
+        return sample.getIntensity();
     }
 
     public List<SleepDetailsView.SleepDetail> prepareStages(List<? extends ActivitySample> samples) {
