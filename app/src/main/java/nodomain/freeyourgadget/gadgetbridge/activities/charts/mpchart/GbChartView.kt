@@ -2,6 +2,7 @@ package nodomain.freeyourgadget.gadgetbridge.activities.charts.mpchart
 
 import android.annotation.SuppressLint
 import android.content.Context
+import android.graphics.Bitmap
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
@@ -234,6 +235,28 @@ class GbChartView @JvmOverloads constructor(
         enableDashedLine(dash, dash, 0f)
     }
 
+    /**
+     * The chart drawn dark on white with its series legend, e.g. for a PDF export.
+     */
+    fun toLightBitmap(): Bitmap {
+        val previousBackground = background
+        val axes = listOf(xAxis, axisLeft, axisRight)
+        val textColors = axes.map { it.textColor }
+        select(null)
+        setBackgroundColor(Color.WHITE)
+        axes.forEach { it.textColor = Color.BLACK }
+        legend.isEnabled = true
+        legend.textColor = Color.BLACK
+        notifyDataSetChanged()
+        val bitmap = toBitmap()
+        background = previousBackground
+        axes.zip(textColors).forEach { (axis, color) -> axis.textColor = color }
+        legend.isEnabled = false
+        notifyDataSetChanged()
+        invalidate()
+        return bitmap
+    }
+
     override fun onTouchEvent(event: MotionEvent): Boolean {
         val handled = gestures.onTouchEvent(event)
         scrub(event)
@@ -381,7 +404,9 @@ class GbChartView @JvmOverloads constructor(
         if (spec == null) {
             return
         }
-        axis.valueFormatter = formatterFor(labelFor(spec.format))
+        val label = labelFor(spec.format)
+        val unit = spec.unit
+        axis.valueFormatter = formatterFor { value -> if (unit == null) label(value) else "${label(value)} $unit" }
         axis.isGranularityEnabled = spec.format == ChartValueFormat.INTEGER
         spec.minimum?.let { axis.axisMinimum = it.toFloat() } ?: axis.resetAxisMinimum()
         spec.maximum?.let { axis.axisMaximum = it.toFloat() } ?: axis.resetAxisMaximum()

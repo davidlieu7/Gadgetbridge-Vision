@@ -95,6 +95,7 @@ data class AxisSpec(
     val format: ChartValueFormat = ChartValueFormat.DECIMAL,
     val minimum: Double? = null,
     val maximum: Double? = null,
+    val unit: String? = null,
 )
 
 /**
