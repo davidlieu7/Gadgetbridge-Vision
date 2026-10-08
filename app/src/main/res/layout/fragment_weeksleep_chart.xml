@@ -58,7 +58,7 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="@dimen/chart_section_spacing"
             app:sectionTitle="@string/sleep_score" />
-        <com.github.mikephil.charting.charts.LineChart
+        <nodomain.freeyourgadget.gadgetbridge.activities.charts.mpchart.GbChartView
             android:id="@+id/sleep_score_chart"
             android:layout_width="fill_parent"
             android:layout_height="250dp"
