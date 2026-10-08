@@ -1,8 +1,12 @@
 package nodomain.freeyourgadget.gadgetbridge.activities.charts.mpchart
 
+import android.text.format.DateFormat
 import nodomain.freeyourgadget.gadgetbridge.activities.charts.spec.AxisSpec
 import nodomain.freeyourgadget.gadgetbridge.activities.charts.spec.ChartSpec
 import nodomain.freeyourgadget.gadgetbridge.activities.charts.spec.fixedLabelValues
+import java.time.LocalDate
+import java.time.format.DateTimeFormatter
+import java.util.Locale
 import kotlin.math.abs
 import kotlin.math.roundToInt
 
@@ -52,5 +56,32 @@ internal object ChartSlots {
     fun tooltipLeft(guideX: Float, centerX: Float, width: Float, gap: Float, minLeft: Float, maxRight: Float): Float {
         val left = if (guideX < centerX) guideX + gap else guideX - gap - width
         return left.coerceIn(minLeft, maxOf(minLeft, maxRight - width))
+    }
+}
+
+object DaySelections {
+    /**
+     * Tooltip for epoch day [x]: its date, then one row per label. [texts] format the value at a day's index.
+     */
+    @JvmStatic
+    fun of(
+        epochDays: LongArray,
+        x: Double,
+        labels: List<String>,
+        colors: List<Int>,
+        texts: List<(Int) -> String>,
+        emptyText: String,
+    ): ChartSelection {
+        val locale = Locale.getDefault()
+        val day = Math.round(x)
+        val title = DateTimeFormatter.ofPattern(DateFormat.getBestDateTimePattern(locale, "EEEMMMd"), locale)
+            .format(LocalDate.ofEpochDay(day))
+        val index = epochDays.indexOf(day)
+        val values = texts.map { if (index >= 0) it(index) else emptyText }
+        return ChartSelection(
+            title = title,
+            rows = colors.zip(values) { color, value -> ChartSelection.Row(color, value) },
+            description = (listOf(title) + labels.zip(values) { label, value -> "$label $value" }).joinToString(". ", postfix = "."),
+        )
     }
 }

@@ -23,7 +23,6 @@ import static nodomain.freeyourgadget.gadgetbridge.model.MetricSample.Metric.GEN
 import android.content.Context;
 import android.content.res.Resources;
 import android.os.Bundle;
-import android.text.format.DateFormat;
 import android.util.TypedValue;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -49,20 +48,19 @@ import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
-import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Collections;
 import java.util.Date;
 import java.util.List;
-import java.util.Locale;
-import java.util.function.IntFunction;
+
+import kotlin.jvm.functions.Function1;
 
 import nodomain.freeyourgadget.gadgetbridge.GBApplication;
 import nodomain.freeyourgadget.gadgetbridge.R;
 import nodomain.freeyourgadget.gadgetbridge.activities.charts.load.LoadChartData;
 import nodomain.freeyourgadget.gadgetbridge.activities.charts.mpchart.ChartLegendView;
-import nodomain.freeyourgadget.gadgetbridge.activities.charts.mpchart.ChartSelection;
+import nodomain.freeyourgadget.gadgetbridge.activities.charts.mpchart.DaySelections;
 import nodomain.freeyourgadget.gadgetbridge.activities.charts.mpchart.GbChartView;
 import nodomain.freeyourgadget.gadgetbridge.activities.charts.spec.ChartSeries;
 import nodomain.freeyourgadget.gadgetbridge.activities.charts.spec.ChartSpec;
@@ -317,9 +315,9 @@ public class LoadFragment extends AbstractChartFragment<LoadFragment.LoadsData> 
         }
 
         final String dailyLoadLabel = getString(R.string.training_daily_load);
-        dailyLoadChart.setSelectionContent(x -> daySelection(
+        dailyLoadChart.setSelectionContent(x -> DaySelections.of(
                 epochDays, x, Collections.singletonList(dailyLoadLabel), Collections.singletonList(LOAD_COLOR),
-                Collections.singletonList(valueText(load))
+                Collections.singletonList(valueText(load)), getString(R.string.stats_empty_value)
         ));
         dailyLoadChart.setSpec(LoadChartData.dailyLoadSpec(epochDays, load, LOAD_COLOR));
 
@@ -333,7 +331,7 @@ public class LoadFragment extends AbstractChartFragment<LoadFragment.LoadsData> 
             );
             final List<String> rowLabels = new ArrayList<>();
             final List<Integer> rowColors = new ArrayList<>();
-            final List<IntFunction<String>> rowTexts = new ArrayList<>();
+            final List<Function1<Integer, String>> rowTexts = new ArrayList<>();
             if (showAcuteLoad) {
                 rowLabels.add(getString(R.string.training_acute_load));
                 rowColors.add(LOAD_COLOR);
@@ -347,7 +345,7 @@ public class LoadFragment extends AbstractChartFragment<LoadFragment.LoadsData> 
                 rowColors.add(OPTIMAL_LOAD_FILL_COLOR);
                 rowTexts.add(optimalRangeText(chronic));
             }
-            acuteLoadChart.setSelectionContent(x -> daySelection(epochDays, x, rowLabels, rowColors, rowTexts));
+            acuteLoadChart.setSelectionContent(x -> DaySelections.of(epochDays, x, rowLabels, rowColors, rowTexts, getString(R.string.stats_empty_value)));
             acuteLoadChart.setSpec(acuteChronicSpec);
             final List<ChartSeries> legendSeries = new ArrayList<>();
             for (final ChartSeries series : acuteChronicSpec.getSeries()) {
@@ -554,32 +552,11 @@ public class LoadFragment extends AbstractChartFragment<LoadFragment.LoadsData> 
         return sampleProvider.getLatestSample(tsToMillis);
     }
 
-    private ChartSelection daySelection(final long[] epochDays, final double x, final List<String> labels,
-                                        final List<Integer> colors, final List<IntFunction<String>> texts) {
-        final Locale locale = Locale.getDefault();
-        final String title = DateTimeFormatter.ofPattern(DateFormat.getBestDateTimePattern(locale, "EEEMMMd"), locale)
-                .format(LocalDate.ofEpochDay(Math.round(x)));
-        int index = -1;
-        for (int i = 0; i < epochDays.length; i++) {
-            if (epochDays[i] == Math.round(x)) {
-                index = i;
-            }
-        }
-        final List<ChartSelection.Row> rows = new ArrayList<>();
-        final StringBuilder description = new StringBuilder(title).append('.');
-        for (int k = 0; k < labels.size(); k++) {
-            final String text = index >= 0 ? texts.get(k).apply(index) : getString(R.string.stats_empty_value);
-            rows.add(new ChartSelection.Row(colors.get(k), text));
-            description.append(' ').append(labels.get(k)).append(' ').append(text).append('.');
-        }
-        return new ChartSelection(title, rows, description.toString());
-    }
-
-    private IntFunction<String> valueText(final int[] values) {
+    private Function1<Integer, String> valueText(final int[] values) {
         return i -> values[i] > 0 ? String.valueOf(values[i]) : getString(R.string.stats_empty_value);
     }
 
-    private IntFunction<String> optimalRangeText(final int[] chronic) {
+    private Function1<Integer, String> optimalRangeText(final int[] chronic) {
         return i -> chronic[i] > 0
                 ? Math.round(chronic[i] * OPTIMAL_LOAD_RATIO_LOWER) + " – " + Math.round(chronic[i] * OPTIMAL_LOAD_RATIO_UPPER)
                 : getString(R.string.stats_empty_value);

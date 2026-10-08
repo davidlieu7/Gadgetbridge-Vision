@@ -8,34 +8,42 @@ import android.view.Gravity
 import android.view.View
 import android.widget.LinearLayout
 import android.widget.TextView
+import com.google.android.flexbox.FlexWrap
+import com.google.android.flexbox.FlexboxLayout
+import com.google.android.flexbox.JustifyContent
 import nodomain.freeyourgadget.gadgetbridge.activities.charts.spec.ChartSeries
 import nodomain.freeyourgadget.gadgetbridge.activities.charts.spec.ChartTheme
 import nodomain.freeyourgadget.gadgetbridge.activities.charts.spec.SeriesStyle
 
 /**
- * Legend row: square swatch for bars, dot for lines.
+ * Legend row: square swatch for bars and ranges, dot for lines. Wraps when it doesn't fit.
  */
 class ChartLegendView @JvmOverloads constructor(
     context: Context,
     attrs: AttributeSet? = null,
-) : LinearLayout(context, attrs) {
+) : FlexboxLayout(context, attrs) {
     private val theme = ChartTheme.from(context)
 
     init {
-        orientation = HORIZONTAL
-        gravity = Gravity.CENTER
+        flexWrap = FlexWrap.WRAP
+        justifyContent = JustifyContent.CENTER
     }
 
     fun setSeries(series: List<ChartSeries>) {
         removeAllViews()
-        series.forEachIndexed { index, chartSeries ->
+        for (chartSeries in series) {
             val style = chartSeries.style
             val color = when (style) {
                 is SeriesStyle.Column -> style.color
                 is SeriesStyle.Line -> style.color
                 is SeriesStyle.Range -> style.color
             }
-            val swatch = View(context).apply {
+            val item = LinearLayout(context).apply {
+                orientation = LinearLayout.HORIZONTAL
+                gravity = Gravity.CENTER_VERTICAL
+            }
+            val size = dp(SWATCH_DP).toInt()
+            item.addView(View(context).apply {
                 background = GradientDrawable().apply {
                     setColor(color)
                     if (style !is SeriesStyle.Line) {
@@ -44,17 +52,18 @@ class ChartLegendView @JvmOverloads constructor(
                         shape = GradientDrawable.OVAL
                     }
                 }
-            }
-            val size = dp(SWATCH_DP).toInt()
-            addView(swatch, LayoutParams(size, size).apply {
-                if (index > 0) marginStart = dp(ITEM_SPACING_DP).toInt()
-            })
-            addView(TextView(context).apply {
+            }, LinearLayout.LayoutParams(size, size))
+            item.addView(TextView(context).apply {
                 text = chartSeries.label
                 setTextColor(theme.textColor)
                 setTextSize(TypedValue.COMPLEX_UNIT_SP, TEXT_SP)
-            }, LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT).apply {
+            }, LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT).apply {
                 marginStart = dp(LABEL_SPACING_DP).toInt()
+            })
+            val halfSpacing = (dp(ITEM_SPACING_DP) / 2f).toInt()
+            val rowSpacing = dp(ROW_SPACING_DP).toInt()
+            addView(item, LayoutParams(LayoutParams.WRAP_CONTENT, LayoutParams.WRAP_CONTENT).apply {
+                setMargins(halfSpacing, rowSpacing, halfSpacing, rowSpacing)
             })
         }
     }
@@ -67,5 +76,6 @@ class ChartLegendView @JvmOverloads constructor(
         const val TEXT_SP = 14f
         const val LABEL_SPACING_DP = 8f
         const val ITEM_SPACING_DP = 16f
+        const val ROW_SPACING_DP = 2f
     }
 }

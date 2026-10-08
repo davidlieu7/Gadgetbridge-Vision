@@ -33,6 +33,7 @@ import nodomain.freeyourgadget.gadgetbridge.activities.charts.spec.SeriesStyle
 import nodomain.freeyourgadget.gadgetbridge.activities.charts.spec.fixedLabelValues
 import nodomain.freeyourgadget.gadgetbridge.activities.charts.spec.labelFor
 import nodomain.freeyourgadget.gadgetbridge.activities.charts.spec.timeLabelValues
+import java.util.TimeZone
 import kotlin.math.abs
 
 /**
@@ -85,7 +86,7 @@ class GbChartView @JvmOverloads constructor(
         isHighlightPerDragEnabled = false
         isNoDataIconEnabled = false
         noDataTextColor = theme.secondaryTextColor
-        drawOrder = listOf(CombinedChart.DrawOrder.BAR, CombinedChart.DrawOrder.LINE)
+        drawOrder = listOf(CombinedChart.DrawOrder.BAR, CombinedChart.DrawOrder.CANDLE, CombinedChart.DrawOrder.LINE)
 
         val gridColor = ColorUtils.setAlphaComponent(theme.secondaryTextColor, GRID_ALPHA)
         xAxis.position = XAxisPosition.BOTTOM
@@ -297,7 +298,8 @@ class GbChartView @JvmOverloads constructor(
         val max = spec.maximum ?: return null
         val labelSpace = maxOf(xAxis.labelWidth.toFloat(), Utils.convertDpToPixel(MIN_TIME_LABEL_WIDTH_DP)) +
             Utils.convertDpToPixel(TIME_LABEL_GAP_DP)
-        return timeLabelValues(min, max, (viewPortHandler.contentWidth / labelSpace).toInt())
+        val zoneOffsetSeconds = TimeZone.getDefault().getOffset(min.toLong() * 1000L) / 1000
+        return timeLabelValues(min, max, (viewPortHandler.contentWidth / labelSpace).toInt(), zoneOffsetSeconds)
     }
 
     private fun drawSelectedPoints(canvas: Canvas, spec: ChartSpec, selected: Double) {

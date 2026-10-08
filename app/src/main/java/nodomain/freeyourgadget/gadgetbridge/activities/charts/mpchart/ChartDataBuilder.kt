@@ -1,18 +1,23 @@
 package nodomain.freeyourgadget.gadgetbridge.activities.charts.mpchart
 
 import android.graphics.Color
+import android.graphics.Paint
 import android.graphics.drawable.GradientDrawable
 import androidx.core.graphics.ColorUtils
 import com.github.mikephil.charting.components.YAxis.AxisDependency
 import com.github.mikephil.charting.data.BarData
 import com.github.mikephil.charting.data.BarDataSet
 import com.github.mikephil.charting.data.BarEntry
+import com.github.mikephil.charting.data.CandleData
+import com.github.mikephil.charting.data.CandleDataSet
+import com.github.mikephil.charting.data.CandleEntry
 import com.github.mikephil.charting.data.CombinedData
 import com.github.mikephil.charting.data.Entry
 import com.github.mikephil.charting.data.LineData
 import com.github.mikephil.charting.data.LineDataSet
 import com.github.mikephil.charting.utils.Fill
 import nodomain.freeyourgadget.gadgetbridge.activities.charts.spec.AxisSide
+import nodomain.freeyourgadget.gadgetbridge.activities.charts.spec.ChartPoint
 import nodomain.freeyourgadget.gadgetbridge.activities.charts.spec.ChartSeries
 import nodomain.freeyourgadget.gadgetbridge.activities.charts.spec.ChartSpec
 import nodomain.freeyourgadget.gadgetbridge.activities.charts.spec.SeriesStyle
@@ -59,14 +64,17 @@ internal object ChartDataBuilder {
     private const val LINE_WIDTH_DP = 2f
     private const val POINT_RADIUS_DP = 3.5f
     private const val AREA_FILL_ALPHA = 0.45f
+    private const val MAX_CANDLE_SPACE = 0.45f
 
     fun columns(spec: ChartSpec) = spec.series.filter { it.style is SeriesStyle.Column && it.points.isNotEmpty() }
 
     fun build(spec: ChartSpec, layout: BarLayout, cornerRadiusPx: Float): CombinedData {
         val columns = columns(spec)
         val ranges = spec.series.filter { it.style is SeriesStyle.Range && it.points.isNotEmpty() }
+        val bands = ranges.filter { (it.style as SeriesStyle.Range).width == null }
+        val candles = ranges - bands.toSet()
         val lines = spec.series.filter { it.style is SeriesStyle.Line && it.points.isNotEmpty() }
-        require(columns.isEmpty() || ranges.isEmpty()) { "Range and column series can't share a chart" }
+        require(columns.isEmpty() || bands.isEmpty()) { "Range and column series can't share a chart" }
         val step = layout.width + layout.gap
         return CombinedData().apply {
             if (columns.isNotEmpty()) {
@@ -74,11 +82,14 @@ internal object ChartDataBuilder {
                     barDataSet(series, (index - (columns.size - 1) / 2f) * step, cornerRadiusPx)
                 }).apply { barWidth = layout.width }
             }
-            if (ranges.isNotEmpty()) {
-                barData = BarData(ranges.map { rangeDataSet(it) }).apply { barWidth = 1f }
+            if (bands.isNotEmpty()) {
+                barData = BarData(bands.map { rangeDataSet(it) }).apply { barWidth = 1f }
+            }
+            if (candles.isNotEmpty()) {
+                candleData = CandleData(candles.map { candleDataSet(it) })
             }
             if (lines.isNotEmpty()) {
-                lineData = LineData(lines.map { lineDataSet(it) })
+                lineData = LineData(lines.flatMap { series -> segments(series).map { lineDataSet(series, it) } })
             }
         }
     }
@@ -109,9 +120,47 @@ internal object ChartDataBuilder {
         }
     }
 
-    private fun lineDataSet(series: ChartSeries): LineDataSet<Float> {
+    private fun candleDataSet(series: ChartSeries): CandleDataSet<Float> {
+        val style = series.style as SeriesStyle.Range
+        val entries = series.points.map { point ->
+            val low = (point.low ?: 0.0).toFloat()
+            val high = point.y.toFloat()
+            CandleEntry(x = point.x.toFloat(), high = high, low = low, open = low, close = high, data = point.x.toFloat())
+        }
+        return CandleDataSet(entries, series.label).apply {
+            shadowColor = style.color
+            increasingColor = style.color
+            increasingPaintStyle = Paint.Style.FILL
+            decreasingColor = style.color
+            decreasingPaintStyle = Paint.Style.FILL
+            neutralColor = style.color
+            barSpace = ((1f - (style.width ?: 1f)) / 2f).coerceIn(0f, MAX_CANDLE_SPACE)
+            isHighlightEnabled = false
+            isDrawValuesEnabled = false
+            axisDependency = axisDependency(series)
+        }
+    }
+
+    /**
+     * The points of [series], split wherever neighbours are further apart than its [SeriesStyle.Line.maxGap].
+     */
+    fun segments(series: ChartSeries): List<List<ChartPoint>> {
+        val maxGap = (series.style as SeriesStyle.Line).maxGap ?: return listOf(series.points)
+        val segments = mutableListOf<MutableList<ChartPoint>>()
+        for (point in series.points) {
+            val current = segments.lastOrNull()
+            if (current == null || point.x - current.last().x > maxGap) {
+                segments += mutableListOf(point)
+            } else {
+                current += point
+            }
+        }
+        return segments
+    }
+
+    private fun lineDataSet(series: ChartSeries, points: List<ChartPoint>): LineDataSet<Float> {
         val style = series.style as SeriesStyle.Line
-        val entries = series.points.map { Entry(x = it.x.toFloat(), y = it.y.toFloat(), data = it.x.toFloat()) }
+        val entries = points.map { Entry(x = it.x.toFloat(), y = it.y.toFloat(), data = it.x.toFloat()) }
         return LineDataSet(entries, series.label).apply {
             color = style.color
             lineWidth = LINE_WIDTH_DP

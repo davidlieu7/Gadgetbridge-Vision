@@ -17,6 +17,7 @@ sealed interface SeriesStyle {
         val filled: Boolean = false,
         val curved: Boolean = false,
         val showPoints: Boolean = false,
+        val maxGap: Double? = null,
     ) : SeriesStyle
 
     /**
@@ -28,10 +29,10 @@ sealed interface SeriesStyle {
     ) : SeriesStyle
 
     /**
-     * A filled band from each point's [ChartPoint.low] to its y, behind the other series. Can't be combined with
-     * [Column] series on one chart.
+     * Each point's [ChartPoint.low] to its y. Without a [width] it's a full-width band, which can't share a chart
+     * with [Column] series.
      */
-    data class Range(val color: Int) : SeriesStyle
+    data class Range(val color: Int, val width: Float? = null) : SeriesStyle
 }
 
 /**

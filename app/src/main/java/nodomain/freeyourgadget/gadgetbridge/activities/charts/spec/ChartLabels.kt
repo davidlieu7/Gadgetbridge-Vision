@@ -103,23 +103,20 @@ fun dayOfMonthValues(lastDay: Int): List<Double> =
     (listOf(1) + (DAY_LABEL_STEP..lastDay step DAY_LABEL_STEP)).map { it.toDouble() }
 
 /**
- * 2 to 7 labels from [min] to [max] (epoch seconds), at a round time interval.
+ * 2 to 7 labels between [min] and [max] (epoch seconds), on round local times [zoneOffsetSeconds] from UTC.
  */
-fun timeLabelValues(min: Double, max: Double, maxLabels: Int): List<Double> {
+fun timeLabelValues(min: Double, max: Double, maxLabels: Int, zoneOffsetSeconds: Int = 0): List<Double> {
     val range = max - min
     if (range <= 0.0) return emptyList()
     val count = maxLabels.coerceIn(MIN_TIME_LABELS, MAX_TIME_LABELS)
     val minimumSpacing = range / count
     val spacing = TIME_LABEL_SPACINGS_SECONDS.firstOrNull { it >= minimumSpacing }
         ?: (ceil(minimumSpacing / SECONDS_PER_DAY) * SECONDS_PER_DAY)
-    val values = generateSequence(0) { it + 1 }
-        .map { min + it * spacing }
+    val first = ceil((min + zoneOffsetSeconds) / spacing) * spacing - zoneOffsetSeconds
+    return generateSequence(0) { it + 1 }
+        .map { first + it * spacing }
         .takeWhile { it <= max }
-        .toMutableList()
-    if (max - values.last() > spacing / 2) {
-        values += max
-    }
-    return values
+        .toList()
 }
 
 private const val MIN_TIME_LABELS = 2

@@ -18,8 +18,8 @@ package nodomain.freeyourgadget.gadgetbridge.activities.charts;
 
 import androidx.annotation.Nullable;
 
-import android.graphics.Paint;
 import android.os.Bundle;
+import android.text.format.DateFormat;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -29,24 +29,6 @@ import android.widget.TextView;
 import android.widget.Toast;
 
 import com.github.mikephil.charting.charts.Chart;
-import com.github.mikephil.charting.charts.CombinedChart;
-import com.github.mikephil.charting.components.Legend;
-import com.github.mikephil.charting.components.LegendEntry;
-import com.github.mikephil.charting.components.XAxis;
-import com.github.mikephil.charting.components.YAxis;
-import com.github.mikephil.charting.data.BarData;
-import com.github.mikephil.charting.data.BarDataSet;
-import com.github.mikephil.charting.data.BarEntry;
-import com.github.mikephil.charting.data.CandleData;
-import com.github.mikephil.charting.data.CandleDataSet;
-import com.github.mikephil.charting.data.CandleEntry;
-import com.github.mikephil.charting.data.CombinedData;
-import com.github.mikephil.charting.data.Entry;
-import com.github.mikephil.charting.data.LineData;
-import com.github.mikephil.charting.data.LineDataSet;
-import com.github.mikephil.charting.formatter.IAxisValueFormatter;
-import com.github.mikephil.charting.interfaces.datasets.ILineDataSet;
-import com.github.mikephil.charting.utils.ViewPortHandler;
 import com.google.android.material.chip.Chip;
 import com.google.android.material.chip.ChipGroup;
 
@@ -54,17 +36,27 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.text.SimpleDateFormat;
+import java.time.LocalDate;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Calendar;
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
 import java.util.Optional;
 
+import kotlin.jvm.functions.Function1;
+
 import nodomain.freeyourgadget.gadgetbridge.GBApplication;
 import nodomain.freeyourgadget.gadgetbridge.R;
+import nodomain.freeyourgadget.gadgetbridge.activities.charts.hrv.HrvChartData;
+import nodomain.freeyourgadget.gadgetbridge.activities.charts.mpchart.ChartLegendView;
+import nodomain.freeyourgadget.gadgetbridge.activities.charts.mpchart.ChartSelection;
+import nodomain.freeyourgadget.gadgetbridge.activities.charts.mpchart.DaySelections;
+import nodomain.freeyourgadget.gadgetbridge.activities.charts.mpchart.GbChartView;
+import nodomain.freeyourgadget.gadgetbridge.activities.charts.spec.ChartSeries;
+import nodomain.freeyourgadget.gadgetbridge.activities.charts.spec.ChartSpec;
 import nodomain.freeyourgadget.gadgetbridge.widgets.impl.HrvWidget;
 import nodomain.freeyourgadget.gadgetbridge.activities.dashboard.GaugeDrawer;
 import nodomain.freeyourgadget.gadgetbridge.activities.workouts.StatTileData;
@@ -86,10 +78,6 @@ public class HRVStatusFragment extends AbstractChartFragment<HRVStatusFragment.H
     private static final String ARG_VIEW_MODE = "view_mode";
     private static final String ARG_TOTAL_DAYS = "total_days";
     private static final int DEFAULT_TOTAL_DAYS = 7;
-    private static final float LEGEND_FORM_SIZE = 10f;
-    private static final float LEGEND_X_ENTRY_SPACE = 10f;
-    private static final float LEGEND_Y_ENTRY_SPACE = 4f;
-    private static final float LEGEND_FORM_TO_TEXT_SPACE = 5f;
 
     private enum ViewMode {
         LAST_NIGHT,
@@ -111,7 +99,8 @@ public class HRVStatusFragment extends AbstractChartFragment<HRVStatusFragment.H
 
     protected GaugeDrawer gaugeDrawer;
     private ImageView mHRVStatusGauge;
-    private CombinedChart mWeeklyHRVStatusChart;
+    private GbChartView mWeeklyHRVStatusChart;
+    private ChartLegendView mHRVChartLegend;
     private ChipGroup mHRVStatusDataTypeGroup;
     private LinearLayout mHRVStatusStatsContainer;
     private TextView mDateView;
@@ -173,6 +162,8 @@ public class HRVStatusFragment extends AbstractChartFragment<HRVStatusFragment.H
         });
 
         mWeeklyHRVStatusChart = rootView.findViewById(R.id.hrv_weekly_line_chart);
+        mWeeklyHRVStatusChart.dismissSelectionOnTapOutside(rootView);
+        mHRVChartLegend = rootView.findViewById(R.id.hrv_chart_legend);
         mHRVStatusStatsContainer = rootView.findViewById(R.id.hrv_status_stats_container);
         mDateView = rootView.findViewById(R.id.hrv_status_date_view);
         mHRVStatusGauge = rootView.findViewById(R.id.hrv_status_gauge_bar);
@@ -182,7 +173,6 @@ public class HRVStatusFragment extends AbstractChartFragment<HRVStatusFragment.H
 
         gaugeDrawer = new GaugeDrawer();
         setupPeriodDataTypeChips(inflater);
-        setupLineChart();
         refresh();
 
         return rootView;
@@ -314,85 +304,8 @@ public class HRVStatusFragment extends AbstractChartFragment<HRVStatusFragment.H
         mWeeklyHRVStatusChart.invalidate();
     }
 
-    protected LineDataSet createAverageDataSet(final List<Entry> values) {
-        final LineDataSet lineDataSet = new LineDataSet(values, getString(R.string.hrv_status_day_avg_legend));
-        lineDataSet.setColor(HRV_AVERAGE_COLOR);
-        lineDataSet.setLineWidth(2.5f);
-        lineDataSet.setFillAlpha(255);
-        lineDataSet.setCircleRadius(5f);
-        lineDataSet.setDrawCirclesEnabled(true);
-        lineDataSet.setDrawCircleHoleEnabled(false);
-        lineDataSet.setCircleColor(HRV_AVERAGE_COLOR);
-        lineDataSet.setAxisDependency(YAxis.AxisDependency.LEFT);
-        lineDataSet.setDrawValuesEnabled(false);
-        lineDataSet.setValueTextSize(10f);
-        lineDataSet.setValueTextColor(TEXT_COLOR);
-        lineDataSet.setValueFormatter(new DataSetValueFormatter() {
-            @Override
-            public String getFormattedValue(final float value, final Entry<?> entry, final int dataSetIndex, final ViewPortHandler viewPortHandler) {
-                return String.format(Locale.ROOT, "%d", (int) value);
-            }
-        });
-        return lineDataSet;
-    }
-
-    protected BarDataSet createBaselineRangeDataSet(final List<BarEntry> values) {
-        final BarDataSet barDataSet = new BarDataSet(values, getString(R.string.hrv_status_baseline_label));
-        barDataSet.setDrawValuesEnabled(false);
-        barDataSet.setDrawIconsEnabled(false);
-        barDataSet.setAxisDependency(YAxis.AxisDependency.LEFT);
-        barDataSet.setColors(0x00000000, HRV_BASELINE_FILL_COLOR);
-        barDataSet.setHighlightAlpha(0);
-        barDataSet.setHighlightEnabled(false);
-        return barDataSet;
-    }
-
-    protected CandleDataSet createRangeDataSet(final List<CandleEntry> values) {
-        final CandleDataSet candleDataSet = new CandleDataSet(values, getString(R.string.hrv_status_daily_range_legend));
-        candleDataSet.setDrawValuesEnabled(false);
-        candleDataSet.setDrawIconsEnabled(false);
-        candleDataSet.setAxisDependency(YAxis.AxisDependency.LEFT);
-        candleDataSet.setShadowColor(HRV_RANGE_COLOR);
-        candleDataSet.setShadowWidth(2f);
-        candleDataSet.setDecreasingColor(HRV_RANGE_COLOR);
-        candleDataSet.setDecreasingPaintStyle(Paint.Style.FILL);
-        candleDataSet.setIncreasingColor(HRV_RANGE_COLOR);
-        candleDataSet.setIncreasingPaintStyle(Paint.Style.FILL);
-        candleDataSet.setNeutralColor(HRV_RANGE_COLOR);
-        candleDataSet.setBarSpace(0.35f);
-        candleDataSet.setShowCandleBar(true);
-        candleDataSet.setHighlightEnabled(false);
-        return candleDataSet;
-    }
-
-    protected LineDataSet createLastNightAverageDataSet(final List<Entry> values) {
-        final LineDataSet lineDataSet = new LineDataSet(values, getString(R.string.hrv_status_nightly_avg_legend));
-        lineDataSet.setColor(HRV_LAST_NIGHT_COLOR);
-        lineDataSet.setLineWidth(2f);
-        lineDataSet.setCircleRadius(4f);
-        lineDataSet.setDrawCirclesEnabled(true);
-        lineDataSet.setDrawCircleHoleEnabled(false);
-        lineDataSet.setCircleColor(HRV_LAST_NIGHT_COLOR);
-        lineDataSet.setAxisDependency(YAxis.AxisDependency.LEFT);
-        lineDataSet.setDrawValuesEnabled(false);
-        lineDataSet.setHighlightEnabled(false);
-        return lineDataSet;
-    }
-
-    protected LineDataSet createRawHrvDataSet(final List<Entry> values) {
-        final LineDataSet lineDataSet = new LineDataSet(values, getString(R.string.hrv_status_last_night_legend));
-        lineDataSet.setColor(HRV_AVERAGE_COLOR);
-        lineDataSet.setDrawCirclesEnabled(false);
-        lineDataSet.setLineWidth(2f);
-        lineDataSet.setAxisDependency(YAxis.AxisDependency.LEFT);
-        lineDataSet.setDrawValuesEnabled(false);
-        lineDataSet.setHighlightEnabled(false);
-        return lineDataSet;
-    }
-
     @Override
     protected void updateChartsnUIThread(HRVStatusWeeklyData weeklyData) {
-        mWeeklyHRVStatusChart.setData(null); // workaround for https://github.com/PhilJay/MPAndroidChart/issues/2317
         if (viewMode == ViewMode.LAST_NIGHT) {
             updateLastNightChart(weeklyData);
         } else {
@@ -469,271 +382,114 @@ public class HRVStatusFragment extends AbstractChartFragment<HRVStatusFragment.H
         return value > 0 ? getString(R.string.hrv_status_unit, value) : getString(R.string.stats_empty_value);
     }
 
-    private void updatePeriodChart(HRVStatusWeeklyData weeklyData) {
+    private void updatePeriodChart(final HRVStatusWeeklyData weeklyData) {
         mDateView.setText(DateTimeUtils.formatDaysUntil(totalDays, getTSEnd()));
-        final List<CandleEntry> rangeEntries = new ArrayList<>();
-        final List<Entry> averageEntries = new ArrayList<>();
-        final List<Entry> lastNightEntries = new ArrayList<>();
-        final List<BarEntry> baselineEntries = new ArrayList<>();
-        final List<ILineDataSet<?>> lineDataSets = new ArrayList<>();
-        final List<ILineDataSet<?>> lastNightDataSets = new ArrayList<>();
-        final Accumulator axisAccumulator = new Accumulator();
-        boolean hasAverageData = false;
-        boolean hasLastNightData = false;
-
-        for (final HRVStatusDayData day : weeklyData.getDaysData()) {
-            if (showDailyAverage) {
-                if (day.dayAvg > 0) {
-                    hasAverageData = true;
-                    axisAccumulator.add(day.dayAvg);
-                    averageEntries.add(new Entry<>(day.i, day.dayAvg, null, null));
-                } else {
-                    addAverageDataSet(lineDataSets, averageEntries);
-                }
-            }
-
-            if (showLastNightAverage) {
-                if (day.lastNight > 0) {
-                    hasLastNightData = true;
-                    axisAccumulator.add(day.lastNight);
-                    lastNightEntries.add(new Entry<>(day.i, day.lastNight, null, null));
-                } else {
-                    addLastNightAverageDataSet(lastNightDataSets, lastNightEntries);
-                }
-            }
-
-            if (showDailyRange && day.dayMin > 0 && day.dayMax > 0) {
-                axisAccumulator.add(day.dayMin);
-                axisAccumulator.add(day.dayMax);
-                rangeEntries.add(new CandleEntry<>(day.i, day.dayMax, day.dayMin, day.dayMin, day.dayMax, null, null));
-            }
-
-            if (day.baseLineBalancedLower > 0 && day.baseLineBalancedUpper > day.baseLineBalancedLower) {
-                axisAccumulator.add(day.baseLineBalancedLower);
-                axisAccumulator.add(day.baseLineBalancedUpper);
-                baselineEntries.add(new BarEntry<>(day.i, Arrays.asList(
-                        (float) day.baseLineBalancedLower,
-                        (float) (day.baseLineBalancedUpper - day.baseLineBalancedLower)
-                ), null, null));
-            }
+        final List<HRVStatusDayData> days = weeklyData.getDaysData();
+        final int n = days.size();
+        final long[] epochDays = new long[n];
+        final int[] dayAvg = new int[n];
+        final int[] lastNight = new int[n];
+        final int[] dayMin = new int[n];
+        final int[] dayMax = new int[n];
+        final int[] baselineLow = new int[n];
+        final int[] baselineHigh = new int[n];
+        for (int i = 0; i < n; i++) {
+            final HRVStatusDayData day = days.get(i);
+            epochDays[i] = LocalDate.of(day.day.get(Calendar.YEAR), day.day.get(Calendar.MONTH) + 1, day.day.get(Calendar.DAY_OF_MONTH)).toEpochDay();
+            dayAvg[i] = day.dayAvg;
+            lastNight[i] = day.lastNight;
+            dayMin[i] = day.dayMin;
+            dayMax[i] = day.dayMax;
+            baselineLow[i] = day.baseLineBalancedLower;
+            baselineHigh[i] = day.baseLineBalancedUpper;
         }
 
-        if (showDailyAverage) {
-            addAverageDataSet(lineDataSets, averageEntries);
-        }
-        if (showLastNightAverage) {
-            addLastNightAverageDataSet(lastNightDataSets, lastNightEntries);
-        }
-        lineDataSets.addAll(lastNightDataSets);
+        final String[] labels = {
+                getString(R.string.hrv_status_day_avg_legend),
+                getString(R.string.hrv_status_nightly_avg_legend),
+                getString(R.string.hrv_status_daily_range_legend),
+                getString(R.string.hrv_status_baseline_label),
+        };
+        final int[] colors = {HRV_AVERAGE_COLOR, HRV_LAST_NIGHT_COLOR, HRV_RANGE_COLOR, HRV_BASELINE_FILL_COLOR};
+        final ChartSpec spec = HrvChartData.periodSpec(
+                epochDays, dayAvg, lastNight, dayMin, dayMax, baselineLow, baselineHigh,
+                showDailyAverage, showLastNightAverage, showDailyRange, labels, colors
+        );
 
-        final boolean hasChartData = !rangeEntries.isEmpty() || !lineDataSets.isEmpty() || !baselineEntries.isEmpty();
-        if (hasChartData) {
-            final CombinedData combinedData = new CombinedData();
-            if (!baselineEntries.isEmpty()) {
-                final BarData barData = new BarData(createBaselineRangeDataSet(baselineEntries));
-                barData.setBarWidth(1f);
-                combinedData.setBarData(barData);
+        final List<String> rowLabels = new ArrayList<>();
+        final List<Integer> rowColors = new ArrayList<>();
+        final List<Function1<Integer, String>> rowTexts = new ArrayList<>();
+        for (final ChartSeries series : spec.getSeries()) {
+            rowLabels.add(series.getLabel());
+            switch (series.getKey()) {
+                case "day_avg":
+                    rowColors.add(colors[0]);
+                    rowTexts.add(i -> formatHrvStatusValue(dayAvg[i]));
+                    break;
+                case "last_night":
+                    rowColors.add(colors[1]);
+                    rowTexts.add(i -> formatHrvStatusValue(lastNight[i]));
+                    break;
+                case "day_range":
+                    rowColors.add(colors[2]);
+                    rowTexts.add(i -> formatHrvRange(dayMin[i], dayMax[i]));
+                    break;
+                default:
+                    rowColors.add(colors[3]);
+                    rowTexts.add(i -> formatHrvRange(baselineLow[i], baselineHigh[i]));
+                    break;
             }
-            if (!rangeEntries.isEmpty()) {
-                combinedData.setCandleData(new CandleData(createRangeDataSet(rangeEntries)));
-            }
-            if (!lineDataSets.isEmpty()) {
-                combinedData.setLineData(new LineData(lineDataSets));
-            }
-            mWeeklyHRVStatusChart.setData(combinedData);
-        } else {
-            mWeeklyHRVStatusChart.setData(null);
         }
-        if (axisAccumulator.getCount() > 0) {
-            mWeeklyHRVStatusChart.getAxisLeft().setAxisMaximum(Math.round(axisAccumulator.getMax()) + 15);
-            mWeeklyHRVStatusChart.getAxisLeft().setAxisMinimum(Math.max(0, Math.round(axisAccumulator.getMin()) - 15));
-        } else {
-            mWeeklyHRVStatusChart.getAxisLeft().setAxisMaximum(120);
-            mWeeklyHRVStatusChart.getAxisLeft().setAxisMinimum(0);
-        }
-
-        final XAxis x = mWeeklyHRVStatusChart.getXAxis();
-        x.setValueFormatter(getHRVStatusChartDayValueFormatter(weeklyData));
-        x.setAxisMinimum(0f);
-        x.setAxisMaximum(totalDays - 1f);
-        x.setLabelCount(Math.min(totalDays, 7));
-        x.setForceLabelsEnabled(false);
-        setupPeriodLegend(!rangeEntries.isEmpty(), hasAverageData, hasLastNightData, !baselineEntries.isEmpty());
+        mWeeklyHRVStatusChart.setSelectionContent(x -> DaySelections.of(
+                epochDays, x, rowLabels, rowColors, rowTexts, getString(R.string.stats_empty_value)
+        ));
+        showChart(spec);
     }
 
-    private void updateLastNightChart(HRVStatusWeeklyData weeklyData) {
+    private void updateLastNightChart(final HRVStatusWeeklyData weeklyData) {
         final String formattedDate = new SimpleDateFormat("E, MMM dd", Locale.getDefault()).format(getEndDate());
         mDateView.setText(formattedDate);
 
-        final List<Entry> rawEntries = new ArrayList<>();
-        final Accumulator axisAccumulator = new Accumulator();
-        final long startMillis = weeklyData.lastNightStart.getTimeInMillis();
-        float minX = Float.MAX_VALUE;
-        float maxX = -Float.MAX_VALUE;
-        for (HrvValueSample sample : weeklyData.lastNightSamples) {
-            if (sample.getValue() <= 0) {
-                continue;
+        final List<? extends HrvValueSample> samples = weeklyData.lastNightSamples;
+        final long[] epochSeconds = new long[samples.size()];
+        final int[] values = new int[samples.size()];
+        for (int i = 0; i < samples.size(); i++) {
+            epochSeconds[i] = samples.get(i).getTimestamp() / 1000L;
+            values[i] = samples.get(i).getValue();
+        }
+        final String label = getString(R.string.hrv_status_last_night_legend);
+        final ChartSpec spec = HrvChartData.lastNightSpec(epochSeconds, values, label, HRV_AVERAGE_COLOR);
+        mWeeklyHRVStatusChart.setSelectionContent(x -> {
+            final String title = DateFormat.getTimeFormat(requireContext()).format(new Date(Math.round(x) * 1000L));
+            int value = 0;
+            for (int i = 0; i < epochSeconds.length; i++) {
+                if (epochSeconds[i] == Math.round(x)) {
+                    value = values[i];
+                }
             }
-
-            final float x = (sample.getTimestamp() - startMillis) / 1000f;
-            rawEntries.add(new Entry<>(x, sample.getValue(), null, null));
-            minX = Math.min(minX, x);
-            maxX = Math.max(maxX, x);
-            axisAccumulator.add(sample.getValue());
-        }
-        rawEntries.sort(Comparator.comparingDouble(Entry::getX));
-
-        if (!rawEntries.isEmpty()) {
-            final CombinedData combinedData = new CombinedData();
-            combinedData.setLineData(new LineData(createRawHrvDataSet(rawEntries)));
-            mWeeklyHRVStatusChart.setData(combinedData);
-        } else {
-            mWeeklyHRVStatusChart.setData(null);
-        }
-
-        if (axisAccumulator.getCount() > 0) {
-            mWeeklyHRVStatusChart.getAxisLeft().setAxisMaximum(Math.round(axisAccumulator.getMax()) + 15);
-            mWeeklyHRVStatusChart.getAxisLeft().setAxisMinimum(Math.max(0, Math.round(axisAccumulator.getMin()) - 15));
-        } else {
-            mWeeklyHRVStatusChart.getAxisLeft().setAxisMaximum(120);
-            mWeeklyHRVStatusChart.getAxisLeft().setAxisMinimum(0);
-        }
-
-        final XAxis x = mWeeklyHRVStatusChart.getXAxis();
-        x.setValueFormatter(getLastNightChartValueFormatter(weeklyData.lastNightStart));
-        if (rawEntries.isEmpty()) {
-            x.setAxisMinimum(0f);
-            x.setAxisMaximum((weeklyData.lastNightEnd.getTimeInMillis() - weeklyData.lastNightStart.getTimeInMillis()) / 1000f);
-        } else if (minX == maxX) {
-            x.setAxisMinimum(minX - 1f);
-            x.setAxisMaximum(maxX + 1f);
-        } else {
-            x.setAxisMinimum(minX);
-            x.setAxisMaximum(maxX);
-        }
-        x.setLabelCount(7);
-        x.setForceLabelsEnabled(true);
-        setupLastNightLegend(!rawEntries.isEmpty());
+            final String text = formatHrvStatusValue(value);
+            return new ChartSelection(
+                    title,
+                    Collections.singletonList(new ChartSelection.Row(HRV_AVERAGE_COLOR, text)),
+                    title + ". " + label + " " + text + "."
+            );
+        });
+        showChart(spec);
     }
 
-    private void addAverageDataSet(final List<ILineDataSet<?>> lineDataSets, final List<Entry> averageEntries) {
-        if (averageEntries.isEmpty()) {
-            return;
-        }
-
-        lineDataSets.add(createAverageDataSet(new ArrayList<>(averageEntries)));
-        averageEntries.clear();
-    }
-
-    private void addLastNightAverageDataSet(final List<ILineDataSet<?>> lineDataSets, final List<Entry> lastNightEntries) {
-        if (lastNightEntries.isEmpty()) {
-            return;
-        }
-
-        lineDataSets.add(createLastNightAverageDataSet(new ArrayList<>(lastNightEntries)));
-        lastNightEntries.clear();
-    }
-
-    private void setupPeriodLegend(final boolean hasRange,
-                                   final boolean hasDailyAverage,
-                                   final boolean hasLastNightAverage,
-                                   final boolean hasBaseline) {
-        final List<LegendEntry> legendEntries = new ArrayList<>(4);
-
-        for (final PeriodDataType dataType : PERIOD_DATA_TYPE_ORDER) {
-            if (hasPeriodDataTypeData(dataType, hasRange, hasDailyAverage, hasLastNightAverage)) {
-                legendEntries.add(createPeriodDataTypeLegendEntry(dataType));
+    private void showChart(final ChartSpec spec) {
+        mWeeklyHRVStatusChart.setSpec(spec);
+        final List<ChartSeries> legendSeries = new ArrayList<>();
+        for (final ChartSeries series : spec.getSeries()) {
+            if (!series.getPoints().isEmpty()) {
+                legendSeries.add(series);
             }
         }
-
-        if (hasBaseline) {
-            legendEntries.add(createSquareLegendEntry(
-                    getString(R.string.hrv_status_baseline_label),
-                    HRV_BASELINE_FILL_COLOR));
-        }
-
-        setupHRVStatusLegend(legendEntries);
+        mHRVChartLegend.setSeries(legendSeries);
     }
 
-    private void setupLastNightLegend(final boolean hasRawHrv) {
-        final List<LegendEntry> legendEntries = new ArrayList<>(1);
-        if (hasRawHrv) {
-            legendEntries.add(createLineLegendEntry(getString(R.string.hrv_status_last_night_legend), HRV_AVERAGE_COLOR));
-        }
-
-        setupHRVStatusLegend(legendEntries);
-    }
-
-    private boolean hasPeriodDataTypeData(final PeriodDataType dataType,
-                                          final boolean hasRange,
-                                          final boolean hasDailyAverage,
-                                          final boolean hasLastNightAverage) {
-        switch (dataType) {
-            case DAILY_AVERAGE:
-                return hasDailyAverage;
-            case LAST_NIGHT_AVERAGE:
-                return hasLastNightAverage;
-            case DAILY_RANGE:
-                return hasRange;
-            default:
-                throw new IllegalArgumentException("Unknown period data type: " + dataType);
-        }
-    }
-
-    private LegendEntry createPeriodDataTypeLegendEntry(final PeriodDataType dataType) {
-        switch (dataType) {
-            case DAILY_AVERAGE:
-                return createLineLegendEntry(getString(getPeriodDataTypeLabel(dataType)), HRV_AVERAGE_COLOR);
-            case LAST_NIGHT_AVERAGE:
-                return createLineLegendEntry(getString(getPeriodDataTypeLabel(dataType)), HRV_LAST_NIGHT_COLOR);
-            case DAILY_RANGE:
-                return createSquareLegendEntry(getString(getPeriodDataTypeLabel(dataType)), HRV_RANGE_COLOR);
-            default:
-                throw new IllegalArgumentException("Unknown period data type: " + dataType);
-        }
-    }
-
-    private LegendEntry createLineLegendEntry(final String label, final int color) {
-        final LegendEntry legendEntry = new LegendEntry();
-        legendEntry.setLabel(label);
-        legendEntry.setForm(Legend.LegendForm.LINE);
-        legendEntry.setFormSize(LEGEND_FORM_SIZE);
-        legendEntry.setFormLineWidth(2f);
-        legendEntry.setFormColor(color);
-        return legendEntry;
-    }
-
-    private LegendEntry createSquareLegendEntry(final String label, final int color) {
-        final LegendEntry legendEntry = new LegendEntry();
-        legendEntry.setLabel(label);
-        legendEntry.setForm(Legend.LegendForm.SQUARE);
-        legendEntry.setFormSize(LEGEND_FORM_SIZE);
-        legendEntry.setFormColor(color);
-        return legendEntry;
-    }
-
-    private void setupHRVStatusLegend(final List<LegendEntry> legendEntries) {
-        final Legend legend = mWeeklyHRVStatusChart.getLegend();
-        legend.resetCustom();
-        if (legendEntries.isEmpty()) {
-            legend.setEnabled(false);
-            mWeeklyHRVStatusChart.notifyDataSetChanged();
-            mWeeklyHRVStatusChart.requestLayout();
-            return;
-        }
-
-        legend.setEnabled(true);
-        legend.setTextColor(LEGEND_TEXT_COLOR);
-        legend.setWordWrapEnabled(true);
-        legend.setHorizontalAlignment(Legend.LegendHorizontalAlignment.LEFT);
-        legend.setOrientation(Legend.LegendOrientation.HORIZONTAL);
-        legend.setDrawInsideEnabled(false);
-        legend.setXEntrySpace(LEGEND_X_ENTRY_SPACE);
-        legend.setYEntrySpace(LEGEND_Y_ENTRY_SPACE);
-        legend.setFormToTextSpace(LEGEND_FORM_TO_TEXT_SPACE);
-        legend.setEntries(legendEntries);
-        mWeeklyHRVStatusChart.notifyDataSetChanged();
-        mWeeklyHRVStatusChart.requestLayout();
+    private String formatHrvRange(final int low, final int high) {
+        return low > 0 && high > low ? low + " – " + getString(R.string.hrv_status_unit, high) : getString(R.string.stats_empty_value);
     }
 
     private List<HRVStatusDayData> getPeriodData(DBHandler db, Calendar day, GBDevice device) {
@@ -868,71 +624,6 @@ public class HRVStatusFragment extends AbstractChartFragment<HRVStatusFragment.H
         final Calendar lastNightEnd = DateTimeUtils.dayStart((Calendar) day.clone());
         lastNightEnd.add(Calendar.HOUR_OF_DAY, 12);
         return lastNightEnd;
-    }
-
-    private void setupLineChart() {
-        mWeeklyHRVStatusChart.getDescription().setEnabled(false);
-        mWeeklyHRVStatusChart.setDrawOrder(Arrays.asList(
-                CombinedChart.DrawOrder.BAR,
-                CombinedChart.DrawOrder.CANDLE,
-                CombinedChart.DrawOrder.LINE
-        ));
-        mWeeklyHRVStatusChart.setTouchEnabled(false);
-        mWeeklyHRVStatusChart.setPinchZoomEnabled(false);
-        mWeeklyHRVStatusChart.setDoubleTapToZoomEnabled(false);
-
-
-        final XAxis xAxisBottom = mWeeklyHRVStatusChart.getXAxis();
-        xAxisBottom.setPosition(XAxis.XAxisPosition.BOTTOM);
-        xAxisBottom.setDrawLabelsEnabled(true);
-        xAxisBottom.setDrawGridLinesEnabled(false);
-        xAxisBottom.setEnabled(true);
-        xAxisBottom.setDrawLimitLinesBehindDataEnabled(true);
-        xAxisBottom.setAxisMinimum(0f);
-        xAxisBottom.setAxisMaximum(totalDays - 1f);
-        xAxisBottom.setGranularity(1f);
-        xAxisBottom.setGranularityEnabled(true);
-        xAxisBottom.setTextColor(CHART_TEXT_COLOR);
-
-        final YAxis yAxisLeft = mWeeklyHRVStatusChart.getAxisLeft();
-        yAxisLeft.setDrawGridLinesEnabled(true);
-        yAxisLeft.setAxisMaximum(120);
-        yAxisLeft.setAxisMinimum(0);
-        yAxisLeft.setDrawTopYLabelEntryEnabled(false);
-        yAxisLeft.setEnabled(true);
-        yAxisLeft.setTextColor(CHART_TEXT_COLOR);
-
-        final YAxis yAxisRight = mWeeklyHRVStatusChart.getAxisRight();
-        yAxisRight.setEnabled(true);
-        yAxisRight.setDrawLabelsEnabled(false);
-        yAxisRight.setDrawGridLinesEnabled(false);
-        yAxisRight.setDrawAxisLineEnabled(true);
-    }
-
-    IAxisValueFormatter getHRVStatusChartDayValueFormatter(HRVStatusWeeklyData weeklyData) {
-        return (value, axis) -> formatHRVStatusChartValue(value, weeklyData);
-    }
-
-    protected String formatHRVStatusChartValue(float value, HRVStatusWeeklyData weeklyData) {
-        final int dayIndex = Math.round(value);
-        if (dayIndex < 0 || dayIndex >= weeklyData.getDaysData().size()) {
-            return "";
-        }
-
-        HRVStatusDayData day = weeklyData.getDay(dayIndex);
-
-        final String formatPattern = totalDays == DEFAULT_TOTAL_DAYS ? "EEE" : "dd";
-        SimpleDateFormat formatLetterDay = new SimpleDateFormat(formatPattern, Locale.getDefault());
-        return formatLetterDay.format(new Date(day.day.getTimeInMillis()));
-    }
-
-    IAxisValueFormatter getLastNightChartValueFormatter(final Calendar lastNightStart) {
-        return (value, axis) -> formatLastNightChartValue(value, lastNightStart);
-    }
-
-    protected String formatLastNightChartValue(final float value, final Calendar lastNightStart) {
-        final long timestamp = lastNightStart.getTimeInMillis() + (long) (value * 1000);
-        return new SimpleDateFormat("HH:mm", Locale.getDefault()).format(new Date(timestamp));
     }
 
     @Override
