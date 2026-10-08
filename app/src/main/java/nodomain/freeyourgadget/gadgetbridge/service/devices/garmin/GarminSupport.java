@@ -19,6 +19,7 @@ package nodomain.freeyourgadget.gadgetbridge.service.devices.garmin;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothGatt;
 import android.bluetooth.BluetoothGattCharacteristic;
+import android.bluetooth.BluetoothGattService;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
@@ -35,6 +36,9 @@ import androidx.annotation.Nullable;
 import androidx.annotation.VisibleForTesting;
 import androidx.documentfile.provider.DocumentFile;
 import androidx.localbroadcastmanager.content.LocalBroadcastManager;
+
+import com.google.gson.JsonElement;
+import com.google.gson.JsonObject;
 
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
@@ -56,6 +60,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Optional;
 import java.util.Queue;
 import java.util.Set;
@@ -92,6 +97,7 @@ import nodomain.freeyourgadget.gadgetbridge.model.CannedMessagesSpec;
 import nodomain.freeyourgadget.gadgetbridge.model.HydrationContainer;
 import nodomain.freeyourgadget.gadgetbridge.model.MusicSpec;
 import nodomain.freeyourgadget.gadgetbridge.model.MusicStateSpec;
+import nodomain.freeyourgadget.gadgetbridge.model.NavigationInfoSpec;
 import nodomain.freeyourgadget.gadgetbridge.model.NotificationSpec;
 import nodomain.freeyourgadget.gadgetbridge.model.RecordedDataTypes;
 import nodomain.freeyourgadget.gadgetbridge.model.weather.Weather;
@@ -112,6 +118,7 @@ import nodomain.freeyourgadget.gadgetbridge.service.btle.AbstractBTLESingleDevic
 import nodomain.freeyourgadget.gadgetbridge.service.btle.TransactionBuilder;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.communicator.ICommunicator;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.communicator.v1.CommunicatorV1;
+import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.communicator.GarminWatchAppCommunicator;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.communicator.v2.CommunicatorV2;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.deviceevents.CapabilitiesDeviceEvent;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.deviceevents.FileDownloadedDeviceEvent;
@@ -169,6 +176,7 @@ import static nodomain.freeyourgadget.gadgetbridge.model.ActivityUser.PREF_USER_
 
 public class GarminSupport extends AbstractBTLESingleDeviceSupport implements ICommunicator.Callback {
     private static final Logger LOG = LoggerFactory.getLogger(GarminSupport.class);
+    private static final UUID NAVIGATION_APP_UUID = UUID.fromString("0730e73c-f977-47b3-84e1-cc030f0aefb6");
     private final ProtocolBufferHandler protocolBufferHandler;
     private final NotificationsHandler notificationsHandler;
     private final FileTransferHandler fileTransferHandler;
@@ -177,6 +185,9 @@ public class GarminSupport extends AbstractBTLESingleDeviceSupport implements IC
     private final List<MessageHandler> messageHandlers;
     private final List<FileType> supportedFileTypeList = new ArrayList<>();
     private ICommunicator communicator;
+    private GarminWatchAppCommunicator watchAppCommunicator;
+    private BluetoothGattService watchAppService;
+    private JsonObject lastNavigationMessage;
     private GarminRfcommListener rfcommListener;
     private String classicAddress;
     private MediaManager mediaManager;
@@ -215,6 +226,7 @@ public class GarminSupport extends AbstractBTLESingleDeviceSupport implements IC
         addSupportedService(CommunicatorV1.UUID_SERVICE_GARMIN_GFDI_V0);
         addSupportedService(CommunicatorV1.UUID_SERVICE_GARMIN_GFDI_V1);
         addSupportedService(CommunicatorV2.UUID_SERVICE_GARMIN_ML_GFDI);
+        addSupportedService(GarminWatchAppCommunicator.UUID_SERVICE);
         protocolBufferHandler = new ProtocolBufferHandler(this);
         fileTransferHandler = new FileTransferHandler(this);
         filesToDownload = new LinkedList<>();
@@ -257,6 +269,9 @@ public class GarminSupport extends AbstractBTLESingleDeviceSupport implements IC
             stopSleepAsAndroidSchedulers();
             if (communicator != null) {
                 communicator.dispose();
+            }
+            if (watchAppCommunicator != null) {
+                watchAppCommunicator.dispose();
             }
             if (rfcommListener != null) {
                 rfcommListener.close();
@@ -350,7 +365,18 @@ public class GarminSupport extends AbstractBTLESingleDeviceSupport implements IC
             communicator = communicatorV1;
         }
 
+        watchAppCommunicator = new GarminWatchAppCommunicator(this);
+        if (!watchAppCommunicator.initializeDevice(builder, watchAppService)) {
+            watchAppCommunicator = null;
+        }
+
         return builder;
+    }
+
+    @Override
+    public void onServicesDiscovered(final BluetoothGatt gatt) {
+        watchAppService = gatt.getService(GarminWatchAppCommunicator.UUID_SERVICE);
+        super.onServicesDiscovered(gatt);
     }
 
     @Override
@@ -377,6 +403,10 @@ public class GarminSupport extends AbstractBTLESingleDeviceSupport implements IC
         final UUID characteristicUUID = characteristic.getUuid();
         if (super.onCharacteristicChanged(gatt, characteristic, value)) {
             LOG.debug("Change of characteristic {} handled by parent", characteristicUUID);
+            return true;
+        }
+
+        if (watchAppCommunicator != null && watchAppCommunicator.onCharacteristicChanged(characteristic, value)) {
             return true;
         }
 
@@ -683,13 +713,59 @@ public class GarminSupport extends AbstractBTLESingleDeviceSupport implements IC
 
     @Override
     public void onAppInfoReq() {
-        sendProtobufRequest("request apps",
-                Smart.newBuilder().setInstalledAppsService(
-                        GdiInstalledAppsService.InstalledAppsService.newBuilder().setGetInstalledAppsRequest(
-                                GdiInstalledAppsService.InstalledAppsService.GetInstalledAppsRequest.newBuilder()
-                                        .setAppType(GdiInstalledAppsService.InstalledAppsService.AppType.ALL)
-                        )
-                ).build());
+        onAppInfoReq(GdiInstalledAppsService.InstalledAppsService.AppType.ALL);
+    }
+
+    private void onAppInfoReq(final GdiInstalledAppsService.InstalledAppsService.AppType appType) {
+        sendProtobufRequest("request apps of type " + appType,
+            Smart.newBuilder().setInstalledAppsService(
+                GdiInstalledAppsService.InstalledAppsService.newBuilder().setGetInstalledAppsRequest(
+                    GdiInstalledAppsService.InstalledAppsService.GetInstalledAppsRequest.newBuilder()
+                        .setAppType(appType)
+                )
+            ).build());
+    }
+
+    @Override
+    public void onSetNavigationInfo(final NavigationInfoSpec navigationInfoSpec) {
+        if (!getCoordinator().supportsNavigation(getDevice())) {
+            return;
+        }
+        if (watchAppCommunicator == null || !installedApps.containsKey(NAVIGATION_APP_UUID)) {
+            // Fallback to normal notifications
+            super.onSetNavigationInfo(navigationInfoSpec);
+            return;
+        }
+
+        final JsonObject message = new JsonObject();
+        message.addProperty("action", navigationInfoSpec.getNextAction());
+        if (navigationInfoSpec.getInstruction() != null) {
+            message.addProperty("text", navigationInfoSpec.getInstruction());
+        }
+        if (navigationInfoSpec.getDistanceToTurn() != null) {
+            message.addProperty("distance", navigationInfoSpec.getDistanceToTurn());
+        }
+        if (navigationInfoSpec.getETA() != null) {
+            message.addProperty("eta", navigationInfoSpec.getETA());
+        }
+        message.addProperty("progress", navigationInfoSpec.getCompletionPercent());
+        message.addProperty("alert", lastNavigationMessage == null
+                || !Objects.equals(lastNavigationMessage.get("action"), message.get("action"))
+                || !Objects.equals(lastNavigationMessage.get("text"), message.get("text")));
+
+        lastNavigationMessage = message;
+        watchAppCommunicator.sendMessage(NAVIGATION_APP_UUID, message);
+    }
+
+    public void onWatchAppMessage(final UUID app, final JsonElement message) {
+        if (!NAVIGATION_APP_UUID.equals(app) || lastNavigationMessage == null) {
+            return;
+        }
+        if (message.isJsonPrimitive() && "ready".equals(message.getAsString())) {
+            final JsonObject repeat = lastNavigationMessage.deepCopy();
+            repeat.addProperty("alert", false);
+            watchAppCommunicator.sendMessage(NAVIGATION_APP_UUID, repeat);
+        }
     }
 
     @Override
@@ -983,6 +1059,7 @@ public class GarminSupport extends AbstractBTLESingleDeviceSupport implements IC
         sendOutgoingMessage("set sync ready", new SystemEventMessage(SystemEventMessage.GarminSystemEventType.SYNC_READY, 0));
 
         requestBatteryUpdate();
+        onAppInfoReq(GdiInstalledAppsService.InstalledAppsService.AppType.WATCH_APP);
 
 
         gbDevice.setUpdateState(GBDevice.State.INITIALIZED, getContext());

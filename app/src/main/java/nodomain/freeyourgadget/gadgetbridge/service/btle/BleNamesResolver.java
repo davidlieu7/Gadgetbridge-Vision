@@ -601,6 +601,7 @@ public class BleNamesResolver {
         mServices.put("6217ff4b-fb31-1140-ad5a-a45545d7ecf3", "(Propr: Polar Settings)");
         mServices.put("6a4e2401-667b-11e3-949a-0800200c9a66", "(Propr: Garmin GFDI V1)");
         mServices.put("6a4e2800-667b-11e3-949a-0800200c9a66", "(Propr: Garmin ML)");
+        mServices.put("6a4e8022-667b-11e3-949a-0800200c9a66", "(Propr: Garmin Watch Apps)");
         mServices.put("86f61000-f706-58a0-95b2-1fb9261e4dc7", "(Propr: Ultrahuman State)");
         mServices.put("86f65000-f706-58a0-95b2-1fb9261e4dc7", "(Propr: Ultrahuman Request)");
         mServices.put("86f66000-f706-58a0-95b2-1fb9261e4dc7", "(Propr: Ultrahuman Data)");
