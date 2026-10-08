@@ -42,6 +42,8 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.security.SecureRandom;
 import java.text.SimpleDateFormat;
+import java.time.DateTimeException;
+import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
 import java.time.format.DateTimeParseException;
@@ -95,6 +97,7 @@ import nodomain.freeyourgadget.gadgetbridge.model.MusicSpec;
 import nodomain.freeyourgadget.gadgetbridge.model.MusicStateSpec;
 import nodomain.freeyourgadget.gadgetbridge.model.NotificationSpec;
 import nodomain.freeyourgadget.gadgetbridge.model.WeatherSpec;
+import nodomain.freeyourgadget.gadgetbridge.model.WorldClock;
 import nodomain.freeyourgadget.gadgetbridge.model.weather.Weather;
 import nodomain.freeyourgadget.gadgetbridge.service.btle.AbstractBTLESingleDeviceSupport;
 import nodomain.freeyourgadget.gadgetbridge.service.btle.TransactionBuilder;
@@ -130,6 +133,7 @@ import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3NotificationAction;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3QuickReplies;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3WeatherInfo;
+import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3WorldClock;
 import nodomain.freeyourgadget.gadgetbridge.util.FileUtils;
 import nodomain.freeyourgadget.gadgetbridge.util.GB;
 import nodomain.freeyourgadget.gadgetbridge.util.calendar.CalendarEvent;
@@ -545,6 +549,9 @@ public class SamsungDeviceSupport extends AbstractBTLESingleDeviceSupport {
                     return;
                 case SapProtocol.CH_NOTIFICATION:         // 0x07: /3 icon fetch, /0x3e big-data-chunk upload ack
                     onNotificationRequest(msgId, body);
+                    return;
+                case SapProtocol.CH_WORLD_CLOCK:          // 0x1b: /2,/3 edit or add a city on the phone
+                    LOG.info("Samsung Fit 3: band asks to edit world clocks on the phone (msgId={})", msgId);
                     return;
                 case SapProtocol.CH_SOS:                  // 0x19: setting changed on the band
                     onSosRequest(msgId, body);
@@ -1488,6 +1495,10 @@ public class SamsungDeviceSupport extends AbstractBTLESingleDeviceSupport {
         sendRawMessage(Fit3NotificationCapability.CHANNEL, Fit3NotificationCapability.buildRequest(),
                 "notification-capability");
 
+        // World clock cities. Only a Samsung phone's vendor app sends these;
+        // the band may show its World clock app only once it has them.
+        sendWorldClocks(DBHelper.getWorldClocks(getDevice()));
+
         // SOS / fall-detection settings, same idea as the snapshot below.
         sendRawMessage(Fit3Sos.CHANNEL, Fit3Sos.buildSettingsRequest(hasSosContact(), true),
                 "sos-settings-request");
@@ -2228,6 +2239,42 @@ public class SamsungDeviceSupport extends AbstractBTLESingleDeviceSupport {
         if (!event.preferences.isEmpty()) {
             evaluateGBDeviceEvent(event);
         }
+    }
+
+    @Override
+    public void onSetWorldClocks(ArrayList<? extends WorldClock> clocks) {
+        sendWorldClocks(clocks);
+    }
+
+    /** Send the enabled world clocks, plus the phone's own zone (see {@link Fit3WorldClock}). */
+    private void sendWorldClocks(List<? extends WorldClock> clocks) {
+        Instant now = Instant.now();
+        List<Fit3WorldClock.City> cities = new ArrayList<>();
+        for (WorldClock clock : clocks) {
+            if (Boolean.FALSE.equals(clock.getEnabled())) {
+                continue;
+            }
+            ZoneId zone;
+            try {
+                zone = ZoneId.of(clock.getTimeZoneId());
+            } catch (DateTimeException e) {
+                LOG.warn("Samsung Fit 3: skipping world clock with bad zone {}", clock.getTimeZoneId());
+                continue;
+            }
+            String label = clock.getLabel();
+            if (label == null || label.trim().isEmpty()) {
+                label = zone.getId();
+            }
+            cities.add(Fit3WorldClock.City.of(label, zone, now));
+        }
+        LOG.info("Samsung Fit 3: sending {} world clock(s)", cities.size());
+        sendMessage(Fit3WorldClock.CHANNEL, Fit3WorldClock.buildClockApp(true), "world-clock-app");
+        for (byte[] chunk : Fit3WorldClock.buildCityList(cities)) {
+            sendMessage(Fit3WorldClock.CHANNEL, chunk, "world-clock-cities");
+        }
+        TimeZone home = TimeZone.getDefault();
+        sendMessage(Fit3WorldClock.CHANNEL, Fit3WorldClock.buildCurrentZone(
+                home.getDisplayName(home.inDaylightTime(new Date()), TimeZone.LONG)), "world-clock-home");
     }
 
     @Override
