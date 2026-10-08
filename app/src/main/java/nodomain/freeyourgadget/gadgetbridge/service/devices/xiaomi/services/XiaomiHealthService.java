@@ -134,10 +134,20 @@ public class XiaomiHealthService extends AbstractXiaomiService {
     // The band renders these values on its workout screen and blanks it if the stream stops
     // altogether. The full rate is only worth its radio traffic while the screen is likely to be
     // on, which for a sleep session is the first few seconds; the rest of the night runs at the
-    // idle rate.
+    // idle rate. Keeping the workout open is the keepalive's job, not this stream's.
     private static final long WORKOUT_STATS_INTERVAL_MS = 1_000L;
     private static final long WORKOUT_STATS_IDLE_INTERVAL_MS = 5_000L;
     private static final long WORKOUT_STATS_ACTIVE_WINDOW_MS = 10_000L;
+    // The band closes the synthetic workout on its own unless the start status is repeated.
+    private static final long SAA_KEEPALIVE_INTERVAL_MS = 24_000L;
+    // Raw sensor batches arrive continuously; a longer gap means the band dropped the session.
+    private static final long SAA_STALL_TIMEOUT_MS = 30_000L;
+    // A band that answers none of the restarts will not answer the next one either, and the
+    // session has to stop rather than reopen a workout every half minute until morning.
+    private static final int SAA_MAX_RESTART_ATTEMPTS = 3;
+    // The band ignores a finish that follows the preceding status too closely, and keeps the
+    // workout open. A later start is then rejected until the band is power-cycled.
+    private static final long SAA_FINISH_DELAY_MS = 500L;
     // Reported to the band until a real reading arrives.
     private static final int HEART_RATE_UNKNOWN = 255;
 
@@ -177,11 +187,23 @@ public class XiaomiHealthService extends AbstractXiaomiService {
     private boolean gpsFixAcquired = false;
     private boolean workoutStarted = false;
     private final Handler gpsTimeoutHandler = new Handler();
-    private boolean saaRawSensorActive = false;
-    private long saaWorkoutStartedMs = 0;
-    private long saaStatsActiveUntilMs = 0;
-    private int lastHeartRate = HEART_RATE_UNKNOWN;
+    // The Sleep as Android session is driven from the handler thread and fed from the Bluetooth
+    // callback thread, so every field both of them touch is published.
+    private volatile boolean saaRawSensorActive = false;
+    // Covers the whole Sleep as Android session: the gap between closing a stale workout and
+    // opening the new one, and the gap between the closing pause and the closing finish. The band
+    // echoes its workout status without a sport id, so this is the only way to tell those echoes
+    // apart from a workout started on the band itself.
+    private volatile boolean saaSessionRequested = false;
+    private volatile boolean saaHeartRateRequested = false;
+    private volatile long saaWorkoutStartedMs = 0;
+    private volatile long saaStatsActiveUntilMs = 0;
+    private volatile long lastRawSensorBatchMs = 0;
+    private volatile int saaRestartAttempts = 0;
+    private volatile int lastHeartRate = HEART_RATE_UNKNOWN;
     private final Handler saaWorkoutStatsHandler = new Handler();
+    private final Handler saaKeepaliveHandler = new Handler();
+    private final Handler saaWorkoutStatusHandler = new Handler();
 
     private final Set<Integer> currentGoals = new LinkedHashSet<>();
     private final Set<Integer> supportedGoals = new LinkedHashSet<>();
@@ -285,7 +307,7 @@ public class XiaomiHealthService extends AbstractXiaomiService {
         synchronized (realtimeConsumers) {
             realtimeConsumers.clear();
         }
-        saaRawSensorActive = false;
+        resetSleepAsAndroidSession();
         gpsTimeoutHandler.removeCallbacksAndMessages(null);
 
         setUserInfo();
@@ -304,12 +326,23 @@ public class XiaomiHealthService extends AbstractXiaomiService {
         gpsStarted = false;
         gpsFixAcquired = false;
         workoutStarted = false;
-        stopWorkoutStatsTicker();
         synchronized (realtimeConsumers) {
             realtimeConsumers.clear();
         }
-        saaRawSensorActive = false;
+        resetSleepAsAndroidSession();
         activityFetcher.dispose();
+    }
+
+    /**
+     * Forget the Sleep as Android session along with every timer driving it, all of which belong
+     * to the connection that started them.
+     */
+    private void resetSleepAsAndroidSession() {
+        saaWorkoutStatusHandler.removeCallbacksAndMessages(null);
+        stopKeepalive();
+        stopWorkoutStatsTicker();
+        saaRawSensorActive = false;
+        saaSessionRequested = false;
     }
 
     @Override
@@ -748,17 +781,20 @@ public class XiaomiHealthService extends AbstractXiaomiService {
 
     private void handleWorkoutOpen(final WorkoutOpenWatch workoutOpenWatch) {
         LOG.debug(
-                "Workout open on watch: {}, workoutStarted={}, gpsStarted={}, gpsFixAcquired={}, saa={}",
+                "Workout open on watch: {}, workoutStarted={}, gpsStarted={}, gpsFixAcquired={}, saaSession={}, saaStream={}",
                 workoutOpenWatch.getSport(),
                 workoutStarted,
                 gpsStarted,
                 gpsFixAcquired,
+                saaSessionRequested,
                 saaRawSensorActive
         );
 
         // SaA synthetic mode: the band is asking us to confirm a hidden workout. Reply
         // (0, 2, 2) immediately without starting GPS so the band proceeds to stream raw accel.
-        if (saaRawSensorActive) {
+        // The band repeats the request every few seconds for as long as the workout is open, so
+        // one arriving between two workouts of the session is answered the same way.
+        if (saaSessionRequested) {
             getSupport().sendCommand(
                     "saa raw-sensor open ack",
                     XiaomiProto.Command.newBuilder()
@@ -820,9 +856,10 @@ public class XiaomiHealthService extends AbstractXiaomiService {
     private void handleWorkoutStatus(final WorkoutStatusWatch workoutStatus) {
         LOG.debug("Got workout status: {}, sport={}", workoutStatus.getStatus(), workoutStatus.getSport());
 
-        // Ignore the synthetic SaA workout — it must not trigger OpenTracks or
-        // any GPS bookkeeping.
-        if (saaRawSensorActive || workoutStatus.getSport() == SAA_SYNTHETIC_SPORT) {
+        // Ignore the synthetic SaA workout, it must not trigger OpenTracks or any GPS bookkeeping.
+        // The band echoes the status it was given with the sport field left empty, so a session in
+        // progress is what identifies those echoes rather than the sport.
+        if (saaSessionRequested || workoutStatus.getSport() == SAA_SYNTHETIC_SPORT) {
             return;
         }
 
@@ -1119,34 +1156,122 @@ public class XiaomiHealthService extends AbstractXiaomiService {
      *  1. REALTIME_STATS_START -- enables HR/steps stream (existing path)
      *  2. WORKOUT_WATCH_STATUS(status=STARTED, sport=SAA_SYNTHETIC_SPORT) -- tells the band to
      *     open a hidden workout. Band then sends WORKOUT_WATCH_OPEN to us; handleWorkoutOpen
-     *     replies (0, 2, 2) when saaRawSensorActive is true and the band starts streaming
-     *     subtype-53 raw accel batches.
+     *     replies (0, 2, 2) while the session is open and the band starts streaming subtype-53
+     *     raw accel batches.
+     * A WORKOUT_WATCH_STATUS(FINISHED) goes out first, {@link #SAA_FINISH_DELAY_MS} ahead of the
+     * start, to close a workout the band may still hold from an earlier session.
+     *
+     * @param withHeartRate whether Sleep as Android asked for heart rate, which decides whether
+     *                      the realtime stream is started at all
      */
-    public void startRawSensor() {
+    public void startRawSensor(final boolean withHeartRate) {
+        saaSessionRequested = true;
+        saaRestartAttempts = 0;
+        closeThenOpenRawSensorWorkout(withHeartRate, false);
+    }
+
+    private void closeThenOpenRawSensorWorkout(final boolean withHeartRate, final boolean rearmRealtime) {
+        saaHeartRateRequested = withHeartRate;
+        saaRawSensorActive = false;
+        saaWorkoutStatusHandler.removeCallbacksAndMessages(null);
+        stopKeepalive();
+        stopWorkoutStatsTicker();
+
+        // Otherwise the band rejects the workout opened below.
+        sendWorkoutStatus(WORKOUT_FINISHED);
+        saaWorkoutStatusHandler.postDelayed(() -> openRawSensorWorkout(rearmRealtime), SAA_FINISH_DELAY_MS);
+    }
+
+    private void openRawSensorWorkout(final boolean rearmRealtime) {
         saaRawSensorActive = true;
         saaWorkoutStartedMs = SystemClock.elapsedRealtime();
+        lastRawSensorBatchMs = saaWorkoutStartedMs;
         saaStatsActiveUntilMs = saaWorkoutStartedMs + WORKOUT_STATS_ACTIVE_WINDOW_MS;
         lastHeartRate = HEART_RATE_UNKNOWN;
 
-        setRealtimeConsumer(RealtimeConsumer.SLEEP_AS_ANDROID, true);
+        if (saaHeartRateRequested) {
+            if (rearmRealtime) {
+                // The band dropped the whole session, realtime stream included, so the consumer
+                // bookkeeping no longer reflects what it is actually doing. Re-send the start
+                // instead of trusting it.
+                synchronized (realtimeConsumers) {
+                    realtimeConsumers.add(RealtimeConsumer.SLEEP_AS_ANDROID);
+                }
+                previousSteps = -1;
+                sendRealtimeStats(true);
+            } else {
+                setRealtimeConsumer(RealtimeConsumer.SLEEP_AS_ANDROID, true);
+            }
+        }
         sendWorkoutStatus(WORKOUT_STARTED);
         startWorkoutStatsTicker();
+        startKeepalive();
+    }
+
+    /**
+     * Repeat the start status every {@link #SAA_KEEPALIVE_INTERVAL_MS}, and rebuild the workout
+     * when no raw sensor batch arrived for {@link #SAA_STALL_TIMEOUT_MS}. A batch resets the
+     * restart budget.
+     */
+    private void startKeepalive() {
+        saaKeepaliveHandler.removeCallbacksAndMessages(null);
+        saaKeepaliveHandler.postDelayed(new Runnable() {
+            @Override
+            public void run() {
+                if (!saaRawSensorActive) {
+                    return;
+                }
+
+                final long sinceLastBatch = SystemClock.elapsedRealtime() - lastRawSensorBatchMs;
+                if (sinceLastBatch > SAA_STALL_TIMEOUT_MS) {
+                    if (++saaRestartAttempts > SAA_MAX_RESTART_ATTEMPTS) {
+                        LOG.warn("No raw sensor batch for {}ms after {} restarts, giving up on the synthetic workout",
+                                sinceLastBatch, SAA_MAX_RESTART_ATTEMPTS);
+                        stopRawSensor();
+                        return;
+                    }
+
+                    LOG.warn("No raw sensor batch for {}ms, restarting the synthetic workout ({}/{})",
+                            sinceLastBatch, saaRestartAttempts, SAA_MAX_RESTART_ATTEMPTS);
+                    closeThenOpenRawSensorWorkout(saaHeartRateRequested, true);
+                    return;
+                }
+
+                sendWorkoutStatus(WORKOUT_STARTED);
+                saaKeepaliveHandler.postDelayed(this, SAA_KEEPALIVE_INTERVAL_MS);
+            }
+        }, SAA_KEEPALIVE_INTERVAL_MS);
+    }
+
+    private void stopKeepalive() {
+        saaKeepaliveHandler.removeCallbacksAndMessages(null);
     }
 
     /**
      * Tear down the SaA synthetic workout. Sequence:
      *  1. REALTIME_STATS_STOP
      *  2. WORKOUT_WATCH_STATUS(status=PAUSED, ...)
-     *  3. WORKOUT_WATCH_STATUS(status=FINISHED, ...) -- final close
+     *  3. WORKOUT_WATCH_STATUS(status=FINISHED, ...) -- final close, {@link #SAA_FINISH_DELAY_MS}
+     *     after the pause
      */
     public void stopRawSensor() {
-        if (!saaRawSensorActive) return;
+        if (!saaSessionRequested) {
+            return;
+        }
 
+        saaWorkoutStatusHandler.removeCallbacksAndMessages(null);
+        stopKeepalive();
         stopWorkoutStatsTicker();
         setRealtimeConsumer(RealtimeConsumer.SLEEP_AS_ANDROID, false);
         sendWorkoutStatus(WORKOUT_PAUSED);
-        sendWorkoutStatus(WORKOUT_FINISHED);
         saaRawSensorActive = false;
+
+        // The session owns the workout until the close has actually gone out: the band keeps
+        // echoing the status it was given until then.
+        saaWorkoutStatusHandler.postDelayed(() -> {
+            sendWorkoutStatus(WORKOUT_FINISHED);
+            saaSessionRequested = false;
+        }, SAA_FINISH_DELAY_MS);
     }
 
     private void startWorkoutStatsTicker() {
@@ -1240,6 +1365,8 @@ public class XiaomiHealthService extends AbstractXiaomiService {
     }
 
     private void handleRawSensorBatch(final RawSensorBatch batch) {
+        lastRawSensorBatchMs = SystemClock.elapsedRealtime();
+        saaRestartAttempts = 0;
         final int n = batch.getAccelCount();
         LOG.debug("Got raw sensor batch: {} accel samples", n);
         // Batches carry ten samples and arrive ten times a second, so whether Sleep as Android

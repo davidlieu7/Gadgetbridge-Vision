@@ -52,6 +52,7 @@ public class XiaomiWorkoutStatsWatchTest extends TestBase {
     private static final int CMD_WORKOUT_STATS_PHONE = 49;
     private static final int CMD_WEAR_SPORT_DATA_V2A = 50;
 
+    private static final long OPEN_DELAY_MS = 500L;
     private static final long FULL_INTERVAL_MS = 1_000L;
     private static final long IDLE_INTERVAL_MS = 5_000L;
     private static final long ACTIVE_WINDOW_MS = 10_000L;
@@ -85,8 +86,8 @@ public class XiaomiWorkoutStatsWatchTest extends TestBase {
     }
 
     private void openSession() {
-        health.startRawSensor();
-        idle(0);
+        health.startRawSensor(true);
+        idle(OPEN_DELAY_MS);
     }
 
     private void deliverStats(final WorkoutStatsWatch.Builder stats) {

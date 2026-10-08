@@ -527,8 +527,8 @@ public class XiaomiSupport extends AbstractBluetoothDeviceSupport {
                 sleepAsAndroidSender.confirmConnected();
                 break;
             case SleepAsAndroidAction.START_TRACKING:
-                healthService.startRawSensor();
                 sleepAsAndroidSender.startTracking(extras);
+                healthService.startRawSensor(sleepAsAndroidSender.isHeartRateRequested());
                 break;
             case SleepAsAndroidAction.STOP_TRACKING:
                 healthService.stopRawSensor();
