@@ -353,7 +353,7 @@ public class SleepAsAndroidSender {
      */
     public void setBatchSize(long batchSize) {
         if (!isDeviceDefault()) return;
-        LOG.debug("Setting batch size to " + batchSize);
+        LOG.debug("Setting batch size to {}", batchSize);
         this.batchSize = batchSize;
     }
 
@@ -517,7 +517,7 @@ public class SleepAsAndroidSender {
      * Send the heart rate data
      */
     private synchronized void sendHrData() {
-        LOG.debug("Sending heart rate data: " + this.hrData);
+        LOG.debug("Sending heart rate data: {}", this.hrData);
         Intent intent = new Intent(ACTION_HEART_RATE_DATA_UPDATE);
         intent.putExtra(DATA, convertToFloatArray(this.hrData));
         broadcastToSleepAsAndroid(intent);
