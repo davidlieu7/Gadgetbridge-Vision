@@ -32,15 +32,19 @@ import nodomain.freeyourgadget.gadgetbridge.activities.charts.spec.AxisSpec
 import nodomain.freeyourgadget.gadgetbridge.activities.charts.spec.ChartSpec
 import nodomain.freeyourgadget.gadgetbridge.activities.charts.spec.ChartTheme
 import nodomain.freeyourgadget.gadgetbridge.activities.charts.spec.ChartValueFormat
+import nodomain.freeyourgadget.gadgetbridge.activities.charts.spec.DURATION_LABEL_SPACINGS_SECONDS
 import nodomain.freeyourgadget.gadgetbridge.activities.charts.spec.SeriesStyle
 import nodomain.freeyourgadget.gadgetbridge.activities.charts.spec.fixedLabelValues
 import nodomain.freeyourgadget.gadgetbridge.activities.charts.spec.labelFor
 import nodomain.freeyourgadget.gadgetbridge.activities.charts.spec.timeLabelValues
+import java.lang.ref.WeakReference
 import java.util.TimeZone
+import java.util.WeakHashMap
 import kotlin.math.abs
 
 /**
- * Renders a [ChartSpec]. No zoom or scroll. Tap or drag sideways to select an x.
+ * Renders a [ChartSpec]. Tap or drag sideways to select an x; with a click listener, a tap clicks instead.
+ * With [zoomable], pinch zooms the x axis, a drag pans it once zoomed in, and a long press then drag selects.
  */
 class GbChartView @JvmOverloads constructor(
     context: Context,
@@ -55,7 +59,17 @@ class GbChartView @JvmOverloads constructor(
     private val gestures = GestureDetector(context, object : GestureDetector.SimpleOnGestureListener() {
         override fun onDown(e: MotionEvent) = true
 
+        override fun onLongPress(e: MotionEvent) {
+            if (!zoomable || viewPortHandler.isFullyZoomedOut) return
+            val x = targetAt(e.x, e.y) ?: return
+            startScrub()
+            select(x)
+        }
+
         override fun onSingleTapUp(e: MotionEvent): Boolean {
+            if (hasOnClickListeners()) {
+                return performClick()
+            }
             performClick()
             val x = targetAt(e.x, e.y)
             if (x == null) select(null) else toggle(x)
@@ -72,6 +86,14 @@ class GbChartView @JvmOverloads constructor(
     private var scrubbing = false
 
     var selectionContent: ((Double) -> ChartSelection)? = null
+
+    var zoomable = false
+        set(value) {
+            field = value
+            isDragEnabled = value
+            isScaleXEnabled = value
+            if (!value) fitScreen()
+        }
 
     var selectedX: Double? = null
         private set
@@ -178,27 +200,46 @@ class GbChartView @JvmOverloads constructor(
     internal fun toggle(x: Double) = select(ChartSlots.toggle(selectedX, x))
 
     /**
-     * Dismiss the marker on taps that reach outside this chart.
+     * Dismiss the marker on taps that reach outside this chart. Several charts can share one [container].
+     */
+    fun dismissSelectionOnTapOutside(container: View) {
+        val listener = tapOutsideListeners.getOrPut(container) { TapOutsideListener(container, touchSlop) }
+        listener.add(this)
+    }
+
+    /**
+     * Clears the selection of its charts on a tap that reaches [container] itself.
      */
     @SuppressLint("ClickableViewAccessibility")
-    fun dismissSelectionOnTapOutside(container: View) {
-        var downX = 0f
-        var downY = 0f
-        val handlesOwnTouches = container is ScrollView || container is NestedScrollView || container.isClickable
-        container.setOnTouchListener { _, event ->
+    private class TapOutsideListener(container: View, private val touchSlop: Int) : View.OnTouchListener {
+        private val charts = mutableListOf<WeakReference<GbChartView>>()
+        private val handlesOwnTouches = container is ScrollView || container is NestedScrollView || container.isClickable
+        private var downX = 0f
+        private var downY = 0f
+
+        init {
+            container.setOnTouchListener(this)
+        }
+
+        fun add(chart: GbChartView) {
+            charts.removeAll { it.get() == null || it.get() === chart }
+            charts += WeakReference(chart)
+        }
+
+        override fun onTouch(view: View, event: MotionEvent): Boolean {
             when (event.actionMasked) {
                 MotionEvent.ACTION_DOWN -> {
                     downX = event.x
                     downY = event.y
-                    return@setOnTouchListener !handlesOwnTouches
+                    return !handlesOwnTouches
                 }
                 MotionEvent.ACTION_UP -> {
                     if (abs(event.x - downX) <= touchSlop && abs(event.y - downY) <= touchSlop) {
-                        select(null)
+                        charts.forEach { it.get()?.select(null) }
                     }
                 }
             }
-            false
+            return false
         }
     }
 
@@ -259,8 +300,32 @@ class GbChartView @JvmOverloads constructor(
 
     override fun onTouchEvent(event: MotionEvent): Boolean {
         val handled = gestures.onTouchEvent(event)
-        scrub(event)
+        if (event.pointerCount > 1) {
+            endScrub()
+        } else {
+            scrub(event)
+        }
+        if (zoomable && scrubbing) {
+            return true
+        }
         return super.onTouchEvent(event) || handled
+    }
+
+    private fun startScrub() {
+        scrubbing = true
+        parent?.requestDisallowInterceptTouchEvent(true)
+        if (zoomable) {
+            val cancel = MotionEvent.obtain(0L, 0L, MotionEvent.ACTION_CANCEL, 0f, 0f, 0)
+            super.onTouchEvent(cancel)
+            cancel.recycle()
+        }
+    }
+
+    private fun endScrub() {
+        if (scrubbing) {
+            scrubbing = false
+            parent?.requestDisallowInterceptTouchEvent(false)
+        }
     }
 
     /**
@@ -275,21 +340,16 @@ class GbChartView @JvmOverloads constructor(
             }
             MotionEvent.ACTION_MOVE -> {
                 if (!scrubbing) {
+                    if (zoomable && !viewPortHandler.isFullyZoomedOut) return
                     val dx = abs(event.x - scrubStartX)
                     val dy = abs(event.y - scrubStartY)
                     if (dx <= touchSlop || dx <= dy || targetAt(scrubStartX, scrubStartY) == null) return
-                    scrubbing = true
-                    parent?.requestDisallowInterceptTouchEvent(true)
+                    startScrub()
                 }
                 val x = event.x.coerceIn(viewPortHandler.contentLeft, viewPortHandler.contentRight)
                 targetAt(x, viewPortHandler.contentCenter.y)?.let { select(it) }
             }
-            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
-                if (scrubbing) {
-                    scrubbing = false
-                    parent?.requestDisallowInterceptTouchEvent(false)
-                }
-            }
+            MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> endScrub()
         }
     }
 
@@ -320,13 +380,18 @@ class GbChartView @JvmOverloads constructor(
     }
 
     private fun timeLabelsFor(spec: AxisSpec): List<Double>? {
-        if (spec.format != ChartValueFormat.TIME_OF_DAY && spec.format != ChartValueFormat.DATE) return null
-        val min = spec.minimum ?: return null
-        val max = spec.maximum ?: return null
+        val duration = spec.format == ChartValueFormat.DURATION_SECONDS
+        if (spec.format != ChartValueFormat.TIME_OF_DAY && spec.format != ChartValueFormat.DATE && !duration) return null
+        val min = maxOf(spec.minimum ?: return null, lowestVisibleX.toDouble())
+        val max = minOf(spec.maximum ?: return null, highestVisibleX.toDouble())
         val labelSpace = maxOf(xAxis.labelWidth.toFloat(), Utils.convertDpToPixel(MIN_TIME_LABEL_WIDTH_DP)) +
             Utils.convertDpToPixel(TIME_LABEL_GAP_DP)
+        val maxLabels = (viewPortHandler.contentWidth / labelSpace).toInt()
+        if (duration) {
+            return timeLabelValues(min, max, maxLabels, spacings = DURATION_LABEL_SPACINGS_SECONDS)
+        }
         val zoneOffsetSeconds = TimeZone.getDefault().getOffset(min.toLong() * 1000L) / 1000
-        return timeLabelValues(min, max, (viewPortHandler.contentWidth / labelSpace).toInt(), zoneOffsetSeconds)
+        return timeLabelValues(min, max, maxLabels, zoneOffsetSeconds)
     }
 
     private fun drawSelectedPoints(canvas: Canvas, spec: ChartSpec, selected: Double) {
@@ -406,7 +471,7 @@ class GbChartView @JvmOverloads constructor(
         if (spec == null) {
             return
         }
-        val label = labelFor(spec.format)
+        val label = spec.labeler ?: labelFor(spec.format)
         val unit = spec.unit
         axis.isDrawLabelsEnabled = spec.showLabels
         axis.valueFormatter = formatterFor { value -> if (unit == null) label(value) else "${label(value)} $unit" }
@@ -418,6 +483,8 @@ class GbChartView @JvmOverloads constructor(
     private fun formatterFor(label: (Double) -> String) = IAxisValueFormatter { value, _ -> label(value.toDouble()) }
 
     private companion object {
+        private val tapOutsideListeners = WeakHashMap<View, TapOutsideListener>()
+
         const val BAR_CORNER_DP = 4f
         const val PERIOD_X_PADDING = 0.5
         const val GRID_ALPHA = 0x40

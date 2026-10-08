@@ -15,6 +15,7 @@ import com.github.mikephil.charting.data.CombinedData
 import com.github.mikephil.charting.data.Entry
 import com.github.mikephil.charting.data.LineData
 import com.github.mikephil.charting.data.LineDataSet
+import com.github.mikephil.charting.formatter.IFillFormatter
 import com.github.mikephil.charting.utils.Fill
 import nodomain.freeyourgadget.gadgetbridge.activities.charts.spec.AxisSide
 import nodomain.freeyourgadget.gadgetbridge.activities.charts.spec.ChartPoint
@@ -66,6 +67,7 @@ internal object ChartDataBuilder {
     private const val AREA_FILL_ALPHA = 0.45f
     private const val MAX_CANDLE_SPACE = 0.45f
     private const val SOLID_FILL_ALPHA = 255
+    private const val BAND_FILL_ALPHA = 0x40
 
     fun columns(spec: ChartSpec) = spec.series.filter { it.style is SeriesStyle.Column && it.points.isNotEmpty() }
 
@@ -192,7 +194,12 @@ internal object ChartDataBuilder {
             isDrawCircleHoleEnabled = false
             mode = if (style.curved) LineDataSet.Mode.CUBIC_BEZIER else LineDataSet.Mode.LINEAR
             isDrawFilledEnabled = style.filled
-            if (style.filled && style.solidFill) {
+            val fillBase = style.fillBase
+            if (style.filled && fillBase != null) {
+                fillColor = style.color
+                fillAlpha = BAND_FILL_ALPHA
+                fillFormatter = IFillFormatter { _, _ -> fillBase.toFloat() }
+            } else if (style.filled && style.solidFill) {
                 fillColor = style.color
                 fillAlpha = SOLID_FILL_ALPHA
             } else if (style.filled) {

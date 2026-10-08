@@ -10,7 +10,8 @@ data class ChartPoint(val x: Double, val y: Double, val low: Double? = null)
  */
 sealed interface SeriesStyle {
     /**
-     * A line, optionally filled underneath (an area chart), curved, or with a dot on every point.
+     * A line, optionally filled underneath (an area chart), curved, or with a dot on every point. A filled line
+     * with a [fillBase] is a translucent band from that value to the line.
      */
     data class Line(
         val color: Int,
@@ -20,6 +21,7 @@ sealed interface SeriesStyle {
         val maxGap: Double? = null,
         val showLine: Boolean = true,
         val solidFill: Boolean = false,
+        val fillBase: Double? = null,
     ) : SeriesStyle
 
     /**
@@ -97,6 +99,7 @@ data class AxisSpec(
     val maximum: Double? = null,
     val unit: String? = null,
     val showLabels: Boolean = true,
+    val labeler: ((Double) -> String)? = null,
 )
 
 /**

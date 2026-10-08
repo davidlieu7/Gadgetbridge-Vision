@@ -123,12 +123,18 @@ fun dayOfMonthValues(lastDay: Int): List<Double> =
 /**
  * 2 to 7 labels between [min] and [max] (epoch seconds), on round local times [zoneOffsetSeconds] from UTC.
  */
-fun timeLabelValues(min: Double, max: Double, maxLabels: Int, zoneOffsetSeconds: Int = 0): List<Double> {
+fun timeLabelValues(
+    min: Double,
+    max: Double,
+    maxLabels: Int,
+    zoneOffsetSeconds: Int = 0,
+    spacings: List<Double> = TIME_LABEL_SPACINGS_SECONDS,
+): List<Double> {
     val range = max - min
     if (range <= 0.0) return emptyList()
     val count = maxLabels.coerceIn(MIN_TIME_LABELS, MAX_TIME_LABELS)
     val minimumSpacing = range / count
-    val spacing = TIME_LABEL_SPACINGS_SECONDS.firstOrNull { it >= minimumSpacing }
+    val spacing = spacings.firstOrNull { it >= minimumSpacing }
         ?: (ceil(minimumSpacing / SECONDS_PER_DAY) * SECONDS_PER_DAY)
     val first = ceil((min + zoneOffsetSeconds) / spacing) * spacing - zoneOffsetSeconds
     return generateSequence(0) { it + 1 }
@@ -141,6 +147,11 @@ private const val MIN_TIME_LABELS = 2
 private const val MAX_TIME_LABELS = 7
 private const val SECONDS_PER_DAY = 24 * 60 * 60.0
 private val TIME_LABEL_SPACINGS_SECONDS = listOf(5, 10, 15, 30, 60, 120, 180, 240, 360, 720, 1440).map { it * 60.0 }
+
+/**
+ * Label spacings for a duration axis, which can be zoomed down to seconds.
+ */
+val DURATION_LABEL_SPACINGS_SECONDS = listOf(5.0, 10.0, 15.0, 30.0, 60.0, 120.0) + TIME_LABEL_SPACINGS_SECONDS
 
 /**
  * Label positions for period axes, or null to let the chart choose.
