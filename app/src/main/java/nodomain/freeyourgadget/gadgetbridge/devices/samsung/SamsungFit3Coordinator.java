@@ -24,7 +24,9 @@ import android.os.Bundle;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
 
@@ -32,11 +34,13 @@ import de.greenrobot.dao.AbstractDao;
 import de.greenrobot.dao.Property;
 import nodomain.freeyourgadget.gadgetbridge.GBApplication;
 import nodomain.freeyourgadget.gadgetbridge.R;
+import nodomain.freeyourgadget.gadgetbridge.activities.CameraActivity;
 import nodomain.freeyourgadget.gadgetbridge.activities.appmanager.AppManagerActivity;
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSpecificSettings;
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSpecificSettingsCustomizer;
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSpecificSettingsScreen;
 import nodomain.freeyourgadget.gadgetbridge.devices.AbstractBLEDeviceCoordinator;
+import nodomain.freeyourgadget.gadgetbridge.devices.DeviceCardAction;
 import nodomain.freeyourgadget.gadgetbridge.devices.InstallHandler;
 import nodomain.freeyourgadget.gadgetbridge.devices.SampleProvider;
 import nodomain.freeyourgadget.gadgetbridge.entities.DaoSession;
@@ -221,6 +225,14 @@ public class SamsungFit3Coordinator extends AbstractBLEDeviceCoordinator {
         boolean enabled = GBApplication.getDeviceSpecificSharedPrefs(device.getAddress())
                 .getBoolean(Fit3PhoneAlarm.PREF_ENABLE, false);
         return enabled ? Fit3PhoneAlarm.SLOT_COUNT : 0;
+    }
+
+    @Override
+    public List<DeviceCardAction> getCustomActions() {
+        if (!CameraActivity.supportsCamera()) {
+            return Collections.emptyList();
+        }
+        return Collections.singletonList(new DeviceCardAction.CameraAction());
     }
 
     @Override

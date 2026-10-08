@@ -66,11 +66,13 @@ import java.util.UUID;
 import java.util.zip.CRC32;
 import nodomain.freeyourgadget.gadgetbridge.GBApplication;
 import nodomain.freeyourgadget.gadgetbridge.R;
+import nodomain.freeyourgadget.gadgetbridge.activities.CameraActivity;
 import nodomain.freeyourgadget.gadgetbridge.activities.SettingsActivity;
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsPreferenceConst;
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsUtils;
 import nodomain.freeyourgadget.gadgetbridge.database.DBHandler;
 import nodomain.freeyourgadget.gadgetbridge.database.DBHelper;
+import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEventCameraRemote;
 import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEventAppInfo;
 import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEventBatteryInfo;
 import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEventCallControl;
@@ -133,6 +135,7 @@ import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3Settings;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3Sos;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3Calendar;
+import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3CameraRemote;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3MenuOrder;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3NotificationAction;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.samsung.requests.Fit3PhoneAlarm;
@@ -297,7 +300,12 @@ public class SamsungDeviceSupport extends AbstractBTLESingleDeviceSupport {
     private static final int MTU = 512;
     /** Canned replies per list, matching the settings screens' slots. */
     public static final int CANNED_REPLY_SLOTS = 16;
-    private static final String PHONE_MODEL = "SM-S918B";   // announced in HELLO; any works
+    /**
+     * The phone identity announced in the HELLO. The band gates some features
+     * on the vendor being {@code samsung} (its Camera controller app, at
+     * least), so this announces a Samsung phone; the model is a plausible one.
+     */
+    private static final String PHONE_MODEL = "SM-S918B";
     private static final String PHONE_VENDOR = "samsung";
     private String deviceMac; //get it from GB
 
@@ -462,6 +470,12 @@ public class SamsungDeviceSupport extends AbstractBTLESingleDeviceSupport {
         // state machine, see Fit3WatchfaceManager.
         if (channel == SapProtocol.CH_WATCHFACE) {
             watchfaceManager.onWatchfaceMessage(body);
+            return;
+        }
+        // Camera remote: the band both asks (open, shoot, close) and answers
+        // our handshake on this channel.
+        if (channel == SapProtocol.CH_CAMERA) {
+            onCameraMessage(msgId, isResponse, body);
             return;
         }
         if (channel == SapProtocol.CH_FILE_TRANSFER) {
@@ -1507,6 +1521,12 @@ public class SamsungDeviceSupport extends AbstractBTLESingleDeviceSupport {
         // service rejects writes).
         sendPhoneAlarms();
 
+        // Camera remote handshake; the band shows its Camera controller app
+        // only once the phone side has talked.
+        if (CameraActivity.supportsCamera()) {
+            sendMessage(Fit3CameraRemote.CHANNEL, Fit3CameraRemote.buildCapabilityRequest(), "camera-capability");
+        }
+
         // World clock cities. Only a Samsung phone's vendor app sends these;
         // the band may show its World clock app only once it has them.
         sendWorldClocks(DBHelper.getWorldClocks(getDevice()));
@@ -2407,6 +2427,91 @@ public class SamsungDeviceSupport extends AbstractBTLESingleDeviceSupport {
             default:
                 // Edit on the phone: there is no clock app to open.
                 return;
+        }
+    }
+
+    /** Camera remote traffic (see {@link Fit3CameraRemote}). */
+    private void onCameraMessage(int msgId, boolean isResponse, byte[] body) {
+        if (isResponse) {
+            // The connect handshake: capability, then status, then visibility.
+            LOG.info("Samsung Fit 3: camera handshake reply {}", GB.hexdump(body));
+            if (msgId == Fit3CameraRemote.MSG_ID_CAPABILITY) {
+                sendMessage(Fit3CameraRemote.CHANNEL, Fit3CameraRemote.buildStatusRequest(), "camera-status");
+            } else if (msgId == Fit3CameraRemote.MSG_ID_STATUS) {
+                sendMessage(Fit3CameraRemote.CHANNEL, Fit3CameraRemote.buildVisibility(), "camera-visibility");
+            }
+            return;
+        }
+        LOG.info("Samsung Fit 3: camera request msgId={} from the band", msgId);
+        switch (msgId) {
+            case Fit3CameraRemote.MSG_ID_LAUNCH:
+                if (!CameraActivity.supportsCamera()) {
+                    sendMessage(Fit3CameraRemote.CHANNEL,
+                            Fit3CameraRemote.buildLaunchResult(Fit3CameraRemote.LAUNCH_FAILED), "camera-launch");
+                    return;
+                }
+                // Answered from onCameraStatusChange once the camera is up.
+                cameraLaunchPending = true;
+                evaluateGBDeviceEvent(new GBDeviceEventCameraRemote(GBDeviceEventCameraRemote.Event.OPEN_CAMERA));
+                return;
+            case Fit3CameraRemote.MSG_ID_TAKE_SHOT:
+                if (!cameraOpen) {
+                    sendMessage(Fit3CameraRemote.CHANNEL, Fit3CameraRemote.buildShotFailed(), "camera-shot");
+                    return;
+                }
+                evaluateGBDeviceEvent(new GBDeviceEventCameraRemote(GBDeviceEventCameraRemote.Event.TAKE_PICTURE));
+                return;
+            case Fit3CameraRemote.MSG_ID_EXIT:
+                if (cameraOpen) {
+                    evaluateGBDeviceEvent(new GBDeviceEventCameraRemote(GBDeviceEventCameraRemote.Event.CLOSE_CAMERA));
+                }
+                cameraOpen = false;
+                sendMessage(Fit3CameraRemote.CHANNEL, Fit3CameraRemote.buildExitResult(true), "camera-exit");
+                return;
+            case Fit3CameraRemote.MSG_ID_VIDEO_START:
+            case Fit3CameraRemote.MSG_ID_VIDEO_PAUSE:
+            case Fit3CameraRemote.MSG_ID_VIDEO_STOP:
+                sendMessage(Fit3CameraRemote.CHANNEL, Fit3CameraRemote.buildVideoUnsupported(msgId), "camera-video");
+                return;
+            default:
+                LOG.debug("Samsung Fit 3: camera request msgId={} ignored", msgId);
+        }
+    }
+
+    /** Whether Gadgetbridge's camera screen is open, as far as we know. */
+    private boolean cameraOpen;
+    /** The band asked to open the camera and has not been answered yet. */
+    private boolean cameraLaunchPending;
+
+    @Override
+    public void onCameraStatusChange(GBDeviceEventCameraRemote.Event event, String filename) {
+        LOG.info("Samsung Fit 3: camera {} {}", event, filename != null ? filename : "");
+        switch (event) {
+            case OPEN_CAMERA:
+                cameraOpen = true;
+                cameraLaunchPending = false;
+                sendMessage(Fit3CameraRemote.CHANNEL,
+                        Fit3CameraRemote.buildLaunchResult(Fit3CameraRemote.LAUNCH_OK), "camera-launch");
+                break;
+            case CLOSE_CAMERA:
+                if (cameraOpen) {
+                    cameraOpen = false;
+                    sendMessage(Fit3CameraRemote.CHANNEL, Fit3CameraRemote.buildBackground(), "camera-background");
+                }
+                break;
+            case EXCEPTION:
+                // Either the camera never came up, or a shot failed; captures
+                // aborted by closing the screen also land here, and need nothing.
+                if (cameraLaunchPending) {
+                    cameraLaunchPending = false;
+                    sendMessage(Fit3CameraRemote.CHANNEL,
+                            Fit3CameraRemote.buildLaunchResult(Fit3CameraRemote.LAUNCH_FAILED), "camera-launch");
+                } else if (cameraOpen) {
+                    sendMessage(Fit3CameraRemote.CHANNEL, Fit3CameraRemote.buildShotFailed(), "camera-shot");
+                }
+                break;
+            default:
+                break;
         }
     }
 

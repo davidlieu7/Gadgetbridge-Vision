@@ -49,6 +49,7 @@ public final class SapProtocol {
     public static final int CH_TILES        = 0x0F;   // tile list + carousel order
     public static final int CH_QUICK_REPLY  = 0x12;
     public static final int CH_QUICK_PANEL  = 0x13;   // quick-panel button list + order
+    public static final int CH_CAMERA       = 0x17;   // camera remote
     public static final int CH_APPS         = 0x18;   // app list order
     public static final int CH_SOS          = 0x19;   // SOS + fall-detection settings
     public static final int CH_WORLD_CLOCK  = 0x1B;   // world clock cities
