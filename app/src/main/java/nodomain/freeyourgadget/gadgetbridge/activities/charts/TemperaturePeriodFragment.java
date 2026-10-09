@@ -232,7 +232,7 @@ public class TemperaturePeriodFragment extends AbstractChartFragment<Temperature
         final List<Function1<Integer, String>> rowTexts = new ArrayList<>();
         rowTexts.add(i -> Double.isNaN(dayMinimum[i])
                 ? emptyValue
-                : new DecimalFormat("0.0").format(dayMinimum[i]) + " – " + formatTemperature((float) dayMaximum[i]));
+                : new DecimalFormat("0.0").format(dayMinimum[i]) + " \u2013 " + formatTemperature((float) dayMaximum[i]));
         rowTexts.add(i -> Double.isNaN(dayAverage[i]) ? emptyValue : formatTemperature((float) dayAverage[i]));
         temperatureChart.setSelectionContent(x -> DaySelections.of(
                 epochDays, x, Arrays.asList(rangeLabel, averageLabel), Arrays.asList(TEMPERATURE_COLOR, TEMPERATURE_AVG_COLOR),

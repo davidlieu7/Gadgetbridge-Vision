@@ -281,8 +281,8 @@ public class BloodPressurePeriodFragment extends AbstractChartFragment<BloodPres
                 HeartRateUtils.getInstance().getMinHeartRate(), HeartRateUtils.getInstance().getMaxHeartRate()
         );
         final List<Function1<Integer, String>> rowTexts = new ArrayList<>();
-        rowTexts.add(i -> systolicMin[i] > 0 ? systolicMin[i] + " – " + systolicMax[i] + " " + pressureUnit : emptyValue);
-        rowTexts.add(i -> diastolicMin[i] > 0 ? diastolicMin[i] + " – " + diastolicMax[i] + " " + pressureUnit : emptyValue);
+        rowTexts.add(i -> systolicMin[i] > 0 ? systolicMin[i] + " \u2013 " + systolicMax[i] + " " + pressureUnit : emptyValue);
+        rowTexts.add(i -> diastolicMin[i] > 0 ? diastolicMin[i] + " \u2013 " + diastolicMax[i] + " " + pressureUnit : emptyValue);
         rowTexts.add(i -> heartRateAvg[i] > 0 ? heartRateAvg[i] + " " + pulseUnit : emptyValue);
         mChart.setSelectionContent(x -> DaySelections.of(epochDays, x, labels, colors, rowTexts, emptyValue));
         mChart.setSpec(spec);

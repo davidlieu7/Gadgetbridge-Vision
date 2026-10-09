@@ -184,7 +184,7 @@ public class BodyEnergyPeriodFragment extends AbstractChartFragment<BodyEnergyPe
 
         final String label = getString(R.string.body_energy);
         final Function1<Integer, String> rangeText = i -> dayMinimum[i] > 0
-                ? dayMinimum[i] + " – " + dayMaximum[i]
+                ? dayMinimum[i] + " \u2013 " + dayMaximum[i]
                 : getString(R.string.stats_empty_value);
         bodyEnergyChart.setSelectionContent(x -> DaySelections.of(
                 epochDays, x, Collections.singletonList(label), Collections.singletonList(BODY_ENERGY_COLOR),

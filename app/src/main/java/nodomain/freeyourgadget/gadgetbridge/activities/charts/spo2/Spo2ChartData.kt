@@ -64,7 +64,7 @@ object Spo2ChartData {
     }
 
     /**
-     * The min–max range of each day with its average as a dot.
+     * The min-max range of each day with its average as a dot.
      */
     @JvmStatic
     fun periodSpec(

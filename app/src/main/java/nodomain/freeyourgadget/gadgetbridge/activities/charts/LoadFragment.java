@@ -558,7 +558,7 @@ public class LoadFragment extends AbstractChartFragment<LoadFragment.LoadsData> 
 
     private Function1<Integer, String> optimalRangeText(final int[] chronic) {
         return i -> chronic[i] > 0
-                ? Math.round(chronic[i] * OPTIMAL_LOAD_RATIO_LOWER) + " – " + Math.round(chronic[i] * OPTIMAL_LOAD_RATIO_UPPER)
+                ? Math.round(chronic[i] * OPTIMAL_LOAD_RATIO_LOWER) + " \u2013 " + Math.round(chronic[i] * OPTIMAL_LOAD_RATIO_UPPER)
                 : getString(R.string.stats_empty_value);
     }
 

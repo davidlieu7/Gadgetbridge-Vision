@@ -192,8 +192,8 @@ public class BloodPressureChartFragment extends AbstractChartFragment<BloodPress
                     continue;
                 }
                 if (systolic[i] > 0 || diastolic[i] > 0) {
-                    final String pressure = (systolic[i] > 0 ? String.valueOf(systolic[i]) : "–") + "/"
-                            + (diastolic[i] > 0 ? String.valueOf(diastolic[i]) : "–") + " " + pressureUnit;
+                    final String pressure = (systolic[i] > 0 ? String.valueOf(systolic[i]) : "\u2013") + "/"
+                            + (diastolic[i] > 0 ? String.valueOf(diastolic[i]) : "\u2013") + " " + pressureUnit;
                     rows.add(new ChartSelection.Row(systolic[i] > 0 ? systolicColor : diastolicColor, pressure));
                     description.append(' ').append(pressure).append('.');
                 }

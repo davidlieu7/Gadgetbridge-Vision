@@ -489,7 +489,7 @@ public class HRVStatusFragment extends AbstractChartFragment<HRVStatusFragment.H
     }
 
     private String formatHrvRange(final int low, final int high) {
-        return low > 0 && high > low ? low + " – " + getString(R.string.hrv_status_unit, high) : getString(R.string.stats_empty_value);
+        return low > 0 && high > low ? low + " \u2013 " + getString(R.string.hrv_status_unit, high) : getString(R.string.stats_empty_value);
     }
 
     private List<HRVStatusDayData> getPeriodData(DBHandler db, Calendar day, GBDevice device) {

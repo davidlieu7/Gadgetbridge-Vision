@@ -181,7 +181,7 @@ class WorkoutTabChartsFragment : Fragment(), WorkoutTabScreenshotProvider {
             val intent = Intent(requireContext(), WorkoutChartsActivity::class.java).apply {
                 putExtra(WorkoutChartsActivity.INIT_CHART_ID, chart.id)
                 workoutLabel()?.let {
-                    putExtra(WorkoutChartsActivity.EXTRA_TITLE, "${getString(R.string.charts)} · $it")
+                    putExtra(WorkoutChartsActivity.EXTRA_TITLE, "${getString(R.string.charts)} \u00B7 $it")
                 }
             }
             startActivity(intent)

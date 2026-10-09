@@ -233,7 +233,7 @@ public class Spo2PeriodFragment extends AbstractChartFragment<Spo2PeriodFragment
         );
         final List<Function1<Integer, String>> rowTexts = new ArrayList<>();
         rowTexts.add(i -> dayMinimum[i] > 0
-                ? dayMinimum[i] + " – " + getString(R.string.battery_percentage_str, String.valueOf(dayMaximum[i]))
+                ? dayMinimum[i] + " \u2013 " + getString(R.string.battery_percentage_str, String.valueOf(dayMaximum[i]))
                 : getString(R.string.stats_empty_value));
         rowTexts.add(i -> dayAverage[i] > 0
                 ? getString(R.string.battery_percentage_str, String.valueOf(dayAverage[i]))

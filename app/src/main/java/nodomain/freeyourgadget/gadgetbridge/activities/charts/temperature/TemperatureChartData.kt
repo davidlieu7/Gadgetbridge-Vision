@@ -57,7 +57,7 @@ object TemperatureChartData {
     }
 
     /**
-     * The min–max range of each day with its average as a dot; NaN marks a day without data.
+     * The min-max range of each day with its average as a dot; NaN marks a day without data.
      */
     @JvmStatic
     fun periodSpec(
