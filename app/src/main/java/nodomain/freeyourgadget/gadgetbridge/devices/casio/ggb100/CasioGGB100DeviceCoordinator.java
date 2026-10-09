@@ -1,5 +1,4 @@
-/*  Copyright (C) 2020-2024 Andreas Böhler, Damien Gaignon, Daniel Dakhno,
-    foxstidious, Johannes Krude, José Rebelo, Petr Vaněk
+/*  Copyright (C) 2026 Davide Gessa
 
     This file is part of Gadgetbridge.
 
@@ -15,7 +14,6 @@
 
     You should have received a copy of the GNU Affero General Public License
     along with this program.  If not, see <https://www.gnu.org/licenses/>. */
-/*  Based on code from BlueWatcher, https://github.com/masterjc/bluewatcher */
 package nodomain.freeyourgadget.gadgetbridge.devices.casio.ggb100;
 
 import android.app.Activity;

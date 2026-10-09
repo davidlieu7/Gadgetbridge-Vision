@@ -234,6 +234,34 @@ public class CasioGGB100DeviceSupport extends Casio2C2DSupport
         }
     }
 
+    // ── Location Indicator ──────────────────────────────────────────────────────────
+
+    private void onLocationIndicator(boolean indicate, byte[] data) {
+        if (indicate) {
+            LOG.debug("Indicate!");
+
+            // TODO: send the position info
+            byte[] data_reply = new byte[9];
+            data_reply[0] = Casio2C2DSupport.FEATURE_LOCATION_INDICATOR;
+            data_reply[1] = 0x02;
+            data_reply[2] = 0x00; // 0 -> ok, 1 -> nothing to give
+            // dist in meters
+            // bearing 0-359 true north
+
+            
+        } else {
+            LOG.debug("Memorize the point!");
+
+            // TODO: get gps point and memorize it
+
+
+            byte[] data_reply = new byte[9];
+            data_reply[0] = Casio2C2DSupport.FEATURE_LOCATION_INDICATOR;
+            data_reply[2] = 0x01; // This should be the status, 0 -> ok, 1 -> no fix
+            write(data_reply);
+        }
+    }
+
 
     // ── Characteristic change handler ─────────────────────────────────────────────────────────
 
@@ -264,15 +292,58 @@ public class CasioGGB100DeviceSupport extends Casio2C2DSupport
             namePacket[0] = Casio2C2DSupport.FEATURE_WATCH_NAME;
             System.arraycopy(nameBytes, 0, namePacket, 1, nameBytes.length);
             write(namePacket);
-            // builder.setDeviceState(GBDevice.State.INITIALIZING);
-            
-            byte reason = data[8];
-            LOG.debug("Connection reason is: " + Byte.toString(reason));
+            setInitialized();
+
+            byte connectionReason = data[8];
+            LOG.debug("Connection reason is: " + Byte.toString(connectionReason));
+
+            if (connectionReason == 0x02) {
+                LOG.debug("Watch requests phone finder");
+                // Already handled by the feature, this is redundant.
+                return true;
+            } else if (connectionReason == 0x07) {
+                LOG.debug("Watch requests a location indicator");
+                req(Casio2C2DSupport.FEATURE_LOCATION_INDICATOR);
+                return true;
+            } 
+            // else if (connectionReason == 0x00) {
+            //     LOG.debug("Watch fresh pairing connection");
+            // } else if (connectionReason == 0x01) {
+            //     LOG.debug("Watch connected");
+            // } else if (connectionReason == 0x03) {
+            //     LOG.debug("Watch requests a scheduled sync");
+            // } else if (connectionReason == 0x04) {
+            //     LOG.debug("Watch requests a manual sync");
+            // } else if (connectionReason == 0x08) {
+            //     LOG.debug("Watch requests a mission log connection");
+            // }
+
+            if (connectionReason != 0x04) {
+                // if await link.request_echo(FEAT_BLE_SETTINGS, label="request BLE_SETTINGS 0x11") is None:
+                //     return False
+                // await cmd_status(link)
+                // await cmd_newdata(link)
+            }
+
+            // if not await version_round(link):
+            //     return False
+
+            // if not await link.city_block(gps_chunks()):
+            //         return False
+            if (connectionReason != 0x04) {
+                // await link.request(FEAT_MODE_CUST, label="request MODE_CUST 0x38")
+            }
+            // await link.write_time()
+
             return true;
         } else if (feat == Casio2C2DSupport.FEATURE_ALERT_LEVEL) {
             // Phone finder: 0x02 = start, other = stop
             LOG.debug("Phone finder");
             onReverseFindDevice(data.length > 1 && data[1] == 0x02);
+            return true;
+        } else if (feat == Casio2C2DSupport.FEATURE_LOCATION_INDICATOR) {
+            LOG.debug("Location Indicator Polling: " + GB.hexdump(data));
+            onLocationIndicator(data[1] == 0x02, data);
             return true;
         }
 
