@@ -111,8 +111,8 @@ import nodomain.freeyourgadget.gadgetbridge.model.StressSample;
 import nodomain.freeyourgadget.gadgetbridge.model.WorkoutLoadSample;
 import nodomain.freeyourgadget.gadgetbridge.service.DeviceSupport;
 import nodomain.freeyourgadget.gadgetbridge.service.btle.BluetoothCompanyIdentifiers;
-import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.GarminLoyaltyCards;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.GarminSupport;
+import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.watchapps.GarminLoyaltyCardsApp;
 import nodomain.freeyourgadget.gadgetbridge.util.Prefs;
 import nodomain.freeyourgadget.gadgetbridge.util.preferences.DevicePrefs;
 import nodomain.freeyourgadget.gadgetbridge.widgets.DeviceWidgetsProvider;
@@ -382,7 +382,7 @@ public abstract class GarminCoordinator extends AbstractBLEDeviceCoordinator {
 
     @Override
     public Set<BarcodeFormat> getSupportedBarcodeFormats(@NonNull final GBDevice device) {
-        if (isAppInstalled(device, GarminLoyaltyCards.APP_UUID)) {
+        if (isAppInstalled(device, GarminLoyaltyCardsApp.APP_UUID)) {
             return EnumSet.allOf(BarcodeFormat.class);
         }
         return Collections.emptySet();

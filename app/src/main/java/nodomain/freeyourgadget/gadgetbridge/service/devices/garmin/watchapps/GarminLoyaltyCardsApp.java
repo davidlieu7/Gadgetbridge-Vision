@@ -1,9 +1,10 @@
-package nodomain.freeyourgadget.gadgetbridge.service.devices.garmin;
+package nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.watchapps;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 import com.google.gson.JsonArray;
+import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.google.zxing.EncodeHintType;
 import com.google.zxing.MultiFormatWriter;
@@ -22,30 +23,62 @@ import java.util.Objects;
 import java.util.UUID;
 
 import nodomain.freeyourgadget.gadgetbridge.capabilities.loyaltycards.LoyaltyCard;
+import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.GarminSupport;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.communicator.GarminWatchAppCommunicator;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.http.GarminJson;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.http.GarminJsonException;
 
 /**
- * Encodes loyalty cards, for the custom Loyalty Cards watch app.
+ * The custom Loyalty Cards watch app.
  * <p>
  * A header message contains the version of the card list and number of cards. Each card consists of a header with
  * the name, the code text, the color, and the size of the barcode bit matrix. The bits are row by row, in 32-bit numbers with
  * the most significant bit first. The header also contains the first set of numbers, and subsequent data messages
  * contain the remaining numbers, if needed.
  */
-public final class GarminLoyaltyCards {
-    private static final Logger LOG = LoggerFactory.getLogger(GarminLoyaltyCards.class);
+public class GarminLoyaltyCardsApp extends GarminWatchApp {
+    private static final Logger LOG = LoggerFactory.getLogger(GarminLoyaltyCardsApp.class);
 
     public static final UUID APP_UUID = UUID.fromString("ea44277e-441e-4d2d-987e-5a5a59643016");
 
     private static final int MAX_NAME_LENGTH = 24;
     private static final int MAX_CODE_LENGTH = 48;
 
-    private GarminLoyaltyCards() {
+    private List<JsonObject> messages;
+
+    public GarminLoyaltyCardsApp(final GarminSupport support) {
+        super(support, APP_UUID);
     }
 
-    public static List<JsonObject> encode(final List<LoyaltyCard> cards) {
+    public void onSetLoyaltyCards(final List<LoyaltyCard> cards) {
+        messages = encode(cards);
+        send();
+    }
+
+    @Override
+    public void onMessage(final JsonElement message) {
+        if (messages == null || !message.isJsonObject()) {
+            return;
+        }
+        final JsonElement watchVersion = message.getAsJsonObject().get("v");
+        if (messages.get(0).get("v").equals(watchVersion)) {
+            LOG.debug("Watch already has the latest loyalty cards, version {}", watchVersion);
+            return;
+        }
+        send();
+    }
+
+    private void send() {
+        if (!isAvailable()) {
+            LOG.warn("Loyalty cards app is not installed");
+            return;
+        }
+        for (int i = 0; i < messages.size(); i++) {
+            sendMessage(messages.get(i), i == 0);
+        }
+    }
+
+    private static List<JsonObject> encode(final List<LoyaltyCard> cards) {
         final List<JsonObject> headers = new ArrayList<>();
         final List<JsonArray> data = new ArrayList<>();
         for (final LoyaltyCard card : cards) {

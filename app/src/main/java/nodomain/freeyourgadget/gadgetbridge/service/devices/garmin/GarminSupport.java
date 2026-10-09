@@ -38,7 +38,6 @@ import androidx.documentfile.provider.DocumentFile;
 import androidx.localbroadcastmanager.content.LocalBroadcastManager;
 
 import com.google.gson.JsonElement;
-import com.google.gson.JsonObject;
 
 import org.apache.commons.lang3.StringUtils;
 import org.slf4j.Logger;
@@ -60,7 +59,6 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
-import java.util.Objects;
 import java.util.Optional;
 import java.util.Queue;
 import java.util.Set;
@@ -122,6 +120,9 @@ import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.communicator.
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.communicator.v1.CommunicatorV1;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.communicator.GarminWatchAppCommunicator;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.communicator.v2.CommunicatorV2;
+import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.watchapps.GarminLoyaltyCardsApp;
+import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.watchapps.GarminNavigationApp;
+import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.watchapps.GarminWatchApp;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.deviceevents.CapabilitiesDeviceEvent;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.deviceevents.FileDownloadedDeviceEvent;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.deviceevents.IncomingFitDefinitionDeviceEvent;
@@ -178,7 +179,6 @@ import static nodomain.freeyourgadget.gadgetbridge.model.ActivityUser.PREF_USER_
 
 public class GarminSupport extends AbstractBTLESingleDeviceSupport implements ICommunicator.Callback {
     private static final Logger LOG = LoggerFactory.getLogger(GarminSupport.class);
-    private static final UUID NAVIGATION_APP_UUID = UUID.fromString("0730e73c-f977-47b3-84e1-cc030f0aefb6");
     private final ProtocolBufferHandler protocolBufferHandler;
     private final NotificationsHandler notificationsHandler;
     private final FileTransferHandler fileTransferHandler;
@@ -189,8 +189,12 @@ public class GarminSupport extends AbstractBTLESingleDeviceSupport implements IC
     private ICommunicator communicator;
     private GarminWatchAppCommunicator watchAppCommunicator;
     private BluetoothGattService watchAppService;
-    private JsonObject lastNavigationMessage;
-    private List<JsonObject> loyaltyCardMessages;
+    private final GarminNavigationApp navigationApp = new GarminNavigationApp(this);
+    private final GarminLoyaltyCardsApp loyaltyCardsApp = new GarminLoyaltyCardsApp(this);
+    private final Map<UUID, GarminWatchApp> watchApps = Map.of(
+        navigationApp.getUuid(), navigationApp,
+        loyaltyCardsApp.getUuid(), loyaltyCardsApp
+    );
     private GarminRfcommListener rfcommListener;
     private String classicAddress;
     private MediaManager mediaManager;
@@ -734,73 +738,29 @@ public class GarminSupport extends AbstractBTLESingleDeviceSupport implements IC
         if (!getCoordinator().supportsNavigation(getDevice())) {
             return;
         }
-        if (watchAppCommunicator == null || !installedApps.containsKey(NAVIGATION_APP_UUID)) {
+        if (!navigationApp.onSetNavigationInfo(navigationInfoSpec)) {
             // Fallback to normal notifications
             super.onSetNavigationInfo(navigationInfoSpec);
-            return;
         }
-
-        final JsonObject message = new JsonObject();
-        message.addProperty("action", navigationInfoSpec.getNextAction());
-        if (navigationInfoSpec.getInstruction() != null) {
-            message.addProperty("text", navigationInfoSpec.getInstruction());
-        }
-        if (navigationInfoSpec.getDistanceToTurn() != null) {
-            message.addProperty("distance", navigationInfoSpec.getDistanceToTurn());
-        }
-        if (navigationInfoSpec.getETA() != null) {
-            message.addProperty("eta", navigationInfoSpec.getETA());
-        }
-        message.addProperty("progress", navigationInfoSpec.getCompletionPercent());
-        message.addProperty("alert", lastNavigationMessage == null
-                || !Objects.equals(lastNavigationMessage.get("action"), message.get("action"))
-                || !Objects.equals(lastNavigationMessage.get("text"), message.get("text")));
-
-        lastNavigationMessage = message;
-        watchAppCommunicator.sendMessage(NAVIGATION_APP_UUID, message, true);
     }
 
     @Override
     public void onSetLoyaltyCards(final ArrayList<LoyaltyCard> cards) {
-        loyaltyCardMessages = GarminLoyaltyCards.encode(cards);
-        sendLoyaltyCards();
-    }
-
-    private void sendLoyaltyCards() {
-        if (watchAppCommunicator == null || !installedApps.containsKey(GarminLoyaltyCards.APP_UUID)) {
-            LOG.warn("Loyalty cards app is not installed");
-            return;
-        }
-        for (int i = 0; i < loyaltyCardMessages.size(); i++) {
-            watchAppCommunicator.sendMessage(GarminLoyaltyCards.APP_UUID, loyaltyCardMessages.get(i), i == 0);
-        }
+        loyaltyCardsApp.onSetLoyaltyCards(cards);
     }
 
     public void onWatchAppMessage(final UUID app, final JsonElement message) {
-        if (GarminLoyaltyCards.APP_UUID.equals(app)) {
-            onLoyaltyCardsAppMessage(message);
+        final GarminWatchApp watchApp = watchApps.get(app);
+        if (watchApp == null) {
+            LOG.debug("Message from unknown watch app {}", app);
             return;
         }
-        if (!NAVIGATION_APP_UUID.equals(app) || lastNavigationMessage == null) {
-            return;
-        }
-        if (message.isJsonPrimitive() && "ready".equals(message.getAsString())) {
-            final JsonObject repeat = lastNavigationMessage.deepCopy();
-            repeat.addProperty("alert", false);
-            watchAppCommunicator.sendMessage(NAVIGATION_APP_UUID, repeat, true);
-        }
+        watchApp.onMessage(message);
     }
 
-    private void onLoyaltyCardsAppMessage(final JsonElement message) {
-        if (loyaltyCardMessages == null || !message.isJsonObject()) {
-            return;
-        }
-        final JsonElement watchVersion = message.getAsJsonObject().get("v");
-        if (loyaltyCardMessages.get(0).get("v").equals(watchVersion)) {
-            LOG.debug("Watch already has the latest loyalty cards, version {}", watchVersion);
-            return;
-        }
-        sendLoyaltyCards();
+    @Nullable
+    public GarminWatchAppCommunicator getWatchAppCommunicator() {
+        return watchAppCommunicator;
     }
 
     @Override
