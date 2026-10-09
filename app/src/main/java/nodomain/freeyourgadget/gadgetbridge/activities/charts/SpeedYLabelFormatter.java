@@ -19,6 +19,10 @@ public class SpeedYLabelFormatter implements IAxisValueFormatter {
 
     @Override
     public String getFormattedValue(float value, final AxisBase axis) {
+        return format(value);
+    }
+
+    public String format(double value) {
         if(unit.equals(UNIT_SECONDS_PER_100_METERS)) {
             value = value > 0 ? Math.round(100.0 / value) : 0;
         } else if (unit.equals(UNIT_SECONDS_PER_500_METERS)) {

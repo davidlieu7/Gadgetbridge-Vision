@@ -125,8 +125,8 @@ class WorkoutChartsActivity : AbstractGBActivity(), MenuProvider {
         val charts = selectedCharts.mapNotNull { id -> chartData?.find { it.id == id } }
         if (charts.isEmpty()) return
         val chart = binding.workoutDataChart
-        chart.selectionContent = WorkoutChartSpecs.selection(charts, chart)
-        chart.setSpec(WorkoutChartSpecs.spec(this, charts, showHrZones, chart))
+        chart.selectionContent = WorkoutChartSpecs.selection(charts)
+        chart.setSpec(WorkoutChartSpecs.spec(this, charts, showHrZones))
         binding.workoutDataChartLegend.setSeries(
             if (charts.size > 1) charts.map { ChartLegendView.lineItem(it.title, WorkoutChartSpecs.colorOf(it)) } else emptyList()
         )

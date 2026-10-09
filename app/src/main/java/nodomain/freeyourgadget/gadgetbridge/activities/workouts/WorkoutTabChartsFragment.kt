@@ -174,10 +174,8 @@ class WorkoutTabChartsFragment : Fragment(), WorkoutTabScreenshotProvider {
             )
         }
         val charts = listOf(chart)
-        lineChart.selectionContent = WorkoutChartSpecs.selection(charts, lineChart)
-        lineChart.setSpec(WorkoutChartSpecs.spec(requireContext(), charts, chart.zoneThresholds != null, lineChart))
-        chart.lineChart(lineChart)
-        lineChart.notifyDataSetChanged()
+        lineChart.selectionContent = WorkoutChartSpecs.selection(charts)
+        lineChart.setSpec(WorkoutChartSpecs.spec(requireContext(), charts, chart.zoneThresholds != null))
         lineChart.dismissSelectionOnTapOutside(binding.root)
         lineChart.setOnClickListener {
             ChartDataRepository.chartData = workout.charts
