@@ -30,7 +30,7 @@ import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.http.GarminJs
  * Encodes loyalty cards, for the custom Loyalty Cards watch app.
  * <p>
  * A header message contains the version of the card list and number of cards. Each card consists of a header with
- * the name, the code text, and the size of the barcode bit matrix. The bits are row by row, in 32-bit numbers with
+ * the name, the code text, the color, and the size of the barcode bit matrix. The bits are row by row, in 32-bit numbers with
  * the most significant bit first. The header also contains the first set of numbers, and subsequent data messages
  * contain the remaining numbers, if needed.
  */
@@ -59,6 +59,9 @@ public final class GarminLoyaltyCards {
             final String value = getBarcodeValue(card);
             if (value.length() <= MAX_CODE_LENGTH) {
                 header.addProperty("code", value);
+            }
+            if (card.getColor() != null) {
+                header.addProperty("c", card.getColor() & 0xffffff);
             }
             header.addProperty("w", matrix.getWidth());
             header.addProperty("h", matrix.getHeight());
