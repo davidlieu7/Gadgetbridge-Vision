@@ -60,14 +60,14 @@ class GbChartView @JvmOverloads constructor(
         override fun onDown(e: MotionEvent) = true
 
         override fun onLongPress(e: MotionEvent) {
-            if (!zoomable || viewPortHandler.isFullyZoomedOut) return
+            if (!selectionEnabled || !zoomable || viewPortHandler.isFullyZoomedOut) return
             val x = targetAt(e.x, e.y) ?: return
             startScrub()
             select(x)
         }
 
         override fun onSingleTapUp(e: MotionEvent): Boolean {
-            if (hasOnClickListeners()) {
+            if (hasOnClickListeners() || !selectionEnabled) {
                 return performClick()
             }
             performClick()
@@ -86,6 +86,11 @@ class GbChartView @JvmOverloads constructor(
     private var scrubbing = false
 
     var selectionContent: ((Double) -> ChartSelection)? = null
+
+    /**
+     * Whether taps and drags select an x and show the tooltip.
+     */
+    var selectionEnabled = true
 
     var zoomable = false
         set(value) {
@@ -340,7 +345,7 @@ class GbChartView @JvmOverloads constructor(
             }
             MotionEvent.ACTION_MOVE -> {
                 if (!scrubbing) {
-                    if (zoomable && !viewPortHandler.isFullyZoomedOut) return
+                    if (!selectionEnabled || (zoomable && !viewPortHandler.isFullyZoomedOut)) return
                     val dx = abs(event.x - scrubStartX)
                     val dy = abs(event.y - scrubStartY)
                     if (dx <= touchSlop || dx <= dy || targetAt(scrubStartX, scrubStartY) == null) return
