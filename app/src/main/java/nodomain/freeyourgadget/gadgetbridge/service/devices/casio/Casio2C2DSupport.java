@@ -92,6 +92,7 @@ public abstract class Casio2C2DSupport extends CasioSupport {
     public static final byte FEATURE_VERSION_INFORMATION = 0x20;
     public static final byte FEATURE_APP_INFORMATION = 0x22;
     public static final byte FEATURE_WATCH_NAME = 0x23;
+    public static final byte FEATURE_GPS = 0x24;
     public static final byte FEATURE_MODULE_ID = 0x26;
     public static final byte FEATURE_WATCH_CONDITION = 0x28;
     public static final byte FEATURE_DST_WATCH_STATE = (byte) 0x1d;
@@ -106,11 +107,26 @@ public abstract class Casio2C2DSupport extends CasioSupport {
     public static final byte FEATURE_SETTING_FOR_USER_PROFILE = 0x45;
     public static final byte FEATURE_SERVICE_DISCOVERY_MANAGER = 0x47;
     public static final byte FEATURE_SESSION_EVENT = 0x48;
+    
     // GBD-200 specific features
-    public static final byte FEATURE_GPS = 0x24;
     public static final byte FEATURE_FEAT_2F = 0x2f;
     public static final byte FEATURE_CONVOY_INIT = 0x1c;
     public static final byte FEATURE_BLE_PARAM = 0x3d;
+
+    // GG-B100 specific features
+    public static final byte FEATURE_STATUS_BLOCK = 0x05;
+    public static final byte FEATURE_COUNTDOWN_TIMER = 0x18;
+    public static final byte FEATURE_MISSION_LOG_DATA = 0x19;
+    public static final byte FEATURE_LIFE_LOG = 0x11;
+    public static final byte FEATURE_TRANSACTION_BEGIN_END = 0x21;
+    public static final byte FEATURE_USER_PROFILE = 0x2d;
+    public static final byte FEATURE_DISPLAY_CONFIG = 0x2f;
+    public static final byte FEATURE_LOCATION_INDICATOR = 0x35;
+    // public static final byte FEATURE_STILL_UNKNOWN = 0x36;
+    public static final byte FEATURE_NEW_DATA_STATUS = 0x37;
+    public static final byte FEATURE_MODE_DISPLAY_CUSTOMIZATION = 0x38;
+    
+    
 
     protected static Logger LOG;
     LinkedList<RequestWithHandler> requests = new LinkedList<>();
