@@ -125,11 +125,11 @@ public class XiaomiHealthService extends AbstractXiaomiService {
     private static final long WORKOUT_ALIVE_TIMEOUT_MS = 60_000L;
 
     static final int WORKOUT_OPEN_OK = 0;
-    private static final int WORKOUT_OPEN_NO_PERMISSION = 3;
+    static final int WORKOUT_OPEN_NO_PERMISSION = 3;
     // Picked from the versions the watch offers when it asks to open a workout.
     static final int WORKOUT_PROTOCOL_VERSION = 2;
     static final int GPS_ACCURACY_HIGH = 2;
-    private static final int GPS_ACCURACY_UNKNOWN = 10;
+    static final int GPS_ACCURACY_UNKNOWN = 10;
 
     private static final int GENDER_MALE = 1;
     private static final int GENDER_FEMALE = 2;
@@ -270,7 +270,7 @@ public class XiaomiHealthService extends AbstractXiaomiService {
         synchronized (realtimeConsumers) {
             realtimeConsumers.clear();
         }
-        sleepAsAndroidManager.reset();
+        sleepAsAndroidManager.recover();
         resumeLocationAfterReconnect();
 
         setUserInfo();
@@ -759,6 +759,10 @@ public class XiaomiHealthService extends AbstractXiaomiService {
 
         if (sleepAsAndroidManager.ownsWorkoutOpen()) {
             sleepAsAndroidManager.ackWorkoutOpen();
+            return;
+        }
+        if (sleepAsAndroidManager.isOrphanedWorkoutOpen(workoutOpenWatch)) {
+            sleepAsAndroidManager.refuseWorkoutOpen();
             return;
         }
 
