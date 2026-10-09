@@ -581,6 +581,14 @@ import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreP41iCoord
 import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreP40iCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreP31iCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreP3Coordinator;
+import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreA1Coordinator;
+import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreP2Coordinator;
+import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreP2iCoordinator;
+import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreP2MiniCoordinator;
+import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreA2NCCoordinator;
+import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreA3iCoordinator;
+import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreP3iCoordinator;
+import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreK20iCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreP30iCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreP20iCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.sport_x20.SoundcoreSportX20Coordinator;
@@ -1089,14 +1097,22 @@ public enum DeviceType {
     SOUNDCORE_LIFE_TUNE_XR(SoundcoreLifeTuneXRCoordinator.class),
     SOUNDCORE_AEROFIT2(SoundcoreAeroFit2Coordinator.class),
     SOUNDCORE_SPORT_X20(SoundcoreSportX20Coordinator.class),
-    SOUNDCORE_P42I(SoundcoreP42iCoordinator.class),
-    SOUNDCORE_P41I(SoundcoreP41iCoordinator.class),
-    SOUNDCORE_P40I(SoundcoreP40iCoordinator.class),
-    SOUNDCORE_P31I(SoundcoreP31iCoordinator.class),
-    SOUNDCORE_P30I(SoundcoreP30iCoordinator.class),
-    SOUNDCORE_P20I(SoundcoreP20iCoordinator.class),
-    SOUNDCORE_P3(SoundcoreP3Coordinator.class),
+    SOUNDCORE_A1(SoundcoreA1Coordinator.class),
+    SOUNDCORE_A2_NC(SoundcoreA2NCCoordinator.class),
+    SOUNDCORE_A3I(SoundcoreA3iCoordinator.class),
     SOUNDCORE_A30I(SoundcoreA30iCoordinator.class),
+    SOUNDCORE_K20I(SoundcoreK20iCoordinator.class),
+    SOUNDCORE_P2(SoundcoreP2Coordinator.class),
+    SOUNDCORE_P2I(SoundcoreP2iCoordinator.class),
+    SOUNDCORE_P2_MINI(SoundcoreP2MiniCoordinator.class),
+    SOUNDCORE_P3(SoundcoreP3Coordinator.class),
+    SOUNDCORE_P3I(SoundcoreP3iCoordinator.class),
+    SOUNDCORE_P20I(SoundcoreP20iCoordinator.class),
+    SOUNDCORE_P30I(SoundcoreP30iCoordinator.class),
+    SOUNDCORE_P31I(SoundcoreP31iCoordinator.class),
+    SOUNDCORE_P40I(SoundcoreP40iCoordinator.class),
+    SOUNDCORE_P41I(SoundcoreP41iCoordinator.class),
+    SOUNDCORE_P42I(SoundcoreP42iCoordinator.class),
     HAYLOU_S35_ANC(HaylouS35AncCoordinator.class),
     MOONDROP_SPACE_TRAVEL(MoondropSpaceTravelCoordinator.class),
     MOONDROP_SPACE_TRAVEL_2(MoondropSpaceTravel2Coordinator.class),

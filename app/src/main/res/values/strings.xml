@@ -2397,6 +2397,14 @@
     <string name="devicetype_soundcore_p30i" translatable="false">Soundcore P30i</string>
     <string name="devicetype_soundcore_p20i" translatable="false">Soundcore P20i</string>
     <string name="devicetype_soundcore_p3" translatable="false">Soundcore P3</string>
+    <string name="devicetype_soundcore_a1" translatable="false">Soundcore A1</string>
+    <string name="devicetype_soundcore_p2" translatable="false">Soundcore P2</string>
+    <string name="devicetype_soundcore_p2i" translatable="false">Soundcore P2i</string>
+    <string name="devicetype_soundcore_p2_mini" translatable="false">Soundcore P2 Mini</string>
+    <string name="devicetype_soundcore_a2_nc" translatable="false">Soundcore A2 NC</string>
+    <string name="devicetype_soundcore_a3i" translatable="false">Soundcore A3i</string>
+    <string name="devicetype_soundcore_p3i" translatable="false">Soundcore P3i</string>
+    <string name="devicetype_soundcore_k20i" translatable="false">Soundcore K20i</string>
     <string name="devicetype_haylou_s35_anc" translatable="false">Haylou S35 ANC</string>
     <string name="devicetype_sennheiser_momentum_in_ear_wireless" translatable="false">Sennheiser MOMENTUM In-Ear Wireless</string>
     <string name="devicetype_pixel_buds_a_series" translatable="false">Pixel Buds A-Series</string>

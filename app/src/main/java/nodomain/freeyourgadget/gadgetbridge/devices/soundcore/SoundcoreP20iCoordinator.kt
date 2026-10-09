@@ -35,7 +35,6 @@ class SoundcoreP20iCoordinator : SoundcoreEarbudsCoordinator() {
 
     override fun getDefaultCapabilities(): Set<Capability> = setOf(
         Capability.FindDevice,
-        Capability.NoiseControl,
     )
 
     override fun createProtocol(device: GBDevice): SoundcoreSportX20Protocol =
