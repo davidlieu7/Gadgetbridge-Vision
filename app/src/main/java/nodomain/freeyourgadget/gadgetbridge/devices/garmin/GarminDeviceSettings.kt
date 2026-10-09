@@ -24,6 +24,8 @@ import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.compon
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.components.sendAppNotifications
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.components.timeSync
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.components.workoutSendGpsToBand
+import nodomain.freeyourgadget.gadgetbridge.activities.loyaltycards.LoyaltyCardsSettingsActivity
+import nodomain.freeyourgadget.gadgetbridge.activities.loyaltycards.LoyaltyCardsSettingsConst
 import nodomain.freeyourgadget.gadgetbridge.activities.workouts.templates.WorkoutTemplateListActivity
 import nodomain.freeyourgadget.gadgetbridge.devices.garmin.actions.GarminSendWaypointActivity
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice
@@ -87,6 +89,15 @@ fun garminDeviceSettings(
         ) { context, gbDevice ->
             GarminSendWaypointActivity.handlePreferenceClick(context, gbDevice)
         }
+    }
+
+    if (coordinator.getSupportedBarcodeFormats(device).isNotEmpty()) {
+        externalSettings(
+            key = LoyaltyCardsSettingsConst.PREF_KEY_LOYALTY_CARDS,
+            title = R.string.loyalty_cards,
+            icon = R.drawable.ic_loyalty,
+            activityClass = LoyaltyCardsSettingsActivity::class.java,
+        )
     }
 
     val notifications = mutableListOf(R.xml.devicesettings_transliteration)

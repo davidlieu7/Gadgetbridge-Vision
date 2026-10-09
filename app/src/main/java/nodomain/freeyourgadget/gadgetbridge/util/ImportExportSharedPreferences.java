@@ -138,6 +138,8 @@ public class ImportExportSharedPreferences {
                             case DeviceSettingsPreferenceConst.PREF_DEVICE_ACTION_WOKE_UP_SELECTIONS:
                             // GarminCapability enum
                             case GarminPreferences.PREF_GARMIN_CAPABILITIES:
+                            // UUIDs
+                            case GarminPreferences.PREF_GARMIN_INSTALLED_APPS:
                             // mac addresses
                             case "dashboard_devices_multiselect":
                             case GBPrefs.LAST_DEVICE_ADDRESSES:

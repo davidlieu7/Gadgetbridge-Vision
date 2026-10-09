@@ -4,6 +4,7 @@ import nodomain.freeyourgadget.gadgetbridge.util.CheckSums;
 
 public class GarminPreferences {
     public static final String PREF_GARMIN_CAPABILITIES = "garmin_capabilities";
+    public static final String PREF_GARMIN_INSTALLED_APPS = "garmin_installed_apps";
     public static final String PREF_GARMIN_RFCOMM_FILE_TRANSFER = "garmin_rfcomm_file_transfer";
     public static final String PREF_FEAT_CANNED_MESSAGES = "feat_canned_messages";
     public static final String PREF_FEAT_CONTACTS = "feat_contacts";

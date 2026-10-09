@@ -74,10 +74,12 @@ import java.util.stream.Collectors;
 import nodomain.freeyourgadget.gadgetbridge.GBApplication;
 import nodomain.freeyourgadget.gadgetbridge.R;
 import nodomain.freeyourgadget.gadgetbridge.activities.appmanager.config.DynamicAppConfig;
+import nodomain.freeyourgadget.gadgetbridge.capabilities.loyaltycards.LoyaltyCard;
 import nodomain.freeyourgadget.gadgetbridge.database.DBHandler;
 import nodomain.freeyourgadget.gadgetbridge.database.repository.WorkoutTemplateRepository;
 import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEvent;
 import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEventAppInfo;
+import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEventUpdatePreferences;
 import nodomain.freeyourgadget.gadgetbridge.devices.PendingFileProvider;
 import nodomain.freeyourgadget.gadgetbridge.devices.SleepAsAndroidFeature;
 import nodomain.freeyourgadget.gadgetbridge.devices.garmin.GarminCoordinator;
@@ -188,6 +190,7 @@ public class GarminSupport extends AbstractBTLESingleDeviceSupport implements IC
     private GarminWatchAppCommunicator watchAppCommunicator;
     private BluetoothGattService watchAppService;
     private JsonObject lastNavigationMessage;
+    private List<JsonObject> loyaltyCardMessages;
     private GarminRfcommListener rfcommListener;
     private String classicAddress;
     private MediaManager mediaManager;
@@ -754,18 +757,50 @@ public class GarminSupport extends AbstractBTLESingleDeviceSupport implements IC
                 || !Objects.equals(lastNavigationMessage.get("text"), message.get("text")));
 
         lastNavigationMessage = message;
-        watchAppCommunicator.sendMessage(NAVIGATION_APP_UUID, message);
+        watchAppCommunicator.sendMessage(NAVIGATION_APP_UUID, message, true);
+    }
+
+    @Override
+    public void onSetLoyaltyCards(final ArrayList<LoyaltyCard> cards) {
+        loyaltyCardMessages = GarminLoyaltyCards.encode(cards);
+        sendLoyaltyCards();
+    }
+
+    private void sendLoyaltyCards() {
+        if (watchAppCommunicator == null || !installedApps.containsKey(GarminLoyaltyCards.APP_UUID)) {
+            LOG.warn("Loyalty cards app is not installed");
+            return;
+        }
+        for (int i = 0; i < loyaltyCardMessages.size(); i++) {
+            watchAppCommunicator.sendMessage(GarminLoyaltyCards.APP_UUID, loyaltyCardMessages.get(i), i == 0);
+        }
     }
 
     public void onWatchAppMessage(final UUID app, final JsonElement message) {
+        if (GarminLoyaltyCards.APP_UUID.equals(app)) {
+            onLoyaltyCardsAppMessage(message);
+            return;
+        }
         if (!NAVIGATION_APP_UUID.equals(app) || lastNavigationMessage == null) {
             return;
         }
         if (message.isJsonPrimitive() && "ready".equals(message.getAsString())) {
             final JsonObject repeat = lastNavigationMessage.deepCopy();
             repeat.addProperty("alert", false);
-            watchAppCommunicator.sendMessage(NAVIGATION_APP_UUID, repeat);
+            watchAppCommunicator.sendMessage(NAVIGATION_APP_UUID, repeat, true);
         }
+    }
+
+    private void onLoyaltyCardsAppMessage(final JsonElement message) {
+        if (loyaltyCardMessages == null || !message.isJsonObject()) {
+            return;
+        }
+        final JsonElement watchVersion = message.getAsJsonObject().get("v");
+        if (loyaltyCardMessages.get(0).get("v").equals(watchVersion)) {
+            LOG.debug("Watch already has the latest loyalty cards, version {}", watchVersion);
+            return;
+        }
+        sendLoyaltyCards();
     }
 
     @Override
@@ -842,6 +877,11 @@ public class GarminSupport extends AbstractBTLESingleDeviceSupport implements IC
         }
 
         gbApps.sort(Comparator.comparing(GBDeviceApp::getName));
+
+        final Set<String> installedAppsPref = installedApps.keySet().stream()
+                .map(UUID::toString)
+                .collect(Collectors.toSet());
+        evaluateGBDeviceEvent(new GBDeviceEventUpdatePreferences(GarminPreferences.PREF_GARMIN_INSTALLED_APPS, installedAppsPref));
 
         final GBDeviceEventAppInfo appInfoCmd = new GBDeviceEventAppInfo();
         appInfoCmd.apps = gbApps.toArray(new GBDeviceApp[0]);

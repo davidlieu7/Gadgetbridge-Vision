@@ -16,7 +16,9 @@ import java.io.ByteArrayOutputStream;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.security.SecureRandom;
+import java.util.ArrayDeque;
 import java.util.Arrays;
+import java.util.Deque;
 import java.util.UUID;
 
 import nodomain.freeyourgadget.gadgetbridge.service.btle.TransactionBuilder;
@@ -57,8 +59,12 @@ public class GarminWatchAppCommunicator {
     private static final byte KEY_FLAG_INBOUND = 0x02;
 
     private static final int FRAGMENT_DATA_SIZE = 19;
-    /// A fragment header of index 15 is 0xf1, which collides with TYPE_DATA
-    private static final int MAX_FRAGMENTS = 15;
+    /// The watch rejects a message of 15 fragments with ACK error 0x01
+    private static final int MAX_FRAGMENTS = 14;
+    /**
+     * The maximum size of an encrypted message, including the padding.
+     */
+    public static final int MAX_MESSAGE_SIZE = MAX_FRAGMENTS * FRAGMENT_DATA_SIZE;
     private static final long TIMEOUT_MS = 5000;
 
     private enum State {
@@ -84,8 +90,7 @@ public class GarminWatchAppCommunicator {
     private byte[] currentCipher;
     private int currentFragmentCount;
 
-    private UUID pendingApp;
-    private JsonElement pendingMessage;
+    private final Deque<PendingMessage> pendingMessages = new ArrayDeque<>();
 
     private UUID inboundApp;
     private byte[] inboundKey;
@@ -125,17 +130,18 @@ public class GarminWatchAppCommunicator {
     public synchronized void dispose() {
         timeoutHandler.removeCallbacks(timeoutRunnable);
         state = State.IDLE;
-        pendingMessage = null;
+        pendingMessages.clear();
     }
 
     /**
-     * Sends a message to a watch app. Replaces whatever message is currently waiting for transfer.
-     * <p>
-     * TODO: Should we have a queue?
+     * Queues a message to a watch app. If replace is set, any messages for the same app that
+     * are waiting for transfer are replaced.
      */
-    public synchronized void sendMessage(final UUID app, final JsonElement message) {
-        pendingApp = app;
-        pendingMessage = message;
+    public synchronized void sendMessage(final UUID app, final JsonElement message, final boolean replace) {
+        if (replace) {
+            pendingMessages.removeIf(pending -> pending.app().equals(app));
+        }
+        pendingMessages.add(new PendingMessage(app, message));
         if (state == State.IDLE) {
             startNext();
         }
@@ -164,38 +170,37 @@ public class GarminWatchAppCommunicator {
     }
 
     private void startNext() {
-        if (pendingMessage == null) {
+        PendingMessage pending;
+        while ((pending = pendingMessages.poll()) != null) {
+            final byte[] blob;
+            try {
+                blob = GarminJson.encode(pending.message());
+            } catch (final GarminJsonException e) {
+                LOG.error("Failed to encode message {}", pending.message(), e);
+                continue;
+            }
+
+            final byte[] key = new byte[16];
+            random.nextBytes(key);
+            final byte[] cipher = Xxtea.encrypt(pad(blob), key);
+            if (cipher.length > MAX_MESSAGE_SIZE) {
+                LOG.error("Message is too long: {} bytes", cipher.length);
+                continue;
+            }
+
+            currentApp = pending.app();
+            currentKey = key;
+            currentCipher = cipher;
+            currentFragmentCount = (cipher.length + FRAGMENT_DATA_SIZE - 1) / FRAGMENT_DATA_SIZE;
+            state = State.OPEN;
+            write("open connection", ByteBuffer.allocate(19)
+                .put(TYPE_COMMAND)
+                .put(COMMAND_OPEN)
+                .put(uuidToBytes(currentApp))
+                .put((byte) 0x00)
+                .array());
             return;
         }
-
-        final byte[] blob;
-        try {
-            blob = GarminJson.encode(pendingMessage);
-        } catch (final GarminJsonException e) {
-            LOG.error("Failed to encode message {}", pendingMessage, e);
-            pendingMessage = null;
-            return;
-        }
-        pendingMessage = null;
-
-        final byte[] key = new byte[16];
-        random.nextBytes(key);
-        currentApp = pendingApp;
-        currentCipher = Xxtea.encrypt(pad(blob), key);
-        currentFragmentCount = (currentCipher.length + FRAGMENT_DATA_SIZE - 1) / FRAGMENT_DATA_SIZE;
-        if (currentFragmentCount > MAX_FRAGMENTS) {
-            LOG.error("Message is too long: {} bytes", currentCipher.length);
-            return;
-        }
-
-        currentKey = key;
-        state = State.OPEN;
-        write("open connection", ByteBuffer.allocate(19)
-            .put(TYPE_COMMAND)
-            .put(COMMAND_OPEN)
-            .put(uuidToBytes(currentApp))
-            .put((byte) 0x00)
-            .array());
     }
 
     private void onCommand(final byte[] value) {
@@ -207,6 +212,8 @@ public class GarminWatchAppCommunicator {
                 }
                 if (value.length < 3 || value[2] != 0x00) {
                     LOG.warn("Open connection failed: {}", GB.hexdump(value));
+                    // The next messages would also fail anyway
+                    pendingMessages.removeIf(pending -> pending.app().equals(currentApp));
                     finish();
                     return;
                 }
@@ -364,7 +371,8 @@ public class GarminWatchAppCommunicator {
 
         final byte[] plain = Xxtea.decrypt(cipher, key);
         final int padding = plain[0] & 0xff;
-        if (padding < 1 || padding > 4 || 1 + padding > plain.length) {
+        // The watch uses no padding when the data is already aligned
+        if (padding > 4 || 1 + padding > plain.length) {
             LOG.warn("Inbound message has an invalid padding {}", padding);
             return;
         }
@@ -420,7 +428,7 @@ public class GarminWatchAppCommunicator {
      * Pads a byte array to a multiple of 4, including the first byte as the padding length.
      */
     public static byte[] pad(final byte[] blob) {
-        final int padding = 4 - (1 + blob.length) % 4;
+        final int padding = (4 - (1 + blob.length) % 4) % 4;
         final byte[] plain = new byte[1 + blob.length + padding];
         plain[0] = (byte) padding;
         System.arraycopy(blob, 0, plain, 1, blob.length);
@@ -438,5 +446,8 @@ public class GarminWatchAppCommunicator {
     private static UUID uuidFromBytes(final byte[] bytes, final int offset) {
         final ByteBuffer buf = ByteBuffer.wrap(bytes, offset, 16);
         return new UUID(buf.getLong(), buf.getLong());
+    }
+
+    private record PendingMessage(UUID app, JsonElement message) {
     }
 }
