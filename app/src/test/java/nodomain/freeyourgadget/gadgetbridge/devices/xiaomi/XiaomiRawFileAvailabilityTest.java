@@ -39,6 +39,7 @@ import nodomain.freeyourgadget.gadgetbridge.entities.BaseActivitySummary;
 import nodomain.freeyourgadget.gadgetbridge.entities.XiaomiActivityFile;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
 import nodomain.freeyourgadget.gadgetbridge.model.ActivityKind;
+import nodomain.freeyourgadget.gadgetbridge.model.workout.Workout;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.xiaomi.activity.XiaomiActivityFileFetcher;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.xiaomi.activity.XiaomiActivityFileId;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.xiaomi.activity.XiaomiActivityTrackProvider;
@@ -145,5 +146,9 @@ public class XiaomiRawFileAvailabilityTest extends TestBase {
         assertEquals(ActivityKind.UNKNOWN.getCode(), stored.getActivityKind());
         assertNotNull(stored.getRawSummaryData());
         assertArrayEquals(bytes, stored.getRawSummaryData());
+
+        final Workout workout = new WorkoutSummaryParser().parseWorkout(stored, false);
+        assertEquals(START, workout.getSummary().getEndTime());
+        assertEquals(ActivityKind.UNKNOWN.getCode(), workout.getSummary().getActivityKind());
     }
 }

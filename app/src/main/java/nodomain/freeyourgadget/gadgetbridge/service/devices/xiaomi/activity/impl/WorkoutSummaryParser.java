@@ -116,6 +116,7 @@ import org.slf4j.LoggerFactory;
 
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.util.Date;
 
 import nodomain.freeyourgadget.gadgetbridge.GBApplication;
 import nodomain.freeyourgadget.gadgetbridge.database.DBHandler;
@@ -187,7 +188,17 @@ public class WorkoutSummaryParser extends XiaomiActivityParser implements Activi
             return summary;
         }
 
-        return updateSummaryFromData(summary, fixAndWrap(data), forDetails);
+        // The stored summaries include ones that failed to parse when fetched, see parse
+        final Date endTime = summary.getEndTime();
+        final int activityKind = summary.getActivityKind();
+        try {
+            return updateSummaryFromData(summary, fixAndWrap(data), forDetails);
+        } catch (final Exception e) {
+            LOG.error("Failed to parse workout summary {}", summary.getId(), e);
+            summary.setEndTime(endTime);
+            summary.setActivityKind(activityKind);
+            return summary;
+        }
     }
 
     private BaseActivitySummary updateSummaryFromData(final BaseActivitySummary summary,
