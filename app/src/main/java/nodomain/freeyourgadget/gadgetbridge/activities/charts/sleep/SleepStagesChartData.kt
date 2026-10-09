@@ -36,7 +36,10 @@ object SleepStagesChartData {
         hrMinimum: Double,
         hrMaximum: Double,
     ): ChartSpec {
-        if (seconds.isEmpty()) {
+        val hrPoints = hrSeconds.indices
+            .filter { hrBpm[it] > 0 }
+            .map { ChartPoint(hrSeconds[it].toDouble(), hrBpm[it].toDouble()) }
+        if (seconds.isEmpty() && hrPoints.isEmpty()) {
             return ChartSpec.EMPTY
         }
         val areas = List(labels.size) { mutableListOf<ChartPoint>() }
@@ -54,10 +57,6 @@ object SleepStagesChartData {
             }
             areas[stage].add(ChartPoint(x, values[i]))
         }
-        val hrPoints = hrSeconds.indices
-            .filter { hrBpm[it] > 0 }
-            .map { ChartPoint(hrSeconds[it].toDouble(), hrBpm[it].toDouble()) }
-
         val series = areas.mapIndexedNotNull { stage, points ->
             points.takeIf { it.isNotEmpty() }?.let {
                 ChartSeries("stage_$stage", labels[stage], it, SeriesStyle.Line(colors[stage], filled = true, solidFill = true), selectable = false)
@@ -71,8 +70,8 @@ object SleepStagesChartData {
             series = series,
             xAxis = AxisSpec(
                 format = ChartValueFormat.TIME_OF_DAY,
-                minimum = seconds.first().toDouble(),
-                maximum = seconds.last().toDouble(),
+                minimum = minOf(seconds.firstOrNull()?.toDouble() ?: Double.MAX_VALUE, hrPoints.firstOrNull()?.x ?: Double.MAX_VALUE),
+                maximum = maxOf(seconds.lastOrNull()?.toDouble() ?: -Double.MAX_VALUE, hrPoints.lastOrNull()?.x ?: -Double.MAX_VALUE),
             ),
             yAxis = AxisSpec(format = ChartValueFormat.DECIMAL, minimum = 0.0, maximum = MAX_INTENSITY, showLabels = false),
             endYAxis = if (hrPoints.isEmpty()) null else AxisSpec(format = ChartValueFormat.INTEGER, minimum = hrMinimum, maximum = hrMaximum),

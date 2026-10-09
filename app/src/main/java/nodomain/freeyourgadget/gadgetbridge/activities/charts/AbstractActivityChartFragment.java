@@ -16,6 +16,10 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 package nodomain.freeyourgadget.gadgetbridge.activities.charts;
 
+import static nodomain.freeyourgadget.gadgetbridge.model.ActivitySummaryEntries.UNIT_BPM;
+
+import android.graphics.Color;
+import android.text.format.DateFormat;
 import android.util.TypedValue;
 
 import androidx.annotation.Nullable;
@@ -33,6 +37,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.GregorianCalendar;
@@ -41,10 +46,16 @@ import java.util.List;
 import java.util.Objects;
 
 import de.greenrobot.dao.query.QueryBuilder;
+import kotlin.jvm.functions.Function1;
+
 import nodomain.freeyourgadget.gadgetbridge.GBApplication;
 import nodomain.freeyourgadget.gadgetbridge.R;
 import nodomain.freeyourgadget.gadgetbridge.activities.HeartRateUtils;
+import nodomain.freeyourgadget.gadgetbridge.activities.charts.mpchart.ChartSelection;
 import nodomain.freeyourgadget.gadgetbridge.activities.charts.sleep.SleepDetailsView;
+import nodomain.freeyourgadget.gadgetbridge.activities.charts.sleep.SleepStagesChartData;
+import nodomain.freeyourgadget.gadgetbridge.activities.charts.spec.ChartSpec;
+import nodomain.freeyourgadget.gadgetbridge.activities.workouts.WorkoutValueFormatter;
 import nodomain.freeyourgadget.gadgetbridge.database.DBHandler;
 import nodomain.freeyourgadget.gadgetbridge.database.DBHelper;
 import nodomain.freeyourgadget.gadgetbridge.devices.DeviceCoordinator;
@@ -338,6 +349,114 @@ public abstract class AbstractActivityChartFragment<D extends ChartsData> extend
             };
         }
         return sample.getIntensity();
+    }
+
+    /**
+     * Per sample: time, stage index (see {@link #getIndexOfActivity}) and chart value, plus heart rate samples.
+     */
+    protected static final class StageSamples {
+        public final long[] seconds;
+        public final int[] stages;
+        public final double[] values;
+        public final long[] hrSeconds;
+        public final int[] heartRates;
+        public final double hrMaxGapSeconds;
+
+        public StageSamples(final long[] seconds, final int[] stages, final double[] values,
+                            final long[] hrSeconds, final int[] heartRates, final double hrMaxGapSeconds) {
+            this.seconds = seconds;
+            this.stages = stages;
+            this.values = values;
+            this.hrSeconds = hrSeconds;
+            this.heartRates = heartRates;
+            this.hrMaxGapSeconds = hrMaxGapSeconds;
+        }
+
+        public StageSamples withHeartRate(final long[] hrSeconds, final int[] heartRates) {
+            return new StageSamples(seconds, stages, values, hrSeconds, heartRates, hrMaxGapSeconds);
+        }
+    }
+
+    protected StageSamples stageSamples(final GBDevice device,
+                                        final List<? extends ActivitySample> samples,
+                                        final List<? extends ActivitySample> hrSamples) {
+        final int n = samples.size();
+        final long[] seconds = new long[n];
+        final int[] stages = new int[n];
+        final double[] values = new double[n];
+        for (int i = 0; i < n; i++) {
+            final ActivitySample sample = samples.get(i);
+            seconds[i] = sample.getTimestamp();
+            stages[i] = getIndexOfActivity(sample.getKind());
+            values[i] = chartValueOf(sample);
+        }
+        final int hrCount = supportsHeartrate(device) ? hrSamples.size() : 0;
+        final long[] hrSeconds = new long[hrCount];
+        final int[] heartRates = new int[hrCount];
+        final HeartRateUtils heartRateUtils = HeartRateUtils.getInstance();
+        for (int i = 0; i < hrCount; i++) {
+            final ActivitySample sample = hrSamples.get(i);
+            hrSeconds[i] = sample.getTimestamp();
+            if (sample.getKind() != ActivityKind.NOT_WORN && heartRateUtils.isValidHeartRateValue(sample.getHeartRate())) {
+                heartRates[i] = sample.getHeartRate();
+            }
+        }
+        final int maxGapSeconds = 60 * device.getDeviceCoordinator().getMaxHeartRateMeasurementsGapMinutes(device);
+        return new StageSamples(seconds, stages, values, hrSeconds, heartRates, maxGapSeconds);
+    }
+
+    private ActivityConfig[] stageConfigs() {
+        return new ActivityConfig[]{akDeepSleep, akLightSleep, akRemSleep, akAwakeSleep, akNotWorn, akActivity};
+    }
+
+    /**
+     * Activity per stage as solid areas, with heart rate on the end axis.
+     */
+    protected ChartSpec stagesSpec(final StageSamples samples, final int hrAverage, final boolean showHrAverage,
+                                   final double hrMinimum, final double hrMaximum) {
+        final ActivityConfig[] configs = stageConfigs();
+        final String[] labels = new String[configs.length];
+        final int[] colors = new int[configs.length];
+        for (int i = 0; i < configs.length; i++) {
+            labels[i] = configs[i].label;
+            colors[i] = configs[i].color;
+        }
+        return SleepStagesChartData.daySpec(
+                samples.seconds, samples.stages, samples.values, getIndexOfActivity(ActivityKind.NOT_WORN),
+                labels, colors, CHART_TEXT_COLOR,
+                samples.hrSeconds, samples.heartRates, samples.hrMaxGapSeconds,
+                hrAverage, showHrAverage, HEARTRATE_LABEL, HEARTRATE_COLOR, Color.RED,
+                hrMinimum, hrMaximum
+        );
+    }
+
+    /**
+     * Tooltip for a time on a {@link #stagesSpec} chart: the stage then, and the heart rate.
+     */
+    protected Function1<Double, ChartSelection> stagesSelection(final StageSamples samples) {
+        final ActivityConfig[] configs = stageConfigs();
+        final WorkoutValueFormatter formatter = new WorkoutValueFormatter();
+        final java.text.DateFormat timeFormat = DateFormat.getTimeFormat(requireContext());
+        return x -> {
+            final long time = Math.round(x);
+            final String title = timeFormat.format(new Date(time * 1000L));
+            final List<ChartSelection.Row> rows = new ArrayList<>();
+            final StringBuilder description = new StringBuilder(title).append('.');
+            final int found = Arrays.binarySearch(samples.seconds, time);
+            final int i = found >= 0 ? found : -found - 2;
+            if (i >= 0) {
+                final ActivityConfig config = configs[samples.stages[i]];
+                rows.add(new ChartSelection.Row(config.color, config.label));
+                description.append(' ').append(config.label).append('.');
+            }
+            final int hr = Arrays.binarySearch(samples.hrSeconds, time);
+            if (hr >= 0 && samples.heartRates[hr] > 0) {
+                final String rate = formatter.formatValue(samples.heartRates[hr], UNIT_BPM);
+                rows.add(new ChartSelection.Row(HEARTRATE_COLOR, rate));
+                description.append(' ').append(HEARTRATE_LABEL).append(' ').append(rate).append('.');
+            }
+            return new ChartSelection(title, rows, description.toString());
+        };
     }
 
     public List<SleepDetailsView.SleepDetail> prepareStages(List<? extends ActivitySample> samples) {
