@@ -721,7 +721,8 @@ public class BangleJSDeviceSupport extends AbstractBTLESingleDeviceSupport {
         currentAlarm.setRepetition(Alarm.ALARM_ONCE);
         currentAlarm.setHour(calendar.get(Calendar.HOUR_OF_DAY));
         currentAlarm.setMinute(calendar.get(Calendar.MINUTE));
-        currentAlarm.setEnabled(true);
+        // A past timestamp means Sleep as Android no longer has an upcoming alarm
+        currentAlarm.setEnabled(alarmTimestamp > System.currentTimeMillis());
         currentAlarm.setUnused(false);
 
         // Store modified alarm
