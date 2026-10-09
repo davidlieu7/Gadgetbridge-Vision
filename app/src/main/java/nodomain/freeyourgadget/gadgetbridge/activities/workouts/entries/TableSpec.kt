@@ -54,8 +54,8 @@ class TableSpec private constructor(
      */
     val centered: Boolean,
     /**
-     * Optional per-column header colours, so a column can be titled in the colour it has
-     * everywhere else on the screen; null (or a null entry) keeps the muted header colour.
+     * Optional per-column header colors, so a column can be titled in the color it has
+     * everywhere else on the screen; null (or a null entry) keeps the muted header color.
      */
     private val headerColors: List<Int?>?,
 ) {

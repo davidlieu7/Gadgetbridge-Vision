@@ -19,7 +19,6 @@ package nodomain.freeyourgadget.gadgetbridge.activities.workouts
 import android.content.Context
 import android.content.Intent
 import android.graphics.Color
-import android.graphics.Typeface
 import android.graphics.drawable.GradientDrawable
 import android.os.Bundle
 import android.view.Gravity
@@ -260,7 +259,7 @@ class WorkoutCompareActivity : AbstractGBActivity() {
         }
         val headerRow = ActivitySummaryTableRowEntry(null, headerCells, true, true)
 
-        // Title each column in the workout's own colour, the one it has in the legend,
+        // Title each column in the workout's own color, the one it has in the legend,
         // the charts and the map; the label and delta columns stay muted.
         val headerColors = mutableListOf<Int?>(null)
         workouts.forEachIndexed { index, _ -> headerColors.add(colorFor(index, workouts.size)) }
@@ -360,8 +359,8 @@ private fun raw(value: String?): ActivitySummaryValue =
     ActivitySummaryValue(value, ActivitySummaryEntries.UNIT_RAW_STRING)
 
 /**
- * The row's label, marked with the zone colour when the key is a heart rate zone —
- * the same colour resources the rest of the app uses for zone rows.
+ * The row's label, marked with the zone color when the key is a heart rate zone —
+ * the same color resources the rest of the app uses for zone rows.
  */
 private fun labelCell(key: String): ActivitySummaryValue =
     ActivitySummaryValue(

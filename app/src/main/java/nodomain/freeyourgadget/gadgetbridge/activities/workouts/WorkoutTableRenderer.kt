@@ -34,7 +34,7 @@ private const val HEADER_UNIT_TEXT_SIZE_SP = 10f
 private const val CELL_TEXT_SIZE_SP = 14f
 private const val INDEX_TEXT_SIZE_SP = 13f
 private const val UNIT_TEXT_SIZE_SP = 11
-/** Alpha of the colour wash a marked row (heart rate zones) tints its background with. */
+/** Alpha of the color wash a marked row (heart rate zones) tints its background with. */
 private const val ROW_TINT_ALPHA = 0x33
 
 /** The heart rate column header is too wide for its column as a full word. */
@@ -74,8 +74,8 @@ fun populateTableRow(
             dpToPx(context, bottom)
         )
 
-        // A marked row (heart rate zones) washes its whole background in its colour,
-        // so the row reads as a band while the text keeps the normal table colours.
+        // A marked row (heart rate zones) washes its whole background in its color,
+        // so the row reads as a band while the text keeps the normal table colors.
         val rowColor = entry.columns.firstOrNull()?.color() ?: 0
         if (rowColor != 0) {
             val color = ContextCompat.getColor(context, rowColor)

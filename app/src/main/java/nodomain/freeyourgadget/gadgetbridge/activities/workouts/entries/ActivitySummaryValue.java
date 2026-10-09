@@ -31,8 +31,8 @@ public record ActivitySummaryValue(@Nullable Object value, String unit, String p
     }
 
     /**
-     * @param color a colour resource that washes the whole row's background with (e.g. the
-     *              heart rate zone's colour), or 0 for no marking.
+     * @param color a color resource that washes the whole row's background with (e.g. the
+     *              heart rate zone's color), or 0 for no marking.
      */
     public ActivitySummaryValue(@Nullable Object value, String unit, String prefix, int color) {
         this.unit = unit;
