@@ -54,6 +54,14 @@
             android:key="loyalty_cards_sync"
             android:summary="@string/loyalty_cards_sync_summary"
             android:title="@string/loyalty_cards_sync_title" />
+
+        <SwitchPreferenceCompat
+            android:defaultValue="false"
+            android:icon="@drawable/ic_sync"
+            android:key="loyalty_cards_sync_on_change"
+            android:layout="@layout/preference_checkbox"
+            android:summary="@string/loyalty_cards_sync_on_change_summary"
+            android:title="@string/loyalty_cards_sync_on_change_title" />
     </PreferenceCategory>
 
     <PreferenceCategory

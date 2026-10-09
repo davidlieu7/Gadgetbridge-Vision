@@ -21,6 +21,8 @@ import android.content.Context;
 import android.database.Cursor;
 import android.net.Uri;
 
+import androidx.annotation.Nullable;
+
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -45,6 +47,7 @@ public class CatimaContentProvider {
     }};
 
     private final Context mContext;
+    private final Uri authorityUri;
     private final Uri versionUri;
     private final Uri cardsUri;
     private final Uri groupsUri;
@@ -54,6 +57,7 @@ public class CatimaContentProvider {
     public CatimaContentProvider(final Context context, final String catimaPackageName) {
         this.mContext = context;
         final String catimaAuthority = catimaPackageName + ".contentprovider.cards";
+        this.authorityUri = Uri.parse(String.format(Locale.ROOT, "content://%s", catimaAuthority));
         this.versionUri = Uri.parse(String.format(Locale.ROOT, "content://%s/version", catimaAuthority));
         this.cardsUri = Uri.parse(String.format(Locale.ROOT, "content://%s/cards", catimaAuthority));
         this.groupsUri = Uri.parse(String.format(Locale.ROOT, "content://%s/groups", catimaAuthority));
@@ -65,12 +69,31 @@ public class CatimaContentProvider {
         return this.readPermission;
     }
 
+    public Uri getAuthorityUri() {
+        return this.authorityUri;
+    }
+
     public boolean isCatimaCompatible() {
+        final int[] version = getVersion();
+        // We only support version 1.x for now
+        return version != null && version[0] == 1;
+    }
+
+    /**
+     * Content provider notifications are available since 1.2.
+     */
+    public boolean supportsChangeNotifications() {
+        final int[] version = getVersion();
+        return version != null && version[0] == 1 && version[1] >= 2;
+    }
+
+    @Nullable
+    private int[] getVersion() {
         final ContentResolver contentResolver = mContext.getContentResolver();
         try (Cursor cursor = contentResolver.query(versionUri, null, null, null, null)) {
             if (cursor == null || cursor.getCount() == 0) {
                 LOG.warn("Catima content provider version not found");
-                return false;
+                return null;
             }
 
             cursor.moveToNext();
@@ -79,13 +102,12 @@ public class CatimaContentProvider {
 
             LOG.info("Got catima content provider version: {}.{}", major, minor);
 
-            // We only support version 1.x for now
-            return major == 1;
+            return new int[]{major, minor};
         } catch (final Exception e) {
             LOG.error("Failed to get content provider version from Catima", e);
         }
 
-        return false;
+        return null;
     }
 
     public List<LoyaltyCard> getCards() {

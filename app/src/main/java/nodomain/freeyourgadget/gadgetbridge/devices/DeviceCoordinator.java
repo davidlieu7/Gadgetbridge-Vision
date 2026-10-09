@@ -1190,6 +1190,8 @@ public interface DeviceCoordinator {
 
     Set<BarcodeFormat> getSupportedBarcodeFormats(@NonNull final GBDevice device);
 
+    boolean supportsLoyaltyCards(@NonNull final GBDevice device);
+
     /**
      * @return delay in ms for this device to wait before a reconnection attempt is made.
      */

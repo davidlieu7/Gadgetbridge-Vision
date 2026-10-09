@@ -1364,6 +1364,11 @@ public abstract class AbstractDeviceCoordinator implements DeviceCoordinator {
     }
 
     @Override
+    public boolean supportsLoyaltyCards(@NonNull final GBDevice device) {
+        return !getSupportedBarcodeFormats(device).isEmpty();
+    }
+
+    @Override
     public int getReconnectionDelay() {
         // 2 seconds.
         return 2000;
