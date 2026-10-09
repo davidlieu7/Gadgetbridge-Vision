@@ -16,7 +16,7 @@ object StressChartData {
 
     /**
      * One solid area per stress level over the day from [startTs] (epoch seconds). The samples are what a tap or
-     * drag selects.
+     * drag selects, coloured by their index in [sampleLevels].
      */
     @JvmStatic
     fun daySpec(
@@ -29,11 +29,19 @@ object StressChartData {
         average: Int,
         showAverage: Boolean,
         averageColor: Int,
-        sampleColor: Int,
+        sampleLevels: IntArray,
     ): ChartSpec {
         val samples = sampleSeconds.indices
             .filter { sampleValues[it] > 0 }
-            .map { ChartPoint(sampleSeconds[it].toDouble(), sampleValues[it].toDouble()) }
+            .groupBy { sampleLevels[it] }
+            .toSortedMap()
+            .map { (level, indices) ->
+                ChartSeries(
+                    "stress_$level", "",
+                    indices.map { ChartPoint(sampleSeconds[it].toDouble(), sampleValues[it].toDouble()) },
+                    SeriesStyle.Line(colors[level], showLine = false),
+                )
+            }
         if (samples.isEmpty()) {
             return ChartSpec.EMPTY
         }
@@ -45,8 +53,7 @@ object StressChartData {
             )
         }
         return ChartSpec(
-            series = areas.filter { it.points.isNotEmpty() } +
-                ChartSeries("stress", "", samples, SeriesStyle.Line(sampleColor, showLine = false)),
+            series = areas.filter { it.points.isNotEmpty() } + samples,
             xAxis = AxisSpec(
                 format = ChartValueFormat.TIME_OF_DAY,
                 minimum = startTs.toDouble(),

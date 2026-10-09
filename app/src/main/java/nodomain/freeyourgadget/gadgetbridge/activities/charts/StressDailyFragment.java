@@ -176,18 +176,20 @@ public class StressDailyFragment extends StressFragment<StressDailyFragment.Stre
             colors[i] = types[i].getColor(requireContext());
         }
         final List<? extends StressSample> samples = stressData.getSamples();
+        final int[] stressRanges = stressData.getStressRanges();
         final long[] sampleSeconds = new long[samples.size()];
         final int[] sampleValues = new int[samples.size()];
+        final int[] sampleLevels = new int[samples.size()];
         for (int i = 0; i < samples.size(); i++) {
             sampleSeconds[i] = samples.get(i).getTimestamp() / 1000L;
             sampleValues[i] = samples.get(i).getStress();
+            sampleLevels[i] = StressType.fromStress(sampleValues[i], stressRanges).ordinal();
         }
         final long dayStart = DateTimeUtils.dayStart(date).getTime() / 1000L;
         final ChartSpec spec = StressChartData.daySpec(
                 dayStart, stressData.getLevels(), labels, colors, sampleSeconds, sampleValues,
-                stressData.getAverage(), SHOW_CHARTS_AVERAGE, Color.GRAY, TEXT_COLOR
+                stressData.getAverage(), SHOW_CHARTS_AVERAGE, Color.GRAY, sampleLevels
         );
-        final int[] stressRanges = stressData.getStressRanges();
         mStressChart.setSelectionContent(x -> {
             final long time = Math.round(x);
             final String title = DateFormat.getTimeFormat(requireContext()).format(new Date(time * 1000L));
