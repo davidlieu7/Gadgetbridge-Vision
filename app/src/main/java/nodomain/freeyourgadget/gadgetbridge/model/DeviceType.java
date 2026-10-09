@@ -576,6 +576,13 @@ import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.life_tune.Soundcor
 import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.life_tune.SoundcoreLifeTuneXRCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.motion300.SoundcoreMotion300Coordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.q30.SoundcoreQ30Coordinator;
+import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreP42iCoordinator;
+import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreP41iCoordinator;
+import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreP40iCoordinator;
+import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreP31iCoordinator;
+import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreP3Coordinator;
+import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreP30iCoordinator;
+import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreP20iCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.sport_x20.SoundcoreSportX20Coordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.supercars.SuperCarsCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.test.TestDeviceCoordinator;
@@ -1082,6 +1089,13 @@ public enum DeviceType {
     SOUNDCORE_LIFE_TUNE_XR(SoundcoreLifeTuneXRCoordinator.class),
     SOUNDCORE_AEROFIT2(SoundcoreAeroFit2Coordinator.class),
     SOUNDCORE_SPORT_X20(SoundcoreSportX20Coordinator.class),
+    SOUNDCORE_P42I(SoundcoreP42iCoordinator.class),
+    SOUNDCORE_P41I(SoundcoreP41iCoordinator.class),
+    SOUNDCORE_P40I(SoundcoreP40iCoordinator.class),
+    SOUNDCORE_P31I(SoundcoreP31iCoordinator.class),
+    SOUNDCORE_P30I(SoundcoreP30iCoordinator.class),
+    SOUNDCORE_P20I(SoundcoreP20iCoordinator.class),
+    SOUNDCORE_P3(SoundcoreP3Coordinator.class),
     SOUNDCORE_A30I(SoundcoreA30iCoordinator.class),
     HAYLOU_S35_ANC(HaylouS35AncCoordinator.class),
     MOONDROP_SPACE_TRAVEL(MoondropSpaceTravelCoordinator.class),
