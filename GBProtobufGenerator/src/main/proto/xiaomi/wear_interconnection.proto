@@ -1,0 +1,31 @@
+syntax = "proto2";
+package xiaomi;
+option java_package = "nodomain.freeyourgadget.gadgetbridge.proto.xiaomi";
+option java_multiple_files = true;
+
+// Command type 23
+//   23, 0  -> watch requests the phone status
+//   23, 1  -> phone sends its status
+//   23, 2  -> watch requests devices it can control from the phone (eg. audio outputs)
+//   23, 17 -> watch registers for phone usage reports, sent at night
+//   23, 18 -> watch unregisters from phone usage reports
+//   23, 19 -> phone sends a phone usage report
+message Interconnection {
+  optional InterconnectionPhoneStatus phoneStatus = 1;
+  optional InterconnectionRequestInfo requestInfo = 12;
+  optional InterconnectionPhoneUsage phoneUsage = 16;
+}
+
+message InterconnectionPhoneStatus {
+  optional uint32 screen = 1;
+}
+
+message InterconnectionRequestInfo {
+  optional bool onlyAudio = 1;
+}
+
+message InterconnectionPhoneUsage {
+  optional bool hold = 1;
+  optional uint32 screen = 2;
+  optional uint32 foregroundAppType = 3;
+}

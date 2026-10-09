@@ -32,13 +32,17 @@ import nodomain.freeyourgadget.gadgetbridge.GBApplication;
 import nodomain.freeyourgadget.gadgetbridge.database.DBHandler;
 import nodomain.freeyourgadget.gadgetbridge.database.DBHelper;
 import nodomain.freeyourgadget.gadgetbridge.devices.ComputedHrvSummarySampleProvider;
+import nodomain.freeyourgadget.gadgetbridge.devices.GenericHeartRateSampleProvider;
+import nodomain.freeyourgadget.gadgetbridge.devices.GenericSpo2SampleProvider;
 import nodomain.freeyourgadget.gadgetbridge.devices.HeartPulseSampleProvider;
 import nodomain.freeyourgadget.gadgetbridge.devices.GenericHrvValueSampleProvider;
 import nodomain.freeyourgadget.gadgetbridge.devices.XiaomiSleepStageSampleProvider;
 import nodomain.freeyourgadget.gadgetbridge.devices.XiaomiSleepTimeSampleProvider;
 import nodomain.freeyourgadget.gadgetbridge.entities.DaoSession;
 import nodomain.freeyourgadget.gadgetbridge.entities.Device;
+import nodomain.freeyourgadget.gadgetbridge.entities.GenericHeartRateSample;
 import nodomain.freeyourgadget.gadgetbridge.entities.GenericHrvValueSample;
+import nodomain.freeyourgadget.gadgetbridge.entities.GenericSpo2Sample;
 import nodomain.freeyourgadget.gadgetbridge.entities.HeartPulseSample;
 import nodomain.freeyourgadget.gadgetbridge.entities.User;
 import nodomain.freeyourgadget.gadgetbridge.entities.XiaomiSleepStageSample;
@@ -83,18 +87,11 @@ public class SleepDetailsParser extends XiaomiActivityParser {
         final int wakeupTime = buf.getInt();
         headerIdx++;
 
-        int sleepQuality = -1;
         if (fileId.getVersion() >= 4) {
-            if (version == 6) {
-                // V6 fixed-width report values occupy bytes even when their validity flag is
-                // clear, and sleepFull is no longer represented in the validity bitmap.
-                final int rawSleepQuality = buf.get() & 0xff;
-                if (validData(header, 2)) {
-                    sleepQuality = rawSleepQuality;
-                }
-            } else if (validData(header, headerIdx)) {
-                // Preserve the established behavior for older sleep formats.
-                sleepQuality = buf.get() & 0xff;
+            // Sleep quality (u8), not persisted. In v6 it is fixed-width and occupies its byte
+            // even when its validity flag is clear; older versions only include it when valid.
+            if (version == 6 || validData(header, headerIdx)) {
+                buf.get();
             }
             headerIdx++;
         }
@@ -115,7 +112,9 @@ public class SleepDetailsParser extends XiaomiActivityParser {
         LOG.debug("Sleep sample: bedTime: {}, wakeupTime: {}, isAwake: {}", bedTime, wakeupTime, isAwake);
 
         final List<XiaomiSleepTimeSample> summaries = new ArrayList<>();
-        final List<HrvPoint> hrvPoints = new ArrayList<>();
+        final List<SeriesPoint> heartRatePoints = new ArrayList<>();
+        final List<SeriesPoint> spo2Points = new ArrayList<>();
+        final List<SeriesPoint> hrvPoints = new ArrayList<>();
 
         XiaomiSleepTimeSample sample = new XiaomiSleepTimeSample();
         sample.setTimestamp(bedTime * 1000L);
@@ -125,13 +124,17 @@ public class SleepDetailsParser extends XiaomiActivityParser {
         if (fileId.getVersion() == 6) {
             try {
                 final V6AdditionalData v6Data = decodeV6AdditionalData(buf, header);
+                heartRatePoints.addAll(v6Data.heartRatePoints);
+                spo2Points.addAll(v6Data.spo2Points);
                 hrvPoints.addAll(v6Data.hrvPoints);
                 LOG.debug(
-                        "V6 sleep report: efficiency {}%, asleep in {}s, in bed {}s, HRV avg {}ms, {} valid HRV points",
+                        "V6 sleep report: efficiency {}%, asleep in {}s, in bed {}s, HRV avg {}ms, {} heart rate, {} SpO2 and {} HRV points",
                         v6Data.sleepEfficiency,
                         v6Data.entrySleepDuration,
                         v6Data.inBedDuration,
                         v6Data.hrvAverage,
+                        v6Data.heartRatePoints.size(),
+                        v6Data.spo2Points.size(),
                         v6Data.hrvPoints.size()
                 );
             } catch (final IllegalArgumentException | BufferUnderflowException e) {
@@ -286,6 +289,9 @@ public class SleepDetailsParser extends XiaomiActivityParser {
                     }
                 } else if (type == 16) {
                     sample = decodeSummaryPacket(data, bedTime, wakeupTime, sample);
+                    // Every summary packet after the first starts from a fresh sample, which
+                    // would otherwise lose the awake flag from the file header
+                    sample.setIsAwake(isAwake == 1);
 
                     // FIXME: This is an array, but we end up persisting only the last sample, since
                     //        the timestamp is the primary key
@@ -350,7 +356,7 @@ public class SleepDetailsParser extends XiaomiActivityParser {
                 final User user = DBHelper.getUser(session);
                 final List<GenericHrvValueSample> hrvSamples = new ArrayList<>(hrvPoints.size());
 
-                for (final HrvPoint point : hrvPoints) {
+                for (final SeriesPoint point : hrvPoints) {
                     final GenericHrvValueSample hrvSample = new GenericHrvValueSample();
                     hrvSample.setTimestamp(point.timestamp);
                     hrvSample.setValue(point.value);
@@ -365,6 +371,42 @@ public class SleepDetailsParser extends XiaomiActivityParser {
             } catch (final Exception e) {
                 GB.toast(context, "Error saving sleep HRV samples", Toast.LENGTH_LONG, GB.ERROR);
                 LOG.error("Error saving sleep HRV samples", e);
+                persistSuccess = false;
+            }
+        }
+
+        if (!heartRatePoints.isEmpty() || !spo2Points.isEmpty()) {
+            try (DBHandler handler = GBApplication.acquireDB()) {
+                final DaoSession session = handler.getDaoSession();
+                final Device device = DBHelper.getDevice(gbDevice, session);
+                final User user = DBHelper.getUser(session);
+
+                final List<GenericHeartRateSample> heartRateSamples = new ArrayList<>(heartRatePoints.size());
+                for (final SeriesPoint point : heartRatePoints) {
+                    final GenericHeartRateSample heartRateSample = new GenericHeartRateSample();
+                    heartRateSample.setTimestamp(point.timestamp);
+                    heartRateSample.setHeartRate(point.value);
+                    heartRateSample.setDevice(device);
+                    heartRateSample.setUser(user);
+                    heartRateSamples.add(heartRateSample);
+                }
+                new GenericHeartRateSampleProvider(gbDevice, session).addSamples(heartRateSamples);
+
+                final List<GenericSpo2Sample> spo2Samples = new ArrayList<>(spo2Points.size());
+                for (final SeriesPoint point : spo2Points) {
+                    final GenericSpo2Sample spo2Sample = new GenericSpo2Sample();
+                    spo2Sample.setTimestamp(point.timestamp);
+                    spo2Sample.setSpo2(point.value);
+                    spo2Sample.setDevice(device);
+                    spo2Sample.setUser(user);
+                    spo2Samples.add(spo2Sample);
+                }
+                new GenericSpo2SampleProvider(gbDevice, session).addSamples(spo2Samples);
+
+                LOG.debug("Persisted {} v6 sleep heart rate and {} SpO2 samples", heartRateSamples.size(), spo2Samples.size());
+            } catch (final Exception e) {
+                GB.toast(context, "Error saving sleep heart rate and SpO2 samples", Toast.LENGTH_LONG, GB.ERROR);
+                LOG.error("Error saving sleep heart rate and SpO2 samples", e);
                 persistSuccess = false;
             }
         }
@@ -471,13 +513,13 @@ public class SleepDetailsParser extends XiaomiActivityParser {
         result.hrvBaselineMin = Short.toUnsignedInt(buf.getShort());
 
         if (validData(validity, 19)) {
-            skipAssistSeries(buf, 1, "heart rate");
+            result.heartRatePoints.addAll(readAssistSeries(buf, 1, "heart rate"));
         }
         if (validData(validity, 20)) {
-            skipAssistSeries(buf, 1, "SpO2");
+            result.spo2Points.addAll(readAssistSeries(buf, 1, "SpO2"));
         }
         if (validData(validity, 21)) {
-            result.hrvPoints.addAll(readHrvAssistSeries(buf));
+            result.hrvPoints.addAll(readAssistSeries(buf, 2, "HRV"));
         }
         if (validData(validity, 22)) {
             skipAssistSeries(buf, 4, "snore");
@@ -491,14 +533,18 @@ public class SleepDetailsParser extends XiaomiActivityParser {
         buf.position(buf.position() + header.count * sampleWidth);
     }
 
-    private static List<HrvPoint> readHrvAssistSeries(final ByteBuffer buf) {
-        final AssistSeriesHeader header = readAssistSeriesHeader(buf, 2, "HRV");
-        final List<HrvPoint> points = new ArrayList<>(header.count);
+    /**
+     * Read an assist series of unsigned 1 or 2 byte values, skipping empty slots.
+     */
+    private static List<SeriesPoint> readAssistSeries(final ByteBuffer buf, final int sampleWidth, final String name) {
+        final AssistSeriesHeader header = readAssistSeriesHeader(buf, sampleWidth, name);
+        final int invalidValue = sampleWidth == 1 ? 0xff : 0xffff;
+        final List<SeriesPoint> points = new ArrayList<>(header.count);
         for (int i = 0; i < header.count; i++) {
-            final int value = Short.toUnsignedInt(buf.getShort());
-            // Xiaomi uses zero-filled slots when no valid HRV estimate was produced.
-            if (value > 0) {
-                points.add(new HrvPoint(
+            final int value = sampleWidth == 1 ? buf.get() & 0xff : Short.toUnsignedInt(buf.getShort());
+            // Xiaomi uses zero-filled slots when no valid value was measured
+            if (value > 0 && value != invalidValue) {
+                points.add(new SeriesPoint(
                         (header.firstRecordTime + (long) header.sampleUnit * i) * 1000L,
                         value
                 ));
@@ -552,14 +598,16 @@ public class SleepDetailsParser extends XiaomiActivityParser {
         int hrvMin;
         int hrvBaselineMax;
         int hrvBaselineMin;
-        final List<HrvPoint> hrvPoints = new ArrayList<>();
+        final List<SeriesPoint> heartRatePoints = new ArrayList<>();
+        final List<SeriesPoint> spo2Points = new ArrayList<>();
+        final List<SeriesPoint> hrvPoints = new ArrayList<>();
     }
 
-    static final class HrvPoint {
+    static final class SeriesPoint {
         final long timestamp;
         final int value;
 
-        HrvPoint(final long timestamp, final int value) {
+        SeriesPoint(final long timestamp, final int value) {
             this.timestamp = timestamp;
             this.value = value;
         }
@@ -585,23 +633,16 @@ public class SleepDetailsParser extends XiaomiActivityParser {
             LOG.warn("Unexpected sleep summary packet length {}, expected 13", data.length);
         }
 
+        // Layout: u8 (sleep index << 4 | wake count), u16 durations in minutes (sleep, awake,
+        // light, REM, deep), u8 flags (has REM, has stages), u8 unknown, maybe an awake duration
+        // after sleep. Only the durations are persisted.
         final ByteBuffer dataBuf = ByteBuffer.wrap(data).order(ByteOrder.BIG_ENDIAN);
-        final int data0 = dataBuf.get() & 0xFF;
-        final int sleepIndex = data0 >> 4;
-        final int wakeCount = data0 & 0x0F;
-
+        dataBuf.get();
         final int sleepDuration = dataBuf.getShort() & 0xFFFF;
         final int wakeDuration = dataBuf.getShort() & 0xFFFF;
         final int lightDuration = dataBuf.getShort() & 0xFFFF;
         final int remDuration = dataBuf.getShort() & 0xFFFF;
         final int deepDuration = dataBuf.getShort() & 0xFFFF;
-
-        final int data1 = dataBuf.get() & 0xFF;
-        final boolean hasRem = (data1 >> 4) == 1;
-        final boolean hasStage = (data1 >> 2) == 1;
-
-        // Could probably be an "awake" duration after sleep
-        final int unknownDurationMinutes = dataBuf.get() & 0xFF;
 
         if (sample == null) {
             sample = new XiaomiSleepTimeSample();

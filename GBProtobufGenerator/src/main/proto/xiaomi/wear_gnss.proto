@@ -1,0 +1,30 @@
+syntax = "proto2";
+package xiaomi;
+option java_package = "nodomain.freeyourgadget.gadgetbridge.proto.xiaomi";
+option java_multiple_files = true;
+
+// Command type 16
+//   16, 0 -> watch requests online assistance data
+//   16, 1 -> watch requests offline assistance data (assistRequest)
+//   16, 2 -> phone sends its location (location)
+//   16, 3 -> watch requests the phone location (empty)
+message Gnss {
+  optional uint32 days = 1;
+  optional GnssAssistRequest assistRequest = 2;
+  optional GnssLocation location = 3;
+}
+
+message GnssAssistRequest {
+  optional uint32 type = 1; // 1 AGPS, 2 BeiDou, 3 Galileo
+  optional string source = 2; // eg. "airoha_elpo" (Smart Band 10 Pro), "airoha" (Smart Band 8 Pro)
+  optional uint32 days = 3;
+  optional bool needLocation = 4;
+  optional uint32 expectedSliceLength = 5;
+}
+
+message GnssLocation {
+  optional uint32 timestamp = 1; // seconds
+  optional double longitude = 2;
+  optional double latitude = 3;
+  optional double altitude = 4;
+}

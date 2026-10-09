@@ -106,6 +106,50 @@ public class SleepDetailsParserTest {
         assertEquals(0, buf.remaining());
     }
 
+    @Test
+    public void v6AdditionalData_decodesHeartRateAndSpo2Series() {
+        // validity bits 19 (heart rate) and 20 (SpO2) set, HRV and snore absent
+        final byte[] validity = {(byte) 0xdf, (byte) 0x00, (byte) 0x18};
+        final ByteBuffer buf = ByteBuffer.allocate(41 + (8 + 4) + (8 + 3))
+                .order(ByteOrder.LITTLE_ENDIAN);
+
+        buf.position(41);                    // fixed report fields are not relevant here
+
+        buf.putShort((short) 60);            // heart rate interval
+        buf.putShort((short) 4);
+        buf.putInt(BED_TIME);
+        buf.put((byte) 72);
+        buf.put((byte) 0);                   // empty slot
+        buf.put((byte) 0xff);                // invalid value
+        buf.put((byte) 70);
+
+        buf.putShort((short) 60);            // SpO2 interval
+        buf.putShort((short) 3);
+        buf.putInt(BED_TIME + 60);
+        buf.put((byte) 98);
+        buf.put((byte) 0);                   // empty slot
+        buf.put((byte) 97);
+        buf.flip();
+
+        final SleepDetailsParser.V6AdditionalData data =
+                SleepDetailsParser.decodeV6AdditionalData(buf, validity);
+
+        assertEquals(2, data.heartRatePoints.size());
+        assertEquals(BED_TIME * 1000L, data.heartRatePoints.get(0).timestamp);
+        assertEquals(72, data.heartRatePoints.get(0).value);
+        assertEquals((BED_TIME + 3 * 60L) * 1000L, data.heartRatePoints.get(1).timestamp);
+        assertEquals(70, data.heartRatePoints.get(1).value);
+
+        assertEquals(2, data.spo2Points.size());
+        assertEquals((BED_TIME + 60L) * 1000L, data.spo2Points.get(0).timestamp);
+        assertEquals(98, data.spo2Points.get(0).value);
+        assertEquals((BED_TIME + 3 * 60L) * 1000L, data.spo2Points.get(1).timestamp);
+        assertEquals(97, data.spo2Points.get(1).value);
+
+        assertTrue(data.hrvPoints.isEmpty());
+        assertEquals(0, buf.remaining());
+    }
+
     @Test(expected = IllegalArgumentException.class)
     public void v6AdditionalData_rejectsTruncatedHrvSeries() {
         final byte[] validity = {(byte) 0xdf, (byte) 0xff, (byte) 0xf4};

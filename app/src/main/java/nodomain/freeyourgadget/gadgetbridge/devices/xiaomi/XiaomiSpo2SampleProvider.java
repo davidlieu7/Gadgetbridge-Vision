@@ -21,11 +21,15 @@ import androidx.annotation.Nullable;
 
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 import de.greenrobot.dao.Property;
 import nodomain.freeyourgadget.gadgetbridge.devices.AbstractSampleToTimeSampleProvider;
+import nodomain.freeyourgadget.gadgetbridge.devices.GenericSpo2SampleProvider;
 import nodomain.freeyourgadget.gadgetbridge.entities.DaoSession;
+import nodomain.freeyourgadget.gadgetbridge.entities.GenericSpo2Sample;
 import nodomain.freeyourgadget.gadgetbridge.entities.XiaomiActivitySample;
 import nodomain.freeyourgadget.gadgetbridge.entities.XiaomiActivitySampleDao;
 import nodomain.freeyourgadget.gadgetbridge.entities.XiaomiManualSample;
@@ -34,16 +38,30 @@ import nodomain.freeyourgadget.gadgetbridge.model.Spo2Sample;
 
 public class XiaomiSpo2SampleProvider extends AbstractSampleToTimeSampleProvider<Spo2Sample, XiaomiActivitySample> {
     private final XiaomiManualSampleProvider manualSampleProvider;
+    // Overnight SpO2 from the sleep report
+    private final GenericSpo2SampleProvider sleepSampleProvider;
 
     public XiaomiSpo2SampleProvider(final GBDevice device, final DaoSession session) {
         super(new XiaomiSampleProvider(device, session), device, session);
         manualSampleProvider = new XiaomiManualSampleProvider(device, session);
+        sleepSampleProvider = new GenericSpo2SampleProvider(device, session);
     }
 
     @NonNull
     @Override
     public List<Spo2Sample> getAllSamples(final long timestampFrom, final long timestampTo) {
         final List<Spo2Sample> samples = new ArrayList<>(super.getAllSamples(timestampFrom, timestampTo));
+
+        // The per-minute activity samples win where both have a value for the same time
+        final Set<Long> activityTimestamps = new HashSet<>();
+        for (final Spo2Sample sample : samples) {
+            activityTimestamps.add(sample.getTimestamp());
+        }
+        for (final GenericSpo2Sample sleepSample : sleepSampleProvider.getAllSamples(timestampFrom, timestampTo)) {
+            if (!activityTimestamps.contains(sleepSample.getTimestamp())) {
+                samples.add(convertSleepSample(sleepSample));
+            }
+        }
 
         for (final XiaomiManualSample manualSample : manualSampleProvider.getAllSamples(timestampFrom, timestampTo)) {
             final Spo2Sample converted = convertManualSample(manualSample);
@@ -71,6 +89,19 @@ public class XiaomiSpo2SampleProvider extends AbstractSampleToTimeSampleProvider
     }
 
     @Nullable
+    private static Spo2Sample convertSleepSample(@Nullable final GenericSpo2Sample sample) {
+        if (sample == null) {
+            return null;
+        }
+
+        return new XiaomiSpo2Sample(
+                sample.getTimestamp(),
+                sample.getSpo2(),
+                Spo2Sample.Type.AUTOMATIC
+        );
+    }
+
+    @Nullable
     private Spo2Sample convertManualSample(final XiaomiManualSample sample) {
         if (sample == null || sample.getType() != XiaomiManualSampleProvider.TYPE_SPO2 || sample.getValue() <= 0) {
             return null;
@@ -87,7 +118,7 @@ public class XiaomiSpo2SampleProvider extends AbstractSampleToTimeSampleProvider
     @Override
     public Spo2Sample getLatestSample() {
         return latest(
-                super.getLatestSample(),
+                latest(super.getLatestSample(), convertSleepSample(sleepSampleProvider.getLatestSample())),
                 convertManualSample(manualSampleProvider.getLatestSample(XiaomiManualSampleProvider.TYPE_SPO2))
         );
     }
@@ -96,7 +127,7 @@ public class XiaomiSpo2SampleProvider extends AbstractSampleToTimeSampleProvider
     @Override
     public Spo2Sample getLatestSample(final long until) {
         return latest(
-                super.getLatestSample(until),
+                latest(super.getLatestSample(until), convertSleepSample(sleepSampleProvider.getLatestSample(until))),
                 convertManualSample(manualSampleProvider.getLatestSample(XiaomiManualSampleProvider.TYPE_SPO2, until))
         );
     }
@@ -105,7 +136,7 @@ public class XiaomiSpo2SampleProvider extends AbstractSampleToTimeSampleProvider
     @Override
     public Spo2Sample getFirstSample() {
         return earliest(
-                super.getFirstSample(),
+                earliest(super.getFirstSample(), convertSleepSample(sleepSampleProvider.getFirstSample())),
                 convertManualSample(manualSampleProvider.getFirstSample(XiaomiManualSampleProvider.TYPE_SPO2))
         );
     }

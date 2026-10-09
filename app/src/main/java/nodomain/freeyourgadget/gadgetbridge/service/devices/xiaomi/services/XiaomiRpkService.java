@@ -51,6 +51,7 @@ public class XiaomiRpkService extends AbstractXiaomiService implements XiaomiDat
     public static final int CMD_RPK_DELETE = 3;
     public static final int CMD_RPK_INSTALL = 1;
     public static final int CMD_RPK_INSTALLED = 2;
+    public static final int CMD_WECHAT_LICENSE_REQUEST = 10;
 
 
     // Not null if we're installing a firmware
@@ -89,6 +90,9 @@ public class XiaomiRpkService extends AbstractXiaomiService implements XiaomiDat
                 setDeviceBusy();
                 getSupport().getDataUploadService().setCallback(this);
                 getSupport().getDataUploadService().requestUpload(XiaomiDataUploadService.TYPE_RPK, fwHelper.getBytes());
+                return;
+            case CMD_WECHAT_LICENSE_REQUEST:
+                LOG.debug("Watch requested a WeChat license, not supported");
                 return;
         }
 

@@ -64,7 +64,9 @@ import nodomain.freeyourgadget.gadgetbridge.service.SleepAsAndroidVibration;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.xiaomi.services.AbstractXiaomiService;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.xiaomi.services.XiaomiCalendarService;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.xiaomi.services.XiaomiDataUploadService;
+import nodomain.freeyourgadget.gadgetbridge.service.devices.xiaomi.services.XiaomiGnssService;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.xiaomi.services.XiaomiHealthService;
+import nodomain.freeyourgadget.gadgetbridge.service.devices.xiaomi.services.XiaomiInterconnectionService;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.xiaomi.services.XiaomiMusicService;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.xiaomi.services.XiaomiNotificationService;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.xiaomi.services.XiaomiPhonebookService;
@@ -91,6 +93,8 @@ public class XiaomiSupport extends AbstractBluetoothDeviceSupport {
     private final XiaomiDataUploadService dataUploadService = new XiaomiDataUploadService(this);
     private final XiaomiPhonebookService phonebookService = new XiaomiPhonebookService(this);
     private final XiaomiRpkService rpkService = new XiaomiRpkService(this);
+    private final XiaomiGnssService gnssService = new XiaomiGnssService(this);
+    private final XiaomiInterconnectionService interconnectionService = new XiaomiInterconnectionService(this);
 
 
     private String cachedFirmwareVersion = null;
@@ -125,6 +129,8 @@ public class XiaomiSupport extends AbstractBluetoothDeviceSupport {
         put(XiaomiDataUploadService.COMMAND_TYPE, dataUploadService);
         put(XiaomiPhonebookService.COMMAND_TYPE, phonebookService);
         put(XiaomiRpkService.COMMAND_TYPE, rpkService);
+        put(XiaomiGnssService.COMMAND_TYPE, gnssService);
+        put(XiaomiInterconnectionService.COMMAND_TYPE, interconnectionService);
     }};
 
     @Override

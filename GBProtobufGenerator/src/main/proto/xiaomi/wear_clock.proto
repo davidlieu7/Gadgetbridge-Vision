@@ -17,6 +17,9 @@ message Schedule {
   // 17, 4
   optional AlarmDelete deleteAlarm = 5;
 
+  // 17, 7 watch request (year only) | 17, 6 phone sync
+  optional Holiday holiday = 7;
+
   // 17, 8 get | 17, 9 set
   optional SleepMode sleepMode = 9;
 
@@ -36,6 +39,13 @@ message Schedule {
 
   // 17, 18
   optional ReminderDelete deleteReminder = 17;
+}
+
+// Public holidays and swapped working days, used by "workdays only" alarms
+message Holiday {
+  optional uint32 year = 1;
+  repeated string freeDays = 2;
+  repeated string workDays = 3;
 }
 
 message Alarms {

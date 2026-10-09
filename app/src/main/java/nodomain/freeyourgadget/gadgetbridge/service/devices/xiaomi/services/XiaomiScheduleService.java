@@ -50,6 +50,7 @@ import nodomain.freeyourgadget.gadgetbridge.model.WorldClock;
 import nodomain.freeyourgadget.gadgetbridge.proto.xiaomi.AlarmDelete;
 import nodomain.freeyourgadget.gadgetbridge.proto.xiaomi.AlarmDetails;
 import nodomain.freeyourgadget.gadgetbridge.proto.xiaomi.AlarmInfo;
+import nodomain.freeyourgadget.gadgetbridge.proto.xiaomi.Holiday;
 import nodomain.freeyourgadget.gadgetbridge.proto.xiaomi.ReminderDelete;
 import nodomain.freeyourgadget.gadgetbridge.proto.xiaomi.ReminderDetails;
 import nodomain.freeyourgadget.gadgetbridge.proto.xiaomi.Reminders;
@@ -71,6 +72,8 @@ public class XiaomiScheduleService extends AbstractXiaomiService {
     private static final int CMD_ALARMS_CREATE = 1;
     private static final int CMD_ALARMS_EDIT = 2;
     private static final int CMD_ALARMS_DELETE = 4;
+    private static final int CMD_HOLIDAYS_SYNC = 6;
+    private static final int CMD_HOLIDAYS_REQUEST = 7;
     private static final int CMD_SLEEP_MODE_GET = 8;
     private static final int CMD_SLEEP_MODE_SET = 9;
     private static final int CMD_WORLD_CLOCKS_GET = 10;
@@ -126,6 +129,9 @@ public class XiaomiScheduleService extends AbstractXiaomiService {
                     requestAlarms();
                 }
                 return;
+            case CMD_HOLIDAYS_REQUEST:
+                sendHolidays(cmd.getSchedule().getHoliday().getYear());
+                return;
             case CMD_SLEEP_MODE_SET:
                 LOG.debug("Got sleep mode set ack, status={}", cmd.getStatus());
                 return;
@@ -151,6 +157,22 @@ public class XiaomiScheduleService extends AbstractXiaomiService {
         }
 
         LOG.warn("Unknown schedule command {}", cmd.getSubtype());
+    }
+
+    /**
+     * send empty holiday list for now. Later will try to investigate where to get it.
+     */
+    private void sendHolidays(final int year) {
+        LOG.debug("Watch requested holidays for {}, sending none", year);
+
+        getSupport().sendCommand(
+                "send holidays",
+                XiaomiProto.Command.newBuilder()
+                        .setType(COMMAND_TYPE)
+                        .setSubtype(CMD_HOLIDAYS_SYNC)
+                        .setSchedule(Schedule.newBuilder().setHoliday(Holiday.newBuilder().setYear(year)))
+                        .build()
+        );
     }
 
     @Override

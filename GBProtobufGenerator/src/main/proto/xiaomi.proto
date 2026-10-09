@@ -11,6 +11,8 @@ import "xiaomi/wear_clock.proto";
 import "xiaomi/wear_common.proto";
 import "xiaomi/wear_contact.proto";
 import "xiaomi/wear_fitness.proto";
+import "xiaomi/wear_gnss.proto";
+import "xiaomi/wear_interconnection.proto";
 import "xiaomi/wear_mass.proto";
 import "xiaomi/wear_media.proto";
 import "xiaomi/wear_notification.proto";
@@ -32,6 +34,8 @@ message Command {
   optional Music music = 20;
   optional Notification notification = 9;
   optional Weather weather = 12;
+  // command type 16
+  optional Gnss gnss = 18;
   optional Schedule schedule = 19;
   optional Rpk rpk = 22;
 
@@ -40,6 +44,9 @@ message Command {
 
   // type 22
   optional DataUpload dataUpload = 24;
+
+  // command type 23
+  optional Interconnection interconnection = 25;
 
   optional uint32 status = 100; // 0 on success on some
 }
