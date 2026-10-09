@@ -1198,6 +1198,8 @@
     <string name="minutes_210">210 minutes</string>
     <string name="minutes_240">240 minutes</string>
     <string name="minutes_255">255 minutes</string>
+    <string name="hours_1">1 hour</string>
+    <string name="hours_2">2 hours</string>
     <string name="minutes_360">360 minutes</string>
     <string name="minutes_480">480 minutes</string>
     <string name="liveactivity_live_activity">Live activity</string>
@@ -2552,6 +2554,7 @@
     <string name="devicetype_generic_thermal_printer">Thermal Printer</string>
     <string name="devicetype_garmin_hrm_pro_plus" translatable="false">Garmin HRM-Pro Plus</string>
     <string name="devicetype_generic_headphones">Headphones</string>
+    <string name="devicetype_jbl_tune_buds_2" translatable="false">JBL Tune Buds 2</string>
     <string name="devicetype_generic_heart_rate_sensor">Heart Rate Sensor</string>
     <string name="devicetype_generic_weight_scale">Weight Scale</string>
     <string name="devicetype_coospo_h6" translatable="false">Coospo H6</string>
@@ -3730,6 +3733,49 @@
     <string name="pref_voice_passthrough_enabled">Passthrough</string>
     <string name="pref_voice_passthrough_enabled_summary">Allow external sounds to pass through to your ears</string>
     <string name="pref_voice_passthrough_level">Passthrough level</string>
+    <string name="pref_spatial_audio">Spatial Audio</string>
+    <string name="pref_spatial_audio_music">Music</string>
+    <string name="pref_spatial_audio_movie">Movie</string>
+    <string name="pref_spatial_audio_game">Game</string>
+    <string name="pref_latency_mode">Latency Mode</string>
+    <string name="pref_latency_mode_high_quality">High Quality (Audio Mode)</string>
+    <string name="pref_latency_mode_low_latency">Low Latency (Video Mode)</string>
+    <string name="pref_sidetone">Sidetone (Call Feedback)</string>
+    <string name="pref_channel_balance">Stereo Balance (Left / Right)</string>
+    <string name="pref_safe_sound">Volume Limiter (85 dB Cap)</string>
+    <string name="pref_safe_sound_summary">Limits the maximum volume to 85 dB for hearing protection</string>
+    <string name="pref_voice_prompts">Voice Prompts &amp; Tone</string>
+    <string name="pref_voice_prompts_voice">Voice Prompts</string>
+    <string name="pref_voice_prompts_tone">Tone Feedback (Beeps)</string>
+    <string name="pref_leakage_compensation">Leakage Compensation</string>
+    <string name="pref_leakage_compensation_summary">Automatically compensates for sound leakage caused by earbud fit</string>
+    <string name="pref_call_sound_effect">Call Sound Effect</string>
+    <string name="pref_call_sound_effect_treble">Increased Treble</string>
+    <string name="pref_call_sound_effect_bass">Increased Bass</string>
+    <string name="pref_call_volume_optimizer">Sound Level Optimizer</string>
+    <string name="pref_call_volume_optimizer_summary">Normalizes sudden volume fluctuations during phone calls</string>
+    <string name="pref_touch_ambient_sound_control">Ambient Sound Control</string>
+    <string name="pref_touch_playback_control">Playback Control</string>
+    <string name="pref_touch_volume_control">Volume Control</string>
+    <string name="pref_jbl_tune_buds_2_asc_cycle">Ambient Sound Control Gesture Cycle</string>
+    <string name="pref_jbl_tune_buds_2_asc_cycle_all">Noise Cancelling / Ambient Aware / Off</string>
+    <string name="pref_jbl_tune_buds_2_asc_cycle_anc_ambient">Noise Cancelling / Ambient Aware</string>
+    <string name="pref_jbl_tune_buds_2_asc_cycle_anc_off">Noise Cancelling / Off</string>
+    <string name="pref_jbl_tune_buds_2_asc_cycle_ambient_off">Ambient Aware / Off</string>
+    <string name="jbl_tune_buds_2_equalizer_band_32">32 Hz</string>
+    <string name="jbl_tune_buds_2_equalizer_band_64">64 Hz</string>
+    <string name="jbl_tune_buds_2_equalizer_band_125">125 Hz</string>
+    <string name="jbl_tune_buds_2_equalizer_band_250">250 Hz</string>
+    <string name="jbl_tune_buds_2_equalizer_band_500">500 Hz</string>
+    <string name="jbl_tune_buds_2_equalizer_band_1k">1 kHz</string>
+    <string name="jbl_tune_buds_2_equalizer_band_2k">2 kHz</string>
+    <string name="jbl_tune_buds_2_equalizer_band_4k">4 kHz</string>
+    <string name="jbl_tune_buds_2_equalizer_band_8k">8 kHz</string>
+    <string name="jbl_tune_buds_2_equalizer_band_16k">16 kHz</string>
+    <string name="pref_transparency_ambient">Transparency (Ambient)</string>
+    <string name="pref_transparency_level">Transparency level</string>
+    <string name="pref_talk_thru">TalkThru (Conversation)</string>
+    <string name="pref_mono_mode_feature_disabled">This feature is temporarily disabled in mono mode.</string>
     <string name="pref_header_heartrate_sleep">Sleep</string>
     <string name="pref_header_heartrate_allday">All-day monitoring</string>
     <string name="pref_header_heartrate_alerts">Heart rate alerts</string>

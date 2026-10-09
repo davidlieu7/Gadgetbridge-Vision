@@ -270,6 +270,7 @@ import nodomain.freeyourgadget.gadgetbridge.devices.garmin.watches.vivosmart.Gar
 import nodomain.freeyourgadget.gadgetbridge.devices.garmin.watches.vivosmart.GarminVivosmartHrPlusCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.garmin.watches.vivosport.GarminVivosportCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.generic_headphones.GenericHeadphonesCoordinator;
+import nodomain.freeyourgadget.gadgetbridge.devices.jbl.JblTuneBuds2Coordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.generic_hr.GenericHeartRateCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.generic_scale.GenericWeightScaleCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.gloryfit.watches.BlackviewR3MaxCoordinator;
@@ -1236,6 +1237,7 @@ public enum DeviceType {
     BLE_GATT_CLIENT(BleGattClientCoordinator.class),
     MARSTEK_B2500(MarstekB2500DeviceCoordinator.class),
     GENERIC_HEADPHONES(GenericHeadphonesCoordinator.class),
+    JBL_TUNE_BUDS_2(JblTuneBuds2Coordinator.class),
     GENERIC_THERMAL_PRINTER(ThermalPrinterCoordinator.class),
     GENERIC_HEART_RATE(GenericHeartRateCoordinator.class),
     ULTRAHUMAN_RING_AIR(UltrahumanDeviceCoordinator.class),

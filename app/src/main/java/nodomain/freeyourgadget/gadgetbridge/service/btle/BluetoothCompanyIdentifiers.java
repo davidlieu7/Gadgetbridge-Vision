@@ -16,4 +16,7 @@ public final class BluetoothCompanyIdentifiers {
 
     /// Sony Corporation
     public static final int SONY_CORPORATION = 0x012D;
+
+    /// Zhong Shan City Richsound Electronic Industrial Ltd. (the ID Harman/JBL headsets report)
+    public static final int ZHONGSHAN_CITY_RICHSOUND_ELECTRONIC_INDUSTRIAL_LTD = 0x0ECB;
 }

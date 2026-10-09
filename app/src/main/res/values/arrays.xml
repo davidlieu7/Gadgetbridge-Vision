@@ -4,6 +4,102 @@
         <!-- empty array -->
     </string-array>
 
+    <string-array name="jbl_tune_buds_2_sound_mode_entries">
+        <item>@string/off</item>
+        <item>@string/pref_talk_thru</item>
+        <item>@string/pref_transparency_ambient</item>
+        <item>@string/prefs_active_noise_cancelling</item>
+    </string-array>
+    <string-array name="jbl_tune_buds_2_sound_mode_values">
+        <item>0</item>
+        <item>2</item>
+        <item>3</item>
+        <item>1</item>
+    </string-array>
+
+    <string-array name="jbl_tune_buds_2_call_sound_effect_entries">
+        <item>@string/pref_title_equalizer_natural</item>
+        <item>@string/pref_call_sound_effect_treble</item>
+        <item>@string/pref_call_sound_effect_bass</item>
+    </string-array>
+    <string-array name="jbl_tune_buds_2_call_sound_effect_values">
+        <item>0</item>
+        <item>1</item>
+        <item>2</item>
+    </string-array>
+
+    <string-array name="jbl_tune_buds_2_spatial_audio_entries">
+        <item>@string/off</item>
+        <item>@string/pref_spatial_audio_music</item>
+        <item>@string/pref_spatial_audio_movie</item>
+        <item>@string/pref_spatial_audio_game</item>
+    </string-array>
+    <string-array name="jbl_tune_buds_2_spatial_audio_values">
+        <item>0</item>
+        <item>1</item>
+        <item>2</item>
+        <item>3</item>
+    </string-array>
+
+    <string-array name="jbl_tune_buds_2_latency_mode_entries">
+        <item>@string/pref_latency_mode_high_quality</item>
+        <item>@string/pref_latency_mode_low_latency</item>
+    </string-array>
+    <string-array name="jbl_tune_buds_2_latency_mode_values">
+        <item>0</item>
+        <item>1</item>
+    </string-array>
+
+    <string-array name="jbl_tune_buds_2_sidetone_entries">
+        <item>@string/off</item>
+        <item>@string/low</item>
+        <item>@string/vibration_profile_medium</item>
+        <item>@string/high</item>
+    </string-array>
+    <string-array name="jbl_tune_buds_2_sidetone_values">
+        <item>0</item>
+        <item>1</item>
+        <item>2</item>
+        <item>3</item>
+    </string-array>
+
+    <string-array name="jbl_tune_buds_2_gesture_entries">
+        <item>@string/pref_touch_ambient_sound_control</item>
+        <item>@string/pref_touch_playback_control</item>
+        <item>@string/pref_touch_volume_control</item>
+        <item>@string/pref_title_touch_voice_assistant</item>
+        <item>@string/off</item>
+    </string-array>
+    <string-array name="jbl_tune_buds_2_gesture_values">
+        <item>1</item>
+        <item>2</item>
+        <item>3</item>
+        <item>4</item>
+        <item>0</item>
+    </string-array>
+
+    <string-array name="jbl_tune_buds_2_asc_cycle_entries">
+        <item>@string/pref_jbl_tune_buds_2_asc_cycle_all</item>
+        <item>@string/pref_jbl_tune_buds_2_asc_cycle_anc_ambient</item>
+        <item>@string/pref_jbl_tune_buds_2_asc_cycle_anc_off</item>
+        <item>@string/pref_jbl_tune_buds_2_asc_cycle_ambient_off</item>
+    </string-array>
+    <string-array name="jbl_tune_buds_2_asc_cycle_values">
+        <item>9</item>
+        <item>11</item>
+        <item>12</item>
+        <item>13</item>
+    </string-array>
+
+    <string-array name="jbl_tune_buds_2_voice_prompt_entries">
+        <item>@string/pref_voice_prompts_voice</item>
+        <item>@string/pref_voice_prompts_tone</item>
+    </string-array>
+    <string-array name="jbl_tune_buds_2_voice_prompt_values">
+        <item>1</item>
+        <item>0</item>
+    </string-array>
+
     <string-array name="http_methods">
         <item>GET</item>
         <item>POST</item>
