@@ -497,8 +497,8 @@ class GbChartView @JvmOverloads constructor(
         const val GUIDE_WIDTH_DP = 1f
         const val GUIDE_DASH_DP = 3f
         const val TOOLTIP_GAP_DP = 10f
-        const val SELECTED_DOT_DP = 11f
-        const val SELECTED_GAP_DP = 2f
+        const val SELECTED_DOT_DP = 8f
+        const val SELECTED_GAP_DP = 1.5f
         const val SELECTED_RING_DP = 1.5f
         const val LIMIT_LINE_WIDTH_DP = 1.5f
         const val LIMIT_LINE_DASH_DP = 6f
