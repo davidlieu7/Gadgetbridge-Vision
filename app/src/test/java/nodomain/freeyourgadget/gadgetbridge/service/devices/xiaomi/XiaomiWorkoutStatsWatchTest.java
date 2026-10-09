@@ -72,7 +72,7 @@ public class XiaomiWorkoutStatsWatchTest extends TestBase {
         Mockito.when(support.getDevice()).thenReturn(createDummyGDevice("00:11:22:33:44:55"));
         sender = Mockito.mock(SleepAsAndroidSender.class);
         health = new XiaomiHealthService(support);
-        health.setSleepAsAndroidSender(sender);
+        health.getSleepAsAndroidManager().setSender(sender);
         defaultTimeZone = TimeZone.getDefault();
     }
 
@@ -86,7 +86,7 @@ public class XiaomiWorkoutStatsWatchTest extends TestBase {
     }
 
     private void openSession() {
-        health.startRawSensor(true);
+        health.getSleepAsAndroidManager().start(true);
         idle(OPEN_DELAY_MS);
     }
 
@@ -151,7 +151,7 @@ public class XiaomiWorkoutStatsWatchTest extends TestBase {
     @Test
     public void theStatsStopWithTheSession() {
         openSession();
-        health.stopRawSensor();
+        health.getSleepAsAndroidManager().stop();
         Mockito.clearInvocations(support);
 
         idle(4 * IDLE_INTERVAL_MS);

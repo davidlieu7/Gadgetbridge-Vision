@@ -80,7 +80,7 @@ public class XiaomiSleepAsAndroidWorkoutTest extends TestBase {
         support = Mockito.mock(XiaomiSupport.class);
         Mockito.when(support.getDevice()).thenReturn(createDummyGDevice("00:11:22:33:44:55"));
         health = new XiaomiHealthService(support);
-        health.setSleepAsAndroidSender(Mockito.mock(SleepAsAndroidSender.class));
+        health.getSleepAsAndroidManager().setSender(Mockito.mock(SleepAsAndroidSender.class));
     }
 
     // --- driving ----------------------------------------------------------------------------
@@ -91,7 +91,7 @@ public class XiaomiSleepAsAndroidWorkoutTest extends TestBase {
 
     /** Opens the synthetic workout and leaves every command it sent in the history. */
     private void openSession(final boolean withHeartRate) {
-        health.startRawSensor(withHeartRate);
+        health.getSleepAsAndroidManager().start(withHeartRate);
         idle(OPEN_DELAY_MS);
     }
 
@@ -217,7 +217,7 @@ public class XiaomiSleepAsAndroidWorkoutTest extends TestBase {
 
     @Test
     public void startClosesAnyWorkoutLeftOpenBeforeOpeningANewOne() {
-        health.startRawSensor(true);
+        health.getSleepAsAndroidManager().start(true);
 
         Assert.assertEquals(List.of(WORKOUT_FINISHED), workoutStatuses());
 
@@ -230,7 +230,7 @@ public class XiaomiSleepAsAndroidWorkoutTest extends TestBase {
     public void stopPausesBeforeFinishing() {
         openSessionAndClearHistory(true);
 
-        health.stopRawSensor();
+        health.getSleepAsAndroidManager().stop();
 
         // The finish must not follow the pause immediately, or the band keeps the workout open.
         Assert.assertEquals(List.of(WORKOUT_PAUSED), workoutStatuses());
@@ -282,7 +282,7 @@ public class XiaomiSleepAsAndroidWorkoutTest extends TestBase {
         openSession(true);
         idle(30_000);
 
-        health.stopRawSensor();
+        health.getSleepAsAndroidManager().stop();
 
         Assert.assertEquals(0, statsSentOver(Duration.ofMinutes(5).toMillis()));
     }
@@ -374,7 +374,7 @@ public class XiaomiSleepAsAndroidWorkoutTest extends TestBase {
     @Test
     public void noRestartAfterTheSessionIsStopped() {
         openSession(true);
-        health.stopRawSensor();
+        health.getSleepAsAndroidManager().stop();
         idle(OPEN_DELAY_MS);
         Mockito.clearInvocations(support);
 
@@ -407,7 +407,7 @@ public class XiaomiSleepAsAndroidWorkoutTest extends TestBase {
         // one lands in every gap the session leaves. Answering it as a real workout is what starts
         // the phone GPS.
         openSessionAndClearHistory(true);
-        health.stopRawSensor();
+        health.getSleepAsAndroidManager().stop();
         Mockito.clearInvocations(support);
 
         deliverWorkoutOpen(SAA_SYNTHETIC_SPORT);
@@ -444,7 +444,7 @@ public class XiaomiSleepAsAndroidWorkoutTest extends TestBase {
     @Test
     public void statusEchoedWhileTheSessionClosesIsNotAUserWorkout() {
         openSessionAndClearHistory(true);
-        health.stopRawSensor();
+        health.getSleepAsAndroidManager().stop();
         Mockito.clearInvocations(support);
 
         deliverWorkoutStatus(SPORT_UNSET, WORKOUT_STARTED);
@@ -463,7 +463,7 @@ public class XiaomiSleepAsAndroidWorkoutTest extends TestBase {
     @Test
     public void realWorkoutIsUnaffectedAfterASyntheticSessionEnds() {
         openSession(true);
-        health.stopRawSensor();
+        health.getSleepAsAndroidManager().stop();
         idle(OPEN_DELAY_MS);
         Mockito.clearInvocations(support);
 
