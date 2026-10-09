@@ -636,7 +636,7 @@ abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator(
                             entries = listOf(
                                 ListEntry.Res("0", R.string.off),
                                 ListEntry.Res("20", R.string.low),
-                                ListEntry.Res("70", R.string.medium),
+                                ListEntry.Res("70", R.string.medium_amount),
                                 ListEntry.Res("100", R.string.high),
                             ),
                             defaultValue = "70",

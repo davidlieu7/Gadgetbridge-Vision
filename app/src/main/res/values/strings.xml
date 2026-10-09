@@ -1984,7 +1984,7 @@
     <string name="this_week_total">This week total</string>
     <string name="last_week_total">Last week total</string>
     <string name="low">Low</string>
-    <string name="medium">Medium</string>
+    <string name="medium_amount">Medium</string>
     <string name="optimal">Optimal</string>
     <string name="high">High</string>
     <string name="very_high">Very High</string>
@@ -4020,7 +4020,7 @@
     <string name="soundcore_ldac_mode_title">LDAC Mode</string>
     <string name="soundcore_ldac_mode_summary">Enabling LDAC will decrease the battery life and might lead to connection instability</string>
     <string name="soundcore_auto_power_off_title">Auto Power Off</string>
-    <string name="soundcore_auto_power_off_summary">When disconnectiong from the phone, the device will power off after the specified timeout</string>
+    <string name="soundcore_auto_power_off_summary">When disconnecting from the phone, the device will power off after the specified timeout</string>
     <string name="soundcore_3d_surround_title">3D Surround Sound</string>
     <string name="soundcore_3d_surround_summary">Enable 3D surrounding sound</string>
     <string name="soundcore_enable_pairing_mode_summary">Enable discovery/pairing mode to connect a new device</string>
