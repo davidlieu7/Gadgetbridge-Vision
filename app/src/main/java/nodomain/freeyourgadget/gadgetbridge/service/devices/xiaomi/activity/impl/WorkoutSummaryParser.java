@@ -145,13 +145,17 @@ public class WorkoutSummaryParser extends XiaomiActivityParser implements Activi
         summary.setActivityKind(ActivityKind.UNKNOWN.getCode());
         summary.setRawSummaryData(bytes);
 
+        // A summary that fails to parse is still stored, so its raw bytes can be shared
+        boolean parsed = true;
         try {
             final ByteBuffer buf = ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN);
             updateSummaryFromData(summary, buf, true);
         } catch (final Exception e) {
             LOG.error("Failed to parse workout summary", e);
             GB.toast(context, "Failed to parse workout summary", Toast.LENGTH_LONG, GB.ERROR, e);
-            return false;
+            parsed = false;
+            summary.setEndTime(fileId.getTimestamp());
+            summary.setActivityKind(ActivityKind.UNKNOWN.getCode());
         }
 
         summary.setSummaryData(null); // remove json before saving to database
@@ -173,7 +177,7 @@ public class WorkoutSummaryParser extends XiaomiActivityParser implements Activi
             return false;
         }
 
-        return true;
+        return parsed;
     }
 
     @Override
