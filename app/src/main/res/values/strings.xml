@@ -2998,8 +2998,8 @@
     <string name="ascentDistance">Uphill distance</string>
     <string name="activityTotalAscent">Total ascent</string>
     <string name="activityTotalDescent">Total descent</string>
-    <string name="ascent">Ascent</string>
-    <string name="descent">Descent</string>
+    <string name="workout_ascent">Ascent</string>
+    <string name="workout_descent">Descent</string>
     <string name="avg_speed">Avg Speed</string>
     <string name="avg_power">Avg Power</string>
     <string name="avg_swolf">Avg SWOLF</string>

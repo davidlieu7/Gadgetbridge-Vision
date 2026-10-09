@@ -152,6 +152,16 @@ class SportStatisticsFragment : Fragment() {
 
     private fun formatter() = WorkoutValueFormatter(ActivityKind.fromCode(kindCode))
 
+    /**
+     * Pace in s/m as a value and unit: per 100 m for swimming, per km/mi otherwise.
+     */
+    private fun pace(raw: Double): Pair<Double, String> =
+        if (ActivityKind.isSwimActivity(ActivityKind.fromCode(kindCode))) {
+            raw * METERS_PER_100 to ActivitySummaryEntries.UNIT_SECONDS_PER_100_METERS
+        } else {
+            raw to ActivitySummaryEntries.UNIT_SECONDS_PER_M
+        }
+
     private fun configKey() = PREF_CHART_CONFIG_PREFIX + kindCode
 
     /**
@@ -309,8 +319,9 @@ class SportStatisticsFragment : Fragment() {
         SportMetric.DISTANCE ->
             formatter.convert(raw / METERS_PER_KM, ActivitySummaryEntries.UNIT_KILOMETERS, true).value
         SportMetric.DURATION -> raw / SECONDS_PER_HOUR
-        SportMetric.AVG_PACE ->
-            formatter.convert(raw, ActivitySummaryEntries.UNIT_SECONDS_PER_M, true).value * SECONDS_PER_MINUTE
+        SportMetric.AVG_PACE -> pace(raw).let { (value, unit) ->
+            formatter.convert(value, unit, true).value * SECONDS_PER_MINUTE
+        }
         SportMetric.AVG_SPEED -> formatter.convert(raw, ActivitySummaryEntries.UNIT_METERS_PER_SECOND, true).value
         SportMetric.AVG_HEART_RATE, SportMetric.AVG_POWER, SportMetric.AVG_SWOLF,
         SportMetric.AVG_AEROBIC_EFFECT, SportMetric.AVG_ANAEROBIC_EFFECT -> raw
@@ -337,7 +348,7 @@ class SportStatisticsFragment : Fragment() {
     private fun formatMetric(metric: SportMetric, raw: Double, formatter: WorkoutValueFormatter): String = when (metric) {
         SportMetric.DISTANCE -> formatter.formatValue(raw / METERS_PER_KM, ActivitySummaryEntries.UNIT_KILOMETERS)
         SportMetric.DURATION -> formatter.formatValue(raw, ActivitySummaryEntries.UNIT_SECONDS)
-        SportMetric.AVG_PACE -> formatter.formatValue(raw, ActivitySummaryEntries.UNIT_SECONDS_PER_M)
+        SportMetric.AVG_PACE -> pace(raw).let { (value, unit) -> formatter.formatValue(value, unit) }
         SportMetric.AVG_SPEED -> formatter.formatValue(raw, ActivitySummaryEntries.UNIT_METERS_PER_SECOND)
         SportMetric.AVG_HEART_RATE -> formatter.formatValue(raw.roundToLong(), ActivitySummaryEntries.UNIT_BPM)
         SportMetric.AVG_POWER -> formatter.formatValue(raw.roundToLong(), ActivitySummaryEntries.UNIT_WATT)
@@ -372,6 +383,7 @@ class SportStatisticsFragment : Fragment() {
         private const val STATE_PERIOD_START = "periodStart"
         private const val PREF_CHART_CONFIG_PREFIX = "sport_statistics_chart_"
         private const val METERS_PER_KM = 1000.0
+        private const val METERS_PER_100 = 100.0
         private const val SECONDS_PER_HOUR = 3600.0
         private const val SECONDS_PER_MINUTE = 60.0
 
