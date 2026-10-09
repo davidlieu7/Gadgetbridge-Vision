@@ -50,6 +50,11 @@ public class MiBand8Coordinator extends XiaomiCoordinator {
     }
 
     @Override
+    public boolean supportsHrvMeasurement(@NonNull final GBDevice device) {
+        return true;
+    }
+
+    @Override
     public List<Size> getWatchfacePreviewSizes() {
         return List.of(
             // Scaled-down screen resolution, seen in an unofficial watchface

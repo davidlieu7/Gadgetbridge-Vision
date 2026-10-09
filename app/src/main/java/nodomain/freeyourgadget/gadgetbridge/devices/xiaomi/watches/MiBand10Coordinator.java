@@ -54,6 +54,11 @@ public class MiBand10Coordinator extends XiaomiCoordinator {
     }
 
     @Override
+    public boolean supportsHrvMeasurement(@NonNull final GBDevice device) {
+        return true;
+    }
+
+    @Override
     public boolean supportsCustomVibrationPatterns(@NonNull final GBDevice device) {
         return true;
     }

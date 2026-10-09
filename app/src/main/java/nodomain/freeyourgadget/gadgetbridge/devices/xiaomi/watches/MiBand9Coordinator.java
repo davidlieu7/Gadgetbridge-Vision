@@ -55,6 +55,11 @@ public class MiBand9Coordinator extends XiaomiCoordinator {
     }
 
     @Override
+    public boolean supportsHrvMeasurement(@NonNull final GBDevice device) {
+        return true;
+    }
+
+    @Override
     public Size getScreenSize() {
         return new Size(192, 490);
     }

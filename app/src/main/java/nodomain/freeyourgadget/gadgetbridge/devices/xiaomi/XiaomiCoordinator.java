@@ -60,6 +60,8 @@ import nodomain.freeyourgadget.gadgetbridge.devices.SleepSessionProvider;
 import nodomain.freeyourgadget.gadgetbridge.devices.TimeSampleProvider;
 import nodomain.freeyourgadget.gadgetbridge.devices.WorkoutLoadSampleProvider;
 import nodomain.freeyourgadget.gadgetbridge.devices.XiaomiDailySummarySampleProvider;
+import nodomain.freeyourgadget.gadgetbridge.devices.ComputedHrvSummarySampleProvider;
+import nodomain.freeyourgadget.gadgetbridge.devices.GenericHrvValueSampleProvider;
 import nodomain.freeyourgadget.gadgetbridge.entities.BaseActivitySummary;
 import nodomain.freeyourgadget.gadgetbridge.entities.DaoSession;
 import nodomain.freeyourgadget.gadgetbridge.entities.GenericTrainingLoadAcuteSample;
@@ -79,6 +81,7 @@ import nodomain.freeyourgadget.gadgetbridge.model.StressSample;
 import nodomain.freeyourgadget.gadgetbridge.model.TemperatureSample;
 import nodomain.freeyourgadget.gadgetbridge.model.TrainingLoadStatus;
 import nodomain.freeyourgadget.gadgetbridge.model.WorkoutLoadSample;
+import nodomain.freeyourgadget.gadgetbridge.model.HrvSummarySample;
 import nodomain.freeyourgadget.gadgetbridge.service.DeviceSupport;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.xiaomi.XiaomiUuids;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.xiaomi.XiaomiPreferences;
@@ -155,6 +158,26 @@ public abstract class XiaomiCoordinator extends AbstractBLEDeviceCoordinator {
         // 51-80 = moderate
         // 81-100 = high
         return new int[]{1, 26, 51, 81};
+    }
+
+    @Override
+    public GenericHrvValueSampleProvider getHrvValueSampleProvider(
+        GBDevice device,
+        DaoSession session
+    ) {
+        return new GenericHrvValueSampleProvider(device, session);
+    }
+
+    @Override
+    public TimeSampleProvider<? extends HrvSummarySample> getHrvSummarySampleProvider(
+        GBDevice device,
+        DaoSession session
+    ) {
+        return new ComputedHrvSummarySampleProvider(
+            getHrvValueSampleProvider(device, session),
+            device,
+            session
+        );
     }
 
     @Override

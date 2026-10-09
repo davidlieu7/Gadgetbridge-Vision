@@ -35,6 +35,8 @@ import nodomain.freeyourgadget.gadgetbridge.devices.HeartPulseSampleProvider;
 import nodomain.freeyourgadget.gadgetbridge.devices.GenericRespiratoryRateSampleProvider;
 import nodomain.freeyourgadget.gadgetbridge.devices.XiaomiSleepStageSampleProvider;
 import nodomain.freeyourgadget.gadgetbridge.devices.XiaomiSleepTimeSampleProvider;
+import nodomain.freeyourgadget.gadgetbridge.devices.HeartRrIntervalSampleProvider;
+import nodomain.freeyourgadget.gadgetbridge.devices.GenericHrvValueSampleProvider;
 import nodomain.freeyourgadget.gadgetbridge.entities.DaoSession;
 import nodomain.freeyourgadget.gadgetbridge.entities.Device;
 import nodomain.freeyourgadget.gadgetbridge.entities.HeartPulseSample;
@@ -42,6 +44,8 @@ import nodomain.freeyourgadget.gadgetbridge.entities.User;
 import nodomain.freeyourgadget.gadgetbridge.entities.GenericRespiratoryRateSample;
 import nodomain.freeyourgadget.gadgetbridge.entities.XiaomiSleepStageSample;
 import nodomain.freeyourgadget.gadgetbridge.entities.XiaomiSleepTimeSample;
+import nodomain.freeyourgadget.gadgetbridge.entities.HeartRrIntervalSample;
+import nodomain.freeyourgadget.gadgetbridge.entities.GenericHrvValueSample;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.xiaomi.activity.XiaomiActivityFileId;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.xiaomi.activity.XiaomiActivityParser;
@@ -198,6 +202,8 @@ public class SleepDetailsParser extends XiaomiActivityParser {
         final List<XiaomiSleepStageSample> stages = new ArrayList<>();
         final List<HeartPulseSample> heartPulseSamples = new ArrayList<>();
         final List<GenericRespiratoryRateSample> respiratoryRateSamples = new ArrayList<>();
+        final List<HeartRrIntervalSample> rrIntervalSamples = new ArrayList<>();
+        final List<GenericHrvValueSample> hrvSamples = new ArrayList<>();
         LOG.debug("Sleep stage packets from offset {}", Integer.toHexString(buf.position()));
 
         // Do not crash if we face a buffer underflow, as the next parsing is not 100% fool-proof,
@@ -249,13 +255,35 @@ public class SleepDetailsParser extends XiaomiActivityParser {
                         heartPulseSample.setTimestamp(lastHeartPulseTimestamp);
                         heartPulseSamples.add(heartPulseSample);
                     }
+                    // sequence reset for RR sample
+                    final long packetTimestamp = ts;
+                    int seq = 0;
+                    final List<Integer> packetRrMillis = new ArrayList<>();
                     // add heartbeats after intervals
                     while (dataBuf.position() < dataBuf.limit()) {
                         final int delta = dataBuf.get() & 0xff;  // delta is in 10msec units
-                        lastHeartPulseTimestamp += 10 * delta;  // convert to 1msec units for timestamps
+                        final int rrMillis = 10 * delta;  // convert to 1msec units for timestamps and R-R
+                        packetRrMillis.add(rrMillis);
+                        lastHeartPulseTimestamp += rrMillis;  // saved as variable, because needed twice
                         final HeartPulseSample heartPulseSample = new HeartPulseSample();
                         heartPulseSample.setTimestamp(lastHeartPulseTimestamp);
                         heartPulseSamples.add(heartPulseSample);
+
+                        // new raw RR storage
+                        final HeartRrIntervalSample rrSample = new HeartRrIntervalSample();
+                        rrSample.setTimestamp(packetTimestamp);
+                        rrSample.setSeq(seq++);
+                        rrSample.setRrMillis(rrMillis);
+                        rrIntervalSamples.add(rrSample);
+                    }
+                    if (packetRrMillis.size() >= 2) {
+                        final double rmssd = calculateRmssd(packetRrMillis);
+
+                        final GenericHrvValueSample hrvSample = new GenericHrvValueSample();
+                        hrvSample.setTimestamp(packetTimestamp);
+                        hrvSample.setValue((int) Math.round(rmssd));
+
+                        hrvSamples.add(hrvSample);
                     }
                 } else if (type == 16) {
                     final int data_0 = dataBuf.get() & 0xFF;
@@ -426,6 +454,39 @@ public class SleepDetailsParser extends XiaomiActivityParser {
             persistSuccess = false;
         }
 
+        // Save the heart R-R interval samples
+        if (!rrIntervalSamples.isEmpty()) {
+            try (DBHandler handler = GBApplication.acquireDB()) {
+                final DaoSession session = handler.getDaoSession();
+
+                final HeartRrIntervalSampleProvider sampleProvider =
+                    new HeartRrIntervalSampleProvider(gbDevice, session);
+
+                sampleProvider.persistSamples(rrIntervalSamples, context);
+            } catch (final Exception e) {
+                GB.toast(context, "Error saving heart R-R interval samples", Toast.LENGTH_LONG, GB.ERROR);
+                LOG.error("Error saving heart R-R interval samples", e);
+                persistSuccess = false;
+            }
+        }
+
+        // Save the derived HRV samples
+        if (!hrvSamples.isEmpty()) {
+            try (DBHandler handler = GBApplication.acquireDB()) {
+                final DaoSession session = handler.getDaoSession();
+
+                final GenericHrvValueSampleProvider sampleProvider =
+                    new GenericHrvValueSampleProvider(gbDevice, session);
+
+                sampleProvider.persistSamples(hrvSamples, context);
+            } catch (final Exception e) {
+                GB.toast(context, "Error saving HRV samples", Toast.LENGTH_LONG, GB.ERROR);
+                LOG.error("Error saving HRV samples", e);
+                persistSuccess = false;
+            }
+        }
+
+        // Save respiratory rate samples
         if (!respiratoryRateSamples.isEmpty()) {
             try (DBHandler handler = GBApplication.acquireDB()) {
                 final DaoSession session = handler.getDaoSession();
@@ -449,6 +510,19 @@ public class SleepDetailsParser extends XiaomiActivityParser {
             buffer.position(buffer.position() - 3);
         }
         return false;
+    }
+
+    private static double calculateRmssd(final List<Integer> rrMillis) {
+        double sumSquaredDifferences = 0.0;
+
+        for (int i = 1; i < rrMillis.size(); i++) {
+            final double difference = rrMillis.get(i) - rrMillis.get(i - 1);
+            sumSquaredDifferences += difference * difference;
+        }
+
+        return Math.sqrt(
+            sumSquaredDifferences / (rrMillis.size() - 1)
+        );
     }
 
     private static int decodeStage(int rawStage) {
