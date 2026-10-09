@@ -36,7 +36,6 @@ data class ChartTheme(
         private val DARK_MARKER_BACKGROUND = Color.parseColor("#262626")
         private val DARK_MARKER_TITLE = Color.parseColor("#B4B4B4")
         private val DARK_MARKER_VALUE = Color.parseColor("#F2F2F2")
-        private val DARK_MARKER_DOT_GAP = Color.parseColor("#0F0F0F")
 
         fun from(context: Context): ChartTheme {
             val theme = context.theme
@@ -82,11 +81,7 @@ data class ChartTheme(
                 } else {
                     MaterialColors.getColor(context, R.attr.textColorPrimary, Color.BLACK)
                 },
-                markerDotGapColor = if (dark) {
-                    DARK_MARKER_DOT_GAP
-                } else {
-                    MaterialColors.getColor(context, android.R.attr.colorBackground, Color.WHITE)
-                },
+                markerDotGapColor = GBApplication.getWindowBackgroundColor(context),
             )
         }
     }
