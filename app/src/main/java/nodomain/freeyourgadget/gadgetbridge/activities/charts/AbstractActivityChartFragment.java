@@ -354,7 +354,7 @@ public abstract class AbstractActivityChartFragment<D extends ChartsData> extend
     /**
      * Per sample: time, stage index (see {@link #getIndexOfActivity}) and chart value, plus heart rate samples.
      */
-    protected static final class StageSamples {
+    protected static final class StageSamples extends ChartsData {
         public final long[] seconds;
         public final int[] stages;
         public final double[] values;
