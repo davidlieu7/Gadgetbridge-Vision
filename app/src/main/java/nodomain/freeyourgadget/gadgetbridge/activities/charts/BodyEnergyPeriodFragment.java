@@ -92,6 +92,7 @@ public class BodyEnergyPeriodFragment extends AbstractChartFragment<BodyEnergyPe
         mDateView = rootView.findViewById(R.id.date_view);
         bodyEnergyStatsContainer = rootView.findViewById(R.id.body_energy_period_stats_container);
         bodyEnergyChart = rootView.findViewById(R.id.body_energy_chart);
+        bodyEnergyChart.setZoomable(TOTAL_DAYS > 7);
         bodyEnergyChart.dismissSelectionOnTapOutside(rootView);
 
         refresh();

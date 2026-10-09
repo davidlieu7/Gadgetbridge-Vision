@@ -104,6 +104,7 @@ public class HeartRatePeriodFragment extends AbstractChartFragment<HeartRatePeri
 
         mDateView = rootView.findViewById(R.id.hr_date_view);
         hrLineChart = rootView.findViewById(R.id.heart_rate_line_chart);
+        hrLineChart.setZoomable(true);
         hrLineChart.dismissSelectionOnTapOutside(rootView);
         hrLegend = rootView.findViewById(R.id.heart_rate_chart_legend);
         hrStatsContainer = rootView.findViewById(R.id.hr_stats_container);

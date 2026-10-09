@@ -71,6 +71,7 @@ public class RespiratoryRatePeriodFragment extends RespiratoryRateFragment<Respi
         mDateView = rootView.findViewById(R.id.rr_date_view);
         statsContainer = rootView.findViewById(R.id.respiratory_rate_period_stats_container);
         respiratoryRateChart = rootView.findViewById(R.id.respiratory_rate_line_chart);
+        respiratoryRateChart.setZoomable(TOTAL_DAYS > 7);
         respiratoryRateChart.dismissSelectionOnTapOutside(rootView);
         respiratoryRateLegend = rootView.findViewById(R.id.respiratory_rate_chart_legend);
         refresh();

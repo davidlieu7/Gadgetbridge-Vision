@@ -79,6 +79,7 @@ public class CaloriesPeriodFragment extends CaloriesFragment<CaloriesPeriodFragm
 
         mDateView = rootView.findViewById(R.id.calories_date_view);
         caloriesChart = rootView.findViewById(R.id.calories_chart);
+        caloriesChart.setZoomable(TOTAL_DAYS > 7);
         caloriesChart.dismissSelectionOnTapOutside(rootView);
         caloriesStatsContainer = rootView.findViewById(R.id.calories_period_stats_container);
         CALORIES_GOAL = GBApplication.getPrefs().getInt(ActivityUser.PREF_USER_CALORIES_BURNT, ActivityUser.defaultUserCaloriesBurntGoal);

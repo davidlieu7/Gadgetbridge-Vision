@@ -118,6 +118,7 @@ public class Spo2PeriodFragment extends AbstractChartFragment<Spo2PeriodFragment
         mDateView = rootView.findViewById(R.id.date_view);
         spo2StatsContainer = rootView.findViewById(R.id.spo2_period_stats_container);
         spo2Chart = rootView.findViewById(R.id.spo2_chart);
+        spo2Chart.setZoomable(TOTAL_DAYS > 7);
         spo2Chart.dismissSelectionOnTapOutside(rootView);
         spo2Legend = rootView.findViewById(R.id.spo2_chart_legend);
 

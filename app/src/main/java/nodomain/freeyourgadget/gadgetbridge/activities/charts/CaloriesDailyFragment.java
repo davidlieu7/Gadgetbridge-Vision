@@ -119,6 +119,7 @@ public class CaloriesDailyFragment extends AbstractChartFragment<CaloriesDailyFr
         dateView = rootView.findViewById(R.id.date_view);
         caloriesStatsContainer = rootView.findViewById(R.id.calories_stats_container);
         caloriesChart = rootView.findViewById(R.id.calories_daily_chart);
+        caloriesChart.setZoomable(true);
         caloriesChart.dismissSelectionOnTapOutside(rootView);
         ActivityUser activityUser = new ActivityUser();
         ACTIVE_CALORIES_GOAL = activityUser.getCaloriesBurntGoal();

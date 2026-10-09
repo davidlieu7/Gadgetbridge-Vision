@@ -104,6 +104,7 @@ public class StressPeriodFragment extends StressFragment<StressPeriodFragment.My
         });
 
         mWeekChart = rootView.findViewById(R.id.weekstresschart);
+        mWeekChart.setZoomable(TOTAL_DAYS > 7);
         mWeekChart.dismissSelectionOnTapOutside(rootView);
         mWeekLegend = rootView.findViewById(R.id.weekstress_chart_legend);
         mStressLevelsPieChart = rootView.findViewById(R.id.stress_pie_chart);

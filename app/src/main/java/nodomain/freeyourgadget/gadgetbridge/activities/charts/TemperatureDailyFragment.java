@@ -86,6 +86,7 @@ public class TemperatureDailyFragment extends AbstractChartFragment<TemperatureD
 
         dateView = rootView.findViewById(R.id.temp_date_view);
         tempLineChart = rootView.findViewById(R.id.temp_line_chart);
+        tempLineChart.setZoomable(true);
         tempLineChart.dismissSelectionOnTapOutside(rootView);
         tempLegend = rootView.findViewById(R.id.temp_chart_legend);
         statsContainer = rootView.findViewById(R.id.temp_stats_container);

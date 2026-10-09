@@ -118,6 +118,7 @@ public class TemperaturePeriodFragment extends AbstractChartFragment<Temperature
         dateView = rootView.findViewById(R.id.temperature_period_date_view);
         statsContainer = rootView.findViewById(R.id.temperature_period_stats_container);
         temperatureChart = rootView.findViewById(R.id.temperature_period_chart);
+        temperatureChart.setZoomable(totalDays > 7);
         temperatureChart.dismissSelectionOnTapOutside(rootView);
         temperatureLegend = rootView.findViewById(R.id.temperature_period_chart_legend);
 

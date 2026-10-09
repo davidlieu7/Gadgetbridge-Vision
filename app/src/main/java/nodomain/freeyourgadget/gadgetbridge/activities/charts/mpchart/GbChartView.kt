@@ -318,12 +318,13 @@ class GbChartView @JvmOverloads constructor(
 
     private fun startScrub() {
         scrubbing = true
-        parent?.requestDisallowInterceptTouchEvent(true)
+        // The cancel makes MPAndroidChart call enableScroll(), so disallow the parent afterwards
         if (zoomable) {
             val cancel = MotionEvent.obtain(0L, 0L, MotionEvent.ACTION_CANCEL, 0f, 0f, 0)
             super.onTouchEvent(cancel)
             cancel.recycle()
         }
+        parent?.requestDisallowInterceptTouchEvent(true)
     }
 
     private fun endScrub() {

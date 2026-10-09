@@ -110,6 +110,7 @@ public class VO2MaxPeriodFragment extends AbstractChartFragment<VO2MaxPeriodFrag
 
         mDateView = rootView.findViewById(R.id.vo2max_date_view);
         vo2MaxChart = rootView.findViewById(R.id.vo2max_chart);
+        vo2MaxChart.setZoomable(true);
         vo2MaxChart.dismissSelectionOnTapOutside(rootView);
         vo2MaxLegend = rootView.findViewById(R.id.vo2max_chart_legend);
         device = getChartsHost().getDevice();

@@ -124,6 +124,7 @@ public class RacePredictionPeriodFragment extends AbstractChartFragment<RacePred
         device = getChartsHost().getDevice();
         dateView = rootView.findViewById(R.id.race_prediction_date_view);
         raceChart = rootView.findViewById(R.id.race_prediction_chart);
+        raceChart.setZoomable(true);
         raceChart.dismissSelectionOnTapOutside(rootView);
         metricChipGroup = rootView.findViewById(R.id.race_prediction_chip_group);
 

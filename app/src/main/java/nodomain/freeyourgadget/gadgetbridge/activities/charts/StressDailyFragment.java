@@ -227,6 +227,7 @@ public class StressDailyFragment extends StressFragment<StressDailyFragment.Stre
         rootView.setOnScrollChangeListener((v, scrollX, scrollY, oldScrollX, oldScrollY) -> getChartsHost().enableSwipeRefresh(scrollY == 0));
 
         mStressChart = rootView.findViewById(R.id.stress_line_chart);
+        mStressChart.setZoomable(true);
         mStressChart.dismissSelectionOnTapOutside(rootView);
         mStressLegend = rootView.findViewById(R.id.stress_chart_legend);
         mStressLevelsPieChart = rootView.findViewById(R.id.stress_pie_chart);

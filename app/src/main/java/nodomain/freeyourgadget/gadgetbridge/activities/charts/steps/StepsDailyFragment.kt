@@ -114,7 +114,12 @@ class StepsDailyFragment : AbstractVicoChartFragment<StepsDailyFragment.ScreenDa
     @Composable
     override fun RenderChart(data: ScreenData) {
         AndroidView(
-            factory = { context -> GbChartView(context).also { it.dismissSelectionOnTapOutside(binding.root) } },
+            factory = { context ->
+                GbChartView(context).also {
+                    it.zoomable = true
+                    it.dismissSelectionOnTapOutside(binding.root)
+                }
+            },
             update = { chart ->
                 chart.selectionContent = { x -> selection(data.spec, x) }
                 chart.setSpec(data.spec)

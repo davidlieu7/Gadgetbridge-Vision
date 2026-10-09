@@ -100,6 +100,7 @@ public class ActivitySummariesChartFragment extends AbstractActivityChartFragmen
                              Bundle savedInstanceState) {
         View rootView = inflater.inflate(R.layout.fragment_activity_summaries_chart, container, false);
         mChart = rootView.findViewById(R.id.activity_summaries_chart);
+        mChart.setZoomable(true);
         mLegend = rootView.findViewById(R.id.activity_summaries_chart_legend);
         return rootView;
     }

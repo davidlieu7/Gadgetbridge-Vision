@@ -204,6 +204,7 @@ public class GenericMetricChartFragment extends AbstractChartFragment<GenericMet
         selectedMetric = getInitialMetric(savedInstanceState);
 
         setupMetricSpinner();
+        chart.setZoomable(true);
         chart.dismissSelectionOnTapOutside(rootView);
 
         refresh();

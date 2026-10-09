@@ -74,6 +74,7 @@ public class HydrationPeriodFragment extends HydrationFragment<HydrationPeriodFr
         hydrationChart = rootView.findViewById(R.id.hydration_chart);
         hydrationStatsContainer = rootView.findViewById(R.id.hydration_period_stats_container);
         hydrationLegend = rootView.findViewById(R.id.hydration_chart_legend);
+        hydrationChart.setZoomable(TOTAL_DAYS > 7);
         hydrationChart.dismissSelectionOnTapOutside(rootView);
 
         refresh();

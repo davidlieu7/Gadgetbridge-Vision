@@ -240,6 +240,7 @@ public class WeightChartFragment extends AbstractChartFragment<WeightChartFragme
         textBmr = rootView.findViewById(R.id.weight_bmr_text);
         textImpedance = rootView.findViewById(R.id.weight_impedance_text);
 
+        chart.setZoomable(true);
         chart.dismissSelectionOnTapOutside(rootView);
 
         refresh();
