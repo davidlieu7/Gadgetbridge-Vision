@@ -278,6 +278,9 @@ public abstract class VeryFitCoordinator extends AbstractBLEDeviceCoordinator {
         if (capabilities.supports(VeryFitFeature.HYDRATION_REMINDER)) {
             health.add(R.xml.devicesettings_hydration_reminder_sheduled);
         }
+        if (capabilities.supports(VeryFitFeature.FRAMED_PROTOCOL)) {
+            health.add(R.xml.devicesettings_veryfit_cycle);
+        }
 
         if (capabilities.isKnown()) {
             final List<Integer> display = settings.addRootScreen(DeviceSpecificSettingsScreen.DISPLAY);

@@ -1371,6 +1371,15 @@
     <string name="veryfit_pref_calls_pair_summary">Pair the watch as a Bluetooth headset. Calls from the watch, and incoming calls on it, go over that link</string>
     <string name="veryfit_pref_calls_unpair_title">Unpair for calls</string>
     <string name="veryfit_pref_calls_unpair_summary">Remove the headset pairing with the watch</string>
+    <string name="veryfit_pref_cycle_title">Cycle tracking</string>
+    <string name="veryfit_pref_cycle_summary">Menstrual cycle shown on the watch</string>
+    <string name="veryfit_pref_cycle_enabled_title">Track cycle</string>
+    <string name="veryfit_pref_cycle_enabled_summary">Let the watch predict periods and the fertile window</string>
+    <string name="veryfit_pref_cycle_last_period_title">Last period started</string>
+    <string name="veryfit_pref_cycle_period_days_title">Period length (days)</string>
+    <string name="veryfit_pref_cycle_length_days_title">Cycle length (days)</string>
+    <string name="veryfit_pref_cycle_reminder_title">Period reminder</string>
+    <string name="veryfit_pref_cycle_reminder_summary">Remind three days before the next period is due</string>
     <string name="veryfit_calls_pairing">Pairing for calls, confirm on the phone and the watch if asked</string>
     <string name="veryfit_calls_pairing_failed">Pairing for calls did not complete</string>
     <string name="veryfit_calls_paired">Paired for calls</string>

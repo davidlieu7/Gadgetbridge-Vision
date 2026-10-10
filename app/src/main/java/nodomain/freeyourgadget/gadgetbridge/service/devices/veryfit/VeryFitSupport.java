@@ -677,6 +677,10 @@ public class VeryFitSupport extends AbstractBTLESingleDeviceSupport {
             write(builder, VeryFitSettings.inactivity(prefs));
             write(builder, VeryFitSettings.hydration(prefs));
         }
+        if (capabilities.supports(VeryFitFeature.FRAMED_PROTOCOL)) {
+            write(builder, VeryFitSettings.cycle(prefs));
+            write(builder, VeryFitSettings.cycleReminder(prefs));
+        }
         builder.queue();
     }
 
@@ -714,6 +718,13 @@ public class VeryFitSupport extends AbstractBTLESingleDeviceSupport {
                 return;
             case VeryFitConstants.PREF_CALLS_UNPAIR:
                 calls.unpair(prefs.getString(VeryFitCapabilities.PREF_CALL_ADDRESS, null));
+                return;
+            case VeryFitConstants.PREF_CYCLE_ENABLED:
+            case VeryFitConstants.PREF_CYCLE_PERIOD_DAYS:
+            case VeryFitConstants.PREF_CYCLE_LENGTH_DAYS:
+            case VeryFitConstants.PREF_CYCLE_LAST_PERIOD:
+            case VeryFitConstants.PREF_CYCLE_REMINDER:
+                sendCycle();
                 return;
             case DeviceSettingsPreferenceConst.PREF_WORKOUT_DETECTION_CATEGORIES:
             case DeviceSettingsPreferenceConst.PREF_WORKOUT_AUTO_PAUSE:
@@ -1017,6 +1028,21 @@ public class VeryFitSupport extends AbstractBTLESingleDeviceSupport {
         send("veryfit workout detection", VeryFitSettings.autoWorkout(getDevicePrefs()));
         send("veryfit workout detection read",
                 VeryFitProtocol.query(VeryFitConstants.QUERY_AUTO_WORKOUT));
+    }
+
+    /**
+     * The settings, the reminder, and the period they describe as the watch's history, which is
+     * what the vendor sends on every edit. A cycle that is switched off has no history to give.
+     */
+    private void sendCycle() {
+        final DevicePrefs prefs = getDevicePrefs();
+        send("veryfit cycle", VeryFitSettings.cycle(prefs));
+        send("veryfit cycle reminder", VeryFitSettings.cycleReminder(prefs));
+        if (prefs.getBoolean(VeryFitConstants.PREF_CYCLE_ENABLED, false)) {
+            sendFramed("veryfit cycle history", VeryFitConstants.FRAMED_CYCLE_HISTORY,
+                    VeryFitProtocol.cycleHistory(VeryFitSettings.cycleLastPeriod(prefs),
+                            VeryFitSettings.cyclePeriodDays(prefs), VeryFitSettings.cycleLengthDays(prefs)));
+        }
     }
 
     /** The vendor reads this one straight back after every write, and so do we. */

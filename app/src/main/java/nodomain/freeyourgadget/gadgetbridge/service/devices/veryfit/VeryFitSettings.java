@@ -233,6 +233,43 @@ public final class VeryFitSettings {
         return (byte) (Math.max(1, Math.min(stops, 100 / step)) * step);
     }
 
+    /** The cycle as the user describes it, with the ovulation estimate the vendor sends. */
+    public static byte[] cycle(final Prefs prefs) {
+        final LocalDate lastPeriod = cycleLastPeriod(prefs);
+        final ByteBuffer buf = buffer(12);
+        buf.put(onOff(prefs.getBoolean(VeryFitConstants.PREF_CYCLE_ENABLED, false)));
+        buf.put((byte) cyclePeriodDays(prefs));
+        buf.put((byte) cycleLengthDays(prefs));
+        buf.putShort((short) lastPeriod.getYear());
+        buf.put((byte) lastPeriod.getMonthValue());
+        buf.put((byte) lastPeriod.getDayOfMonth());
+        buf.put(VeryFitConstants.CYCLE_OVULATION_BEFORE_PERIOD);
+        buf.put(VeryFitConstants.CYCLE_FERTILE_DAYS_BEFORE);
+        buf.put(VeryFitConstants.CYCLE_FERTILE_DAYS_AFTER);
+        buf.put(VeryFitConstants.CYCLE_NOTIFY_FLAG);
+        buf.put(onOff(prefs.getBoolean(VeryFitConstants.PREF_CYCLE_REMINDER, false)));
+        return VeryFitProtocol.setting(VeryFitConstants.SETTING_CYCLE, buf.array());
+    }
+
+    public static byte[] cycleReminder(final Prefs prefs) {
+        final byte days = VeryFitConstants.CYCLE_REMIND_DAYS_AHEAD;
+        return VeryFitProtocol.setting(VeryFitConstants.SETTING_CYCLE_REMINDER,
+                days, days, VeryFitConstants.CYCLE_REMIND_HOUR, (byte) 0, days, days, days,
+                onOff(prefs.getBoolean(VeryFitConstants.PREF_CYCLE_REMINDER, false)), VeryFitConstants.OFF);
+    }
+
+    public static int cyclePeriodDays(final Prefs prefs) {
+        return prefs.getInt(VeryFitConstants.PREF_CYCLE_PERIOD_DAYS, VeryFitConstants.CYCLE_DEFAULT_PERIOD_DAYS);
+    }
+
+    public static int cycleLengthDays(final Prefs prefs) {
+        return prefs.getInt(VeryFitConstants.PREF_CYCLE_LENGTH_DAYS, VeryFitConstants.CYCLE_DEFAULT_LENGTH_DAYS);
+    }
+
+    public static LocalDate cycleLastPeriod(final Prefs prefs) {
+        return prefs.getLocalDate(VeryFitConstants.PREF_CYCLE_LAST_PERIOD, LocalDate.now().toString());
+    }
+
     public static byte[] inactivity(final Prefs prefs) {
         final boolean enabled = prefs.getBoolean(DeviceSettingsPreferenceConst.PREF_INACTIVITY_ENABLE, false);
         final int threshold = prefs.getInt(DeviceSettingsPreferenceConst.PREF_INACTIVITY_THRESHOLD, 60);

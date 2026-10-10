@@ -18,6 +18,7 @@ package nodomain.freeyourgadget.gadgetbridge.service.devices.veryfit;
 
 import java.io.ByteArrayOutputStream;
 import java.nio.charset.StandardCharsets;
+import java.time.LocalDate;
 import java.util.Calendar;
 import java.util.GregorianCalendar;
 import java.util.List;
@@ -408,6 +409,28 @@ public class VeryFitProtocol {
             System.arraycopy(name, 0, body, offset + 2 + VeryFitConstants.CONTACT_NUMBER_LEN, name.length);
             offset += VeryFitConstants.CONTACT_RECORD_LEN;
         }
+        return body;
+    }
+
+    /**
+     * The {@link VeryFitConstants#FRAMED_CYCLE_HISTORY} record for a single period: the averages
+     * are that period's own figures, and the slots behind it stay empty.
+     */
+    public static byte[] cycleHistory(final LocalDate start, final int periodDays, final int cycleDays) {
+        final byte[] body = new byte[VeryFitConstants.CYCLE_HISTORY_HEADER_LEN
+                + VeryFitConstants.CYCLE_HISTORY_SLOTS * VeryFitConstants.CYCLE_HISTORY_RECORD_LEN];
+        body[0] = VeryFitConstants.CYCLE_HISTORY_VERSION;
+        body[1] = (byte) periodDays;
+        body[2] = (byte) cycleDays;
+        body[3] = 1;
+
+        final int offset = VeryFitConstants.CYCLE_HISTORY_HEADER_LEN;
+        body[offset] = (byte) start.getYear();
+        body[offset + 1] = (byte) (start.getYear() >> 8);
+        body[offset + 2] = (byte) start.getMonthValue();
+        body[offset + 3] = (byte) start.getDayOfMonth();
+        body[offset + 4] = (byte) periodDays;
+        body[offset + 5] = (byte) cycleDays;
         return body;
     }
 

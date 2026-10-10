@@ -1,0 +1,54 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.preference.PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+    <PreferenceScreen
+        android:icon="@drawable/ic_cycle"
+        android:key="pref_header_veryfit_cycle"
+        android:persistent="false"
+        android:summary="@string/veryfit_pref_cycle_summary"
+        android:title="@string/veryfit_pref_cycle_title">
+
+        <SwitchPreferenceCompat
+            android:defaultValue="false"
+            android:icon="@drawable/ic_cycle"
+            android:key="veryfit_cycle_enabled"
+            android:layout="@layout/preference_checkbox"
+            android:summary="@string/veryfit_pref_cycle_enabled_summary"
+            android:title="@string/veryfit_pref_cycle_enabled_title" />
+
+        <nodomain.freeyourgadget.gadgetbridge.util.XDatePreference
+            android:dependency="veryfit_cycle_enabled"
+            android:icon="@drawable/ic_calendar_month"
+            android:key="veryfit_cycle_last_period"
+            android:title="@string/veryfit_pref_cycle_last_period_title" />
+
+        <SeekBarPreference
+            android:defaultValue="7"
+            android:dependency="veryfit_cycle_enabled"
+            android:icon="@drawable/ic_date_range"
+            android:key="veryfit_cycle_period_days"
+            android:max="15"
+            android:title="@string/veryfit_pref_cycle_period_days_title"
+            app:min="1"
+            app:showSeekBarValue="true" />
+
+        <SeekBarPreference
+            android:defaultValue="28"
+            android:dependency="veryfit_cycle_enabled"
+            android:icon="@drawable/ic_date_range"
+            android:key="veryfit_cycle_length_days"
+            android:max="60"
+            android:title="@string/veryfit_pref_cycle_length_days_title"
+            app:min="15"
+            app:showSeekBarValue="true" />
+
+        <SwitchPreferenceCompat
+            android:defaultValue="false"
+            android:dependency="veryfit_cycle_enabled"
+            android:icon="@drawable/ic_notifications"
+            android:key="veryfit_cycle_reminder"
+            android:layout="@layout/preference_checkbox"
+            android:summary="@string/veryfit_pref_cycle_reminder_summary"
+            android:title="@string/veryfit_pref_cycle_reminder_title" />
+    </PreferenceScreen>
+</androidx.preference.PreferenceScreen>

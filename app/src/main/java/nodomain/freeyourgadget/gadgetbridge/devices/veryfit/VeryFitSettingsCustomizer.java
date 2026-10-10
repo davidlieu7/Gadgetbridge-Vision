@@ -20,14 +20,19 @@ import android.os.Parcel;
 
 import androidx.preference.Preference;
 
+import java.time.LocalDate;
 import java.util.Collections;
 import java.util.Set;
 
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSpecificSettingsCustomizer;
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSpecificSettingsHandler;
 import nodomain.freeyourgadget.gadgetbridge.util.Prefs;
+import nodomain.freeyourgadget.gadgetbridge.util.XDatePreference;
 
-/** Turns the pair/unpair buttons for calls into configuration changes the support acts on. */
+/**
+ * Turns the pair/unpair buttons for calls, and the cycle settings, into configuration changes the
+ * support acts on.
+ */
 public class VeryFitSettingsCustomizer implements DeviceSpecificSettingsCustomizer {
     @Override
     public void onPreferenceChange(final Preference preference, final DeviceSpecificSettingsHandler handler) {
@@ -43,6 +48,23 @@ public class VeryFitSettingsCustomizer implements DeviceSpecificSettingsCustomiz
                     return true;
                 });
             }
+        }
+        for (final String key : new String[]{
+                VeryFitConstants.PREF_CYCLE_ENABLED,
+                VeryFitConstants.PREF_CYCLE_PERIOD_DAYS,
+                VeryFitConstants.PREF_CYCLE_LENGTH_DAYS,
+                VeryFitConstants.PREF_CYCLE_LAST_PERIOD,
+                VeryFitConstants.PREF_CYCLE_REMINDER,
+        }) {
+            handler.addPreferenceHandlerFor(key);
+        }
+
+        // A date preference without a stored value keeps its 1970 placeholder and persists that
+        // on first use, so start it on what is stored, or on today.
+        final XDatePreference lastPeriod = handler.findPreference(VeryFitConstants.PREF_CYCLE_LAST_PERIOD);
+        if (lastPeriod != null) {
+            final LocalDate date = prefs.getLocalDate(VeryFitConstants.PREF_CYCLE_LAST_PERIOD, LocalDate.now().toString());
+            lastPeriod.setValue(date.getYear(), date.getMonthValue(), date.getDayOfMonth());
         }
     }
 

@@ -56,6 +56,7 @@ public final class VeryFitConstants {
     public static final int FRAMED_WATCHFACE = 0x0008;
     public static final int FRAMED_WATCHFACE_LIST = 0x0031;
     public static final int FRAMED_CONTACTS = 0x0039;
+    public static final int FRAMED_CYCLE_HISTORY = 0x003d;
 
     /** What to do with the face named in the fixed-size slot behind it. */
     public static final byte WATCHFACE_SELECT = 0x01;
@@ -151,6 +152,35 @@ public final class VeryFitConstants {
     /** Settings buttons for the classic-Bluetooth side, which carries the calls. */
     public static final String PREF_CALLS_PAIR = "veryfit_calls_pair";
     public static final String PREF_CALLS_UNPAIR = "veryfit_calls_unpair";
+
+    /** Menstrual cycle tracking, kept per device. */
+    public static final String PREF_CYCLE_ENABLED = "veryfit_cycle_enabled";
+    public static final String PREF_CYCLE_PERIOD_DAYS = "veryfit_cycle_period_days";
+    public static final String PREF_CYCLE_LENGTH_DAYS = "veryfit_cycle_length_days";
+    public static final String PREF_CYCLE_LAST_PERIOD = "veryfit_cycle_last_period";
+    public static final String PREF_CYCLE_REMINDER = "veryfit_cycle_reminder";
+    /** The watch's own defaults, which it shows before anything has been sent. */
+    public static final int CYCLE_DEFAULT_PERIOD_DAYS = 7;
+    public static final int CYCLE_DEFAULT_LENGTH_DAYS = 28;
+
+    // Cycle settings: [on][period days][cycle days][last period year:2][month][day], then the
+    // ovulation estimate - days before the next period, and the fertile days either side of it -
+    // a flag the vendor always sets, and the reminder switch.
+    public static final byte CYCLE_OVULATION_BEFORE_PERIOD = 14;
+    public static final byte CYCLE_FERTILE_DAYS_BEFORE = 5;
+    public static final byte CYCLE_FERTILE_DAYS_AFTER = 5;
+    public static final byte CYCLE_NOTIFY_FLAG = 0x01;
+    // Cycle reminders: days ahead of the period and of ovulation, the time of day, three more
+    // day counts, then the period and pregnancy switches. All but the period switch are sent as
+    // the vendor sends them.
+    public static final byte CYCLE_REMIND_DAYS_AHEAD = 3;
+    public static final byte CYCLE_REMIND_HOUR = 20;
+    // Cycle history: [version][average period][average cycle][count], ten spare bytes, then five
+    // fixed slots of which the first describes the current period.
+    public static final byte CYCLE_HISTORY_VERSION = 0x21;
+    public static final int CYCLE_HISTORY_HEADER_LEN = 14;
+    public static final int CYCLE_HISTORY_RECORD_LEN = 20;
+    public static final int CYCLE_HISTORY_SLOTS = 5;
 
     // Favourite contacts: [version][operation][total][already done][in this frame], then one
     // fixed-size record per contact. The reply repeats the counters behind a result byte.
@@ -280,6 +310,8 @@ public final class VeryFitConstants {
     public static final byte SETTING_AUTO_WORKOUT = 0x49;
     public static final byte SETTING_INACTIVITY = 0x47;
     public static final byte SETTING_HYDRATION = 0x60;
+    public static final byte SETTING_CYCLE = 0x41;
+    public static final byte SETTING_CYCLE_REMINDER = 0x42;
     public static final byte SETTING_VOLUME = (byte) 0xf0;
 
     public static final byte BIND_START = 0x01;
