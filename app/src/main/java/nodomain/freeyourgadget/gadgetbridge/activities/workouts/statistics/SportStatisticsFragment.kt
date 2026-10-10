@@ -458,12 +458,13 @@ class SportStatisticsFragment : Fragment() {
         SportMetric.DISTANCE ->
             formatter.convert(raw / METERS_PER_KM, ActivitySummaryEntries.UNIT_KILOMETERS, true).value
         SportMetric.DURATION -> raw / SECONDS_PER_HOUR
-        SportMetric.AVG_PACE -> pace(raw).let { (value, unit) ->
+        SportMetric.AVG_PACE, SportMetric.MAX_PACE -> pace(raw).let { (value, unit) ->
             formatter.convert(value, unit, true).value * SECONDS_PER_MINUTE
         }
-        SportMetric.AVG_SPEED -> formatter.convert(raw, ActivitySummaryEntries.UNIT_METERS_PER_SECOND, true).value
-        SportMetric.AVG_HEART_RATE, SportMetric.AVG_POWER, SportMetric.AVG_CADENCE, SportMetric.MAX_CADENCE,
-        SportMetric.AVG_SWOLF, SportMetric.AVG_AEROBIC_EFFECT, SportMetric.AVG_ANAEROBIC_EFFECT -> raw
+        SportMetric.AVG_SPEED, SportMetric.MAX_SPEED -> formatter.convert(raw, ActivitySummaryEntries.UNIT_METERS_PER_SECOND, true).value
+        SportMetric.AVG_HEART_RATE, SportMetric.MAX_HEART_RATE, SportMetric.AVG_POWER, SportMetric.MAX_POWER,
+        SportMetric.AVG_CADENCE, SportMetric.MAX_CADENCE, SportMetric.AVG_SWOLF, SportMetric.AVG_AEROBIC_EFFECT,
+        SportMetric.AVG_ANAEROBIC_EFFECT -> raw
         SportMetric.ASCENT, SportMetric.DESCENT ->
             formatter.convert(raw, ActivitySummaryEntries.UNIT_METERS, true).value
         SportMetric.CALORIES, SportMetric.STEPS, SportMetric.TRAINING_LOAD, SportMetric.SETS -> raw
@@ -472,8 +473,9 @@ class SportStatisticsFragment : Fragment() {
     private fun emptyAxisMaximum(metric: SportMetric): Double = when (metric) {
         SportMetric.DISTANCE -> 10.0
         SportMetric.DURATION -> 1.0
-        SportMetric.AVG_PACE, SportMetric.AVG_SPEED, SportMetric.AVG_HEART_RATE, SportMetric.AVG_POWER, SportMetric.AVG_CADENCE,
-        SportMetric.MAX_CADENCE,
+        SportMetric.AVG_PACE, SportMetric.MAX_PACE, SportMetric.AVG_SPEED, SportMetric.MAX_SPEED,
+        SportMetric.AVG_HEART_RATE, SportMetric.MAX_HEART_RATE, SportMetric.AVG_POWER, SportMetric.MAX_POWER,
+        SportMetric.AVG_CADENCE, SportMetric.MAX_CADENCE,
         SportMetric.AVG_SWOLF, SportMetric.AVG_AEROBIC_EFFECT, SportMetric.AVG_ANAEROBIC_EFFECT -> 0.0
         SportMetric.CALORIES -> 500.0
         SportMetric.ASCENT, SportMetric.DESCENT -> 100.0
@@ -488,10 +490,13 @@ class SportStatisticsFragment : Fragment() {
     private fun formatMetric(metric: SportMetric, raw: Double, formatter: WorkoutValueFormatter): String = when (metric) {
         SportMetric.DISTANCE -> formatter.formatValue(raw / METERS_PER_KM, ActivitySummaryEntries.UNIT_KILOMETERS)
         SportMetric.DURATION -> formatter.formatValue(raw, ActivitySummaryEntries.UNIT_SECONDS)
-        SportMetric.AVG_PACE -> pace(raw).let { (value, unit) -> formatter.formatValue(value, unit) }
-        SportMetric.AVG_SPEED -> formatter.formatValue(raw, ActivitySummaryEntries.UNIT_METERS_PER_SECOND)
-        SportMetric.AVG_HEART_RATE -> formatter.formatValue(raw.roundToLong(), ActivitySummaryEntries.UNIT_BPM)
-        SportMetric.AVG_POWER -> formatter.formatValue(raw.roundToLong(), ActivitySummaryEntries.UNIT_WATT)
+        SportMetric.AVG_PACE, SportMetric.MAX_PACE -> pace(raw).let { (value, unit) -> formatter.formatValue(value, unit) }
+        SportMetric.AVG_SPEED, SportMetric.MAX_SPEED ->
+            formatter.formatValue(raw, ActivitySummaryEntries.UNIT_METERS_PER_SECOND)
+        SportMetric.AVG_HEART_RATE, SportMetric.MAX_HEART_RATE ->
+            formatter.formatValue(raw.roundToLong(), ActivitySummaryEntries.UNIT_BPM)
+        SportMetric.AVG_POWER, SportMetric.MAX_POWER ->
+            formatter.formatValue(raw.roundToLong(), ActivitySummaryEntries.UNIT_WATT)
         SportMetric.AVG_CADENCE, SportMetric.MAX_CADENCE -> overview?.cadenceUnit?.let { formatter.formatValue(raw.roundToLong(), it) }
             ?: raw.roundToLong().toString()
         SportMetric.AVG_AEROBIC_EFFECT, SportMetric.AVG_ANAEROBIC_EFFECT ->

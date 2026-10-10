@@ -93,17 +93,17 @@ object SportChartSpecBuilder {
             return AxisSpec(format = ChartValueFormat.ONE_DECIMAL, minimum = 0.0, maximum = TRAINING_EFFECT_MAXIMUM)
         }
         val format = when (metric) {
-            SportMetric.AVG_PACE -> ChartValueFormat.DURATION_SECONDS
-            SportMetric.AVG_SPEED -> ChartValueFormat.ONE_DECIMAL
+            SportMetric.AVG_PACE, SportMetric.MAX_PACE -> ChartValueFormat.DURATION_SECONDS
+            SportMetric.AVG_SPEED, SportMetric.MAX_SPEED -> ChartValueFormat.ONE_DECIMAL
             else -> ChartValueFormat.INTEGER
         }
         if (points.isEmpty()) {
             return AxisSpec(format = format)
         }
         val step = when (metric) {
-            SportMetric.AVG_PACE -> PACE_AXIS_STEP
-            SportMetric.AVG_SPEED -> SPEED_AXIS_STEP
-            SportMetric.AVG_HEART_RATE -> HEART_RATE_AXIS_STEP
+            SportMetric.AVG_PACE, SportMetric.MAX_PACE -> PACE_AXIS_STEP
+            SportMetric.AVG_SPEED, SportMetric.MAX_SPEED -> SPEED_AXIS_STEP
+            SportMetric.AVG_HEART_RATE, SportMetric.MAX_HEART_RATE -> HEART_RATE_AXIS_STEP
             SportMetric.AVG_SWOLF -> SWOLF_AXIS_STEP
             SportMetric.AVG_CADENCE, SportMetric.MAX_CADENCE -> CADENCE_AXIS_STEP
             else -> POWER_AXIS_STEP

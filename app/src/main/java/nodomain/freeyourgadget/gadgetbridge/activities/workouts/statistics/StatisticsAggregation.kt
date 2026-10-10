@@ -26,8 +26,11 @@ data class WorkoutInput(
     val descentMeters: Double = 0.0,
     val steps: Double = 0.0,
     val avgSpeedMetersPerSecond: Double = 0.0,
+    val maxSpeedMetersPerSecond: Double = 0.0,
     val avgHeartRate: Double = 0.0,
+    val maxHeartRate: Double = 0.0,
     val avgPowerWatts: Double = 0.0,
+    val maxPowerWatts: Double = 0.0,
     val avgCadence: Double = 0.0,
     val maxCadence: Double = 0.0,
     val cadenceUnit: String? = null,
@@ -53,8 +56,11 @@ data class WorkoutInput(
                 descentMeters = descentMeters,
                 steps = steps,
                 speed = WeightedSum.of(avgSpeedMetersPerSecond, movingSeconds),
+                maxSpeed = maxSpeedMetersPerSecond,
                 heartRate = WeightedSum.of(avgHeartRate, durationSeconds.toDouble()),
+                maxHeartRate = maxHeartRate,
                 power = WeightedSum.of(avgPowerWatts, durationSeconds.toDouble()),
+                maxPower = maxPowerWatts,
                 cadence = WeightedSum.of(avgCadence, durationSeconds.toDouble()),
                 maxCadence = maxCadence,
                 swolf = WeightedSum.of(avgSwolf, durationSeconds.toDouble()),
@@ -94,8 +100,11 @@ data class MetricTotals(
     val descentMeters: Double = 0.0,
     val steps: Double = 0.0,
     val speed: WeightedSum = WeightedSum(),
+    val maxSpeed: Double = 0.0,
     val heartRate: WeightedSum = WeightedSum(),
+    val maxHeartRate: Double = 0.0,
     val power: WeightedSum = WeightedSum(),
+    val maxPower: Double = 0.0,
     val cadence: WeightedSum = WeightedSum(),
     val maxCadence: Double = 0.0,
     val swolf: WeightedSum = WeightedSum(),
@@ -112,8 +121,11 @@ data class MetricTotals(
         descentMeters = descentMeters + other.descentMeters,
         steps = steps + other.steps,
         speed = speed + other.speed,
+        maxSpeed = maxOf(maxSpeed, other.maxSpeed),
         heartRate = heartRate + other.heartRate,
+        maxHeartRate = maxOf(maxHeartRate, other.maxHeartRate),
         power = power + other.power,
+        maxPower = maxOf(maxPower, other.maxPower),
         cadence = cadence + other.cadence,
         maxCadence = maxOf(maxCadence, other.maxCadence),
         swolf = swolf + other.swolf,
@@ -132,19 +144,23 @@ enum class SportMetric(val average: Boolean = false, val valueOf: (MetricTotals)
     DURATION(valueOf = { it.durationSeconds.toDouble() }),
     AVG_PACE(average = true, valueOf = { if (it.speed.average > 0.0) 1.0 / it.speed.average else 0.0 }),
     AVG_SPEED(average = true, valueOf = { it.speed.average }),
+    MAX_PACE(average = true, valueOf = { if (it.maxSpeed > 0.0) 1.0 / it.maxSpeed else 0.0 }),
+    MAX_SPEED(average = true, valueOf = { it.maxSpeed }),
     AVG_HEART_RATE(average = true, valueOf = { it.heartRate.average }),
+    MAX_HEART_RATE(average = true, valueOf = { it.maxHeartRate }),
     AVG_POWER(average = true, valueOf = { it.power.average }),
+    MAX_POWER(average = true, valueOf = { it.maxPower }),
     AVG_CADENCE(average = true, valueOf = { it.cadence.average }),
     MAX_CADENCE(average = true, valueOf = { it.maxCadence }),
     AVG_SWOLF(average = true, valueOf = { it.swolf.average }),
-    AVG_AEROBIC_EFFECT(average = true, valueOf = { it.aerobicEffect.average }),
-    AVG_ANAEROBIC_EFFECT(average = true, valueOf = { it.anaerobicEffect.average }),
     CALORIES(valueOf = { it.calories }),
     ASCENT(valueOf = { it.ascentMeters }),
     DESCENT(valueOf = { it.descentMeters }),
     STEPS(valueOf = { it.steps }),
     TRAINING_LOAD(valueOf = { it.trainingLoad }),
     SETS(valueOf = { it.sets }),
+    AVG_AEROBIC_EFFECT(average = true, valueOf = { it.aerobicEffect.average }),
+    AVG_ANAEROBIC_EFFECT(average = true, valueOf = { it.anaerobicEffect.average }),
 }
 
 enum class PeriodKind { WEEK, MONTH, YEAR, CUSTOM }
@@ -311,7 +327,7 @@ object StatisticsAggregation {
             firstDate = dateOf(workouts.minOf { it.startMillis }),
             lastDate = dateOf(workouts.maxOf { it.startMillis }),
             availableMetrics = SportMetric.entries
-                .filter { it != if (paceSport) SportMetric.AVG_SPEED else SportMetric.AVG_PACE }
+                .filter { it !in if (paceSport) SPEED_METRICS else PACE_METRICS }
                 .filter { metric -> metric == SportMetric.DURATION || totals.any { metric.valueOf(it) > 0.0 } },
             cadenceUnit = workouts.filter { it.avgCadence > 0.0 || it.maxCadence > 0.0 }
                 .mapNotNull { it.cadenceUnit }
@@ -332,10 +348,13 @@ object StatisticsAggregation {
             ActivitySummaryEntries.UNIT_KMPH -> value / KMPH_PER_METER_PER_SECOND
             ActivitySummaryEntries.UNIT_SECONDS_PER_KM -> METERS_PER_KM / value
             ActivitySummaryEntries.UNIT_SECONDS_PER_100_METERS -> METERS_PER_100_M / value
+            ActivitySummaryEntries.UNIT_SECONDS_PER_M -> 1.0 / value
             else -> 0.0
         }
     }
 
+    private val PACE_METRICS = setOf(SportMetric.AVG_PACE, SportMetric.MAX_PACE)
+    private val SPEED_METRICS = setOf(SportMetric.AVG_SPEED, SportMetric.MAX_SPEED)
     private const val KMPH_PER_METER_PER_SECOND = 3.6
     private const val METERS_PER_KM = 1000.0
     private const val METERS_PER_100_M = 100.0

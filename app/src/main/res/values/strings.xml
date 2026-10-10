@@ -3018,6 +3018,7 @@
     <string name="avg_speed">Avg Speed</string>
     <string name="avg_power">Avg Power</string>
     <string name="avg_cadence">Avg Cadence</string>
+    <string name="max_speed">Max Speed</string>
     <string name="avg_swolf">Avg SWOLF</string>
     <string name="avg_aerobic_effect">Avg Aerobic Effect</string>
     <string name="avg_anaerobic_effect">Avg Anaerobic Effect</string>
