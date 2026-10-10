@@ -312,11 +312,13 @@ class GbChartView @JvmOverloads constructor(
      */
     private fun layoutMarkerLabels() {
         if (markerLines.isEmpty() || viewPortHandler.contentWidth <= 0f) return
+        // LimitLine keeps its text size, line width and offset in dp; the renderer converts them when it draws
         val labels = markerLines.map { (marker, line) ->
-            markerLabelPaint.textSize = line.textSize
+            markerLabelPaint.textSize = Utils.convertDpToPixel(line.textSize)
             XMarkerLabelLayout.Label(
                 x = pixelX(marker.value),
-                width = markerLabelPaint.measureText(marker.label.orEmpty()) + line.xOffset,
+                width = markerLabelPaint.measureText(marker.label.orEmpty()) +
+                        Utils.convertDpToPixel(line.lineWidth) + Utils.convertDpToPixel(line.xOffset),
                 atBottom = marker.labelAtBottom,
                 beforeLine = marker.labelBeforeLine,
             )
