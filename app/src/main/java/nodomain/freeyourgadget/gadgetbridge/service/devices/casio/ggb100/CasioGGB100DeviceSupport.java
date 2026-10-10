@@ -16,85 +16,35 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 package nodomain.freeyourgadget.gadgetbridge.service.devices.casio.ggb100;
 
-import android.Manifest;
 import android.bluetooth.BluetoothGatt;
 import android.bluetooth.BluetoothGattCharacteristic;
 import android.content.SharedPreferences;
-import android.content.pm.PackageManager;
 import android.location.Location;
-import android.location.LocationManager;
 import android.os.Handler;
 import android.os.Looper;
-import android.widget.Toast;
-
-import androidx.core.app.ActivityCompat;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.text.SimpleDateFormat;
-import java.time.DayOfWeek;
-import java.time.Instant;
-import java.time.ZoneId;
-import java.time.ZonedDateTime;
-import java.time.format.TextStyle;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.Date;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Locale;
-import java.util.TimeZone;
 import java.util.UUID;
 
 import nodomain.freeyourgadget.gadgetbridge.GBApplication;
 import nodomain.freeyourgadget.gadgetbridge.R;
-import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsPreferenceConst;
-import nodomain.freeyourgadget.gadgetbridge.database.DBHandler;
-import nodomain.freeyourgadget.gadgetbridge.database.DBHelper;
 import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEventFindPhone;
 import nodomain.freeyourgadget.gadgetbridge.devices.casio.CasioConstants;
-import nodomain.freeyourgadget.gadgetbridge.devices.casio.gbx100.CasioGBX100SampleProvider;
-import nodomain.freeyourgadget.gadgetbridge.entities.CasioGBX100ActivitySample;
-import nodomain.freeyourgadget.gadgetbridge.entities.Device;
-import nodomain.freeyourgadget.gadgetbridge.entities.User;
-import nodomain.freeyourgadget.gadgetbridge.externalevents.opentracks.OpenTracksController;
-import nodomain.freeyourgadget.gadgetbridge.model.ActivityKind;
-import nodomain.freeyourgadget.gadgetbridge.model.Alarm;
-import nodomain.freeyourgadget.gadgetbridge.model.CallSpec;
-import nodomain.freeyourgadget.gadgetbridge.model.NotificationSpec;
-import nodomain.freeyourgadget.gadgetbridge.model.WorldClock;
+import nodomain.freeyourgadget.gadgetbridge.model.GPSCoordinate;
 import nodomain.freeyourgadget.gadgetbridge.service.btle.TransactionBuilder;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.casio.Casio2C2DSupport;
-import nodomain.freeyourgadget.gadgetbridge.service.devices.casio.CasioTimeZone;
-import nodomain.freeyourgadget.gadgetbridge.service.devices.casio.CasioIntervalTimerLibrary;
+import nodomain.freeyourgadget.gadgetbridge.service.devices.casio.CasioLocationIndicatorLibrary;
+import nodomain.freeyourgadget.gadgetbridge.service.devices.casio.CasioLocationPoint;
 import nodomain.freeyourgadget.gadgetbridge.util.GB;
-import nodomain.freeyourgadget.gadgetbridge.util.StringUtils;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
+import nodomain.freeyourgadget.gadgetbridge.webview.CurrentPosition;
 
-import static nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsPreferenceConst.PREF_AUTOLIGHT;
-import static nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsPreferenceConst.PREF_AUTOREMOVE_MESSAGE;
-import static nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsPreferenceConst.PREF_CASIO_ALERT_CALENDAR;
-import static nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsPreferenceConst.PREF_CASIO_ALERT_CALL;
-import static nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsPreferenceConst.PREF_CASIO_ALERT_EMAIL;
-import static nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsPreferenceConst.PREF_CASIO_ALERT_OTHER;
-import static nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsPreferenceConst.PREF_CASIO_ALERT_SMS;
-import static nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsPreferenceConst.PREF_FAKE_RING_DURATION;
 import static nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsPreferenceConst.PREF_FIND_PHONE;
 import static nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsPreferenceConst.PREF_FIND_PHONE_DURATION;
-import static nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsPreferenceConst.PREF_KEY_VIBRATION;
-import static nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsPreferenceConst.PREF_OPERATING_SOUNDS;
-import static nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsPreferenceConst.PREF_PREVIEW_MESSAGE_IN_TITLE;
-import static nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsPreferenceConst.PREF_TIMEFORMAT;
-import static nodomain.freeyourgadget.gadgetbridge.model.ActivityUser.PREF_USER_ACTIVETIME_MINUTES;
-import static nodomain.freeyourgadget.gadgetbridge.model.ActivityUser.PREF_USER_DATE_OF_BIRTH;
-import static nodomain.freeyourgadget.gadgetbridge.model.ActivityUser.PREF_USER_DISTANCE_METERS;
-import static nodomain.freeyourgadget.gadgetbridge.model.ActivityUser.PREF_USER_GENDER;
-import static nodomain.freeyourgadget.gadgetbridge.model.ActivityUser.PREF_USER_HEIGHT_CM;
-import static nodomain.freeyourgadget.gadgetbridge.model.ActivityUser.PREF_USER_STEPS_GOAL;
-import static nodomain.freeyourgadget.gadgetbridge.model.ActivityUser.PREF_USER_WEIGHT_KG;
 
 public class CasioGGB100DeviceSupport extends Casio2C2DSupport
         implements SharedPreferences.OnSharedPreferenceChangeListener {
@@ -238,26 +188,69 @@ public class CasioGGB100DeviceSupport extends Casio2C2DSupport
 
     private void onLocationIndicator(boolean indicate, byte[] data) {
         if (indicate) {
-            LOG.debug("Indicate!");
+            LOG.debug("Watch asked us to indicate the active location point");
 
-            // TODO: send the position info
+            final SharedPreferences prefs = GBApplication.getDeviceSpecificSharedPrefs(getDevice().getAddress());
+            final CasioLocationIndicatorLibrary lib = CasioLocationIndicatorLibrary.fromJson(
+                    prefs.getString(CasioLocationIndicatorLibrary.PREF_LOCATION_INDICATOR_LIBRARY, null));
+            final CasioLocationPoint active = lib.getActive();
+
             byte[] data_reply = new byte[9];
             data_reply[0] = Casio2C2DSupport.FEATURE_LOCATION_INDICATOR;
             data_reply[1] = 0x02;
-            data_reply[2] = 0x00; // 0 -> ok, 1 -> nothing to give
-            // dist in meters
-            // bearing 0-359 true north
 
-            
+            final Location l = new CurrentPosition().getLastKnownLocation();
+            if (active == null || l == null) {
+                data_reply[2] = 0x01; // status: 0 -> ok, 1 -> nothing to give
+                write(data_reply);
+                return;
+            }
+
+            // phone → ALL_FEAT  35 <mode> <st> <dist LE32> <bearing LE16>
+            final GPSCoordinate current = new GPSCoordinate(l.getLongitude(), l.getLatitude());
+            final long dist = Math.round(GPSCoordinate.distanceHaversine(current, active.waypoint));
+            final int bearing = (int) Math.round(GPSCoordinate.bearing(current, active.waypoint)) % 360;
+
+            data_reply[2] = 0x00; // status: ok
+            data_reply[3] = (byte) (dist & 0xff);
+            data_reply[4] = (byte) ((dist >> 8) & 0xff);
+            data_reply[5] = (byte) ((dist >> 16) & 0xff);
+            data_reply[6] = (byte) ((dist >> 24) & 0xff);
+            data_reply[7] = (byte) (bearing & 0xff);
+            data_reply[8] = (byte) ((bearing >> 8) & 0xff);
+            write(data_reply);
         } else {
-            LOG.debug("Memorize the point!");
+            LOG.debug("Watch asked us to memorize the current location.");
 
-            // TODO: get gps point and memorize it
-
+            Location l = new CurrentPosition().getLastKnownLocation();
 
             byte[] data_reply = new byte[9];
             data_reply[0] = Casio2C2DSupport.FEATURE_LOCATION_INDICATOR;
-            data_reply[2] = 0x01; // This should be the status, 0 -> ok, 1 -> no fix
+
+            if (l == null) {
+                LOG.warn("No GPS fix, cannot memorize location");
+                data_reply[2] = 0x01; // status: 0 -> ok, 1 -> no fix
+                write(data_reply);
+                return;
+            }
+
+            final SharedPreferences prefs = GBApplication.getDeviceSpecificSharedPrefs(getDevice().getAddress());
+            final CasioLocationIndicatorLibrary lib = CasioLocationIndicatorLibrary.fromJson(
+                    prefs.getString(CasioLocationIndicatorLibrary.PREF_LOCATION_INDICATOR_LIBRARY, null));
+
+            CasioLocationPoint point = new CasioLocationPoint();
+            point.label = getContext().getString(
+                    R.string.casio_location_indicator_default_label, lib.locations.size() + 1);
+            point.timestamp = System.currentTimeMillis();
+            point.waypoint = new GPSCoordinate(l.getLongitude(), l.getLatitude(),
+                    l.hasAltitude() ? l.getAltitude() : GPSCoordinate.UNKNOWN_ALTITUDE);
+
+            lib.add(point);
+            prefs.edit()
+                    .putString(CasioLocationIndicatorLibrary.PREF_LOCATION_INDICATOR_LIBRARY, lib.toJson())
+                    .apply();
+
+            data_reply[2] = 0x00; // status: ok
             write(data_reply);
         }
     }
@@ -305,7 +298,7 @@ public class CasioGGB100DeviceSupport extends Casio2C2DSupport
                 LOG.debug("Watch requests a location indicator");
                 req(Casio2C2DSupport.FEATURE_LOCATION_INDICATOR);
                 return true;
-            } 
+            }
             // else if (connectionReason == 0x00) {
             //     LOG.debug("Watch fresh pairing connection");
             // } else if (connectionReason == 0x01) {

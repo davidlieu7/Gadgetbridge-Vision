@@ -469,6 +469,14 @@
     <string name="casio_interval_timer_repeat">Auto-repeat</string>
     <string name="casio_interval_timer_default_label">Timer %1$d</string>
     <string name="casio_interval_timer_total">Total: %1$s × %2$d = %3$s</string>
+    <string name="pref_casio_location_indicator_title">Location indicator</string>
+    <string name="casio_location_indicator_add">Add waypoint</string>
+    <string name="casio_location_indicator_active">Active location</string>
+    <string name="casio_location_indicator_empty">No waypoints saved yet</string>
+    <string name="casio_location_indicator_default_label">Location %1$d</string>
+    <string name="casio_location_indicator_no_fix">No GPS fix</string>
+    <string name="casio_location_indicator_invalid_coordinates">Invalid coordiantes</string>
+    <string name="casio_location_indicator_use_current">Use current location</string>
     <string name="pref_title_autoremove_notifications">Autoremove dismissed notifications</string>
     <string name="pref_summary_autoremove_notifications">Notifications are automatically removed from the device when dismissed from the phone</string>
     <string name="pref_title_screen_on_on_notifications">Screen On on Notifications</string>

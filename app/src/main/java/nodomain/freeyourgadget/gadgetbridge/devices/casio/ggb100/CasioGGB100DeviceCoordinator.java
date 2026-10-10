@@ -31,8 +31,10 @@ import java.util.regex.Pattern;
 import de.greenrobot.dao.AbstractDao;
 import de.greenrobot.dao.Property;
 import nodomain.freeyourgadget.gadgetbridge.R;
+import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSpecificSettingsCustomizer;
 import nodomain.freeyourgadget.gadgetbridge.devices.SampleProvider;
 import nodomain.freeyourgadget.gadgetbridge.devices.casio.Casio2C2DDeviceCoordinator;
+import nodomain.freeyourgadget.gadgetbridge.devices.casio.CasioLocationIndicatorSettingsCustomizer;
 import nodomain.freeyourgadget.gadgetbridge.entities.DaoSession;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
 import nodomain.freeyourgadget.gadgetbridge.model.ActivitySample;
@@ -102,7 +104,10 @@ public class CasioGGB100DeviceCoordinator extends Casio2C2DDeviceCoordinator {
                 R.xml.devicesettings_timeformat,
                 R.xml.devicesettings_autolight,
                 R.xml.devicesettings_operating_sounds,
-                R.xml.devicesettings_casio_alert
+                R.xml.devicesettings_hourly_chime_enable,
+                R.xml.devicesettings_casio_connection_duration,
+                R.xml.devicesettings_casio_location_indicator
+                // R.xml.devicesettings_casio_interval_timer
         };
     }
 
@@ -115,5 +120,11 @@ public class CasioGGB100DeviceCoordinator extends Casio2C2DDeviceCoordinator {
     @Override
     public int getDeviceNameResource() {
         return R.string.devicetype_casioggb100;
+    }
+
+
+    @Override
+    public DeviceSpecificSettingsCustomizer getDeviceSpecificSettingsCustomizer(final GBDevice device) {
+        return new CasioLocationIndicatorSettingsCustomizer(device);
     }
 }
