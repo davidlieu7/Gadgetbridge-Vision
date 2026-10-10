@@ -12,6 +12,7 @@ fun SportMetric.labelRes(): Int = when (this) {
     SportMetric.AVG_HEART_RATE -> R.string.averageHR
     SportMetric.AVG_POWER -> R.string.avg_power
     SportMetric.AVG_CADENCE -> R.string.avg_cadence
+    SportMetric.MAX_CADENCE -> R.string.maxCadence
     SportMetric.AVG_SWOLF -> R.string.avg_swolf
     SportMetric.CALORIES -> R.string.calories
     SportMetric.ASCENT -> R.string.workout_ascent

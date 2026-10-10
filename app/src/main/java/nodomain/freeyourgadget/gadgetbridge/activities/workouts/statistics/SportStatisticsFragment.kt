@@ -462,8 +462,8 @@ class SportStatisticsFragment : Fragment() {
             formatter.convert(value, unit, true).value * SECONDS_PER_MINUTE
         }
         SportMetric.AVG_SPEED -> formatter.convert(raw, ActivitySummaryEntries.UNIT_METERS_PER_SECOND, true).value
-        SportMetric.AVG_HEART_RATE, SportMetric.AVG_POWER, SportMetric.AVG_CADENCE, SportMetric.AVG_SWOLF,
-        SportMetric.AVG_AEROBIC_EFFECT, SportMetric.AVG_ANAEROBIC_EFFECT -> raw
+        SportMetric.AVG_HEART_RATE, SportMetric.AVG_POWER, SportMetric.AVG_CADENCE, SportMetric.MAX_CADENCE,
+        SportMetric.AVG_SWOLF, SportMetric.AVG_AEROBIC_EFFECT, SportMetric.AVG_ANAEROBIC_EFFECT -> raw
         SportMetric.ASCENT, SportMetric.DESCENT ->
             formatter.convert(raw, ActivitySummaryEntries.UNIT_METERS, true).value
         SportMetric.CALORIES, SportMetric.STEPS, SportMetric.TRAINING_LOAD, SportMetric.SETS -> raw
@@ -473,6 +473,7 @@ class SportStatisticsFragment : Fragment() {
         SportMetric.DISTANCE -> 10.0
         SportMetric.DURATION -> 1.0
         SportMetric.AVG_PACE, SportMetric.AVG_SPEED, SportMetric.AVG_HEART_RATE, SportMetric.AVG_POWER, SportMetric.AVG_CADENCE,
+        SportMetric.MAX_CADENCE,
         SportMetric.AVG_SWOLF, SportMetric.AVG_AEROBIC_EFFECT, SportMetric.AVG_ANAEROBIC_EFFECT -> 0.0
         SportMetric.CALORIES -> 500.0
         SportMetric.ASCENT, SportMetric.DESCENT -> 100.0
@@ -491,7 +492,7 @@ class SportStatisticsFragment : Fragment() {
         SportMetric.AVG_SPEED -> formatter.formatValue(raw, ActivitySummaryEntries.UNIT_METERS_PER_SECOND)
         SportMetric.AVG_HEART_RATE -> formatter.formatValue(raw.roundToLong(), ActivitySummaryEntries.UNIT_BPM)
         SportMetric.AVG_POWER -> formatter.formatValue(raw.roundToLong(), ActivitySummaryEntries.UNIT_WATT)
-        SportMetric.AVG_CADENCE -> overview?.cadenceUnit?.let { formatter.formatValue(raw.roundToLong(), it) }
+        SportMetric.AVG_CADENCE, SportMetric.MAX_CADENCE -> overview?.cadenceUnit?.let { formatter.formatValue(raw.roundToLong(), it) }
             ?: raw.roundToLong().toString()
         SportMetric.AVG_AEROBIC_EFFECT, SportMetric.AVG_ANAEROBIC_EFFECT ->
             String.format(Locale.getDefault(), "%.1f", raw)

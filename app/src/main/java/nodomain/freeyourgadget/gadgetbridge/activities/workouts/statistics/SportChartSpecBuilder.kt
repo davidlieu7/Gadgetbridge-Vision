@@ -105,7 +105,7 @@ object SportChartSpecBuilder {
             SportMetric.AVG_SPEED -> SPEED_AXIS_STEP
             SportMetric.AVG_HEART_RATE -> HEART_RATE_AXIS_STEP
             SportMetric.AVG_SWOLF -> SWOLF_AXIS_STEP
-            SportMetric.AVG_CADENCE -> CADENCE_AXIS_STEP
+            SportMetric.AVG_CADENCE, SportMetric.MAX_CADENCE -> CADENCE_AXIS_STEP
             else -> POWER_AXIS_STEP
         }
         val lowest = points.minOf { it.y }
