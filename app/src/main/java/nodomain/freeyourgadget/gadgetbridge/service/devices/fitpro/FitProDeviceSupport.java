@@ -17,6 +17,8 @@
 
 package nodomain.freeyourgadget.gadgetbridge.service.devices.fitpro;
 
+import static nodomain.freeyourgadget.gadgetbridge.service.btle.BLETypeConversions.toUint16;
+
 import static nodomain.freeyourgadget.gadgetbridge.devices.fitpro.FitProConstants.CMD_ALARM;
 import static nodomain.freeyourgadget.gadgetbridge.devices.fitpro.FitProConstants.CMD_DND;
 import static nodomain.freeyourgadget.gadgetbridge.devices.fitpro.FitProConstants.CMD_FIND_BAND;
@@ -91,6 +93,7 @@ import static nodomain.freeyourgadget.gadgetbridge.devices.fitpro.FitProConstant
 
 import android.bluetooth.BluetoothGatt;
 import android.bluetooth.BluetoothGattCharacteristic;
+import android.bluetooth.BluetoothProfile;
 import android.content.Intent;
 import android.os.Bundle;
 import android.widget.Toast;
@@ -174,6 +177,12 @@ public class FitProDeviceSupport extends AbstractBTLESingleDeviceSupport {
     private static final boolean debugEnabled = false;
     private int mtuSize=20;
 
+    private final FitProCommandQueue commandQueue = new FitProCommandQueue(
+            ConnectionMonitor,
+            () -> getDevice().isConnected(),
+            () -> writeCharacteristic,
+            () -> createTransactionBuilder("FitPro command queue"));
+
     public FitProDeviceSupport() {
         super(LOG);
         addSupportedService(GattService.UUID_SERVICE_DEVICE_INFORMATION);
@@ -222,35 +231,48 @@ public class FitProDeviceSupport extends AbstractBTLESingleDeviceSupport {
         // - band seems to drain battery really fast
         // - the wait time is needed as the band must process each command
         // - (implementation based on individual requests did not work, the wait is still needed)
+        // NOTE: Each command is sent with commandQueue waiting for ACK or timeout.
 
-        builder.write(writeCharacteristic, craftData(CMD_GROUP_GENERAL, FitProConstants.CMD_INIT1, (byte) 0x2));
-        setTime(builder);
-        builder.sleep(200);
-        builder.write(writeCharacteristic, craftData(CMD_GROUP_REQUEST_DATA, FitProConstants.CMD_INIT1));
-        builder.sleep(200);
-        builder.write(writeCharacteristic, craftData(CMD_GROUP_REQUEST_DATA, FitProConstants.CMD_INIT2));
-        builder.sleep(200);
-        setLanguage(builder);
-        builder.sleep(200);
-        builder.write(writeCharacteristic, craftData(CMD_GROUP_GENERAL, FitProConstants.CMD_INIT3, VALUE_ON));
-        builder.sleep(200);
-        builder.write(writeCharacteristic, craftData(CMD_GROUP_REQUEST_DATA, VALUE_ON));
-        builder.sleep(200);
-        builder.write(writeCharacteristic, craftData(CMD_GROUP_REQUEST_DATA, (byte) 0xf));
-        builder.sleep(200);
-        builder.write(writeCharacteristic, craftData(CMD_GROUP_REQUEST_DATA, CMD_GET_HW_INFO));
-        builder.sleep(200);
-        builder.write(writeCharacteristic, craftData(CMD_GROUP_BAND_INFO, CMD_RX_BAND_INFO));
-        builder.sleep(200);
-        builder.write(writeCharacteristic, craftData(CMD_GROUP_REQUEST_DATA, CMD_GET_DISPLAY_ON_LIFT));
-        builder.sleep(200);
-        builder.write(writeCharacteristic, craftData(CMD_GROUP_REQUEST_DATA, CMD_GET_LONG_SIT_REMINDER));
-        builder.sleep(200);
-        builder.write(writeCharacteristic, craftData(CMD_GROUP_REQUEST_DATA, CMD_GET_DEVICE_VIBRATIONS));
-        builder.sleep(200);
-
-        builder.setDeviceState(GBDevice.State.INITIALIZED);
+        final List<byte[]> commands = Arrays.asList(
+            craftData(CMD_GROUP_GENERAL, FitProConstants.CMD_INIT1, (byte) 0x2),
+            getTimeCommand(),
+            craftData(CMD_GROUP_REQUEST_DATA, FitProConstants.CMD_INIT1),
+            craftData(CMD_GROUP_REQUEST_DATA, FitProConstants.CMD_INIT2),
+            getLanguageCommand(),
+            craftData(CMD_GROUP_GENERAL, FitProConstants.CMD_INIT3, VALUE_ON),
+            craftData(CMD_GROUP_REQUEST_DATA, VALUE_ON),
+            craftData(CMD_GROUP_REQUEST_DATA, (byte) 0xf),
+            craftData(CMD_GROUP_REQUEST_DATA, CMD_GET_HW_INFO),
+            craftData(CMD_GROUP_BAND_INFO, CMD_RX_BAND_INFO)
+        );
+        commandQueue.initialize(builder, commands);
         return builder;
+    }
+
+    @Override
+    public void disconnect() {
+        synchronized (ConnectionMonitor) {
+            commandQueue.clear();
+            super.disconnect();
+        }
+    }
+
+    @Override
+    public void onConnectionStateChange(BluetoothGatt gatt, int status, int newState) {
+        synchronized (ConnectionMonitor) {
+            if (newState == BluetoothProfile.STATE_DISCONNECTED) {
+                commandQueue.clear();
+            }
+            super.onConnectionStateChange(gatt, status, newState);
+        }
+    }
+
+    @Override
+    public void dispose() {
+        synchronized (ConnectionMonitor) {
+            commandQueue.clear();
+            super.dispose();
+        }
     }
 
     public void handleDeviceInfo(DeviceInfo info) {
@@ -291,6 +313,18 @@ public class FitProDeviceSupport extends AbstractBTLESingleDeviceSupport {
         super.onCharacteristicChanged(gatt, characteristic, data);
         UUID characteristicUUID = characteristic.getUuid();
         debugPrintArray(data, "FitPro received value");
+        if (!UUID_CHARACTERISTIC_RX.equals(characteristicUUID) || data == null || data.length == 0) {
+            return false;
+        }
+        if (data[0] == FitProConstants.DATA_HEADER_ACK) {
+            commandQueue.acceptReply(characteristicUUID, data);
+            if (data.length == 8 && toUint16(data[2], data[1]) == 5
+                    && data[3] == CMD_GROUP_RECEIVE_SPORTS_DATA
+                    && data[4] == CMD_REQUEST_STEPS_DATA1 && data[7] == 1) {
+                indicateFinishedFetchingOperation();
+            }
+            return false;
+        }
         if (data[0] != FitProConstants.DATA_HEADER) {
             if (debugEnabled) {
                 LOG.info("FitPro, packet not starting with 0xcd: " + data[0]);
@@ -381,6 +415,8 @@ public class FitProDeviceSupport extends AbstractBTLESingleDeviceSupport {
                     break;
             }
 
+            // Payload handlers queue the phone ACK before releasing the next command.
+            commandQueue.acceptReply(characteristicUUID, data);
             LOG.info("Characteristic changed UUID: " + characteristicUUID);
             LOG.info("Characteristic changed service: " + characteristic.getService().getCharacteristics());
             debugPrintArray(data, "value bytes");
@@ -681,6 +717,11 @@ public class FitProDeviceSupport extends AbstractBTLESingleDeviceSupport {
     }
 
     public FitProDeviceSupport setLanguage(TransactionBuilder builder) {
+        builder.write(writeCharacteristic, getLanguageCommand());
+        return this;
+    }
+
+    private byte[] getLanguageCommand() {
         LOG.debug("FitPro set language");
         String localeString = GBApplication.getDeviceSpecificSharedPrefs(gbDevice.getAddress())
                 .getString(DeviceSettingsPreferenceConst.PREF_LANGUAGE, Language.AUTO.getCode());
@@ -698,9 +739,7 @@ public class FitProDeviceSupport extends AbstractBTLESingleDeviceSupport {
         final Language language = Language.fromCode(localeString);
         final byte languageCode = FitProConstants.FitProLanguage.getCode(language);
 
-        builder.write(writeCharacteristic, craftData(CMD_GROUP_GENERAL, CMD_SET_LANGUAGE, languageCode));
-
-        return this;
+        return craftData(CMD_GROUP_GENERAL, CMD_SET_LANGUAGE, languageCode);
     }
 
     public FitProDeviceSupport setUserData(TransactionBuilder builder) {
@@ -779,16 +818,10 @@ public class FitProDeviceSupport extends AbstractBTLESingleDeviceSupport {
 
     @Override
     public void onReadConfiguration(final String config) {
-        final TransactionBuilder builder = createTransactionBuilder("Read settings");
-        for (final byte command : new byte[]{
-            CMD_GET_DISPLAY_ON_LIFT,
-            CMD_GET_LONG_SIT_REMINDER,
-            CMD_GET_DEVICE_VIBRATIONS
-        }) {
-            builder.write(writeCharacteristic, craftData(CMD_GROUP_REQUEST_DATA, command));
-            builder.sleep(200);
-        }
-        builder.queue();
+        commandQueue.enqueueAll(Arrays.asList(
+                craftData(CMD_GROUP_REQUEST_DATA, CMD_GET_DISPLAY_ON_LIFT),
+                craftData(CMD_GROUP_REQUEST_DATA, CMD_GET_LONG_SIT_REMINDER),
+                craftData(CMD_GROUP_REQUEST_DATA, CMD_GET_DEVICE_VIBRATIONS)));
     }
 
     @Override
@@ -905,6 +938,11 @@ public class FitProDeviceSupport extends AbstractBTLESingleDeviceSupport {
 
 
     public FitProDeviceSupport setTime(TransactionBuilder builder) {
+        builder.write(writeCharacteristic, getTimeCommand());
+        return this;
+    }
+
+    private byte[] getTimeCommand() {
         LOG.debug("FitPro set time");
         Calendar calendar = Calendar.getInstance();
 
@@ -919,9 +957,7 @@ public class FitProDeviceSupport extends AbstractBTLESingleDeviceSupport {
         // int datetime2 = ByteBuffer.wrap(array).getInt();
 
         //byte[] time = craftData(LT716Constants.CMD_SET_DATE_TIME, new byte[]{(byte) (datetime >> 24), (byte) (datetime >> 16), (byte) (datetime >> 8), (byte) (datetime >> 0)});
-        byte[] time = craftData(CMD_GROUP_GENERAL, CMD_SET_DATE_TIME, (ByteBuffer.allocate(4).putInt(datetime).array()));
-        builder.write(writeCharacteristic, time);
-        return this;
+        return craftData(CMD_GROUP_GENERAL, CMD_SET_DATE_TIME, ByteBuffer.allocate(4).putInt(datetime).array());
     }
 
 
