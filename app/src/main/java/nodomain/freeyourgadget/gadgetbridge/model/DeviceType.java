@@ -58,6 +58,7 @@ import nodomain.freeyourgadget.gadgetbridge.devices.coospo.CoospoHW9Coordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.cycling_sensor.coordinator.CyclingSensorCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.divoom.PixooCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.dji.cameras.DjiOsmoAction4Coordinator;
+import nodomain.freeyourgadget.gadgetbridge.devices.concept2.Concept2PM5Coordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.domyos.DomyosT540Coordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.earfun.EarFunAirPro4Coordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.earfun.EarFunAirSCoordinator;
@@ -1026,6 +1027,7 @@ public enum DeviceType {
     WASPOS(WaspOSCoordinator.class),
     UM25(UM25Coordinator.class),
     DOMYOS_T540(DomyosT540Coordinator.class),
+    CONCEPT2_PM5(Concept2PM5Coordinator.class),
     EVEN_REALITIES_G_1(G1DeviceCoordinator.class),
     NOTHING_EAR1(Ear1Coordinator.class),
     NOTHING_EAR2(Ear2Coordinator.class),
