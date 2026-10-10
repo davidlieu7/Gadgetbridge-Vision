@@ -574,7 +574,7 @@ abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator(
                             min = levelRange.first,
                             max = levelRange.last,
                             defaultValue = levelRange.first,
-                            dependency = DeviceSettingsPreferenceConst.PREF_SOUNDCORE_ADAPTIVE_NOISE_CANCELLING,
+                            dependency = if (separateAdaptiveToggle) DeviceSettingsPreferenceConst.PREF_SOUNDCORE_ADAPTIVE_NOISE_CANCELLING else null,
                         )
                     }
                     if (has(Capability.WindNoiseReduction)) {
