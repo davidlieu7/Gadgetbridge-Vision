@@ -28,6 +28,8 @@ object PM5Uuids {
     fun of(shortId: Int): UUID = UUID.fromString(String.format("ce06%04x-43e5-11e4-916c-0800200c9a66", shortId))
 
     @JvmField val SERVICE_DEVICE_INFO: UUID = of(0x0010)
+    /** ASCII serial number, the one the monitor also advertises in its name. */
+    @JvmField val SERIAL_NUMBER: UUID = of(0x0012)
     @JvmField val HARDWARE_REVISION: UUID = of(0x0013)
     @JvmField val FIRMWARE_REVISION: UUID = of(0x0014)
 
@@ -44,7 +46,7 @@ object PM5Uuids {
     @JvmField val FORCE_CURVE: UUID = of(0x003D)
 
     /**
-     * Carries every rowing data block behind a one-byte id (0x31 to 0x3C), as long as the
+     * Carries every rowing data block behind a one-byte id (0x31 to 0x3F), as long as the
      * characteristic of the same id has notifications off.
      */
     @JvmField val MULTIPLEXED: UUID = of(0x0080)

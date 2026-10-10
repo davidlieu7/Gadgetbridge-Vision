@@ -31,12 +31,13 @@ enum class PM5WorkoutType(val code: Int) {
     VARIABLE_UNDEFINED_REST_INTERVAL(9),
     FIXED_CALORIE(10),
     FIXED_WATT_MINUTES(11),
-    FIXED_CALORIE_INTERVAL(12);
+    FIXED_CALORIE_INTERVAL(12),
+    FIXED_WATT_MINUTE_INTERVAL(13);
 
     val isInterval: Boolean
         get() = when (this) {
             FIXED_TIME_INTERVAL, FIXED_DISTANCE_INTERVAL, VARIABLE_INTERVAL,
-            VARIABLE_UNDEFINED_REST_INTERVAL, FIXED_CALORIE_INTERVAL -> true
+            VARIABLE_UNDEFINED_REST_INTERVAL, FIXED_CALORIE_INTERVAL, FIXED_WATT_MINUTE_INTERVAL -> true
             else -> false
         }
 
@@ -136,6 +137,12 @@ enum class PM5ErgKind {
     BIKE,
     UNKNOWN;
 
+    /** Metres the monitor's pace fields count time over: 1000 on the BikeErg, 500 on the others. */
+    val paceMeters: Int get() = if (this == BIKE) 1000 else 500
+
+    /** [monitorPace], as the monitor sends it for this erg, in seconds per 500 m. */
+    fun pacePer500m(monitorPace: Double): Double = monitorPace * 500 / paceMeters
+
     companion object {
         @JvmStatic
         fun fromMachineType(code: Int): PM5ErgKind = when (code) {
@@ -146,6 +153,31 @@ enum class PM5ErgKind {
             225 -> SKI // multi-erg ski
             226 -> BIKE // multi-erg bike
             else -> UNKNOWN
+        }
+
+        /**
+         * The erg a monitor names after its serial when it advertises, as in "PM5 430070439 Row";
+         * null when the name gives none.
+         */
+        @JvmStatic
+        fun fromDeviceName(name: String?): PM5ErgKind? {
+            val words = name?.split(' ')?.drop(2) ?: return null
+            return when {
+                words.any { it.equals("Row", ignoreCase = true) } -> ROWER
+                words.any { it.equals("Ski", ignoreCase = true) } -> SKI
+                words.any { it.equals("Bike", ignoreCase = true) } -> BIKE
+                else -> null
+            }
+        }
+
+        /**
+         * The erg from the machine type the monitor reports, which firmware before interface
+         * revision 1.26 leaves out of its status, else from [named], else a rower.
+         */
+        @JvmStatic
+        fun of(machineType: Int?, named: PM5ErgKind?): PM5ErgKind {
+            val reported = machineType?.let { fromMachineType(it) }
+            return reported?.takeIf { it != UNKNOWN } ?: named ?: reported ?: ROWER
         }
     }
 }

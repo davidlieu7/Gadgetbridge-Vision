@@ -32,7 +32,7 @@ sealed interface PM5Message {
         val rowingState: PM5RowingState?,
         val strokeState: PM5StrokeState?,
         val totalWorkDistanceMeters: Int,
-        /** Hundredths of a second for a time target, otherwise meters, calories or watts as [durationType] says. */
+        /** Hundredths of a second for a time target, otherwise meters, calories or watt-minutes as [durationType] says. */
         val workoutDurationRaw: Int,
         val durationType: PM5DurationType?,
         val dragFactor: Int,
@@ -59,9 +59,9 @@ sealed interface PM5Message {
         val speedMetersPerSecond: Double,
         val strokeRate: Int,
         val heartRate: Int?,
-        /** Seconds per 500 m. */
+        /** Seconds per 500 m, per 1000 m on the BikeErg; see [PM5ErgKind.paceMeters]. */
         val currentPaceSeconds: Double,
-        /** Seconds per 500 m. */
+        /** Seconds per 500 m, per 1000 m on the BikeErg; see [PM5ErgKind.paceMeters]. */
         val averagePaceSeconds: Double,
         val restDistanceMeters: Int,
         val restTimeSeconds: Double,
@@ -78,7 +78,7 @@ sealed interface PM5Message {
         /** Only in the individual characteristic layout; the multiplexed layout moves it to 0x32. */
         val averagePowerWatts: Int?,
         val totalCalories: Int,
-        /** Seconds per 500 m. */
+        /** Seconds per 500 m, per 1000 m on the BikeErg; see [PM5ErgKind.paceMeters]. */
         val splitAveragePaceSeconds: Double,
         val splitAveragePowerWatts: Int,
         val splitAverageCaloriesPerHour: Int,
@@ -131,7 +131,7 @@ sealed interface PM5Message {
         val averageStrokeRate: Int,
         val workHeartRate: Int?,
         val restHeartRate: Int?,
-        /** Seconds per 500 m. */
+        /** Seconds per 500 m, per 1000 m on the BikeErg; see [PM5ErgKind.paceMeters]. */
         val averagePaceSeconds: Double,
         val totalCalories: Int,
         val averageCaloriesPerHour: Int,
@@ -156,7 +156,7 @@ sealed interface PM5Message {
         val averageDragFactor: Int,
         val recoveryHeartRate: Int?,
         val workoutType: PM5WorkoutType?,
-        /** Seconds per 500 m. Only in the individual characteristic layout; the multiplexed layout moves it to 0x3C. */
+        /** Seconds per 500 m, per 1000 m on the BikeErg. Only in the individual characteristic layout; the multiplexed layout moves it to 0x3C. */
         val averagePaceSeconds: Double?,
     ) : PM5Message
 
@@ -178,7 +178,7 @@ sealed interface PM5Message {
     /** Multiplexed id 0x3C, only sent multiplexed. */
     data class AdditionalSummary2(
         val logDate: PM5LogDate,
-        /** Seconds per 500 m. */
+        /** Seconds per 500 m, per 1000 m on the BikeErg; see [PM5ErgKind.paceMeters]. */
         val averagePaceSeconds: Double,
         val gameId: Int,
         val verified: Boolean,

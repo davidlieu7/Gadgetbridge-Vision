@@ -39,7 +39,7 @@ object PM5MessageDecoder {
     const val ID_HEART_RATE_BELT_INFO = 0x3B
     const val ID_ADDITIONAL_SUMMARY_2 = 0x3C
 
-    /** Never multiplexed: the force curve has a characteristic of its own. */
+    /** Multiplexed only while its own characteristic is not subscribed. */
     const val ID_FORCE_CURVE = 0x3D
 
     // Shortest block each layout accepts. The trailing machine type byte of 0x32 arrived with

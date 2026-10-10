@@ -41,9 +41,11 @@ class Concept2PM5Support : AbstractBTLESingleDeviceSupport(LOG) {
 
     override fun initializeDevice(builder: TransactionBuilder): TransactionBuilder {
         builder.setDeviceState(GBDevice.State.INITIALIZING)
+        builder.read(PM5Uuids.SERIAL_NUMBER)
         builder.read(PM5Uuids.HARDWARE_REVISION)
         builder.read(PM5Uuids.FIRMWARE_REVISION)
-        builder.write(PM5Uuids.SAMPLE_RATE, PM5Uuids.SAMPLE_RATE_500_MS)
+        // status blocks four times a second
+        builder.write(PM5Uuids.SAMPLE_RATE, PM5Uuids.SAMPLE_RATE_250_MS)
         // One subscription carries every rowing block; enabling an individual rowing
         // characteristic as well would take its id off the multiplexed stream.
         builder.notify(PM5Uuids.MULTIPLEXED, true)
@@ -62,6 +64,11 @@ class Concept2PM5Support : AbstractBTLESingleDeviceSupport(LOG) {
         }
         val text = String(value, Charsets.US_ASCII).trim { it <= ' ' }
         return when (characteristic.uuid) {
+            PM5Uuids.SERIAL_NUMBER -> {
+                LOG.info("Serial number {}", text)
+                true
+            }
+
             PM5Uuids.HARDWARE_REVISION -> {
                 versionInfo.hwVersion = text
                 true
