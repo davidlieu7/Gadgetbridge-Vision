@@ -19,6 +19,8 @@ package nodomain.freeyourgadget.gadgetbridge.devices.fitpro;
 
 import java.util.UUID;
 
+import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.Language;
+
 public class FitProConstants {
 
     // cd 00 2a 05 01 0c 00 0c 0000012d000000bb000018
@@ -171,18 +173,40 @@ public class FitProConstants {
     public static final byte NOTIFICATION_ICON_QQ = (byte) 0x2;
     public static final byte NOTIFICATION_ICON_INSTAGRAM = (byte) 0x10;
 
-    public static final int LANG_CHINESE = 0x0;
-    public static final int LANG_PORTUGUESE = 0xc;
-    public static final int LANG_GERMAN = 0x5;
-    public static final int LANG_SPANISH = 0x6;
-    public static final int LANG_FRENCH = 0x7;
-    public static final int LANG_NETHERLANDS = 0xa;
-    public static final int LANG_POLISH = 0xb;
-    public static final int LANG_RUSSIAN = 0xd;
-    public static final int LANG_TURKISH = 0x10;
-    public static final int LANG_ENGLISH = 0x1;
-    public static final int LANG_CZECH = 0x4;
-    public static final int LANG_ITALIAN = 0x12;
+    public enum FitProLanguage {
+        CHINESE     (Language.ZH, 0x0),
+        PORTUGUESE  (Language.PT, 0xc),
+        GERMAN      (Language.DE, 0x5),
+        SPANISH     (Language.ES, 0x6),
+        FRENCH      (Language.FR, 0x7),
+        DUTCH       (Language.NL, 0xa),
+        POLISH      (Language.PL, 0xb),
+        RUSSIAN     (Language.RU, 0xd),
+        TURKISH     (Language.TR, 0x10),
+        ENGLISH     (Language.EN, 0x1),
+        CZECH       (Language.CS, 0x4),
+        ITALIAN     (Language.IT, 0x12);
+
+        private final Language language;
+        private final byte code;
+
+        FitProLanguage(final Language language, final int code) {
+            this.language = language;
+            this.code = (byte) code;
+        }
+
+        public static byte getCode(final Language language) {
+            if (language != null) {
+                final String languageCode = language.getCode().substring(0, 2);
+                for (final FitProLanguage fitProLanguage : values()) {
+                    if (fitProLanguage.language.getCode().equals(languageCode)) {
+                        return fitProLanguage.code;
+                    }
+                }
+            }
+            return ENGLISH.code;
+        }
+    }
 
     //00       01         00      96            03            08      16    7f
     //^^ zeros ^^ on/off  ^^ sep  ^^unknown     ^^minutes     ^^from  ^^ to ^^ unknown

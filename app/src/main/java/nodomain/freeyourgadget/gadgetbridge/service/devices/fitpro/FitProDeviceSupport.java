@@ -124,6 +124,7 @@ import nodomain.freeyourgadget.gadgetbridge.GBApplication;
 import nodomain.freeyourgadget.gadgetbridge.R;
 import nodomain.freeyourgadget.gadgetbridge.activities.SettingsActivity;
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsPreferenceConst;
+import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.Language;
 import nodomain.freeyourgadget.gadgetbridge.database.DBHandler;
 import nodomain.freeyourgadget.gadgetbridge.database.DBHelper;
 import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEventBatteryInfo;
@@ -681,61 +682,21 @@ public class FitProDeviceSupport extends AbstractBTLESingleDeviceSupport {
 
     public FitProDeviceSupport setLanguage(TransactionBuilder builder) {
         LOG.debug("FitPro set language");
-        String localeString = GBApplication.getDeviceSpecificSharedPrefs(gbDevice.getAddress()).getString("language", "auto");
-        if (localeString == null || localeString.equals("auto")) {
+        String localeString = GBApplication.getDeviceSpecificSharedPrefs(gbDevice.getAddress())
+                .getString(DeviceSettingsPreferenceConst.PREF_LANGUAGE, Language.AUTO.getCode());
+        if (localeString == null || localeString.equals(Language.AUTO.getCode())) {
             String language = Locale.getDefault().getLanguage();
             String country = Locale.getDefault().getCountry();
 
             if (country == null) {
                 country = language;
             }
-            localeString = language + "_" + country.toUpperCase();
+            localeString = language + "_" + country.toUpperCase(Locale.ROOT);
         }
         LOG.info("Setting device to locale: " + localeString);
 
-        byte languageCode = FitProConstants.LANG_ENGLISH;
-
-        switch (localeString.substring(0, 2)) {
-            case "zh":
-                languageCode = FitProConstants.LANG_CHINESE;
-                break;
-            case "it":
-                languageCode = FitProConstants.LANG_ITALIAN;
-                break;
-            case "cs":
-                languageCode = FitProConstants.LANG_CZECH;
-                break;
-            case "en":
-                languageCode = FitProConstants.LANG_ENGLISH;
-                break;
-            case "tr":
-                languageCode = FitProConstants.LANG_TURKISH;
-                break;
-            case "ru":
-                languageCode = FitProConstants.LANG_RUSSIAN;
-                break;
-            case "pl":
-                languageCode = FitProConstants.LANG_POLISH;
-                break;
-            case "nl":
-                languageCode = FitProConstants.LANG_NETHERLANDS;
-                break;
-            case "fr":
-                languageCode = FitProConstants.LANG_FRENCH;
-                break;
-            case "es":
-                languageCode = FitProConstants.LANG_SPANISH;
-                break;
-            case "de":
-                languageCode = FitProConstants.LANG_GERMAN;
-                break;
-            case "pt":
-                languageCode = FitProConstants.LANG_PORTUGUESE;
-                break;
-
-            default:
-                languageCode = FitProConstants.LANG_ENGLISH;
-        }
+        final Language language = Language.fromCode(localeString);
+        final byte languageCode = FitProConstants.FitProLanguage.getCode(language);
 
         builder.write(writeCharacteristic, craftData(CMD_GROUP_GENERAL, CMD_SET_LANGUAGE, languageCode));
 
