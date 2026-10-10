@@ -56,6 +56,10 @@ public abstract class SoundcoreProtocolImplV1 extends AbstractSoundcoreProtocol 
     public static final short CMD_SET_3D_SURROUND = (short) 0x8602;
     public static final short CMD_SET_BATTERY_LOW_TONE = (short) 0x8210;
 
+    public static final short CMD_SET_GAMING_MODE = (short) 0x8701;
+    public static final short CMD_SET_EQUALIZER = (short) 0x8703;
+    public static final short CMD_SET_FIT_TEST = (short) 0x0109;
+
     private static final int DEFAULT_BATTERY_MULTIPLIER = 10;
     private static final int DEFAULT_BATTERY_OFFSET = 0;
 
@@ -328,6 +332,29 @@ public abstract class SoundcoreProtocolImplV1 extends AbstractSoundcoreProtocol 
         intent.putExtra(GBDevice.EXTRA_DEVICE, getDevice());
         intent.putExtra(MultipointPairingActivity.EXTRA_PAIRING_ENABLED, enabled);
         LocalBroadcastManager.getInstance(GBApplication.getContext()).sendBroadcast(intent);
+    }
+
+    protected final void broadcastPairedDevices(final List<MultipointDevice> pairedDevices,
+                                                final String activeSourceAddress) {
+        final List<MultipointDevice> devices = new ArrayList<>();
+        for (final MultipointDevice device : pairedDevices) {
+            devices.add(new MultipointDevice(device.getAddress(), device.getName(), device.isConnected(),
+                    device.isConnected() && device.getAddress().equalsIgnoreCase(activeSourceAddress),
+                    device.getCanForget()));
+        }
+        broadcastMultipointList(devices);
+    }
+
+    /** Formats the six-byte little-endian Bluetooth address used by V1 multipoint commands. */
+    public static String formatMacAddress(final byte[] payload, final int position) {
+        StringBuilder mac = new StringBuilder(17);
+        for (int i = 5; i >= 0; i--) {
+            if (mac.length() > 0) {
+                mac.append(':');
+            }
+            mac.append(String.format("%02X", payload[position + i] & 0xFF));
+        }
+        return mac.toString();
     }
 
     public void broadcastMultipointList(final List<MultipointDevice> devices) {

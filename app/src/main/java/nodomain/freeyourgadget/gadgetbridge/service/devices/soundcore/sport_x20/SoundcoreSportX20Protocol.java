@@ -30,8 +30,6 @@ import nodomain.freeyourgadget.gadgetbridge.util.StringUtils;
 public class SoundcoreSportX20Protocol extends SoundcoreProtocolImplV1 {
     private static final Logger LOG = LoggerFactory.getLogger(SoundcoreSportX20Protocol.class);
 
-    private static final short CMD_SET_EQUALIZER = (short) 0x8703;
-    private static final short CMD_SET_FIT_TEST = (short) 0x0109;
     private static final int BATTERY_MULTIPLIER = 20;
 
     // Offsets within CMD_GET_DEVICE_INFO payload for the equalizer preset and band values.
@@ -310,7 +308,7 @@ public class SoundcoreSportX20Protocol extends SoundcoreProtocolImplV1 {
         }
         pairedDevices.clear();
         pairedDevices.addAll(devices);
-        broadcastPairedDevices();
+        broadcastPairedDevices(pairedDevices, activeSourceAddress);
     }
 
     private void decodeConnectionStatusPayload(final byte[] payload) {
@@ -319,29 +317,9 @@ public class SoundcoreSportX20Protocol extends SoundcoreProtocolImplV1 {
             return;
         }
         activeSourceAddress = payload[0] == 0x01 ? formatMacAddress(payload, 1) : null;
-        broadcastPairedDevices();
+        broadcastPairedDevices(pairedDevices, activeSourceAddress);
     }
 
-    private void broadcastPairedDevices() {
-        final List<MultipointDevice> devices = new ArrayList<>();
-        for (final MultipointDevice device : pairedDevices) {
-            devices.add(new MultipointDevice(device.getAddress(), device.getName(), device.isConnected(),
-                    device.isConnected() && device.getAddress().equalsIgnoreCase(activeSourceAddress),
-                    device.getCanForget()));
-        }
-        broadcastMultipointList(devices);
-    }
-
-    public static String formatMacAddress(byte[] payload, int position) {
-        StringBuilder mac = new StringBuilder(17);
-        for (int i = 5; i >= 0; i--) {
-            if (mac.length() > 0) {
-                mac.append(':');
-            }
-            mac.append(String.format("%02X", payload[position + i] & 0xFF));
-        }
-        return mac.toString();
-    }
 
     /** Maps a low-nibble TapFunction code (0–15) back to the TapFunction enum. */
     private static TapFunction functionFromCode(final int code) {
