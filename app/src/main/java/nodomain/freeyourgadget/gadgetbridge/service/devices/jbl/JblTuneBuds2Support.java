@@ -592,16 +592,12 @@ public class JblTuneBuds2Support extends AbstractDeviceSupport implements JblGat
     }
 
     private boolean isEqBandPref(final String config) {
-        return PREF_EQ_BAND_32.equals(config)
-                || PREF_EQ_BAND_64.equals(config)
-                || PREF_EQ_BAND_125.equals(config)
-                || PREF_EQ_BAND_250.equals(config)
-                || PREF_EQ_BAND_500.equals(config)
-                || PREF_EQ_BAND_1K.equals(config)
-                || PREF_EQ_BAND_2K.equals(config)
-                || PREF_EQ_BAND_4K.equals(config)
-                || PREF_EQ_BAND_8K.equals(config)
-                || PREF_EQ_BAND_16K.equals(config);
+        for (final String preference : EQ_BAND_PREFS) {
+            if (preference.equals(config)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     // ─── Command builders ──────────────────────────────────────────────────
