@@ -137,30 +137,50 @@ data class MetricTotals(
 }
 
 /**
+ * How a metric combines over several workouts.
+ */
+enum class MetricAggregation { TOTAL, AVERAGE, MAXIMUM }
+
+/**
  * Metrics a sport's chart can plot. Speed is in m/s, pace in s/m.
  */
-enum class SportMetric(val average: Boolean = false, val valueOf: (MetricTotals) -> Double) {
+enum class SportMetric(
+    val aggregation: MetricAggregation = MetricAggregation.TOTAL,
+    val valueOf: (MetricTotals) -> Double,
+) {
     DISTANCE(valueOf = { it.distanceMeters }),
     DURATION(valueOf = { it.durationSeconds.toDouble() }),
-    AVG_PACE(average = true, valueOf = { if (it.speed.average > 0.0) 1.0 / it.speed.average else 0.0 }),
-    AVG_SPEED(average = true, valueOf = { it.speed.average }),
-    MAX_PACE(average = true, valueOf = { if (it.maxSpeed > 0.0) 1.0 / it.maxSpeed else 0.0 }),
-    MAX_SPEED(average = true, valueOf = { it.maxSpeed }),
-    AVG_HEART_RATE(average = true, valueOf = { it.heartRate.average }),
-    MAX_HEART_RATE(average = true, valueOf = { it.maxHeartRate }),
-    AVG_POWER(average = true, valueOf = { it.power.average }),
-    MAX_POWER(average = true, valueOf = { it.maxPower }),
-    AVG_CADENCE(average = true, valueOf = { it.cadence.average }),
-    MAX_CADENCE(average = true, valueOf = { it.maxCadence }),
-    AVG_SWOLF(average = true, valueOf = { it.swolf.average }),
+    AVG_PACE(
+        aggregation = MetricAggregation.AVERAGE,
+        valueOf = { if (it.speed.average > 0.0) 1.0 / it.speed.average else 0.0 },
+    ),
+    AVG_SPEED(aggregation = MetricAggregation.AVERAGE, valueOf = { it.speed.average }),
+    MAX_PACE(
+        aggregation = MetricAggregation.MAXIMUM,
+        valueOf = { if (it.maxSpeed > 0.0) 1.0 / it.maxSpeed else 0.0 },
+    ),
+    MAX_SPEED(aggregation = MetricAggregation.MAXIMUM, valueOf = { it.maxSpeed }),
+    AVG_HEART_RATE(aggregation = MetricAggregation.AVERAGE, valueOf = { it.heartRate.average }),
+    MAX_HEART_RATE(aggregation = MetricAggregation.MAXIMUM, valueOf = { it.maxHeartRate }),
+    AVG_POWER(aggregation = MetricAggregation.AVERAGE, valueOf = { it.power.average }),
+    MAX_POWER(aggregation = MetricAggregation.MAXIMUM, valueOf = { it.maxPower }),
+    AVG_CADENCE(aggregation = MetricAggregation.AVERAGE, valueOf = { it.cadence.average }),
+    MAX_CADENCE(aggregation = MetricAggregation.MAXIMUM, valueOf = { it.maxCadence }),
+    AVG_SWOLF(aggregation = MetricAggregation.AVERAGE, valueOf = { it.swolf.average }),
     CALORIES(valueOf = { it.calories }),
     ASCENT(valueOf = { it.ascentMeters }),
     DESCENT(valueOf = { it.descentMeters }),
     STEPS(valueOf = { it.steps }),
     TRAINING_LOAD(valueOf = { it.trainingLoad }),
     SETS(valueOf = { it.sets }),
-    AVG_AEROBIC_EFFECT(average = true, valueOf = { it.aerobicEffect.average }),
-    AVG_ANAEROBIC_EFFECT(average = true, valueOf = { it.anaerobicEffect.average }),
+    AVG_AEROBIC_EFFECT(aggregation = MetricAggregation.AVERAGE, valueOf = { it.aerobicEffect.average }),
+    AVG_ANAEROBIC_EFFECT(aggregation = MetricAggregation.AVERAGE, valueOf = { it.anaerobicEffect.average }),
+    ;
+
+    /**
+     * Averages and maximums aren't totals, so they are only drawn as lines.
+     */
+    val lineOnly: Boolean get() = aggregation != MetricAggregation.TOTAL
 }
 
 enum class PeriodKind { WEEK, MONTH, YEAR, CUSTOM }

@@ -3389,7 +3389,7 @@
     <string name="statistics_chart_set_2">Set 2</string>
     <string name="statistics_chart_type_bar">Bar</string>
     <string name="statistics_chart_type_line">Line</string>
-    <string name="statistics_chart_average_hint">Averages are always shown as a line.</string>
+    <string name="statistics_chart_average_hint">Averages and maximums are always shown as a line.</string>
     <string name="statistics_chart_apply">Apply</string>
     <!-- Accessibility description of the statistics chart, e.g. "Distance per day, Sep 22 - 28, 2026, total 31.4 km" -->
     <string name="statistics_chart_description_daily">%1$s per day, %2$s, total %3$s</string>
@@ -3403,6 +3403,12 @@
     <string name="statistics_chart_description_daily_average">%1$s per day, %2$s, average %3$s</string>
     <!-- Accessibility description of the statistics chart, e.g. "Power per month, 2026, average 215 W" -->
     <string name="statistics_chart_description_monthly_average">%1$s per month, %2$s, average %3$s</string>
+    <!-- Accessibility description of the statistics chart, e.g. "Max Heart Rate per day, Sep 22 - 28, 2026, highest 182 bpm" -->
+    <string name="statistics_chart_description_daily_maximum">%1$s per day, %2$s, highest %3$s</string>
+    <!-- Accessibility description of the statistics chart, e.g. "Max Heart Rate per week, Sep 3 - Dec 1, 2026, highest 182 bpm" -->
+    <string name="statistics_chart_description_weekly_maximum">%1$s per week, %2$s, highest %3$s</string>
+    <!-- Accessibility description of the statistics chart, e.g. "Max Heart Rate per month, 2026, highest 182 bpm" -->
+    <string name="statistics_chart_description_monthly_maximum">%1$s per month, %2$s, highest %3$s</string>
     <string name="statistics_sessions">Sessions</string>
     <string name="statistics_previous_period">Previous period</string>
     <string name="statistics_next_period">Next period</string>

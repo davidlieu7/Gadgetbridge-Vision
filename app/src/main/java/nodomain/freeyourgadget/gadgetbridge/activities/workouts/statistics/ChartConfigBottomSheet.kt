@@ -103,9 +103,9 @@ class ChartConfigBottomSheet : BottomSheetDialogFragment() {
         set.setField.text = chartSet?.let { getString(it.metric.labelRes()) } ?: getString(R.string.none)
         set.setType.check(if (chartSet?.type == SeriesType.LINE) R.id.set_type_line else R.id.set_type_bar)
         set.setType.isEnabled = chartSet != null
-        set.setTypeBar.isEnabled = chartSet != null && !chartSet.metric.average
+        set.setTypeBar.isEnabled = chartSet != null && !chartSet.metric.lineOnly
         set.setTypeLine.isEnabled = chartSet != null
-        set.setHint.visibility = if (chartSet?.metric?.average == true) View.VISIBLE else View.GONE
+        set.setHint.visibility = if (chartSet?.metric?.lineOnly == true) View.VISIBLE else View.GONE
     }
 
     /**

@@ -3,16 +3,16 @@ package nodomain.freeyourgadget.gadgetbridge.activities.workouts.statistics
 enum class SeriesType { BAR, LINE }
 
 /**
- * A metric and how it is drawn. Averages are always lines.
+ * A metric and how it is drawn. See [SportMetric.lineOnly].
  */
 data class ChartSet(val metric: SportMetric, val type: SeriesType) {
-    fun withMetric(newMetric: SportMetric) = ChartSet(newMetric, if (newMetric.average) SeriesType.LINE else type)
+    fun withMetric(newMetric: SportMetric) = ChartSet(newMetric, if (newMetric.lineOnly) SeriesType.LINE else type)
 
     companion object {
         /**
-         * Lines for averages, bars for totals.
+         * Lines for averages and maximums, bars for totals.
          */
-        fun of(metric: SportMetric) = ChartSet(metric, if (metric.average) SeriesType.LINE else SeriesType.BAR)
+        fun of(metric: SportMetric) = ChartSet(metric, if (metric.lineOnly) SeriesType.LINE else SeriesType.BAR)
     }
 }
 

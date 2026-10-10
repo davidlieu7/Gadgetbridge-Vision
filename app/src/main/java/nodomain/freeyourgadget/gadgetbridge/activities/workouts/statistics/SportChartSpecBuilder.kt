@@ -78,8 +78,8 @@ object SportChartSpecBuilder {
         .filter { bar -> chart.type == SeriesType.BAR || chart.metric.valueOf(bar.totals) > 0.0 }
         .map { bar -> ChartPoint(bar.x, chart.toDisplay(chart.metric.valueOf(bar.totals))) }
 
-    private fun yAxis(chart: MetricChart, points: List<ChartPoint>): AxisSpec = if (chart.metric.average) {
-        averageAxis(chart.metric, points)
+    private fun yAxis(chart: MetricChart, points: List<ChartPoint>): AxisSpec = if (chart.metric.lineOnly) {
+        rangeAxis(chart.metric, points)
     } else {
         AxisSpec(
             format = ChartValueFormat.DECIMAL,
@@ -88,7 +88,7 @@ object SportChartSpecBuilder {
         )
     }
 
-    private fun averageAxis(metric: SportMetric, points: List<ChartPoint>): AxisSpec {
+    private fun rangeAxis(metric: SportMetric, points: List<ChartPoint>): AxisSpec {
         if (metric == SportMetric.AVG_AEROBIC_EFFECT || metric == SportMetric.AVG_ANAEROBIC_EFFECT) {
             return AxisSpec(format = ChartValueFormat.ONE_DECIMAL, minimum = 0.0, maximum = TRAINING_EFFECT_MAXIMUM)
         }

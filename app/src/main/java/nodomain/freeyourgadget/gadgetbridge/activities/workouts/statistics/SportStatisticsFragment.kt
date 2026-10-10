@@ -432,20 +432,20 @@ class SportStatisticsFragment : Fragment() {
         formatter: WorkoutValueFormatter,
     ): String = getString(
         when (stats.period.barUnit) {
-            BarUnit.DAY -> if (metric.average) {
-                R.string.statistics_chart_description_daily_average
-            } else {
-                R.string.statistics_chart_description_daily
+            BarUnit.DAY -> when (metric.aggregation) {
+                MetricAggregation.TOTAL -> R.string.statistics_chart_description_daily
+                MetricAggregation.AVERAGE -> R.string.statistics_chart_description_daily_average
+                MetricAggregation.MAXIMUM -> R.string.statistics_chart_description_daily_maximum
             }
-            BarUnit.WEEK -> if (metric.average) {
-                R.string.statistics_chart_description_weekly_average
-            } else {
-                R.string.statistics_chart_description_weekly
+            BarUnit.WEEK -> when (metric.aggregation) {
+                MetricAggregation.TOTAL -> R.string.statistics_chart_description_weekly
+                MetricAggregation.AVERAGE -> R.string.statistics_chart_description_weekly_average
+                MetricAggregation.MAXIMUM -> R.string.statistics_chart_description_weekly_maximum
             }
-            BarUnit.MONTH -> if (metric.average) {
-                R.string.statistics_chart_description_monthly_average
-            } else {
-                R.string.statistics_chart_description_monthly
+            BarUnit.MONTH -> when (metric.aggregation) {
+                MetricAggregation.TOTAL -> R.string.statistics_chart_description_monthly
+                MetricAggregation.AVERAGE -> R.string.statistics_chart_description_monthly_average
+                MetricAggregation.MAXIMUM -> R.string.statistics_chart_description_monthly_maximum
             }
         },
         label,
@@ -485,7 +485,7 @@ class SportStatisticsFragment : Fragment() {
     }
 
     private fun formatTotal(metric: SportMetric, raw: Double, formatter: WorkoutValueFormatter): String =
-        if (metric.average && raw == 0.0) getString(R.string.stats_empty_value) else formatMetric(metric, raw, formatter)
+        if (metric.lineOnly && raw == 0.0) getString(R.string.stats_empty_value) else formatMetric(metric, raw, formatter)
 
     private fun formatMetric(metric: SportMetric, raw: Double, formatter: WorkoutValueFormatter): String = when (metric) {
         SportMetric.DISTANCE -> formatter.formatValue(raw / METERS_PER_KM, ActivitySummaryEntries.UNIT_KILOMETERS)
