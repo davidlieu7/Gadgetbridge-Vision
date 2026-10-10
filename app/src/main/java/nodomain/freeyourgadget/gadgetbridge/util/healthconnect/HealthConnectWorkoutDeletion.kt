@@ -108,12 +108,13 @@ internal object HealthConnectWorkoutDeletion {
 
         for (recordType in childRecordTypes) {
             if (!hasWritePermission(grantedPermissions, recordType.recordClass)) {
+                // Without write permission we most likely never wrote this record type, so don't
+                // let it block deletion of the session.
                 LOG.debug(
                     "Skipping Health Connect {} deletion for workout {}: permission not granted.",
                     recordType.recordClass.simpleName,
                     snapshot.summaryId
                 )
-                childRecordsDeleted = false
                 continue
             }
 

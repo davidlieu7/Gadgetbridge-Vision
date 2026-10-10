@@ -68,13 +68,18 @@ class HealthConnectWorkoutDeletionTest {
     }
 
     @Test
-    fun deleteWorkoutFromHealthConnect_skipsSessionWhenChildPermissionMissing() = runBlocking {
+    fun deleteWorkoutFromHealthConnect_deletesSessionWhenChildPermissionMissing() = runBlocking {
         val client = CapturingClient()
         val grantedPermissions = setOf(HealthPermission.getWritePermission(ExerciseSessionRecord::class))
 
         HealthConnectWorkoutDeletion.deleteWorkoutFromHealthConnect(client, grantedPermissions, testSnapshot())
 
-        assertTrue(client.idDeletes.none { it.recordType == ExerciseSessionRecord::class })
+        // Some child types (e.g. cadence) share the exercise write permission with the session.
+        val expected = expectedDeleteOrder()
+            .filter { HealthPermission.getWritePermission(it) in grantedPermissions }
+        assertTrue(expected.size < WorkoutSyncerUtils.WORKOUT_RECORD_TYPES.size)
+        assertEquals(expected, client.idDeletes.map { it.recordType })
+        assertEquals(ExerciseSessionRecord::class, client.idDeletes.last().recordType)
         assertTrue(client.rangeDeletes.isEmpty())
     }
 
