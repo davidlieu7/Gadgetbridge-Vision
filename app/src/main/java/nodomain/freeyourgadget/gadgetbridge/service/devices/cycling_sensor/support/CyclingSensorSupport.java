@@ -28,6 +28,7 @@ import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
 import nodomain.freeyourgadget.gadgetbridge.model.DeviceService;
 import nodomain.freeyourgadget.gadgetbridge.service.btle.TransactionBuilder;
 import nodomain.freeyourgadget.gadgetbridge.service.btle.profiles.battery.BatteryInfoProfile;
+import nodomain.freeyourgadget.gadgetbridge.util.GB;
 import nodomain.freeyourgadget.gadgetbridge.util.Prefs;
 
 public class CyclingSensorSupport extends CyclingSensorBaseSupport {
@@ -38,22 +39,31 @@ public class CyclingSensorSupport extends CyclingSensorBaseSupport {
         public boolean cadenceDataPresent = false;
         public int revolutionCount;
         public int lastRevolutionTimeTicks;
-        private int crankRevolutionCount;
-        private int lastCrankRevolutionTimeTicks;
+        public int crankRevolutionCount;
+        public int lastCrankRevolutionTimeTicks;
 
         public static CyclingSpeedCadenceMeasurement fromPayload(byte[] payload) throws RuntimeException {
-            if(payload.length < 7){
-                throw new RuntimeException("wrong payload length");
+            if (payload == null || payload.length < 1) {
+                throw new IllegalArgumentException("empty payload");
             }
 
             ByteBuffer buffer = ByteBuffer
                     .wrap(payload)
                     .order(ByteOrder.LITTLE_ENDIAN);
 
-            byte flags = buffer.get();
+            int flags = buffer.get() & 0xFF;
 
-            boolean revolutionDataPresent = (flags | FLAG_REVOLUTION_DATA_PRESENT) == FLAG_REVOLUTION_DATA_PRESENT;
-            boolean cadenceDataPresent = (flags | FLAG_CADENCE_DATA_PRESENT) == FLAG_CADENCE_DATA_PRESENT;
+            // A sensor that measures both wheel and crank sets both bits, so test each bit on its own
+            boolean revolutionDataPresent = (flags & FLAG_REVOLUTION_DATA_PRESENT) != 0;
+            boolean cadenceDataPresent = (flags & FLAG_CADENCE_DATA_PRESENT) != 0;
+
+            // wheel: uint32 revolutions + uint16 event time; crank: uint16 revolutions + uint16 event time
+            int expectedLength = 1 + (revolutionDataPresent ? 6 : 0) + (cadenceDataPresent ? 4 : 0);
+            if (payload.length < expectedLength) {
+                throw new IllegalArgumentException("payload length " + payload.length
+                        + " too short for flags " + flags + ", expected " + expectedLength);
+            }
+
             CyclingSpeedCadenceMeasurement result = new CyclingSpeedCadenceMeasurement();
 
             if(revolutionDataPresent){
@@ -64,11 +74,29 @@ public class CyclingSensorSupport extends CyclingSensorBaseSupport {
 
             if(cadenceDataPresent){
                 result.cadenceDataPresent = true;
-                result.crankRevolutionCount = buffer.getInt();
-                result.lastCrankRevolutionTimeTicks = buffer.getShort();
+                result.crankRevolutionCount = buffer.getShort() & 0xFFFF;
+                result.lastCrankRevolutionTimeTicks = buffer.getShort() & 0xFFFF;
             }
 
             return result;
+        }
+
+        /**
+         * Speed in m/s since the previous wheel measurement, or null if no wheel event time passed.
+         * Wheel event times count 1/1024 s in 16 bits, so they roll over every 64 s.
+         */
+        Float speedSince(CyclingSpeedCadenceMeasurement previous, float wheelCircumferenceMeters) {
+            int ticksPassed = (lastRevolutionTimeTicks - previous.lastRevolutionTimeTicks) & 0xFFFF;
+            // every second is subdivided in 1024 ticks
+            int millisDelta = (int)(ticksPassed * (1000f / 1024f));
+
+            if (millisDelta <= 0) {
+                return null;
+            }
+
+            int revolutionsDelta = revolutionCount - previous.revolutionCount;
+            float revolutionsPerSecond = revolutionsDelta * (1000f / millisDelta);
+            return revolutionsPerSecond * wheelCircumferenceMeters;
         }
 
         @NonNull
@@ -144,20 +172,12 @@ public class CyclingSensorSupport extends CyclingSensorBaseSupport {
     }
 
     private void handleMeasurementCharacteristic(byte[] value){
-        if(value == null || value.length < 7){
-            logger.error("Measurement characteristic value length smaller than 7");
-            return;
-        }
-
-        CyclingSpeedCadenceMeasurement measurement = null;
+        CyclingSpeedCadenceMeasurement measurement;
 
         try {
             measurement = CyclingSpeedCadenceMeasurement.fromPayload(value);
-        }catch (RuntimeException e){
-            // do nothing, measurement stays null
-        }
-
-        if(measurement == null){
+        } catch (RuntimeException e) {
+            logger.warn("Ignoring invalid CSC measurement {}: {}", GB.hexdump(value), e.getMessage());
             return;
         }
 
@@ -178,17 +198,7 @@ public class CyclingSensorSupport extends CyclingSensorBaseSupport {
         long lastMeasurementDelta = (now - lastMeasurementTime);
 
         if(lastMeasurementDelta <= 30_000){
-            int ticksPassed = currentMeasurement.lastRevolutionTimeTicks - lastReportedMeasurement.lastRevolutionTimeTicks;
-            // every second is subdivided in 1024 ticks
-            int millisDelta = (int)(ticksPassed * (1000f / 1024f));
-
-            if(millisDelta > 0) {
-                int revolutionsDelta = currentMeasurement.revolutionCount - lastReportedMeasurement.revolutionCount;
-
-                float revolutionsPerSecond = revolutionsDelta * (1000f / millisDelta);
-
-                speed = revolutionsPerSecond * wheelCircumferenceMeters;
-            }
+            speed = currentMeasurement.speedSince(lastReportedMeasurement, wheelCircumferenceMeters);
         }
 
         lastReportedMeasurement = currentMeasurement;
