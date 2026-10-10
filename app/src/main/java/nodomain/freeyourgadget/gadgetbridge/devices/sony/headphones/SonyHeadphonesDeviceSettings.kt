@@ -417,9 +417,7 @@ fun sonyHeadphonesDeviceSettings(
                 defaultValue = false,
             )
 
-            multipointPairing(visibleWhen = { prefs ->
-                prefs.getBoolean(DeviceSettingsPreferenceConst.PREF_SONY_CONNECT_TWO_DEVICES, false)
-            })
+            multipointPairing()
         }
 
         if (capabilities.contains(SonyHeadphonesCapabilities.WideAreaTap)) {
