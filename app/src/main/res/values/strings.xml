@@ -3594,6 +3594,8 @@
     <string name="workout_intervals">Intervals</string>
     <string name="interval_type_active">Active</string>
     <string name="interval_type_rest">Rest</string>
+    <string name="interval_type_warmup">Warm-up</string>
+    <string name="interval_type_cooldown">Cool-down</string>
     <string name="interval_type_unknown">Unknown</string>
     <!-- Diving params -->
     <string name="diving_maximum_diving_depth">Maximum Diving Depth</string>

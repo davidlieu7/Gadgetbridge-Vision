@@ -24,8 +24,10 @@ import org.slf4j.LoggerFactory;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.Comparator;
 import java.util.Iterator;
-import java.util.Objects;
+import java.util.List;
+import java.util.stream.Collectors;
 
 import nodomain.freeyourgadget.gadgetbridge.entities.BaseActivitySummary;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.FitFile;
@@ -77,33 +79,39 @@ public class FitActivityTrackProvider implements ActivityTrackProvider {
                 .map(r -> (FitRecord) r)
                 .iterator();
 
-        final Iterator<Long> lapStarts = fitFile.getRecords().stream()
+        final List<FitLap> laps = fitFile.getRecords().stream()
                 .filter(record -> record instanceof FitLap)
                 .map(record -> (FitLap) record)
-                .filter(lap -> {
-                    Event event = lap.getEvent();
-                    if (event != null && event != Event.LAP) {
-                        return false;
-                    }
-                    EventType eventType = lap.getEventType();
-                    return (eventType == null || eventType == EventType.STOP);
-                })
-                .map(FitLap::getStartTime)
-                .filter(Objects::nonNull)
-                .iterator();
+                .filter(FitActivityTrackProvider::isLapBoundary)
+                .filter(lap -> lap.getStartTime() != null)
+                .sorted(Comparator.comparingLong(FitLap::getStartTime))
+                .collect(Collectors.toList());
+        final boolean hasRestLaps = laps.stream()
+                .anyMatch(lap -> intensityOf(lap) == ActivityTrack.SegmentIntensity.REST);
 
-        // skip first lap start
-        if(lapStarts.hasNext()){
-            lapStarts.next();
+        if (!laps.isEmpty()) {
+            activityTrack.setCurrentSegmentInfo(segmentInfoOf(laps.get(0), hasRestLaps));
         }
-
-        long nextLapStart = (lapStarts.hasNext() ? lapStarts.next() : Long.MAX_VALUE);
+        int nextLap = 1;
+        boolean segmentHasPoints = false;
         while (records.hasNext()) {
             FitRecord record = records.next();
-            if (record.getComputedTimestamp() >= nextLapStart) {
-                activityTrack.startNewSegment();
-                nextLapStart = (lapStarts.hasNext() ? lapStarts.next() : Long.MAX_VALUE);
+            final Long timestamp = record.getComputedTimestamp();
+            if (timestamp == null) {
+                continue;
             }
+            FitLap startedLap = null;
+            while (nextLap < laps.size() && timestamp >= laps.get(nextLap).getStartTime()) {
+                startedLap = laps.get(nextLap++);
+            }
+            if (startedLap != null) {
+                if (segmentHasPoints) {
+                    activityTrack.startNewSegment(segmentInfoOf(startedLap, hasRestLaps));
+                } else {
+                    activityTrack.setCurrentSegmentInfo(segmentInfoOf(startedLap, hasRestLaps));
+                }
+            }
+            segmentHasPoints = true;
             final ActivityPoint point = record.toActivityPoint();
             normalizeStepCadence(point, activityKind);
             activityTrack.addTrackPoint(point);
@@ -162,6 +170,49 @@ public class FitActivityTrackProvider implements ActivityTrackProvider {
         }
 
         return activityTrack;
+    }
+
+    private static boolean isLapBoundary(@NonNull final FitLap lap) {
+        final Event event = lap.getEvent();
+        if (event != null && event != Event.LAP) {
+            return false;
+        }
+        final EventType eventType = lap.getEventType();
+        return eventType == null || eventType == EventType.STOP;
+    }
+
+    /**
+     * Maps the FIT {@code lap.intensity} enum: active 0, rest 1, warmup 2, cooldown 3,
+     * recovery 4, interval 5, other 6, main 7.
+     */
+    @NonNull
+    static ActivityTrack.SegmentIntensity intensityOf(@NonNull final FitLap lap) {
+        final Integer intensity = lap.getIntensity();
+        if (intensity == null) {
+            return ActivityTrack.SegmentIntensity.UNKNOWN;
+        }
+        return switch (intensity) {
+            case 0, 5, 7 -> ActivityTrack.SegmentIntensity.ACTIVE;
+            case 1, 4 -> ActivityTrack.SegmentIntensity.REST;
+            case 2 -> ActivityTrack.SegmentIntensity.WARMUP;
+            case 3 -> ActivityTrack.SegmentIntensity.COOLDOWN;
+            default -> ActivityTrack.SegmentIntensity.UNKNOWN;
+        };
+    }
+
+    /**
+     * Devices write intensity active on every lap of a workout without rest laps, auto-laps
+     * included, so an active lap only marks an interval when some lap is a rest.
+     */
+    @NonNull
+    private static ActivityTrack.SegmentInfo segmentInfoOf(@NonNull final FitLap lap, final boolean hasRestLaps) {
+        final ActivityTrack.SegmentIntensity intensity = intensityOf(lap);
+        final Double distance = lap.getTotalDistance();
+        return new ActivityTrack.SegmentInfo(
+                intensity == ActivityTrack.SegmentIntensity.ACTIVE && !hasRestLaps
+                        ? ActivityTrack.SegmentIntensity.UNKNOWN : intensity,
+                distance != null ? (int) Math.round(distance) : null,
+                null);
     }
 
     /**

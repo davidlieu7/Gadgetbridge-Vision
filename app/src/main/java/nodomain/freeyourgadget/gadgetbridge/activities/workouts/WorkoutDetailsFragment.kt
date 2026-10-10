@@ -184,37 +184,38 @@ class WorkoutDetailsFragment : Fragment(), MenuProvider {
                             mutableListOf()
                         )
                     }
-                    // Reading the track means parsing the device's raw file a second time, so it is
-                    // only done when the workout has no charts of its own. That is also the only
-                    // path that yields interval phases: a parser that builds its own charts reports
-                    // laps through its summary instead.
-                    if (parsedWorkout.charts.isEmpty()) {
-                        try {
-                            val activityTrack = gbDevice.deviceCoordinator
-                                .getActivityTrackProvider(gbDevice, requireContext())
-                                ?.getActivityTrack(parsedWorkout.summary)
-                            val activityPoints = activityTrack?.allPoints
-                            if (activityTrack != null && !activityPoints.isNullOrEmpty()) {
-                                // Altitude from imported elevation tiles replaces what the device recorded
-                                if (ElevationTiles.correct(requireContext(), gbDevice, ActivityKind.fromCode(parsedWorkout.summary.activityKind), activityPoints)) {
-                                    ElevationTiles.applyToSummary(parsedWorkout.data, activityPoints)
-                                }
-                                val intervals = IntervalChartUtils.deriveIntervals(
-                                    activityTrack.segments, activityTrack.segmentInfos
-                                )
-                                IntervalChartUtils.addToSummaryData(requireContext(), parsedWorkout.data, intervals)
-                                val defaultCharts = DefaultWorkoutCharts.buildDefaultCharts(
+                    // Intervals come from the activity track for every device, also when the parser
+                    // built its own charts, so they match the laps of the FIT export, which reads the
+                    // same track.
+                    try {
+                        val activityTrack = gbDevice.deviceCoordinator
+                            .getActivityTrackProvider(gbDevice, requireContext())
+                            ?.getActivityTrack(parsedWorkout.summary)
+                        val activityPoints = activityTrack?.allPoints
+                        if (activityTrack != null && !activityPoints.isNullOrEmpty()) {
+                            // Altitude from imported elevation tiles replaces what the device recorded,
+                            // only where the charts are built from this track
+                            if (parsedWorkout.charts.isEmpty() &&
+                                ElevationTiles.correct(requireContext(), gbDevice, ActivityKind.fromCode(parsedWorkout.summary.activityKind), activityPoints)) {
+                                ElevationTiles.applyToSummary(parsedWorkout.data, activityPoints)
+                            }
+                            val intervals = IntervalChartUtils.deriveIntervals(
+                                activityTrack.segments, activityTrack.segmentInfos
+                            )
+                            IntervalChartUtils.addToSummaryData(requireContext(), parsedWorkout.data, intervals)
+                            val charts = parsedWorkout.charts.ifEmpty {
+                                DefaultWorkoutCharts.buildDefaultCharts(
                                     requireContext(),
                                     activityPoints,
                                     ActivityKind.fromCode(parsedWorkout.summary.activityKind),
                                     parsedWorkout.data,
                                     gbDevice
                                 )
-                                return@withContext Workout(parsedWorkout.summary, parsedWorkout.data, defaultCharts, intervals)
                             }
-                        } catch (e: Exception) {
-                            LOG.error("Failed to build default charts", e)
+                            return@withContext Workout(parsedWorkout.summary, parsedWorkout.data, charts, intervals)
                         }
+                    } catch (e: Exception) {
+                        LOG.error("Failed to read the activity track", e)
                     }
                     return@withContext parsedWorkout
                 }

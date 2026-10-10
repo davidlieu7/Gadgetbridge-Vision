@@ -98,6 +98,8 @@ public class FitExporter {
     // FIT lap intensity codes (from intensity_t in the FIT spec)
     private static final int FIT_INTENSITY_ACTIVE = 0;
     private static final int FIT_INTENSITY_REST = 1;
+    private static final int FIT_INTENSITY_WARMUP = 2;
+    private static final int FIT_INTENSITY_COOLDOWN = 3;
 
     // Tiny-segment threshold: ActivityTrack segments smaller than this are dropped
     // from the lap stream (their records still emit in the FIT record stream — only
@@ -160,10 +162,14 @@ public class FitExporter {
     }
 
     private static int mapIntensity(final ActivityTrack.SegmentIntensity intensity) {
-        if (intensity == ActivityTrack.SegmentIntensity.REST) return FIT_INTENSITY_REST;
-        // ACTIVE and UNKNOWN both map to ACTIVE — UNKNOWN defaults to active so that
-        // importers that filter by intensity still surface the lap.
-        return FIT_INTENSITY_ACTIVE;
+        return switch (intensity) {
+            case REST -> FIT_INTENSITY_REST;
+            case WARMUP -> FIT_INTENSITY_WARMUP;
+            case COOLDOWN -> FIT_INTENSITY_COOLDOWN;
+            // UNKNOWN defaults to active so that importers that filter by intensity still
+            // surface the lap.
+            case ACTIVE, UNKNOWN -> FIT_INTENSITY_ACTIVE;
+        };
     }
 
     /// Detects FIT sport+sub_sport pairs that represent rowing of any kind. Used to gate
@@ -816,7 +822,7 @@ public class FitExporter {
         b.setMessageIndex(messageIndex);
         b.setTimestamp(startSeconds + elapsedSeconds);
         b.setStartTime(startSeconds);
-        b.setEvent(Event.TIMER);
+        b.setEvent(Event.LAP);
         b.setEventType(EventType.STOP);
         b.setSport(sport);
         b.setLapTrigger(0); // manual

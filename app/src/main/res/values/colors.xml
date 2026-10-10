@@ -173,6 +173,8 @@
     <color name="chart_line_step_length" type="color">#FF4088</color>
     <color name="chart_interval_active" type="color">#66BB6A</color>
     <color name="chart_interval_rest" type="color">#FFC107</color>
+    <color name="chart_interval_warmup" type="color">#42A5F5</color>
+    <color name="chart_interval_cooldown" type="color">#26C6DA</color>
     <color name="chart_interval_unknown" type="color">#92a4ad</color>
     <color name="chart_cns_toxicity" type="color">#FF4040</color>
     <color name="chart_n2_load" type="color">#FF8840</color>

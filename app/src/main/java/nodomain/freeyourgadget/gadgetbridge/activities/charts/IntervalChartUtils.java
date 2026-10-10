@@ -163,6 +163,12 @@ public final class IntervalChartUtils {
             case REST:
                 colorRes = R.color.chart_interval_rest;
                 break;
+            case WARMUP:
+                colorRes = R.color.chart_interval_warmup;
+                break;
+            case COOLDOWN:
+                colorRes = R.color.chart_interval_cooldown;
+                break;
             default:
                 colorRes = R.color.chart_interval_unknown;
                 break;
@@ -176,6 +182,10 @@ public final class IntervalChartUtils {
                 return ctx.getString(R.string.interval_type_active);
             case REST:
                 return ctx.getString(R.string.interval_type_rest);
+            case WARMUP:
+                return ctx.getString(R.string.interval_type_warmup);
+            case COOLDOWN:
+                return ctx.getString(R.string.interval_type_cooldown);
             default:
                 return ctx.getString(R.string.interval_type_unknown);
         }
@@ -189,7 +199,7 @@ public final class IntervalChartUtils {
      * Builds the lines marking where each interval starts, for a time axis in seconds. The
      * first interval starts on the y axis, so its line is transparent and only its label shows. A
      * rest label goes at the bottom of the plot, where the signal sits low during
-     * rest, and an active label at the top. An interval of unknown type takes the side opposite the
+     * rest, and an active label at the top. Any other interval takes the side opposite the
      * label before it, since a short block puts two boundaries within a few pixels of each other
      * and same-side labels then overlap. The last label is drawn left of its line: a final
      * boundary close to the end of the workout leaves no room on its right.
@@ -228,7 +238,8 @@ public final class IntervalChartUtils {
     }
 
     /**
-     * Whether {@code intervals} describe a genuine ACTIVE/REST interval workout. Providers also
+     * Whether {@code intervals} describe a genuine interval workout, with at least one segment
+     * tagged with its phase (active, rest, warmup or cooldown). Providers also
      * split tracks into segments for recording pauses or plain laps with UNKNOWN intensity, and
      * those must not surface as intervals.
      */
@@ -246,7 +257,7 @@ public final class IntervalChartUtils {
 
     /**
      * Adds {@code intervals} to {@code summaryData} as the {@link ActivitySummaryEntries#GROUP_INTERVALS}
-     * table, unless the device already reported one or the intervals carry no ACTIVE/REST phases.
+     * table, unless the device already reported one or no interval carries its phase.
      */
     public static void addToSummaryData(final Context ctx,
                                         final ActivitySummaryData summaryData,
