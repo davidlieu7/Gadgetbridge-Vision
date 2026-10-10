@@ -77,6 +77,8 @@ public class SoundcoreProtocolImplV1 extends AbstractSoundcoreProtocol {
     public static final short CMD_SET_BATTERY_LOW_TONE = (short) 0x8210;
 
     public static final short CMD_SET_GAMING_MODE = (short) 0x8701;
+    public static final short CMD_SET_LIGHTS_ENABLED = (short) 0x870e;
+    public static final short CMD_SET_LIGHT_MODE = (short) 0x860e;
     public static final short CMD_SET_EQUALIZER = (short) 0x8703;
     public static final short CMD_SET_FIT_TEST = (short) 0x0109;
 

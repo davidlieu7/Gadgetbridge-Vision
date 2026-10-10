@@ -17,17 +17,20 @@
 package nodomain.freeyourgadget.gadgetbridge.devices.soundcore
 
 import nodomain.freeyourgadget.gadgetbridge.R
+import nodomain.freeyourgadget.gadgetbridge.GBApplication
 import nodomain.freeyourgadget.gadgetbridge.activities.multipoint.MultipointPairingActivity
 import nodomain.freeyourgadget.gadgetbridge.devices.DeviceCoordinator
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice
-import nodomain.freeyourgadget.gadgetbridge.service.devices.soundcore.sport_x20.SoundcoreSportX20Protocol
+import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.DeviceSettingsSpec
+import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.ListEntry
+import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.deviceSettings
+import nodomain.freeyourgadget.gadgetbridge.service.devices.soundcore.SoundcoreV20iProtocol
 import java.util.regex.Pattern
 
 class SoundcoreV20iCoordinator : SoundcoreEarbudsCoordinator() {
     override fun getModelName(): String = "A3876"
 
-    override fun getSupportedDeviceName(): Pattern =
-        Pattern.compile("soundcore V20i", Pattern.CASE_INSENSITIVE)
+    override fun getSupportedDeviceName(): Pattern = Pattern.compile("^soundcore V20i$")
 
     override fun getDeviceNameResource(): Int = R.string.devicetype_soundcore_v20i
 
@@ -46,7 +49,6 @@ class SoundcoreV20iCoordinator : SoundcoreEarbudsCoordinator() {
         Capability.Multipoint,
         Capability.TouchControls,
         Capability.AutoPowerOff,
-        Capability.VoicePrompts,
         Capability.AudioEqualizer,
         Capability.GamingMode,
     )
@@ -76,14 +78,44 @@ class SoundcoreV20iCoordinator : SoundcoreEarbudsCoordinator() {
             else -> supportedTapFunctions
         }
 
+    override fun getDeviceSettings(device: GBDevice): DeviceSettingsSpec {
+        val context = GBApplication.getContext()
+        val lightingSettings = deviceSettings {
+            screen(key = "pref_soundcore_light_screen", title = R.string.soundcore_colorful_lights) {
+                switchSetting(
+                    key = PREF_LIGHTS_ENABLED,
+                    title = R.string.soundcore_colorful_lights
+                )
+                list(
+                    key = PREF_LIGHT_MODE,
+                    title = R.string.soundcore_light_mode,
+                    entries = (0..3).map { mode ->
+                        ListEntry.Text(
+                            mode.toString(),
+                            context.getString(R.string.soundcore_light_mode_i, mode + 1),
+                        )
+                    },
+                    defaultValue = "0",
+                    dependency = PREF_LIGHTS_ENABLED,
+                )
+            }
+        }
+        return DeviceSettingsSpec(super.getDeviceSettings(device).items + lightingSettings.items)
+    }
+
     override fun getSupportedEqualizerBands(): IntArray = intArrayOf(
         100, 200, 400, 800, 1600, 3200, 6400, 12800,
     )
 
     override fun getCustomEqualizerPresetArray(): Int = R.array.soundcore_sport_x20_equalizer_preset_names
 
-    override fun createProtocol(device: GBDevice): SoundcoreSportX20Protocol =
-        SoundcoreSportX20Protocol(device)
+    override fun createProtocol(device: GBDevice): SoundcoreV20iProtocol =
+        SoundcoreV20iProtocol(device)
+
+    companion object {
+        const val PREF_LIGHTS_ENABLED = "pref_soundcore_colorful_lights"
+        const val PREF_LIGHT_MODE = "pref_soundcore_light_mode"
+    }
 
     override fun getSupportedMultipointActions(): Set<String> = setOf(
         MultipointPairingActivity.ACTION_MULTIPOINT_ENABLE,
