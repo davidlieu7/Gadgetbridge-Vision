@@ -15,6 +15,7 @@ import nodomain.freeyourgadget.gadgetbridge.R
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.DeviceSettingsSpec
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.ListEntry
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.deviceSettings
+import nodomain.freeyourgadget.gadgetbridge.service.devices.jbl.JblProtocol
 import nodomain.freeyourgadget.gadgetbridge.service.devices.jbl.JblTuneBuds2Support
 import nodomain.freeyourgadget.gadgetbridge.util.Prefs
 
@@ -216,10 +217,10 @@ fun jblTuneBuds2Settings(): DeviceSettingsSpec = deviceSettings {
     }
 }
 
-private const val SOUND_MODE_OFF = "0"
-private const val SOUND_MODE_ANC = "1"
-private const val SOUND_MODE_TALK_THRU = "2"
-private const val SOUND_MODE_AMBIENT = "3"
+private val SOUND_MODE_OFF = JblProtocol.SOUND_MODE_OFF.toString()
+private val SOUND_MODE_ANC = JblProtocol.SOUND_MODE_ANC.toString()
+private val SOUND_MODE_TALK_THRU = JblProtocol.SOUND_MODE_TALKTHRU.toString()
+private val SOUND_MODE_AMBIENT = JblProtocol.SOUND_MODE_AMBIENT.toString()
 
 private const val GESTURE_AMBIENT_SOUND_CONTROL = "1"
 private const val GESTURE_PLAYBACK_CONTROL = "2"
