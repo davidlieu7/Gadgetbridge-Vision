@@ -320,7 +320,7 @@ public class FitProDeviceSupport extends AbstractBTLESingleDeviceSupport {
                         case RX_CAMERA1:
                         case RX_CAMERA2:
                         case RX_CAMERA3:
-                            sendAck(data[3], data[1], data[2], data[5]);
+                            sendAck(data);
                             handleCamera(param);
                             break;
                         default:
@@ -350,7 +350,7 @@ public class FitProDeviceSupport extends AbstractBTLESingleDeviceSupport {
                         case CMD_REQUEST_STEPS_DATA0x8:
                         case CMD_REQUEST_STEPS_DATA0x10:
                             //acking this makes the band to send data
-                            sendAck(data[3], data[1], data[2], data[5]);
+                            sendAck(data);
                             break;
                     }
                     break;
@@ -360,7 +360,7 @@ public class FitProDeviceSupport extends AbstractBTLESingleDeviceSupport {
                             handleDeviceInfo(data);
                             break;
                     }
-                    sendAck(data[3], data[1], data[2], data[5]);
+                    sendAck(data);
                     break;
                 case CMD_GROUP_REQUEST_DATA:
                     switch (param) {
@@ -376,7 +376,7 @@ public class FitProDeviceSupport extends AbstractBTLESingleDeviceSupport {
                             handleHardwareDetails(data);
                             break;
                     }
-                    sendAck(data[3], data[1], data[2], data[5]);
+                    sendAck(data);
                     break;
             }
 
@@ -553,6 +553,11 @@ public class FitProDeviceSupport extends AbstractBTLESingleDeviceSupport {
         } catch (IOException e) {
             GB.toast(getContext(), "Error sending configuration: " + e.getLocalizedMessage(), Toast.LENGTH_LONG, GB.ERROR, e);
         }
+    }
+
+    // FitPro default ack command
+    public void sendAck(byte[] data) {
+        sendAck(data[3], data[1], data[2], data[5]);
     }
 
     public void sendAck(byte command_group, byte length_high, byte length_low, byte command) {
@@ -792,7 +797,7 @@ public class FitProDeviceSupport extends AbstractBTLESingleDeviceSupport {
         int calories = ByteBuffer.wrap(caloriesBytes, 0, 3).getShort();
 
         LOG.debug("processing day data summary, steps: " + steps + " distance: " + distance + " calories: " + calories);
-        sendAck(value[3], value[1], value[2], value[5]);
+        sendAck(value);
         //handleDayTotalsData(steps, distance, calories);
     }
 
@@ -1305,7 +1310,7 @@ public class FitProDeviceSupport extends AbstractBTLESingleDeviceSupport {
             samples.add(sample);
         }
         if (addGBActivitySamples(samples)) {
-            sendAck(value[3], value[1], value[2], value[5]);
+            sendAck(value);
         }
     }
 
@@ -1355,7 +1360,7 @@ public class FitProDeviceSupport extends AbstractBTLESingleDeviceSupport {
             samples.add(sample);
         }
         if (addGBActivitySamples(samples)) {
-            sendAck(value[3], value[1], value[2], value[5]);
+            sendAck(value);
         }
     }
 
