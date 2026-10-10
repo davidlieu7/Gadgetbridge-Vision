@@ -20,6 +20,9 @@ package nodomain.freeyourgadget.gadgetbridge.service.devices.fitpro;
 import static nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsPreferenceConst.PREF_ACTIVATE_DISPLAY_ON_LIFT;
 import static nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsPreferenceConst.PREF_DISPLAY_ON_LIFT_END;
 import static nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsPreferenceConst.PREF_DISPLAY_ON_LIFT_START;
+import static nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsPreferenceConst.PREF_DO_NOT_DISTURB_NOAUTO;
+import static nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsPreferenceConst.PREF_DO_NOT_DISTURB_NOAUTO_START;
+import static nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsPreferenceConst.PREF_DO_NOT_DISTURB_NOAUTO_END;
 import static nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsPreferenceConst.PREF_INACTIVITY_ENABLE;
 import static nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsPreferenceConst.PREF_INACTIVITY_END;
 import static nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsPreferenceConst.PREF_INACTIVITY_START;
@@ -51,6 +54,7 @@ final class FitProSettings {
             case FitProConstants.CMD_GET_DISPLAY_ON_LIFT -> decodeDisplayOnLift(data);
             case FitProConstants.CMD_GET_LONG_SIT_REMINDER -> decodeLongSitReminder(data);
             case FitProConstants.CMD_GET_DEVICE_VIBRATIONS -> decodeVibrations(data);
+            case FitProConstants.CMD_GET_DND -> decodeDoNotDisturb(data);
             default -> Collections.emptyMap();
         };
     }
@@ -79,6 +83,22 @@ final class FitProSettings {
         preferences.put(PREF_ACTIVATE_DISPLAY_ON_LIFT, data[8] == 1 ? "scheduled" : "off");
         preferences.put(PREF_DISPLAY_ON_LIFT_START, formatTime(start));
         preferences.put(PREF_DISPLAY_ON_LIFT_END, formatTime(end));
+        return preferences;
+    }
+
+    private static Map<String, Object> decodeDoNotDisturb(final byte[] data) {
+        if (data.length != 13 || !isBoolean(data[8])) {
+            return Collections.emptyMap();
+        }
+        final int start = toUint16(data[10], data[9]);
+        final int end = toUint16(data[12], data[11]);
+        if (start >= 24 * 60 || end >= 24 * 60) {
+            return Collections.emptyMap();
+        }
+        final Map<String, Object> preferences = new HashMap<>();
+        preferences.put(PREF_DO_NOT_DISTURB_NOAUTO, data[8] == 1 ? "scheduled" : "off");
+        preferences.put(PREF_DO_NOT_DISTURB_NOAUTO_START, formatTime(start));
+        preferences.put(PREF_DO_NOT_DISTURB_NOAUTO_END, formatTime(end));
         return preferences;
     }
 

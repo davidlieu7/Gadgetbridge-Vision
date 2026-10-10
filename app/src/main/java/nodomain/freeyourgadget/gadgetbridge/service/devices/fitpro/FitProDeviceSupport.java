@@ -24,6 +24,7 @@ import static nodomain.freeyourgadget.gadgetbridge.devices.fitpro.FitProConstant
 import static nodomain.freeyourgadget.gadgetbridge.devices.fitpro.FitProConstants.CMD_FIND_BAND;
 import static nodomain.freeyourgadget.gadgetbridge.devices.fitpro.FitProConstants.CMD_GET_DEVICE_VIBRATIONS;
 import static nodomain.freeyourgadget.gadgetbridge.devices.fitpro.FitProConstants.CMD_GET_DISPLAY_ON_LIFT;
+import static nodomain.freeyourgadget.gadgetbridge.devices.fitpro.FitProConstants.CMD_GET_DND;
 import static nodomain.freeyourgadget.gadgetbridge.devices.fitpro.FitProConstants.CMD_GET_HW_INFO;
 import static nodomain.freeyourgadget.gadgetbridge.devices.fitpro.FitProConstants.CMD_GET_LONG_SIT_REMINDER;
 import static nodomain.freeyourgadget.gadgetbridge.devices.fitpro.FitProConstants.CMD_GROUP_BAND_INFO;
@@ -402,6 +403,7 @@ public class FitProDeviceSupport extends AbstractBTLESingleDeviceSupport {
                         case CMD_GET_LONG_SIT_REMINDER:
                         case CMD_GET_DISPLAY_ON_LIFT:
                         case CMD_GET_DEVICE_VIBRATIONS:
+                        case CMD_GET_DND:
                             final Map<String, Object> preferences = FitProSettings.decode(data);
                             if (!preferences.isEmpty()) {
                                 evaluateGBDeviceEvent(new GBDeviceEventUpdatePreferences(preferences));
@@ -821,7 +823,8 @@ public class FitProDeviceSupport extends AbstractBTLESingleDeviceSupport {
         commandQueue.enqueueAll(Arrays.asList(
                 craftData(CMD_GROUP_REQUEST_DATA, CMD_GET_DISPLAY_ON_LIFT),
                 craftData(CMD_GROUP_REQUEST_DATA, CMD_GET_LONG_SIT_REMINDER),
-                craftData(CMD_GROUP_REQUEST_DATA, CMD_GET_DEVICE_VIBRATIONS)));
+                craftData(CMD_GROUP_REQUEST_DATA, CMD_GET_DEVICE_VIBRATIONS),
+                craftData(CMD_GROUP_REQUEST_DATA, CMD_GET_DND)));
     }
 
     @Override

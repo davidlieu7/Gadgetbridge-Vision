@@ -39,7 +39,7 @@ import nodomain.freeyourgadget.gadgetbridge.service.btle.actions.FunctionAction;
 import nodomain.freeyourgadget.gadgetbridge.service.btle.actions.WriteAction;
 
 final class FitProCommandQueue {
-    private static final long TIMEOUT_MS = 1000;
+    private static final long TIMEOUT_MS = 2000;
     private final Object monitor;
     private final BooleanSupplier connected;
     private final Supplier<BluetoothGattCharacteristic> characteristic;
