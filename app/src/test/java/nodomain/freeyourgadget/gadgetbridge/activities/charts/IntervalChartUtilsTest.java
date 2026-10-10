@@ -30,6 +30,7 @@ import java.util.Collections;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 import kotlin.jvm.functions.Function1;
 import nodomain.freeyourgadget.gadgetbridge.R;
@@ -81,6 +82,27 @@ public class IntervalChartUtilsTest extends TestBase {
         assertEquals(422.0, lines.get(2).getValue(), 0.0);
         assertFalse(lines.get(2).getLabelAtBottom());
         assertTrue(lines.get(2).getLabelBeforeLine());
+    }
+
+    @Test
+    public void consecutiveIntervalsOfOneTypeGetOneLine() {
+        final List<IntervalChartUtils.IntervalRow> intervals = IntervalChartUtils.deriveIntervals(
+                Arrays.asList(segment(0, 60, 120), segment(60, 60, 125), segment(120, 60, 160),
+                        segment(180, 60, 110), segment(240, 60, 100), segment(300, 60, 95)),
+                Arrays.asList(
+                        new SegmentInfo(SegmentIntensity.WARMUP),
+                        new SegmentInfo(SegmentIntensity.WARMUP),
+                        new SegmentInfo(SegmentIntensity.ACTIVE),
+                        new SegmentInfo(SegmentIntensity.REST),
+                        new SegmentInfo(SegmentIntensity.COOLDOWN),
+                        new SegmentInfo(SegmentIntensity.COOLDOWN)));
+
+        final List<XMarkerSpec> lines = IntervalChartUtils.boundaryLines(getContext(), intervals);
+
+        assertEquals(Arrays.asList(0.0, 120.0, 180.0, 240.0), lines.stream().map(XMarkerSpec::getValue).collect(Collectors.toList()));
+        assertEquals(getContext().getString(R.string.interval_type_warmup).toLowerCase(), lines.get(0).getLabel());
+        assertEquals(getContext().getString(R.string.interval_type_cooldown).toLowerCase(), lines.get(3).getLabel());
+        assertTrue(lines.get(3).getLabelBeforeLine());
     }
 
     @Test

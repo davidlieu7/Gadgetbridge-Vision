@@ -196,10 +196,11 @@ public final class IntervalChartUtils {
     }
 
     /**
-     * Builds the lines marking where each interval starts, for a time axis in seconds. The
-     * first interval starts on the y axis, so its line is transparent and only its label shows. A
-     * rest label goes at the bottom of the plot, where the signal sits low during
-     * rest, and an active label at the top. Any other interval takes the side opposite the
+     * Builds the lines marking where each phase starts, for a time axis in seconds. Consecutive
+     * intervals of the same type form one phase (a warm-up recorded as several laps gets one
+     * line). The first phase starts on the y axis, so its line is transparent and only its label
+     * shows. A rest label goes at the bottom of the plot, where the signal sits low during
+     * rest, and an active label at the top. Any other phase takes the side opposite the
      * label before it, since a short block puts two boundaries within a few pixels of each other
      * and same-side labels then overlap. The last label is drawn left of its line: a final
      * boundary close to the end of the workout leaves no room on its right.
@@ -210,9 +211,15 @@ public final class IntervalChartUtils {
         if (intervals == null) {
             return lines;
         }
+        final List<IntervalRow> phases = new ArrayList<>();
+        for (final IntervalRow interval : intervals) {
+            if (phases.isEmpty() || phases.get(phases.size() - 1).type != interval.type) {
+                phases.add(interval);
+            }
+        }
         boolean previousBottom = false;
-        for (int i = 0; i < intervals.size(); i++) {
-            final IntervalRow interval = intervals.get(i);
+        for (int i = 0; i < phases.size(); i++) {
+            final IntervalRow interval = phases.get(i);
             final boolean bottom;
             switch (interval.type) {
                 case REST:
@@ -226,7 +233,7 @@ public final class IntervalChartUtils {
                     break;
             }
             previousBottom = bottom;
-            final boolean last = i > 0 && i == intervals.size() - 1;
+            final boolean last = i > 0 && i == phases.size() - 1;
             lines.add(new XMarkerSpec(
                     interval.startSeconds,
                     i == 0 ? Color.TRANSPARENT : colorForType(ctx, interval.type),
