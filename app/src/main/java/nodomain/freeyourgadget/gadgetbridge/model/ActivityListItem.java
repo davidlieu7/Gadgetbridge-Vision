@@ -10,13 +10,14 @@ import android.widget.RelativeLayout;
 import android.widget.TextView;
 
 import androidx.annotation.Nullable;
-import androidx.core.content.ContextCompat;
 
 import org.apache.commons.lang3.StringUtils;
 
 import java.text.DecimalFormat;
 import java.util.Date;
 import java.util.concurrent.TimeUnit;
+
+import com.google.android.material.color.MaterialColors;
 
 import nodomain.freeyourgadget.gadgetbridge.R;
 import nodomain.freeyourgadget.gadgetbridge.activities.workouts.WorkoutUploadStatus;
@@ -79,7 +80,7 @@ public class ActivityListItem {
 
         this.backgroundColor = 0;
         this.alternateColor = getThemedColor(itemView.getContext(), R.attr.alternate_row_background);
-        this.selectedColor = ContextCompat.getColor(itemView.getContext(), R.color.accent);
+        this.selectedColor = MaterialColors.getColor(itemView, R.attr.accent_color);
     }
 
     public void update(@Nullable final Date timeFrom,

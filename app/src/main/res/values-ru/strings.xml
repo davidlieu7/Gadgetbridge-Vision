@@ -1630,7 +1630,7 @@
     <string name="pref_header_heartrate_allday">Отслеживание в течение всего дня</string>
     <string name="pref_voice_detect_duration_10">10 секунд</string>
     <string name="pref_header_heartrate_sleep">Сон</string>
-    <string name="pref_switch_controls_anc_off">Подавление ←→ Выключено</string>
+    <string name="pref_switch_controls_anc_off">Подавление ↔ Выключено</string>
     <string name="pref_agps_update_time">Время обновления AGPS</string>
     <string name="mi2_dnd_always">Всегда</string>
     <string name="sony_anc_optimizer_status_atmospheric_pressure">Измерение атмосферного давления…</string>
@@ -1925,7 +1925,7 @@
     <string name="loyalty_cards_sync_groups_only">Синхронизировать только выбранные группы</string>
     <string name="pref_app_logs_start_summary">Начать ведение журнала из приложений часов</string>
     <string name="pref_app_logs_stop_summary">Остановить ведение журнала</string>
-    <string name="pref_switch_controls_anc_ambient_off">Подавление ←→ Звук окружения ←→ Выкл</string>
+    <string name="pref_switch_controls_anc_ambient_off">Подавление ↔ Звук окружения ↔ Выкл</string>
     <string name="activity_type_surfing">Сёрфинг</string>
     <string name="activity_type_windsurfing">Виндсёрфинг</string>
     <string name="activity_type_kitesurfing">Кайтинг</string>
@@ -2031,9 +2031,9 @@
     <string name="pref_title_touch_ambient">Звук окружения</string>
     <string name="prefs_ambient_volume_left">Громкость окружения Слева</string>
     <string name="prefs_ambient_sound">Звук окружения</string>
-    <string name="pref_switch_controls_anc_ambient">Подавление ←→ Звук окружения</string>
+    <string name="pref_switch_controls_anc_ambient">Подавление ↔ Звук окружения</string>
     <string name="prefs_ambient_sound_during_call_title">Звуки окружения во время звонка</string>
-    <string name="pref_switch_controls_ambient_off">Звук окружения ←→ Выкл</string>
+    <string name="pref_switch_controls_ambient_off">Звук окружения ↔ Выкл</string>
     <string name="sony_button_mode_ambient_sound_control">Управление звуком окружения</string>
     <string name="find_my_phone_found_it">НАШЁЛ ЕГО</string>
     <string name="voice_service_package_title">Набор голосовой службы</string>
@@ -2647,12 +2647,12 @@
     <string name="activity_type_track_and_field">Легкая атлетика</string>
     <string name="activity_type_mind_and_body">Разум и тело</string>
     <string name="activity_type_cross_country_skiing">Катание на беговых лыжах</string>
-    <string name="swolfAvg">Средний волк</string>
+    <string name="swolfAvg">Средний swolf</string>
     <string name="avgStrokeRate">Средняя скорость инсульта</string>
     <string name="maxStrokeRate">Максимальная скорость хода</string>
     <string name="strokes">Всего ударов</string>
-    <string name="swolfMax">Максимальный волк</string>
-    <string name="swolfMin">Минимальный волк</string>
+    <string name="swolfMax">Максимальный swolf</string>
+    <string name="swolfMin">Минимальный swolf</string>
     <string name="stepRateSum">Сумма шаговой скорости</string>
     <string name="stepRateAvg">Средняя скорость шага</string>
     <string name="stepLengthAvg">Средняя длина шага</string>
@@ -4882,4 +4882,19 @@
     <string name="xiaomi_scooter_tire_pressure_reset_title">Напоминание о сбросе настроек</string>
     <string name="xiaomi_scooter_tire_pressure_reset_summary">Нажмите эту кнопку, чтобы перезапустить таймер поддержания давления в шинах.</string>
     <string name="xiaomi_scooter_tire_pressure_reset_confirmation">Сбросить напоминание о поддержании давления в шинах?</string>
+    <string name="prefs_jabra_guidance_voice">Голос</string>
+    <string name="unit_kg">кг</string>
+    <string name="unit_hours">ч</string>
+    <string name="bluetooth_multipoint_forget">Забыть</string>
+    <string name="map">Карта</string>
+    <string name="widgets_remove">Удалить</string>
+    <string name="alarm_add">Добавить будильник</string>
+    <string name="minutes_40">40 минут</string>
+    <string name="minutes_360">360 минут</string>
+    <string name="minutes_480">480 минут</string>
+    <string name="minutes_unit">мин</string>
+    <string name="jabra_equalizer_band_60">60 Гц</string>
+    <string name="jabra_equalizer_band_7600">7.6 кГц</string>
+    <string name="widgets_add_widget">Добавить виджет</string>
+    <string name="pref_roidmi_f8_battery_temperature_title">Температура батареи</string>
 </resources>

@@ -113,12 +113,20 @@ import nodomain.freeyourgadget.gadgetbridge.devices.garmin.hrm.GarminHrm200Coord
 import nodomain.freeyourgadget.gadgetbridge.devices.garmin.hrm.GarminHrm600Coordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.garmin.hrm.GarminHrmProPlusCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.garmin.watches.cirqa.GarminCirqaCoordinator;
+import nodomain.freeyourgadget.gadgetbridge.devices.garmin.watches.d2.GarminD2AirCoordinator;
+import nodomain.freeyourgadget.gadgetbridge.devices.garmin.watches.d2.GarminD2AirX10Coordinator;
+import nodomain.freeyourgadget.gadgetbridge.devices.garmin.watches.d2.GarminD2AirX15Coordinator;
+import nodomain.freeyourgadget.gadgetbridge.devices.garmin.watches.d2.GarminD2Mach1Coordinator;
+import nodomain.freeyourgadget.gadgetbridge.devices.garmin.watches.d2.GarminD2Mach1ProCoordinator;
+import nodomain.freeyourgadget.gadgetbridge.devices.garmin.watches.d2.GarminD2Mach2Coordinator;
+import nodomain.freeyourgadget.gadgetbridge.devices.garmin.watches.d2.GarminD2Mach2ProCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.garmin.watches.descent.GarminDescentG1Coordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.garmin.watches.descent.GarminDescentG2Coordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.garmin.watches.descent.GarminDescentMk3Coordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.garmin.watches.descent.GarminDescentMk3iCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.garmin.watches.enduro.GarminEnduro2Coordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.garmin.watches.enduro.GarminEnduro3Coordinator;
+import nodomain.freeyourgadget.gadgetbridge.devices.garmin.watches.enduro.GarminEnduro4Coordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.garmin.watches.enduro.GarminEnduroCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.garmin.watches.epix.GarminEpixCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.garmin.watches.epix.GarminEpixGen2Coordinator;
@@ -493,6 +501,7 @@ import nodomain.freeyourgadget.gadgetbridge.devices.nothing.Ear2Coordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.nothing.EarACoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.nothing.EarStickCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.nut.NutCoordinator;
+import nodomain.freeyourgadget.gadgetbridge.devices.nxwear.NxWearB8Coordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.ollee.OlleeDeviceCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.onemoresonoflow.OneMoreSonoFlowCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.onemoresonoflow.OneMoreSonoFlowSECoordinator;
@@ -559,6 +568,7 @@ import nodomain.freeyourgadget.gadgetbridge.devices.sony.reonpocket.SonyReonPock
 import nodomain.freeyourgadget.gadgetbridge.devices.sony.wena3.SonyWena3Coordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.sonyswr12.SonySWR12DeviceCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.soundbrenner.SoundbrennerCoordinator;
+import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.a30i.SoundcoreA30iCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.aerofit.SoundcoreAeroFit2Coordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.liberty3_pro.SoundcoreLiberty3ProCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.liberty4_nc.SoundcoreLiberty4NCCoordinator;
@@ -816,6 +826,7 @@ public enum DeviceType {
     ITAG(ITagCoordinator.class),
     IKEA_IDASEN(IdasenCoordinator.class),
     NUTMINI(NutCoordinator.class),
+    NX_WEAR_B8(NxWearB8Coordinator.class),
     VIVOMOVE_HR(GarminVivomoveHrCoordinator.class),
     GARMIN_HRM_PRO_PLUS(GarminHrmProPlusCoordinator.class),
     GARMIN_HRM_200(GarminHrm200Coordinator.class),
@@ -852,6 +863,7 @@ public enum DeviceType {
     GARMIN_ENDURO(GarminEnduroCoordinator.class),
     GARMIN_ENDURO_2(GarminEnduro2Coordinator.class),
     GARMIN_ENDURO_3(GarminEnduro3Coordinator.class),
+    GARMIN_ENDURO_4(GarminEnduro4Coordinator.class),
     GARMIN_EPIX(GarminEpixCoordinator.class),
     GARMIN_EPIX_GEN2(GarminEpixGen2Coordinator.class),
     GARMIN_EPIX_PRO(GarminEpixProCoordinator.class),
@@ -999,6 +1011,13 @@ public enum DeviceType {
     GARMIN_VIVOSMART_5(GarminVivosmart5Coordinator.class),
     GARMIN_VIVOSPORT(GarminVivosportCoordinator.class),
     GARMIN_CIRQA(GarminCirqaCoordinator.class),
+    GARMIN_D2_AIR(GarminD2AirCoordinator.class),
+    GARMIN_D2_AIR_X10(GarminD2AirX10Coordinator.class),
+    GARMIN_D2_AIR_X15(GarminD2AirX15Coordinator.class),
+    GARMIN_D2_MACH_1(GarminD2Mach1Coordinator.class),
+    GARMIN_D2_MACH_1_PRO(GarminD2Mach1ProCoordinator.class),
+    GARMIN_D2_MACH_2(GarminD2Mach2Coordinator.class),
+    GARMIN_D2_MACH_2_PRO(GarminD2Mach2ProCoordinator.class),
     GREE_AC(GreeAcCoordinator.class),
     AAWIRELESS(AAWirelessCoordinator.class),
     VIBRATISSIMO(VibratissimoCoordinator.class),
@@ -1063,6 +1082,7 @@ public enum DeviceType {
     SOUNDCORE_LIFE_TUNE_XR(SoundcoreLifeTuneXRCoordinator.class),
     SOUNDCORE_AEROFIT2(SoundcoreAeroFit2Coordinator.class),
     SOUNDCORE_SPORT_X20(SoundcoreSportX20Coordinator.class),
+    SOUNDCORE_A30I(SoundcoreA30iCoordinator.class),
     HAYLOU_S35_ANC(HaylouS35AncCoordinator.class),
     MOONDROP_SPACE_TRAVEL(MoondropSpaceTravelCoordinator.class),
     MOONDROP_SPACE_TRAVEL_2(MoondropSpaceTravel2Coordinator.class),

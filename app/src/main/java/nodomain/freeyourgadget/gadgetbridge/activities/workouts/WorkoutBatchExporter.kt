@@ -70,7 +70,7 @@ object WorkoutBatchExporter {
         sink.use {
             for (summary in summaries) {
                 val base = uniqueBase(ActivitySummaryUtils.getExportBaseName(context, summary), usedNames)
-                val time = summary.startTime?.time ?: System.currentTimeMillis()
+                val time = summary.startTime.time
 
                 fun add(name: String, build: () -> File?) {
                     try {

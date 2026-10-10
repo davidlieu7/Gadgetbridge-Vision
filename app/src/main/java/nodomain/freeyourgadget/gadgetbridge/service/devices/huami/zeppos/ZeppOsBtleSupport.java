@@ -219,6 +219,11 @@ public class ZeppOsBtleSupport extends AbstractBTLESingleDeviceSupport implement
     }
 
     @Override
+    public void onMusicListReq() {
+        zeppOsSupport.onMusicListReq();
+    }
+
+    @Override
     public void onFindPhone(final boolean start) {
         zeppOsSupport.onFindPhone(start);
     }

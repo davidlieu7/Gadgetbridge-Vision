@@ -269,7 +269,7 @@ public class WaypointHelperTest extends TestBase {
         // fit -> text
         FitFile decodedFit = FitFile.parseIncoming(fitGenerated);
         String decodedActual = decodedFit.toString().replace("}, Fit", "},\nFit").replace("}, RecordData{", "},\nRecordData{");
-        String decodedExpected = readTextResource("/TestFitLocationEncoding.txt");
+        String decodedExpected = readTextResource("/TestFitLocationEncoding.txt").trim();
         Assert.assertEquals(decodedExpected, decodedActual);
     }
 

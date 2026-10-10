@@ -501,6 +501,10 @@ public class HuaweiState {
         return supportsCommandForService(0x18, 0x02);
     }
 
+    public boolean supportsWheelchairMode() {
+        return supportsExpandCapability(276);
+    }
+
     public boolean supportsGpsAndTimeToDevice() {
         return supportsCommandForService(0x18, 0x06);
     }

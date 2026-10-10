@@ -1,3 +1,19 @@
+/*  Copyright (C) 2024-2026 Daniele Gobbetti, José Rebelo, Thomas Kuehne
+
+    This file is part of Gadgetbridge.
+
+    Gadgetbridge is free software: you can redistribute it and/or modify
+    it under the terms of the GNU Affero General Public License as published
+    by the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    Gadgetbridge is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU Affero General Public License for more details.
+
+    You should have received a copy of the GNU Affero General Public License
+    along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 package nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.communicator.v2;
 
 import static nodomain.freeyourgadget.gadgetbridge.service.btle.AbstractBTLEDeviceSupport.calcMaxWriteChunk;
@@ -341,10 +357,14 @@ public class CommunicatorV2 implements ICommunicator {
                         yield new RealtimeHeartRateCallback();
                     case REALTIME_STEPS:
                         yield new RealtimeStepsCallback();
+                    case REALTIME_FLOORS:
+                        yield new RealtimeFloorsCallback();
                     case REALTIME_ACCELEROMETER:
                         yield new RealtimeAccelerometerCallback();
                     case REALTIME_SPO2:
                         yield new RealtimeSpo2Callback();
+                    case REALTIME_BODY_BATTERY:
+                        yield new RealtimeBodyBatteryCallback();
                     case REALTIME_RESPIRATION:
                         yield new RealtimeRespirationCallback();
                     case REALTIME_HRV:
@@ -709,6 +729,7 @@ public class CommunicatorV2 implements ICommunicator {
         REALTIME_HR(6),
         REALTIME_STEPS(7),
         REALTIME_CALORIES(8),
+        REALTIME_FLOORS(9),
         REALTIME_INTENSITY(10),
         REALTIME_HRV(12),
         REALTIME_STRESS(13),

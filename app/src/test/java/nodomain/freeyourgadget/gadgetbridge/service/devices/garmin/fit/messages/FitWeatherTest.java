@@ -112,7 +112,7 @@ public class FitWeatherTest {
         final FitFile fitFile = new FitFile(weatherLocalMessage.getRecordDataList());
         final String actual = fitFile.toString().replace("}, Fit", "},\nFit").replace("}, RecordData{", "},\nRecordData{");
 
-        final String expected = GarminSupportTest.readTextResource("/FitWeatherTestEncode.txt");
+        final String expected = GarminSupportTest.readTextResource("/FitWeatherTestEncode.txt").trim();
         Assert.assertEquals(expected, actual);
     }
 }

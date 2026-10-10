@@ -16,8 +16,8 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 package nodomain.freeyourgadget.gadgetbridge.activities.endurain
 
-import android.app.AlertDialog
 import android.content.Context
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import nodomain.freeyourgadget.gadgetbridge.R
 
 class EndurainSsoProviderDialog(
@@ -29,7 +29,7 @@ class EndurainSsoProviderDialog(
     fun show() {
         val providerNames = providers.map { it.name }.toTypedArray()
 
-        AlertDialog.Builder(context)
+        MaterialAlertDialogBuilder(context)
             .setTitle(context.getString(R.string.endurain_select_identity_provider))
             .setItems(providerNames) { dialog, which ->
                 onProviderSelected(providers[which])

@@ -10,8 +10,16 @@ import java.nio.ByteBuffer;
 public class CobsCoDec {
     private static final Logger LOG = LoggerFactory.getLogger(CobsCoDec.class);
 
-    private final ByteBuffer byteBuffer = ByteBuffer.allocate(10_000);
+    private final ByteBuffer byteBuffer;
     private byte[] cobsDecodedMessage;
+
+    public CobsCoDec() {
+        this(10_000);
+    }
+
+    public CobsCoDec(final int bufferSize) {
+        byteBuffer = ByteBuffer.allocate(bufferSize);
+    }
 
     /**
      * Accumulates received bytes in a local buffer and attempts to parse it.

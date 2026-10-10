@@ -96,7 +96,7 @@ object BodyEnergyWidget : GaugeWidget<BodyEnergyWidget.Data>() {
                 drawSimpleGauge(gaugeBar, 0, -1f)
                 return
             }
-            gaugeValue.text = data.value.toString()
+            gaugeValue.text = context.getString(R.string.body_energy_percentage, data.value)
             drawSimpleGauge(gaugeBar, colorEnergy, data.value / 100f)
         } else {
             if (data.gained < 0 || data.lost < 0) {

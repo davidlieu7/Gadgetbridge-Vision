@@ -33,6 +33,7 @@ import androidx.recyclerview.widget.RecyclerView;
 import com.github.mikephil.charting.charts.Chart;
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
 import com.google.android.material.snackbar.Snackbar;
+import com.google.android.material.color.MaterialColors;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -210,7 +211,7 @@ public class ActivityListingChartFragment extends AbstractActivityChartFragment<
         final Snackbar snackbar = Snackbar.make(view, text, 1000 * 8);
 
         View snackbarView = snackbar.getView();
-        snackbarView.setBackgroundColor(requireContext().getResources().getColor(R.color.accent));
+        snackbarView.setBackgroundColor(MaterialColors.getColor(requireContext(), R.attr.accent_color, getResources().getColor(R.color.accent)));
         snackbar.setActionTextColor(Color.WHITE);
         snackbar.setAction(getString(R.string.dialog_hide).toUpperCase(), snackbarActionView -> snackbar.dismiss());
         snackbar.show();

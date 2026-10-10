@@ -19,6 +19,7 @@ package nodomain.freeyourgadget.gadgetbridge.devices.huami.zeppos;
 import android.app.Activity;
 import android.content.Context;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
 
 import androidx.annotation.NonNull;
@@ -362,7 +363,8 @@ public abstract class ZeppOsCoordinator extends HuamiCoordinator {
 
     @Override
     public boolean supportsAudioRecordings(@NonNull final GBDevice device) {
-        return supportsDisplayItem(device, "voice_memos") && supportsBleFileTransfer(device, "voicememo");
+        return supportsDisplayItem(device, "voice_memos") &&
+            (supportsBleFileTransfer(device, "voicememo") || supportsWifiFtp(device));
     }
 
     @Override
@@ -408,6 +410,9 @@ public abstract class ZeppOsCoordinator extends HuamiCoordinator {
         }
         if (supportsAudioRecordings(device)) {
             deviceSpecificSettings.addRootScreen(R.xml.devicesettings_audio_recordings);
+        }
+        if (supportsWifiFtp(device) && supportsDisplayItem(device, "music")) {
+            deviceSpecificSettings.addRootScreen(R.xml.devicesettings_musicmanagement);
         }
 
         //
@@ -498,6 +503,9 @@ public abstract class ZeppOsCoordinator extends HuamiCoordinator {
             if (getCannedRepliesSlotCount(device) > 0) {
                 notifications.add(R.xml.devicesettings_canned_reply_16);
             }
+            if (supportsNavigation(device)) {
+                notifications.add(R.xml.devicesettings_navigation_notifications);
+            }
             notifications.add(R.xml.devicesettings_transliteration);
         } else {
             // As of #6755 we support forwarding notifications
@@ -556,6 +564,7 @@ public abstract class ZeppOsCoordinator extends HuamiCoordinator {
         }
         if (supportsFtpServer(device)) {
             developer.add(R.xml.devicesettings_ftp_server);
+            developer.add(R.xml.devicesettings_ftp_file_browser);
         }
         developer.add(R.xml.devicesettings_keep_activity_data_on_device);
         developer.add(R.xml.devicesettings_huami2021_fetch_operation_time_unit);
@@ -668,6 +677,12 @@ public abstract class ZeppOsCoordinator extends HuamiCoordinator {
         return supportsWifiHotspot(device);
     }
 
+    public boolean supportsWifiFtp(final GBDevice device) {
+        return Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q &&
+            supportsWifiHotspot(device) &&
+            supportsFtpServer(device);
+    }
+
     public boolean hasGps(final GBDevice device) {
         return supportsConfig(device, ZeppOsConfigService.ConfigArg.AGPS_UPDATE_TIME);
     }
@@ -692,8 +707,14 @@ public abstract class ZeppOsCoordinator extends HuamiCoordinator {
         return supportsDisplayItem(device, "map");
     }
 
+    @Override
+    public boolean supportsNavigation(@NonNull final GBDevice device) {
+        return hasDisplay();
+    }
+
     public boolean supportsMusicUpload(final GBDevice device) {
-        return supportsDisplayItem(device, "music") && supportsBleFileTransfer(device, "music");
+        return supportsDisplayItem(device, "music") &&
+            (supportsBleFileTransfer(device, "music") || supportsWifiFtp(device));
     }
 
     private boolean supportsConfig(final GBDevice device, final ZeppOsConfigService.ConfigArg config) {

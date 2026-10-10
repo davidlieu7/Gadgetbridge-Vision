@@ -25,7 +25,7 @@ import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.FieldDefi
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.baseTypes.BaseType;
 
 public class FieldDefinitionAlarm extends FieldDefinition {
-    public FieldDefinitionAlarm(int localNumber, int size, BaseType baseType, String name, int scale, int offset) {
+    public FieldDefinitionAlarm(int localNumber, int size, BaseType baseType, String name, double scale, int offset) {
         super(localNumber, size, baseType, name, scale, offset);
     }
 

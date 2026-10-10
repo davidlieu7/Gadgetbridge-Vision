@@ -29,6 +29,8 @@ object ActivitySummaryGroup {
 
         activitySummaryData.keys
             .filterNot { it.startsWith("internal") }
+            // Zone boundaries drive the chart overlay and are not values worth a row of their own.
+            .filterNot { it.startsWith(ActivitySummaryEntries.HR_ZONE_BOUND_PREFIX) }
             .forEach { key ->
                 val item = activitySummaryData[key]
                 // Use the group if specified in the entry, otherwise fallback to the default mapping from getDefaultGroup
@@ -109,7 +111,8 @@ object ActivitySummaryGroup {
                 )
             )
 
-            // Heart rate zones
+            // Time the device itself reports per heart-rate zone. The chart overlay derives its own
+            // bands from the zone boundaries, which is a different, app-side computation.
             put(
                 ActivitySummaryEntries.GROUP_HEART_RATE_ZONES, listOf<String>(
                     ActivitySummaryEntries.HR_ZONE_NA,

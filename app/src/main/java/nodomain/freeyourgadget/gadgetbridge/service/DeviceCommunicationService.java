@@ -30,11 +30,14 @@ import static nodomain.freeyourgadget.gadgetbridge.model.DeviceService.ACTION_CO
 import static nodomain.freeyourgadget.gadgetbridge.model.DeviceService.ACTION_DELETE_NOTIFICATION;
 import static nodomain.freeyourgadget.gadgetbridge.model.DeviceService.ACTION_DISCONNECT;
 import static nodomain.freeyourgadget.gadgetbridge.model.DeviceService.ACTION_NOTIFICATION;
+import static nodomain.freeyourgadget.gadgetbridge.model.DeviceService.ACTION_SLEEP_AS_ANDROID;
+import static nodomain.freeyourgadget.gadgetbridge.model.DeviceService.EXTRA_SLEEP_AS_ANDROID_ACTION;
 import static nodomain.freeyourgadget.gadgetbridge.model.DeviceService.EXTRA_CONNECT_FIRST_TIME;
 import static nodomain.freeyourgadget.gadgetbridge.model.DeviceService.EXTRA_NOTIFICATION_ID;
 
 import android.Manifest;
 import android.app.ActivityManager;
+import android.app.ApplicationExitInfo;
 import android.app.Service;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
@@ -62,6 +65,7 @@ import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
@@ -143,6 +147,8 @@ public class DeviceCommunicationService extends Service implements SharedPrefere
     private final HashMap<String, Long> deviceLastScannedTimestamps = new HashMap<>();
 
     private final int NOTIFICATIONS_CACHE_MAX = 10;  // maximum amount of notifications to cache per device while disconnected
+
+    private final PendingSleepAsAndroidAction pendingSleepAsAndroidAction = new PendingSleepAsAndroidAction();
     private boolean allowBluetoothIntentApi = false;
     private boolean reconnectViaScan = GBPrefs.RECONNECT_SCAN_DEFAULT;
 
@@ -267,6 +273,7 @@ public class DeviceCommunicationService extends Service implements SharedPrefere
                             .apply();
                     sendDeviceConnectedBroadcast(device.getAddress());
                     sendCachedNotifications(device);
+                    sendPendingSleepAsAndroidAction(device);
                 } else if (subject == GBDevice.DeviceUpdateSubject.DEVICE_STATE && (device.getState() == GBDevice.State.SCANNED)) {
                     sendDeviceAPIBroadcast(device.getAddress(), API_LEGACY_ACTION_DEVICE_SCANNED);
                 }
@@ -379,6 +386,7 @@ public class DeviceCommunicationService extends Service implements SharedPrefere
     public void onCreate() {
         LOG.debug("DeviceCommunicationService is being created");
         super.onCreate();
+        logLastExitReason();
         mFactory = new DeviceSupportFactory(this);
         deviceReceiversManager = new DeviceReceiversManager(this);
 
@@ -392,11 +400,37 @@ public class DeviceCommunicationService extends Service implements SharedPrefere
         }
 
         startForeground();
+        updateReceiversState();
         if (reconnectViaScan) {
             scanAllDevices();
 
             Intent scanServiceIntent = new Intent(this, BLEScanService.class);
             startService(scanServiceIntent);
+        }
+    }
+
+    /**
+     * A process killed by the system writes nothing to the log, so record why the previous one
+     * ended.
+     */
+    private void logLastExitReason() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
+            return;
+        }
+        final ActivityManager am = (ActivityManager) getSystemService(ACTIVITY_SERVICE);
+        if (am == null) {
+            return;
+        }
+        try {
+            final List<ApplicationExitInfo> exits = am.getHistoricalProcessExitReasons(getPackageName(), 0, 1);
+            if (!exits.isEmpty()) {
+                final ApplicationExitInfo exit = exits.get(0);
+                LOG.info("Previous process exit: reason={} status={} importance={} at {} ({})",
+                        exit.getReason(), exit.getStatus(), exit.getImportance(),
+                        new Date(exit.getTimestamp()), exit.getDescription());
+            }
+        } catch (final Exception e) {
+            LOG.warn("Failed to read the previous process exit reason", e);
         }
     }
 
@@ -594,7 +628,10 @@ public class DeviceCommunicationService extends Service implements SharedPrefere
     @Override
     public synchronized int onStartCommand(Intent intent, int flags, int startId) {
         if (intent == null) {
-            LOG.info("no intent");
+            // The system restarting the service after the process died: reconnect what was
+            // connected then, as the notification's reconnect action does.
+            LOG.info("no intent, reconnecting");
+            connectToDevice(null, false);
             return START_STICKY;
         }
 
@@ -620,6 +657,15 @@ public class DeviceCommunicationService extends Service implements SharedPrefere
                 ArrayList<GBDevice> targetedDevices = new ArrayList<>();
                 if (targetDevice != null) {
                     targetedDevices.add(targetDevice);
+                } else if (ACTION_SLEEP_AS_ANDROID.equals(action)) {
+                    final GBDevice saaDevice = getSleepAsAndroidDevice();
+                    if (saaDevice == null) {
+                        LOG.debug("No device configured for Sleep as Android, dropping {}", action);
+                    } else if (hasLiveLink(saaDevice)) {
+                        targetedDevices.add(saaDevice);
+                    } else {
+                        connectForSleepAsAndroid(intent, saaDevice);
+                    }
                 } else {
                     for (GBDevice device : getGBDevices()) {
                         if (isDeviceInitialized(device)) {
@@ -795,6 +841,23 @@ public class DeviceCommunicationService extends Service implements SharedPrefere
         return false;
     }
 
+    /**
+     * Whether commands sent to a device would actually reach it.
+     * <p>
+     * {@link GBDevice#isInitialized()} also accepts {@link GBDevice.State#SCANNED}, which a device
+     * sits in for seconds at a time while it is being scanned for, with no link to send anything
+     * over. That is close enough for actions the user retries by hand, but not for one Sleep as
+     * Android sends once and expects the wearable to act on.
+     */
+    private boolean hasLiveLink(GBDevice device) {
+        for (DeviceStruct struct : deviceStructs) {
+            if (struct.getDevice().getAddress().compareToIgnoreCase(device.getAddress()) == 0) {
+                return struct.getDevice().getState().equalsOrHigherThan(GBDevice.State.INITIALIZED);
+            }
+        }
+        return false;
+    }
+
     private boolean isDeviceReconnecting(GBDevice device) {
         if ((device = getDeviceByAddressOrNull(device.getAddress())) != null) {
             return device.getState().equalsOrHigherThan(GBDevice.State.NOT_CONNECTED);
@@ -811,6 +874,90 @@ public class DeviceCommunicationService extends Service implements SharedPrefere
             }
         } catch (DeviceNotFoundException e) {
             LOG.error("Error while sending cached notifications to {}", device.getAliasOrName(), e);
+        }
+    }
+
+    @Nullable
+    private GBDevice getSleepAsAndroidDevice() {
+        final String address = GBApplication.getPrefs().getString(GBPrefs.SLEEP_AS_ANDROID_DEVICE, "");
+        if (address.isEmpty()) {
+            return null;
+        }
+        // Every known device is searched, not only the ones this service currently holds: those
+        // cover connected devices and Bluetooth LE reconnect candidates, so a disconnected
+        // wearable would never be found and so could never be connected on demand.
+        final List<GBDevice> devices = GBApplication.app().getDeviceManager().getDevices();
+        if (devices == null) {
+            return null;
+        }
+        for (final GBDevice device : devices) {
+            if (address.equals(device.getAddress())) {
+                return device;
+            }
+        }
+        return null;
+    }
+
+    /**
+     * Sleep as Android starts tracking and rings its alarms whether or not the wearable happens to
+     * be connected, so a disconnected provider is connected on demand. The connect is driven by the
+     * held action, or by CHECK_CONNECTED when nothing is held, so an unreachable wearable is tried
+     * once per hold window rather than once per action Sleep as Android sends. A device whose
+     * auto-reconnect is off is never connected this way: {@link #connectToDevice} would otherwise
+     * connect it anyway, as for a connect the user asked for.
+     */
+    private void connectForSleepAsAndroid(final Intent intent, final GBDevice device) {
+        final String saaAction = intent.getStringExtra(EXTRA_SLEEP_AS_ANDROID_ACTION);
+
+        if (pendingSleepAsAndroidAction.cancels(saaAction)) {
+            LOG.debug("Sleep as Android action {} cancels whatever is held", saaAction);
+            return;
+        }
+
+        if (!getPrefs().getAutoReconnect(device)) {
+            LOG.debug("Dropping Sleep as Android action {}, auto-reconnect is off for {}", saaAction, device.getAliasOrName());
+            return;
+        }
+
+        final boolean connectInFlight = pendingSleepAsAndroidAction.isPending();
+
+        if (!pendingSleepAsAndroidAction.store(intent, device.getAddress())) {
+            if (!connectInFlight && pendingSleepAsAndroidAction.wakes(saaAction)) {
+                LOG.info("Connecting to {}, Sleep as Android is looking for it", device.getAliasOrName());
+                connectToDevice(device, false);
+                return;
+            }
+            LOG.debug("Dropping Sleep as Android action {}, {} is not connected", saaAction, device.getAliasOrName());
+            return;
+        }
+
+        if (connectInFlight) {
+            LOG.debug("Sleep as Android action {} takes over the connect already in flight", saaAction);
+            return;
+        }
+
+        LOG.info("Connecting to {} to replay Sleep as Android action {}", device.getAliasOrName(), saaAction);
+        connectToDevice(device, false);
+    }
+
+    private void sendPendingSleepAsAndroidAction(final GBDevice device) {
+        if (!hasLiveLink(device)) {
+            return;
+        }
+
+        if (device.getAddress().equals(getPrefs().getString(GBPrefs.SLEEP_AS_ANDROID_DEVICE, ""))) {
+            pendingSleepAsAndroidAction.linkUp();
+        }
+
+        final Intent pending = pendingSleepAsAndroidAction.take(device.getAddress());
+        if (pending == null) {
+            return;
+        }
+
+        try {
+            handleAction(pending, ACTION_SLEEP_AS_ANDROID, device);
+        } catch (final Exception e) {
+            LOG.error("Error while replaying Sleep as Android action to {}", device.getAliasOrName(), e);
         }
     }
 
@@ -867,6 +1014,7 @@ public class DeviceCommunicationService extends Service implements SharedPrefere
                 allowBluetoothIntentApi = sharedPreferences.getBoolean(GBPrefs.PREF_ALLOW_INTENT_API, false);
                 LOG.info("allowBluetoothIntentApi changed to {}", allowBluetoothIntentApi);
             }
+            case GBPrefs.NAVIGATION_ALLOW_UNSUPPORTED_DEVICES -> updateReceiversState();
         }
 
         deviceReceiversManager.onSharedPreferenceChanged(sharedPreferences, key);

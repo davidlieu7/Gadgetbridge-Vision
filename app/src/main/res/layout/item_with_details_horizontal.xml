@@ -34,7 +34,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:scrollHorizontally="false"
-            android:textColor="@color/secondarytext"
+            android:textColor="?attr/textColorSecondary"
             android:textSize="12sp"
             android:text="Item Name"
             android:singleLine="true" />
@@ -43,7 +43,7 @@
             android:id="@+id/item_details"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
-            android:textColor="@color/secondarytext"
+            android:textColor="?attr/textColorSecondary"
             android:textSize="12sp"
             android:text="Item Description" />
     </LinearLayout>

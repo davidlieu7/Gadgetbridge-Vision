@@ -116,6 +116,7 @@ import org.slf4j.LoggerFactory;
 
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
+import java.util.Date;
 
 import nodomain.freeyourgadget.gadgetbridge.GBApplication;
 import nodomain.freeyourgadget.gadgetbridge.database.DBHandler;
@@ -145,13 +146,17 @@ public class WorkoutSummaryParser extends XiaomiActivityParser implements Activi
         summary.setActivityKind(ActivityKind.UNKNOWN.getCode());
         summary.setRawSummaryData(bytes);
 
+        // A summary that fails to parse is still stored, so its raw bytes can be shared
+        boolean parsed = true;
         try {
             final ByteBuffer buf = ByteBuffer.wrap(bytes).order(ByteOrder.LITTLE_ENDIAN);
             updateSummaryFromData(summary, buf, true);
         } catch (final Exception e) {
             LOG.error("Failed to parse workout summary", e);
             GB.toast(context, "Failed to parse workout summary", Toast.LENGTH_LONG, GB.ERROR, e);
-            return false;
+            parsed = false;
+            summary.setEndTime(fileId.getTimestamp());
+            summary.setActivityKind(ActivityKind.UNKNOWN.getCode());
         }
 
         summary.setSummaryData(null); // remove json before saving to database
@@ -173,7 +178,7 @@ public class WorkoutSummaryParser extends XiaomiActivityParser implements Activi
             return false;
         }
 
-        return true;
+        return parsed;
     }
 
     @Override
@@ -183,7 +188,17 @@ public class WorkoutSummaryParser extends XiaomiActivityParser implements Activi
             return summary;
         }
 
-        return updateSummaryFromData(summary, fixAndWrap(data), forDetails);
+        // The stored summaries include ones that failed to parse when fetched, see parse
+        final Date endTime = summary.getEndTime();
+        final int activityKind = summary.getActivityKind();
+        try {
+            return updateSummaryFromData(summary, fixAndWrap(data), forDetails);
+        } catch (final Exception e) {
+            LOG.error("Failed to parse workout summary {}", summary.getId(), e);
+            summary.setEndTime(endTime);
+            summary.setActivityKind(activityKind);
+            return summary;
+        }
     }
 
     private BaseActivitySummary updateSummaryFromData(final BaseActivitySummary summary,

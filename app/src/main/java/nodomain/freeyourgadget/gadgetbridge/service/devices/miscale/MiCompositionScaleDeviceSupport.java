@@ -104,6 +104,7 @@ public class MiCompositionScaleDeviceSupport extends AbstractBTLESingleDeviceSup
         if (characteristicUUID.equals(GattCharacteristic.UUID_CHARACTERISTIC_BODY_COMPOSITION_MEASUREMENT)) {
             final byte flags = data[1];
             final boolean stabilized = testBit(flags, 5) && !testBit(flags, 7);
+            final boolean hasImpedance = testBit(flags, 1);
 
             if (stabilized) {
                 final int year = BLETypeConversions.toUint16(data, 2);
@@ -124,11 +125,11 @@ public class MiCompositionScaleDeviceSupport extends AbstractBTLESingleDeviceSup
                 // Body Composition Measurement packets from the MIBFS are 13 bytes: protocol
                 // version, flags, a 7-byte timestamp, then a 2-byte impedance slot (bytes 9-10)
                 // followed by the 2-byte weight (bytes 11-12, read above). The impedance slot is
-                // only meaningful once the reading has stabilised, which is exactly the condition
+                // only meaningful once the reading has stabilized, which is exactly the condition
                 // already checked above. See
                 // https://codeberg.org/Freeyourgadget/Gadgetbridge/issues/6393 for the packet
                 // layout this was reverse-engineered from.
-                final Integer impedanceOhm = BLETypeConversions.toUint16(data, 9);
+                final Integer impedanceOhm = hasImpedance ? BLETypeConversions.toUint16(data, 9) : null;
 
                 handleWeightInfo(date, weightKg, impedanceOhm);
             }

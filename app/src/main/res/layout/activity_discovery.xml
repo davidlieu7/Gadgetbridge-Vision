@@ -61,7 +61,7 @@
             android:text="@string/discovery_note"
             android:id="@+id/discovery_note"
             android:textStyle="bold"
-            android:textColor="@color/secondarytext"
+            android:textColor="?attr/textColorSecondary"
             android:gravity="center_horizontal|bottom" />
 
         <TextView
@@ -70,7 +70,7 @@
             android:textAppearance="?android:attr/textAppearanceSmall"
             android:text="@string/discovery_connected_devices_hint"
             android:id="@+id/discovery_hint"
-            android:textColor="@color/secondarytext"
+            android:textColor="?attr/textColorSecondary"
             android:textIsSelectable="true" />
     </LinearLayout>
 </LinearLayout>

@@ -16,6 +16,8 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 package nodomain.freeyourgadget.gadgetbridge.activities.charts;
 
+import androidx.annotation.Nullable;
+
 import static nodomain.freeyourgadget.gadgetbridge.devices.GenericMetricSampleProvider.getLatestMetricSample;
 import static nodomain.freeyourgadget.gadgetbridge.model.MetricSample.Metric.GENERIC_RESTING_METABOLIC_RATE;
 
@@ -160,5 +162,9 @@ abstract class CaloriesFragment<T extends ChartsData> extends AbstractChartFragm
         }
     }
 
-
+    @Nullable
+    @Override
+    public ChartDataRange getAvailableDataRange(final GBDevice device, final DBHandler db) {
+        return ChartDataRange.ofActivitySamples(device.getDeviceCoordinator().getSampleProvider(device, db.getDaoSession()));
+    }
 }

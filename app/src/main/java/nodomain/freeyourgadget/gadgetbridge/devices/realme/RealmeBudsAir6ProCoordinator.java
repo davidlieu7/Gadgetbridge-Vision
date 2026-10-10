@@ -17,6 +17,7 @@
 package nodomain.freeyourgadget.gadgetbridge.devices.realme;
 
 import android.util.Pair;
+
 import androidx.annotation.NonNull;
 
 import java.util.Arrays;
@@ -24,12 +25,16 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.regex.Pattern;
+import java.nio.ByteOrder;
 
 import nodomain.freeyourgadget.gadgetbridge.R;
 import nodomain.freeyourgadget.gadgetbridge.devices.oppo.OppoHeadphonesCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
 import nodomain.freeyourgadget.gadgetbridge.model.BatteryConfig;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.oppo.OppoUuid;
+import nodomain.freeyourgadget.gadgetbridge.service.devices.oppo.commands.AncConfigValue;
+import nodomain.freeyourgadget.gadgetbridge.service.devices.oppo.commands.EarbudsStatusSide;
+import nodomain.freeyourgadget.gadgetbridge.service.devices.oppo.commands.EarbudsStatusValue;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.oppo.commands.TouchConfigSide;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.oppo.commands.TouchConfigType;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.oppo.commands.TouchConfigValue;
@@ -69,6 +74,29 @@ public class RealmeBudsAir6ProCoordinator extends OppoHeadphonesCoordinator {
     }
 
     @Override
+    public ByteOrder multipointMacOrder(@NonNull GBDevice device) {
+        return ByteOrder.LITTLE_ENDIAN;
+    }
+
+    @Override
+    public boolean canApplyAncMode(
+        @NonNull final GBDevice device,
+        @NonNull final Map<EarbudsStatusSide, ? extends EarbudsStatusValue> map,
+        @NonNull final AncConfigValue mode
+    ) {
+        final boolean isAllReady = map.values().stream().allMatch(value -> value == EarbudsStatusValue.READY);
+        final boolean isAnyReady = map.values().stream().anyMatch(value -> value == EarbudsStatusValue.READY);
+        if (map.size() == 2) {
+            if (isAllReady) {
+                return true;
+            }
+            return isAnyReady && mode != AncConfigValue.ON;
+        }
+
+        return false;
+    }
+
+    @Override
     public boolean supportsFindDevice(@NonNull GBDevice device) {
         return true;
     }
@@ -96,17 +124,7 @@ public class RealmeBudsAir6ProCoordinator extends OppoHeadphonesCoordinator {
     @Override
     protected Map<Pair<TouchConfigSide, TouchConfigType>, List<TouchConfigValue>> getTouchOptions() {
         return new LinkedHashMap<>() {{
-            final List<TouchConfigValue> options = Arrays.asList(
-                    TouchConfigValue.OFF,
-                    TouchConfigValue.PLAY_PAUSE,
-                    TouchConfigValue.PREVIOUS,
-                    TouchConfigValue.NEXT,
-                    TouchConfigValue.VOLUME_UP,
-                    TouchConfigValue.VOLUME_DOWN,
-                    TouchConfigValue.VOICE_ASSISTANT_REALME,
-                    TouchConfigValue.GAME_MODE,
-                    TouchConfigValue.NOISE_CONTROL
-            );
+            final List<TouchConfigValue> options = Arrays.asList(TouchConfigValue.OFF, TouchConfigValue.PLAY_PAUSE, TouchConfigValue.PREVIOUS, TouchConfigValue.NEXT, TouchConfigValue.VOLUME_UP, TouchConfigValue.VOLUME_DOWN, TouchConfigValue.VOICE_ASSISTANT_REALME, TouchConfigValue.GAME_MODE, TouchConfigValue.NOISE_CONTROL);
             put(Pair.create(TouchConfigSide.LEFT, TouchConfigType.TAP_2), options);
             put(Pair.create(TouchConfigSide.LEFT, TouchConfigType.TAP_3), options);
             put(Pair.create(TouchConfigSide.LEFT, TouchConfigType.HOLD), options);

@@ -93,6 +93,7 @@ public class GB {
     public static final int NOTIFICATION_ID_GPS = 7;
     public static final int NOTIFICATION_ID_SCAN = 8;
     public static final int NOTIFICATION_ID_PEBBLE_JS = 10;
+    public static final int NOTIFICATION_ID_WIFI_FTP = 11;
     public static final int NOTIFICATION_ID_ERROR = 42;
 
     private static final Logger LOG = LoggerFactory.getLogger(GB.class);

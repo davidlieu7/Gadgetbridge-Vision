@@ -29,6 +29,8 @@ import nodomain.freeyourgadget.gadgetbridge.widgets.WidgetConfig
 import nodomain.freeyourgadget.gadgetbridge.widgets.WidgetInstance
 import nodomain.freeyourgadget.gadgetbridge.widgets.WidgetLayoutStore
 import nodomain.freeyourgadget.gadgetbridge.widgets.WidgetRegistry
+import nodomain.freeyourgadget.gadgetbridge.util.dialogs.IconListAdapter
+import java.text.Collator
 import java.util.Collections
 
 /**
@@ -110,7 +112,10 @@ class DashboardWidgetsActivity : AbstractGBActivity() {
     }
 
     private fun showAddWidgetDialog() {
-        val available = WidgetRegistry.available().sortedBy { it.name }
+        val collator = Collator.getInstance()
+        val available = WidgetRegistry.available().sortedWith { a, b ->
+            collator.compare(getString(a.name), getString(b.name))
+        }
         if (available.isEmpty()) {
             MaterialAlertDialogBuilder(this)
                 .setTitle(R.string.widgets_add_widget)
@@ -119,10 +124,10 @@ class DashboardWidgetsActivity : AbstractGBActivity() {
                 .show()
             return
         }
-        val labels = available.map { getString(it.name) }.toTypedArray()
+        val entries = available.map { IconListAdapter.Entry(it.icon, getString(it.name)) }
         MaterialAlertDialogBuilder(this)
             .setTitle(R.string.widgets_add_widget)
-            .setItems(labels) { _, which ->
+            .setAdapter(IconListAdapter(this, entries)) { _, which ->
                 WidgetLayoutStore.add(available[which].id)
                 reload()
             }

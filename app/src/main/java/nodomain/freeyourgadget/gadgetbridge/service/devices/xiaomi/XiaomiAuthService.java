@@ -55,6 +55,9 @@ import javax.crypto.spec.SecretKeySpec;
 import nodomain.freeyourgadget.gadgetbridge.GBApplication;
 import nodomain.freeyourgadget.gadgetbridge.R;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
+import nodomain.freeyourgadget.gadgetbridge.proto.xiaomi.Account;
+import nodomain.freeyourgadget.gadgetbridge.proto.xiaomi.Auth;
+import nodomain.freeyourgadget.gadgetbridge.proto.xiaomi.CompanionDevice;
 import nodomain.freeyourgadget.gadgetbridge.proto.xiaomi.XiaomiProto;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.xiaomi.services.AbstractXiaomiService;
 import nodomain.freeyourgadget.gadgetbridge.util.GB;
@@ -98,11 +101,11 @@ public class XiaomiAuthService extends AbstractXiaomiService {
     }
 
     protected void startClearTextHandshake() {
-        final XiaomiProto.Auth auth = XiaomiProto.Auth.newBuilder()
+        final var auth = Account.newBuilder()
                 .setUserId(getUserId(getSupport().getDevice()))
                 .build();
 
-        final XiaomiProto.Command command = XiaomiProto.Command.newBuilder()
+        final var command = XiaomiProto.Command.newBuilder()
                 .setType(XiaomiAuthService.COMMAND_TYPE)
                 .setSubtype(XiaomiAuthService.CMD_SEND_USERID)
                 .setAuth(auth)
@@ -128,7 +131,7 @@ public class XiaomiAuthService extends AbstractXiaomiService {
                 LOG.debug("Got watch nonce");
 
                 // Watch nonce
-                final XiaomiProto.Command command = handleWatchNonce(cmd.getAuth().getWatchNonce());
+                final XiaomiProto.Command command = handleWatchNonce(cmd.getAuth().getDeviceVerify());
 
                 if (command == null) {
                     GB.toast(getSupport().getContext(), R.string.authentication_failed_check_key, Toast.LENGTH_LONG, GB.WARN);
@@ -199,8 +202,8 @@ public class XiaomiAuthService extends AbstractXiaomiService {
     }
 
     @Nullable
-    private XiaomiProto.Command handleWatchNonce(final XiaomiProto.WatchNonce watchNonce) {
-        final byte[] step2hmac = computeAuthStep3Hmac(secretKey, nonce, watchNonce.getNonce().toByteArray());
+    private XiaomiProto.Command handleWatchNonce(final Auth.DeviceVerify deviceVerify) {
+        final byte[] step2hmac = computeAuthStep3Hmac(secretKey, nonce, deviceVerify.getNonce().toByteArray());
 
         System.arraycopy(step2hmac, 0, decryptionKey, 0, 16);
         System.arraycopy(step2hmac, 16, encryptionKey, 0, 16);
@@ -212,13 +215,13 @@ public class XiaomiAuthService extends AbstractXiaomiService {
         LOG.debug("decryptionNonce: {}", GB.hexdump(decryptionNonce));
         LOG.debug("encryptionNonce: {}", GB.hexdump(encryptionNonce));
 
-        final byte[] decryptionConfirmation = hmacSHA256(decryptionKey, ArrayUtils.addAll(watchNonce.getNonce().toByteArray(), nonce));
-        if (!Arrays.equals(decryptionConfirmation, watchNonce.getHmac().toByteArray())) {
+        final byte[] decryptionConfirmation = hmacSHA256(decryptionKey, ArrayUtils.addAll(deviceVerify.getNonce().toByteArray(), nonce));
+        if (!Arrays.equals(decryptionConfirmation, deviceVerify.getHmac().toByteArray())) {
             LOG.warn("Watch hmac mismatch");
             return null;
         }
 
-        final XiaomiProto.AuthDeviceInfo authDeviceInfo = XiaomiProto.AuthDeviceInfo.newBuilder()
+        final var authDeviceInfo = CompanionDevice.newBuilder()
                 .setUnknown1(0) // TODO ?
                 .setPhoneApiLevel(Build.VERSION.SDK_INT)
                 .setPhoneName(Build.MODEL)
@@ -227,25 +230,25 @@ public class XiaomiAuthService extends AbstractXiaomiService {
                 .setRegion(Locale.getDefault().getLanguage().substring(0, 2).toUpperCase(Locale.ROOT))
                 .build();
 
-        final byte[] encryptedNonces = hmacSHA256(encryptionKey, ArrayUtils.addAll(nonce, watchNonce.getNonce().toByteArray()));
+        final byte[] encryptedNonces = hmacSHA256(encryptionKey, ArrayUtils.addAll(nonce, deviceVerify.getNonce().toByteArray()));
         final byte[] encryptedDeviceInfo = encrypt(authDeviceInfo.toByteArray(), 0);
-        final XiaomiProto.AuthStep3 authStep3 = XiaomiProto.AuthStep3.newBuilder()
+        final var appConfirm = Auth.AppConfirm.newBuilder()
                 .setEncryptedNonces(ByteString.copyFrom(encryptedNonces))
                 .setEncryptedDeviceInfo(ByteString.copyFrom(encryptedDeviceInfo))
                 .build();
 
-        final XiaomiProto.Command.Builder cmd = XiaomiProto.Command.newBuilder();
+        final var cmd = XiaomiProto.Command.newBuilder();
         cmd.setType(COMMAND_TYPE);
         cmd.setSubtype(CMD_AUTH);
 
-        final XiaomiProto.Auth.Builder auth = XiaomiProto.Auth.newBuilder();
-        auth.setAuthStep3(authStep3);
+        final var auth = Account.newBuilder();
+        auth.setAppConfirm(appConfirm);
 
         return cmd.setAuth(auth.build()).build();
     }
 
     public static XiaomiProto.Command buildNonceCommand(final byte[] nonce, final String deviceId) {
-        final XiaomiProto.PhoneNonce.Builder phoneNonce = XiaomiProto.PhoneNonce.newBuilder();
+        final var phoneNonce = Auth.AppVerify.newBuilder();
         phoneNonce.setNonce(ByteString.copyFrom(nonce));
         // Wear OS Xiaomi watches (e.g. Watch 5) require the client identity here, or they
         // refuse the handshake and reply with a status instead of a WatchNonce.
@@ -253,10 +256,10 @@ public class XiaomiAuthService extends AbstractXiaomiService {
             phoneNonce.setDeviceId(deviceId);
         }
 
-        final XiaomiProto.Auth.Builder auth = XiaomiProto.Auth.newBuilder();
-        auth.setPhoneNonce(phoneNonce.build());
+        final var auth = Account.newBuilder();
+        auth.setAppVerify(phoneNonce.build());
 
-        final XiaomiProto.Command.Builder command = XiaomiProto.Command.newBuilder();
+        final var command = XiaomiProto.Command.newBuilder();
         command.setType(COMMAND_TYPE);
         command.setSubtype(CMD_NONCE);
         command.setAuth(auth.build());

@@ -28,17 +28,19 @@ import java.time.temporal.ChronoUnit
 import kotlin.reflect.KClass
 
 internal object ActiveCaloriesSyncer : AbstractActivitySampleSyncer<ActiveCaloriesBurnedRecord>() {
-    override val logger: Logger = LoggerFactory.getLogger(StepsSyncer::class.java)
+    override val logger: Logger = LoggerFactory.getLogger(ActiveCaloriesSyncer::class.java)
     override val recordClass: KClass<ActiveCaloriesBurnedRecord> = ActiveCaloriesBurnedRecord::class
 
-    override fun convertSample(
-        sample: ActivitySample,
+    override fun convertMinute(
+        endTs: Instant,
+        minuteSamples: List<ActivitySample>,
         offset: ZoneOffset,
         metadata: Metadata,
         deviceName: String,
         version: Long
     ): ActiveCaloriesBurnedRecord? {
-        val caloriesInMinute = sample.activeCalories
+        // Sum the minute's samples; NOT_MEASURED (-1) and 0 both mean "no calories" and contribute nothing.
+        val caloriesInMinute = minuteSamples.sumOf { if (it.activeCalories > 0) it.activeCalories else 0 }
         if (caloriesInMinute <= 0) {
             return null
         }
@@ -48,7 +50,6 @@ internal object ActiveCaloriesSyncer : AbstractActivitySampleSyncer<ActiveCalori
             return null
         }
 
-        val endTs = Instant.ofEpochSecond(sample.timestamp.toLong())
         val startTs = endTs.minus(1, ChronoUnit.MINUTES)
 
         return ActiveCaloriesBurnedRecord(

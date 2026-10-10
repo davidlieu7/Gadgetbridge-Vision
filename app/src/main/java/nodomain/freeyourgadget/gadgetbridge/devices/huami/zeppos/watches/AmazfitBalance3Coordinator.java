@@ -19,7 +19,6 @@ package nodomain.freeyourgadget.gadgetbridge.devices.huami.zeppos.watches;
 import androidx.annotation.NonNull;
 
 import java.util.Arrays;
-import java.util.Collections;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
@@ -30,12 +29,6 @@ import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
 
 public class AmazfitBalance3Coordinator extends ZeppOsCoordinator {
     @Override
-    public boolean isExperimental() {
-        // untested
-        return true;
-    }
-
-    @Override
     public ConnectionType getConnectionType() {
         // unconfirmed
         return ConnectionType.BOTH;
@@ -43,8 +36,7 @@ public class AmazfitBalance3Coordinator extends ZeppOsCoordinator {
 
     @Override
     public List<String> getDeviceBluetoothNames() {
-        // never seen, assumption
-        return Collections.singletonList("Amazfit Balance 3");
+        return Arrays.asList("Amazfit Balance 3", "Balance 3");
     }
 
     @Override

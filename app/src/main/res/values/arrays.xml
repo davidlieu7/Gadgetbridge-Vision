@@ -27,9 +27,7 @@
         <item>@string/pref_theme_value_dynamic</item>
     </string-array>
 
-    <!--
-    These must match nodomain.freeyourgadget.gadgetbridge.util.maps.MapTheme
-    -->
+    <!-- these must match MapTheme, plus the custom value -->
     <string-array name="maps_themes_names">
         <item>@string/pref_default</item>
         <item>@string/map_theme_biker</item>
@@ -37,6 +35,7 @@
         <item>@string/map_theme_indigo</item>
         <item>@string/map_theme_motorider</item>
         <item>@string/map_theme_osmarender</item>
+        <item>@string/map_theme_custom</item>
     </string-array>
     <string-array name="maps_themes_values">
         <item>default</item>
@@ -45,6 +44,7 @@
         <item>indigo</item>
         <item>motorider</item>
         <item>osmarender</item>
+        <item>custom</item>
     </string-array>
 
     <!-- https://meta.wikimedia.org/wiki/Template:List_of_language_names_ordered_by_code -->
@@ -186,6 +186,17 @@
     <string-array name="notification_mode_values">
         <item>always</item>
         <item>when_screen_off</item>
+        <item>never</item>
+    </string-array>
+
+    <string-array name="pref_device_card_show_items">
+        <item>@string/always</item>
+        <item>@string/when_connected</item>
+        <item>@string/never</item>
+    </string-array>
+    <string-array name="pref_device_card_show_items_values">
+        <item>always</item>
+        <item>connected</item>
         <item>never</item>
     </string-array>
 
@@ -3449,7 +3460,7 @@
     </string-array>
 
     <string-array name="activity_filter_quick_filter_period_items">
-        <item>@string/sports_activity_quick_filter_select</item>
+        <item>@string/custom</item>
         <item>@string/activity_summary_today</item>
         <item>@string/sports_activity_quick_filter_this_week</item>
         <item>@string/sports_activity_quick_filter_this_month</item>
@@ -3521,6 +3532,7 @@
         <item>@string/menuitem_temperature</item>
         <item>@string/menuitem_weight</item>
         <item>@string/watchface_widget_type_calories</item>
+        <item>@string/pref_header_hydration</item>
         <item>@string/respiratoryrate</item>
         <item>@string/blood_pressure</item>
     </string-array>
@@ -3547,6 +3559,7 @@
         <item>@string/p_temperature</item>
         <item>@string/p_weight</item>
         <item>@string/p_calories</item>
+        <item>@string/p_hydration</item>
         <item>@string/p_respiratory_rate</item>
         <item>@string/p_bloodpressure</item>
     </string-array>
@@ -3574,6 +3587,7 @@
         <item>@string/p_temperature</item>
         <item>@string/p_weight</item>
         <item>@string/p_calories</item>
+        <item>@string/p_hydration</item>
         <item>@string/p_respiratory_rate</item>
         <item>@string/p_bloodpressure</item>
     </string-array>
@@ -4150,68 +4164,6 @@
         <item>AMBIENT_SOUND_CONTROL</item>
     </string-array>
 
-    <string-array name="soundcore_sport_x20_single_tap_function_names">
-        <item>@string/pref_media_volumedown</item>
-        <item>@string/pref_media_volumeup</item>
-        <item>@string/pref_media_next</item>
-        <item>@string/pref_media_previous</item>
-        <item>@string/pref_media_playpause</item>
-        <item>@string/none</item>
-    </string-array>
-
-    <string-array name="soundcore_sport_x20_single_tap_function_values">
-        <item>VOLUME_DOWN</item>
-        <item>VOLUME_UP</item>
-        <item>MEDIA_NEXT</item>
-        <item>MEDIA_PREV</item>
-        <item>PLAYPAUSE</item>
-        <item>NONE</item>
-    </string-array>
-
-    <string-array name="soundcore_sport_x20_double_tap_function_names">
-        <item>@string/pref_media_volumedown</item>
-        <item>@string/pref_media_volumeup</item>
-        <item>@string/pref_media_next</item>
-        <item>@string/pref_media_previous</item>
-        <item>@string/pref_media_playpause</item>
-        <item>@string/pref_title_touch_voice_assistant</item>
-        <item>@string/sony_button_mode_ambient_sound_control</item>
-        <item>@string/none</item>
-    </string-array>
-
-    <string-array name="soundcore_sport_x20_double_tap_function_values">
-        <item>VOLUME_DOWN</item>
-        <item>VOLUME_UP</item>
-        <item>MEDIA_NEXT</item>
-        <item>MEDIA_PREV</item>
-        <item>PLAYPAUSE</item>
-        <item>VOICE_ASSISTANT</item>
-        <item>AMBIENT_SOUND_CONTROL</item>
-        <item>NONE</item>
-    </string-array>
-
-    <string-array name="soundcore_sport_x20_long_press_function_names">
-        <item>@string/pref_media_volumedown</item>
-        <item>@string/pref_media_volumeup</item>
-        <item>@string/pref_media_next</item>
-        <item>@string/pref_media_previous</item>
-        <item>@string/pref_media_playpause</item>
-        <item>@string/pref_title_touch_voice_assistant</item>
-        <item>@string/sony_button_mode_ambient_sound_control</item>
-        <item>@string/none</item>
-    </string-array>
-
-    <string-array name="soundcore_sport_x20_long_press_function_values">
-        <item>VOLUME_DOWN</item>
-        <item>VOLUME_UP</item>
-        <item>MEDIA_NEXT</item>
-        <item>MEDIA_PREV</item>
-        <item>PLAYPAUSE</item>
-        <item>VOICE_ASSISTANT</item>
-        <item>AMBIENT_SOUND_CONTROL</item>
-        <item>NONE</item>
-    </string-array>
-
     <string-array name="soundcore_sport_x20_equalizer_preset_names">
         <item>@string/soundcore_equalizer_preset_signature</item>
         <item>@string/soundcore_equalizer_preset_acoustic</item>
@@ -4484,6 +4436,42 @@
         <item>7</item>
         <item>8</item>
         <item>9</item>
+    </string-array>
+
+    <string-array name="soundcore_find_left_earbud_names">
+        <item>@string/off</item>
+        <item>@string/earfun_find_headphones_hint</item>
+    </string-array>
+
+    <string-array name="soundcore_find_left_earbud_values">
+        <item>0</item>
+        <item>1</item>
+    </string-array>
+
+    <string-array name="soundcore_find_right_earbud_names">
+        <item>@string/off</item>
+        <item>@string/earfun_find_headphones_hint</item>
+    </string-array>
+
+    <string-array name="soundcore_find_right_earbud_values">
+        <item>0</item>
+        <item>1</item>
+    </string-array>
+
+    <string-array name="soundcore_ambient_sound_control_names">
+        <item>@string/sony_ambient_sound_off</item>
+        <item>@string/prefs_active_noise_cancelling_transparency</item>
+        <item>@string/sony_ambient_sound_noise_cancelling</item>
+        <item>@string/pref_adaptive_noise_cancelling_title</item>
+        <item>@string/sony_ambient_sound_ambient_sound</item>
+    </string-array>
+
+    <string-array name="soundcore_ambient_sound_control_values">
+        <item>off</item>
+        <item>transparency</item>
+        <item>noise_cancelling</item>
+        <item>adaptive_anc</item>
+        <item>ambient_sound</item>
     </string-array>
 
     <string-array name="moondrop_equalizer_preset_names">

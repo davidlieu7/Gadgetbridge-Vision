@@ -46,6 +46,7 @@ import nodomain.freeyourgadget.gadgetbridge.activities.dashboard.DashboardAdapte
 import nodomain.freeyourgadget.gadgetbridge.activities.dashboard.DashboardCalendarActivity
 import nodomain.freeyourgadget.gadgetbridge.activities.dashboard.DashboardViewModel
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice
+import nodomain.freeyourgadget.gadgetbridge.util.BarShade
 import nodomain.freeyourgadget.gadgetbridge.util.DateTimeUtils
 import nodomain.freeyourgadget.gadgetbridge.util.kotlin.getDevice
 import java.util.Calendar
@@ -55,7 +56,7 @@ import java.util.GregorianCalendar
  * Hosts the widget grid: date header, calendar/settings menu, and the [RecyclerView] the
  * [DashboardAdapter] renders configured widgets into, driven by [DashboardViewModel].
  */
-class DashboardFragment : Fragment(), MenuProvider {
+class DashboardFragment : Fragment(), MenuProvider, HeaderShadePage {
     private val day: Calendar = GregorianCalendar.getInstance()
     private lateinit var textViewDate: TextView
     private lateinit var arrowRight: TextView
@@ -224,6 +225,11 @@ class DashboardFragment : Fragment(), MenuProvider {
         }
 
         viewModel.refresh(day, showAllDevices, deviceList)
+    }
+
+    override fun getHeaderShade(): View? {
+        val shade = view?.findViewById<View>(R.id.dashboard_date_row_shade) ?: return null
+        return if (BarShade.continuesToolbar(shade.context, R.attr.datestep_row_bg)) shade else null
     }
 
     private fun isDeviceInScope(device: GBDevice): Boolean {

@@ -401,6 +401,32 @@ class DeviceSettingsScope {
         )
     }
 
+    fun time(
+        key: String,
+        @StringRes title: Int,
+        @StringRes summary: Int = 0,
+        @DrawableRes icon: Int = 0,
+        defaultValue: String = "",
+        dependency: String? = null,
+        connectedOnly: Boolean = true,
+        visibleWhen: ((Prefs) -> Boolean)? = null,
+        onSharedPreferenceChanged: ((String) -> Unit)? = null,
+    ) {
+        items.add(
+            TimeSetting(
+                key = key,
+                title = title,
+                summary = summary,
+                icon = icon,
+                defaultValue = defaultValue,
+                dependency = dependency,
+                connectedOnly = connectedOnly,
+                visibleWhen = visibleWhen,
+                onSharedPreferenceChanged = onSharedPreferenceChanged,
+            )
+        )
+    }
+
     fun date(
         key: String,
         @StringRes title: Int,
@@ -436,6 +462,7 @@ class DeviceSettingsScope {
         @StringRes title: Int,
         @StringRes summary: Int = 0,
         @DrawableRes icon: Int = 0,
+        dependency: String? = null,
         connectedOnly: Boolean = false,
         visibleWhen: ((Prefs) -> Boolean)? = null,
         activityClass: Class<out AbstractGBActivity>,
@@ -445,6 +472,7 @@ class DeviceSettingsScope {
             title = title,
             summary = summary,
             icon = icon,
+            dependency = dependency,
             connectedOnly = connectedOnly,
             visibleWhen = visibleWhen,
         ) { context, device ->

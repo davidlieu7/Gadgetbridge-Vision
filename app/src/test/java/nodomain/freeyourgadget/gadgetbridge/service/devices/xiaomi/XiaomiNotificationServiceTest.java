@@ -29,6 +29,8 @@ import java.util.List;
 
 import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEvent;
 import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEventNotificationControl;
+import nodomain.freeyourgadget.gadgetbridge.proto.xiaomi.Notification;
+import nodomain.freeyourgadget.gadgetbridge.proto.xiaomi.NotificationId;
 import nodomain.freeyourgadget.gadgetbridge.proto.xiaomi.XiaomiProto;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.xiaomi.services.XiaomiNotificationService;
 
@@ -51,8 +53,8 @@ public class XiaomiNotificationServiceTest {
         service.handleCommand(XiaomiProto.Command.newBuilder()
                 .setType(XiaomiNotificationService.COMMAND_TYPE)
                 .setSubtype(XiaomiNotificationService.CMD_OPEN_ON_PHONE)
-                .setNotification(XiaomiProto.Notification.newBuilder()
-                        .setOpenOnPhone(XiaomiProto.NotificationId.newBuilder().setId(1234)))
+                .setNotification(Notification.newBuilder()
+                        .setOpenOnPhone(NotificationId.newBuilder().setId(1234)))
                 .build());
 
         assertEquals("open on phone should raise exactly one event", 1, events.size());

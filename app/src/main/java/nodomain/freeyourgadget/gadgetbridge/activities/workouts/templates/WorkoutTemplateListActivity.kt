@@ -33,9 +33,12 @@ import nodomain.freeyourgadget.gadgetbridge.databinding.ActivityWorkoutTemplateL
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice
 import nodomain.freeyourgadget.gadgetbridge.model.ActivityKind
 import nodomain.freeyourgadget.gadgetbridge.model.workouts.WorkoutTemplate
+import nodomain.freeyourgadget.gadgetbridge.model.workouts.spec.WorkoutTemplateExporter
 import nodomain.freeyourgadget.gadgetbridge.model.workouts.spec.WorkoutTemplateSpec
+import nodomain.freeyourgadget.gadgetbridge.util.AndroidUtils
 import nodomain.freeyourgadget.gadgetbridge.util.GB
 import nodomain.freeyourgadget.gadgetbridge.util.kotlin.getParcelableCompat
+import org.slf4j.LoggerFactory
 
 /**
  * Lists the [WorkoutTemplate]s of [device]. A template that the [WorkoutTemplateSpec] does not
@@ -166,6 +169,36 @@ class WorkoutTemplateListActivity : AbstractGBActivity() {
         )
     }
 
+    private fun share(item: WorkoutTemplateListItem, exporter: WorkoutTemplateExporter) {
+        lifecycleScope.launch {
+            val file = withContext(Dispatchers.IO) {
+                exporter.export(item.template)
+            }
+            if (file == null) {
+                LOG.error("Failed to export workout template {}", item.template.id)
+                GB.toast(
+                    this@WorkoutTemplateListActivity,
+                    getString(R.string.workout_template_share_failed),
+                    Toast.LENGTH_LONG,
+                    GB.ERROR
+                )
+                return@launch
+            }
+            LOG.debug("Sharing workout template {} as {} ({} bytes)", item.template.id, file.name, file.bytes.size)
+            try {
+                AndroidUtils.shareBytesAsFile(this@WorkoutTemplateListActivity, file.name, file.bytes, file.mimeType)
+            } catch (e: Exception) {
+                GB.toast(
+                    this@WorkoutTemplateListActivity,
+                    getString(R.string.workout_template_share_failed),
+                    Toast.LENGTH_LONG,
+                    GB.ERROR,
+                    e
+                )
+            }
+        }
+    }
+
     private fun confirmDelete(item: WorkoutTemplateListItem) {
         val id = item.template.id ?: return
         MaterialAlertDialogBuilder(this)
@@ -199,7 +232,11 @@ class WorkoutTemplateListActivity : AbstractGBActivity() {
         }
         popup.menu.add(0, MENU_EDIT, 1, R.string.appmanager_app_edit)
         popup.menu.add(0, MENU_DUPLICATE, 2, R.string.widgets_duplicate)
-        popup.menu.add(0, MENU_DELETE, 3, R.string.delete)
+        val exporter = spec.exporter
+        if (item.supported && exporter != null) {
+            popup.menu.add(0, MENU_SHARE, 3, R.string.share)
+        }
+        popup.menu.add(0, MENU_DELETE, 4, R.string.delete)
         popup.setOnMenuItemClickListener { menuItem ->
             when (menuItem.itemId) {
                 MENU_SYNC -> {
@@ -214,6 +251,11 @@ class WorkoutTemplateListActivity : AbstractGBActivity() {
 
                 MENU_DUPLICATE -> {
                     duplicate(item)
+                    true
+                }
+
+                MENU_SHARE -> {
+                    exporter?.let { share(item, it) }
                     true
                 }
 
@@ -277,9 +319,12 @@ class WorkoutTemplateListActivity : AbstractGBActivity() {
     }
 
     companion object {
+        private val LOG = LoggerFactory.getLogger(WorkoutTemplateListActivity::class.java)
+
         private const val MENU_SYNC = 1
         private const val MENU_EDIT = 2
         private const val MENU_DUPLICATE = 3
         private const val MENU_DELETE = 4
+        private const val MENU_SHARE = 5
     }
 }

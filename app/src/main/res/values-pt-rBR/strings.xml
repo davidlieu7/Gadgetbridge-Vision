@@ -3175,10 +3175,10 @@
     <string name="pref_ambient_sound_tone">Tom do som ambiente</string>
     <string name="pref_ambient_sound_tone_summary">De suave a claro</string>
     <string name="pref_balance">Equilíbrio</string>
-    <string name="pref_switch_controls_anc_ambient">Cancelamento de ruído ←→ Ambiente</string>
-    <string name="pref_switch_controls_anc_off">Cancelamento de ruído ←→ Desligado</string>
-    <string name="pref_switch_controls_ambient_off">Ambiente ←→ Desligado</string>
-    <string name="pref_switch_controls_anc_ambient_off">Cancelamento de ruído ←→ Ambiente ←→ Desligado</string>
+    <string name="pref_switch_controls_anc_ambient">Cancelamento de ruído ↔ Ambiente</string>
+    <string name="pref_switch_controls_anc_off">Cancelamento de ruído ↔ Desligado</string>
+    <string name="pref_switch_controls_ambient_off">Ambiente ↔ Desligado</string>
+    <string name="pref_switch_controls_anc_ambient_off">Cancelamento de ruído ↔ Ambiente ↔ Desligado</string>
     <string name="prefs_noise_control">Controle de ruído</string>
     <string name="prefs_voice_detect">Detecção de voz</string>
     <string name="prefs_voice_detect_summary">Ativar som ambiente e diminuir automaticamente a reprodução após a detecção de voz</string>

@@ -69,6 +69,13 @@
             android:title="@string/menuitem_weather" />
 
         <Preference
+            android:fragment="nodomain.freeyourgadget.gadgetbridge.activities.debug.NavigationDebugFragment"
+            android:icon="@drawable/ic_navigation"
+            android:key="pref_debug_navigation"
+            android:persistent="false"
+            android:title="@string/pref_header_navigation" />
+
+        <Preference
             android:fragment="nodomain.freeyourgadget.gadgetbridge.activities.debug.DatabaseDebugFragment"
             android:icon="@drawable/ic_database"
             android:key="pref_debug_database"

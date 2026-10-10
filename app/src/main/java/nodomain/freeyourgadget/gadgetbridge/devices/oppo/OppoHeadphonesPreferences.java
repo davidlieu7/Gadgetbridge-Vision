@@ -25,7 +25,6 @@ public class OppoHeadphonesPreferences {
     public static final String TOUCH_PREFIX = "oppo_touch__";
 
     public static final String LDAC = "pref_soundcore_ldac_mode";
-    public static final String MULTIPOINT = "oppo_multipoint";
     public static final String GAME_MODE = "oppo_game_mode";
     public static final String FIND_PHONE = "pref_find_phone";
     public static final String ANC_SELECTOR = "noise_control_selector";

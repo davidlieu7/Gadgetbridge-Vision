@@ -39,8 +39,7 @@ import androidx.annotation.Nullable;
 import androidx.localbroadcastmanager.content.LocalBroadcastManager;
 
 import net.e175.klaus.solarpositioning.DeltaT;
-import net.e175.klaus.solarpositioning.SPA;
-import net.e175.klaus.solarpositioning.SunriseResult;
+import net.e175.klaus.solarpositioning.SolarEvents;
 
 import org.apache.commons.lang3.ArrayUtils;
 import org.slf4j.Logger;
@@ -52,6 +51,7 @@ import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate;
+import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Calendar;
@@ -3113,16 +3113,19 @@ public abstract class HuamiSupport extends AbstractBTLESingleDeviceSupport
             float longitude = longlat[0];
             float latitude = longlat[1];
             if (longitude != 0 && latitude != 0) {
-                final GregorianCalendar dateTimeToday = new GregorianCalendar();
+                final ZonedDateTime dateTimeToday = ZonedDateTime.now();
 
-                final SunriseResult sunriseResult = SPA.calculateSunriseTransitSet(
-                        dateTimeToday.toZonedDateTime(),
+                final SolarEvents.Day solarDay = SolarEvents.spa().forDate(
+                        dateTimeToday.toLocalDate(),
+                        dateTimeToday.getZone(),
                         latitude,
                         longitude,
-                        DeltaT.estimate(dateTimeToday.toZonedDateTime().toLocalDate())
+                        DeltaT.estimate(dateTimeToday.toLocalDate())
                 );
 
-                if (sunriseResult instanceof SunriseResult.RegularDay regularDay) {
+                if (!solarDay.rises().isEmpty() && !solarDay.sets().isEmpty()) {
+                    final ZonedDateTime sunrise = solarDay.rises().get(0);
+                    final ZonedDateTime sunset = solarDay.sets().get(0);
                     try {
                         TransactionBuilder builder;
                         builder = performInitialized("Sending sunrise/sunset");
@@ -3132,10 +3135,10 @@ public abstract class HuamiSupport extends AbstractBTLESingleDeviceSupport
                         buf.put((byte) 16);
                         buf.putInt(weatherSpec.getTimestamp());
                         buf.put((byte) (tz_offset_hours * 4));
-                        buf.put((byte) regularDay.sunrise().getHour());
-                        buf.put((byte) regularDay.sunrise().getMinute());
-                        buf.put((byte) regularDay.sunset().getHour());
-                        buf.put((byte) regularDay.sunset().getMinute());
+                        buf.put((byte) sunrise.getHour());
+                        buf.put((byte) sunrise.getMinute());
+                        buf.put((byte) sunset.getHour());
+                        buf.put((byte) sunset.getMinute());
 
                         writeToChunked(builder, 1, buf.array());
                         builder.queue();
@@ -4139,9 +4142,11 @@ public abstract class HuamiSupport extends AbstractBTLESingleDeviceSupport
                 sleepAsAndroidSender.confirmConnected();
                 break;
             case SleepAsAndroidAction.START_TRACKING:
-                onEnableRealtimeHeartRateMeasurement(true);
+                sleepAsAndroidSender.startTracking(extras);
+                if (sleepAsAndroidSender.isHeartRateRequested()) {
+                    onEnableRealtimeHeartRateMeasurement(true);
+                }
                 setRawSensor(true);
-                sleepAsAndroidSender.startTracking();
                 break;
             case SleepAsAndroidAction.STOP_TRACKING:
                 onEnableRealtimeHeartRateMeasurement(false);

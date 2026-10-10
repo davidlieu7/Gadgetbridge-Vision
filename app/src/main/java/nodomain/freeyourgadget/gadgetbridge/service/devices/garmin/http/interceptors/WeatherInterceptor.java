@@ -27,8 +27,7 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 
 import net.e175.klaus.solarpositioning.DeltaT;
-import net.e175.klaus.solarpositioning.SPA;
-import net.e175.klaus.solarpositioning.SunriseResult;
+import net.e175.klaus.solarpositioning.SolarEvents;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -36,6 +35,7 @@ import org.slf4j.LoggerFactory;
 import java.nio.charset.StandardCharsets;
 import java.text.NumberFormat;
 import java.text.ParseException;
+import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Date;
@@ -245,16 +245,18 @@ public class WeatherInterceptor implements HttpInterceptor {
             } else {
                 final Location lastKnownLocation = new CurrentPosition().getLastKnownLocation();
 
-                final SunriseResult sunriseResult = SPA.calculateSunriseTransitSet(
-                        date.toZonedDateTime(),
+                final ZonedDateTime zonedDate = date.toZonedDateTime();
+                final SolarEvents.Day solarDay = SolarEvents.spa().forDate(
+                        zonedDate.toLocalDate(),
+                        zonedDate.getZone(),
                         lastKnownLocation.getLatitude(),
                         lastKnownLocation.getLongitude(),
-                        DeltaT.estimate(date.toZonedDateTime().toLocalDate())
+                        DeltaT.estimate(zonedDate.toLocalDate())
                 );
 
-                if (sunriseResult instanceof SunriseResult.RegularDay regularDay) {
-                    epochSunrise = (int) (regularDay.sunrise().toInstant().getEpochSecond());
-                    epochSunset = (int) (regularDay.sunset().toInstant().getEpochSecond());
+                if (!solarDay.rises().isEmpty() && !solarDay.sets().isEmpty()) {
+                    epochSunrise = (int) solarDay.rises().get(0).toEpochSecond();
+                    epochSunset = (int) solarDay.sets().get(0).toEpochSecond();
                 }
             }
 

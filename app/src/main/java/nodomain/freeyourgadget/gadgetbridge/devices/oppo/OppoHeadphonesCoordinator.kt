@@ -17,9 +17,11 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 package nodomain.freeyourgadget.gadgetbridge.devices.oppo
 
+import android.annotation.SuppressLint
 import android.bluetooth.BluetoothClass
 import android.util.Pair
 import java.util.Locale
+import java.nio.ByteOrder
 import nodomain.freeyourgadget.gadgetbridge.R
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSpecificSettingsCustomizer
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSpecificSettingsScreen
@@ -28,6 +30,7 @@ import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.Device
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.components.enumList
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.components.multiEnumList
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.components.screen
+import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.components.multipointPairing
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.deviceSettings
 import nodomain.freeyourgadget.gadgetbridge.devices.AbstractBLClassicDeviceCoordinator
 import nodomain.freeyourgadget.gadgetbridge.devices.DeviceCoordinator
@@ -41,6 +44,8 @@ import nodomain.freeyourgadget.gadgetbridge.service.devices.oppo.commands.TouchC
 import nodomain.freeyourgadget.gadgetbridge.service.devices.oppo.commands.TouchConfigType
 import nodomain.freeyourgadget.gadgetbridge.service.devices.oppo.commands.TouchConfigValue
 import nodomain.freeyourgadget.gadgetbridge.service.devices.oppo.commands.AncConfigValue
+import nodomain.freeyourgadget.gadgetbridge.service.devices.oppo.commands.EarbudsStatusSide
+import nodomain.freeyourgadget.gadgetbridge.service.devices.oppo.commands.EarbudsStatusValue
 
 abstract class OppoHeadphonesCoordinator : AbstractBLClassicDeviceCoordinator() {
     override fun getManufacturer(): String = "Oppo"
@@ -52,6 +57,7 @@ abstract class OppoHeadphonesCoordinator : AbstractBLClassicDeviceCoordinator() 
 
     override fun getBatteryCount(device: GBDevice): Int = 3
 
+    @SuppressLint("MissingPermission") // if we're here, we have permission
     override fun supports(candidate: GBDeviceCandidate): Boolean {
         if (!super.supports(candidate)) return false
         val majorDeviceClass = candidate.device?.bluetoothClass?.majorDeviceClass
@@ -90,11 +96,7 @@ abstract class OppoHeadphonesCoordinator : AbstractBLClassicDeviceCoordinator() 
             )
         }
         if (supportsMultipoint(device)) {
-            switchSetting(
-                key = OppoHeadphonesPreferences.MULTIPOINT,
-                title = R.string.bluetooth_multipoint_pairing,
-                icon = R.drawable.ic_bluetooth_searching,
-            )
+            multipointPairing()
         }
         touchOptions(device)
         xmlScreen(
@@ -166,6 +168,12 @@ abstract class OppoHeadphonesCoordinator : AbstractBLClassicDeviceCoordinator() 
         DeviceCoordinator.DeviceKind.EARBUDS
 
     open fun ctrlUuid(device: GBDevice): OppoUuid = OppoUuid.VENDOR_RFCOMM
+    open fun multipointMacOrder(device: GBDevice): ByteOrder = ByteOrder.BIG_ENDIAN
+    open fun canApplyAncMode(
+        device: GBDevice,
+        earbudsStatus: Map<EarbudsStatusSide, EarbudsStatusValue>,
+        mode: AncConfigValue
+    ): Boolean = true
     open fun supportsLdac(device: GBDevice): Boolean = false
     open fun supportsMultipoint(device: GBDevice): Boolean = false
     open fun supportsGameMode(device: GBDevice): Boolean = false

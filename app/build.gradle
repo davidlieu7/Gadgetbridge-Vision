@@ -49,7 +49,7 @@ tasks.register("buildGitChangelog"){
         def allCommits
         try {
             allCommits = providers.exec {
-                commandLine('git', 'log', '--pretty=format:%h %s')
+                commandLine('git', 'log', '--pretty=format:%H %s')
             }.standardOutput.asText.get()
         } catch (ignored) {
             logger.warn("Skipping git changelog: git is not available")
@@ -68,7 +68,8 @@ tasks.register("buildGitChangelog"){
                 return true
             }
 
-            final def (commitHash, commitMessage) = line.split(" ", 2)
+            final def (fullCommitHash, commitMessage) = line.split(" ", 2)
+            final def commitHash = fullCommitHash.take(10)
             if (commitMessage.contains("Translated using Weblate")) {
                 if (includedTranslations == 0) {
                     final def releaseNode = new Node(changelogNode, 'release', [version: commitHash, versioncode: commitVersionCode--])
@@ -91,8 +92,8 @@ tasks.register("buildGitChangelog"){
 final def getGitHashShort = { ->
     try {
         return providers.exec {
-            commandLine('git', 'rev-parse', '--short', 'HEAD')
-        }.standardOutput.asText.get().trim()
+            commandLine('git', 'rev-parse', 'HEAD')
+        }.standardOutput.asText.get().trim().take(10)
     } catch (ignored) {
         return null
     }
@@ -142,8 +143,8 @@ android {
         minSdk = 23
 
         // Note: always bump BOTH versionCode and versionName!
-        versionName "0.94.0"
-        versionCode 253
+        versionName "0.95.1"
+        versionCode 255
         vectorDrawables.useSupportLibrary = true
         buildConfigField "String", "GIT_HASH_SHORT", "\"${getGitHashShort()}\""
         buildConfigField "String", "GIT_DIRTY_STATUS", "\"${getGitDirtyFlag()}\""
@@ -274,6 +275,7 @@ android {
         // https://issuetracker.google.com/issues/353554169
         jniLibs.keepDebugSymbols.add("**/libimage_processing_util_jni.so")
         jniLibs.keepDebugSymbols.add("**/libsurface_util_jni.so")
+        jniLibs.keepDebugSymbols.add("**/libandroidx.graphics.path.so")
     }
 }
 

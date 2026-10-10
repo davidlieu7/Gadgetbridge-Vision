@@ -68,6 +68,8 @@ import nodomain.freeyourgadget.gadgetbridge.capabilities.loyaltycards.BarcodeFor
 import nodomain.freeyourgadget.gadgetbridge.capabilities.password.PasswordCapabilityImpl;
 import nodomain.freeyourgadget.gadgetbridge.capabilities.widgets.WidgetManager;
 import nodomain.freeyourgadget.gadgetbridge.database.DBHandler;
+import nodomain.freeyourgadget.gadgetbridge.devices.cards.DefaultDeviceCardItems;
+import nodomain.freeyourgadget.gadgetbridge.devices.cards.DeviceCardItem;
 import nodomain.freeyourgadget.gadgetbridge.database.DBHelper;
 import nodomain.freeyourgadget.gadgetbridge.database.repository.WorkoutTemplateRepository;
 import nodomain.freeyourgadget.gadgetbridge.entities.AlarmDao;
@@ -86,6 +88,7 @@ import nodomain.freeyourgadget.gadgetbridge.entities.GenericTrainingLoadAcuteSam
 import nodomain.freeyourgadget.gadgetbridge.entities.GenericTrainingLoadChronicSample;
 import nodomain.freeyourgadget.gadgetbridge.entities.HealthConnectSleepSessionDao;
 import nodomain.freeyourgadget.gadgetbridge.entities.HealthConnectSyncStateDao;
+import nodomain.freeyourgadget.gadgetbridge.entities.HealthConnectWorkoutSyncFailureDao;
 import nodomain.freeyourgadget.gadgetbridge.entities.InternetFirewallRuleDao;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDeviceCandidate;
@@ -160,7 +163,7 @@ public abstract class AbstractDeviceCoordinator implements DeviceCoordinator {
     }
 
     @Override
-    public boolean isConnectable(){
+    public boolean isConnectable() {
         return true;
     }
 
@@ -208,8 +211,8 @@ public abstract class AbstractDeviceCoordinator implements DeviceCoordinator {
     @Override
     public GBDevice createDevice(Device dbDevice, DeviceType deviceType) {
         GBDevice gbDevice =
-                new GBDevice(dbDevice.getIdentifier(), dbDevice.getName(), dbDevice.getAlias(),
-                             dbDevice.getParentFolder(), deviceType);
+            new GBDevice(dbDevice.getIdentifier(), dbDevice.getName(), dbDevice.getAlias(),
+                dbDevice.getParentFolder(), deviceType);
 
         setBatteryConfigOnDevice(gbDevice);
 
@@ -258,6 +261,7 @@ public abstract class AbstractDeviceCoordinator implements DeviceCoordinator {
                 deleteBy(session.getAlarmDao(), AlarmDao.Properties.DeviceId, device.getId());
                 deleteBy(session.getHealthConnectSyncStateDao(), HealthConnectSyncStateDao.Properties.DeviceId, device.getId());
                 deleteBy(session.getHealthConnectSleepSessionDao(), HealthConnectSleepSessionDao.Properties.DeviceId, device.getId());
+                deleteBy(session.getHealthConnectWorkoutSyncFailureDao(), HealthConnectWorkoutSyncFailureDao.Properties.DeviceId, device.getId());
                 deleteBy(session.getInternetFirewallRuleDao(), InternetFirewallRuleDao.Properties.DeviceId, device.getId());
                 WorkoutTemplateRepository.INSTANCE.deleteByDevice(session, device.getId());
                 session.getDeviceDao().delete(device);
@@ -292,12 +296,12 @@ public abstract class AbstractDeviceCoordinator implements DeviceCoordinator {
             export = getWritableExportDirectory(gbDevice, false);
             if (!FileUtils.deleteRecursively(export)) {
                 String message = GBApplication.getContext().getString(R.string.error_deleting_file,
-                        export.getPath());
+                    export.getPath());
                 GB.toast(message, Toast.LENGTH_LONG, GB.ERROR);
             }
         } catch (Exception e) {
             String message = GBApplication.getContext().getString(R.string.error_deleting_file_exception,
-                    export.getPath(), e.getLocalizedMessage());
+                export.getPath(), e.getLocalizedMessage());
             GB.toast(message, Toast.LENGTH_LONG, GB.ERROR, e);
         }
     }
@@ -471,6 +475,12 @@ public abstract class AbstractDeviceCoordinator implements DeviceCoordinator {
     }
 
     @Override
+    @Nullable
+    public HydrationSampleProvider getHydrationSampleProvider(final GBDevice device, final DaoSession session) {
+        return null;
+    }
+
+    @Override
     public TimeSampleProvider<? extends RestingMetabolicRateSample> getRestingMetabolicRateProvider(final GBDevice device, final DaoSession session) {
         return new DefaultRestingMetabolicRateProvider(device, session);
     }
@@ -519,15 +529,15 @@ public abstract class AbstractDeviceCoordinator implements DeviceCoordinator {
             return false;
         }
         if (bluetoothClass.getMajorDeviceClass() == BluetoothClass.Device.Major.WEARABLE
-                || bluetoothClass.getMajorDeviceClass() == BluetoothClass.Device.Major.UNCATEGORIZED) {
+            || bluetoothClass.getMajorDeviceClass() == BluetoothClass.Device.Major.UNCATEGORIZED) {
             int deviceClasses =
-                    BluetoothClass.Device.HEALTH_BLOOD_PRESSURE
-                            | BluetoothClass.Device.HEALTH_DATA_DISPLAY
-                            | BluetoothClass.Device.HEALTH_PULSE_RATE
-                            | BluetoothClass.Device.HEALTH_WEIGHING
-                            | BluetoothClass.Device.HEALTH_UNCATEGORIZED
-                            | BluetoothClass.Device.HEALTH_PULSE_OXIMETER
-                            | BluetoothClass.Device.HEALTH_GLUCOSE;
+                BluetoothClass.Device.HEALTH_BLOOD_PRESSURE
+                    | BluetoothClass.Device.HEALTH_DATA_DISPLAY
+                    | BluetoothClass.Device.HEALTH_PULSE_RATE
+                    | BluetoothClass.Device.HEALTH_WEIGHING
+                    | BluetoothClass.Device.HEALTH_UNCATEGORIZED
+                    | BluetoothClass.Device.HEALTH_PULSE_OXIMETER
+                    | BluetoothClass.Device.HEALTH_GLUCOSE;
 
             return (bluetoothClass.getDeviceClass() & deviceClasses) != 0;
         }
@@ -797,27 +807,28 @@ public abstract class AbstractDeviceCoordinator implements DeviceCoordinator {
     public boolean supportsCharts(@NonNull GBDevice device) {
         // All the default charts (see DefaultChartsProvider)
         return supportsActivityTracking(device) ||
-                supportsSleepMeasurement(device) ||
-                supportsHrvMeasurement(device) ||
-                supportsBodyEnergy(device) ||
-                supportsVO2Max(device) ||
-                supportsTrainingLoad(device) ||
-                supportsHeartRateMeasurement(device) ||
-                supportsStepCounter(device) ||
-                supportsStressMeasurement(device) ||
-                supportsPai(device) ||
-                supportsSpeedzones(device) ||
-                supportsRealtimeData(device) ||
-                supportsSpo2(device) ||
-                supportsTemperatureMeasurement(device) ||
-                supportsWeightMeasurement(device) ||
-                supportsActiveCalories(device) ||
-                supportsCyclingData(device) ||
-                supportsRespiratoryRate(device) ||
-                supportsBloodPressureMeasurement(device) ||
-                supportsRacePrediction(device) ||
-                supportsTrainingReadiness(device) ||
-                supportsSolarCharging(device);
+            supportsSleepMeasurement(device) ||
+            supportsHrvMeasurement(device) ||
+            supportsBodyEnergy(device) ||
+            supportsVO2Max(device) ||
+            supportsTrainingLoad(device) ||
+            supportsHeartRateMeasurement(device) ||
+            supportsStepCounter(device) ||
+            supportsStressMeasurement(device) ||
+            supportsPai(device) ||
+            supportsSpeedzones(device) ||
+            supportsRealtimeData(device) ||
+            supportsSpo2(device) ||
+            supportsTemperatureMeasurement(device) ||
+            supportsWeightMeasurement(device) ||
+            supportsHydration(device) ||
+            supportsActiveCalories(device) ||
+            supportsCyclingData(device) ||
+            supportsRespiratoryRate(device) ||
+            supportsBloodPressureMeasurement(device) ||
+            supportsRacePrediction(device) ||
+            supportsTrainingReadiness(device) ||
+            supportsSolarCharging(device);
     }
 
     @Override
@@ -912,6 +923,11 @@ public abstract class AbstractDeviceCoordinator implements DeviceCoordinator {
 
     @Override
     public boolean supportsWeightMeasurement(@NonNull GBDevice device) {
+        return false;
+    }
+
+    @Override
+    public boolean supportsHydration(@NonNull GBDevice device) {
         return false;
     }
 
@@ -1140,9 +1156,9 @@ public abstract class AbstractDeviceCoordinator implements DeviceCoordinator {
 
     @Override
     public int[] getSupportedDebugSettings(final GBDevice device) {
-        return new int[] {
-                R.xml.devicesettings_stress_test,
-                R.xml.devicesettings_disable_busy_checking,
+        return new int[]{
+            R.xml.devicesettings_stress_test,
+            R.xml.devicesettings_disable_busy_checking,
         };
     }
 
@@ -1211,12 +1227,12 @@ public abstract class AbstractDeviceCoordinator implements DeviceCoordinator {
     @Override
     public List<HeartRateCapability.MeasurementInterval> getHeartRateMeasurementIntervals() {
         return Arrays.asList(
-                HeartRateCapability.MeasurementInterval.OFF,
-                HeartRateCapability.MeasurementInterval.MINUTES_1,
-                HeartRateCapability.MeasurementInterval.MINUTES_5,
-                HeartRateCapability.MeasurementInterval.MINUTES_10,
-                HeartRateCapability.MeasurementInterval.MINUTES_30,
-                HeartRateCapability.MeasurementInterval.HOUR_1
+            HeartRateCapability.MeasurementInterval.OFF,
+            HeartRateCapability.MeasurementInterval.MINUTES_1,
+            HeartRateCapability.MeasurementInterval.MINUTES_5,
+            HeartRateCapability.MeasurementInterval.MINUTES_10,
+            HeartRateCapability.MeasurementInterval.MINUTES_30,
+            HeartRateCapability.MeasurementInterval.HOUR_1
         );
     }
 
@@ -1233,7 +1249,14 @@ public abstract class AbstractDeviceCoordinator implements DeviceCoordinator {
 
     @Override
     public boolean supportsNavigation(@NonNull final GBDevice device) {
-        return false;
+        return supportsNotifications(device) &&
+            GBApplication.getPrefs().getBoolean(GBPrefs.NAVIGATION_ALLOW_UNSUPPORTED_DEVICES, false);
+    }
+
+    @Override
+    public boolean supportsNotifications(@NonNull final GBDevice device) {
+        // FIXME override this per-device
+        return true;
     }
 
     @Override
@@ -1328,6 +1351,11 @@ public abstract class AbstractDeviceCoordinator implements DeviceCoordinator {
     @Override
     public List<DeviceCardAction> getCustomActions() {
         return Collections.emptyList();
+    }
+
+    @Override
+    public List<DeviceCardItem> getCardItems(@NonNull final GBDevice device) {
+        return DefaultDeviceCardItems.build(this, device);
     }
 
     @Override

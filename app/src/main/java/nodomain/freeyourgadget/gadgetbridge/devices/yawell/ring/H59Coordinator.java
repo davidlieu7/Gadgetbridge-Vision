@@ -26,7 +26,7 @@ import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
 public class H59Coordinator extends AbstractYawellRingCoordinator {
     @Override
     protected Pattern getSupportedDeviceName() {
-        return Pattern.compile("^H59_.*");
+        return Pattern.compile("^H59(MAX)?_.*");
     }
 
     @Override

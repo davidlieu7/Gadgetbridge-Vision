@@ -85,8 +85,8 @@ public class UltrahumanDeviceCoordinator extends AbstractBLEDeviceCoordinator {
     @Override
     public List<DeviceCardAction> getCustomActions() {
         List<DeviceCardAction> list = new ArrayList<>(2);
-        list.add(new UltrahumanDeviceCardAction(R.drawable.ic_flight, R.string.ultrahuman_airplane_mode_title, R.string.ultrahuman_airplane_mode_question, UltrahumanConstants.ACTION_AIRPLANE_MODE));
-        list.add(new UltrahumanDeviceCardAction(R.drawable.ic_pulmonology, R.string.ultrahuman_breathing_title, UltrahumanBreathingActivity.class));
+        list.add(new UltrahumanDeviceCardAction("ultrahuman_airplane", R.drawable.ic_flight, R.string.ultrahuman_airplane_mode_title, R.string.ultrahuman_airplane_mode_question, UltrahumanConstants.ACTION_AIRPLANE_MODE));
+        list.add(new UltrahumanDeviceCardAction("ultrahuman_breathing", R.drawable.ic_pulmonology, R.string.ultrahuman_breathing_title, UltrahumanBreathingActivity.class));
         return list;
     }
 

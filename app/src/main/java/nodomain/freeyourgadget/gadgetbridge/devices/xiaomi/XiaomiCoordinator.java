@@ -24,6 +24,7 @@ import android.content.Context;
 import android.net.Uri;
 import android.os.Bundle;
 import android.os.ParcelUuid;
+import android.util.Size;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -34,6 +35,7 @@ import java.io.File;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.List;
@@ -287,6 +289,21 @@ public abstract class XiaomiCoordinator extends AbstractBLEDeviceCoordinator {
         return supportsAppsManagement(device);
     }
 
+    /**
+     * Returns the known watchface preview sizes that match the device. Empty when the sizes are not known.
+     */
+    public List<Size> getWatchfacePreviewSizes() {
+        return Collections.emptyList();
+    }
+
+    /**
+     * Returns the screen resolution of the device, or null if it is not known.
+     */
+    @Nullable
+    public Size getScreenSize() {
+        return null;
+    }
+
     @Override
     public Class<? extends Activity> getAppsManagementActivity(@NonNull final GBDevice device) {
         return AppManagerActivity.class;
@@ -334,7 +351,13 @@ public abstract class XiaomiCoordinator extends AbstractBLEDeviceCoordinator {
 
     @Override
     public boolean supportsBodyEnergy(@NonNull GBDevice device) {
-        return false; // FIXME is should, but untested
+        return true;
+    }
+
+    @Override
+    public boolean supportsVO2Max(@NonNull GBDevice device) {
+        // Persisted in the workout summaries - see WorkoutSummaryParser
+        return true;
     }
 
     @Override
@@ -481,7 +504,7 @@ public abstract class XiaomiCoordinator extends AbstractBLEDeviceCoordinator {
     public Set<SleepAsAndroidFeature> getSleepAsAndroidFeatures(@NonNull final GBDevice device) {
         // Default set for Xiaomi protobuf devices. Raw accelerometer is streamed via the
         // synthetic-workout raw-sensor protocol (sport=810, subtype 53; see
-        // XiaomiHealthService.startRawSensor). Devices that do not honor it should override
+        // XiaomiSleepAsAndroidManager.start). Devices that do not honor it should override
         // this to remove ACCELEROMETER.
         return EnumSet.of(
                 SleepAsAndroidFeature.HEART_RATE,
@@ -531,6 +554,18 @@ public abstract class XiaomiCoordinator extends AbstractBLEDeviceCoordinator {
         return ArrayUtils.addAll(
                 super.getSupportedDeviceSpecificConnectionSettings(),
                 ArrayUtils.toPrimitive(settings.toArray(new Integer[0]))
+        );
+    }
+
+    @Override
+    public int[] getSupportedDebugSettings(final GBDevice device) {
+        if (getConnectionType().equals(ConnectionType.BLE)) {
+            return super.getSupportedDebugSettings(device);
+        }
+        // Only SPP V2 drops packets, see XiaomiSppProtocolV2
+        return ArrayUtils.add(
+                super.getSupportedDebugSettings(device),
+                R.xml.devicesettings_debug_drop_packets
         );
     }
 
@@ -614,6 +649,9 @@ public abstract class XiaomiCoordinator extends AbstractBLEDeviceCoordinator {
         notifications.add(R.xml.devicesettings_autoremove_notifications);
         if (getCannedRepliesSlotCount(device) > 0) {
             notifications.add(R.xml.devicesettings_canned_dismisscall_16);
+        }
+        if (supportsNavigation(device)) {
+            notifications.add(R.xml.devicesettings_navigation_notifications);
         }
         notifications.add(R.xml.devicesettings_transliteration);
 
@@ -722,6 +760,11 @@ public abstract class XiaomiCoordinator extends AbstractBLEDeviceCoordinator {
     @Override
     public WidgetManager getWidgetManager(@NonNull final GBDevice device) {
         return new XiaomiWidgetManager(device);
+    }
+
+    @Override
+    public boolean supportsNavigation(@NonNull final GBDevice device) {
+        return true;
     }
 
     protected static Prefs getPrefs(@NonNull final GBDevice device) {

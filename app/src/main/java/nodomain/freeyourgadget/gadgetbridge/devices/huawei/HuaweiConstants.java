@@ -136,6 +136,7 @@ public final class HuaweiConstants {
     public static final String PREF_HUAWEI_ARRHYTHMIA_ALERT = "pref_huawei_arrhythmia_alert";
     public static final String PREF_HUAWEI_ECG_SWITCH = "pref_huawei_ecg_switch";
     public static final String PREF_HUAWEI_ARTERIAL_STIFFNESS_DETECTION_SWITCH = "pref_huawei_arterial_stiffness_detection_switch";
+    public static final String PREF_HUAWEI_WHEELCHAIR_MODE = "pref_huawei_wheelchair_mode";
 
 
 

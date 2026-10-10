@@ -32,6 +32,9 @@ import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEventAppInfo;
 import nodomain.freeyourgadget.gadgetbridge.devices.xiaomi.XiaomiFWHelper;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDeviceApp;
+import nodomain.freeyourgadget.gadgetbridge.proto.xiaomi.Watchface;
+import nodomain.freeyourgadget.gadgetbridge.proto.xiaomi.WatchfaceInstallStart;
+import nodomain.freeyourgadget.gadgetbridge.proto.xiaomi.WatchfaceList;
 import nodomain.freeyourgadget.gadgetbridge.proto.xiaomi.XiaomiProto;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.xiaomi.XiaomiSupport;
 
@@ -100,7 +103,7 @@ public class XiaomiWatchfaceService extends AbstractXiaomiService implements Xia
         getSupport().sendCommand("request watchface list", COMMAND_TYPE, CMD_WATCHFACE_LIST);
     }
 
-    private void handleWatchfaceList(final XiaomiProto.WatchfaceList watchfaceList) {
+    private void handleWatchfaceList(final WatchfaceList watchfaceList) {
         LOG.debug("Got {} watchfaces", watchfaceList.getWatchfaceCount());
 
         allWatchfaces.clear();
@@ -108,7 +111,7 @@ public class XiaomiWatchfaceService extends AbstractXiaomiService implements Xia
         facesCache.clear();
         activeWatchface = null;
 
-        for (final XiaomiProto.WatchfaceInfo watchface : watchfaceList.getWatchfaceList()) {
+        for (final var watchface : watchfaceList.getWatchfaceList()) {
             final UUID uuid = toWatchfaceUUID(watchface.getId());
             allWatchfaces.add(uuid);
             if (watchface.getCanDelete()) {
@@ -153,7 +156,7 @@ public class XiaomiWatchfaceService extends AbstractXiaomiService implements Xia
                 XiaomiProto.Command.newBuilder()
                         .setType(COMMAND_TYPE)
                         .setSubtype(CMD_WATCHFACE_SET)
-                        .setWatchface(XiaomiProto.Watchface.newBuilder().setWatchfaceId(id))
+                        .setWatchface(Watchface.newBuilder().setWatchfaceId(id))
                         .build()
         );
     }
@@ -190,7 +193,7 @@ public class XiaomiWatchfaceService extends AbstractXiaomiService implements Xia
                 XiaomiProto.Command.newBuilder()
                         .setType(COMMAND_TYPE)
                         .setSubtype(CMD_WATCHFACE_DELETE)
-                        .setWatchface(XiaomiProto.Watchface.newBuilder().setWatchfaceId(id))
+                        .setWatchface(Watchface.newBuilder().setWatchfaceId(id))
                         .build()
         );
     }
@@ -206,8 +209,8 @@ public class XiaomiWatchfaceService extends AbstractXiaomiService implements Xia
                 XiaomiProto.Command.newBuilder()
                         .setType(COMMAND_TYPE)
                         .setSubtype(CMD_WATCHFACE_INSTALL)
-                        .setWatchface(XiaomiProto.Watchface.newBuilder().setWatchfaceInstallStart(
-                                XiaomiProto.WatchfaceInstallStart.newBuilder()
+                        .setWatchface(Watchface.newBuilder().setWatchfaceInstallStart(
+                                WatchfaceInstallStart.newBuilder()
                                         .setId(fwHelper.getId())
                                         .setSize(fwHelper.getBytes().length)
                         ))

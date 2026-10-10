@@ -90,6 +90,7 @@ import nodomain.freeyourgadget.gadgetbridge.activities.workouts.templates.Workou
 import nodomain.freeyourgadget.gadgetbridge.activities.NotificationsAppIconUploadActivity;
 import nodomain.freeyourgadget.gadgetbridge.activities.app_specific_notifications.AppSpecificNotificationSettingsActivity;
 import nodomain.freeyourgadget.gadgetbridge.activities.audiorecordings.AudioRecordingsActivity;
+import nodomain.freeyourgadget.gadgetbridge.activities.files.FtpFileBrowserActivity;
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.DeviceSetting;
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.DeviceSettingRenderer;
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.DeviceSettingsIndexer;
@@ -275,6 +276,7 @@ public class DeviceSpecificSettingsFragment extends AbstractPreferenceFragment i
                             }
                         }
                     }
+                    addDynamicSettings(rootKey);
                     reloadEnabledPreferences();
                     return;
                 }
@@ -1050,6 +1052,11 @@ public class DeviceSpecificSettingsFragment extends AbstractPreferenceFragment i
         addPreferenceHandlerFor(PREF_SOUNDCORE_EQUALIZER_BAND8_VALUE);
         addPreferenceHandlerFor(PREF_SOUNDCORE_EQUALIZER_BAND9_FREQ);
         addPreferenceHandlerFor(PREF_SOUNDCORE_EQUALIZER_BAND9_VALUE);
+        addPreferenceHandlerFor(PREF_SOUNDCORE_FIND_LEFT_EARBUD);
+        addPreferenceHandlerFor(PREF_SOUNDCORE_FIND_RIGHT_EARBUD);
+        addPreferenceHandlerFor(PREF_SOUNDCORE_A30I_DISABLE_OPTION_AMBIENT_MODE);
+        addPreferenceHandlerFor(PREF_SOUNDCORE_A30I_DISABLE_OPTION_AMBIENT_SOUND_LEVEL);
+        addPreferenceHandlerFor(PREF_SOUNDCORE_A30I_DISABLE_OPTION_WIND_NOISE_REDUCTION);
 
         addPreferenceHandlerFor(PREF_MOONDROP_EQUALIZER_PRESET);
         addPreferenceHandlerFor(PREF_MOONDROP_ANC_MODE);
@@ -1551,6 +1558,7 @@ public class DeviceSpecificSettingsFragment extends AbstractPreferenceFragment i
         setInputTypeFor(DeviceSettingsPreferenceConst.PREF_DEVICE_GPS_UPDATE_INTERVAL, InputType.TYPE_CLASS_NUMBER);
         setInputTypeFor(DeviceSettingsPreferenceConst.PREF_BANGLEJS_TEXT_BITMAP_SIZE, InputType.TYPE_CLASS_NUMBER);
         setInputTypeFor(DeviceSettingsPreferenceConst.PREF_AUTO_REPLY_INCOMING_CALL_DELAY, InputType.TYPE_CLASS_NUMBER);
+        setInputTypeFor(DeviceSettingsPreferenceConst.PREF_NAVIGATION_UPDATE_RATE, InputType.TYPE_CLASS_NUMBER);
         setInputTypeFor("hplus_screentime", InputType.TYPE_CLASS_NUMBER);
         setInputTypeFor(PREF_CALENDAR_SYNC_EVENTS_AMOUNT, InputType.TYPE_CLASS_NUMBER);
         setInputTypeFor(PREF_CALENDAR_MAX_TITLE_LENGTH, InputType.TYPE_CLASS_NUMBER);
@@ -1665,6 +1673,24 @@ public class DeviceSpecificSettingsFragment extends AbstractPreferenceFragment i
             }
         }
 
+        final Preference deviceCardShowItems = findPreference(PREF_DEVICE_CARD_SHOW_ITEMS);
+        if (deviceCardShowItems != null) {
+            deviceCardShowItems.setOnPreferenceChangeListener((preference, newValue) -> {
+                LocalBroadcastManager.getInstance(requireContext()).sendBroadcast(new Intent(DeviceManager.ACTION_REFRESH_DEVICELIST));
+                return true;
+            });
+        }
+
+        final Preference deviceCardItems = findPreference(PREF_DEVICE_CARD_ITEMS);
+        if (deviceCardItems != null) {
+            deviceCardItems.setOnPreferenceClickListener(preference -> {
+                final Intent intent = new Intent(getContext(), DeviceCardItemsActivity.class);
+                intent.putExtra(GBDevice.EXTRA_DEVICE, device);
+                startActivity(intent);
+                return true;
+            });
+        }
+
         // Replace the PAI with the device-specific name
         if (chartsTabsOrderSelection != null) {
             final ListPreference chartsTabsListPref = (ListPreference) chartsTabsOrderSelection;
@@ -1713,6 +1739,16 @@ public class DeviceSpecificSettingsFragment extends AbstractPreferenceFragment i
         if (audioRecordings != null) {
             audioRecordings.setOnPreferenceClickListener(preference -> {
                 final Intent intent = new Intent(getContext(), AudioRecordingsActivity.class);
+                intent.putExtra(GBDevice.EXTRA_DEVICE, getDevice());
+                startActivity(intent);
+                return true;
+            });
+        }
+
+        final Preference ftpBrowse = findPreference(FTP_SERVER_BROWSE);
+        if (ftpBrowse != null) {
+            ftpBrowse.setOnPreferenceClickListener(preference -> {
+                final Intent intent = new Intent(getContext(), FtpFileBrowserActivity.class);
                 intent.putExtra(GBDevice.EXTRA_DEVICE, getDevice());
                 startActivity(intent);
                 return true;
@@ -1809,12 +1845,16 @@ public class DeviceSpecificSettingsFragment extends AbstractPreferenceFragment i
                         R.xml.devicesettings_chartstabs
                 );
             }
+
+            final List<Integer> deviceCardSubScreens = new ArrayList<>();
+            deviceCardSubScreens.add(R.xml.devicesettings_device_card);
             if (coordinator.supportsActivityTracking(device)) {
-                deviceSpecificSettings.addRootScreen(
-                        DeviceSpecificSettingsScreen.ACTIVITY_INFO,
-                        R.xml.devicesettings_device_card_activity_card_preferences
-                );
+                deviceCardSubScreens.add(R.xml.devicesettings_device_card_activity_card_preferences);
             }
+            deviceSpecificSettings.addRootScreen(
+                    DeviceSpecificSettingsScreen.DEVICE_CARD,
+                    deviceCardSubScreens
+            );
 
             if (coordinator.getConnectionType() != DeviceCoordinator.ConnectionType.USB) {
                 // USB devices do not support it (and should not need it)

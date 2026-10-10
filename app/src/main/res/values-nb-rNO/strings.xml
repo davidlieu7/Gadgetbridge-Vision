@@ -2775,10 +2775,10 @@
     <string name="prefs_noise_control_with_one_earbud_summary">Tillat støy kontroll når du bruker bare én ørepropp</string>
     <string name="pref_ambient_sound_tone">Omgivelseslyd tone</string>
     <string name="pref_ambient_sound_tone_summary">Fra myk til klar</string>
-    <string name="pref_switch_controls_anc_ambient">Støyfjerning ←→ Omgivelseslyd</string>
-    <string name="pref_switch_controls_anc_off">Støyisolering ←→ Av</string>
-    <string name="pref_switch_controls_ambient_off">Omgivelseslyd ←→ Av</string>
-    <string name="pref_switch_controls_anc_ambient_off">Støyisolering ←→ Omgivelseslyd ←→ Av</string>
+    <string name="pref_switch_controls_anc_ambient">Støyfjerning ↔ Omgivelseslyd</string>
+    <string name="pref_switch_controls_anc_off">Støyisolering ↔ Av</string>
+    <string name="pref_switch_controls_ambient_off">Omgivelseslyd ↔ Av</string>
+    <string name="pref_switch_controls_anc_ambient_off">Støyisolering ↔ Omgivelseslyd ↔ Av</string>
     <string name="prefs_voice_detect_summary">Aktiver omgivelseslyd og senk avspilling automatisk etter at stemme er oppdaget</string>
     <string name="prefs_double_tap_edge">Dobbeltrykk kant</string>
     <string name="prefs_double_tap_edge_summary">Oppdag dobbelttrykk selv når det ikke trykkes på berøringspanelet</string>

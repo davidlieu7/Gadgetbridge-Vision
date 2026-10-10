@@ -1,14 +1,18 @@
 package nodomain.freeyourgadget.gadgetbridge.activities.workouts.entries;
 
 import android.content.Context;
-import android.content.res.ColorStateList;
 import android.view.Gravity;
-import android.view.View;
 import android.widget.LinearLayout;
-import android.widget.ProgressBar;
 import android.widget.TextView;
 
+import androidx.core.content.ContextCompat;
+
+import com.google.android.material.progressindicator.LinearProgressIndicator;
+
+import java.util.Locale;
+
 import nodomain.freeyourgadget.gadgetbridge.GBApplication;
+import nodomain.freeyourgadget.gadgetbridge.R;
 import nodomain.freeyourgadget.gadgetbridge.activities.workouts.WorkoutValueFormatter;
 
 public class ActivitySummaryProgressEntry extends ActivitySummarySimpleEntry {
@@ -54,7 +58,7 @@ public class ActivitySummaryProgressEntry extends ActivitySummarySimpleEntry {
         valueTextView.setTextSize(12);
         valueTextView.setTextColor(GBApplication.getTextColor(context));
         valueTextView.setGravity(Gravity.END);
-        valueTextView.setText(workoutValueFormatter.formatValue(getValue(), getUnit()));
+        valueTextView.setText(String.format(Locale.getDefault(), "%s (%d%%)", workoutValueFormatter.formatValue(getValue(), getUnit()), progress));
 
         // Layout for the labels, so the value is at the right
         final LinearLayout labelsLinearLayout = new LinearLayout(context);
@@ -63,17 +67,24 @@ public class ActivitySummaryProgressEntry extends ActivitySummarySimpleEntry {
         labelsLinearLayout.addView(valueTextView);
 
         final LinearLayout progressLayout = new LinearLayout(context);
-        final ProgressBar progressBar = new ProgressBar(context, null, android.R.attr.progressBarStyleHorizontal);
+        final LinearProgressIndicator progressBar = new LinearProgressIndicator(context);
         progressBar.setIndeterminate(false);
+        progressBar.setMax(100);
         progressBar.setProgress(progress);
-        progressBar.setVisibility(View.VISIBLE);
-        if (color != 0) {
-            progressBar.setProgressTintList(ColorStateList.valueOf(color));
-        }
+        progressBar.setTrackThickness((int) (10 * context.getResources().getDisplayMetrics().density));
+        progressBar.setTrackCornerRadius((int) (4 * context.getResources().getDisplayMetrics().density));
+        progressBar.setTrackColor(ContextCompat.getColor(context, R.color.gauge_line_color));
+        progressBar.setIndicatorColor(color != 0 ? color : GBApplication.getTextColor(context));
+        progressBar.setTrackStopIndicatorSize(0);
+        progressBar.setIndicatorTrackGapSize(0);
+
         LinearLayout.LayoutParams params = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
         progressLayout.addView(progressBar, params);
 
+        final LinearLayout.LayoutParams progressLayoutParams = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        progressLayoutParams.topMargin = (int) (4 * context.getResources().getDisplayMetrics().density);
+
         linearLayout.addView(labelsLinearLayout);
-        linearLayout.addView(progressLayout);
+        linearLayout.addView(progressLayout, progressLayoutParams);
     }
 }

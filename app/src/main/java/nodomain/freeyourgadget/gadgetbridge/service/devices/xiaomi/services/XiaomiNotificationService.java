@@ -18,16 +18,11 @@ package nodomain.freeyourgadget.gadgetbridge.service.devices.xiaomi.services;
 
 import android.Manifest;
 import android.content.pm.PackageManager;
-import android.graphics.Bitmap;
-import android.graphics.Canvas;
-import android.graphics.Rect;
 import android.graphics.drawable.Drawable;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.nio.ByteBuffer;
-import java.nio.ByteOrder;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.LinkedList;
@@ -35,7 +30,6 @@ import java.util.Locale;
 import java.util.Queue;
 
 import nodomain.freeyourgadget.gadgetbridge.BuildConfig;
-import nodomain.freeyourgadget.gadgetbridge.R;
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsPreferenceConst;
 import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEventCallControl;
 import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEventNotificationControl;
@@ -43,10 +37,18 @@ import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEventUpdatePref
 import nodomain.freeyourgadget.gadgetbridge.model.CallSpec;
 import nodomain.freeyourgadget.gadgetbridge.model.CannedMessagesSpec;
 import nodomain.freeyourgadget.gadgetbridge.model.NotificationSpec;
+import nodomain.freeyourgadget.gadgetbridge.proto.xiaomi.Notification;
+import nodomain.freeyourgadget.gadgetbridge.proto.xiaomi.Notification2;
+import nodomain.freeyourgadget.gadgetbridge.proto.xiaomi.Notification3;
+import nodomain.freeyourgadget.gadgetbridge.proto.xiaomi.NotificationDismiss;
+import nodomain.freeyourgadget.gadgetbridge.proto.xiaomi.NotificationIconPackage;
+import nodomain.freeyourgadget.gadgetbridge.proto.xiaomi.NotificationIconRequest;
+import nodomain.freeyourgadget.gadgetbridge.proto.xiaomi.NotificationId;
+import nodomain.freeyourgadget.gadgetbridge.proto.xiaomi.NotificationReply;
+import nodomain.freeyourgadget.gadgetbridge.proto.xiaomi.ReplyMsg;
 import nodomain.freeyourgadget.gadgetbridge.proto.xiaomi.XiaomiProto;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.xiaomi.XiaomiPreferences;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.xiaomi.XiaomiSupport;
-import nodomain.freeyourgadget.gadgetbridge.util.BitmapUtil;
 import nodomain.freeyourgadget.gadgetbridge.util.LimitedQueue;
 import nodomain.freeyourgadget.gadgetbridge.util.NotificationUtils;
 import nodomain.freeyourgadget.gadgetbridge.util.Prefs;
@@ -106,7 +108,7 @@ public class XiaomiNotificationService extends AbstractXiaomiService implements 
         switch (cmd.getSubtype()) {
             case CMD_NOTIFICATION_DISMISS:
                 LOG.info("Watch dismiss {} notifications", cmd.getNotification().getNotificationDismiss().getNotificationIdCount());
-                for (final XiaomiProto.NotificationId notificationId : cmd.getNotification().getNotificationDismiss().getNotificationIdList()) {
+                for (final var notificationId : cmd.getNotification().getNotificationDismiss().getNotificationIdList()) {
                     LOG.debug("Watch dismiss {}", notificationId.getId());
                     deviceEvtNotificationControl.handle = notificationId.getId();
                     deviceEvtNotificationControl.event = GBDeviceEventNotificationControl.Event.DISMISS;
@@ -175,7 +177,7 @@ public class XiaomiNotificationService extends AbstractXiaomiService implements 
             return;
         }
 
-        final XiaomiProto.Notification3.Builder notification3 = XiaomiProto.Notification3.newBuilder()
+        final var notification3 = Notification3.newBuilder()
                 .setId(notificationSpec.getId())
                 .setUnknown4("") // ?
                 .setTimestamp(TIMESTAMP_SDF.format(new Date(notificationSpec.getWhen())));
@@ -215,11 +217,11 @@ public class XiaomiNotificationService extends AbstractXiaomiService implements 
             notification3.setOpenOnPhone(true);
         }
 
-        final XiaomiProto.Notification2 notification2 = XiaomiProto.Notification2.newBuilder()
+        final var notification2 = Notification2.newBuilder()
                 .setNotification3(notification3)
                 .build();
 
-        final XiaomiProto.Notification notification = XiaomiProto.Notification.newBuilder()
+        final var notification = Notification.newBuilder()
                 .setNotification2(notification2)
                 .build();
 
@@ -244,7 +246,7 @@ public class XiaomiNotificationService extends AbstractXiaomiService implements 
             return;
         }
 
-        final XiaomiProto.NotificationId.Builder notificationId = XiaomiProto.NotificationId.newBuilder()
+        final var notificationId = NotificationId.newBuilder()
                 .setId(id)
                 .setPackage(mNotificationPackageName.lookup(id));
 
@@ -255,11 +257,11 @@ public class XiaomiNotificationService extends AbstractXiaomiService implements 
             notificationId.setKey(key);
         }
 
-        final XiaomiProto.NotificationDismiss notificationDismiss = XiaomiProto.NotificationDismiss.newBuilder()
+        final var notificationDismiss = NotificationDismiss.newBuilder()
                 .addNotificationId(notificationId)
                 .build();
 
-        final XiaomiProto.Notification notification = XiaomiProto.Notification.newBuilder()
+        final var notification = Notification.newBuilder()
                 .setNotificationDismiss(notificationDismiss)
                 .build();
 
@@ -279,10 +281,10 @@ public class XiaomiNotificationService extends AbstractXiaomiService implements 
         }
 
         if (callSpec.getCommand() != CallSpec.CALL_INCOMING) {
-            final XiaomiProto.NotificationDismiss.Builder notification4 = XiaomiProto.NotificationDismiss.newBuilder()
-                    .addNotificationId(XiaomiProto.NotificationId.newBuilder().setId(0).setPackage("phone"));
+            final var notification4 = NotificationDismiss.newBuilder()
+                    .addNotificationId(NotificationId.newBuilder().setId(0).setPackage("phone"));
 
-            final XiaomiProto.Notification notification = XiaomiProto.Notification.newBuilder()
+            final var notification = Notification.newBuilder()
                     .setNotificationDismiss(notification4)
                     .build();
 
@@ -297,7 +299,7 @@ public class XiaomiNotificationService extends AbstractXiaomiService implements 
             return;
         }
 
-        final XiaomiProto.Notification3.Builder notification3 = XiaomiProto.Notification3.newBuilder()
+        final var notification3 = Notification3.newBuilder()
                 .setId(0) // ?
                 .setUnknown4("") // ?
                 .setIsCall(true)
@@ -318,11 +320,11 @@ public class XiaomiNotificationService extends AbstractXiaomiService implements 
             notification3.setBody("?");
         }
 
-        final XiaomiProto.Notification2 notification2 = XiaomiProto.Notification2.newBuilder()
+        final var notification2 = Notification2.newBuilder()
                 .setNotification3(notification3)
                 .build();
 
-        final XiaomiProto.Notification notification = XiaomiProto.Notification.newBuilder()
+        final var notification = Notification.newBuilder()
                 .setNotification2(notification2)
                 .build();
 
@@ -348,7 +350,7 @@ public class XiaomiNotificationService extends AbstractXiaomiService implements 
                 XiaomiProto.Command.newBuilder()
                         .setType(COMMAND_TYPE)
                         .setSubtype(CMD_SCREEN_ON_ON_NOTIFICATIONS_SET)
-                        .setNotification(XiaomiProto.Notification.newBuilder().setScreenOnOnNotifications(screenOnOnNotificationsEnabled).build())
+                        .setNotification(Notification.newBuilder().setScreenOnOnNotifications(screenOnOnNotificationsEnabled).build())
                         .build()
         );
     }
@@ -367,7 +369,7 @@ public class XiaomiNotificationService extends AbstractXiaomiService implements 
             return;
         }
 
-        final XiaomiProto.CannedMessages.Builder cannedMessagesBuilder = XiaomiProto.CannedMessages.newBuilder()
+        final var cannedMessagesBuilder = ReplyMsg.newBuilder()
                 .setMinReplies(minReplies)
                 .setMaxReplies(maxReplies);
         int i = 0;
@@ -386,7 +388,7 @@ public class XiaomiNotificationService extends AbstractXiaomiService implements 
             cannedMessagesBuilder.addReply("-");
         }
 
-        final XiaomiProto.Notification.Builder notificationBuilder = XiaomiProto.Notification.newBuilder()
+        final var notificationBuilder = Notification.newBuilder()
                 .setCannedMessages(cannedMessagesBuilder);
 
         getSupport().sendCommand(
@@ -405,12 +407,12 @@ public class XiaomiNotificationService extends AbstractXiaomiService implements 
                 XiaomiProto.Command.newBuilder()
                         .setType(COMMAND_TYPE)
                         .setSubtype(CMD_CANNED_MESSAGES_GET)
-                        .setNotification(XiaomiProto.Notification.newBuilder().setUnknown8(1))
+                        .setNotification(Notification.newBuilder().setUnknown8(1))
                         .build()
         );
     }
 
-    public void handleCannedMessages(final XiaomiProto.CannedMessages cannedMessages) {
+    public void handleCannedMessages(final ReplyMsg cannedMessages) {
         LOG.info("Got {} canned messages", cannedMessages.getReplyCount());
 
         final int minReplies = cannedMessages.getMinReplies();
@@ -441,7 +443,7 @@ public class XiaomiNotificationService extends AbstractXiaomiService implements 
         return getSupport().getContext().checkSelfPermission(Manifest.permission.SEND_SMS) == PackageManager.PERMISSION_GRANTED;
     }
 
-    private void handleNotificationIconQuery(final XiaomiProto.NotificationIconPackage notificationIconPackage) {
+    private void handleNotificationIconQuery(final NotificationIconPackage notificationIconPackage) {
         LOG.debug("Watch querying notification icon for {}", notificationIconPackage.getPackage());
 
         iconPackageName = notificationIconPackage.getPackage();
@@ -471,13 +473,13 @@ public class XiaomiNotificationService extends AbstractXiaomiService implements 
                 XiaomiProto.Command.newBuilder()
                         .setType(COMMAND_TYPE)
                         .setSubtype(CMD_NOTIFICATION_ICON_REQUEST)
-                        .setNotification(XiaomiProto.Notification.newBuilder()
+                        .setNotification(Notification.newBuilder()
                                 .setNotificationIconReply(notificationIconPackage)
                         ).build()
         );
     }
 
-    private void handleCannedSmsReply(final XiaomiProto.NotificationReply notificationReply) {
+    private void handleCannedSmsReply(final NotificationReply notificationReply) {
         final String phoneNumber = notificationReply.getNumber();
         if (phoneNumber == null) {
             LOG.warn("Missing phone number for sms reply");
@@ -514,13 +516,13 @@ public class XiaomiNotificationService extends AbstractXiaomiService implements 
                 XiaomiProto.Command.newBuilder()
                         .setType(COMMAND_TYPE)
                         .setSubtype(CMD_CALL_REPLY_ACK)
-                        .setNotification(XiaomiProto.Notification.newBuilder()
+                        .setNotification(Notification.newBuilder()
                                 .setNotificationReplyStatus(success ? 0 : 1)
                         ).build()
         );
     }
 
-    private void handleNotificationIconRequest(final XiaomiProto.NotificationIconRequest notificationIconRequest) {
+    private void handleNotificationIconRequest(final NotificationIconRequest notificationIconRequest) {
         if (iconPackageName == null) {
             LOG.warn("No icon package name");
             return;

@@ -225,7 +225,8 @@ public class FitExporterReadmeRoundTripTest {
 
         // Build the export inputs from the parsed file.
         final BaseActivitySummary summary = buildSummaryFromSession(session, in.getName());
-        final ActivityTrack track = buildTrackFromRecordsAndLaps(records, laps);
+        final boolean stepCadence = ActivityKind.getCycleUnit(ActivityKind.fromCode(summary.getActivityKind())) == ActivityKind.CycleUnit.STEPS;
+        final ActivityTrack track = buildTrackFromRecordsAndLaps(records, laps, stepCadence);
         // Pass lengths/splits/sets through so the exporter can re-emit them on
         // round-trip. Mirrors what FitActivityTrackProvider does for the production
         // import path.
@@ -275,7 +276,7 @@ public class FitExporterReadmeRoundTripTest {
                     sm.getWeightDisplayUnit(),
                     sm.getMessageIndex()));
         }
-        final ActivitySummaryData data = buildSummaryDataFromSession(session);
+        final ActivitySummaryData data = buildSummaryDataFromSession(session, stepCadence);
 
         // Export. Hash the relPath into the temp filename — the same basename
         // (e.g. Lap-Swimming-Fenix6x.fit) appears under multiple year dirs in the
@@ -401,10 +402,10 @@ public class FitExporterReadmeRoundTripTest {
 
             // GPS — both lat & lon must round-trip. FIT semicircle scale is exact,
             // so equality is OK after both encodes use the same scale.
-            if (inRec.getLatitude() != null && inRec.getLongitude() != null) {
+            if (inRec.getPositionLat() != null && inRec.getPositionLong() != null) {
                 gpsTotal++;
-                if (inRec.getLatitude().equals(outRec.getLatitude())
-                        && inRec.getLongitude().equals(outRec.getLongitude())) {
+                if (inRec.getPositionLat().equals(outRec.getPositionLat())
+                        && inRec.getPositionLong().equals(outRec.getPositionLong())) {
                     gpsHits++;
                 }
             }
@@ -511,10 +512,10 @@ public class FitExporterReadmeRoundTripTest {
         }
         // HR. Skip when input avg=0 (no strap → sentinel; some devices record
         // record-level HR but never aggregate to session — exporter computes one).
-        if (in.getAverageHeartRate() != null && out.getAverageHeartRate() != null
-                && in.getAverageHeartRate() > 0
-                && !in.getAverageHeartRate().equals(out.getAverageHeartRate())) {
-            mismatches.add("avgHr in=" + in.getAverageHeartRate() + " out=" + out.getAverageHeartRate());
+        if (in.getAvgHeartRate() != null && out.getAvgHeartRate() != null
+                && in.getAvgHeartRate() > 0
+                && !in.getAvgHeartRate().equals(out.getAvgHeartRate())) {
+            mismatches.add("avgHr in=" + in.getAvgHeartRate() + " out=" + out.getAvgHeartRate());
         }
         // Avg speed: input scale is FIT m/s × 1000; we round-trip via Float.
         // Exporter intentionally re-derives avg_speed from distance/elapsed when the
@@ -580,8 +581,8 @@ public class FitExporterReadmeRoundTripTest {
         final Long startSec = session.getStartTime();
         final long startMs = startSec != null ? startSec * 1000L : 0L;
         s.setStartTime(new Date(startMs));
-        // total_elapsed_time is stored unscaled (raw uint32 = ms per FIT spec scale=1000).
-        final Long elapsedMs = session.getTotalElapsedTime();
+        final Double elapsedSec = session.getTotalElapsedTime();
+        final Long elapsedMs = (elapsedSec != null) ? Math.round(elapsedSec * 1000L) : null;
         s.setEndTime(new Date(startMs + (elapsedMs != null ? elapsedMs : 0L)));
         s.setName(fileName);
         final ActivityKind kind = mapSportToKind(session.getSport(), session.getSubSport());
@@ -596,7 +597,8 @@ public class FitExporterReadmeRoundTripTest {
     }
 
     private static ActivityTrack buildTrackFromRecordsAndLaps(final List<FitRecord> records,
-                                                              final List<FitLap> laps) {
+                                                              final List<FitLap> laps,
+                                                              final boolean stepCadence) {
         final ActivityTrack track = new ActivityTrack();
         track.setCurrentSegmentInfo(new ActivityTrack.SegmentInfo(ActivityTrack.SegmentIntensity.ACTIVE));
         // Lap boundaries: split records into segments by lap.startTime monotone walk.
@@ -610,6 +612,10 @@ public class FitExporterReadmeRoundTripTest {
         boolean firstSeg = true;
         for (final FitRecord rec : records) {
             final ActivityPoint p = rec.toActivityPoint();
+            // Gadgetbridge tracks hold steps/min; the FIT records count strides.
+            if (stepCadence && p.getCadence() > 0) {
+                p.setCadence(p.getCadence() * 2);
+            }
             // Cross next lap boundary → start a new segment.
             while (boundaryIdx < lapBoundaries.length
                     && p.getTime() != null
@@ -628,7 +634,9 @@ public class FitExporterReadmeRoundTripTest {
     /** Translate a small but useful subset of FitSession aggregate fields back into
      *  ActivitySummaryData entries so FitExporter populates the same lap/session
      *  aggregates on the way out. Mirrors the fields GarminWorkoutParser emits. */
-    private static ActivitySummaryData buildSummaryDataFromSession(final FitSession session) {
+    private static ActivitySummaryData buildSummaryDataFromSession(final FitSession session,
+                                                                    final boolean stepCadence) {
+        final int cadenceFactor = stepCadence ? 2 : 1;
         final ActivitySummaryData d = new ActivitySummaryData();
         // Getter returns raw meters (codec applies scale=100 on decode).
         final Double totalDistance = session.getTotalDistance();
@@ -652,9 +660,9 @@ public class FitExporterReadmeRoundTripTest {
                     session.getMaxSpeed(),
                     ActivitySummaryEntries.UNIT_METERS_PER_SECOND);
         }
-        if (session.getAverageHeartRate() != null) {
+        if (session.getAvgHeartRate() != null) {
             d.add(ActivitySummaryEntries.HR_AVG,
-                    session.getAverageHeartRate(),
+                    session.getAvgHeartRate(),
                     ActivitySummaryEntries.UNIT_BPM);
         }
         if (session.getMaxHeartRate() != null) {
@@ -664,12 +672,12 @@ public class FitExporterReadmeRoundTripTest {
         }
         if (session.getAvgCadence() != null) {
             d.add(ActivitySummaryEntries.CADENCE_AVG,
-                    session.getAvgCadence(),
+                    session.getAvgCadence() * cadenceFactor,
                     ActivitySummaryEntries.UNIT_NONE);
         }
         if (session.getMaxCadence() != null) {
             d.add(ActivitySummaryEntries.CADENCE_MAX,
-                    session.getMaxCadence(),
+                    session.getMaxCadence() * cadenceFactor,
                     ActivitySummaryEntries.UNIT_NONE);
         }
         if (session.getTotalAscent() != null) {

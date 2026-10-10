@@ -17,9 +17,8 @@
         <ImageView
             android:id="@+id/gauge_bar"
             android:layout_width="150dp"
-            android:layout_height="75dp"
-            android:layout_centerHorizontal="true"
-            android:scaleType="fitStart" />
+            android:layout_height="wrap_content"
+            android:layout_centerHorizontal="true" />
 
         <TextView
             android:id="@+id/gauge_value"

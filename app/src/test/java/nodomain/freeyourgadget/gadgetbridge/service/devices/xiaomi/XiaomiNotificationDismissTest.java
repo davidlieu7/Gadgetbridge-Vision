@@ -14,6 +14,8 @@ import java.util.List;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
 import nodomain.freeyourgadget.gadgetbridge.model.DeviceType;
 import nodomain.freeyourgadget.gadgetbridge.model.NotificationSpec;
+import nodomain.freeyourgadget.gadgetbridge.proto.xiaomi.NotificationDismiss;
+import nodomain.freeyourgadget.gadgetbridge.proto.xiaomi.NotificationId;
 import nodomain.freeyourgadget.gadgetbridge.proto.xiaomi.XiaomiProto;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.xiaomi.services.XiaomiNotificationService;
 import nodomain.freeyourgadget.gadgetbridge.test.GBTestApplication;
@@ -42,14 +44,14 @@ public class XiaomiNotificationDismissTest {
         notificationService = new XiaomiNotificationService(support);
     }
 
-    private XiaomiProto.NotificationId postAndDismiss(final NotificationSpec spec) {
+    private NotificationId postAndDismiss(final NotificationSpec spec) {
         notificationService.onNotification(spec);
         notificationService.onDeleteNotification(spec.getId());
 
         final ArgumentCaptor<XiaomiProto.Command> captor = ArgumentCaptor.forClass(XiaomiProto.Command.class);
         Mockito.verify(support, Mockito.atLeastOnce()).sendCommand(Mockito.anyString(), captor.capture());
 
-        XiaomiProto.NotificationDismiss dismiss = null;
+        NotificationDismiss dismiss = null;
         for (final XiaomiProto.Command command : captor.getAllValues()) {
             if (command.getType() == COMMAND_TYPE && command.getSubtype() == CMD_NOTIFICATION_DISMISS) {
                 dismiss = command.getNotification().getNotificationDismiss();
@@ -57,7 +59,7 @@ public class XiaomiNotificationDismissTest {
         }
 
         Assert.assertNotNull("dismiss command was sent", dismiss);
-        final List<XiaomiProto.NotificationId> ids = dismiss.getNotificationIdList();
+        final List<NotificationId> ids = dismiss.getNotificationIdList();
         Assert.assertEquals(1, ids.size());
         return ids.get(0);
     }
@@ -67,7 +69,7 @@ public class XiaomiNotificationDismissTest {
         final NotificationSpec spec = new NotificationSpec();
         spec.setSourceAppId(ALARM_PACKAGE);
 
-        final XiaomiProto.NotificationId notificationId = postAndDismiss(spec);
+        final NotificationId notificationId = postAndDismiss(spec);
 
         Assert.assertEquals(spec.getId(), notificationId.getId());
         Assert.assertEquals(ALARM_PACKAGE, notificationId.getPackage());
@@ -80,7 +82,7 @@ public class XiaomiNotificationDismissTest {
         spec.setSourceAppId(ALARM_PACKAGE);
         spec.setKey("0|" + ALARM_PACKAGE + "|42|null|12345");
 
-        final XiaomiProto.NotificationId notificationId = postAndDismiss(spec);
+        final NotificationId notificationId = postAndDismiss(spec);
 
         Assert.assertEquals(spec.getId(), notificationId.getId());
         Assert.assertEquals(ALARM_PACKAGE, notificationId.getPackage());

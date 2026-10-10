@@ -37,7 +37,7 @@ message Smart {
     optional Service18 service18 = 18;
     optional Service21 service21 = 21;
     optional Service23 service23 = 23;
-    optional Service24 service24 = 24;
+    optional PushNotificationService push_notification_service = 24;
     optional AuthenticationService authenticationService = 27;
     optional ExploreSyncService explore_sync_service = 22;
     optional Service28 service28 = 28;
@@ -170,15 +170,22 @@ message Service21 {
 message Service23 {
 }
 
-message Service24 {
-    message Message1 {
-        optional string unk1 = 1;
+message PushNotificationService {
+    message LastPushNotification {
+        optional string id = 1;
     }
-    message Message4 {
-        optional uint32 unk2 = 2;
+    message PushNotification {
+        optional string id = 1;
+        optional string app_id = 2; // app UUID / topic?
+        optional string payload = 3; // JSON
     }
-    optional Message1 from_device1 = 1;
-    optional Message4 from_device4 = 4;
+    message PushNotificationAck {
+        optional string id = 1;
+        optional uint32 status = 2; // 0 = OK
+    }
+    optional LastPushNotification last_push_notification = 1;
+    optional PushNotification push_notification = 3;
+    optional PushNotificationAck push_notification_ack = 4;
 }
 
 message Service28 {

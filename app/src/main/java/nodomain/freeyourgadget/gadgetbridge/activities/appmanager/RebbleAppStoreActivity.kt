@@ -167,8 +167,10 @@ class RebbleAppStoreActivity : AbstractGBActivity()  {
                 request: WebResourceRequest,
                 error: WebResourceError,
             ) {
-                LOG.error("Got webview error: {}", error.description)
-                view.loadUrl("about:blank")
+                LOG.error("Got webview error for {}: {}", request.url, error.description)
+                if (request.isForMainFrame) {
+                    view.loadUrl("about:blank")
+                }
             }
         }
         webView!!.webViewClient = gbWebClient

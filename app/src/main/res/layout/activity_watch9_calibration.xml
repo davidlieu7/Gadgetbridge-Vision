@@ -13,7 +13,7 @@
         android:layout_marginStart="16dp"
         android:layout_marginTop="16dp"
         android:text="@string/discovery_note"
-        android:textColor="@color/accent"
+        android:textColor="?attr/accent_color"
         android:textStyle="bold" />
 
     <TextView
@@ -49,7 +49,7 @@
                 android:layout_height="wrap_content"
                 android:text="@string/watch9_time_hours"
                 android:textAllCaps="true"
-                android:textColor="@color/accent" />
+                android:textColor="?attr/accent_color" />
 
             <NumberPicker
                 android:id="@+id/np_hour"
@@ -73,7 +73,7 @@
                 android:layout_height="wrap_content"
                 android:text="@string/watch9_time_minutes"
                 android:textAllCaps="true"
-                android:textColor="@color/accent" />
+                android:textColor="?attr/accent_color" />
 
             <NumberPicker
                 android:id="@+id/np_minute"
@@ -97,7 +97,7 @@
                 android:layout_height="wrap_content"
                 android:text="@string/watch9_time_seconds"
                 android:textAllCaps="true"
-                android:textColor="@color/accent" />
+                android:textColor="?attr/accent_color" />
 
             <NumberPicker
                 android:id="@+id/np_second"

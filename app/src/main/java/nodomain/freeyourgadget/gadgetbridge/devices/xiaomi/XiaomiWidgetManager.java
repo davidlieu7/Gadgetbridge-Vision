@@ -47,6 +47,7 @@ import nodomain.freeyourgadget.gadgetbridge.capabilities.widgets.WidgetScreen;
 import nodomain.freeyourgadget.gadgetbridge.capabilities.widgets.WidgetType;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
 import nodomain.freeyourgadget.gadgetbridge.proto.xiaomi.XiaomiProto;
+import nodomain.freeyourgadget.gadgetbridge.proto.xiaomi.XiaomiSystem;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.xiaomi.XiaomiPreferences;
 import nodomain.freeyourgadget.gadgetbridge.util.GB;
 import nodomain.freeyourgadget.gadgetbridge.util.Prefs;
@@ -64,7 +65,7 @@ public class XiaomiWidgetManager implements WidgetManager {
     public List<WidgetLayout> getSupportedWidgetLayouts() {
         final List<WidgetLayout> layouts = new ArrayList<>();
 
-        final XiaomiProto.WidgetScreens widgetScreens = getRawWidgetScreens();
+        final XiaomiSystem.WidgetScreens widgetScreens = getRawWidgetScreens();
         if (!widgetScreens.hasWidgetsCapabilities() || !widgetScreens.getWidgetsCapabilities().hasSupportedLayoutStyles()) {
             return Collections.emptyList();
         }
@@ -103,7 +104,7 @@ public class XiaomiWidgetManager implements WidgetManager {
     public List<WidgetPart> getSupportedWidgetParts(final WidgetType targetWidgetType) {
         final List<WidgetPart> parts = new LinkedList<>();
 
-        final XiaomiProto.WidgetParts rawWidgetParts = getRawWidgetParts();
+        final XiaomiSystem.WidgetParts rawWidgetParts = getRawWidgetParts();
 
         final Set<String> seenNames = new HashSet<>();
         final Set<String> duplicatedNames = new HashSet<>();
@@ -111,7 +112,7 @@ public class XiaomiWidgetManager implements WidgetManager {
         // get supported workout types and convert to subtypes for workout widgets
         final Collection<WidgetPartSubtype> subtypes = convertWorkoutTypesToPartSubtypes(XiaomiWorkoutType.getWorkoutTypesSupportedByDevice(getDevice()));
 
-        for (final XiaomiProto.WidgetPart widgetPart : rawWidgetParts.getWidgetPartList()) {
+        for (final XiaomiSystem.WidgetPart widgetPart : rawWidgetParts.getWidgetPartList()) {
             final WidgetPart convertedPart = fromRawWidgetPart(widgetPart, subtypes);
 
             if (convertedPart == null) {
@@ -144,7 +145,7 @@ public class XiaomiWidgetManager implements WidgetManager {
         return parts;
     }
 
-    private WidgetPart fromRawWidgetPart(final XiaomiProto.WidgetPart widgetPart, final Collection<WidgetPartSubtype> subtypes) {
+    private WidgetPart fromRawWidgetPart(final XiaomiSystem.WidgetPart widgetPart, final Collection<WidgetPartSubtype> subtypes) {
         final WidgetType type = fromRawWidgetType(widgetPart.getType());
 
         if (type == null) {
@@ -163,7 +164,7 @@ public class XiaomiWidgetManager implements WidgetManager {
             convertedPart.setName(widgetPart.getTitle());
         } else {
             // some models do not provide the name of the widget in the screens list, resolve it here
-            final XiaomiProto.WidgetPart resolvedPart = findRawPart(widgetPart.getType(), widgetPart.getId());
+            final XiaomiSystem.WidgetPart resolvedPart = findRawPart(widgetPart.getType(), widgetPart.getId());
             if (resolvedPart != null) {
                 convertedPart.setName(resolvedPart.getTitle());
             }
@@ -199,17 +200,17 @@ public class XiaomiWidgetManager implements WidgetManager {
 
     @Override
     public List<WidgetScreen> getWidgetScreens() {
-        final XiaomiProto.WidgetScreens rawWidgetScreens = getRawWidgetScreens();
+        final XiaomiSystem.WidgetScreens rawWidgetScreens = getRawWidgetScreens();
 
         final List<WidgetScreen> convertedScreens = new ArrayList<>(rawWidgetScreens.getWidgetScreenCount());
         final Collection<WidgetPartSubtype> workoutTypes = convertWorkoutTypesToPartSubtypes(XiaomiWorkoutType.getWorkoutTypesSupportedByDevice(getDevice()));
 
-        for (final XiaomiProto.WidgetScreen rawScreen : rawWidgetScreens.getWidgetScreenList()) {
+        for (final XiaomiSystem.WidgetScreen rawScreen : rawWidgetScreens.getWidgetScreenList()) {
             final WidgetLayout layout = fromRawLayout(rawScreen.getLayout());
 
             final List<WidgetPart> convertedParts = new ArrayList<>(rawScreen.getWidgetPartCount());
 
-            for (final XiaomiProto.WidgetPart rawPart : rawScreen.getWidgetPartList()) {
+            for (final XiaomiSystem.WidgetPart rawPart : rawScreen.getWidgetPartList()) {
                 final WidgetPart convertedPart = fromRawWidgetPart(rawPart, workoutTypes);
 
                 if (convertedPart == null) {
@@ -247,22 +248,22 @@ public class XiaomiWidgetManager implements WidgetManager {
 
     @Override
     public void saveScreen(final WidgetScreen widgetScreen) {
-        final XiaomiProto.WidgetScreens rawWidgetScreens = getRawWidgetScreens();
+        final XiaomiSystem.WidgetScreens rawWidgetScreens = getRawWidgetScreens();
 
         final int layoutNum = toRawLayout(widgetScreen.getLayout());
         if (layoutNum == -1) {
             return;
         }
 
-        XiaomiProto.WidgetScreen.Builder rawScreen = null;
+        XiaomiSystem.WidgetScreen.Builder rawScreen = null;
         if (widgetScreen.getId() == null) {
             // new screen
-            rawScreen = XiaomiProto.WidgetScreen.newBuilder()
+            rawScreen = XiaomiSystem.WidgetScreen.newBuilder()
                     .setId(rawWidgetScreens.getWidgetScreenCount() + 1); // ids start at 1
         } else {
-            for (final XiaomiProto.WidgetScreen screen : rawWidgetScreens.getWidgetScreenList()) {
+            for (final XiaomiSystem.WidgetScreen screen : rawWidgetScreens.getWidgetScreenList()) {
                 if (String.valueOf(screen.getId()).equals(widgetScreen.getId())) {
-                    rawScreen = XiaomiProto.WidgetScreen.newBuilder(screen);
+                    rawScreen = XiaomiSystem.WidgetScreen.newBuilder(screen);
                     break;
                 }
 
@@ -270,7 +271,7 @@ public class XiaomiWidgetManager implements WidgetManager {
             }
 
             if (rawScreen == null) {
-                rawScreen = XiaomiProto.WidgetScreen.newBuilder()
+                rawScreen = XiaomiSystem.WidgetScreen.newBuilder()
                         .setId(rawWidgetScreens.getWidgetScreenCount() + 1);
             }
         }
@@ -282,12 +283,12 @@ public class XiaomiWidgetManager implements WidgetManager {
 
         for (final WidgetPart newPart : widgetScreen.getParts()) {
             // Find the existing raw part
-            final XiaomiProto.WidgetPart knownRawPart = findRawPart(
+            final XiaomiSystem.WidgetPart knownRawPart = findRawPart(
                     toRawWidgetType(newPart.getType()),
                     Integer.parseInt(Objects.requireNonNull(newPart.getId()))
             );
 
-            final XiaomiProto.WidgetPart.Builder newRawPartBuilder = XiaomiProto.WidgetPart.newBuilder(knownRawPart);
+            final XiaomiSystem.WidgetPart.Builder newRawPartBuilder = XiaomiSystem.WidgetPart.newBuilder(knownRawPart);
 
             // TODO only support subtypes on widget with type 16
             if (newPart.getSubtype() != null) {
@@ -310,7 +311,7 @@ public class XiaomiWidgetManager implements WidgetManager {
             rawScreen.addWidgetPart(newRawPartBuilder);
         }
 
-        final XiaomiProto.WidgetScreens.Builder builder = XiaomiProto.WidgetScreens.newBuilder(rawWidgetScreens);
+        final XiaomiSystem.WidgetScreens.Builder builder = XiaomiSystem.WidgetScreens.newBuilder(rawWidgetScreens);
         if (rawScreen.getId() == rawWidgetScreens.getWidgetScreenCount() + 1) {
             // Append at the end
             builder.addWidgetScreen(rawScreen);
@@ -318,7 +319,7 @@ public class XiaomiWidgetManager implements WidgetManager {
             // Replace existing
             builder.clearWidgetScreen();
 
-            for (final XiaomiProto.WidgetScreen screen : rawWidgetScreens.getWidgetScreenList()) {
+            for (final XiaomiSystem.WidgetScreen screen : rawWidgetScreens.getWidgetScreenList()) {
                 if (screen.getId() == rawScreen.getId()) {
                     builder.addWidgetScreen(rawScreen);
                 } else {
@@ -341,20 +342,20 @@ public class XiaomiWidgetManager implements WidgetManager {
             return;
         }
 
-        final XiaomiProto.WidgetScreens rawWidgetScreens = getRawWidgetScreens();
+        final XiaomiSystem.WidgetScreens rawWidgetScreens = getRawWidgetScreens();
 
-        final XiaomiProto.WidgetScreens.Builder builder = XiaomiProto.WidgetScreens.newBuilder(rawWidgetScreens)
+        final XiaomiSystem.WidgetScreens.Builder builder = XiaomiSystem.WidgetScreens.newBuilder(rawWidgetScreens)
                 .clearWidgetScreen();
 
         int i = 1;
-        for (final XiaomiProto.WidgetScreen screen : rawWidgetScreens.getWidgetScreenList()) {
+        for (final XiaomiSystem.WidgetScreen screen : rawWidgetScreens.getWidgetScreenList()) {
             if (String.valueOf(screen.getId()).equals(widgetScreen.getId())) {
                 continue;
             }
 
             // Ensure the IDs stay sequential and start at 1
             builder.addWidgetScreen(
-                    XiaomiProto.WidgetScreen.newBuilder()
+                    XiaomiSystem.WidgetScreen.newBuilder()
                             .mergeFrom(screen)
                             .setId(i++)
                             .build()
@@ -481,10 +482,10 @@ public class XiaomiWidgetManager implements WidgetManager {
     }
 
     @Nullable
-    private XiaomiProto.WidgetPart findRawPart(final int type, final int id) {
-        final XiaomiProto.WidgetParts rawWidgetParts = getRawWidgetParts();
+    private XiaomiSystem.WidgetPart findRawPart(final int type, final int id) {
+        final XiaomiSystem.WidgetParts rawWidgetParts = getRawWidgetParts();
 
-        for (final XiaomiProto.WidgetPart rawPart : rawWidgetParts.getWidgetPartList()) {
+        for (final XiaomiSystem.WidgetPart rawPart : rawWidgetParts.getWidgetPartList()) {
             if (rawPart.getType() == type && rawPart.getId() == id) {
                 return rawPart;
             }
@@ -493,33 +494,33 @@ public class XiaomiWidgetManager implements WidgetManager {
         return null;
     }
 
-    private XiaomiProto.WidgetScreens getRawWidgetScreens() {
+    private XiaomiSystem.WidgetScreens getRawWidgetScreens() {
         final String hex = getPrefs().getString(XiaomiPreferences.PREF_WIDGET_SCREENS, null);
         if (hex == null) {
             LOG.warn("raw widget screens hex is null");
-            return XiaomiProto.WidgetScreens.newBuilder().build();
+            return XiaomiSystem.WidgetScreens.newBuilder().build();
         }
 
         try {
-            return XiaomiProto.WidgetScreens.parseFrom(GB.hexStringToByteArray(hex));
+            return XiaomiSystem.WidgetScreens.parseFrom(GB.hexStringToByteArray(hex));
         } catch (final InvalidProtocolBufferException e) {
             LOG.warn("failed to parse raw widget screns hex");
-            return XiaomiProto.WidgetScreens.newBuilder().build();
+            return XiaomiSystem.WidgetScreens.newBuilder().build();
         }
     }
 
-    private XiaomiProto.WidgetParts getRawWidgetParts() {
+    private XiaomiSystem.WidgetParts getRawWidgetParts() {
         final String hex = getPrefs().getString(XiaomiPreferences.PREF_WIDGET_PARTS, null);
         if (hex == null) {
             LOG.warn("raw widget parts hex is null");
-            return XiaomiProto.WidgetParts.newBuilder().build();
+            return XiaomiSystem.WidgetParts.newBuilder().build();
         }
 
         try {
-            return XiaomiProto.WidgetParts.parseFrom(GB.hexStringToByteArray(hex));
+            return XiaomiSystem.WidgetParts.parseFrom(GB.hexStringToByteArray(hex));
         } catch (final InvalidProtocolBufferException e) {
             LOG.warn("failed to parse raw widget parts hex");
-            return XiaomiProto.WidgetParts.newBuilder().build();
+            return XiaomiSystem.WidgetParts.newBuilder().build();
         }
     }
 }

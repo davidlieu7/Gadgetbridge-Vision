@@ -45,6 +45,16 @@
             app:iconSpaceReserved="false"
             android:defaultValue="true">
         </SwitchPreferenceCompat>
+        <EditTextPreference
+            android:key="pref_key_sleepasandroid_alarm_max_minutes"
+            android:dependency="pref_key_sleepasandroid_feat_alarms"
+            android:title="@string/pref_sleepasandroid_alarm_max_minutes"
+            android:inputType="number"
+            android:maxLength="3"
+            app:iconSpaceReserved="false"
+            app:useSimpleSummaryProvider="true"
+            android:defaultValue="5">
+        </EditTextPreference>
         <SwitchPreferenceCompat
             android:key="pref_key_sleepasandroid_feat_notifications"
             android:title="@string/pref_sleepasandroid_feat_notifications"

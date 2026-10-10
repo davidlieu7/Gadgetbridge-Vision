@@ -33,7 +33,7 @@
             android:layout_height="wrap_content"
             android:textSize="@dimen/um25_value_text_size_small"
             android:gravity="center"
-            android:textColor="@color/secondarytext"
+            android:textColor="?attr/textColorSecondary"
             android:text="Long press to zero"/>
 
         <TextView
@@ -43,7 +43,7 @@
             android:textSize="@dimen/um25_value_text_size_small"
             android:layout_marginTop="100dp"
             android:gravity="center"
-            android:textColor="@color/secondarytext"
+            android:textColor="?attr/textColorSecondary"
             android:text="-"/>
 
     </LinearLayout>

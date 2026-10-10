@@ -116,6 +116,20 @@ public class DailyTotals implements Serializable {
         // Purposely not including awake sleep
         return new DailyTotals(totalSteps, totalDistance, sleep, totalActiveCalories, totalRestingCalories);
     }
+    
+    public static long getDailyStepsForDevice(GBDevice device, Calendar day, DBHandler handler) {
+        ActivityAnalysis analysis = new ActivityAnalysis();
+        ActivityAmounts totalAmounts;
+
+        totalAmounts = analysis.calculateActivityAmounts(getSamplesOfDay(handler, day, 0, device));
+
+        long totalSteps = 0;
+        for (ActivityAmount amount : totalAmounts.getAmounts()) {
+            totalSteps += amount.getTotalSteps();
+        }
+
+        return totalSteps;
+    }
 
     private static long[] getTotalsSleepForActivityAmounts(ActivityAmounts activityAmounts) {
         long totalSecondsDeepSleep = 0;

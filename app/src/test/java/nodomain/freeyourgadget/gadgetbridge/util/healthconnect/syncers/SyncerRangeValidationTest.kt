@@ -3,6 +3,7 @@ package nodomain.freeyourgadget.gadgetbridge.util.healthconnect.syncers
 import androidx.health.connect.client.records.metadata.Device
 import androidx.health.connect.client.records.metadata.Metadata
 import nodomain.freeyourgadget.gadgetbridge.entities.GlucoseSample
+import nodomain.freeyourgadget.gadgetbridge.model.BloodPressureSample
 import nodomain.freeyourgadget.gadgetbridge.model.HeartRateSample
 import nodomain.freeyourgadget.gadgetbridge.model.HrvValueSample
 import nodomain.freeyourgadget.gadgetbridge.model.RespiratoryRateSample
@@ -248,5 +249,37 @@ class SyncerRangeValidationTest {
     @Test
     fun bloodGlucose_negative_dropped() {
         assertNull(BloodGlucoseSyncer.convertSample(glucoseSample(-1.0), offset, metadata, device))
+    }
+
+    // --- Blood pressure ---
+
+    private fun bloodPressureSample(systolic: Int, diastolic: Int, ts: Long = 1_700_000_000_000L): BloodPressureSample =
+        object : BloodPressureSample {
+            override fun getTimestamp(): Long = ts
+            override fun getBpSystolic(): Int = systolic
+            override fun getBpDiastolic(): Int = diastolic
+        }
+
+    @Test
+    fun bloodPressure_normal_accepted() {
+        assertNotNull(BloodPressureSyncer.convertSample(bloodPressureSample(120, 80), offset, metadata, device))
+    }
+
+    @Test
+    fun bloodPressure_boundaries_accepted() {
+        assertNotNull(BloodPressureSyncer.convertSample(bloodPressureSample(20, 10), offset, metadata, device))
+        assertNotNull(BloodPressureSyncer.convertSample(bloodPressureSample(200, 180), offset, metadata, device))
+    }
+
+    @Test
+    fun bloodPressure_systolicOutOfRange_dropped() {
+        assertNull(BloodPressureSyncer.convertSample(bloodPressureSample(201, 80), offset, metadata, device))
+        assertNull(BloodPressureSyncer.convertSample(bloodPressureSample(19, 10), offset, metadata, device))
+    }
+
+    @Test
+    fun bloodPressure_diastolicOutOfRange_dropped() {
+        assertNull(BloodPressureSyncer.convertSample(bloodPressureSample(120, 181), offset, metadata, device))
+        assertNull(BloodPressureSyncer.convertSample(bloodPressureSample(120, 9), offset, metadata, device))
     }
 }

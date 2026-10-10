@@ -67,6 +67,7 @@ class XiaomiHipeeP1Coordinator : AbstractBLEDeviceCoordinator() {
 
     override fun getCustomActions(): List<DeviceCardAction> = listOf(
         deviceCardAction {
+            id = "hipee_live_posture"
             icon = { R.drawable.ic_angle }
             description = { _, context -> context.getString(R.string.mi_hipee_p1_view_live_posture) }
             isVisible = { device -> device.isInitialized }
@@ -77,6 +78,7 @@ class XiaomiHipeeP1Coordinator : AbstractBLEDeviceCoordinator() {
             }
         },
         deviceCardAction {
+            id = "hipee_history"
             icon = { R.drawable.ic_activity_graphs }
             description = { _, context -> context.getString(R.string.controlcenter_start_activitymonitor) }
             isVisible = { _ -> true }

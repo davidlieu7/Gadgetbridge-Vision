@@ -1456,8 +1456,8 @@
     <string name="activity_type_outdoor_running">Laufen im Freien</string>
     <string name="activity_type_outdoor_cycling">Radfahren im Freien</string>
     <string name="prefs_noise_control">Geräuschkontrolle</string>
-    <string name="pref_switch_controls_anc_off">Geräuschunterdrückung ←→ Aus</string>
-    <string name="pref_switch_controls_ambient_off">Umgebung ←→ Aus</string>
+    <string name="pref_switch_controls_anc_off">Geräuschunterdrückung ↔ Aus</string>
+    <string name="pref_switch_controls_ambient_off">Umgebung ↔ Aus</string>
     <string name="prefs_double_tap_edge_summary">Doppeltippen erkennen, auch wenn nicht auf dem Touchpad getippt wird</string>
     <string name="prefs_voice_detect_duration">Ende nach Ruhe für:</string>
     <string name="pref_voice_detect_duration_5">5 Sekunden</string>
@@ -1497,7 +1497,7 @@
     <string name="prefs_ambient_sound_during_call_title">Umgebungsgeräusche während des Anrufs</string>
     <string name="permission_notification_listener">%1$s benötigt Zugriff auf Benachrichtigungen, um sie auf deiner Smartwatch anzuzeigen, wenn der Bildschirm deines Telefons ausgeschaltet ist.\n\nTippe bitte auf \"%2$s\", dann auf \"%1$s\" und aktiviere „Benachrichtigungszugriff erlauben“. Tippe anschließend auf „Zurück“, um zu %1$s zurückzukehren.</string>
     <string name="prefs_switch_control_left">Schaltersteuerung links</string>
-    <string name="pref_switch_controls_anc_ambient">Geräuschunterdrückung ←→ Umgebungsgeräusche</string>
+    <string name="pref_switch_controls_anc_ambient">Geräuschunterdrückung ↔ Umgebungsgeräusche</string>
     <string name="pref_workout_start_on_phone_summary">Startet/stoppt das Fitness-App-Tracking auf dem Telefon, wenn ein GPS-Training auf dem Gerät gestartet wird</string>
     <string name="pref_workout_send_gps_title">GPS während des Trainings senden</string>
     <string name="pref_workout_send_gps_summary">Senden der aktuellen GPS-Position an das Band während des Trainings</string>
@@ -1928,7 +1928,7 @@
     <string name="fw_upgrade_notice_amazfit_gtr3_pro">Du bist dabei, die Firmware %s auf deine Amazfit GTR 3 Pro zu installieren. \n \nDeine Smartwatch wird nach der Installation der .zip Datei neu starten. \n \nINSTALLATION AUF EIGENE GEFAHR!</string>
     <string name="menuitem_forecast">Vorhersage</string>
     <string name="menuitem_last_workout">Letztes Training</string>
-    <string name="pref_switch_controls_anc_ambient_off">Geräuschunterdrückung ←→ Umgebungsgeräusche ←→ Aus</string>
+    <string name="pref_switch_controls_anc_ambient_off">Geräuschunterdrückung ↔ Umgebungsgeräusche ↔ Aus</string>
     <string name="single_tap">Einmaliges Antippen</string>
     <string name="prefs_shortcut_cards_summary">Kurzbefehlkarten, die erscheinen, wenn du vom Zifferblatt nach rechts wischst. Wenn gerade eine App läuft, wirkt sich diese Einstellung nicht auf automatisch erstellte Karten aus.</string>
     <string name="prefs_shortcut_cards">Verknüpfungskarten</string>

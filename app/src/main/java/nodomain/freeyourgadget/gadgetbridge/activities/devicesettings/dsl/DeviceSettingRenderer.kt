@@ -40,6 +40,7 @@ import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.SettingsRe
 import nodomain.freeyourgadget.gadgetbridge.util.Prefs
 import nodomain.freeyourgadget.gadgetbridge.util.UriUtils
 import nodomain.freeyourgadget.gadgetbridge.util.XDatePreference
+import nodomain.freeyourgadget.gadgetbridge.util.XTimePreference
 import nodomain.freeyourgadget.gadgetbridge.util.preferences.GBSimpleSummaryProvider
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
@@ -138,8 +139,10 @@ object DeviceSettingRenderer {
             cat.isVisible = members.isNotEmpty() && members.any { it.isVisible }
         }
 
-        if (summaryPairs.isNotEmpty()) {
-            // A summaryProvider can read any preference, so refresh on every write.
+        if (summaryPairs.isNotEmpty() || visibilityPairs.isNotEmpty() || enabledPairs.isNotEmpty()) {
+            // A summaryProvider, visibility predicate, or enabled predicate can read any preference.
+            // Refresh on every write so changes made outside this renderer (for example by a
+            // device service action) are reflected in the rendered settings.
             val listener = SharedPreferences.OnSharedPreferenceChangeListener { _, _ -> postRefresh() }
             spListeners.add(listener)
             sp.registerOnSharedPreferenceChangeListener(listener)
@@ -355,7 +358,12 @@ object DeviceSettingRenderer {
                         } else {
                             summaryProvider = ListPreference.SimpleSummaryProvider.getInstance()
                         }
-                        setOnPreferenceChangeListener { _, _ ->
+                        setOnPreferenceChangeListener { pref, newValue ->
+                            setting.onValueChange?.invoke(
+                                pref,
+                                (pref as ListPreference).value ?: setting.defaultValue,
+                                newValue as String
+                            )
                             handler.notifyPreferenceChanged(setting.key)
                             postRefresh()
                             true
@@ -586,6 +594,29 @@ object DeviceSettingRenderer {
                     }
                 }
 
+                is TimeSetting -> {
+                    XTimePreference(context, null).apply {
+                        key = setting.key
+                        setTitle(setting.title)
+                        if (setting.icon != 0) setIcon(setting.icon)
+                        setDefaultValue(setting.defaultValue)
+
+                        val listener = SharedPreferences.OnSharedPreferenceChangeListener { sharedPrefs, changedKey ->
+                            if (changedKey == setting.key) {
+                                val newValue = sharedPrefs.getString(changedKey, setting.defaultValue)
+                                    ?: setting.defaultValue
+                                mainHandler.post {
+                                    handler.notifyPreferenceChanged(setting.key)
+                                    postRefresh()
+                                    setting.onSharedPreferenceChanged?.invoke(newValue)
+                                }
+                            }
+                        }
+                        spListeners.add(listener)
+                        sp.registerOnSharedPreferenceChangeListener(listener)
+                    }
+                }
+
                 is DateSetting -> {
                     XDatePreference(context, null).apply {
                         key = setting.key
@@ -688,6 +719,7 @@ object DeviceSettingRenderer {
                 is TextSetting -> setting.dependency
                 is ActionSetting -> setting.dependency
                 is InfoSetting -> setting.dependency
+                is TimeSetting -> setting.dependency
                 is DateSetting -> setting.dependency
                 is FilePickerSetting -> setting.dependency
                 is FolderPickerSetting -> setting.dependency

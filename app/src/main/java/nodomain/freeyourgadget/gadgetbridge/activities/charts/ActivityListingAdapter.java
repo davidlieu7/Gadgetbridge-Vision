@@ -33,6 +33,7 @@ import com.github.mikephil.charting.data.PieData;
 import com.github.mikephil.charting.data.PieDataSet;
 import com.github.mikephil.charting.data.PieEntry;
 import com.github.mikephil.charting.utils.MPPointF;
+import com.google.android.material.color.MaterialColors;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -66,24 +67,23 @@ public class ActivityListingAdapter extends AbstractActivityListingAdapter<Activ
     @NonNull
     @Override
     public AbstractActivityListingViewHolder<ActivitySession> onCreateViewHolder(@NonNull final ViewGroup parent, final int viewType) {
-        switch (viewType) {
-            case 0: // dashboard
-                return new DashboardViewHolder(LayoutInflater.from(getContext()).inflate(R.layout.activity_list_dashboard_item, parent, false));
-            case 2: // item
-                return new ActivityItemViewHolder(LayoutInflater.from(getContext()).inflate(R.layout.activity_list_item, parent, false));
-        }
-
-        return super.onCreateViewHolder(parent, viewType);
+        return switch (viewType) {
+            case 0 -> // dashboard
+                new DashboardViewHolder(LayoutInflater.from(getContext()).inflate(R.layout.activity_list_dashboard_item, parent, false));
+            case 2 -> // item
+                new ActivityItemViewHolder(LayoutInflater.from(getContext()).inflate(R.layout.activity_list_item, parent, false));
+            default -> super.onCreateViewHolder(parent, viewType);
+        };
     }
 
     private void setChartsData(PieChart pieChart, float value, float target, String label, Context context) {
         ArrayList<PieEntry> entries = new ArrayList<>();
-        entries.add(new PieEntry(value, AppCompatResources.getDrawable(context, R.drawable.ic_star_gold)));
+        entries.add(new PieEntry<>(value, null, AppCompatResources.getDrawable(context, R.drawable.ic_star_gold), null));
 
-        Easing.EasingFunction animationEffect = Easing.EaseInOutSine;
+        Easing.EasingFunction animationEffect = Easing.INSTANCE.getEaseInOutSine();
 
         if (value < target) {
-            entries.add(new PieEntry(target - value));
+            entries.add(new PieEntry<>(target - value, null, null, null));
         }
 
         pieChart.setCenterText(String.format("%d%%\n%s", (int) (value * 100 / target), label));
@@ -91,15 +91,15 @@ public class ActivityListingAdapter extends AbstractActivityListingAdapter<Activ
         int chartColor = interpolateColor(Color.parseColor(CHART_COLOR_START), Color.parseColor(CHART_COLOR_END), colorValue);
 
         PieDataSet dataSet = new PieDataSet(entries, "");
-        dataSet.setDrawIcons(false);
+        dataSet.setDrawIconsEnabled(false);
         dataSet.setIconsOffset(new MPPointF(0, -66));
 
         if (colorValue == 1) {
-            dataSet.setDrawIcons(true);
+            dataSet.setDrawIconsEnabled(true);
         }
         dataSet.setSliceSpace(0f);
         dataSet.setSelectionShift(5f);
-        dataSet.setColors(chartColor, Color.LTGRAY);
+        dataSet.setColors(chartColor, MaterialColors.getColor(pieChart, com.google.android.material.R.attr.colorSurfaceContainerHighest));
 
         PieData data = new PieData(dataSet);
         data.setValueTextSize(0f);
@@ -138,21 +138,21 @@ public class ActivityListingAdapter extends AbstractActivityListingAdapter<Activ
         @Override
         public void fill(final int position, final ActivitySession session, final boolean selected) {
             this.activityListItem.update(
-                    session.getStartTime(),
-                    session.getEndTime(),
-                    session.getActivityKind(),
-                    null,
-                    session.getActiveSteps(),
-                    session.getDistance(),
-                    session.getHeartRateAverage(),
-                    session.getIntensity(),
-                    session.getEndTime().getTime() - session.getStartTime().getTime(),
-                    false,
-                    false,
-                    null,
-                    null,
-                    position % 2 == 1,
-                    selected
+                session.getStartTime(),
+                session.getEndTime(),
+                session.getActivityKind(),
+                null,
+                session.getActiveSteps(),
+                session.getDistance(),
+                session.getHeartRateAverage(),
+                session.getIntensity(),
+                session.getEndTime().getTime() - session.getStartTime().getTime(),
+                false,
+                false,
+                null,
+                null,
+                position % 2 == 1,
+                selected
             );
         }
     }
@@ -271,15 +271,16 @@ public class ActivityListingAdapter extends AbstractActivityListingAdapter<Activ
 
         private void setUpChart(PieChart DashboardChart) {
             DashboardChart.setNoDataText("");
+            DashboardChart.setNoDataIconEnabled(false);
             DashboardChart.getLegend().setEnabled(false);
             DashboardChart.setDrawHoleEnabled(true);
-            DashboardChart.setHoleColor(Color.WHITE);
+            DashboardChart.setHoleColor(Color.TRANSPARENT);
             DashboardChart.getDescription().setText("");
-            DashboardChart.setTransparentCircleColor(Color.WHITE);
-            DashboardChart.setTransparentCircleAlpha(110);
-            DashboardChart.setHoleRadius(70f);
-            DashboardChart.setTransparentCircleRadius(75f);
-            DashboardChart.setDrawCenterText(true);
+            DashboardChart.setTransparentCircleAlpha(0);
+            DashboardChart.setHoleRadius(82f);
+            DashboardChart.setTransparentCircleRadius(0f);
+            DashboardChart.setCenterTextColor(MaterialColors.getColor(DashboardChart, com.google.android.material.R.attr.colorOnSurface));
+            DashboardChart.setDrawCenterTextEnabled(true);
             DashboardChart.setRotationEnabled(true);
             DashboardChart.setHighlightPerTapEnabled(true);
             DashboardChart.setCenterTextOffset(0, 0);

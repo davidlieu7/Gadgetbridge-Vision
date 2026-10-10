@@ -97,7 +97,7 @@ object WorkoutUploader {
             val activityTrackProvider = gbDevice.deviceCoordinator
                 .getActivityTrackProvider(gbDevice, context)
             val track = try {
-                activityTrackProvider?.getActivityTrack(summary)
+                ActivitySummaryUtils.resolveExportableTrack(activityTrackProvider, summary)
             } catch (e: Exception) {
                 LOG.warn("Failed to load activity track for FIT export", e)
                 null

@@ -16,9 +16,12 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 package nodomain.freeyourgadget.gadgetbridge.activities.endurain
 
+import android.graphics.Bitmap
+import android.graphics.BitmapFactory
 import android.net.Uri
 import androidx.core.net.toUri
 import com.google.gson.Gson
+import nodomain.freeyourgadget.gadgetbridge.GBApplication
 import nodomain.freeyourgadget.gadgetbridge.model.ActivityKind
 import nodomain.freeyourgadget.gadgetbridge.util.InternetUtils
 import nodomain.freeyourgadget.gadgetbridge.util.gson.GsonSerialized
@@ -388,13 +391,24 @@ class EndurainApiClient(
      */
     fun uploadActivityPhoto(activityId: Int, file: File, callback: ((mediaId: Int?) -> Unit)? = null) {
         Thread {
+            var converted: File? = null
             try {
+                val uploadFile = if (file.extension.lowercase() in ALLOWED_PHOTO_EXTENSIONS) {
+                    file
+                } else {
+                    converted = convertToJpeg(file)
+                    if (converted == null) {
+                        callback?.invoke(null)
+                        return@Thread
+                    }
+                    converted
+                }
                 val uri = "$baseUrl/api/v1/activities_media/upload/activity_id/$activityId".toUri()
                 val headers = buildHeaders(EndurainAuthType.AUTH_TOKEN)
 
                 InternetUtils.uploadBinaryFile(
                     uri = uri,
-                    file = file,
+                    file = uploadFile,
                     requestHeaders = headers
                 ) { success, statusCode, responseText, reason ->
                     if (success && responseText != null) {
@@ -414,8 +428,32 @@ class EndurainApiClient(
             } catch (e: Exception) {
                 LOG.error("Activity photo upload error", e)
                 callback?.invoke(null)
+            } finally {
+                converted?.delete()
             }
         }.start()
+    }
+
+    /** Re-encodes [file] as a JPEG in the cache directory, or answers null when it cannot be decoded. */
+    private fun convertToJpeg(file: File): File? {
+        val bitmap = BitmapFactory.decodeFile(file.path)
+        if (bitmap == null) {
+            LOG.warn("Cannot decode photo {} to convert it for Endurain", file.name)
+            return null
+        }
+        return try {
+            val jpeg = File.createTempFile("endurain_photo", ".jpg", GBApplication.getContext().cacheDir)
+            val written = jpeg.outputStream().use { bitmap.compress(Bitmap.CompressFormat.JPEG, 90, it) }
+            if (!written) {
+                LOG.warn("Cannot encode photo {} as JPEG for Endurain", file.name)
+                jpeg.delete()
+                return null
+            }
+            LOG.debug("Converted photo {} to JPEG for Endurain", file.name)
+            jpeg
+        } finally {
+            bitmap.recycle()
+        }
     }
 
     /** Reads back the user-owned parts of [activityId]. */
@@ -646,6 +684,9 @@ class EndurainApiClient(
 
     /** Endurain's activity type for a workout whose kind it has no code for. */
     private val GENERIC_ACTIVITY_TYPE = 10
+
+    /** The only photo extensions Endurain accepts; anything else is answered 400 EXTENSION_NOT_ALLOWED. */
+    private val ALLOWED_PHOTO_EXTENSIONS = setOf("jpg", "jpeg", "png")
 
     /**
      * Per-activity display toggles the user can set. Listed so they survive an activity being

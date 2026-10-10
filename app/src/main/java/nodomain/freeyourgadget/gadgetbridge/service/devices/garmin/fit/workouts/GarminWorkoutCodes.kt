@@ -4,12 +4,13 @@ import nodomain.freeyourgadget.gadgetbridge.model.ActivityKind
 import nodomain.freeyourgadget.gadgetbridge.model.workouts.WorkoutDurationType
 import nodomain.freeyourgadget.gadgetbridge.model.workouts.WorkoutEffort
 import nodomain.freeyourgadget.gadgetbridge.model.workouts.WorkoutEquipment
+import nodomain.freeyourgadget.gadgetbridge.model.workouts.WorkoutLoadCategory
 import nodomain.freeyourgadget.gadgetbridge.model.workouts.WorkoutPoolLengthUnit
 import nodomain.freeyourgadget.gadgetbridge.model.workouts.WorkoutStepType
 import nodomain.freeyourgadget.gadgetbridge.model.workouts.WorkoutSwimDrill
 import nodomain.freeyourgadget.gadgetbridge.model.workouts.WorkoutSwimStroke
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.enums.Intensity
-import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.enums.SwimStyle
+import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.enums.SwimStroke
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.enums.WktStepDuration
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.enums.WktSwimDrill
 import kotlin.math.roundToLong
@@ -45,6 +46,16 @@ object GarminWorkoutCodes {
     }
 
     /**
+     * `workout_step.exercise_load_category`.
+     */
+    fun loadCategoryCode(category: WorkoutLoadCategory): Int = when (category) {
+        WorkoutLoadCategory.LIGHT -> 1
+        WorkoutLoadCategory.MODERATE -> 2
+        WorkoutLoadCategory.HEAVY -> 3
+        WorkoutLoadCategory.VERY_HEAVY -> 4
+    }
+
+    /**
      * Bpm are offset by +100 in the heart rate fields of a `workout_step`.
      */
     const val HR_OFFSET = 100
@@ -69,15 +80,15 @@ object GarminWorkoutCodes {
      * `workout_step.target_value` of a `SWIM_STROKE` target.
      */
     fun swimStrokeCode(stroke: WorkoutSwimStroke?): Long = when (stroke) {
-        WorkoutSwimStroke.FREESTYLE -> SwimStyle.FREESTYLE.num.toLong()
-        WorkoutSwimStroke.BACKSTROKE -> SwimStyle.BACKSTROKE.num.toLong()
-        WorkoutSwimStroke.BREASTSTROKE -> SwimStyle.BREASTSTROKE.num.toLong()
-        WorkoutSwimStroke.BUTTERFLY -> SwimStyle.BUTTERFLY.num.toLong()
-        WorkoutSwimStroke.DRILL -> SwimStyle.DRILL.num.toLong()
-        WorkoutSwimStroke.MIXED -> SwimStyle.MIXED.num.toLong()
-        WorkoutSwimStroke.INDIVIDUAL_MEDLEY -> SwimStyle.IM.num.toLong()
-        WorkoutSwimStroke.IM_BY_ROUND -> SwimStyle.IM_BY_ROUND.num.toLong()
-        WorkoutSwimStroke.REVERSE_IM_ORDER -> SwimStyle.REVERSE_IM_ORDER.num.toLong()
+        WorkoutSwimStroke.FREESTYLE -> SwimStroke.FREESTYLE.num.toLong()
+        WorkoutSwimStroke.BACKSTROKE -> SwimStroke.BACKSTROKE.num.toLong()
+        WorkoutSwimStroke.BREASTSTROKE -> SwimStroke.BREASTSTROKE.num.toLong()
+        WorkoutSwimStroke.BUTTERFLY -> SwimStroke.BUTTERFLY.num.toLong()
+        WorkoutSwimStroke.DRILL -> SwimStroke.DRILL.num.toLong()
+        WorkoutSwimStroke.MIXED -> SwimStroke.MIXED.num.toLong()
+        WorkoutSwimStroke.INDIVIDUAL_MEDLEY -> SwimStroke.IM.num.toLong()
+        WorkoutSwimStroke.IM_BY_ROUND -> SwimStroke.IM_BY_ROUND.num.toLong()
+        WorkoutSwimStroke.REVERSE_IM_ORDER -> SwimStroke.REVERSE_IM_ORDER.num.toLong()
         WorkoutSwimStroke.CHOICE, null -> SWIM_STROKE_CHOICE
     }
 

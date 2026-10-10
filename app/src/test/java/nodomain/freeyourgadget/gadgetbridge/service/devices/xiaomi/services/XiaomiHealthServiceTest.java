@@ -30,6 +30,8 @@ import java.util.List;
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsPreferenceConst;
 import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEvent;
 import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEventUpdatePreferences;
+import nodomain.freeyourgadget.gadgetbridge.proto.xiaomi.Health;
+import nodomain.freeyourgadget.gadgetbridge.proto.xiaomi.HeartRate;
 import nodomain.freeyourgadget.gadgetbridge.proto.xiaomi.XiaomiProto;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.xiaomi.XiaomiSupport;
 
@@ -74,8 +76,8 @@ public class XiaomiHealthServiceTest {
         service.handleCommand(XiaomiProto.Command.newBuilder()
                 .setType(XiaomiHealthService.COMMAND_TYPE)
                 .setSubtype(HEART_RATE_CONFIG_REPLY)
-                .setHealth(XiaomiProto.Health.newBuilder()
-                        .setHeartRate(XiaomiProto.HeartRate.newBuilder()
+                .setHealth(Health.newBuilder()
+                        .setHeartRate(HeartRate.newBuilder()
                                 .setDisabled(false)
                                 .setInterval(reportedMinutes)))
                 .build());

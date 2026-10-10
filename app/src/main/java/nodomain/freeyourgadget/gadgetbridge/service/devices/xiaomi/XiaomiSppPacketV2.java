@@ -31,8 +31,11 @@ public abstract class XiaomiSppPacketV2 {
 
     public static final byte[] PACKET_PREAMBLE = new byte[]{(byte) 0xa5, (byte) 0xa5};
 
-    // TODO NACK
     public static final int PACKET_TYPE_UNKNOWN = -1;
+    // Empty payload. The sequence number is the next data packet the receiver expects: it accepts
+    // data packets strictly in sequence, drops one that arrives ahead of that number and answers
+    // with this. Everything before the expected number counts as acked.
+    public static final int PACKET_TYPE_NACK = 0;
     public static final int PACKET_TYPE_ACK = 1;
     public static final int PACKET_TYPE_SESSION_CONFIG = 2;
     public static final int PACKET_TYPE_DATA = 3;
@@ -60,6 +63,28 @@ public abstract class XiaomiSppPacketV2 {
         }
 
         public abstract XiaomiSppPacketV2 build();
+    }
+
+    public static class NackPacket extends XiaomiSppPacketV2 {
+        public static class Builder extends XiaomiSppPacketV2.Builder<Builder> {
+            public Builder() {
+                setPacketType(PACKET_TYPE_NACK);
+            }
+
+            @Override
+            public XiaomiSppPacketV2 build() {
+                return new NackPacket(this);
+            }
+        }
+
+        protected NackPacket(final Builder builder) {
+            super(builder.packetType, builder.packetNumber);
+        }
+
+        @Override
+        protected byte[] getPacketPayloadBytes(XiaomiAuthService authService) {
+            return new byte[0];
+        }
     }
 
     public static class AckPacket extends XiaomiSppPacketV2 {
@@ -426,7 +451,14 @@ public abstract class XiaomiSppPacketV2 {
     }
 
     public byte[] encode(final XiaomiAuthService authService) {
-        final byte[] payloadBytes = getPacketPayloadBytes(authService);
+        return encodeFrame(packetType, sequenceNumber, getPacketPayloadBytes(authService));
+    }
+
+    /**
+     * The checksum covers the payload only, so a payload can be encrypted before its sequence
+     * number is known.
+     */
+    public static byte[] encodeFrame(final int packetType, final int sequenceNumber, final byte[] payloadBytes) {
         final ByteBuffer buffer = ByteBuffer.allocate(8 + payloadBytes.length).order(ByteOrder.LITTLE_ENDIAN);
         buffer.put(PACKET_PREAMBLE);
         buffer.put((byte) (packetType & 0xf));
@@ -502,6 +534,11 @@ public abstract class XiaomiSppPacketV2 {
                 break;
             case PACKET_TYPE_ACK:
                 decodedPacket = new AckPacket.Builder()
+                        .setSequenceNumber(sequenceNumber)
+                        .build();
+                break;
+            case PACKET_TYPE_NACK:
+                decodedPacket = new NackPacket.Builder()
                         .setSequenceNumber(sequenceNumber)
                         .build();
                 break;

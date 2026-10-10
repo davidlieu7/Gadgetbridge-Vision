@@ -16,6 +16,10 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 package nodomain.freeyourgadget.gadgetbridge.activities.devicesettings;
 
+import android.content.Context;
+import android.content.Intent;
+
+import androidx.annotation.NonNull;
 import androidx.preference.PreferenceFragmentCompat;
 
 import com.bytehamster.lib.preferencesearch.SearchPreferenceResult;
@@ -32,6 +36,34 @@ public class DeviceSettingsActivity extends AbstractSettingsActivityV2 {
         DEVICE_SETTINGS,
         AUTH_SETTINGS,
         APPLICATION_SETTINGS
+    }
+
+    /**
+     * Opens the device-specific settings of a device.
+     */
+    public static void start(@NonNull final Context context, @NonNull final GBDevice device) {
+        context.startActivity(newIntent(context, device));
+    }
+
+    /**
+     * Opens the device-specific settings of a device, on the screen that contains {@code prefKey},
+     * and highlights that preference.
+     */
+    public static void start(@NonNull final Context context, @NonNull final GBDevice device, @NonNull final String prefKey) {
+        final Intent intent = newIntent(context, device);
+        final DeviceSettingsSpec spec = device.getDeviceCoordinator().getDeviceSettings(device);
+        if (spec != null) {
+            intent.putExtra(EXTRA_PREF_SCREEN, spec.findScreenKeyForPreference(prefKey));
+        }
+        intent.putExtra(EXTRA_PREF_HIGHLIGHT, prefKey);
+        context.startActivity(intent);
+    }
+
+    private static Intent newIntent(@NonNull final Context context, @NonNull final GBDevice device) {
+        final Intent intent = new Intent(context, DeviceSettingsActivity.class);
+        intent.putExtra(GBDevice.EXTRA_DEVICE, device);
+        intent.putExtra(MENU_ENTRY_POINT, MENU_ENTRY_POINTS.DEVICE_SETTINGS);
+        return intent;
     }
 
     @Override

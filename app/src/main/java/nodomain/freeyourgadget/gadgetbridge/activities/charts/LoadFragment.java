@@ -22,35 +22,20 @@ import static nodomain.freeyourgadget.gadgetbridge.model.MetricSample.Metric.GEN
 
 import android.content.Context;
 import android.content.res.Resources;
-import android.graphics.Color;
 import android.os.Bundle;
 import android.util.TypedValue;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.GridLayout;
 import android.widget.ImageView;
+import android.widget.LinearLayout;
 import android.widget.TextView;
 import android.widget.Toast;
 
+import androidx.annotation.Nullable;
 import androidx.core.content.ContextCompat;
 
-import com.github.mikephil.charting.charts.BarChart;
 import com.github.mikephil.charting.charts.Chart;
-import com.github.mikephil.charting.charts.CombinedChart;
-import com.github.mikephil.charting.components.Legend;
-import com.github.mikephil.charting.components.LegendEntry;
-import com.github.mikephil.charting.components.XAxis;
-import com.github.mikephil.charting.components.YAxis;
-import com.github.mikephil.charting.data.BarData;
-import com.github.mikephil.charting.data.BarDataSet;
-import com.github.mikephil.charting.data.BarEntry;
-import com.github.mikephil.charting.data.CombinedData;
-import com.github.mikephil.charting.data.Entry;
-import com.github.mikephil.charting.data.LineData;
-import com.github.mikephil.charting.data.LineDataSet;
-import com.github.mikephil.charting.formatter.ValueFormatter;
-import com.github.mikephil.charting.interfaces.datasets.ILineDataSet;
 import com.google.android.material.chip.Chip;
 import com.google.android.material.chip.ChipGroup;
 
@@ -59,6 +44,7 @@ import org.slf4j.LoggerFactory;
 
 import java.text.SimpleDateFormat;
 import java.time.DayOfWeek;
+import java.time.LocalDate;
 import java.time.LocalTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
@@ -67,11 +53,20 @@ import java.util.Calendar;
 import java.util.Collections;
 import java.util.Date;
 import java.util.List;
-import java.util.Locale;
+
+import kotlin.jvm.functions.Function1;
 
 import nodomain.freeyourgadget.gadgetbridge.GBApplication;
 import nodomain.freeyourgadget.gadgetbridge.R;
+import nodomain.freeyourgadget.gadgetbridge.activities.charts.load.LoadChartData;
+import nodomain.freeyourgadget.gadgetbridge.activities.charts.mpchart.ChartLegendView;
+import nodomain.freeyourgadget.gadgetbridge.activities.charts.mpchart.DaySelections;
+import nodomain.freeyourgadget.gadgetbridge.activities.charts.mpchart.GbChartView;
+import nodomain.freeyourgadget.gadgetbridge.activities.charts.spec.ChartSeries;
+import nodomain.freeyourgadget.gadgetbridge.activities.charts.spec.ChartSpec;
 import nodomain.freeyourgadget.gadgetbridge.activities.dashboard.GaugeDrawer;
+import nodomain.freeyourgadget.gadgetbridge.activities.workouts.StatTileData;
+import nodomain.freeyourgadget.gadgetbridge.activities.workouts.StatTileGridUtilKt;
 import nodomain.freeyourgadget.gadgetbridge.database.DBHandler;
 import nodomain.freeyourgadget.gadgetbridge.devices.DeviceCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.TimeSampleProvider;
@@ -87,8 +82,8 @@ import nodomain.freeyourgadget.gadgetbridge.util.DateTimeUtils;
 public class LoadFragment extends AbstractChartFragment<LoadFragment.LoadsData> {
     protected static final Logger LOG = LoggerFactory.getLogger(LoadFragment.class);
     protected final int TOTAL_DAYS = 30;
-    protected static final float OPTIMAL_LOAD_RATIO_LOWER = 0.8f;
-    protected static final float OPTIMAL_LOAD_RATIO_UPPER = 1.5f;
+    protected static final float OPTIMAL_LOAD_RATIO_LOWER = LoadChartData.OPTIMAL_LOAD_RATIO_LOWER;
+    protected static final float OPTIMAL_LOAD_RATIO_UPPER = LoadChartData.OPTIMAL_LOAD_RATIO_UPPER;
 
     private enum LoadDataType {
         ACUTE_LOAD,
@@ -106,17 +101,13 @@ public class LoadFragment extends AbstractChartFragment<LoadFragment.LoadsData> 
     private TextView acuteLoadRatioGaugeValue;
     private TextView acuteLoadRatioGaugeStatus;
 
-    private TextView acuteLoad;
-    private TextView chronicLoad;
-    private TextView thisWeekTotal;
-    private TextView lastWeekTotal;
+    private LinearLayout acuteChronicLoadStatsContainer;
+    private LinearLayout weeklyLoadStatsContainer;
     private TextView dateHeader;
-    private CombinedChart acuteLoadChart;
-    private BarChart dailyLoadChart;
+    private GbChartView acuteLoadChart;
+    private ChartLegendView acuteLoadLegend;
+    private GbChartView dailyLoadChart;
     private ChipGroup loadChartDataTypeGroup;
-    protected int CHART_TEXT_COLOR;
-    protected int LEGEND_TEXT_COLOR;
-    protected int TEXT_COLOR;
     protected int LOAD_COLOR;
     protected int OPTIMAL_LOAD_FILL_COLOR;
 
@@ -135,8 +126,8 @@ public class LoadFragment extends AbstractChartFragment<LoadFragment.LoadsData> 
 
         dateHeader = rootView.findViewById(R.id.date_view);
         dailyLoadChart = rootView.findViewById(R.id.daily_load_chart);
-        thisWeekTotal = rootView.findViewById(R.id.this_week_total);
-        lastWeekTotal = rootView.findViewById(R.id.last_week_total);
+        dailyLoadChart.dismissSelectionOnTapOutside(rootView);
+        weeklyLoadStatsContainer = rootView.findViewById(R.id.weekly_load_stats_container);
 
         metricTrainingLoad = GBApplication.getPrefs().experimentalMetrics()
                 && supportsMetrics(GENERIC_TRAINING_LOAD_ACUTE);
@@ -146,23 +137,19 @@ public class LoadFragment extends AbstractChartFragment<LoadFragment.LoadsData> 
 
         if (supportsTrainingLoad()) {
             acuteLoadChart = rootView.findViewById(R.id.acute_load_chart);
-            acuteLoad = rootView.findViewById(R.id.acute_load);
-            chronicLoad = rootView.findViewById(R.id.chronic_load);
+            acuteLoadChart.dismissSelectionOnTapOutside(rootView);
+            acuteLoadLegend = rootView.findViewById(R.id.acute_load_legend);
+            acuteChronicLoadStatsContainer = rootView.findViewById(R.id.acute_chronic_load_stats_container);
             acuteLoadRatioGauge = rootView.findViewById(R.id.acute_load_ratio_gauge);
             acuteLoadRatioGaugeValue = rootView.findViewById(R.id.acute_load_ratio_gauge_value);
             acuteLoadRatioGaugeStatus = rootView.findViewById(R.id.acute_load_ratio_gauge_status);
             loadChartDataTypeGroup = rootView.findViewById(R.id.load_chart_data_type_group);
             gaugeDrawer = new GaugeDrawer();
             showChronicLoad = supportsTrainingLoadChronic();
-            if (!showChronicLoad) {
-                relabelAsTrainingLoad(rootView);
-            }
             setupLoadDataTypeChips(inflater);
-            setupAcuteLoadChart();
         } else {
             rootView.findViewById(R.id.training_load_wrapper).setVisibility(View.GONE);
         }
-        setupDailyLoadChart();
         refresh();
 
         return rootView;
@@ -181,20 +168,6 @@ public class LoadFragment extends AbstractChartFragment<LoadFragment.LoadsData> 
         return device.getDeviceCoordinator().supportsTrainingLoadChronic(device);
     }
 
-    /**
-     * Relabels the acute-load header and tile as a plain training load, hides the chronic-load tile
-     * and widens the remaining tile across both columns of the grid.
-     */
-    private void relabelAsTrainingLoad(final View rootView) {
-        ((TextView) rootView.findViewById(R.id.acute_load_header)).setText(R.string.pref_header_training_load);
-        ((TextView) rootView.findViewById(R.id.acute_load_label)).setText(R.string.pref_header_training_load);
-        rootView.findViewById(R.id.chronic_load_wrapper).setVisibility(View.GONE);
-        final View acuteLoadWrapper = rootView.findViewById(R.id.acute_load_wrapper);
-        final GridLayout.LayoutParams params = (GridLayout.LayoutParams) acuteLoadWrapper.getLayoutParams();
-        params.columnSpec = GridLayout.spec(0, 2, GridLayout.FILL, 1f);
-        acuteLoadWrapper.setLayoutParams(params);
-    }
-
     @Override
     public String getTitle() {
         return getString(R.string.pref_header_training_load);
@@ -202,9 +175,6 @@ public class LoadFragment extends AbstractChartFragment<LoadFragment.LoadsData> 
 
     @Override
     protected void init() {
-        TEXT_COLOR = GBApplication.getTextColor(requireContext());
-        LEGEND_TEXT_COLOR = GBApplication.getTextColor(requireContext());
-        CHART_TEXT_COLOR = GBApplication.getSecondaryTextColor(requireContext());
         LOAD_COLOR = getAcuteColor(requireContext());
         OPTIMAL_LOAD_FILL_COLOR = getResources().getColor(R.color.training_load_optimal_fill_color);
     }
@@ -223,33 +193,6 @@ public class LoadFragment extends AbstractChartFragment<LoadFragment.LoadsData> 
             acuteLoadChart.invalidate();
         }
         dailyLoadChart.invalidate();
-    }
-
-    protected LineDataSet createDataSet(final List<Entry> values, String name, int color) {
-        final LineDataSet lineDataSet = new LineDataSet(values, name);
-        lineDataSet.setColor(color);
-        lineDataSet.setDrawCircles(false);
-        lineDataSet.setLineWidth(2f);
-        lineDataSet.setFillAlpha(255);
-        lineDataSet.setCircleRadius(5f);
-        lineDataSet.setDrawCircles(true);
-        lineDataSet.setDrawCircleHole(false);
-        lineDataSet.setCircleHoleColor(Color.WHITE);
-        lineDataSet.setCircleColor(color);
-        lineDataSet.setAxisDependency(YAxis.AxisDependency.LEFT);
-        lineDataSet.setDrawValues(false);
-        return lineDataSet;
-    }
-
-    protected BarDataSet createOptimalLoadRangeDataSet(final List<BarEntry> values) {
-        final BarDataSet barDataSet = new BarDataSet(values, getString(R.string.training_optimal_load));
-        barDataSet.setDrawValues(false);
-        barDataSet.setDrawIcons(false);
-        barDataSet.setAxisDependency(YAxis.AxisDependency.LEFT);
-        barDataSet.setColors(0x00000000, OPTIMAL_LOAD_FILL_COLOR);
-        barDataSet.setHighLightAlpha(0);
-        barDataSet.setHighlightEnabled(false);
-        return barDataSet;
     }
 
     private void setupLoadDataTypeChips(final LayoutInflater inflater) {
@@ -348,104 +291,77 @@ public class LoadFragment extends AbstractChartFragment<LoadFragment.LoadsData> 
         }
         String formattedDate = new SimpleDateFormat("E, MMM dd").format(getEndDate());
         dateHeader.setText(formattedDate);
-        thisWeekTotal.setText(String.valueOf(data.getThisWeekLoad()));
-        lastWeekTotal.setText(String.valueOf(data.getLastWeekLoad()));
-        dailyLoadChart.setData(null);
-        acuteLoadChart.setData(null);
+        weeklyLoadStatsContainer.removeAllViews();
+        final List<StatTileData> weeklyLoadStats = new ArrayList<>();
+        weeklyLoadStats.add(new StatTileData(String.valueOf(data.getThisWeekLoad()), getString(R.string.this_week_total)));
+        weeklyLoadStats.add(new StatTileData(String.valueOf(data.getLastWeekLoad()), getString(R.string.last_week_total)));
+        StatTileGridUtilKt.addStatTileGrid(weeklyLoadStatsContainer, requireContext(), weeklyLoadStats, 0);
+        final List<LoadData> days = data.getData();
+        final long[] epochDays = new long[days.size()];
+        final int[] load = new int[days.size()];
+        final int[] acute = new int[days.size()];
+        final int[] chronic = new int[days.size()];
+        for (int i = 0; i < days.size(); i++) {
+            epochDays[i] = epochDay(days.get(i).day);
+            load[i] = days.get(i).load;
+            acute[i] = days.get(i).acuteLoad;
+            chronic[i] = days.get(i).chronicLoad;
+        }
 
-        List<Entry> acuteLoadEntries = new ArrayList<>();
-        List<Entry> chronicLoadEntries = new ArrayList<>();
-        List<BarEntry> dailyLoadEntries = new ArrayList<>();
-        List<BarEntry> optimalLoadEntries = new ArrayList<>();
-        data.getData().forEach((LoadData dayData) -> {
-            if (dayData.acuteLoad > 0) {
-                acuteLoadEntries.add(new Entry(dayData.i, dayData.acuteLoad));
-            }
-            if (dayData.chronicLoad > 0) {
-                chronicLoadEntries.add(new Entry(dayData.i, dayData.chronicLoad));
-                float optimalLower = dayData.chronicLoad * OPTIMAL_LOAD_RATIO_LOWER;
-                float optimalUpper = dayData.chronicLoad * OPTIMAL_LOAD_RATIO_UPPER;
-                optimalLoadEntries.add(new BarEntry(dayData.i, new float[]{optimalLower, optimalUpper - optimalLower}));
-            }
-            if (dayData.load > 0) {
-                dailyLoadEntries.add(new BarEntry(dayData.i, dayData.load));
-            }
-        });
-
-        // Daily load chart.
-        BarDataSet set = new BarDataSet(dailyLoadEntries, getString(R.string.training_daily_load));
-        set.setDrawValues(true);
-        set.setColors(LOAD_COLOR);
-        final XAxis x = dailyLoadChart.getXAxis();
-        x.setValueFormatter(getDailyLoadChartDayValueFormatter(data));
-        dailyLoadChart.getAxisLeft().setAxisMaximum(Math.max(set.getYMax(), 200) + 100);
-        dailyLoadChart.setRenderer(new AngledLabelsChartRenderer(dailyLoadChart, dailyLoadChart.getAnimator(), dailyLoadChart.getViewPortHandler()));
-        BarData barData = new BarData(set);
-        barData.setValueTextColor(TEXT_COLOR);
-        barData.setValueTextSize(10f);
-
-        LegendEntry dailyLoadEntry = new LegendEntry();
-        dailyLoadEntry.label = getString(R.string.training_daily_load);
-        dailyLoadEntry.formColor = LOAD_COLOR;
-        dailyLoadEntry.form = Legend.LegendForm.SQUARE;
-        dailyLoadChart.getLegend().setTextColor(LEGEND_TEXT_COLOR);
-        dailyLoadChart.getLegend().setCustom(Collections.singletonList(dailyLoadEntry));
-
-        dailyLoadChart.setData(barData);
+        final String dailyLoadLabel = getString(R.string.training_daily_load);
+        dailyLoadChart.setSelectionContent(x -> DaySelections.of(
+                epochDays, x, Collections.singletonList(dailyLoadLabel), Collections.singletonList(LOAD_COLOR),
+                Collections.singletonList(valueText(load)), getString(R.string.stats_empty_value)
+        ));
+        dailyLoadChart.setSpec(LoadChartData.dailyLoadSpec(epochDays, load, LOAD_COLOR));
 
         if (supportsTrainingLoad()) {
-            List<LegendEntry> legendEntries = new ArrayList<>(3);
+            final int chronicColor = getResources().getColor(R.color.training_chronic_load);
+            final ChartSpec acuteChronicSpec = LoadChartData.acuteChronicSpec(
+                    epochDays, acute, chronic, showAcuteLoad, showChronicLoad,
+                    getString(R.string.training_acute_load), LOAD_COLOR,
+                    getString(R.string.training_chronic_load), chronicColor,
+                    getString(R.string.training_optimal_load), OPTIMAL_LOAD_FILL_COLOR
+            );
+            final List<String> rowLabels = new ArrayList<>();
+            final List<Integer> rowColors = new ArrayList<>();
+            final List<Function1<Integer, String>> rowTexts = new ArrayList<>();
             if (showAcuteLoad) {
-                LegendEntry acuteLoadEntry = new LegendEntry();
-                acuteLoadEntry.label = getString(R.string.training_acute_load);
-                acuteLoadEntry.formColor = LOAD_COLOR;
-                acuteLoadEntry.form = Legend.LegendForm.CIRCLE;
-                legendEntries.add(acuteLoadEntry);
+                rowLabels.add(getString(R.string.training_acute_load));
+                rowColors.add(LOAD_COLOR);
+                rowTexts.add(valueText(acute));
             }
             if (showChronicLoad) {
-                LegendEntry chronicLoadEntry = new LegendEntry();
-                chronicLoadEntry.label = getString(R.string.training_chronic_load);
-                chronicLoadEntry.formColor = getResources().getColor(R.color.training_chronic_load);
-                chronicLoadEntry.form = Legend.LegendForm.CIRCLE;
-                legendEntries.add(chronicLoadEntry);
+                rowLabels.add(getString(R.string.training_chronic_load));
+                rowColors.add(chronicColor);
+                rowTexts.add(valueText(chronic));
+                rowLabels.add(getString(R.string.training_optimal_load));
+                rowColors.add(OPTIMAL_LOAD_FILL_COLOR);
+                rowTexts.add(optimalRangeText(chronic));
             }
-            if (showChronicLoad && !optimalLoadEntries.isEmpty()) {
-                LegendEntry optimalLoadEntry = new LegendEntry();
-                optimalLoadEntry.label = getString(R.string.training_optimal_load);
-                optimalLoadEntry.formColor = OPTIMAL_LOAD_FILL_COLOR;
-                optimalLoadEntry.form = Legend.LegendForm.SQUARE;
-                legendEntries.add(optimalLoadEntry);
+            acuteLoadChart.setSelectionContent(x -> DaySelections.of(epochDays, x, rowLabels, rowColors, rowTexts, getString(R.string.stats_empty_value)));
+            acuteLoadChart.setSpec(acuteChronicSpec);
+            final List<ChartSeries> legendSeries = new ArrayList<>();
+            for (final ChartSeries series : acuteChronicSpec.getSeries()) {
+                if (!series.getPoints().isEmpty()) {
+                    legendSeries.add(series);
+                }
             }
-            acuteLoadChart.getLegend().setTextColor(LEGEND_TEXT_COLOR);
-            acuteLoadChart.getLegend().setCustom(legendEntries);
-            acuteLoadChart.getXAxis().setValueFormatter(getDailyLoadChartDayValueFormatter(data));
-
-            final List<ILineDataSet> lineDataSets = new ArrayList<>();
-            if (showAcuteLoad) {
-                lineDataSets.add(createDataSet(acuteLoadEntries, getString(R.string.training_acute_load), LOAD_COLOR));
-            }
-            if (showChronicLoad) {
-                lineDataSets.add(createDataSet(chronicLoadEntries, getString(R.string.training_chronic_load), getResources().getColor(R.color.training_chronic_load)));
-            }
-            final LineData lineData = new LineData(lineDataSets);
-
-            final CombinedData combinedData = new CombinedData();
-            float optimalLoadMax = 0f;
-            if (showChronicLoad && !optimalLoadEntries.isEmpty()) {
-                final BarData optimalLoadBarData = new BarData(createOptimalLoadRangeDataSet(optimalLoadEntries));
-                optimalLoadBarData.setBarWidth(1f);
-                combinedData.setData(optimalLoadBarData);
-                optimalLoadMax = optimalLoadBarData.getYMax();
-            }
-            combinedData.setData(lineData);
-            acuteLoadChart.getAxisLeft().setAxisMaximum(Math.max(Math.max(lineData.getYMax(), optimalLoadMax), 200) + 100);
-            acuteLoadChart.setData(combinedData);
+            acuteLoadLegend.setSeries(legendSeries);
 
             // Acute load ratio gauge
             int latestAcuteLoad = data.getLatestAcuteLoad();
             int latestChronicLoad = data.getLatestChronicLoad();
-            acuteLoad.setText(String.valueOf(latestAcuteLoad));
-            chronicLoad.setText(String.valueOf(latestChronicLoad));
+            acuteChronicLoadStatsContainer.removeAllViews();
+            final List<StatTileData> acuteChronicLoadStats = new ArrayList<>();
+            acuteChronicLoadStats.add(new StatTileData(
+                    String.valueOf(latestAcuteLoad),
+                    showChronicLoad ? getString(R.string.training_acute_load) : getString(R.string.pref_header_training_load)
+            ));
+            if (showChronicLoad) {
+                acuteChronicLoadStats.add(new StatTileData(String.valueOf(latestChronicLoad), getString(R.string.training_chronic_load)));
+            }
+            StatTileGridUtilKt.addStatTileGrid(acuteChronicLoadStatsContainer, requireContext(), acuteChronicLoadStats, 0);
             // Gauge
             acuteLoadRatioGaugeValue.setText(String.valueOf(latestAcuteLoad));
             float value;
@@ -630,80 +546,18 @@ public class LoadFragment extends AbstractChartFragment<LoadFragment.LoadsData> 
         return sampleProvider.getLatestSample(tsToMillis);
     }
 
-    private void setupAcuteLoadChart() {
-        acuteLoadChart.getDescription().setEnabled(false);
-        acuteLoadChart.setTouchEnabled(false);
-        acuteLoadChart.setPinchZoom(false);
-        acuteLoadChart.setDoubleTapToZoomEnabled(false);
-        acuteLoadChart.setDrawOrder(new CombinedChart.DrawOrder[]{
-                CombinedChart.DrawOrder.BAR,
-                CombinedChart.DrawOrder.LINE
-        });
-
-        final XAxis xAxisBottom = acuteLoadChart.getXAxis();
-        xAxisBottom.setPosition(XAxis.XAxisPosition.BOTTOM);
-        xAxisBottom.setDrawLabels(true);
-        xAxisBottom.setDrawGridLines(false);
-        xAxisBottom.setEnabled(true);
-        xAxisBottom.setDrawLimitLinesBehindData(true);
-        xAxisBottom.setAxisMaximum(29 + 0.5f);
-        xAxisBottom.setAxisMinimum(0 - 0.5f);
-        xAxisBottom.setTextColor(CHART_TEXT_COLOR);
-
-        final YAxis yAxisLeft = acuteLoadChart.getAxisLeft();
-        yAxisLeft.setDrawGridLines(true);
-        yAxisLeft.setAxisMaximum(1000);
-        yAxisLeft.setAxisMinimum(0);
-        yAxisLeft.setDrawTopYLabelEntry(false);
-        yAxisLeft.setEnabled(true);
-        yAxisLeft.setTextColor(CHART_TEXT_COLOR);
-
-        final YAxis yAxisRight = acuteLoadChart.getAxisRight();
-        yAxisRight.setEnabled(true);
-        yAxisRight.setDrawLabels(false);
-        yAxisRight.setDrawGridLines(false);
-        yAxisRight.setDrawAxisLine(true);
+    private Function1<Integer, String> valueText(final int[] values) {
+        return i -> values[i] > 0 ? String.valueOf(values[i]) : getString(R.string.stats_empty_value);
     }
 
-    protected void setupDailyLoadChart() {
-        dailyLoadChart.getDescription().setEnabled(false);
-        dailyLoadChart.setDoubleTapToZoomEnabled(false);
-        dailyLoadChart.setTouchEnabled(false);
-
-        final XAxis xAxisBottom = dailyLoadChart.getXAxis();
-        xAxisBottom.setPosition(XAxis.XAxisPosition.BOTTOM);
-        xAxisBottom.setDrawLabels(true);
-        xAxisBottom.setDrawGridLines(false);
-        xAxisBottom.setEnabled(true);
-        xAxisBottom.setDrawLimitLinesBehindData(true);
-        xAxisBottom.setTextColor(CHART_TEXT_COLOR);
-        xAxisBottom.setAxisMaximum(29 + 0.5f);
-        xAxisBottom.setAxisMinimum(0 - 0.5f);
-
-        final YAxis yAxisLeft = dailyLoadChart.getAxisLeft();
-        yAxisLeft.setDrawGridLines(true);
-        yAxisLeft.setDrawTopYLabelEntry(true);
-        yAxisLeft.setEnabled(true);
-        yAxisLeft.setTextColor(CHART_TEXT_COLOR);
-        yAxisLeft.setAxisMinimum(0f);
-
-        final YAxis yAxisRight = dailyLoadChart.getAxisRight();
-        yAxisRight.setEnabled(true);
-        yAxisRight.setDrawLabels(false);
-        yAxisRight.setDrawGridLines(false);
-        yAxisRight.setDrawAxisLine(true);
+    private Function1<Integer, String> optimalRangeText(final int[] chronic) {
+        return i -> chronic[i] > 0
+                ? Math.round(chronic[i] * OPTIMAL_LOAD_RATIO_LOWER) + " \u2013 " + Math.round(chronic[i] * OPTIMAL_LOAD_RATIO_UPPER)
+                : getString(R.string.stats_empty_value);
     }
 
-    ValueFormatter getDailyLoadChartDayValueFormatter(LoadFragment.LoadsData data) {
-        return new ValueFormatter() {
-            @Override
-            public String getFormattedValue(float value) {
-                LoadFragment.LoadData day = data.getDay((int) value);
-                String pattern = TOTAL_DAYS > 7 ? "dd" : "EEE";
-                SimpleDateFormat formatLetterDay = new SimpleDateFormat(pattern, Locale.getDefault());
-                return formatLetterDay.format(new Date(day.day.getTimeInMillis()));
-            }
-        };
+    private static long epochDay(final Calendar day) {
+        return LocalDate.of(day.get(Calendar.YEAR), day.get(Calendar.MONTH) + 1, day.get(Calendar.DAY_OF_MONTH)).toEpochDay();
     }
 
     public static int getAcuteColor(Context context) {
@@ -790,5 +644,15 @@ public class LoadFragment extends AbstractChartFragment<LoadFragment.LoadsData> 
             this.day = day;
             this.i = i;
         }
+    }
+
+    @Nullable
+    @Override
+    public ChartDataRange getAvailableDataRange(final GBDevice device, final DBHandler db) {
+        return ChartDataRange.union(
+                ChartDataRange.ofSamples(device.getDeviceCoordinator().getWorkoutLoadSampleProvider(device, db.getDaoSession())),
+                ChartDataRange.ofSamples(device.getDeviceCoordinator().getTrainingAcuteLoadSampleProvider(device, db.getDaoSession())),
+                ChartDataRange.ofSamples(device.getDeviceCoordinator().getTrainingChronicLoadSampleProvider(device, db.getDaoSession()))
+        );
     }
 }

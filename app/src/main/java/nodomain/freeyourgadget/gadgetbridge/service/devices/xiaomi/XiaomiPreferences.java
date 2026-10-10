@@ -29,6 +29,7 @@ import nodomain.freeyourgadget.gadgetbridge.GBApplication;
 import nodomain.freeyourgadget.gadgetbridge.R;
 import nodomain.freeyourgadget.gadgetbridge.devices.xiaomi.XiaomiWorkoutType;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
+import nodomain.freeyourgadget.gadgetbridge.proto.xiaomi.WearCommon;
 import nodomain.freeyourgadget.gadgetbridge.proto.xiaomi.XiaomiProto;
 import nodomain.freeyourgadget.gadgetbridge.util.Prefs;
 
@@ -61,21 +62,21 @@ public final class XiaomiPreferences {
         // util class
     }
 
-    public static String prefFromHourMin(final XiaomiProto.HourMinute hourMinute) {
+    public static String prefFromHourMin(final WearCommon.HourMinute hourMinute) {
         return String.format(Locale.ROOT, "%02d:%02d", hourMinute.getHour(), hourMinute.getMinute());
     }
 
-    public static XiaomiProto.HourMinute prefToHourMin(final Date date) {
+    public static WearCommon.HourMinute prefToHourMin(final Date date) {
         final Calendar calendar = GregorianCalendar.getInstance();
         calendar.setTime(date);
 
-        return XiaomiProto.HourMinute.newBuilder()
+        return WearCommon.HourMinute.newBuilder()
                 .setHour(calendar.get(Calendar.HOUR_OF_DAY))
                 .setMinute(calendar.get(Calendar.MINUTE))
                 .build();
     }
 
-    public static Date toDate(final XiaomiProto.Date date, final XiaomiProto.Time time) {
+    public static Date toDate(final WearCommon.Date date, final WearCommon.Time time) {
         // For some reason, the watch expects those in UTC...
         // TODO double-check with official app, this does not make sense
         final Calendar calendar = GregorianCalendar.getInstance(TimeZone.getTimeZone("UTC"));

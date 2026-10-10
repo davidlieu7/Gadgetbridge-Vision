@@ -3,6 +3,9 @@ package nodomain.freeyourgadget.gadgetbridge.devices.beurer
 import de.greenrobot.dao.AbstractDao
 import de.greenrobot.dao.Property
 import nodomain.freeyourgadget.gadgetbridge.R
+import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.DeviceSettingsSpec
+import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.components.bloodPressureActiveUser
+import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.deviceSettings
 import nodomain.freeyourgadget.gadgetbridge.devices.AbstractBLEDeviceCoordinator
 import nodomain.freeyourgadget.gadgetbridge.devices.DeviceCoordinator
 import nodomain.freeyourgadget.gadgetbridge.devices.GenericBloodPressureSampleProvider
@@ -56,6 +59,10 @@ class BeurerBm69Coordinator : AbstractBLEDeviceCoordinator() {
         session: DaoSession
     ): GenericBloodPressureSampleProvider {
         return GenericBloodPressureSampleProvider(device, session)
+    }
+
+    override fun getDeviceSettings(device: GBDevice): DeviceSettingsSpec = deviceSettings {
+        bloodPressureActiveUser(device)
     }
 
     override fun getAllDeviceDao(session: DaoSession): MutableMap<AbstractDao<*, *>, Property> {

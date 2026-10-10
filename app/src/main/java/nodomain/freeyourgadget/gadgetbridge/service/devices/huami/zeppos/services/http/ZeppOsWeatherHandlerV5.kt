@@ -27,7 +27,7 @@ import kotlin.math.roundToInt
 object ZeppOsWeatherHandlerV5 {
     private val LOG: Logger = LoggerFactory.getLogger(ZeppOsWeatherHandlerV5::class.java)
 
-    private val GSON: Gson = GsonBuilder()
+    internal val GSON: Gson = GsonBuilder()
         .serializeNulls()
         .registerTypeAdapter(OffsetDateTime::class.java, OffsetDateTimeAdapter())
         .registerTypeAdapter(Float::class.java, FloatAdapter)
@@ -86,13 +86,13 @@ object ZeppOsWeatherHandlerV5 {
         return GSON.toJson(response)
     }
 
-    private fun createMetadata(weatherSpec: WeatherSpec) = Metadata(
+    internal fun createMetadata(weatherSpec: WeatherSpec) = Metadata(
         reportedTime = toOffsetDateTime(Date(weatherSpec.timestamp * 1000L)),
         units = "m",
         version = 1,
     )
 
-    private fun createPlace(weatherSpec: WeatherSpec): Place {
+    internal fun createPlace(weatherSpec: WeatherSpec): Place {
         val (lat, lon) = resolveCoordinates(weatherSpec)
         // While the location ID should be stable so that the watch can dedupe responses, this
         // is also preventing it from reloading the most updated data from the phone. Until we
@@ -156,7 +156,7 @@ object ZeppOsWeatherHandlerV5 {
                         forecastStart = toOffsetDateTime(Date(it.timestamp * 1000L)),
                         conditionCode = ZeppOsWeatherHandler.mapToZeppOsWeatherCode(it.conditionCode).toString(),
                         humidity = it.humidity / 100.0f,
-                        pressure = weatherSpec.pressure, // TODO WeatherSpec does not support hourly pressure
+                        pressure = if (it.pressure > 0) it.pressure else weatherSpec.pressure,
                         temperature = it.temp - 273f,
                         uvIndex = it.uvIndex.roundToInt(),
                         visibility = weatherSpec.visibility, // TODO WeatherSpec does not support hourly visibility
@@ -184,7 +184,7 @@ object ZeppOsWeatherHandlerV5 {
         )
     }
 
-    private fun createDailyIndices(weatherSpec: WeatherSpec): DailyIndices {
+    internal fun createDailyIndices(weatherSpec: WeatherSpec): DailyIndices {
         return DailyIndices(
             metadata = createMetadata(weatherSpec),
             days = (listOf(weatherSpec.todayAsDaily()) + weatherSpec.forecasts).mapIndexed { i, day ->
@@ -269,7 +269,7 @@ object ZeppOsWeatherHandlerV5 {
         )
     }
 
-    private fun toOffsetDateTime(date: Date): OffsetDateTime {
+    internal fun toOffsetDateTime(date: Date): OffsetDateTime {
         return OffsetDateTime.ofInstant(
             Instant.ofEpochMilli(date.time),
             ZoneId.systemDefault()

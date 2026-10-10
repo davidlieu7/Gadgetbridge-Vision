@@ -78,6 +78,7 @@ public class ProtocolBufferHandler implements MessageHandler {
     private final FileSyncServiceHandler fileSyncServiceHandler;
     private final EcgServiceHandler ecgServiceHandler;
     private final ExploreSyncHandler exploreSyncHandler;
+    private final PushNotificationHandler pushNotificationHandler;
 
     private final Map<GdiSmsNotification.SmsNotificationService.CannedListType, String[]> cannedListTypeMap = new HashMap<>();
 
@@ -89,6 +90,7 @@ public class ProtocolBufferHandler implements MessageHandler {
         fileSyncServiceHandler = new FileSyncServiceHandler(deviceSupport);
         ecgServiceHandler = new EcgServiceHandler(deviceSupport);
         exploreSyncHandler = new ExploreSyncHandler(deviceSupport);
+        pushNotificationHandler = new PushNotificationHandler(deviceSupport);
     }
 
     public void setContext(final GBDevice gbDevice, final BluetoothAdapter btAdapter, final Context context) {
@@ -236,6 +238,9 @@ public class ProtocolBufferHandler implements MessageHandler {
             }
             if (smart.hasAppConfigService()) {
                 processed = appConfigHandler.process(smart.getAppConfigService());
+            }
+            if (smart.hasPushNotificationService()) {
+                processed = pushNotificationHandler.handle(smart.getPushNotificationService());
             }
             if (smart.hasExploreSyncService()) {
                 if (deviceSupport.getDevicePrefs().getBoolean("garmin_exploresync", false)) {
@@ -704,6 +709,10 @@ public class ProtocolBufferHandler implements MessageHandler {
 
     public FileSyncServiceHandler getFileSyncServiceHandler() {
         return fileSyncServiceHandler;
+    }
+
+    public PushNotificationHandler getPushNotificationHandler() {
+        return pushNotificationHandler;
     }
 
     public AppConfigHandler getAppConfigHandler() {

@@ -9,6 +9,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.TextStyle
+import nodomain.freeyourgadget.gadgetbridge.activities.charts.spec.ChartTheme
 
 /**
  * A message shown in place of a chart, e.g. "no data" or a load error.

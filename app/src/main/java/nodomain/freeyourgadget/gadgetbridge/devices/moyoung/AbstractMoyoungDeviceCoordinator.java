@@ -83,6 +83,12 @@ public abstract class AbstractMoyoungDeviceCoordinator extends AbstractBLEDevice
     @Override
     public List<DeviceCardAction> getCustomActions() {
         return Collections.singletonList(new DeviceCardAction() {
+            @NonNull
+            @Override
+            public String getId() {
+                return "moyoung_spo2";
+            }
+
             @Override
             public int getIcon(@NonNull final GBDevice device) {
                 return R.drawable.ic_spo2;

@@ -34,6 +34,10 @@ import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEventAppInfo;
 import nodomain.freeyourgadget.gadgetbridge.devices.xiaomi.XiaomiFWHelper;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDeviceApp;
+import nodomain.freeyourgadget.gadgetbridge.proto.xiaomi.Rpk;
+import nodomain.freeyourgadget.gadgetbridge.proto.xiaomi.RpkInfo;
+import nodomain.freeyourgadget.gadgetbridge.proto.xiaomi.RpkInfoList;
+import nodomain.freeyourgadget.gadgetbridge.proto.xiaomi.RpkList;
 import nodomain.freeyourgadget.gadgetbridge.proto.xiaomi.XiaomiProto;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.xiaomi.XiaomiSupport;
 
@@ -105,9 +109,9 @@ public class XiaomiRpkService extends AbstractXiaomiService implements XiaomiDat
                         XiaomiProto.Command.newBuilder()
                                 .setType(COMMAND_TYPE)
                                 .setSubtype(CMD_RPK_DELETE)
-                                .setRpk(XiaomiProto.Rpk.newBuilder()
+                                .setRpk(Rpk.newBuilder()
                                         .setRpkDel(
-                                                XiaomiProto.RpkInfoList.newBuilder()
+                                                RpkInfoList.newBuilder()
                                                         .setId(packageName)
                                                         .setSha(sha)
                                         )
@@ -132,9 +136,9 @@ public class XiaomiRpkService extends AbstractXiaomiService implements XiaomiDat
                 XiaomiProto.Command.newBuilder()
                         .setType(COMMAND_TYPE)
                         .setSubtype(CMD_RPK_INSTALL)
-                        .setRpk(XiaomiProto.Rpk.newBuilder()
+                        .setRpk(Rpk.newBuilder()
                                 .setRpkInfo(
-                                        XiaomiProto.RpkInfo.newBuilder()
+                                        RpkInfo.newBuilder()
                                                 .setId(fwHelper.getId())
                                                 .setUnknown2(fwHelper.getVersionCode())
                                                 .setSize(fwHelper.getBytes().length)
@@ -142,11 +146,11 @@ public class XiaomiRpkService extends AbstractXiaomiService implements XiaomiDat
                         .build());
     }
 
-    private void handleRpkList(final XiaomiProto.RpkList rpkList) {
+    private void handleRpkList(final RpkList rpkList) {
         LOG.debug("Got {} rpks", rpkList.getRpkInfoCount());
         apps.clear();
         shaMap.clear();
-        for (XiaomiProto.RpkInfoList info : rpkList.getRpkInfoList()) {
+        for (var info : rpkList.getRpkInfoList()) {
             shaMap.put(info.getId(), info.getSha());
             String packageName = info.getId();
             String appName = info.getName();

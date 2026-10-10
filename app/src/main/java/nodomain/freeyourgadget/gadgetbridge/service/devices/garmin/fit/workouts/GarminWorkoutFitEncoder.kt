@@ -4,6 +4,7 @@ import nodomain.freeyourgadget.gadgetbridge.model.ActivityKind
 import nodomain.freeyourgadget.gadgetbridge.model.workouts.WorkoutDuration
 import nodomain.freeyourgadget.gadgetbridge.model.workouts.WorkoutDurationType
 import nodomain.freeyourgadget.gadgetbridge.model.workouts.WorkoutEffort
+import nodomain.freeyourgadget.gadgetbridge.model.workouts.WorkoutLoadCategory
 import nodomain.freeyourgadget.gadgetbridge.model.workouts.WorkoutNodeType
 import nodomain.freeyourgadget.gadgetbridge.model.workouts.WorkoutPoolLengthUnit
 import nodomain.freeyourgadget.gadgetbridge.model.workouts.WorkoutStepNode
@@ -22,6 +23,7 @@ import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.enums.Wkt
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.messages.FitExerciseTitle
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.messages.FitFileCreator
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.messages.FitFileId
+import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.messages.FitMemoGlob
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.messages.FitWorkout
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.messages.FitWorkoutSession
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.messages.FitWorkoutStep
@@ -39,6 +41,15 @@ object GarminWorkoutFitEncoder {
     private const val LMT_WORKOUT_STEP = 0x03
     private const val LMT_EXERCISE_TITLE = 0x04
     private const val LMT_WORKOUT_SESSION = 0x05
+    private const val LMT_MEMO_GLOB = 0x06
+
+    private const val MESG_NUM_WORKOUT_STEP = 27
+    private const val FIELD_NUM_NOTES = 8
+
+    /**
+     * The maximum size of a FIT field, excluding the null terminator.
+     */
+    private const val MEMO_MAX_BYTES = 254
 
     /**
      * @param timestampSeconds the creation time of the file, in the FIT epoch
@@ -82,15 +93,15 @@ object GarminWorkoutFitEncoder {
     private fun workout(template: WorkoutTemplate, garminSport: GarminSport, steps: StepRecords): FitWorkout {
         val builder = FitWorkout.Builder()
         builder.setMessageIndex(0)
-        builder.setName(template.name)
-        template.note?.takeIf { it.isNotEmpty() }?.let { builder.setNotes(it) }
+        builder.setWktName(template.name)
+        template.note?.takeIf { it.isNotEmpty() }?.let { builder.setWktDescription(it) }
         builder.setSport(garminSport.type)
         builder.setSubSport(garminSport.subtype)
         builder.setCapabilities(32L) // TODO what are these?
-        builder.setNumValidSteps(steps.stepRecords.size)
+        builder.setNumValidSteps(steps.stepCount)
         if (template.activityKind == ActivityKind.MULTISPORT) {
             builder.setNumSessions(steps.sessionRecords.size)
-            builder.setTransitions(if (template.transitions == true) 1 else 0)
+            builder.setTransitions(template.transitions)
         }
         if (template.activityKind == ActivityKind.POOL_SWIM) {
             steps.poolLength?.let { (lengthCm, unit) ->
@@ -138,6 +149,9 @@ object GarminWorkoutFitEncoder {
      * they are encoded.
      */
     private class StepRecords(val poolLength: Pair<Int, WorkoutPoolLengthUnit>?) {
+        /**
+         * The workout steps. A step with notes is followed by the `memo_glob` of its notes.
+         */
         val stepRecords = mutableListOf<RecordData>()
         val sessionRecords = mutableListOf<RecordData>()
         var hasRepeat = false
@@ -145,6 +159,9 @@ object GarminWorkoutFitEncoder {
 
         private val exerciseTitleOrder = LinkedHashMap<GarminExercise, Int>()
         private var messageIndex = 0
+
+        val stepCount: Int
+            get() = messageIndex
 
         fun encodeLeg(leg: WorkoutStepNode) {
             val legKind = leg.legActivityKind
@@ -187,6 +204,7 @@ object GarminWorkoutFitEncoder {
             builder.setMessageIndex(index)
             builder.setExerciseCategory(exercise.category.num)
             exercise.code?.let { builder.setExerciseName(it) }
+            builder.setWktStepName(exercise.name)
             builder.build(LMT_EXERCISE_TITLE)
         }
 
@@ -199,7 +217,7 @@ object GarminWorkoutFitEncoder {
             builder.setDurationType(WktStepDuration.REPEAT_UNTIL_STEPS_CMPLT)
             builder.setDurationValue(startIndex.toLong())
             builder.setTargetValue((node.repeatCount ?: 1).toLong())
-            builder.setSkipLastRecover(if (activityKind == ActivityKind.POOL_SWIM) 1 else 0)
+            builder.setSkipLastRecover(activityKind == ActivityKind.POOL_SWIM)
             stepRecords.add(builder.build(LMT_WORKOUT_STEP))
             messageIndex++
         }
@@ -207,31 +225,69 @@ object GarminWorkoutFitEncoder {
         private fun encodeStep(node: WorkoutStepNode, activityKind: ActivityKind) {
             val builder = FitWorkoutStep.Builder()
             builder.setMessageIndex(messageIndex)
-            // Garmin Connect writes the weight unit on every step?
-            builder.setWeightDisplayUnit(FitBaseUnit.KILOGRAM)
 
             val stepType = node.stepType ?: WorkoutStepType.ACTIVE
             builder.setIntensity(GarminWorkoutCodes.intensityOf(stepType))
 
-            node.note?.takeIf { it.isNotEmpty() }?.let { builder.setNotes(it) }
+            // Write the weight unit on every step, except on a load category step
+            if (node.weightType != WorkoutWeightType.LOAD_CATEGORY) {
+                builder.setWeightDisplayUnit(FitBaseUnit.KILOGRAM)
+            }
 
-            encodeDuration(builder, node.duration)
+            val note = node.note?.takeIf { it.isNotEmpty() }
+            note?.let { builder.setNotes(it) }
+
+            val repsPlus = node.duration?.type == WorkoutDurationType.REPS && node.duration?.plus == true
+            if (repsPlus) {
+                encodeRepsPlus(builder, node.duration?.value)
+            } else {
+                encodeDuration(builder, node.duration)
+            }
             if (activityKind == ActivityKind.POOL_SWIM) {
                 encodeSwimTargets(builder, node, stepType)
                 GarminWorkoutCodes.equipmentCode(node.swimEquipment)?.let { builder.setEquipment(it) }
                 GarminWorkoutCodes.swimDrillCode(node.swimDrill)?.let { builder.setSwimDrillType(it) }
             } else {
-                encodeTarget(builder, node.target, primary = true, activityKind)
+                if (!repsPlus) {
+                    encodeTarget(builder, node.target, primary = true, activityKind)
+                }
                 encodeTarget(builder, node.secondaryTarget, primary = false, activityKind)
             }
 
-            // Only an ACTIVE step has an exercise and a weight
-            if (stepType == WorkoutStepType.ACTIVE) {
-                encodeExerciseAndWeight(builder, node)
-            }
+            encodeExerciseAndWeight(builder, node)
 
             stepRecords.add(builder.build(LMT_WORKOUT_STEP))
+            note?.let { stepRecords.add(noteMemo(it, messageIndex)) }
             messageIndex++
+        }
+
+        /**
+         * A Reps+ step has no duration. Its rep count is the primary target, with no upper bound.
+         */
+        private fun encodeRepsPlus(builder: FitWorkoutStep.Builder, reps: Long?) {
+            builder.setTargetType(WktStepTarget.REPEATS)
+            builder.setTargetValue(0L)
+            builder.setCustomTargetValueLow(reps ?: 0L)
+            builder.setCustomTargetValueHigh(null)
+        }
+
+        /**
+         * The `memo_glob` with the notes of the step at [stepIndex].
+         */
+        private fun noteMemo(note: String, stepIndex: Int): RecordData {
+            var text = note
+            while (text.toByteArray(Charsets.UTF_8).size > MEMO_MAX_BYTES) {
+                text = text.dropLast(1)
+            }
+            val data = text.toByteArray(Charsets.UTF_8).map { it.toInt() and 0xFF } + 0
+
+            val builder = FitMemoGlob.Builder()
+            builder.setPartIndex(0L)
+            builder.setMesgNum(MESG_NUM_WORKOUT_STEP)
+            builder.setParentIndex(stepIndex)
+            builder.setFieldNum(FIELD_NUM_NOTES)
+            builder.setData(data.toTypedArray())
+            return builder.build(LMT_MEMO_GLOB)
         }
 
         private fun encodeExerciseAndWeight(builder: FitWorkoutStep.Builder, node: WorkoutStepNode) {
@@ -256,6 +312,15 @@ object GarminWorkoutFitEncoder {
                 WorkoutWeightType.PERCENT_1RM -> {
                     builder.setExerciseWeightPercent(node.weightValue ?: 0)
                     builder.setExerciseWeightType(5) // constant seen on every %-of-1RM capture
+                }
+
+                WorkoutWeightType.LOAD_CATEGORY -> {
+                    val category = WorkoutLoadCategory.entries.getOrNull(node.weightValue ?: -1)
+                    if (category != null) {
+                        builder.setExerciseLoadCategory(GarminWorkoutCodes.loadCategoryCode(category))
+                    } else {
+                        LOG.warn("Invalid load category {}, omitting it from the encoded step", node.weightValue)
+                    }
                 }
 
                 WorkoutWeightType.RM, WorkoutWeightType.NONE, null -> {}

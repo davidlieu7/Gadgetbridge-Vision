@@ -13,5 +13,5 @@
     android:paddingTop="12dp"
     dslv:sort_enabled="true"
     dslv:remove_enabled="false"
-    dslv:float_background_color="@color/accent"
+    dslv:float_background_color="?attr/accent_color"
     dslv:drag_handle_id="@id/drag_handle" />

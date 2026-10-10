@@ -139,6 +139,8 @@
     <uses-permission android:name="android.permission.health.WRITE_RESPIRATORY_RATE" />
     <uses-permission android:name="android.permission.health.WRITE_RESTING_HEART_RATE" />
     <uses-permission android:name="android.permission.health.WRITE_BLOOD_GLUCOSE" />
+    <uses-permission android:name="android.permission.health.WRITE_BLOOD_PRESSURE" />
+    <uses-permission android:name="android.permission.health.WRITE_HYDRATION" />
     <uses-permission android:name="android.permission.health.WRITE_STEPS_CADENCE" />
     <uses-permission android:name="android.permission.health.WRITE_CYCLING_PEDALING_CADENCE" />
     <uses-sdk tools:overrideLibrary="androidx.health.connect.client"/>
@@ -269,6 +271,9 @@
             android:label="@string/activity_data_management_directory_content_title"
             android:parentActivityName=".activities.DataManagementActivity" />
         <activity
+            android:name=".activities.files.FtpFileBrowserActivity"
+            android:label="@string/ftp_file_browser" />
+        <activity
             android:name=".activities.fit.FitViewerActivity"
             android:exported="true"
             android:label="@string/fit_file_viewer" />
@@ -323,6 +328,11 @@
             android:parentActivityName=".activities.workouts.templates.WorkoutTemplateEditActivity"
             android:windowSoftInputMode="stateHidden" />
         <activity
+            android:name=".devices.test.TestFeaturesActivity"
+            android:label="@string/pref_test_features_title"
+            android:parentActivityName=".activities.devicesettings.DeviceSettingsActivity"
+            android:windowSoftInputMode="stateHidden" />
+        <activity
             android:name=".activities.workouts.templates.WorkoutExercisePickerActivity"
             android:label="@string/workout_exercise_picker_title"
             android:parentActivityName=".activities.workouts.templates.WorkoutStepEditActivity"
@@ -331,6 +341,10 @@
             android:name=".activities.workouts.WorkoutListActivity"
             android:label="@string/activity_summaries"
             android:parentActivityName=".activities.ControlCenterv2" />
+        <activity
+            android:name=".activities.workouts.statistics.WorkoutStatisticsActivity"
+            android:label="@string/activity_summaries_statistics"
+            android:parentActivityName=".activities.workouts.WorkoutListActivity" />
         <activity
             android:name=".activities.appmanager.AppManagerActivity"
             android:label="@string/title_activity_appmanager"
@@ -721,6 +735,9 @@
             </intent-filter>
         </receiver>
 
+        <receiver
+            android:name=".service.ftp.WifiFtpSessionStopReceiver"
+            android:exported="false" />
         <receiver
             android:name=".service.receivers.GBMusicControlReceiver"
             android:exported="false">
@@ -1152,6 +1169,11 @@
             android:name=".activities.dashboard.DashboardWidgetsActivity"
             android:label="@string/pref_dashboard_manage_widgets_title"
             android:parentActivityName=".activities.DashboardPreferencesActivity" />
+
+        <activity
+            android:name=".activities.devicesettings.DeviceCardItemsActivity"
+            android:label="@string/pref_device_card_items_title"
+            android:parentActivityName=".activities.devicesettings.DeviceSettingsActivity" />
 
         <activity
             android:name=".activities.dashboard.WidgetInstanceSettingsActivity"

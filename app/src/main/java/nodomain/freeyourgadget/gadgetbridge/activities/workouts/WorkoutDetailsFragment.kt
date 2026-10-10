@@ -46,6 +46,8 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import nodomain.freeyourgadget.gadgetbridge.GBApplication
 import nodomain.freeyourgadget.gadgetbridge.R
+import nodomain.freeyourgadget.gadgetbridge.activities.AbstractGBActivity
+import nodomain.freeyourgadget.gadgetbridge.activities.charts.IntervalChartUtils
 import nodomain.freeyourgadget.gadgetbridge.activities.endurain.EndurainApiClient
 import nodomain.freeyourgadget.gadgetbridge.activities.endurain.EndurainSetupViewModel
 import nodomain.freeyourgadget.gadgetbridge.activities.endurain.WandererApiClient
@@ -65,6 +67,7 @@ import nodomain.freeyourgadget.gadgetbridge.model.workout.Workout
 import nodomain.freeyourgadget.gadgetbridge.model.workout.WorkoutViewModel
 import nodomain.freeyourgadget.gadgetbridge.util.ActivitySummaryUtils
 import nodomain.freeyourgadget.gadgetbridge.util.AndroidUtils
+import nodomain.freeyourgadget.gadgetbridge.util.BarShade
 import nodomain.freeyourgadget.gadgetbridge.util.DateTimeUtils
 import nodomain.freeyourgadget.gadgetbridge.util.FileUtils
 import nodomain.freeyourgadget.gadgetbridge.util.GB
@@ -116,6 +119,10 @@ class WorkoutDetailsFragment : Fragment(), MenuProvider {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+
+        if (BarShade.continuesToolbar(requireContext(), R.attr.tab_bar_bg)) {
+            (requireActivity() as AbstractGBActivity).setTopShade(binding.tabRowShade)
+        }
 
         // Attach workout tabs.
         val viewPager = binding.tabsViewPager
@@ -180,20 +187,29 @@ class WorkoutDetailsFragment : Fragment(), MenuProvider {
                             mutableListOf()
                         )
                     }
+                    // Reading the track means parsing the device's raw file a second time, so it is
+                    // only done when the workout has no charts of its own. That is also the only
+                    // path that yields interval phases: a parser that builds its own charts reports
+                    // laps through its summary instead.
                     if (parsedWorkout.charts.isEmpty()) {
                         try {
-                            val activityTrackProvider =
-                                gbDevice.deviceCoordinator.getActivityTrackProvider(gbDevice, requireContext())
-                            if (activityTrackProvider != null) {
-                                val activityPoints = activityTrackProvider.getActivityTrack(parsedWorkout.summary)?.allPoints
-                                if (!activityPoints.isNullOrEmpty()) {
-                                    val defaultCharts = DefaultWorkoutCharts.buildDefaultCharts(
-                                        requireContext(),
-                                        activityPoints,
-                                        ActivityKind.fromCode(parsedWorkout.summary.activityKind)
-                                    )
-                                    return@withContext Workout(parsedWorkout.summary, parsedWorkout.data, defaultCharts)
-                                }
+                            val activityTrack = gbDevice.deviceCoordinator
+                                .getActivityTrackProvider(gbDevice, requireContext())
+                                ?.getActivityTrack(parsedWorkout.summary)
+                            val activityPoints = activityTrack?.allPoints
+                            if (activityTrack != null && !activityPoints.isNullOrEmpty()) {
+                                val intervals = IntervalChartUtils.deriveIntervals(
+                                    activityTrack.segments, activityTrack.segmentInfos
+                                )
+                                IntervalChartUtils.addToSummaryData(requireContext(), parsedWorkout.data, intervals)
+                                val defaultCharts = DefaultWorkoutCharts.buildDefaultCharts(
+                                    requireContext(),
+                                    activityPoints,
+                                    ActivityKind.fromCode(parsedWorkout.summary.activityKind),
+                                    parsedWorkout.data,
+                                    gbDevice
+                                )
+                                return@withContext Workout(parsedWorkout.summary, parsedWorkout.data, defaultCharts, intervals)
                             }
                         } catch (e: Exception) {
                             LOG.error("Failed to build default charts", e)
@@ -210,6 +226,7 @@ class WorkoutDetailsFragment : Fragment(), MenuProvider {
 
                 currentWorkout?.let { workout ->
                     workoutValueFormatter.setActivityKind(ActivityKind.fromCode(workout.summary.activityKind))
+                    updateActionBarTitle()
                     workoutViewModel.setWorkout(workout, workoutId)
                     tabsPagerAdapter.setOptionalTabs(hasCharts(workout), hasLaps(workout))
 

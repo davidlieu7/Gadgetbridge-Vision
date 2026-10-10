@@ -1931,7 +1931,7 @@
     <string name="watchface_widget_type_uv_index">UV sugárzás</string>
     <string name="enable_notifications_summary">Hívás, üzenet és egyéb értesítések</string>
     <string name="watchface_dialog_title_settings">Számlapbeállítások</string>
-    <string name="pref_switch_controls_anc_off">Zajszűrés ←→ Ki</string>
+    <string name="pref_switch_controls_anc_off">Zajszűrés ↔ Ki</string>
     <string name="activity_filter_reset_filter">Szűrők törlése</string>
     <string name="watchface_dialog_title_set_name">Számlap elnevezése</string>
     <string name="watchface_upload_failed">A számlapot nem sikerült feltölteni. Próbálja meg újra.</string>
@@ -1943,7 +1943,7 @@
     <string name="medley">Vegyesúszás</string>
     <string name="pref_summary_canned_messages_set">A következő beállított üzenetek küldése az eszközre</string>
     <string name="pref_summary_canned_messages_dismisscall">Hívások visszautasítása az óráról SMS-üzenettel</string>
-    <string name="pref_switch_controls_anc_ambient_off">Zajszűrés ←→ Környezet ←→ Ki</string>
+    <string name="pref_switch_controls_anc_ambient_off">Zajszűrés ↔ Környezet ↔ Ki</string>
     <string name="backstroke">Hátúszás</string>
     <string name="sony_speak_to_chat_timeout_standard">Alapértelmezett (30 mp)</string>
     <string name="addto_filter">Szűrő hozzáadása</string>
@@ -1967,8 +1967,8 @@
     <string name="prefs_active_noise_cancelling_level">Aktív zajszűrés szintje</string>
     <string name="right_earbud">Jobb oldali fülhallgató</string>
     <string name="pref_title_touch_spotify_official_app">Spotify (csak a hivatalos alkalmazás)</string>
-    <string name="pref_switch_controls_ambient_off">Környezet ←→ Ki</string>
-    <string name="pref_switch_controls_anc_ambient">Zajszűrés ←→ Környezet</string>
+    <string name="pref_switch_controls_ambient_off">Környezet ↔ Ki</string>
+    <string name="pref_switch_controls_anc_ambient">Zajszűrés ↔ Környezet</string>
     <string name="prefs_voice_detect_summary">Környezeti hang engedélyezése és a médialejátszás lehalkítása beszédérzékeléskor</string>
     <string name="sony_speak_to_chat_timeout_long">Hosszú (1 p)</string>
     <string name="sony_speak_to_chat_sensitivity_standard">Alapértelmezett</string>
@@ -4539,4 +4539,7 @@
     <string name="sony_voice_assistant_function">Hangsegéd-funkció</string>
     <string name="sony_voice_assistant_mobile_device">Hangsegéd (hordozható eszköz)</string>
     <string name="sony_service_link">Szolgáltatás hivatkozása</string>
+    <string name="controlcenter_get_spo2_measurement">Véroxigén szint mérés indítása</string>
+    <string name="appmanager_app_store">App áruház</string>
+    <string name="refresh">Frissítés</string>
 </resources>

@@ -45,6 +45,7 @@ import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.http.intercep
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.http.interceptors.ContactsInterceptor;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.http.interceptors.FirewallInterceptor;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.http.interceptors.HttpInterceptor;
+import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.http.interceptors.HydrationInterceptor;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.http.interceptors.ImageServiceInterceptor;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.http.interceptors.OauthInterceptor;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.http.interceptors.WeatherInterceptor;
@@ -62,6 +63,7 @@ public class HttpHandler {
                 new ImageServiceInterceptor(deviceSupport),
                 new ContactsInterceptor(deviceSupport),
                 new OauthInterceptor(deviceSupport),
+                new HydrationInterceptor(deviceSupport),
                 // Should always be the last one
                 new FirewallInterceptor(deviceSupport)
         );

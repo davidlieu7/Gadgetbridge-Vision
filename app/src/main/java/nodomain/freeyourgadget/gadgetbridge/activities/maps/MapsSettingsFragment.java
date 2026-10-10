@@ -21,6 +21,7 @@ import android.content.SharedPreferences;
 import android.net.Uri;
 import android.os.Bundle;
 import android.text.format.DateUtils;
+import android.widget.Toast;
 
 import androidx.activity.result.ActivityResultLauncher;
 import androidx.activity.result.contract.ActivityResultContracts;
@@ -32,18 +33,23 @@ import androidx.preference.PreferenceCategory;
 
 import org.mapsforge.map.reader.MapFile;
 import org.mapsforge.map.reader.header.MapFileInfo;
+import org.mapsforge.map.rendertheme.ZipXmlThemeResourceProvider;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.BufferedInputStream;
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.zip.ZipInputStream;
 
 import nodomain.freeyourgadget.gadgetbridge.R;
 import nodomain.freeyourgadget.gadgetbridge.activities.AbstractPreferenceFragment;
 import nodomain.freeyourgadget.gadgetbridge.util.FormatUtils;
+import nodomain.freeyourgadget.gadgetbridge.util.GB;
 import nodomain.freeyourgadget.gadgetbridge.util.UriUtils;
 import nodomain.freeyourgadget.gadgetbridge.util.maps.MapsManager;
 
@@ -54,6 +60,8 @@ public class MapsSettingsFragment extends AbstractPreferenceFragment {
     public static final String EXTRA_SETTING_KEY = "nodomain.freeyourgadget.gadgetbridge.maps_setting_key";
     private static final String PREF_CATEGORY_MAP_FILES = "pref_category_map_files";
     private static final String PREF_MAP_FILE_PREFIX = "pref_map_file_";
+    private static final String PREF_MAP_THEME_CUSTOM_FILE = "maps_theme_custom_file";
+    private static final String[] THEME_FILE_MIME_TYPES = {"application/zip", "application/x-zip-compressed", "*/*"};
 
     @Override
     public void onCreatePreferences(@Nullable final Bundle savedInstanceState, @Nullable final String rootKey) {
@@ -102,14 +110,90 @@ public class MapsSettingsFragment extends AbstractPreferenceFragment {
         final Preference prefMapTheme = Objects.requireNonNull(findPreference(MapsManager.PREF_MAP_THEME));
         prefMapTheme.setOnPreferenceChangeListener((preference, newValue) -> {
             broadcastPreferenceChange(MapsManager.PREF_MAP_THEME);
+            updateCustomThemeFileVisibility(String.valueOf(newValue));
             return true;
         });
+
+        final Preference prefThemeFile = Objects.requireNonNull(findPreference(PREF_MAP_THEME_CUSTOM_FILE));
+        final ActivityResultLauncher<String[]> themeFileChooser = registerForActivityResult(
+                new ActivityResultContracts.OpenDocument(),
+                fileUri -> {
+                    if (fileUri == null) {
+                        return;
+                    }
+                    final String problem = validateRenderTheme(fileUri);
+                    if (problem != null) {
+                        GB.toast(requireContext().getString(R.string.map_theme_custom_file_invalid, problem), Toast.LENGTH_LONG, GB.ERROR);
+                        return;
+                    }
+                    try {
+                        requireContext().getContentResolver().takePersistableUriPermission(fileUri, Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                    } catch (final SecurityException e) {
+                        LOG.error("Could not persist permission for theme file {}", fileUri, e);
+                        GB.toast(requireContext().getString(R.string.map_theme_custom_file_invalid, e.getMessage()), Toast.LENGTH_LONG, GB.ERROR);
+                        return;
+                    }
+                    prefs.edit()
+                            .putString(MapsManager.PREF_MAP_THEME_CUSTOM_URI, fileUri.toString())
+                            .apply();
+                    prefThemeFile.setSummary(UriUtils.INSTANCE.resolveLocationSummary(requireContext(), fileUri.toString()));
+                    broadcastPreferenceChange(MapsManager.PREF_MAP_THEME);
+                }
+        );
+        final String currentThemeFile = prefs.getString(MapsManager.PREF_MAP_THEME_CUSTOM_URI, "");
+        if (!currentThemeFile.isEmpty()) {
+            prefThemeFile.setSummary(UriUtils.INSTANCE.resolveLocationSummary(requireContext(), currentThemeFile));
+        }
+        prefThemeFile.setOnPreferenceClickListener(preference -> {
+            themeFileChooser.launch(THEME_FILE_MIME_TYPES);
+            return true;
+        });
+        updateCustomThemeFileVisibility(prefs.getString(MapsManager.PREF_MAP_THEME, "default"));
 
         final Preference prefTrackColor = Objects.requireNonNull(findPreference(MapsManager.PREF_TRACK_COLOR));
         prefTrackColor.setOnPreferenceChangeListener((preference, newValue) -> {
             broadcastPreferenceChange(MapsManager.PREF_TRACK_COLOR);
             return true;
         });
+    }
+
+    private void updateCustomThemeFileVisibility(final String themeValue) {
+        final Preference prefThemeFile = findPreference(PREF_MAP_THEME_CUSTOM_FILE);
+        if (prefThemeFile != null) {
+            prefThemeFile.setVisible(MapsManager.MAP_THEME_VALUE_CUSTOM.equals(themeValue));
+        }
+    }
+
+    /**
+     * Checks the picked theme up front, so a broken file gets rejected with a message instead of
+     * showing up later as a blank map.
+     *
+     * @return null if the archive holds a render theme, otherwise the problem
+     */
+    private String validateRenderTheme(final Uri uri) {
+        try (InputStream in = requireContext().getContentResolver().openInputStream(uri)) {
+            if (in == null) {
+                return "the file could not be opened";
+            }
+            final BufferedInputStream buffered = new BufferedInputStream(in);
+            buffered.mark(2);
+            final byte[] magic = new byte[2];
+            final int read = buffered.read(magic);
+            buffered.reset();
+            if (read != 2 || magic[0] != 'P' || magic[1] != 'K') {
+                return "a zip archive with the render theme and its icons is required";
+            }
+
+            final ZipXmlThemeResourceProvider provider = new ZipXmlThemeResourceProvider(new ZipInputStream(buffered));
+            if (provider.getXmlThemes().isEmpty()) {
+                return "the archive contains no rendertheme";
+            }
+            return null;
+        } catch (final IOException e) {
+            return "could not read the archive: " + e.getMessage();
+        } catch (final Exception e) {
+            return e.getMessage() != null ? e.getMessage() : e.getClass().getSimpleName();
+        }
     }
 
     private void refreshMapFiles() {

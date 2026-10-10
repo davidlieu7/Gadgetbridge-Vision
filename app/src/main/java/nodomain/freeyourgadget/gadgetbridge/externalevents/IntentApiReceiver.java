@@ -329,7 +329,7 @@ public class IntentApiReceiver extends BroadcastReceiver {
                 }
                 String option = key.substring(prefix.length());
                 Object extra = extras.get(key);
-                if (!BundleUtils.addToBundle(options, key, extra)) {
+                if (!BundleUtils.addToBundle(options, option, extra)) {
                     LOG.warn("unhandled extra {} {} {}", option, extra, extra.getClass());
                 }
             }

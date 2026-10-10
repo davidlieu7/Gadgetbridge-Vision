@@ -31,6 +31,12 @@ import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEventCameraRemo
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
 
 public interface DeviceCardAction {
+    /**
+     * A stable identifier, used to persist the order of the device card items.
+     */
+    @NonNull
+    String getId();
+
     @DrawableRes
     int getIcon(@NonNull final GBDevice device);
 
@@ -83,6 +89,12 @@ public interface DeviceCardAction {
             this.activityClass = activityClass;
         }
 
+        @NonNull
+        @Override
+        public String getId() {
+            return "activity:" + activityClass.getName();
+        }
+
         @Override
         public int getIcon(@NonNull final GBDevice device) {
             return icon;
@@ -115,6 +127,12 @@ public interface DeviceCardAction {
             this.icon = icon;
             this.description = description;
             this.intentAction = intentAction;
+        }
+
+        @NonNull
+        @Override
+        public String getId() {
+            return "broadcast:" + intentAction;
         }
 
         @Override
@@ -152,6 +170,12 @@ public interface DeviceCardAction {
             this.configKey = configKey;
         }
 
+        @NonNull
+        @Override
+        public String getId() {
+            return "config:" + configKey;
+        }
+
         @Override
         public int getIcon(@NonNull final GBDevice device) {
             return icon;
@@ -172,6 +196,12 @@ public interface DeviceCardAction {
     }
 
     class CameraAction implements DeviceCardAction {
+        @NonNull
+        @Override
+        public String getId() {
+            return "camera";
+        }
+
         @Override
         public int getIcon(@NonNull GBDevice device) {
             return R.drawable.ic_camera_remote;

@@ -21,30 +21,20 @@ import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSett
 import nodomain.freeyourgadget.gadgetbridge.activities.multipoint.MultipointDevice;
 import nodomain.freeyourgadget.gadgetbridge.activities.multipoint.MultipointPairingActivity;
 import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEvent;
+import nodomain.freeyourgadget.gadgetbridge.devices.sony.headphones.prefs.AmbientSoundControlButtonMode;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
-import nodomain.freeyourgadget.gadgetbridge.service.devices.soundcore.SoundcorePacket;
-import nodomain.freeyourgadget.gadgetbridge.service.devices.soundcore.liberty.SoundcoreLibertyProtocol;
+import nodomain.freeyourgadget.gadgetbridge.service.devices.soundcore.protocol.impl.v1.SoundcoreProtocolImplV1;
 import nodomain.freeyourgadget.gadgetbridge.util.GB;
 import nodomain.freeyourgadget.gadgetbridge.util.Prefs;
 import nodomain.freeyourgadget.gadgetbridge.util.StringUtils;
 
-public class SoundcoreSportX20Protocol extends SoundcoreLibertyProtocol {
+public class SoundcoreSportX20Protocol extends SoundcoreProtocolImplV1 {
     private static final Logger LOG = LoggerFactory.getLogger(SoundcoreSportX20Protocol.class);
 
     private static final short CMD_SET_EQUALIZER = (short) 0x8703;
-    private static final short CMD_SET_3D_SURROUND = (short) 0x8602;
     private static final short CMD_SET_DUAL_CONNECTION = (short) 0x840b;
     private static final short CMD_SET_FIT_TEST = (short) 0x0109;
-    // Session handshake sent after CMD_GET_DEVICE_INFO; device ACKs with empty payload
-    private static final short CMD_SESSION_INIT = (short) 0x8105;
-    // Unsolicited notifications from the device on connection
-    private static final short CMD_NOTIFY_PAIRED_DEVICES = (short) 0x010b;
-    private static final short CMD_NOTIFY_CONNECTION_STATUS = (short) 0x020b;
-    private static final short CMD_NOTIFY_DEVICE_STATE = (short) 0x0910;
-    // Connect/disconnect a specific paired device; payload = 6-byte address (little-endian)
-    private static final short CMD_DISCONNECT_DEVICE = (short) 0x810b;
-    private static final short CMD_CONNECT_DEVICE = (short) 0x820b;
-    private static final short CMD_FORGET_DEVICE = (short) 0x830b;
+    private static final int BATTERY_MULTIPLIER = 20;
 
     // Offsets within CMD_GET_DEVICE_INFO payload for the equalizer preset and band values.
     // [38]    = preset ID (0x00–0x15 = named preset, 0xfe = custom)
@@ -121,73 +111,56 @@ public class SoundcoreSportX20Protocol extends SoundcoreLibertyProtocol {
     }
 
     @Override
-    public GBDeviceEvent[] decodeResponse(final byte[] responseData) {
-        final SoundcorePacket packet = decodePacket(responseData);
+    protected GBDeviceEvent[] decodeDeviceInfo(final byte[] payload) {
+        // Sport X20 appends model-specific settings at offsets 38+, while the
+        // common Liberty header still carries battery and version information.
+        decodeControlFunctionsFromDeviceInfo(payload);
+        return decodeStandardEarbudDeviceInfo(payload);
+    }
 
-        if (packet != null && packet.getCommand() == CMD_NOTIFY_AUDIO_MODE) {
-            decodeAdvancedAudioMode(packet.getPayload());
+    @Override
+    protected GBDeviceEvent[] decodeAudioMode(final byte[] payload) {
+        decodeAdvancedAudioMode(payload);
+        return new GBDeviceEvent[0];
+    }
+
+    @Override
+    protected int getBatteryMultiplier() {
+        return BATTERY_MULTIPLIER;
+    }
+
+    @Override
+    protected GBDeviceEvent[] decodePairedDevices(final byte[] payload) {
+        decodePairedDevicesPayload(payload);
+        return new GBDeviceEvent[0];
+    }
+
+    @Override
+    protected GBDeviceEvent[] decodeConnectionStatus(final byte[] payload) {
+        decodeConnectionStatusPayload(payload);
+        return new GBDeviceEvent[0];
+    }
+
+    @Override
+    protected GBDeviceEvent[] decodeDeviceState(final byte[] payload) {
+        LOG.debug("Device state notification, {} bytes", payload.length);
+        return new GBDeviceEvent[0];
+    }
+
+    @Override
+    protected GBDeviceEvent[] decodeCommand(final short command, final byte[] payload) {
+        if (command == CMD_SET_EQUALIZER) {
+            decodeEqualizer(payload);
             return new GBDeviceEvent[0];
         }
-
-        if (packet != null && packet.getCommand() == CMD_SET_EQUALIZER) {
-            decodeEqualizer(packet.getPayload());
-            return new GBDeviceEvent[0];
-        }
-
-        if (packet != null && packet.getCommand() == CMD_GET_DEVICE_INFO) {
-            // Decode button-control functions embedded in the device-info response,
-            // then fall through so the super class handles battery / firmware / serial.
-            decodeControlFunctionsFromDeviceInfo(packet.getPayload());
-        }
-
-        if (packet != null && packet.getCommand() == CMD_SET_FIT_TEST) {
-            final byte[] payload = packet.getPayload();
+        if (command == CMD_SET_FIT_TEST) {
             if (payload.length >= 2) {
                 decodeFitTestResult(payload);
             }
             return new GBDeviceEvent[0];
         }
-
-        if (packet != null && packet.getCommand() == CMD_SESSION_INIT) {
-            // Empty ACK from the device to our session-init request – nothing to do.
-            return new GBDeviceEvent[0];
-        }
-
-        if (packet != null && packet.getCommand() == CMD_NOTIFY_PAIRED_DEVICES) {
-            decodePairedDevices(packet.getPayload());
-            return new GBDeviceEvent[0];
-        }
-
-        if (packet != null && packet.getCommand() == CMD_NOTIFY_CONNECTION_STATUS) {
-            // Active audio source. Payload layout (7 bytes):
-            //   [0]    = active flag: 0x01 = some device is currently playing audio, 0x00 = none
-            //   [1..6] = 6-byte Bluetooth address (little-endian) of the device playing audio,
-            //            all zero when nothing is playing.
-            // The address matches one of the entries reported by CMD_NOTIFY_PAIRED_DEVICES (0x010b),
-            // so it can be used to flag which paired device is the active audio source.
-            // Examples (payload):
-            //   00 00 00 00 00 00 00                -> nothing playing
-            //   01 F1 F2 F3 F4 F5 F6                -> F6:F5:F4:F3:F2:F1 is playing
-            decodeConnectionStatus(packet.getPayload());
-            return new GBDeviceEvent[0];
-        }
-
-        if (packet != null && packet.getCommand() == CMD_NOTIFY_DEVICE_STATE) {
-            LOG.debug("Device state notification, {} bytes", packet.getPayload().length);
-            return new GBDeviceEvent[0];
-        }
-
-        return super.decodeResponse(responseData);
-    }
-
-    /** Requests extended device configuration (firmware details, serial, settings). */
-    byte[] encodeExtendedInfoRequest() {
-        return encodeRequest(CMD_GET_UNKNOWN_DATA_0105);
-    }
-
-    /** Sent after CMD_GET_DEVICE_INFO to finalise the session with the device. */
-    byte[] encodeSessionInitRequest() {
-        return encodeRequest(CMD_SESSION_INIT);
+        LOG.debug("Unknown incoming message - command: {} ({} bytes)", command, payload.length);
+        return new GBDeviceEvent[0];
     }
 
     /**
@@ -225,7 +198,7 @@ public class SoundcoreSportX20Protocol extends SoundcoreLibertyProtocol {
      * [128]  [01] [01] 00 00 ff ff ff ff ff ff ff ff ff ff ff   [127]=tone=0x01, [128]=APO_en, [129]=APO_dur
      * </pre>
      */
-    private void decodeControlFunctionsFromDeviceInfo(final byte[] payload) {
+    protected void decodeControlFunctionsFromDeviceInfo(final byte[] payload) {
         if (payload.length < DEVICE_INFO_MIN_EXPECTED_LENGTH) {
             LOG.warn("CMD_GET_DEVICE_INFO payload too short: {} bytes (expected {})", payload.length, 143);
             return;
@@ -313,7 +286,7 @@ public class SoundcoreSportX20Protocol extends SoundcoreLibertyProtocol {
      *   [8..]    = device name, UTF-8, zero-padded, (entry length - 8) bytes
      * </pre>
      */
-    private void decodePairedDevices(final byte[] payload) {
+    private void decodePairedDevicesPayload(final byte[] payload) {
         if (payload.length < 2) {
             return;
         }
@@ -341,7 +314,7 @@ public class SoundcoreSportX20Protocol extends SoundcoreLibertyProtocol {
         broadcastPairedDevices();
     }
 
-    private void decodeConnectionStatus(final byte[] payload) {
+    private void decodeConnectionStatusPayload(final byte[] payload) {
         if (payload.length != 7 || (payload[0] != 0x00 && payload[0] != 0x01)) {
             LOG.warn("Invalid connection status payload");
             return;
@@ -423,6 +396,8 @@ public class SoundcoreSportX20Protocol extends SoundcoreLibertyProtocol {
         final Intent intent = new Intent(MultipointPairingActivity.ACTION_MULTIPOINT_STATUS_UPDATE);
         intent.putExtra(GBDevice.EXTRA_DEVICE, getDevice());
         intent.putExtra(MultipointPairingActivity.EXTRA_MULTIPOINT_ENABLED, enabled);
+        intent.putExtra(MultipointPairingActivity.EXTRA_MULTIPOINT_DISABLE_SUPPORTED, true);
+        intent.putExtra(MultipointPairingActivity.EXTRA_MULTIPOINT_PAIR_SUPPORTED, true);
         LocalBroadcastManager.getInstance(GBApplication.getContext()).sendBroadcast(intent);
     }
 
@@ -484,6 +459,19 @@ public class SoundcoreSportX20Protocol extends SoundcoreLibertyProtocol {
             case DeviceSettingsPreferenceConst.PREF_SOUNDCORE_CONTROL_LONG_PRESS_ACTION_RIGHT:
                 prefString = prefs.getString(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_CONTROL_LONG_PRESS_ACTION_RIGHT, "AMBIENT_SOUND_CONTROL");
                 return encodeControlFunction(TapAction.LONG_PRESS, true, TapFunction.valueOf(prefString));
+
+            case DeviceSettingsPreferenceConst.PREF_SONY_AMBIENT_SOUND_CONTROL_BUTTON_MODE:
+                switch (AmbientSoundControlButtonMode.fromPreferences(prefs.getPreferences())) {
+                    case NC_AS_OFF:
+                        return encodeControlAmbientMode(true, true, true);
+                    case NC_AS:
+                        return encodeControlAmbientMode(true, true, false);
+                    case NC_OFF:
+                        return encodeControlAmbientMode(true, false, true);
+                    case AS_OFF:
+                        return encodeControlAmbientMode(false, true, true);
+                }
+                return null;
 
             case DeviceSettingsPreferenceConst.PREF_SOUNDCORE_AUTO_POWER_OFF:
                 final int duration = Integer.parseInt(prefs.getString(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_AUTO_POWER_OFF, "3"));

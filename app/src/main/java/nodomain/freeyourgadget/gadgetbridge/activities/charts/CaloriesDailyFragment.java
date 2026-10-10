@@ -20,6 +20,7 @@ import static nodomain.freeyourgadget.gadgetbridge.devices.GenericMetricSamplePr
 import static nodomain.freeyourgadget.gadgetbridge.model.MetricSample.Metric.GENERIC_RESTING_METABOLIC_RATE;
 
 import android.os.Bundle;
+import android.text.format.DateFormat;
 import android.util.TypedValue;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -28,11 +29,10 @@ import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
+import androidx.annotation.Nullable;
 import androidx.core.content.ContextCompat;
 
 import com.github.mikephil.charting.charts.Chart;
-import com.github.mikephil.charting.charts.LineChart;
-import com.github.mikephil.charting.data.Entry;
 
 import org.apache.commons.lang3.EnumUtils;
 import org.slf4j.Logger;
@@ -41,13 +41,20 @@ import org.slf4j.LoggerFactory;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
+import java.util.Collections;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
 
 import nodomain.freeyourgadget.gadgetbridge.GBApplication;
 import nodomain.freeyourgadget.gadgetbridge.R;
+import nodomain.freeyourgadget.gadgetbridge.activities.charts.calories.CaloriesChartData;
+import nodomain.freeyourgadget.gadgetbridge.activities.charts.mpchart.ChartSelection;
+import nodomain.freeyourgadget.gadgetbridge.activities.charts.mpchart.GbChartView;
+import nodomain.freeyourgadget.gadgetbridge.activities.charts.spec.ChartPoint;
 import nodomain.freeyourgadget.gadgetbridge.activities.dashboard.GaugeDrawer;
+import nodomain.freeyourgadget.gadgetbridge.activities.workouts.StatTileData;
+import nodomain.freeyourgadget.gadgetbridge.activities.workouts.StatTileGridUtilKt;
 import nodomain.freeyourgadget.gadgetbridge.database.DBHandler;
 import nodomain.freeyourgadget.gadgetbridge.devices.DefaultRestingMetabolicRateProvider;
 import nodomain.freeyourgadget.gadgetbridge.devices.SampleProvider;
@@ -64,13 +71,8 @@ public class CaloriesDailyFragment extends AbstractChartFragment<CaloriesDailyFr
 
     private ImageView caloriesGauge;
     private TextView dateView;
-    private TextView caloriesResting;
-    private TextView caloriesActive;
-    private TextView metabolicRate;
-    private LinearLayout caloriesActiveWrapper;
-    private TextView caloriesActiveGoal;
-    private LinearLayout caloriesActiveGoalWrapper;
-    private LineChart caloriesChart;
+    private LinearLayout caloriesStatsContainer;
+    private GbChartView caloriesChart;
     protected int CALORIES_GOAL;
     protected int ACTIVE_CALORIES_GOAL;
     public enum GaugeViewMode {
@@ -115,21 +117,15 @@ public class CaloriesDailyFragment extends AbstractChartFragment<CaloriesDailyFr
 
         caloriesGauge = rootView.findViewById(R.id.calories_gauge);
         dateView = rootView.findViewById(R.id.date_view);
-        caloriesResting = rootView.findViewById(R.id.calories_resting);
-        caloriesActive = rootView.findViewById(R.id.calories_active);
-        metabolicRate = rootView.findViewById(R.id.calories_resting_metabolic_rate);
-        caloriesActiveWrapper = rootView.findViewById(R.id.calories_active_wrapper);
-        caloriesActiveGoal = rootView.findViewById(R.id.calories_active_goal);
-        caloriesActiveGoalWrapper = rootView.findViewById(R.id.calories_active_goal_wrapper);
+        caloriesStatsContainer = rootView.findViewById(R.id.calories_stats_container);
         caloriesChart = rootView.findViewById(R.id.calories_daily_chart);
-        setupCaloriesChart();
+        caloriesChart.setZoomable(true);
+        caloriesChart.dismissSelectionOnTapOutside(rootView);
         ActivityUser activityUser = new ActivityUser();
         ACTIVE_CALORIES_GOAL = activityUser.getCaloriesBurntGoal();
 
         refresh();
         if (!supportsActiveCalories()) {
-            caloriesActiveWrapper.setVisibility(View.GONE);
-            caloriesActiveGoalWrapper.setVisibility(View.GONE);
             caloriesChart.setVisibility(View.GONE);
         }
 
@@ -200,7 +196,7 @@ public class CaloriesDailyFragment extends AbstractChartFragment<CaloriesDailyFr
             restingMetabolicRate = (sample == null) ? null : sample.getRestingMetabolicRate();
         }
         if (restingMetabolicRate == null) {
-            return new CaloriesData(0, 0, 0, 0, activeCaloriesData.entries, startTs, formattedDate);
+            return new CaloriesData(0, 0, 0, 0, activeCaloriesData.points, startTs, formattedDate);
         }
         int totalBurnt;
         int activeBurnt = activeCaloriesData.activeCalories;
@@ -215,7 +211,7 @@ public class CaloriesDailyFragment extends AbstractChartFragment<CaloriesDailyFr
         totalBurnt = restingBurnt + activeBurnt;
 
         return new CaloriesData(totalBurnt, activeBurnt, restingBurnt, restingMetabolicRate,
-                activeCaloriesData.entries, startTs, formattedDate);
+                activeCaloriesData.points, startTs, formattedDate);
     }
 
     @Override
@@ -225,10 +221,18 @@ public class CaloriesDailyFragment extends AbstractChartFragment<CaloriesDailyFr
         int totalCalories = activeCalories + restingCalories;
         final String kcal = getString(R.string.calories_unit);
         dateView.setText(data.formattedDate);
-        caloriesActive.setText(String.format(Locale.getDefault(), "%d %s", activeCalories, kcal));
-        metabolicRate.setText(String.format(Locale.getDefault(), "%d %s", data.restingMetabolicRate, kcal));
-        caloriesResting.setText(String.format(Locale.getDefault(), "%d %s", restingCalories, kcal));
-        caloriesActiveGoal.setText(String.format(Locale.getDefault(), "%d %s", ACTIVE_CALORIES_GOAL, kcal));
+
+        final List<StatTileData> stats = new ArrayList<>();
+        if (supportsActiveCalories()) {
+            stats.add(new StatTileData(String.format(Locale.getDefault(), "%d %s", activeCalories, kcal), getString(R.string.active_calories_short)));
+        }
+        stats.add(new StatTileData(String.format(Locale.getDefault(), "%d %s", restingCalories, kcal), getString(R.string.hr_resting)));
+        if (supportsActiveCalories()) {
+            stats.add(new StatTileData(String.format(Locale.getDefault(), "%d %s", ACTIVE_CALORIES_GOAL, kcal), getString(R.string.active_calories_goal)));
+        }
+        stats.add(new StatTileData(String.format(Locale.getDefault(), "%d %s", data.restingMetabolicRate, kcal), getString(R.string.metabolic_rate)));
+        caloriesStatsContainer.removeAllViews();
+        StatTileGridUtilKt.addStatTileGrid(caloriesStatsContainer, requireContext(), stats, 0);
 
         updateCaloriesChart(data);
 
@@ -279,38 +283,43 @@ public class CaloriesDailyFragment extends AbstractChartFragment<CaloriesDailyFr
 
     private void updateCaloriesChart(final CaloriesData data) {
         final int caloriesColor = ContextCompat.getColor(requireContext(), R.color.calories_color);
-        final float yAxisMaximum = Math.max(
-                Math.max(DailyCumulativeLineChartHelper.maxY(data.activeCaloriesEntries), ACTIVE_CALORIES_GOAL),
-                1f
-        ) * 1.1f;
-
-        DailyCumulativeLineChartHelper.setCumulativeData(
-                caloriesChart,
-                data.activeCaloriesEntries,
-                DailyCumulativeLineChartHelper.timeValueFormatter(data.startTs, "HH:mm"),
-                getString(R.string.active_calories),
-                caloriesColor,
-                GBApplication.getTextColor(requireContext()),
-                ACTIVE_CALORIES_GOAL,
-                yAxisMaximum
-        );
+        final String kcal = getString(R.string.calories_unit);
+        final List<ChartPoint> points = data.activeCaloriesPoints;
+        caloriesChart.setSelectionContent(x -> {
+            final String title = DateFormat.getTimeFormat(requireContext()).format(new Date(Math.round(x) * 1000L));
+            double value = 0;
+            for (final ChartPoint point : points) {
+                if (point.getX() == x) {
+                    value = point.getY();
+                }
+            }
+            final String text = String.format(Locale.getDefault(), "%d %s", Math.round(value), kcal);
+            return new ChartSelection(
+                    title,
+                    Collections.singletonList(new ChartSelection.Row(caloriesColor, text)),
+                    title + ". " + getString(R.string.active_calories) + " " + text + "."
+            );
+        });
+        caloriesChart.setSpec(CaloriesChartData.dailySpec(
+                data.startTs, points, ACTIVE_CALORIES_GOAL, caloriesColor, getString(R.string.active_calories)
+        ));
     }
 
     static ActiveCaloriesDailyData createActiveCaloriesDailyData(
             final List<? extends ActivitySample> samples,
             final int startTs
     ) {
-        final List<Entry> lineEntries = new ArrayList<>();
-        lineEntries.add(new Entry(0f, 0f));
+        final List<ChartPoint> points = new ArrayList<>();
+        points.add(new ChartPoint(startTs, 0, null));
 
         int activeCalories = 0;
         for (final ActivitySample sample : samples) {
             if (sample.getActiveCalories() > 0) {
                 activeCalories += sample.getActiveCalories();
             }
-            lineEntries.add(new Entry(sample.getTimestamp() - startTs, activeCalories / 1000));
+            points.add(new ChartPoint(sample.getTimestamp(), activeCalories / 1000, null));
         }
-        return new ActiveCaloriesDailyData(activeCalories / 1000, lineEntries);
+        return new ActiveCaloriesDailyData(activeCalories / 1000, points);
     }
 
     @Override
@@ -321,20 +330,13 @@ public class CaloriesDailyFragment extends AbstractChartFragment<CaloriesDailyFr
     @Override
     protected void setupLegend(Chart<?> chart) {}
 
-    private void setupCaloriesChart() {
-        DailyCumulativeLineChartHelper.setup(
-                caloriesChart,
-                GBApplication.getSecondaryTextColor(requireContext())
-        );
-    }
-
     protected static class ActiveCaloriesDailyData {
         public int activeCalories;
-        public List<Entry> entries;
+        public List<ChartPoint> points;
 
-        protected ActiveCaloriesDailyData(final int activeCalories, final List<Entry> entries) {
+        protected ActiveCaloriesDailyData(final int activeCalories, final List<ChartPoint> points) {
             this.activeCalories = activeCalories;
-            this.entries = entries;
+            this.points = points;
         }
     }
 
@@ -343,7 +345,7 @@ public class CaloriesDailyFragment extends AbstractChartFragment<CaloriesDailyFr
         public int restingBurnt;
         public int totalBurnt;
         public int restingMetabolicRate;
-        public List<Entry> activeCaloriesEntries;
+        public List<ChartPoint> activeCaloriesPoints;
         public int startTs;
         public final String formattedDate;
 
@@ -352,7 +354,7 @@ public class CaloriesDailyFragment extends AbstractChartFragment<CaloriesDailyFr
                 int activeBurnt,
                 int restingBurnt,
                 final int restingMetabolicRate,
-                final List<Entry> activeCaloriesEntries,
+                final List<ChartPoint> activeCaloriesPoints,
                 final int startTs,
                 final String formattedDate
         ) {
@@ -360,9 +362,15 @@ public class CaloriesDailyFragment extends AbstractChartFragment<CaloriesDailyFr
             this.activeBurnt = activeBurnt;
             this.restingBurnt = restingBurnt;
             this.restingMetabolicRate = restingMetabolicRate;
-            this.activeCaloriesEntries = activeCaloriesEntries;
+            this.activeCaloriesPoints = activeCaloriesPoints;
             this.startTs = startTs;
             this.formattedDate = formattedDate;
         }
+    }
+
+    @Nullable
+    @Override
+    public ChartDataRange getAvailableDataRange(final GBDevice device, final DBHandler db) {
+        return ChartDataRange.ofActivitySamples(device.getDeviceCoordinator().getSampleProvider(device, db.getDaoSession()));
     }
 }

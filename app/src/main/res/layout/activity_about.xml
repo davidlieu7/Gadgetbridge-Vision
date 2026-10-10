@@ -34,7 +34,7 @@
                 android:layout_height="wrap_content"
                 android:text="@string/app_name"
                 android:textAppearance="@style/TextAppearance.AppCompat.Large"
-                android:textColor="@color/accent" />
+                android:textColor="?attr/accent_color" />
 
             <LinearLayout
                 android:layout_width="match_parent"
@@ -67,7 +67,7 @@
                 android:layout_height="wrap_content"
                 android:text="@string/about_links"
                 android:textAppearance="@style/TextAppearance.AppCompat.Large"
-                android:textColor="@color/accent" />
+                android:textColor="?attr/accent_color" />
 
             <LinearLayout
                 android:layout_width="match_parent"
@@ -116,7 +116,7 @@
                 android:layout_height="wrap_content"
                 android:text="@string/about_contributors"
                 android:textAppearance="@style/TextAppearance.AppCompat.Large"
-                android:textColor="@color/accent" />
+                android:textColor="?attr/accent_color" />
 
             <LinearLayout
                 android:layout_width="match_parent"
@@ -130,7 +130,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:text="@string/about_core_team_title"
-                    android:textColor="@color/accent" />
+                    android:textColor="?attr/accent_color" />
 
                 <LinearLayout
                     android:layout_width="match_parent"
@@ -160,7 +160,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:text="@string/about_additional_device_support"
-                    android:textColor="@color/accent" />
+                    android:textColor="?attr/accent_color" />
 
                 <LinearLayout
                     android:layout_width="match_parent"
@@ -182,7 +182,7 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:text="@string/about_additional_contributions"
-                    android:textColor="@color/accent" />
+                    android:textColor="?attr/accent_color" />
 
             </LinearLayout>
         </LinearLayout>

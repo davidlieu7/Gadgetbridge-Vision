@@ -13,6 +13,8 @@ import android.view.SurfaceHolder;
 import android.view.SurfaceView;
 import android.view.View;
 
+import com.google.android.material.color.MaterialColors;
+
 import nodomain.freeyourgadget.gadgetbridge.GBApplication;
 import nodomain.freeyourgadget.gadgetbridge.R;
 
@@ -73,7 +75,7 @@ public class JoystickView extends SurfaceView implements SurfaceHolder.Callback,
             myCanvas.drawCircle(newX - cos * hypotenuse * (ratio / baseRadius) * 30,
                     newY - sin * hypotenuse * (ratio / baseRadius) * 30, 100, colors);
 
-            colors.setColor(this.getResources().getColor(R.color.accent));
+            colors.setColor(MaterialColors.getColor(this, R.attr.accent_color));
             myCanvas.drawCircle(newX, newY, hatRadius, colors);
 
             getHolder().unlockCanvasAndPost(myCanvas);

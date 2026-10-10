@@ -204,6 +204,25 @@ public class WorkoutValueFormatter {
         return formatValue(rawValue, unit, true);
     }
 
+    /**
+     * Formats a value for a stat tile, which always shows a label next to it. Plain counts
+     * (steps, strokes...) skip the unit, since it would only repeat that label.
+     */
+    public String formatTileValue(final Object rawValue, final String unit) {
+        return formatValue(rawValue, unit, !isCountUnit(unit));
+    }
+
+    private static boolean isCountUnit(final String unit) {
+        return switch (unit) {
+            case ActivitySummaryEntries.UNIT_STEPS,
+                 ActivitySummaryEntries.UNIT_STROKES,
+                 ActivitySummaryEntries.UNIT_JUMPS,
+                 ActivitySummaryEntries.UNIT_REPS,
+                 ActivitySummaryEntries.UNIT_REVS -> true;
+            default -> false;
+        };
+    }
+
     /** A value converted to its display unit: the numeric value plus the display unit token. */
     public static final class Converted {
         public final double value;
@@ -377,6 +396,16 @@ public class WorkoutValueFormatter {
         } else {
             return context.getString(resId);
         }
+    }
+
+    /**
+     * The label a value with this unit is shown with, e.g. "min/mi" for a pace when imperial units
+     * are on, or the stored unit as is when raw data is shown. For units whose conversion doesn't
+     * depend on the value (pace, heart rate...), which is what a table header needs.
+     */
+    public String getDisplayUnitLabel(@NonNull final String unit) {
+        final String displayUnit = show_raw_data ? unit : convert(0d, unit, false).unit;
+        return getUnitString(displayUnit);
     }
 
     public static String getUnitString(@NonNull final Context context, @Nullable String unit) {

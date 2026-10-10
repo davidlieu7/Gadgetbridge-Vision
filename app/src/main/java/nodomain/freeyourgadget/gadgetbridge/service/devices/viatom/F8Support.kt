@@ -22,6 +22,7 @@ import nodomain.freeyourgadget.gadgetbridge.service.btle.profiles.deviceinfo.Dev
 import nodomain.freeyourgadget.gadgetbridge.service.btle.profiles.deviceinfo.DeviceInfoProfile
 import nodomain.freeyourgadget.gadgetbridge.service.devices.viatom.UserData.Sex
 import nodomain.freeyourgadget.gadgetbridge.util.GB
+import nodomain.freeyourgadget.gadgetbridge.util.kotlin.getParcelableCompat
 import nodomain.freeyourgadget.gadgetbridge.util.kotlin.withTransaction
 import org.jetbrains.annotations.TestOnly
 import org.slf4j.Logger
@@ -80,7 +81,7 @@ open class F8Support : AbstractBTLESingleDeviceSupport(LOG) {
             intent?.action?.let { action ->
                 when (action) {
                     DeviceInfoProfile.ACTION_DEVICE_INFO -> {
-                        handleDeviceInfo(intent.getParcelableExtra(DeviceInfoProfile.EXTRA_DEVICE_INFO)!!)
+                        handleDeviceInfo(intent.getParcelableCompat<DeviceInfo>(DeviceInfoProfile.EXTRA_DEVICE_INFO)!!)
                     }
                 }
             }

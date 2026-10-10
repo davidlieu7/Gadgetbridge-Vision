@@ -21,7 +21,7 @@ import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.baseTypes
 
 public class FieldDefinitionTemperature extends FieldDefinition {
 
-    public FieldDefinitionTemperature(int localNumber, int size, BaseType baseType, String name, int scale, int offset) {
+    public FieldDefinitionTemperature(int localNumber, int size, BaseType baseType, String name, double scale, int offset) {
         // Don't hardcode the fake Kelvin to Celsius transformation (-273 instead of -273.15) for
         // all temperature fields. Only do the transformation where it is actually needed
         // (e.g. FitWeather.Builder) to limit the 0.15/0.85 error.

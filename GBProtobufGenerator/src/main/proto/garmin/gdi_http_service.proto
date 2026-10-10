@@ -71,6 +71,7 @@ message HttpService {
 
   message RawRequest {
     required string url = 1;
+    optional uint32 maxResponseLength = 2;
     optional Method method = 3;
     optional string body = 4;
     repeated Header header = 5;

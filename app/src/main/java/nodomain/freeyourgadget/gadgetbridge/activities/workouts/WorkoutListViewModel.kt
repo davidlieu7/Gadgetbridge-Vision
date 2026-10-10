@@ -15,6 +15,7 @@ import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice
 import nodomain.freeyourgadget.gadgetbridge.model.ActivitySummaryEntries
 import nodomain.freeyourgadget.gadgetbridge.model.ActivitySummaryJsonSummary
 import nodomain.freeyourgadget.gadgetbridge.model.ActivitySummaryParser
+import nodomain.freeyourgadget.gadgetbridge.util.healthconnect.HealthConnectWorkoutSync
 import org.slf4j.LoggerFactory
 import java.util.Date
 
@@ -39,6 +40,11 @@ class WorkoutListViewModel : ViewModel() {
 
     /** Upload state per summary id, for the indicator on each row of the list. */
     val uploadStatuses: LiveData<Map<Long, WorkoutUploadStatus>> = _uploadStatuses
+
+    private val _healthConnectFailures = MutableLiveData<Set<Long>>(emptySet())
+
+    /** Ids of the summaries whose Health Connect sync failed, for the indicator on each row of the list. */
+    val healthConnectFailures: LiveData<Set<Long>> = _healthConnectFailures
 
     fun loadSummaries(
         gbDevice: GBDevice,
@@ -76,6 +82,9 @@ class WorkoutListViewModel : ViewModel() {
 
                 _uploadStatuses.value = withContext(Dispatchers.IO) {
                     resolveUploadStatuses(summaries)
+                }
+                _healthConnectFailures.value = withContext(Dispatchers.IO) {
+                    HealthConnectWorkoutSync.failedIn(summaries)
                 }
 
                 val allSummaries: MutableList<BaseActivitySummary> = mutableListOf()

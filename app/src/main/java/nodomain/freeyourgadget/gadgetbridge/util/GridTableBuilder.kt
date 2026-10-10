@@ -30,6 +30,7 @@ import nodomain.freeyourgadget.gadgetbridge.activities.workouts.entries.Activity
 import nodomain.freeyourgadget.gadgetbridge.activities.workouts.entries.ActivitySummaryProgressEntry
 import nodomain.freeyourgadget.gadgetbridge.activities.workouts.entries.ActivitySummarySimpleEntry
 import nodomain.freeyourgadget.gadgetbridge.activities.workouts.entries.ActivitySummaryTableRowEntry
+import nodomain.freeyourgadget.gadgetbridge.activities.workouts.entries.TableSpec
 
 class GridTableBuilder @JvmOverloads constructor(
     private val context: Context,
@@ -37,6 +38,16 @@ class GridTableBuilder @JvmOverloads constructor(
 ) {
     private var cellNumber = 0
     private val columnSpans = mutableListOf<Int>()
+
+    // Parallel to the grid's children: table rows draw their own rules, so they get no gray gaps.
+    private val tableRowFlags = mutableListOf<Boolean>()
+
+    // Rows of the table being collected. They are drawn together once it is complete, because
+    // the column layout depends on all of its rows.
+    private val pendingTable = mutableListOf<PendingTableRow>()
+
+    private class PendingTableRow(val entry: ActivitySummaryTableRowEntry, val layout: LinearLayout)
+
     private val gridLayout = GridLayout(context).apply {
         setBackgroundColor(ContextCompat.getColor(context, R.color.gauge_line_color))
         columnCount = 2
@@ -49,26 +60,51 @@ class GridTableBuilder @JvmOverloads constructor(
     fun addEntry(key: String, entry: ActivitySummaryEntry?) {
         val entry = entry ?: ActivitySummarySimpleEntry.EMPTY
 
+        // Anything but a table row ends the current table, and a header starts a new one.
+        val tableRow = entry as? ActivitySummaryTableRowEntry
+        if (tableRow == null || tableRow.isHeader) {
+            flushTable()
+        }
+
         val columnSpan = entry.columnSpan
         if (columnSpan == 2 && cellNumber % 2 != 0) {
             cellNumber++
         }
 
         val compact = entry is ActivitySummaryTableRowEntry || entry is ActivitySummaryProgressEntry
-        val linearLayout = generateLinearLayout(cellNumber, columnSpan, compact)
-        entry.populate(key, linearLayout, workoutValueFormatter)
+        val linearLayout = generateLinearLayout(cellNumber, columnSpan, compact, tableRow != null)
+        if (tableRow != null) {
+            pendingTable.add(PendingTableRow(tableRow, linearLayout))
+        } else {
+            entry.populate(key, linearLayout, workoutValueFormatter)
+        }
         gridLayout.addView(linearLayout)
         columnSpans.add(columnSpan)
+        tableRowFlags.add(tableRow != null)
         cellNumber += columnSpan
     }
 
+    private fun flushTable() {
+        if (pendingTable.isEmpty()) {
+            return
+        }
+        val spec = TableSpec.from(pendingTable.map { it.entry })
+        pendingTable.forEachIndexed { index, row ->
+            row.entry.populate(row.layout, workoutValueFormatter, spec, index == pendingTable.lastIndex)
+        }
+        pendingTable.clear()
+    }
+
     fun build(): GridLayout {
+        flushTable()
+
         if (gridLayout.isNotEmpty() && cellNumber % 2 != 0) {
             // When in an odd number of cells, add an empty one to prevent a gray hole from showing up
             val emptyLayout = generateLinearLayout(cellNumber, 1)
             ActivitySummarySimpleEntry("", "string").populate("", emptyLayout, workoutValueFormatter)
             gridLayout.addView(emptyLayout)
             columnSpans.add(1)
+            tableRowFlags.add(false)
         }
 
         // Then, adjust the bottom margin for the last row
@@ -77,7 +113,10 @@ class GridTableBuilder @JvmOverloads constructor(
             for (i in gridLayout.childCount - 1 downTo 0) {
                 val layoutParams = gridLayout.getChildAt(i).layoutParams
                 if (layoutParams is GridLayout.LayoutParams) {
-                    layoutParams.bottomMargin = dpToPx(2)
+                    // A table's last row has no gray strip under it, it ends on its own rules.
+                    if (!tableRowFlags[i]) {
+                        layoutParams.bottomMargin = dpToPx(2)
+                    }
                     adjustedColumns += columnSpans[i]
 
                     if (adjustedColumns >= gridLayout.columnCount) {
@@ -90,7 +129,7 @@ class GridTableBuilder @JvmOverloads constructor(
         return gridLayout
     }
 
-    private fun generateLinearLayout(i: Int, columnSize: Int, compact: Boolean = false): LinearLayout {
+    private fun generateLinearLayout(i: Int, columnSize: Int, compact: Boolean = false, tableRow: Boolean = false): LinearLayout {
         return LinearLayout(context).apply {
             val layoutParams = GridLayout.LayoutParams(
                 GridLayout.spec(GridLayout.UNDEFINED, GridLayout.FILL, 1f),
@@ -103,7 +142,12 @@ class GridTableBuilder @JvmOverloads constructor(
             // Table rows (laps, intervals, sets) and zone progress bars pack many rows on
             // screen, so give them less room than a regular key/value summary cell.
             val verticalPadding = if (compact) 8 else 15
-            setPadding(dpToPx(15), dpToPx(verticalPadding), dpToPx(15), dpToPx(verticalPadding))
+            // Table rows do their own padding and draw their own rules, inset from the edges.
+            if (tableRow) {
+                setPadding(0, 0, 0, 0)
+            } else {
+                setPadding(dpToPx(15), dpToPx(verticalPadding), dpToPx(15), dpToPx(verticalPadding))
+            }
             setBackgroundColor(GBApplication.getWindowBackgroundColor(context))
 
             // A full-width (2-column-span) cell has no adjacent column, so it gets no side border.
@@ -112,7 +156,11 @@ class GridTableBuilder @JvmOverloads constructor(
             val marginTop = 2
             val marginBottom = 0 // will be changed to 2 for the last row
 
-            layoutParams.setMargins(dpToPx(marginLeft), dpToPx(marginTop), dpToPx(marginRight), dpToPx(marginBottom))
+            if (tableRow) {
+                layoutParams.setMargins(0, 0, 0, 0)
+            } else {
+                layoutParams.setMargins(dpToPx(marginLeft), dpToPx(marginTop), dpToPx(marginRight), dpToPx(marginBottom))
+            }
         }
     }
 

@@ -28,7 +28,7 @@
         android:maxLines="2"
         android:scrollHorizontally="false"
         android:textAllCaps="true"
-        android:textColor="@color/accent"
+        android:textColor="?attr/summary_tile_label"
         android:textStyle="bold" />
 
     <TextView

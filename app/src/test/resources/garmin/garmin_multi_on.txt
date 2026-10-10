@@ -1,6 +1,6 @@
 [FitFileId{type=WORKOUTS, manufacturer=1, product=65534, serial_number=1, number=1},
 FitFileCreator{software_version=1},
-FitWorkout{sport=18, capabilities=32, num_valid_steps=6, name=garmin_multi_on, sub_sport=0, num_sessions=3, transitions=1, message_index=0},
+FitWorkout{sport=18, capabilities=32, num_valid_steps=6, wkt_name=garmin_multi_on, sub_sport=0, num_sessions=3, transitions=true, message_index=0},
 FitWorkoutSession{sport=1, sub_sport=0, num_valid_steps=2, first_step_index=0, message_index=0},
 FitWorkoutSession{sport=2, sub_sport=0, num_valid_steps=2, first_step_index=2, message_index=1},
 FitWorkoutSession{sport=5, sub_sport=17, num_valid_steps=2, first_step_index=4, pool_length=25.0, pool_length_unit=0, message_index=2},

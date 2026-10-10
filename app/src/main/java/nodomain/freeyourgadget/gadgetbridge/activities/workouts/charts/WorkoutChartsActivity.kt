@@ -8,29 +8,16 @@ import android.view.Menu
 import android.view.MenuInflater
 import android.view.MenuItem
 import android.widget.Toast
-import androidx.core.content.ContextCompat
 import androidx.core.view.MenuProvider
 import androidx.core.view.children
-import com.github.mikephil.charting.components.LegendEntry
-import com.github.mikephil.charting.components.XAxis
-import com.github.mikephil.charting.components.YAxis
-import com.github.mikephil.charting.data.CombinedData
-import com.github.mikephil.charting.data.Entry
-import com.github.mikephil.charting.data.LineData
-import com.github.mikephil.charting.data.LineDataSet
-import com.github.mikephil.charting.data.LineScatterCandleRadarDataSet
-import com.github.mikephil.charting.data.ScatterData
-import com.github.mikephil.charting.data.ScatterDataSet
-import com.github.mikephil.charting.formatter.DefaultAxisValueFormatter
-import com.github.mikephil.charting.formatter.ValueFormatter
 import com.google.android.material.chip.Chip
 import com.google.android.material.chip.ChipGroup
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import nodomain.freeyourgadget.gadgetbridge.GBApplication
 import nodomain.freeyourgadget.gadgetbridge.R
 import nodomain.freeyourgadget.gadgetbridge.activities.AbstractGBActivity
-import nodomain.freeyourgadget.gadgetbridge.activities.charts.DurationXLabelFormatter
-import nodomain.freeyourgadget.gadgetbridge.activities.charts.marker.ValueMarker
+import nodomain.freeyourgadget.gadgetbridge.activities.charts.IntervalChartUtils
+import nodomain.freeyourgadget.gadgetbridge.activities.charts.mpchart.ChartLegendView
 import nodomain.freeyourgadget.gadgetbridge.databinding.WorkoutChartsBinding
 import nodomain.freeyourgadget.gadgetbridge.model.workout.WorkoutChart
 
@@ -40,6 +27,9 @@ class WorkoutChartsActivity : AbstractGBActivity(), MenuProvider {
     private lateinit var binding: WorkoutChartsBinding
     private var chartData: List<WorkoutChart>? = null
     val selectedCharts = mutableListOf<Any>()
+
+    private var showHrZones = false
+    private var showIntervals = false
 
     private var menu: Menu? = null
 
@@ -57,34 +47,13 @@ class WorkoutChartsActivity : AbstractGBActivity(), MenuProvider {
             return
         }
 
-        val chartTextColor = GBApplication.getSecondaryTextColor(context)
-        binding.workoutDataChart.xAxis.apply {
-            setDrawLabels(true)
-            setDrawGridLines(false)
-            setDrawLimitLinesBehindData(true)
-            isEnabled = true
-            textColor = chartTextColor
-            position = XAxis.XAxisPosition.BOTTOM
-            valueFormatter = DurationXLabelFormatter()
-        }
-        binding.workoutDataChart.axisLeft.apply {
-            setDrawGridLines(false)
-            setDrawTopYLabelEntry(true)
-            textColor = chartTextColor
-            isEnabled = true
-        }
-        binding.workoutDataChart.axisRight.apply {
-            setDrawGridLines(false)
-            setDrawTopYLabelEntry(true)
-            textColor = chartTextColor
-            isEnabled = true
-        }
-        binding.workoutDataChart.description.isEnabled = false
-        binding.workoutDataChart.legend.textColor = GBApplication.getTextColor(context)
+        binding.workoutDataChart.zoomable = true
+        binding.workoutDataChart.dismissSelectionOnTapOutside(binding.root)
 
         val initChartId = intent.getStringExtra(INIT_CHART_ID) ?: "none"
         selectedCharts.add(0, initChartId)
         setupChipGroup(binding.workoutDataChartChipGroup, initChartId)
+        setupOverlayChips(binding.workoutDataChartOverlayChipGroup)
         refreshChart()
     }
 
@@ -95,7 +64,7 @@ class WorkoutChartsActivity : AbstractGBActivity(), MenuProvider {
 
     fun setupChipGroup(chipGroup: ChipGroup, initChartId: String) {
         for (chart in chartData!!) {
-            val chip = Chip(this).apply {
+            val chip = (layoutInflater.inflate(R.layout.layout_chart_chip, chipGroup, false) as Chip).apply {
                 text = chart.title
                 isCheckable = true
                 isClickable = true
@@ -136,62 +105,48 @@ class WorkoutChartsActivity : AbstractGBActivity(), MenuProvider {
         chip?.isChecked = checked
     }
 
-    fun refreshChart() {
-        val combinedData = CombinedData()
-        val lineData = LineData()
-        val scatterData = ScatterData()
-        // Keyed by dataset label rather than position: a metric split into several
-        // segments contributes multiple datasets that all share one label.
-        val markerFormatters = mutableMapOf<String, ValueFormatter?>()
-        val markerUnits = mutableMapOf<String, String?>()
-        val legendEntries = mutableListOf<LegendEntry>()
-        var leftY = true
-        selectedCharts.forEach { selectedChart ->
-            val workoutChart = chartData?.find { it.id == selectedChart } ?: return@forEach
-            val axisDependency = if (leftY) YAxis.AxisDependency.LEFT else YAxis.AxisDependency.RIGHT
-            var legendAdded = false
-            workoutChart.chartData.dataSets.forEach { rawDataSet ->
-                val dataSet = rawDataSet as? LineScatterCandleRadarDataSet<Entry> ?: return@forEach
-                dataSet.highLightColor = ContextCompat.getColor(context, R.color.chart_highline_dolor)
-                dataSet.highlightLineWidth = 1f
-                dataSet.axisDependency = axisDependency
-                when (dataSet) {
-                    is LineDataSet -> lineData.addDataSet(dataSet)
-                    is ScatterDataSet -> scatterData.addDataSet(dataSet)
-                    else -> return@forEach
-                }
-                markerFormatters[dataSet.label] = workoutChart.chartYLabelFormatter
-                markerUnits[dataSet.label] = workoutChart.unitString
-                if (!legendAdded) {
-                    legendEntries.add(
-                        LegendEntry(
-                            dataSet.label,
-                            dataSet.form,
-                            dataSet.formSize,
-                            dataSet.formLineWidth,
-                            dataSet.formLineDashEffect,
-                            dataSet.color
-                        )
-                    )
-                    legendAdded = true
-                }
+    private fun setupOverlayChips(group: ChipGroup) {
+        // HR-zone bands: only offered when an HR chart with resolved thresholds is present.
+        val hrChart = chartData?.find { it.id == HR_CHART_ID }
+        if (hrChart?.zoneThresholds != null) {
+            val chip = Chip(this).apply {
+                text = context.getString(R.string.HeartRateZones)
+                isCheckable = true
+                isClickable = true
+                isChecked = false
             }
-            val axis = if (leftY) binding.workoutDataChart.axisLeft else binding.workoutDataChart.axisRight
-            axis.valueFormatter = workoutChart.chartYLabelFormatter ?: DefaultAxisValueFormatter(0)
-            leftY = false
+            chip.setOnCheckedChangeListener { _, isChecked ->
+                showHrZones = isChecked
+                refreshChart()
+            }
+            group.addView(chip)
         }
-        if (selectedCharts.size == 1) {
-            val selectedChartId = selectedCharts.first()
-            val workoutChart = chartData?.find { it.id == selectedChartId } ?: return
-            binding.workoutDataChart.axisRight.valueFormatter = workoutChart.chartYLabelFormatter ?: DefaultAxisValueFormatter(0)
+        // Interval splits: only offered when the workout actually has distinct interval phases.
+        if (IntervalChartUtils.hasIntervalPhases(ChartDataRepository.intervals)) {
+            val chip = Chip(this).apply {
+                text = context.getString(R.string.workout_intervals)
+                isCheckable = true
+                isClickable = true
+                isChecked = false
+            }
+            chip.setOnCheckedChangeListener { _, isChecked ->
+                showIntervals = isChecked
+                refreshChart()
+            }
+            group.addView(chip)
         }
-        binding.workoutDataChart.legend.setCustom(legendEntries)
-        combinedData.setData(lineData)
-        combinedData.setData(scatterData)
-        binding.workoutDataChart.data = combinedData
-        binding.workoutDataChart.marker = ValueMarker(this, combinedData, markerFormatters, markerUnits)
-        binding.workoutDataChart.highlightValues(null)
-        binding.workoutDataChart.invalidate()
+    }
+
+    fun refreshChart() {
+        val charts = selectedCharts.mapNotNull { id -> chartData?.find { it.id == id } }
+        if (charts.isEmpty()) return
+        val chart = binding.workoutDataChart
+        val intervals = ChartDataRepository.intervals.takeIf { showIntervals }
+        chart.selectionContent = WorkoutChartSpecs.selection(this, charts, intervals)
+        chart.setSpec(WorkoutChartSpecs.spec(this, charts, showHrZones, intervals))
+        binding.workoutDataChartLegend.setSeries(
+            if (charts.size > 1) charts.map { ChartLegendView.lineItem(it.title, WorkoutChartSpecs.colorOf(it)) } else emptyList()
+        )
     }
 
     override fun onCreateMenu(menu: Menu, menuInflater: MenuInflater) {
@@ -275,5 +230,6 @@ class WorkoutChartsActivity : AbstractGBActivity(), MenuProvider {
     companion object {
         const val INIT_CHART_ID = "INIT_CHART_ID"
         const val EXTRA_TITLE = "EXTRA_TITLE"
+        private const val HR_CHART_ID = "heart_rate"
     }
 }

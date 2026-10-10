@@ -1,18 +1,12 @@
 package nodomain.freeyourgadget.gadgetbridge.service.devices.soundcore.liberty;
 
-import static nodomain.freeyourgadget.gadgetbridge.util.GB.hexdump;
-
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
-import java.util.ArrayList;
-import java.util.List;
 
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsPreferenceConst;
 import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEvent;
 import nodomain.freeyourgadget.gadgetbridge.devices.sony.headphones.prefs.AmbientSoundControlButtonMode;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
-import nodomain.freeyourgadget.gadgetbridge.service.devices.soundcore.SoundcorePacket;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.soundcore.protocol.impl.v1.SoundcoreProtocolImplV1;
 import nodomain.freeyourgadget.gadgetbridge.util.Prefs;
 
@@ -22,64 +16,50 @@ public class SoundcoreLibertyProtocol extends SoundcoreProtocolImplV1 {
 
     private static final short CMD_GET_UNKNOWN_DATA_8D01 = (short) 0x8d01;
     private static final short CMD_GET_UNKNOWN_DATA_8205 = (short) 0x8205;
-    private static final short CMD_SET_AMBIENT_SOUND_CONTROL_BUTTON_MODE = (short) 0x8206;
-    private static final short CMD_SET_TOUCH_LOCK = (short) 0x8304;
     private static final short CMD_SET_WEARING_DETECTION = (short) 0x8101;
     private static final short CMD_SET_WEARING_TONE = (short) 0x8c01;
-
-    private static final int battery_case = 0;
-    private static final int battery_earphone_left = 1;
-    private static final int battery_earphone_right = 2;
+    private static final int BATTERY_MULTIPLIER = 20;
 
     protected SoundcoreLibertyProtocol(GBDevice device) {
         super(device);
     }
 
     @Override
-    public GBDeviceEvent[] decodeResponse(byte[] responseData) {
-        SoundcorePacket packet = decodePacket(responseData);
-
-        if (packet == null)
-            return null;
-
-        List<GBDeviceEvent> devEvts = new ArrayList<>();
-        short cmd = packet.getCommand();
-        byte[] payload = packet.getPayload();
-
-        if (cmd == CMD_GET_DEVICE_INFO) {
-            int batteryLeft = payload[2] * 20;
-            int batteryRight = payload[3] * 20;
-
-            String firmware1 = readString(payload, 6, 5);
-            String firmware2 = readString(payload, 11, 5);
-            String serialNumber = readString(payload, 16, 16);
-
-            // todo: Initializing Battery for battery_case not implemented
-            devEvts.add(buildBatteryInfo(battery_earphone_left, batteryLeft));
-            devEvts.add(buildBatteryInfo(battery_earphone_right, batteryRight));
-            devEvts.add(buildVersionInfo(firmware1, firmware2, serialNumber));
-        } else if (cmd == CMD_GET_UNKNOWN_DATA_8D01) {
-            LOG.debug("Unknown incoming message - command: " + cmd + ", dump: " + hexdump(responseData));
-        } else if (cmd == CMD_GET_UNKNOWN_DATA_8205) {
-            LOG.debug("Unknown incoming message - command: " + cmd + ", dump: " + hexdump(responseData));
-        } else if (cmd == CMD_GET_UNKNOWN_DATA_0105) {
-            LOG.debug("Unknown incoming message - command: " + cmd + ", dump: " + hexdump(responseData));
-        } else if (cmd == CMD_NOTIFY_AUDIO_MODE) {
-            decodeAdvancedAudioMode(payload);
-        } else if (cmd == CMD_NOTIFY_BATTERY_INFO) {
-            int batteryLeft = payload[0] * 20;
-            int batteryRight = payload[1] * 20;
-            int batteryCase = payload[2] * 20;
-
-            devEvts.add(buildBatteryInfo(battery_case, batteryCase));
-            devEvts.add(buildBatteryInfo(battery_earphone_left, batteryLeft));
-            devEvts.add(buildBatteryInfo(battery_earphone_right, batteryRight));
-        } else {
-            // see https://github.com/gmallios/SoundcoreManager/blob/master/soundcore-lib/src/models/packet_kind.rs
-            // for a mapping for other soundcore devices (similar protocol?)
-            LOG.debug("Unknown incoming message - command: " + cmd + ", dump: " + hexdump(responseData));
+    protected GBDeviceEvent[] decodeDeviceInfo(final byte[] payload) {
+        if (payload.length < 32) {
+            LOG.warn("CMD_GET_DEVICE_INFO payload too short: {} bytes", payload.length);
+            return new GBDeviceEvent[0];
         }
-        return devEvts.toArray(new GBDeviceEvent[devEvts.size()]);
+
+        return decodeStandardEarbudDeviceInfo(payload);
+    }
+
+    @Override
+    protected GBDeviceEvent[] decodeAudioMode(final byte[] payload) {
+        decodeAdvancedAudioMode(payload);
+        return new GBDeviceEvent[0];
+    }
+
+    @Override
+    protected int getBatteryMultiplier() {
+        return BATTERY_MULTIPLIER;
+    }
+
+    @Override
+    protected GBDeviceEvent[] decodeExtendedInfo(final byte[] payload) {
+        LOG.debug("Unknown incoming extended information, {} bytes", payload.length);
+        return new GBDeviceEvent[0];
+    }
+
+    @Override
+    protected GBDeviceEvent[] decodeCommand(final short command, final byte[] payload) {
+        if (command == CMD_GET_UNKNOWN_DATA_8D01 || command == CMD_GET_UNKNOWN_DATA_8205) {
+            LOG.debug("Unknown incoming message - command: {} ({} bytes)", command, payload.length);
+            return new GBDeviceEvent[0];
+        }
+
+        LOG.debug("Unknown incoming message - command: {} ({} bytes)", command, payload.length);
+        return new GBDeviceEvent[0];
     }
 
     @Override
@@ -166,7 +146,7 @@ public class SoundcoreLibertyProtocol extends SoundcoreProtocolImplV1 {
         return encodeCommand(CMD_GET_UNKNOWN_DATA_8D01, payload);
     }
     byte[] encodeMysteryDataRequest2() {
-        return encodeRequest(CMD_GET_UNKNOWN_DATA_0105);
+        return encodeRequest(CMD_GET_EXTENDED_INFO);
     }
     byte[] encodeMysteryDataRequest3() {
         byte[] payload = new byte[]{0x00};
@@ -225,16 +205,6 @@ public class SoundcoreLibertyProtocol extends SoundcoreProtocolImplV1 {
                 return null;
         }
         return encodeControlFunction(right, action.getCode(), function_byte);
-    }
-
-    /**
-     * Encodes between which Audio Modes a tap should switch, if it is set to switch the Audio Mode.
-     * Zb ANC -> -> Transparency -> Normal -> ANC -> ....
-     */
-    private byte[] encodeControlAmbientMode(boolean anc, boolean transparency, boolean normal) {
-        // Original app does not allow only one true flag. Unsure if Earbuds accept this state.
-        byte ambientModes = (byte) (4 * (normal?1:0) + 2 * (transparency?1:0) + (anc?1:0));
-        return encodeCommand(CMD_SET_AMBIENT_SOUND_CONTROL_BUTTON_MODE, new byte[] {ambientModes});
     }
 
 }

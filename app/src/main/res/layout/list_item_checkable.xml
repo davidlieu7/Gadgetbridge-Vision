@@ -23,6 +23,6 @@
         android:layout_centerVertical="true"
         android:contentDescription="@string/drag_handle"
         app:srcCompat="@drawable/ic_drag_handle"
-        app:tint="@color/secondarytext" />
+        app:tint="?attr/textColorSecondary" />
 
 </com.mobeta.android.dslv.CheckableLinearLayout>

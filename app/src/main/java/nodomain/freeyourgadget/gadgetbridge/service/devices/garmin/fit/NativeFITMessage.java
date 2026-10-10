@@ -24,6 +24,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.slf4j.event.Level;
 
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -95,13 +96,13 @@ public class NativeFITMessage {
         return subset;
     }
 
-    FieldDefinition getFieldDefinition(final String name, final int count) {
+    FieldDefinition getFieldDefinition(final String name, final Object[] value) {
         for (FieldDefinitionPrimitive fieldDefinitionPrimitive :
                 fieldDefinitionPrimitives) {
             if (name.equals(fieldDefinitionPrimitive.name)) {
                 return FieldDefinitionFactory.create(
                         fieldDefinitionPrimitive.number,
-                        fieldDefinitionPrimitive.size * count,
+                        fieldSize(fieldDefinitionPrimitive, value),
                         fieldDefinitionPrimitive.type,
                         fieldDefinitionPrimitive.baseType,
                         fieldDefinitionPrimitive.name,
@@ -112,6 +113,20 @@ public class NativeFITMessage {
         }
 
         throw new IllegalArgumentException("Unknown field name " + name);
+    }
+
+    /**
+     * The size of a field that holds {@code value}. A string field with no declared size is as long
+     * as the UTF-8 bytes of the string and the null terminator, up to 255 bytes.
+     */
+    private static int fieldSize(final FieldDefinitionPrimitive fieldDefinitionPrimitive, final Object[] value) {
+        final boolean undeclaredString = fieldDefinitionPrimitive.baseType == BaseType.STRING
+                && fieldDefinitionPrimitive.size == BaseType.STRING.getSize();
+        if (!undeclaredString || value.length != 1 || !(value[0] instanceof String)) {
+            return fieldDefinitionPrimitive.size * value.length;
+        }
+        final int length = ((String) value[0]).getBytes(StandardCharsets.UTF_8).length + 1;
+        return Math.min(length, 255);
     }
 
     @Nullable
@@ -193,11 +208,11 @@ public class NativeFITMessage {
         final BaseType baseType;
         final String name;
         final FieldDefinitions type;
-        final int scale;
+        final double scale;
         final int offset;
         final int size;
 
-        FieldDefinitionPrimitive(int number, BaseType baseType, int size, String name, FieldDefinitions type, int scale, int offset) {
+        FieldDefinitionPrimitive(int number, BaseType baseType, int size, String name, FieldDefinitions type, double scale, int offset) {
             this.number = number;
             this.baseType = baseType;
             this.size = size;
@@ -207,23 +222,23 @@ public class NativeFITMessage {
             this.offset = offset;
         }
 
-        FieldDefinitionPrimitive(int number, BaseType baseType, String name, FieldDefinitions type, int scale, int offset) {
+        FieldDefinitionPrimitive(int number, BaseType baseType, String name, FieldDefinitions type, double scale, int offset) {
             this(number, baseType, baseType.getSize(), name, type, scale, offset);
         }
 
         FieldDefinitionPrimitive(int number, BaseType baseType, String name, FieldDefinitions type) {
-            this(number, baseType, baseType.getSize(), name, type, 1, 0);
+            this(number, baseType, baseType.getSize(), name, type, 1.0, 0);
         }
 
         FieldDefinitionPrimitive(int number, BaseType baseType, String name) {
-            this(number, baseType, baseType.getSize(), name, null, 1, 0);
+            this(number, baseType, baseType.getSize(), name, null, 1.0, 0);
         }
 
         FieldDefinitionPrimitive(int number, BaseType baseType, int size, String name) {
-            this(number, baseType, size, name, null, 1, 0);
+            this(number, baseType, size, name, null, 1.0, 0);
         }
 
-        FieldDefinitionPrimitive(int number, BaseType baseType, String name, int scale, int offset) {
+        FieldDefinitionPrimitive(int number, BaseType baseType, String name, double scale, int offset) {
             this(number, baseType, baseType.getSize(), name, null, scale, offset);
         }
 
@@ -243,7 +258,7 @@ public class NativeFITMessage {
             return type;
         }
 
-        public int getScale() {
+        public double getScale() {
             return scale;
         }
 
@@ -269,7 +284,7 @@ public class NativeFITMessage {
             result = 31 * result + Objects.hashCode(baseType);
             result = 31 * result + Objects.hashCode(name);
             result = 31 * result + Objects.hashCode(type);
-            result = 31 * result + scale;
+            result = 31 * result + Double.hashCode(scale);
             result = 31 * result + offset;
             result = 31 * result + size;
             return result;

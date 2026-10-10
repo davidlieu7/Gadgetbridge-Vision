@@ -30,15 +30,16 @@ internal object StepsSyncer : AbstractActivitySampleSyncer<StepsRecord>() {
     override val logger: Logger = LoggerFactory.getLogger(StepsSyncer::class.java)
     override val recordClass: KClass<StepsRecord> = StepsRecord::class
 
-    override fun convertSample(
-        sample: ActivitySample,
+    override fun convertMinute(
+        endTs: Instant,
+        minuteSamples: List<ActivitySample>,
         offset: ZoneOffset,
         metadata: Metadata,
         deviceName: String,
         version: Long
     ): StepsRecord? {
-        val stepsInMinute = sample.steps.toLong()
-        // <= 0 means "no steps in that minute" - common, drop silently.
+        // Sum the minute's samples; NOT_MEASURED (-1) and 0 both mean "no steps" and contribute nothing.
+        val stepsInMinute = minuteSamples.sumOf { if (it.steps > 0) it.steps else 0 }
         if (stepsInMinute <= 0L) {
             return null
         }
@@ -47,7 +48,6 @@ internal object StepsSyncer : AbstractActivitySampleSyncer<StepsRecord>() {
             return null
         }
 
-        val endTs = Instant.ofEpochSecond(sample.timestamp.toLong())
         val startTs = endTs.minus(1, ChronoUnit.MINUTES)
 
         return StepsRecord(
@@ -55,7 +55,7 @@ internal object StepsSyncer : AbstractActivitySampleSyncer<StepsRecord>() {
             offset,
             endTs,
             offset,
-            stepsInMinute,
+            stepsInMinute.toLong(),
             clientRecordMetadata(metadata, "steps", endTs.epochSecond, version)
         )
     }

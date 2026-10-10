@@ -16,45 +16,38 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 package nodomain.freeyourgadget.gadgetbridge.activities.charts;
 
-import android.content.res.ColorStateList;
 import android.os.Bundle;
 import android.view.LayoutInflater;
-import android.view.MotionEvent;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.LinearLayout;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.core.content.ContextCompat;
-import androidx.core.widget.TextViewCompat;
 
 import com.github.mikephil.charting.charts.Chart;
-import com.github.mikephil.charting.charts.LineChart;
-import com.github.mikephil.charting.components.XAxis;
-import com.github.mikephil.charting.components.YAxis;
-import com.github.mikephil.charting.data.Entry;
-import com.github.mikephil.charting.data.LineData;
-import com.github.mikephil.charting.data.LineDataSet;
-import com.github.mikephil.charting.formatter.ValueFormatter;
-import com.github.mikephil.charting.interfaces.datasets.ILineDataSet;
-import com.github.mikephil.charting.listener.ChartTouchListener;
-import com.github.mikephil.charting.listener.OnChartGestureListener;
 import com.google.android.material.chip.Chip;
 import com.google.android.material.chip.ChipGroup;
+import com.google.android.material.color.MaterialColors;
 
-import java.text.SimpleDateFormat;
+import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Collections;
 import java.util.Date;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
-import java.util.Set;
 
-import nodomain.freeyourgadget.gadgetbridge.GBApplication;
+import kotlin.jvm.functions.Function1;
+
 import nodomain.freeyourgadget.gadgetbridge.R;
+import nodomain.freeyourgadget.gadgetbridge.activities.charts.mpchart.DaySelections;
+import nodomain.freeyourgadget.gadgetbridge.activities.charts.mpchart.GbChartView;
+import nodomain.freeyourgadget.gadgetbridge.activities.charts.race.RacePredictionChartData;
+import nodomain.freeyourgadget.gadgetbridge.activities.workouts.StatTileData;
+import nodomain.freeyourgadget.gadgetbridge.activities.workouts.StatTileGridUtilKt;
 import nodomain.freeyourgadget.gadgetbridge.database.DBHandler;
 import nodomain.freeyourgadget.gadgetbridge.devices.GenericMetricSampleProvider;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
@@ -74,32 +67,17 @@ public class RacePredictionPeriodFragment extends AbstractChartFragment<RacePred
             MetricSample.Metric.GENERIC_RACE_PREDICTOR_FULL_MARATHON,
     };
     private static final MetricSample.Metric DEFAULT_METRIC = MetricSample.Metric.GENERIC_RACE_PREDICTOR_5K;
-    private static final float MIN_VALUE_LABEL_SPACING_DP = 32f;
-    private static final float ESTIMATED_Y_AXIS_WIDTH_DP = 40f;
 
     private int totalDays;
     private boolean showTiles;
     private GBDevice device;
     private MetricSample.Metric selectedMetric = DEFAULT_METRIC;
-    private float density;
-    private final Set<Entry> labeledEntries = new HashSet<>();
 
     private TextView dateView;
-    private LineChart raceChart;
+    private GbChartView raceChart;
     private ChipGroup metricChipGroup;
+    private LinearLayout statsContainer;
 
-    private TextView tile5kValue;
-    private TextView tile10kValue;
-    private TextView tileHalfMarathonValue;
-    private TextView tileFullMarathonValue;
-
-    private TextView tile5kTrend;
-    private TextView tile10kTrend;
-    private TextView tileHalfMarathonTrend;
-    private TextView tileFullMarathonTrend;
-
-    protected int CHART_TEXT_COLOR;
-    protected int TEXT_COLOR;
     protected int LINE_COLOR;
 
     public static RacePredictionPeriodFragment newInstance(final int totalDays, final boolean showTiles) {
@@ -130,10 +108,7 @@ public class RacePredictionPeriodFragment extends AbstractChartFragment<RacePred
     protected void init() {
         totalDays = getArguments() != null ? getArguments().getInt(ARG_TOTAL_DAYS, DEFAULT_TOTAL_DAYS) : DEFAULT_TOTAL_DAYS;
         showTiles = getArguments() != null && getArguments().getBoolean(ARG_SHOW_TILES, false);
-        density = getResources().getDisplayMetrics().density;
-        TEXT_COLOR = GBApplication.getTextColor(requireContext());
-        CHART_TEXT_COLOR = GBApplication.getSecondaryTextColor(requireContext());
-        LINE_COLOR = getResources().getColor(R.color.accent);
+        LINE_COLOR = MaterialColors.getColor(requireContext(), R.attr.accent_color, getResources().getColor(R.color.accent));
     }
 
     @Override
@@ -144,18 +119,12 @@ public class RacePredictionPeriodFragment extends AbstractChartFragment<RacePred
         device = getChartsHost().getDevice();
         dateView = rootView.findViewById(R.id.race_prediction_date_view);
         raceChart = rootView.findViewById(R.id.race_prediction_chart);
+        raceChart.setZoomable(true);
+        raceChart.dismissSelectionOnTapOutside(rootView);
         metricChipGroup = rootView.findViewById(R.id.race_prediction_chip_group);
 
         if (showTiles) {
-            tile5kValue = rootView.findViewById(R.id.race_prediction_5k_value);
-            tile10kValue = rootView.findViewById(R.id.race_prediction_10k_value);
-            tileHalfMarathonValue = rootView.findViewById(R.id.race_prediction_half_marathon_value);
-            tileFullMarathonValue = rootView.findViewById(R.id.race_prediction_full_marathon_value);
-
-            tile5kTrend = rootView.findViewById(R.id.race_prediction_5k_trend);
-            tile10kTrend = rootView.findViewById(R.id.race_prediction_10k_trend);
-            tileHalfMarathonTrend = rootView.findViewById(R.id.race_prediction_half_marathon_trend);
-            tileFullMarathonTrend = rootView.findViewById(R.id.race_prediction_full_marathon_trend);
+            statsContainer = rootView.findViewById(R.id.race_prediction_stats_container);
         }
 
         if (savedInstanceState != null) {
@@ -170,7 +139,6 @@ public class RacePredictionPeriodFragment extends AbstractChartFragment<RacePred
         }
 
         setupMetricChips(inflater);
-        setupRaceChart();
         refresh();
 
         return rootView;
@@ -203,72 +171,6 @@ public class RacePredictionPeriodFragment extends AbstractChartFragment<RacePred
                 refresh();
             }
         });
-    }
-
-    private void setupRaceChart() {
-        raceChart.getDescription().setEnabled(false);
-        raceChart.getLegend().setEnabled(false);
-        raceChart.setMaxVisibleValueCount(Integer.MAX_VALUE);
-        raceChart.setScaleXEnabled(true);
-        raceChart.setScaleYEnabled(false);
-        raceChart.setDragEnabled(true);
-        raceChart.setDoubleTapToZoomEnabled(true);
-        raceChart.setOnChartGestureListener(new OnChartGestureListener() {
-            @Override
-            public void onChartGestureStart(final MotionEvent me, final ChartTouchListener.ChartGesture lastPerformedGesture) {
-            }
-
-            @Override
-            public void onChartGestureEnd(final MotionEvent me, final ChartTouchListener.ChartGesture lastPerformedGesture) {
-                updateValueLabelVisibility(false);
-            }
-
-            @Override
-            public void onChartLongPressed(final MotionEvent me) {
-            }
-
-            @Override
-            public void onChartDoubleTapped(final MotionEvent me) {
-                updateValueLabelVisibility(false);
-            }
-
-            @Override
-            public void onChartSingleTapped(final MotionEvent me) {
-            }
-
-            @Override
-            public void onChartFling(final MotionEvent me1, final MotionEvent me2, final float velocityX, final float velocityY) {
-            }
-
-            @Override
-            public void onChartScale(final MotionEvent me, final float scaleX, final float scaleY) {
-                updateValueLabelVisibility(false);
-            }
-
-            @Override
-            public void onChartTranslate(final MotionEvent me, final float dX, final float dY) {
-                updateValueLabelVisibility(false);
-            }
-        });
-
-        final XAxis xAxis = raceChart.getXAxis();
-        xAxis.setPosition(XAxis.XAxisPosition.BOTTOM);
-        xAxis.setDrawGridLines(false);
-        xAxis.setTextColor(CHART_TEXT_COLOR);
-        xAxis.setGranularity(1f);
-
-        final YAxis yAxisLeft = raceChart.getAxisLeft();
-        yAxisLeft.setDrawGridLines(true);
-        yAxisLeft.setTextColor(CHART_TEXT_COLOR);
-        yAxisLeft.setValueFormatter(new ValueFormatter() {
-            @Override
-            public String getFormattedValue(final float value) {
-                return formatSeconds(value);
-            }
-        });
-
-        final YAxis yAxisRight = raceChart.getAxisRight();
-        yAxisRight.setEnabled(false);
     }
 
     @Override
@@ -329,36 +231,21 @@ public class RacePredictionPeriodFragment extends AbstractChartFragment<RacePred
 
         dateView.setText(DateTimeUtils.formatDaysUntil(totalDays, getTSEnd()));
 
-        final List<Entry> entries = new ArrayList<>();
-        for (final RacePredictionDay raceDay : data.days) {
-            if (raceDay.value != null) {
-                entries.add(new Entry(raceDay.i, raceDay.value.floatValue()));
-            }
+        final int n = data.days.size();
+        final long[] epochDays = new long[n];
+        final double[] seconds = new double[n];
+        for (int i = 0; i < n; i++) {
+            final RacePredictionDay raceDay = data.days.get(i);
+            epochDays[i] = LocalDate.of(raceDay.day.get(Calendar.YEAR), raceDay.day.get(Calendar.MONTH) + 1, raceDay.day.get(Calendar.DAY_OF_MONTH)).toEpochDay();
+            seconds[i] = raceDay.value != null ? raceDay.value : 0;
         }
-
-        final LineDataSet dataSet = createDataSet(entries, data.metric);
-        final LineData lineData = new LineData(dataSet);
-        raceChart.getXAxis().setValueFormatter(getDayValueFormatter(data));
-        raceChart.getXAxis().setAxisMinimum(0f);
-        raceChart.getXAxis().setAxisMaximum(totalDays - 1);
-
-        if (!entries.isEmpty()) {
-            float yMin = Float.MAX_VALUE;
-            float yMax = -Float.MAX_VALUE;
-            for (final Entry entry : entries) {
-                yMin = Math.min(yMin, entry.getY());
-                yMax = Math.max(yMax, entry.getY());
-            }
-            final float padding = Math.max(60f, (yMax - yMin) * 0.1f);
-            raceChart.getAxisLeft().setAxisMinimum(Math.max(0f, yMin - padding));
-            raceChart.getAxisLeft().setAxisMaximum(yMax + padding);
-        } else {
-            raceChart.getAxisLeft().setAxisMinimum(0f);
-            raceChart.getAxisLeft().setAxisMaximum(1f);
-        }
-
-        raceChart.setData(lineData);
-        updateValueLabelVisibility(true);
+        final String label = getString(data.metric.labelResId);
+        final Function1<Integer, String> timeText = i -> seconds[i] > 0 ? formatSeconds(seconds[i]) : getString(R.string.stats_empty_value);
+        raceChart.setSelectionContent(x -> DaySelections.of(
+                epochDays, x, Collections.singletonList(label), Collections.singletonList(LINE_COLOR),
+                Collections.singletonList(timeText), getString(R.string.stats_empty_value)
+        ));
+        raceChart.setSpec(RacePredictionChartData.spec(epochDays, seconds, label, LINE_COLOR));
 
         if (showTiles) {
             updateTiles(data.latestValues, data.trendDeltas);
@@ -369,117 +256,29 @@ public class RacePredictionPeriodFragment extends AbstractChartFragment<RacePred
         if (latestValues == null) {
             return;
         }
-        tile5kValue.setText(formatTileValue(latestValues[0]));
-        tile10kValue.setText(formatTileValue(latestValues[1]));
-        tileHalfMarathonValue.setText(formatTileValue(latestValues[2]));
-        tileFullMarathonValue.setText(formatTileValue(latestValues[3]));
 
-        applyTrend(tile5kTrend, trendDeltas != null ? trendDeltas[0] : null);
-        applyTrend(tile10kTrend, trendDeltas != null ? trendDeltas[1] : null);
-        applyTrend(tileHalfMarathonTrend, trendDeltas != null ? trendDeltas[2] : null);
-        applyTrend(tileFullMarathonTrend, trendDeltas != null ? trendDeltas[3] : null);
-    }
-
-    private String formatTileValue(@Nullable final Double value) {
-        if (value == null) {
-            return getString(R.string.stats_empty_value);
+        final List<StatTileData> stats = new ArrayList<>();
+        for (int i = 0; i < METRICS_IN_CHIP_ORDER.length; i++) {
+            stats.add(buildStatTile(latestValues[i], trendDeltas != null ? trendDeltas[i] : null, METRICS_IN_CHIP_ORDER[i]));
         }
-        return formatSeconds(value);
+
+        statsContainer.removeAllViews();
+        StatTileGridUtilKt.addStatTileGrid(statsContainer, requireContext(), stats, 0);
     }
 
-    private void applyTrend(final TextView trendView, @Nullable final Double deltaSeconds) {
+    private StatTileData buildStatTile(@Nullable final Double value, @Nullable final Double deltaSeconds, final MetricSample.Metric metric) {
+        final String tileValue = value != null ? formatSeconds(value) : getString(R.string.stats_empty_value);
+        final String label = getString(metric.labelResId);
+
         if (deltaSeconds == null) {
-            trendView.setVisibility(View.GONE);
-            return;
+            return new StatTileData(tileValue, label);
         }
 
         final boolean faster = deltaSeconds < 0;
         final int iconRes = faster ? R.drawable.ic_caret_down_solid : R.drawable.ic_caret_up_solid;
         final int color = ContextCompat.getColor(requireContext(), faster ? R.color.body_energy_level_color : R.color.body_energy_lost_color);
 
-        trendView.setVisibility(View.VISIBLE);
-        trendView.setText(formatSeconds(Math.abs(deltaSeconds)));
-        trendView.setTextColor(color);
-        TextViewCompat.setCompoundDrawablesRelativeWithIntrinsicBounds(trendView, iconRes, 0, 0, 0);
-        TextViewCompat.setCompoundDrawableTintList(trendView, ColorStateList.valueOf(color));
-    }
-
-    private LineDataSet createDataSet(final List<Entry> entries, final MetricSample.Metric metric) {
-        final LineDataSet dataSet = new LineDataSet(entries, getString(metric.labelResId));
-        dataSet.setAxisDependency(YAxis.AxisDependency.LEFT);
-        dataSet.setColor(LINE_COLOR);
-        dataSet.setCircleColor(LINE_COLOR);
-        dataSet.setDrawCircleHole(false);
-        dataSet.setCircleRadius(4f);
-        dataSet.setDrawCircles(true);
-        dataSet.setLineWidth(2f);
-        dataSet.setValueTextColor(TEXT_COLOR);
-        dataSet.setValueTextSize(10f);
-        dataSet.setDrawValues(true);
-        dataSet.setValueFormatter(new ValueFormatter() {
-            @Override
-            public String getPointLabel(final Entry entry) {
-                return labeledEntries.contains(entry) ? formatSeconds(entry.getY()) : "";
-            }
-        });
-        return dataSet;
-    }
-
-    private void updateValueLabelVisibility(final boolean justLoadedData) {
-        labeledEntries.clear();
-
-        final LineData lineData = raceChart.getData();
-        if (lineData == null) {
-            raceChart.invalidate();
-            return;
-        }
-
-        final float lowestVisibleX;
-        final float highestVisibleX;
-        if (justLoadedData) {
-            lowestVisibleX = raceChart.getXAxis().getAxisMinimum();
-            highestVisibleX = raceChart.getXAxis().getAxisMaximum();
-        } else {
-            lowestVisibleX = raceChart.getLowestVisibleX();
-            highestVisibleX = raceChart.getHighestVisibleX();
-        }
-
-        float contentWidthPx = raceChart.getViewPortHandler().contentWidth();
-        if (contentWidthPx <= 0) {
-            // The view itself may also not have been laid out yet on a first load.
-            contentWidthPx = getResources().getDisplayMetrics().widthPixels - ESTIMATED_Y_AXIS_WIDTH_DP * density;
-        }
-
-        final List<Entry> visibleSorted = new ArrayList<>();
-        for (final ILineDataSet dataSet : lineData.getDataSets()) {
-            for (int i = 0; i < dataSet.getEntryCount(); i++) {
-                final Entry entry = dataSet.getEntryForIndex(i);
-                if (entry.getX() >= lowestVisibleX && entry.getX() <= highestVisibleX) {
-                    visibleSorted.add(entry);
-                }
-            }
-        }
-        if (visibleSorted.isEmpty()) {
-            raceChart.invalidate();
-            return;
-        }
-        Collections.sort(visibleSorted, (a, b) -> Float.compare(a.getX(), b.getX()));
-
-        final int maxLabelSlots = contentWidthPx > 0
-                ? Math.max(2, (int) (contentWidthPx / (MIN_VALUE_LABEL_SPACING_DP * density)))
-                : visibleSorted.size();
-
-        if (visibleSorted.size() <= maxLabelSlots) {
-            labeledEntries.addAll(visibleSorted);
-        } else {
-            final int lastIndex = visibleSorted.size() - 1;
-            for (int slot = 0; slot < maxLabelSlots; slot++) {
-                final int index = Math.round(slot * (float) lastIndex / (maxLabelSlots - 1));
-                labeledEntries.add(visibleSorted.get(index));
-            }
-        }
-
-        raceChart.invalidate();
+        return new StatTileData(tileValue, label, null, formatSeconds(Math.abs(deltaSeconds)), iconRes, color);
     }
 
     private static String formatSeconds(final double seconds) {
@@ -491,18 +290,6 @@ public class RacePredictionPeriodFragment extends AbstractChartFragment<RacePred
             return String.format(Locale.ROOT, "%d:%02d:%02d", hours, minutes, secs);
         }
         return String.format(Locale.ROOT, "%02d:%02d", minutes, secs);
-    }
-
-    private ValueFormatter getDayValueFormatter(final RacePredictionData data) {
-        return new ValueFormatter() {
-            @Override
-            public String getFormattedValue(final float value) {
-                final RacePredictionDay raceDay = data.getDay((int) value);
-                final String pattern = totalDays > 7 ? "dd/MM" : "EEE";
-                final SimpleDateFormat format = new SimpleDateFormat(pattern, Locale.getDefault());
-                return format.format(new Date(raceDay.day.getTimeInMillis()));
-            }
-        };
     }
 
     @Override

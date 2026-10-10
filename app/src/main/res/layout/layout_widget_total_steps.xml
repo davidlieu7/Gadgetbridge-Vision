@@ -29,7 +29,7 @@
         android:scrollHorizontally="false"
         android:text="@string/live_activity_total_steps"
         android:textAllCaps="true"
-        android:textColor="@color/accent"
+        android:textColor="?attr/summary_tile_label"
         android:textStyle="bold" />
 
     <TextView

@@ -146,6 +146,7 @@ open class UgreenHituneMax5cCoordinator : AbstractBLClassicDeviceCoordinator() {
 
     companion object {
         private val DEVICE_CARD_ACTION_ANC = deviceCardAction {
+            id = "ugreen_anc"
             icon = { device ->
                 val prefs = GBApplication.getDevicePrefs(device)
                 val mode = UgreenAncMode.fromPreference(prefs.getString(PREF_UGREEN_ANC_MODE, null))
@@ -187,6 +188,7 @@ open class UgreenHituneMax5cCoordinator : AbstractBLClassicDeviceCoordinator() {
         }
 
         private val DEVICE_CARD_ACTION_EQ = deviceCardAction {
+            id = "ugreen_equalizer"
             icon = { R.drawable.ic_equalizer }
             description = { _, context -> context.getString(R.string.prefs_equalizer_preset) }
             label = { device, context ->

@@ -47,6 +47,7 @@ import android.os.Handler;
 import android.os.Looper;
 import android.widget.Toast;
 
+import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.annotation.RequiresApi;
 import androidx.annotation.RequiresPermission;
@@ -57,6 +58,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.lang.reflect.Method;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 import java.util.Locale;
@@ -347,49 +349,109 @@ public class BondingUtil {
                                                    BluetoothDevice device) {
         final String macAddress = device.getAddress();
         final int type = device.getType();
-        final DeviceFilter<?> deviceFilter;
 
-        if (useLeDeviceFilter(bondingInterface, type)) {
-            LOG.debug("companionDeviceManagerBond {} type {} - treat as LE",
-                    macAddress, type);
-            ScanFilter scan = new ScanFilter.Builder()
-                    .setDeviceAddress(macAddress)
-                    .build();
-
-            deviceFilter = new BluetoothLeDeviceFilter.Builder()
-                    .setScanFilter(scan)
-                    .build();
-        } else {
-            LOG.debug("companionDeviceManagerBond {} type {} - treat as classic BT",
-                    macAddress, type);
-            deviceFilter = new BluetoothDeviceFilter.Builder()
-                    .setAddress(macAddress)
-                    .build();
+        if (isCompanionAssociated(bondingInterface.getContext(), macAddress)) {
+            StartObserving(bondingInterface.getContext(), macAddress);
+            LOG.info("The device has already been bonded through CompanionDeviceManager, using regular");
+            // If it's already "associated", we should immediately pair
+            // because the callback is never called (AFAIK?)
+            BondingUtil.bluetoothBond(bondingInterface, device);
+            return;
         }
 
-        AssociationRequest pairingRequest = new AssociationRequest.Builder()
-                .addDeviceFilter(deviceFilter)
-                .setSingleDevice(true)
-                .build();
+        final boolean useLe = useLeDeviceFilter(bondingInterface, type);
+        LOG.debug("companionDeviceManagerBond {} type {} - treat as {}", macAddress, type, useLe ? "LE" : "classic BT");
+        associateCompanion((Activity) bondingInterface.getContext(), macAddress, useLe, REQUEST_CODE, null);
+    }
 
-        CompanionDeviceManager manager = (CompanionDeviceManager) bondingInterface.getContext().getSystemService(Context.COMPANION_DEVICE_SERVICE);
-        LOG.debug(String.format("Searching for %s associations", macAddress));
-        for (String association : manager.getAssociations()) {
-            LOG.debug(String.format("Already associated with: %s", association));
-            if (association.equals(macAddress)) {
-                StartObserving(bondingInterface.getContext(), macAddress);
-                LOG.info("The device has already been bonded through CompanionDeviceManager, using regular");
-                // If it's already "associated", we should immediately pair
-                // because the callback is never called (AFAIK?)
-                BondingUtil.bluetoothBond(bondingInterface, device);
-                return;
+    /**
+     * Returns the MAC addresses, in upper case, of all the devices associated with the CompanionDeviceManager.
+     */
+    public static List<String> getCompanionAssociations(final Context context) {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O) {
+            return Collections.emptyList();
+        }
+        final CompanionDeviceManager manager = getCompanionDeviceManager(context);
+        if (manager == null) {
+            return Collections.emptyList();
+        }
+        final List<String> addresses = new ArrayList<>();
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            for (final AssociationInfo association : manager.getMyAssociations()) {
+                final MacAddress macAddress = association.getDeviceMacAddress();
+                if (macAddress != null) {
+                    addresses.add(macAddress.toString().toUpperCase(Locale.ROOT));
+                }
+            }
+        } else {
+            //noinspection deprecation
+            for (final String address : manager.getAssociations()) {
+                addresses.add(address.toUpperCase(Locale.ROOT));
             }
         }
+        return addresses;
+    }
 
-        LOG.debug("Starting association request");
-        manager.associate(pairingRequest,
-                getCompanionDeviceManagerCallback(bondingInterface),
-                null);
+    public static boolean isCompanionAssociated(final Context context, final String mac) {
+        return getCompanionAssociations(context).contains(mac.toUpperCase(Locale.ROOT));
+    }
+
+    /**
+     * @param useLe find the device by a BLE scan. Otherwise, find it by classic discovery or in the bonded devices.
+     */
+    @RequiresApi(Build.VERSION_CODES.O)
+    public static void associateCompanion(final Activity activity,
+                                          final String mac,
+                                          final boolean useLe,
+                                          final int requestCode,
+                                          @Nullable final Runnable onAssociated) {
+        final CompanionDeviceManager manager = getCompanionDeviceManager(activity);
+        if (manager == null) {
+            return;
+        }
+
+        final DeviceFilter<?> deviceFilter;
+        if (useLe) {
+            deviceFilter = new BluetoothLeDeviceFilter.Builder()
+                .setScanFilter(new ScanFilter.Builder().setDeviceAddress(mac).build())
+                .build();
+        } else {
+            deviceFilter = new BluetoothDeviceFilter.Builder()
+                .setAddress(mac)
+                .build();
+        }
+
+        final AssociationRequest pairingRequest = new AssociationRequest.Builder()
+            .addDeviceFilter(deviceFilter)
+            .setSingleDevice(true)
+            .build();
+
+        LOG.debug("Starting association request for {}", mac);
+        manager.associate(pairingRequest, new CompanionDeviceManager.Callback() {
+            @Override
+            public void onFailure(final CharSequence error) {
+                LOG.warn("Association with {} failed: {}", mac, error);
+                toast(activity, activity.getString(R.string.discovery_bonding_error, error), Toast.LENGTH_SHORT, GB.ERROR);
+            }
+
+            @SuppressWarnings("deprecation")
+            @Override
+            public void onDeviceFound(@NonNull final IntentSender chooserLauncher) {
+                try {
+                    startIntentSenderForResult(activity, chooserLauncher, requestCode, null, 0, 0, 0, null);
+                } catch (final IntentSender.SendIntentException e) {
+                    LOG.error("Failed to start the companion device chooser", e);
+                }
+            }
+
+            @Override
+            public void onAssociationCreated(@NonNull final AssociationInfo associationInfo) {
+                LOG.debug("Association created for {}", mac);
+                if (onAssociated != null) {
+                    onAssociated.run();
+                }
+            }
+        }, null);
     }
 
     /**
@@ -499,40 +561,6 @@ public class BondingUtil {
                 .show();
     }
 
-    /**
-     * Returns a callback for CompanionDeviceManager
-     *
-     * @param bondingInterface the activity that started the CDM bonding process
-     * @return CompanionDeviceManager.Callback that handles the CompanionDeviceManager bonding process results
-     */
-    @RequiresApi(Build.VERSION_CODES.O)
-    private static CompanionDeviceManager.Callback getCompanionDeviceManagerCallback(final BondingInterface bondingInterface) {
-        return new CompanionDeviceManager.Callback() {
-            @Override
-            public void onFailure(CharSequence error) {
-                Context context = bondingInterface.getContext();
-                String message = context.getString(R.string.discovery_bonding_error, error);
-                toast(context, message, Toast.LENGTH_SHORT, GB.ERROR);
-            }
-
-            @Override
-            public void onDeviceFound(IntentSender chooserLauncher) {
-                try {
-                    startIntentSenderForResult((Activity) bondingInterface.getContext(),
-                            chooserLauncher,
-                            REQUEST_CODE,
-                            null,
-                            0,
-                            0,
-                            0,
-                            null);
-                } catch (IntentSender.SendIntentException e) {
-                    LOG.error(e.toString());
-                }
-            }
-        };
-    }
-
     public static boolean StartObservingAll(Context context) {
         return StartObserving(context, null);
     }
@@ -558,7 +586,7 @@ public class BondingUtil {
         boolean success = false;
         final List<String> addresses;
         if (mac == null) {
-            addresses = manager.getAssociations();
+            addresses = getCompanionAssociations(context);
             LOG.debug("StartObserving - {} associations", addresses.size());
         } else {
             addresses = Collections.singletonList(mac);
@@ -602,7 +630,7 @@ public class BondingUtil {
         boolean success = false;
         final List<String> addresses;
         if (mac == null) {
-            addresses = manager.getAssociations();
+            addresses = getCompanionAssociations(context);
             LOG.debug("StopObserving - {} associations", addresses.size());
         } else {
             addresses = Collections.singletonList(mac);

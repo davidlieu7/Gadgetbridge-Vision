@@ -2927,10 +2927,10 @@
     <string name="pref_ambient_sound_tone">تن Ambient Sound</string>
     <string name="pref_ambient_sound_tone_summary">از ملایم تا شفاف</string>
     <string name="pref_balance">تعادل</string>
-    <string name="pref_switch_controls_anc_ambient">حذف نویز ←→ Ambient</string>
-    <string name="pref_switch_controls_anc_off">حذف نویز ←→ خاموش</string>
-    <string name="pref_switch_controls_ambient_off">Ambient ←→ خاموش</string>
-    <string name="pref_switch_controls_anc_ambient_off">حذف نویز ←→ Ambient ←→ خاموش</string>
+    <string name="pref_switch_controls_anc_ambient">حذف نویز ↔ Ambient</string>
+    <string name="pref_switch_controls_anc_off">حذف نویز ↔ خاموش</string>
+    <string name="pref_switch_controls_ambient_off">Ambient ↔ خاموش</string>
+    <string name="pref_switch_controls_anc_ambient_off">حذف نویز ↔ Ambient ↔ خاموش</string>
     <string name="prefs_noise_control">کنترل نویز</string>
     <string name="prefs_voice_detect">تشخیص صدا</string>
     <string name="prefs_voice_detect_summary">پس از تشخیص صدا، Ambient Sound به‌طور خودکار فعال و صدای پخش کم می‌شود.</string>

@@ -258,10 +258,12 @@ public class FileTransferHandler implements MessageHandler {
                 throw new IllegalArgumentException("Invalid directory data length");
             final GarminByteBufferReader reader = new GarminByteBufferReader(currentlyDownloading.dataHolder.array());
             reader.setByteOrder(ByteOrder.LITTLE_ENDIAN);
+            boolean hasFitFiles = false;
             while (reader.remaining() > 0) {
                 final int fileIndex = reader.readShort();//2
                 final int fileDataType = reader.readByte();//3
                 final int fileSubType = reader.readByte();//4
+                hasFitFiles |= fileDataType == 128;
                 final FileType.FILETYPE filetype = FileType.FILETYPE.fromDataTypeSubType(fileDataType, fileSubType);
                 final int fileNumber = reader.readShort();//6
                 final int specificFlags = reader.readByte();//7
@@ -284,6 +286,9 @@ public class FileTransferHandler implements MessageHandler {
                 conditionallyDownload(directoryEntry);
             }
             currentlyDownloading = null;
+            if (!hasFitFiles) {
+                deviceSupport.onDirectoryWithoutFitFiles();
+            }
         }
     }
 

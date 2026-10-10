@@ -134,6 +134,7 @@ object WorkoutTemplateRepository {
             row.legActivityKind = node.legActivityKind?.code
             row.durationType = node.duration?.type?.name
             row.durationValue = node.duration?.value
+            row.durationPlus = node.duration?.plus
             row.targetType = node.target?.type?.name
             row.targetZone = node.target?.zone
             row.targetLow = node.target?.low
@@ -250,6 +251,7 @@ object WorkoutTemplateRepository {
             .append(',').append(node.repeatCount)
             .append(',').append(node.legActivityKind?.code)
             .append(',').append(node.duration?.type?.name).append(':').append(node.duration?.value)
+            .append(':').append(node.duration?.plus)
             .append(',').append(node.target?.type?.name).append(':').append(node.target?.zone).append(':')
             .append(node.target?.low).append(':').append(node.target?.high).append(':').append(node.target?.enumValue)
             .append(',').append(node.secondaryTarget?.type?.name).append(':').append(node.secondaryTarget?.zone)
@@ -377,7 +379,7 @@ object WorkoutTemplateRepository {
             ActivityKind.fromCode(it)
         },
         duration = WorkoutDurationType.fromName(row.durationType)?.let {
-            WorkoutDuration(it, row.durationValue)
+            WorkoutDuration(it, row.durationValue, row.durationPlus == true)
         },
         target = WorkoutTargetType.fromName(row.targetType)?.let {
             WorkoutTarget(it, row.targetZone, row.targetLow, row.targetHigh, row.targetEnum)

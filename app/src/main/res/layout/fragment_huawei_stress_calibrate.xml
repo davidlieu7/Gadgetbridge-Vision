@@ -22,7 +22,7 @@
             android:layout_width="270dp"
             android:layout_height="270dp"
             app:indicatorSize="200dp"
-            app:indicatorColor="@color/accent"
+            app:indicatorColor="?attr/accent_color"
             app:trackThickness="10dp"
             android:layout_centerInParent="true"
             android:indeterminate="false"

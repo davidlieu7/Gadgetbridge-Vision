@@ -103,6 +103,7 @@ class SinilinkCoordinator : AbstractBLEDeviceCoordinator() {
             ),
 
             deviceCardAction {
+                id = "sinilink_play_pause"
                 icon = { device ->
                     val state = device.getExtraInfo("playback_state") as? String
                     if (state != null && SinilinkPlaybackState.fromPreference(state) == SinilinkPlaybackState.PLAYING) {

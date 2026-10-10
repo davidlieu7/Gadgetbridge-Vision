@@ -21,7 +21,7 @@
                 android:textSize="20sp"
                 android:textColor="?attr/textColorPrimary"
                 android:layout_marginTop="15dp"
-                android:layout_marginBottom="20dp"
+                android:layout_marginBottom="@dimen/chart_section_spacing"
                 />
             <ImageView
                 android:layout_width="50dp"
@@ -43,52 +43,15 @@
             android:scaleType="fitStart"
             android:id="@+id/steps_gauge" />
 
-        <GridLayout
-            android:background="@color/gauge_line_color"
+        <LinearLayout
+            android:id="@+id/steps_stats_container"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:columnCount="2"
-            android:layout_marginTop="15dp"
+            android:layout_marginTop="@dimen/chart_section_spacing"
             android:layout_marginBottom="15dp"
-            >
-            <LinearLayout
-                style="@style/GridTile"
-                android:layout_marginEnd="1dp"
-                android:layout_marginTop="2dp"
-                >
-                <TextView
-                    android:id="@+id/steps_count"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="0"
-                    android:textColor="?attr/textColorPrimary"
-                    android:textSize="20sp" />
-
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/steps"
-                    android:textSize="12sp" />
-            </LinearLayout>
-            <LinearLayout
-                style="@style/GridTile"
-                android:layout_marginStart="1dp"
-                android:layout_marginTop="2dp"
-                >
-                <TextView
-                    android:id="@+id/steps_distance"
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="0"
-                    android:textColor="?attr/textColorPrimary"
-                    android:textSize="20sp" />
-                <TextView
-                    android:layout_width="wrap_content"
-                    android:layout_height="wrap_content"
-                    android:text="@string/distance"
-                    android:textSize="12sp" />
-            </LinearLayout>
-        </GridLayout>
+            android:layout_marginStart="15dp"
+            android:layout_marginEnd="15dp"
+            android:orientation="vertical" />
 
         <LinearLayout
             android:layout_width="match_parent"

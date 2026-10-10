@@ -18,7 +18,7 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:padding="30dp"
-        rotaryControl:controlpoint_color="@color/accent"
+        rotaryControl:controlpoint_color="?attr/accent_color"
         rotaryControl:controlpoint_size="20dp"
         rotaryControl:line_color="@color/design_default_color_on_secondary"
         rotaryControl:line_thickness="10dp" />

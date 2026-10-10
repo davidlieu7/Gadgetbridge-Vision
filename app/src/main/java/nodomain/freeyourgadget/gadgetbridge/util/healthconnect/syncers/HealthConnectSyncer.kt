@@ -18,6 +18,7 @@ package nodomain.freeyourgadget.gadgetbridge.util.healthconnect.syncers
 
 import android.content.Context
 import androidx.health.connect.client.HealthConnectClient
+import androidx.health.connect.client.records.metadata.Device
 import androidx.health.connect.client.records.metadata.Metadata
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice
 import nodomain.freeyourgadget.gadgetbridge.model.ActivitySample
@@ -36,12 +37,19 @@ internal fun clientRecordMetadata(
     version: Long
 ): Metadata {
     val device = base.device ?: return base
-    val id = "gb-$type-${device.manufacturer ?: "unknown"}-${device.model ?: "unknown"}-$idKey"
+    val id = clientRecordId(device, type, idKey)
     return when (base.recordingMethod) {
         Metadata.RECORDING_METHOD_ACTIVELY_RECORDED -> Metadata.activelyRecorded(device, id, version)
         else -> Metadata.autoRecorded(device, id, version)
     }
 }
+
+internal fun clientRecordId(device: Device, type: String, idKey: Long): String =
+    "gb-$type-${device.manufacturer ?: "unknown"}-${device.model ?: "unknown"}-$idKey"
+
+/** clientRecordId of the per-minute DistanceRecord [DistanceSyncer] writes for the minute ending at [endEpochSecond]. */
+internal fun distanceClientRecordId(device: Device, endEpochSecond: Long): String =
+    clientRecordId(device, DistanceSyncer.RECORD_TYPE, endEpochSecond)
 
 /**
  * Statistics returned by a syncer after processing a slice.

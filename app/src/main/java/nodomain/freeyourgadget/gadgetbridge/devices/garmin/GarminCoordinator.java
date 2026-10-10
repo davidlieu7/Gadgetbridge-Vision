@@ -31,6 +31,7 @@ import org.apache.commons.lang3.ArrayUtils;
 
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import de.greenrobot.dao.AbstractDao;
@@ -56,10 +57,12 @@ import nodomain.freeyourgadget.gadgetbridge.devices.GarminSpo2SampleProvider;
 import nodomain.freeyourgadget.gadgetbridge.devices.GarminStressSampleProvider;
 import nodomain.freeyourgadget.gadgetbridge.devices.GenericTrainingLoadAcuteSampleProvider;
 import nodomain.freeyourgadget.gadgetbridge.devices.GenericTrainingLoadChronicSampleProvider;
+import nodomain.freeyourgadget.gadgetbridge.devices.HydrationSampleProvider;
 import nodomain.freeyourgadget.gadgetbridge.devices.InstallHandler;
 import nodomain.freeyourgadget.gadgetbridge.devices.SampleProvider;
 import nodomain.freeyourgadget.gadgetbridge.devices.TimeSampleProvider;
 import nodomain.freeyourgadget.gadgetbridge.devices.WorkoutLoadSampleProvider;
+import nodomain.freeyourgadget.gadgetbridge.devices.cards.DeviceCardItem;
 import nodomain.freeyourgadget.gadgetbridge.entities.BaseActivitySummaryDao;
 import nodomain.freeyourgadget.gadgetbridge.entities.DaoSession;
 import nodomain.freeyourgadget.gadgetbridge.entities.GarminActivitySampleDao;
@@ -77,6 +80,7 @@ import nodomain.freeyourgadget.gadgetbridge.entities.GarminSleepStageSampleDao;
 import nodomain.freeyourgadget.gadgetbridge.entities.GarminSleepStatsSampleDao;
 import nodomain.freeyourgadget.gadgetbridge.entities.GarminSpo2SampleDao;
 import nodomain.freeyourgadget.gadgetbridge.entities.GarminStressSampleDao;
+import nodomain.freeyourgadget.gadgetbridge.entities.GenericHydrationSampleDao;
 import nodomain.freeyourgadget.gadgetbridge.entities.GenericMetricSampleDao;
 import nodomain.freeyourgadget.gadgetbridge.entities.GenericTrainingLoadAcuteSample;
 import nodomain.freeyourgadget.gadgetbridge.entities.GenericTrainingLoadAcuteSampleDao;
@@ -177,6 +181,7 @@ public abstract class GarminCoordinator extends AbstractBLEDeviceCoordinator {
             put(session.getGenericTrainingLoadAcuteSampleDao(), GenericTrainingLoadAcuteSampleDao.Properties.DeviceId);
             put(session.getGenericTrainingLoadChronicSampleDao(), GenericTrainingLoadChronicSampleDao.Properties.DeviceId);
             put(session.getGenericMetricSampleDao(), GenericMetricSampleDao.Properties.DeviceId);
+            put(session.getGenericHydrationSampleDao(), GenericHydrationSampleDao.Properties.DeviceId);
         }};
     }
 
@@ -297,6 +302,11 @@ public abstract class GarminCoordinator extends AbstractBLEDeviceCoordinator {
     }
 
     @Override
+    public HydrationSampleProvider getHydrationSampleProvider(final GBDevice device, final DaoSession session) {
+        return new HydrationSampleProvider(device, session);
+    }
+
+    @Override
     public GarminHeartRateRestingSampleProvider getHeartRateRestingSampleProvider(final GBDevice device, final DaoSession session) {
         return new GarminHeartRateRestingSampleProvider(device, session);
     }
@@ -328,6 +338,11 @@ public abstract class GarminCoordinator extends AbstractBLEDeviceCoordinator {
     @Override
     public DeviceSettingsSpec getDeviceSettings(@NonNull final GBDevice device) {
         return GarminDeviceSettingsKt.garminDeviceSettings(device, this);
+    }
+
+    @Override
+    public List<DeviceCardItem> getCardItems(@NonNull final GBDevice device) {
+        return GarminDeviceCardItemsKt.garminDeviceCardItems(device, this);
     }
 
     @Override
@@ -363,6 +378,11 @@ public abstract class GarminCoordinator extends AbstractBLEDeviceCoordinator {
     }
 
     @Override
+    public boolean supportsNavigation(@NonNull final GBDevice device) {
+        return supportsNotifications(device);
+    }
+
+    @Override
     public boolean supportsAppsManagement(@NonNull final GBDevice device) {
         // FIXME: experimental until better polished
         return experimentalSettingEnabled(device, "garmin_experimental_app_management");
@@ -387,6 +407,11 @@ public abstract class GarminCoordinator extends AbstractBLEDeviceCoordinator {
     @Override
     public boolean supportsAppListFetching(@NonNull final GBDevice device) {
         return true;
+    }
+
+    @Override
+    public boolean supportsHydration(@NonNull final GBDevice device) {
+        return getPrefs(device).getBoolean(GarminPreferences.PREF_GARMIN_HYDRATION_SUPPORTED, false);
     }
 
     public boolean supportsAgpsUpdates(final GBDevice device) {

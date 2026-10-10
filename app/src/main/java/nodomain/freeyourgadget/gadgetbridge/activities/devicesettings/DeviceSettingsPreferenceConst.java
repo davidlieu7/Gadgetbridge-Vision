@@ -243,6 +243,7 @@ public class DeviceSettingsPreferenceConst {
 
     public static final String PREF_HEARTRATE_USE_FOR_SLEEP_DETECTION = "heartrate_sleep_detection";
     public static final String PREF_HEARTRATE_MEASUREMENT_INTERVAL = "heartrate_measurement_interval";
+    public static final String PREF_BLOOD_PRESSURE_ACTIVE_USER = "blood_pressure_active_user";
     public static final String PREF_HEARTRATE_ACTIVITY_MONITORING = "heartrate_activity_monitoring";
     public static final String PREF_HEARTRATE_ALERT_ENABLED = "heartrate_alert_enabled";
     public static final String PREF_HEARTRATE_ALERT_ACTIVE_HIGH_THRESHOLD = "heartrate_alert_active_high_threshold";
@@ -333,6 +334,8 @@ public class DeviceSettingsPreferenceConst {
     public static final String PREF_SEND_APP_NOTIFICATIONS = "send_app_notifications";
     public static final String PREF_NOTIFICATION_WAKE_ON_OPEN = "notification_wake_on_open";
     public static final String PREF_AUTOREMOVE_NOTIFICATIONS = "autoremove_notifications";
+    public static final String PREF_NAVIGATION_CONTINUOUS_UPDATES = "navigation_continuous_updates";
+    public static final String PREF_NAVIGATION_UPDATE_RATE = "navigation_update_rate";
     public static final String PREF_SCREEN_ON_ON_NOTIFICATIONS = "screen_on_on_notifications";
     public static final String PREF_SCREEN_ON_ON_NOTIFICATIONS_TIMEOUT = "screen_on_on_notifications_timeout";
     public static final String PREF_WORKOUT_KEEP_SCREEN_ON = "workout_keep_screen_on";
@@ -359,6 +362,8 @@ public class DeviceSettingsPreferenceConst {
     public static final String PREF_HYDRATION_DND_END = "pref_hydration_dnd_end";
     public static final String PREF_HYDRATION_REMINDER_START = "pref_hydration_reminder_start";
     public static final String PREF_HYDRATION_REMINDER_END = "pref_hydration_reminder_end";
+    public static final String PREF_HYDRATION_UNIT = "hydration_unit";
+    public static final String PREF_HYDRATION_SEND_TODAY = "hydration_send_today";
     public static final String PREF_AMPM_ENABLED = "pref_ampm_enabled";
 
     public static final String PREF_SONYSWR12_LOW_VIBRATION = "vibration_preference";
@@ -403,6 +408,7 @@ public class DeviceSettingsPreferenceConst {
     public static final String FTP_SERVER_START = "ftp_server_start";
     public static final String FTP_SERVER_STOP = "ftp_server_stop";
     public static final String FTP_SERVER_STATUS = "ftp_server_status";
+    public static final String FTP_SERVER_BROWSE = "ftp_server_browse";
 
     public static final String PREF_NOTHING_EAR1_INEAR = "pref_nothing_inear_detection";
     public static final String PREF_NOTHING_EAR1_AUDIOMODE = "pref_nothing_audiomode";
@@ -568,6 +574,11 @@ public class DeviceSettingsPreferenceConst {
     public static final String PREF_SOUNDCORE_EQUALIZER_BAND8_VALUE = "pref_soundcore_equalizer_band8_value";
     public static final String PREF_SOUNDCORE_EQUALIZER_BAND9_FREQ = "pref_soundcore_equalizer_band9_freq";
     public static final String PREF_SOUNDCORE_EQUALIZER_BAND9_VALUE = "pref_soundcore_equalizer_band9_value";
+    public static final String PREF_SOUNDCORE_FIND_LEFT_EARBUD = "pref_soundcore_find_left_earbud";
+    public static final String PREF_SOUNDCORE_FIND_RIGHT_EARBUD = "pref_soundcore_find_right_earbud";
+    public static final String PREF_SOUNDCORE_A30I_DISABLE_OPTION_AMBIENT_MODE = "pref_soundcore_a30i_disable_option_ambient_mode";
+    public static final String PREF_SOUNDCORE_A30I_DISABLE_OPTION_AMBIENT_SOUND_LEVEL = "pref_soundcore_a30i_disable_option_ambient_sound_level";
+    public static final String PREF_SOUNDCORE_A30I_DISABLE_OPTION_WIND_NOISE_REDUCTION = "pref_soundcore_a30i_disable_option_wind_noise_reduction";
 
     public static final String PREF_HAYLOU_S35_ANC_AUDIO_MODE = "pref_haylou_s35_anc_audio_mode";
     public static final String PREF_HAYLOU_S35_ANC_GAME_MODE = "pref_haylou_s35_anc_game_mode";
@@ -698,6 +709,8 @@ public class DeviceSettingsPreferenceConst {
     public static final String PREFS_ACTIVITY_IN_DEVICE_CARD_STEPS = "prefs_activity_in_device_card_steps";
     public static final String PREFS_ACTIVITY_IN_DEVICE_CARD_SLEEP = "prefs_activity_in_device_card_sleep";
     public static final String PREFS_ACTIVITY_IN_DEVICE_CARD_DISTANCE = "prefs_activity_in_device_card_distance";
+    public static final String PREF_DEVICE_CARD_SHOW_ITEMS = "pref_device_card_show_items";
+    public static final String PREF_DEVICE_CARD_ITEMS = "pref_device_card_items";
     public static final String PREFS_DEVICE_CHARTS_TABS = "charts_tabs";
     public static final String PREFS_PER_APP_NOTIFICATION_SETTINGS = "pref_per_app_notification_settings";
     public static final String PREF_MULTIPOINT = "pref_multipoint";

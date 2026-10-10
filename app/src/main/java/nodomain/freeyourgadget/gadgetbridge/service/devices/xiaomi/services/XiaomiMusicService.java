@@ -24,6 +24,8 @@ import org.slf4j.LoggerFactory;
 import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEventMusicControl;
 import nodomain.freeyourgadget.gadgetbridge.model.MusicSpec;
 import nodomain.freeyourgadget.gadgetbridge.model.MusicStateSpec;
+import nodomain.freeyourgadget.gadgetbridge.proto.xiaomi.Music;
+import nodomain.freeyourgadget.gadgetbridge.proto.xiaomi.MusicInfo;
 import nodomain.freeyourgadget.gadgetbridge.proto.xiaomi.XiaomiProto;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.xiaomi.XiaomiSupport;
 import nodomain.freeyourgadget.gadgetbridge.util.MediaManager;
@@ -61,7 +63,7 @@ public class XiaomiMusicService extends AbstractXiaomiService {
 
     @Override
     public void handleCommand(final XiaomiProto.Command cmd) {
-        final XiaomiProto.Music music = cmd.getMusic();
+        final Music music = cmd.getMusic();
 
         switch (cmd.getSubtype()) {
             case CMD_MUSIC_GET:
@@ -128,7 +130,7 @@ public class XiaomiMusicService extends AbstractXiaomiService {
         final MusicSpec musicSpec = mediaManager.getBufferMusicSpec();
         final MusicStateSpec musicStateSpec = mediaManager.getBufferMusicStateSpec();
 
-        final XiaomiProto.MusicInfo.Builder musicInfo = XiaomiProto.MusicInfo.newBuilder()
+        final var musicInfo = MusicInfo.newBuilder()
                 .setVolume(mediaManager.getPhoneVolume());
 
         if (musicSpec == null || musicStateSpec == null) {
@@ -147,7 +149,7 @@ public class XiaomiMusicService extends AbstractXiaomiService {
                     .setDuration(musicSpec.getDuration());
         }
 
-        final XiaomiProto.Music music = XiaomiProto.Music.newBuilder()
+        final var music = Music.newBuilder()
                 .setMusicInfo(musicInfo.build())
                 .build();
 

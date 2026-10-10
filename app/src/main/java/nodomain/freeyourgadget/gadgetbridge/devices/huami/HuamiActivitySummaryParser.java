@@ -443,7 +443,8 @@ public class HuamiActivitySummaryParser implements ActivitySummaryParser {
             charts.addAll(DefaultWorkoutCharts.buildDefaultCharts(
                     GBApplication.getContext(),
                     allPoints,
-                    ActivityKind.fromCode(summary.getActivityKind())
+                    ActivityKind.fromCode(summary.getActivityKind()),
+                    summaryData
             ));
         }
     }

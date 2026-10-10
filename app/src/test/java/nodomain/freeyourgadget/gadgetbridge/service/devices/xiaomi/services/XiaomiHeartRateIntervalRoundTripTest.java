@@ -36,6 +36,8 @@ import nodomain.freeyourgadget.gadgetbridge.capabilities.HeartRateCapability;
 import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEvent;
 import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEventUpdatePreferences;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
+import nodomain.freeyourgadget.gadgetbridge.proto.xiaomi.Health;
+import nodomain.freeyourgadget.gadgetbridge.proto.xiaomi.HeartRate;
 import nodomain.freeyourgadget.gadgetbridge.proto.xiaomi.XiaomiProto;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.xiaomi.XiaomiSupport;
 import nodomain.freeyourgadget.gadgetbridge.test.TestBase;
@@ -98,14 +100,14 @@ public class XiaomiHeartRateIntervalRoundTripTest extends TestBase {
         // what we send to the band
         service.setHeartRateConfig();
         assertEquals("expected exactly one command for " + seconds + "s", 1, sent.size());
-        final XiaomiProto.HeartRate outgoing = sent.get(0).getHealth().getHeartRate();
+        final HeartRate outgoing = sent.get(0).getHealth().getHeartRate();
 
         // what the band reports back, echoing the value it was given
         service.handleCommand(XiaomiProto.Command.newBuilder()
                 .setType(XiaomiHealthService.COMMAND_TYPE)
                 .setSubtype(HEART_RATE_CONFIG_REPLY)
-                .setHealth(XiaomiProto.Health.newBuilder()
-                        .setHeartRate(XiaomiProto.HeartRate.newBuilder()
+                .setHealth(Health.newBuilder()
+                        .setHeartRate(HeartRate.newBuilder()
                                 .setDisabled(outgoing.getDisabled())
                                 .setInterval(outgoing.getInterval())))
                 .build());
