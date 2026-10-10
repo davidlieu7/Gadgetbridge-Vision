@@ -28,6 +28,8 @@ data class WorkoutInput(
     val avgSpeedMetersPerSecond: Double = 0.0,
     val avgHeartRate: Double = 0.0,
     val avgPowerWatts: Double = 0.0,
+    val avgCadence: Double = 0.0,
+    val cadenceUnit: String? = null,
     val avgSwolf: Double = 0.0,
     val aerobicEffect: Double = 0.0,
     val anaerobicEffect: Double = 0.0,
@@ -52,6 +54,7 @@ data class WorkoutInput(
                 speed = WeightedSum.of(avgSpeedMetersPerSecond, movingSeconds),
                 heartRate = WeightedSum.of(avgHeartRate, durationSeconds.toDouble()),
                 power = WeightedSum.of(avgPowerWatts, durationSeconds.toDouble()),
+                cadence = WeightedSum.of(avgCadence, durationSeconds.toDouble()),
                 swolf = WeightedSum.of(avgSwolf, durationSeconds.toDouble()),
                 aerobicEffect = WeightedSum.of(aerobicEffect, durationSeconds.toDouble()),
                 anaerobicEffect = WeightedSum.of(anaerobicEffect, durationSeconds.toDouble()),
@@ -91,6 +94,7 @@ data class MetricTotals(
     val speed: WeightedSum = WeightedSum(),
     val heartRate: WeightedSum = WeightedSum(),
     val power: WeightedSum = WeightedSum(),
+    val cadence: WeightedSum = WeightedSum(),
     val swolf: WeightedSum = WeightedSum(),
     val aerobicEffect: WeightedSum = WeightedSum(),
     val anaerobicEffect: WeightedSum = WeightedSum(),
@@ -107,6 +111,7 @@ data class MetricTotals(
         speed = speed + other.speed,
         heartRate = heartRate + other.heartRate,
         power = power + other.power,
+        cadence = cadence + other.cadence,
         swolf = swolf + other.swolf,
         aerobicEffect = aerobicEffect + other.aerobicEffect,
         anaerobicEffect = anaerobicEffect + other.anaerobicEffect,
@@ -125,6 +130,7 @@ enum class SportMetric(val average: Boolean = false, val valueOf: (MetricTotals)
     AVG_SPEED(average = true, valueOf = { it.speed.average }),
     AVG_HEART_RATE(average = true, valueOf = { it.heartRate.average }),
     AVG_POWER(average = true, valueOf = { it.power.average }),
+    AVG_CADENCE(average = true, valueOf = { it.cadence.average }),
     AVG_SWOLF(average = true, valueOf = { it.swolf.average }),
     AVG_AEROBIC_EFFECT(average = true, valueOf = { it.aerobicEffect.average }),
     AVG_ANAEROBIC_EFFECT(average = true, valueOf = { it.anaerobicEffect.average }),
@@ -240,9 +246,14 @@ data class PeriodStats(
 )
 
 /**
- * Date range and metrics with data for a sport.
+ * Date range and metrics with data for a sport. [cadenceUnit] is the unit most of its workouts record cadence in.
  */
-data class SportOverview(val firstDate: LocalDate?, val lastDate: LocalDate?, val availableMetrics: List<SportMetric>)
+data class SportOverview(
+    val firstDate: LocalDate?,
+    val lastDate: LocalDate?,
+    val availableMetrics: List<SportMetric>,
+    val cadenceUnit: String? = null,
+)
 
 object StatisticsAggregation {
     /**
@@ -297,6 +308,10 @@ object StatisticsAggregation {
             availableMetrics = SportMetric.entries
                 .filter { it != if (paceSport) SportMetric.AVG_SPEED else SportMetric.AVG_PACE }
                 .filter { metric -> metric == SportMetric.DURATION || totals.any { metric.valueOf(it) > 0.0 } },
+            cadenceUnit = workouts.filter { it.avgCadence > 0.0 }
+                .mapNotNull { it.cadenceUnit }
+                .groupingBy { it }.eachCount()
+                .maxByOrNull { it.value }?.key,
         )
     }
 

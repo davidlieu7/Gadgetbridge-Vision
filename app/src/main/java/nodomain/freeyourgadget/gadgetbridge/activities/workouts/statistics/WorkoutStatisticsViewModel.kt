@@ -155,6 +155,10 @@ class WorkoutStatisticsViewModel : ViewModel() {
             return StatisticsAggregation.speedMetersPerSecond(value, entry.unit)
         }
 
+        val cadenceKey = listOf(ActivitySummaryEntries.CADENCE_AVG, ActivitySummaryEntries.SWIM_AVG_CADENCE)
+            .firstOrNull { data?.has(it) == true }
+        val cadenceUnit = cadenceKey?.let { (data?.get(it) as? ActivitySummarySimpleEntry)?.unit }
+
         return WorkoutInput(
             startMillis = summary.startTime.time,
             endMillis = summary.endTime.time,
@@ -166,6 +170,8 @@ class WorkoutStatisticsViewModel : ViewModel() {
             avgSpeedMetersPerSecond = speed(ActivitySummaryEntries.PACE_AVG_SECONDS_KM, ActivitySummaryEntries.SPEED_AVG),
             avgHeartRate = number(ActivitySummaryEntries.HR_AVG),
             avgPowerWatts = number(ActivitySummaryEntries.AVG_POWER),
+            avgCadence = cadenceKey?.let { number(it) } ?: 0.0,
+            cadenceUnit = cadenceUnit,
             avgSwolf = number(ActivitySummaryEntries.SWOLF_AVG, ActivitySummaryEntries.SWOLF_INDEX),
             aerobicEffect = number(ActivitySummaryEntries.TRAINING_EFFECT_AEROBIC),
             anaerobicEffect = number(ActivitySummaryEntries.TRAINING_EFFECT_ANAEROBIC),
