@@ -1,9 +1,7 @@
 package nodomain.freeyourgadget.gadgetbridge.service.devices.soundcore.aeroFit;
 
-import static nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsPreferenceConst.PREF_SOUNDCORE_AUTO_POWER_OFF;
 import static nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsPreferenceConst.PREF_SOUNDCORE_BATTERY_LOW_TONE;
 import static nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsPreferenceConst.PREF_SOUNDCORE_CONTROL_TOUCH_DISABLED;
-import static nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsPreferenceConst.PREF_SOUNDCORE_GAMING_MODE;
 import static nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsPreferenceConst.PREF_SOUNDCORE_TOUCH_TONE;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -95,17 +93,9 @@ public class SoundcoreAeroFitProtocol extends SoundcoreProtocolImplV1 {
             case PREF_SOUNDCORE_BATTERY_LOW_TONE:
                 boolean batteryLowTone = prefs.getBoolean(PREF_SOUNDCORE_BATTERY_LOW_TONE, false);
                 return encodeBooleanCommand(CMD_SET_BATTERY_LOW_TONE, batteryLowTone);
-            case PREF_SOUNDCORE_GAMING_MODE:
-                boolean gamingMode = prefs.getBoolean(PREF_SOUNDCORE_GAMING_MODE, false);
-                return encodeBooleanCommand(CMD_SET_GAMING_MODE, gamingMode);
-            case PREF_SOUNDCORE_AUTO_POWER_OFF:
-                int duration = Integer.parseInt(prefs.getString(PREF_SOUNDCORE_AUTO_POWER_OFF, "3"));
-                return encodeAutoPowerOff(CMD_SET_AUTO_POWER_OFF, duration, (byte) 0x03);
             default:
-                LOG.debug("Unsupported CONFIG: " + config);
+                return super.encodeSendConfiguration(config);
         }
-
-        return super.encodeSendConfiguration(config);
     }
 
 }

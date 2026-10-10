@@ -1,6 +1,5 @@
 package nodomain.freeyourgadget.gadgetbridge.service.devices.soundcore.a30i;
 
-import static nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsPreferenceConst.PREF_SOUNDCORE_AUTO_POWER_OFF;
 import static nodomain.freeyourgadget.gadgetbridge.util.GB.hexdump;
 
 import androidx.annotation.Nullable;
@@ -176,13 +175,6 @@ public class SoundcoreA30iProtocol extends SoundcoreProtocolImplV1 {
                 // It enables/disables the low battery tone of the device at 20% and 10%.
                 final boolean low_battery = prefs.getBoolean(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_BATTERY_LOW_TONE, false);
                 return encodeBooleanCommand(CMD_SET_BATTERY_LOW_TONE, low_battery);
-
-            case DeviceSettingsPreferenceConst.PREF_SOUNDCORE_AUTO_POWER_OFF:
-                // IIt sets, after which time the speakers turn themselves off after
-                // they are disconnected from the phone: supported values:
-                // Disabled, 10 min, 20 min, 30 min, 60 min
-                int duration = Integer.parseInt(prefs.getString(PREF_SOUNDCORE_AUTO_POWER_OFF, "3"));
-                return encodeAutoPowerOff(CMD_SET_AUTO_POWER_OFF, duration, (byte) 0x03);
 
             case DeviceSettingsPreferenceConst.PREF_SOUNDCORE_ANC_MODE, DeviceSettingsPreferenceConst.PREF_SOUNDCORE_AMBIENT_SOUND_CONTROL,
                  DeviceSettingsPreferenceConst.PREF_SONY_AMBIENT_SOUND_LEVEL, DeviceSettingsPreferenceConst.PREF_SOUNDCORE_WIND_NOISE_REDUCTION:

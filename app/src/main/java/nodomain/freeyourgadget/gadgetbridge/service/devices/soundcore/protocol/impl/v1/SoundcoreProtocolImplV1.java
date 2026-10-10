@@ -71,6 +71,25 @@ public abstract class SoundcoreProtocolImplV1 extends AbstractSoundcoreProtocol 
         super(device);
     }
 
+    @Override
+    public byte[] encodeSendConfiguration(final String config) {
+        final Prefs prefs = getDevicePrefs();
+        switch (config) {
+            case DeviceSettingsPreferenceConst.PREF_SOUNDCORE_GAMING_MODE:
+                return encodeBooleanCommand(CMD_SET_GAMING_MODE, prefs.getBoolean(config, false));
+            case DeviceSettingsPreferenceConst.PREF_SOUNDCORE_AUTO_POWER_OFF:
+                return encodeAutoPowerOffConfiguration(prefs);
+            default:
+                return super.encodeSendConfiguration(config);
+        }
+    }
+
+    protected byte[] encodeAutoPowerOffConfiguration(final Prefs prefs) {
+        final int duration = Integer.parseInt(prefs.getString(
+                DeviceSettingsPreferenceConst.PREF_SOUNDCORE_AUTO_POWER_OFF, "3"));
+        return encodeAutoPowerOff(CMD_SET_AUTO_POWER_OFF, duration, (byte) 0x03);
+    }
+
     /**
      * Decodes the common V1 response envelope and routes commands to device-specific hooks.
      *
