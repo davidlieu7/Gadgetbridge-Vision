@@ -143,7 +143,7 @@ public class JblTuneBuds2Support extends AbstractDeviceSupport implements JblGat
     private final Runnable writeCustomEq = new Runnable() {
         @Override
         public void run() {
-            write(JblProtocol.WRITE_CHARACTERISTIC_UUID, buildCustomEqCommand());
+            write(buildCustomEqCommand());
         }
     };
 
@@ -269,25 +269,25 @@ public class JblTuneBuds2Support extends AbstractDeviceSupport implements JblGat
     }
 
     @RequiresPermission("android.permission.BLUETOOTH_CONNECT")
-    private void write(@NonNull final UUID characteristicUuid, @NonNull final byte[] value) {
+    private void write(@NonNull final byte[] value) {
         if (gattLink == null) {
             LOG.warn("JblTuneBuds2Support.write: no gatt link, dropping {} bytes", value.length);
             return;
         }
-        gattLink.enqueueWrite(JblProtocol.SERVICE_UUID, characteristicUuid, value);
+        gattLink.enqueueWrite(JblProtocol.SERVICE_UUID, JblProtocol.WRITE_CHARACTERISTIC_UUID, value);
     }
 
     private void initializeDevice() {
         gattLink.requestMtu(512);
-        write(JblProtocol.WRITE_CHARACTERISTIC_UUID, GET_DEVICE_INFO_GENERAL);
-        write(JblProtocol.WRITE_CHARACTERISTIC_UUID, GET_DEVICE_INFO_BATTERY);
-        write(JblProtocol.WRITE_CHARACTERISTIC_UUID, GET_MODES);
-        write(JblProtocol.WRITE_CHARACTERISTIC_UUID, GET_ADVANCED_ANC);
-        write(JblProtocol.WRITE_CHARACTERISTIC_UUID, GET_LATENCY_MODE);
-        write(JblProtocol.WRITE_CHARACTERISTIC_UUID, GET_BALANCE);
-        write(JblProtocol.WRITE_CHARACTERISTIC_UUID, GET_VOICE_PROMPTS);
-        write(JblProtocol.WRITE_CHARACTERISTIC_UUID, GET_EQ);
-        write(JblProtocol.WRITE_CHARACTERISTIC_UUID, GET_GESTURES);
+        write(GET_DEVICE_INFO_GENERAL);
+        write(GET_DEVICE_INFO_BATTERY);
+        write(GET_MODES);
+        write(GET_ADVANCED_ANC);
+        write(GET_LATENCY_MODE);
+        write(GET_BALANCE);
+        write(GET_VOICE_PROMPTS);
+        write(GET_EQ);
+        write(GET_GESTURES);
     }
 
     /**
@@ -508,83 +508,83 @@ public class JblTuneBuds2Support extends AbstractDeviceSupport implements JblGat
             final int mode = Integer.parseInt(prefs.getString(PREF_SOUND_MODE, "0"));
 
             if (PREF_SOUND_MODE.equals(config)) {
-                write(JblProtocol.WRITE_CHARACTERISTIC_UUID, buildModeCommand(mode));
+                write(buildModeCommand(mode));
             }
 
             if (PREF_ADAPTIVE_ANC.equals(config)) {
                 final boolean adaptive = prefs.getBoolean(PREF_ADAPTIVE_ANC, false);
                 if (adaptive) {
-                    write(JblProtocol.WRITE_CHARACTERISTIC_UUID, buildAdaptiveAncCommand(true));
+                    write(buildAdaptiveAncCommand(true));
                 } else {
-                    write(JblProtocol.WRITE_CHARACTERISTIC_UUID, buildAdaptiveAncCommand(false));
-                    write(JblProtocol.WRITE_CHARACTERISTIC_UUID,
+                    write(buildAdaptiveAncCommand(false));
+                    write(
                             buildAncLevelCommand(prefs.getInt(PREF_ANC_LEVEL, 4)));
                 }
             } else if (PREF_ANC_LEVEL.equals(config)) {
                 prefs.edit().putBoolean(PREF_ADAPTIVE_ANC, false).apply();
-                write(JblProtocol.WRITE_CHARACTERISTIC_UUID, buildAdaptiveAncCommand(false));
-                write(JblProtocol.WRITE_CHARACTERISTIC_UUID,
+                write(buildAdaptiveAncCommand(false));
+                write(
                         buildAncLevelCommand(prefs.getInt(PREF_ANC_LEVEL, 4)));
             } else if (PREF_AUTO_COMPENSATION.equals(config)) {
                 final boolean autoComp = prefs.getBoolean(PREF_AUTO_COMPENSATION, true);
-                write(JblProtocol.WRITE_CHARACTERISTIC_UUID, buildAutoCompensationCommand(autoComp));
+                write(buildAutoCompensationCommand(autoComp));
             } else if (PREF_SOUND_MODE.equals(config) && mode == SOUND_MODE_ANC) {
                 final boolean adaptive = prefs.getBoolean(PREF_ADAPTIVE_ANC, false);
                 if (adaptive) {
-                    write(JblProtocol.WRITE_CHARACTERISTIC_UUID, buildAdaptiveAncCommand(true));
+                    write(buildAdaptiveAncCommand(true));
                 } else {
-                    write(JblProtocol.WRITE_CHARACTERISTIC_UUID, buildAdaptiveAncCommand(false));
-                    write(JblProtocol.WRITE_CHARACTERISTIC_UUID,
+                    write(buildAdaptiveAncCommand(false));
+                    write(
                             buildAncLevelCommand(prefs.getInt(PREF_ANC_LEVEL, 4)));
                 }
             } else if (mode == SOUND_MODE_AMBIENT && (PREF_AMBIENT_LEVEL.equals(config) || PREF_SOUND_MODE.equals(config))) {
-                write(JblProtocol.WRITE_CHARACTERISTIC_UUID,
+                write(
                         buildAmbientLevelCommand(prefs.getInt(PREF_AMBIENT_LEVEL, 4)));
             } else if (isEqBandPref(config)) {
                 mainHandler.removeCallbacks(writeCustomEq);
                 mainHandler.postDelayed(writeCustomEq, EQ_WRITE_DELAY_MS);
             } else if (PREF_SPATIAL_AUDIO.equals(config)) {
                 final int spatial = Integer.parseInt(prefs.getString(PREF_SPATIAL_AUDIO, "0"));
-                write(JblProtocol.WRITE_CHARACTERISTIC_UUID, buildSpatialAudioCommand(spatial));
+                write(buildSpatialAudioCommand(spatial));
             } else if (PREF_LATENCY_MODE.equals(config)) {
                 final int latencyMode = Integer.parseInt(prefs.getString(PREF_LATENCY_MODE, "0"));
-                write(JblProtocol.WRITE_CHARACTERISTIC_UUID, buildLatencyModeCommand(latencyMode));
+                write(buildLatencyModeCommand(latencyMode));
             } else if (PREF_CALL_SOUND_EFFECT.equals(config)) {
                 final int callEffect = Integer.parseInt(prefs.getString(PREF_CALL_SOUND_EFFECT, "0"));
-                write(JblProtocol.WRITE_CHARACTERISTIC_UUID, buildCallSoundEffectCommand(callEffect));
+                write(buildCallSoundEffectCommand(callEffect));
             } else if (PREF_CALL_VOLUME_OPTIMIZER.equals(config)) {
                 final boolean opt = prefs.getBoolean(PREF_CALL_VOLUME_OPTIMIZER, false);
-                write(JblProtocol.WRITE_CHARACTERISTIC_UUID, buildCallVolumeOptimizerCommand(opt));
+                write(buildCallVolumeOptimizerCommand(opt));
             } else if (PREF_SIDETONE.equals(config)) {
                 final int sidetoneLevel = Integer.parseInt(prefs.getString(PREF_SIDETONE, "0"));
-                write(JblProtocol.WRITE_CHARACTERISTIC_UUID, buildSidetoneCommand(sidetoneLevel));
+                write(buildSidetoneCommand(sidetoneLevel));
             } else if (PREF_AUTO_POWER_OFF.equals(config)) {
                 final int autoOff = Integer.parseInt(prefs.getString(PREF_AUTO_POWER_OFF, "0"));
-                write(JblProtocol.WRITE_CHARACTERISTIC_UUID, buildAutoPowerOffCommand(autoOff));
+                write(buildAutoPowerOffCommand(autoOff));
             } else if (PREF_SAFE_SOUND.equals(config)) {
                 final boolean safeSound = prefs.getBoolean(PREF_SAFE_SOUND, false);
-                write(JblProtocol.WRITE_CHARACTERISTIC_UUID, buildSafeSoundCommand(safeSound));
+                write(buildSafeSoundCommand(safeSound));
             } else if (PREF_CHANNEL_BALANCE.equals(config)) {
                 final int balance = prefs.getInt(PREF_CHANNEL_BALANCE, 0);
-                write(JblProtocol.WRITE_CHARACTERISTIC_UUID, buildChannelBalanceCommand(balance));
+                write(buildChannelBalanceCommand(balance));
             } else if (PREF_GESTURE_LEFT.equals(config)) {
                 final int gestureRole = Integer.parseInt(prefs.getString(PREF_GESTURE_LEFT, "1"));
-                write(JblProtocol.WRITE_CHARACTERISTIC_UUID, buildGestureCommand(true, gestureRole));
+                write(buildGestureCommand(true, gestureRole));
             } else if (PREF_GESTURE_RIGHT.equals(config)) {
                 final int gestureRole = Integer.parseInt(prefs.getString(PREF_GESTURE_RIGHT, "2"));
-                write(JblProtocol.WRITE_CHARACTERISTIC_UUID, buildGestureCommand(false, gestureRole));
+                write(buildGestureCommand(false, gestureRole));
             } else if (PREF_ASC_CYCLE.equals(config)) {
                 final String leftRole = prefs.getString(PREF_GESTURE_LEFT, "1");
                 final String rightRole = prefs.getString(PREF_GESTURE_RIGHT, "2");
                 if (String.valueOf(GESTURE_ROLE_AMBIENT_SOUND_CONTROL).equals(leftRole)) {
-                    write(JblProtocol.WRITE_CHARACTERISTIC_UUID, buildGestureCommand(true, GESTURE_ROLE_AMBIENT_SOUND_CONTROL));
+                    write(buildGestureCommand(true, GESTURE_ROLE_AMBIENT_SOUND_CONTROL));
                 }
                 if (String.valueOf(GESTURE_ROLE_AMBIENT_SOUND_CONTROL).equals(rightRole)) {
-                    write(JblProtocol.WRITE_CHARACTERISTIC_UUID, buildGestureCommand(false, GESTURE_ROLE_AMBIENT_SOUND_CONTROL));
+                    write(buildGestureCommand(false, GESTURE_ROLE_AMBIENT_SOUND_CONTROL));
                 }
             } else if (PREF_VOICE_PROMPTS.equals(config)) {
                 final int vpType = Integer.parseInt(prefs.getString(PREF_VOICE_PROMPTS, "0"));
-                write(JblProtocol.WRITE_CHARACTERISTIC_UUID, buildVoicePromptsCommand(vpType));
+                write(buildVoicePromptsCommand(vpType));
             }
         } catch (final RuntimeException e) {
             LOG.error("Failed to send JBL configuration", e);
@@ -809,11 +809,11 @@ public class JblTuneBuds2Support extends AbstractDeviceSupport implements JblGat
         }
         LOG.info("JBL Tune Buds 2: onFindDevice: {}", start);
         if (start) {
-            write(JblProtocol.WRITE_CHARACTERISTIC_UUID, buildPacket(CMD_EAR_BEEPING, BEEP_START_LEFT));
-            write(JblProtocol.WRITE_CHARACTERISTIC_UUID, buildPacket(CMD_EAR_BEEPING, BEEP_START_RIGHT));
+            write(buildPacket(CMD_EAR_BEEPING, BEEP_START_LEFT));
+            write(buildPacket(CMD_EAR_BEEPING, BEEP_START_RIGHT));
         } else {
-            write(JblProtocol.WRITE_CHARACTERISTIC_UUID, buildPacket(CMD_EAR_BEEPING, BEEP_STOP_LEFT));
-            write(JblProtocol.WRITE_CHARACTERISTIC_UUID, buildPacket(CMD_EAR_BEEPING, BEEP_STOP_RIGHT));
+            write(buildPacket(CMD_EAR_BEEPING, BEEP_STOP_LEFT));
+            write(buildPacket(CMD_EAR_BEEPING, BEEP_STOP_RIGHT));
         }
     }
 
