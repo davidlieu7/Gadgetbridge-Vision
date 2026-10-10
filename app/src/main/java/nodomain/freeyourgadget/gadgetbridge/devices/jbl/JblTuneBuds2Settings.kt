@@ -222,9 +222,9 @@ private val SOUND_MODE_ANC = JblProtocol.SOUND_MODE_ANC.toString()
 private val SOUND_MODE_TALK_THRU = JblProtocol.SOUND_MODE_TALKTHRU.toString()
 private val SOUND_MODE_AMBIENT = JblProtocol.SOUND_MODE_AMBIENT.toString()
 
-private const val GESTURE_AMBIENT_SOUND_CONTROL = "1"
-private const val GESTURE_PLAYBACK_CONTROL = "2"
-private const val ASC_CYCLE_ALL = "9"
+private val GESTURE_AMBIENT_SOUND_CONTROL = JblProtocol.GESTURE_ROLE_AMBIENT_SOUND_CONTROL.toString()
+private val GESTURE_PLAYBACK_CONTROL = JblProtocol.GESTURE_ROLE_PLAYBACK_CONTROL.toString()
+private val ASC_CYCLE_ALL = JblProtocol.ASC_CYCLE_ALL.toString()
 
 private data class EqBand(val key: String, @StringRes val title: Int)
 

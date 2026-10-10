@@ -151,6 +151,9 @@ public final class JblProtocol {
     public static final int GESTURE_ROLE_VOLUME_CONTROL      = 3;
     public static final int GESTURE_ROLE_VOICE_ASSISTANT     = 4;
 
+    // Placeholder for the ambient sound control cycle, standing for the device default.
+    public static final int ASC_CYCLE_ALL                = 9;
+
     // Voice Prompts & Tones. The device only knows enabled/disabled.
     public static final int VOICE_PROMPT_LANGUAGE            = 1;
 
