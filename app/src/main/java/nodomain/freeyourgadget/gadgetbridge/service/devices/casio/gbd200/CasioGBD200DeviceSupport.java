@@ -35,7 +35,6 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.text.SimpleDateFormat;
-import java.time.DayOfWeek;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
@@ -186,20 +185,7 @@ public class CasioGBD200DeviceSupport extends Casio2C2DSupport
      */
     @Override
     public void writeCurrentTime(TransactionBuilder builder, ZonedDateTime time) {
-        int dow = time.getDayOfWeek() == DayOfWeek.SUNDAY ? 0 : time.getDayOfWeek().getValue();
-        byte[] arr = new byte[11];
-        arr[0]  = FEATURE_CURRENT_TIME;
-        arr[1]  = (byte) (time.getYear() & 0xff);
-        arr[2]  = (byte) ((time.getYear() >> 8) & 0xff);
-        arr[3]  = (byte) time.getMonthValue();
-        arr[4]  = (byte) time.getDayOfMonth();
-        arr[5]  = (byte) time.getHour();
-        arr[6]  = (byte) time.getMinute();
-        arr[7]  = (byte) time.getSecond();
-        arr[8]  = (byte) dow;
-        arr[9]  = 0x00; // fractions256
-        arr[10] = 0x01; // reason = manual sync
-        writeAllFeatures(builder, arr);
+        writeAllFeatures(builder, Casio2C2DSupport.buildCurrentTimePacket(time));
     }
 
     @Override

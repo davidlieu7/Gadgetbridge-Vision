@@ -18,7 +18,10 @@ package nodomain.freeyourgadget.gadgetbridge.service.devices.casio;
 
 import java.time.ZonedDateTime;
 import java.time.ZoneId;
+import java.time.DayOfWeek;
 import java.time.LocalDate;
+import java.nio.ByteBuffer;
+import java.nio.ByteOrder;
 import java.nio.charset.StandardCharsets;
 import java.io.IOException;
 import android.bluetooth.BluetoothGatt;
@@ -349,6 +352,46 @@ public abstract class Casio2C2DSupport extends CasioSupport {
         System.arraycopy(tmp, 0, arr, 1, 10);
 
         writeAllFeatures(builder, arr);
+    }
+
+    /**
+     * CURRENT_TIME (0x09) packet in the Casio convention: day-of-week Sun=0..Sat=6,
+     * unlike the BLE CTS standard (Mon=1..Sun=7) used by {@link #writeCurrentTime}.
+     * Matches the GBD-200/GG-B100 captures; reason byte is 1 (sync).
+     */
+    public static byte[] buildCurrentTimePacket(ZonedDateTime time) {
+        final int dow = time.getDayOfWeek() == DayOfWeek.SUNDAY
+                ? 0 : time.getDayOfWeek().getValue();
+        final byte[] arr = new byte[11];
+        arr[0]  = FEATURE_CURRENT_TIME;
+        arr[1]  = (byte) (time.getYear() & 0xff);
+        arr[2]  = (byte) ((time.getYear() >> 8) & 0xff);
+        arr[3]  = (byte) time.getMonthValue();
+        arr[4]  = (byte) time.getDayOfMonth();
+        arr[5]  = (byte) time.getHour();
+        arr[6]  = (byte) time.getMinute();
+        arr[7]  = (byte) time.getSecond();
+        arr[8]  = (byte) dow;
+        arr[9]  = 0x00; // fractions256
+        arr[10] = 0x01; // reason = sync
+        return arr;
+    }
+
+    /**
+     * GPS chunk: 24 {@code <slot>} 01 {@code <lat float64 BE>} {@code <lon float64 BE>} 04.
+     * On the GG-B100 slot 0 is the phone's position and slot 1 the world-city
+     * coordinates; on the GBD-200 slot 1 carries altitude instead, so that device
+     * keeps its own encoding for it.
+     */
+    public static byte[] buildGpsChunk(int slot, double lat, double lon) {
+        final ByteBuffer buf = ByteBuffer.allocate(20).order(ByteOrder.BIG_ENDIAN);
+        buf.put((byte) 0x24);
+        buf.put((byte) slot);
+        buf.put((byte) 0x01);
+        buf.putDouble(lat);
+        buf.putDouble(lon);
+        buf.put((byte) 0x04);
+        return buf.array();
     }
 
     /** Writes a full clock-slot set (slot 0 = home, slots 1+ = world) inside the 0x21
