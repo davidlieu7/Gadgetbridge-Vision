@@ -463,7 +463,7 @@ class GbChartView @JvmOverloads constructor(
      */
     private fun setXLabels(axis: AxisSpec, dayNames: Boolean = true) {
         val origin = xOrigin
-        val label = labelFor(axis, dayNames)
+        val label = axis.labeler ?: labelFor(axis, dayNames)
         xAxisLabels.values = fixedLabelValues(axis)?.map { it - origin }
         xAxis.valueFormatter = formatterFor { label(it + origin) }
     }

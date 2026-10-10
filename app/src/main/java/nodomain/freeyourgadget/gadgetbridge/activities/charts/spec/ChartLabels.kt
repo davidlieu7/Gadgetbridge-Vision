@@ -25,6 +25,7 @@ fun labelFor(format: ChartValueFormat): (Double) -> String = when (format) {
     ChartValueFormat.MONTH_OF_YEAR -> wholeLabeler(1..12) { monthOfYearLabel(it) }
     ChartValueFormat.EPOCH_DAY -> wholeLabeler(Int.MIN_VALUE..Int.MAX_VALUE) { dayOfMonthLabel(epochDay(it).dayOfMonth.toDouble()) }
     ChartValueFormat.DURATION_MINUTES -> { value -> minutesLabel(value) }
+    ChartValueFormat.BAR_INDEX -> decimalLabeler("0")
 }
 
 /**
@@ -179,9 +180,15 @@ fun fixedLabelValues(xAxis: AxisSpec): List<Double>? {
                 }
             }
             .map { it.toDouble() }
+        ChartValueFormat.BAR_INDEX -> {
+            val step = ceil((max - min + 1) / MAX_BAR_INDEX_LABELS).toInt().coerceAtLeast(1)
+            (min.toInt()..max.toInt() step step).map { it.toDouble() }
+        }
         else -> null
     }
 }
+
+private const val MAX_BAR_INDEX_LABELS = 6.0
 
 /**
  * Skips the 30th, which would collide with the next month's 1st.

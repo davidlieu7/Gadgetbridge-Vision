@@ -40,17 +40,22 @@
                     android:contentDescription="@string/statistics_previous_period"
                     app:icon="@drawable/ic_chevron_1" />
 
-                <TextView
+                <com.google.android.material.button.MaterialButton
                     android:id="@+id/sport_period_title"
+                    style="@style/Widget.Material3.Button.TextButton.Icon"
                     android:layout_width="0dp"
                     android:layout_height="wrap_content"
                     android:layout_weight="1"
                     android:ellipsize="end"
                     android:fontFamily="sans-serif-medium"
-                    android:gravity="center"
                     android:maxLines="1"
+                    android:textAllCaps="false"
                     android:textColor="?attr/colorOnSurface"
-                    android:textSize="14sp" />
+                    android:textSize="14sp"
+                    app:icon="@drawable/ic_date_range"
+                    app:iconGravity="textEnd"
+                    app:iconSize="18dp"
+                    app:iconTint="?attr/colorOnSurface" />
 
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/sport_period_next"

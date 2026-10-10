@@ -1,5 +1,6 @@
 package nodomain.freeyourgadget.gadgetbridge.activities.workouts.statistics
 
+import android.content.res.ColorStateList
 import android.os.Bundle
 import android.text.format.DateFormat
 import android.text.format.DateUtils
@@ -7,10 +8,16 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import androidx.core.content.ContextCompat
+import androidx.core.util.Pair as DateRange
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
 import androidx.lifecycle.lifecycleScope
 import com.google.android.material.color.MaterialColors
+import com.google.android.material.datepicker.CalendarConstraints
+import com.google.android.material.datepicker.CompositeDateValidator
+import com.google.android.material.datepicker.DateValidatorPointBackward
+import com.google.android.material.datepicker.DateValidatorPointForward
+import com.google.android.material.datepicker.MaterialDatePicker
 import com.google.android.material.tabs.TabLayout
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
@@ -25,6 +32,7 @@ import nodomain.freeyourgadget.gadgetbridge.databinding.FragmentSportStatisticsB
 import nodomain.freeyourgadget.gadgetbridge.model.ActivityKind
 import nodomain.freeyourgadget.gadgetbridge.model.ActivitySummaryEntries
 import org.slf4j.LoggerFactory
+import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.ZoneId
@@ -35,7 +43,7 @@ import java.util.Locale
 import kotlin.math.roundToLong
 
 /**
- * Statistics of one sport over a week, month or year.
+ * Statistics of one sport over a week, month, year or custom range.
  */
 class SportStatisticsFragment : Fragment() {
     private val viewModel: WorkoutStatisticsViewModel by activityViewModels()
@@ -51,13 +59,19 @@ class SportStatisticsFragment : Fragment() {
     private var overview: SportOverview? = null
     private var stats: PeriodStats? = null
     private var loadJob: Job? = null
+    private var tabTextColors: ColorStateList? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         if (savedInstanceState != null) {
             kind = PeriodKind.valueOf(savedInstanceState.getString(STATE_KIND, kind.name))
             if (savedInstanceState.containsKey(STATE_PERIOD_START)) {
-                period = StatisticsPeriod(kind, LocalDate.ofEpochDay(savedInstanceState.getLong(STATE_PERIOD_START)))
+                val start = LocalDate.ofEpochDay(savedInstanceState.getLong(STATE_PERIOD_START))
+                period = if (kind == PeriodKind.CUSTOM) {
+                    StatisticsPeriod.custom(start, LocalDate.ofEpochDay(savedInstanceState.getLong(STATE_PERIOD_END)))
+                } else {
+                    StatisticsPeriod(kind, start)
+                }
             }
         }
     }
@@ -70,7 +84,7 @@ class SportStatisticsFragment : Fragment() {
         _binding = FragmentSportStatisticsBinding.inflate(inflater, container, false)
         binding.sportChart.dismissSelectionOnTapOutside(binding.sportContent)
 
-        PeriodKind.entries.forEach { periodKind ->
+        PRESET_KINDS.forEach { periodKind ->
             val tab = binding.sportPeriodTabs.newTab().setText(tabLabel(periodKind)).setTag(periodKind)
             binding.sportPeriodTabs.addTab(tab, periodKind == kind)
         }
@@ -84,11 +98,17 @@ class SportStatisticsFragment : Fragment() {
 
             override fun onTabUnselected(tab: TabLayout.Tab) = Unit
 
-            override fun onTabReselected(tab: TabLayout.Tab) = Unit
+            override fun onTabReselected(tab: TabLayout.Tab) {
+                if (kind == PeriodKind.CUSTOM) {
+                    onTabSelected(tab)
+                }
+            }
         })
+        tabTextColors = binding.sportPeriodTabs.tabTextColors
 
-        binding.sportPeriodPrevious.setOnClickListener { period?.let { showPeriod(it.previous()) } }
+        binding.sportPeriodPrevious.setOnClickListener { period?.let { showPeriod(startingAfterFirstWorkout(it.previous())) } }
         binding.sportPeriodNext.setOnClickListener { period?.let { showPeriod(it.next()) } }
+        binding.sportPeriodTitle.setOnClickListener { showRangePicker() }
         binding.sportChartEdit.setOnClickListener {
             val available = overview?.availableMetrics ?: return@setOnClickListener
             val current = config ?: return@setOnClickListener
@@ -106,6 +126,10 @@ class SportStatisticsFragment : Fragment() {
             config = applied
             GBApplication.getPrefs().preferences.edit().putString(configKey(), applied.serialize()).apply()
             stats?.let { renderChart(it) }
+        }
+        (childFragmentManager.findFragmentByTag(TAG_RANGE_PICKER) as? MaterialDatePicker<*>)?.let {
+            @Suppress("UNCHECKED_CAST")
+            listenToRangePicker(it as MaterialDatePicker<DateRange<Long, Long>>)
         }
         viewLifecycleOwner.lifecycleScope.launch {
             try {
@@ -132,7 +156,10 @@ class SportStatisticsFragment : Fragment() {
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)
         outState.putString(STATE_KIND, kind.name)
-        period?.let { outState.putLong(STATE_PERIOD_START, it.start.toEpochDay()) }
+        period?.let {
+            outState.putLong(STATE_PERIOD_START, it.start.toEpochDay())
+            outState.putLong(STATE_PERIOD_END, it.endInclusive.toEpochDay())
+        }
     }
 
     override fun onDestroyView() {
@@ -145,6 +172,7 @@ class SportStatisticsFragment : Fragment() {
             PeriodKind.WEEK -> R.string.calendar_week
             PeriodKind.MONTH -> R.string.calendar_month
             PeriodKind.YEAR -> R.string.calendar_year
+            PeriodKind.CUSTOM -> R.string.statistics_custom_range
         }
     )
 
@@ -165,10 +193,71 @@ class SportStatisticsFragment : Fragment() {
     private fun configKey() = PREF_CHART_CONFIG_PREFIX + kindCode
 
     /**
+     * Moves a custom range that starts before the first workout to start on it, keeping its length.
+     */
+    private fun startingAfterFirstWorkout(shown: StatisticsPeriod): StatisticsPeriod {
+        val first = overview?.firstDate ?: return shown
+        if (shown.kind != PeriodKind.CUSTOM || !shown.start.isBefore(first)) {
+            return shown
+        }
+        return StatisticsPeriod.custom(first, first.plusDays(shown.dayCount - 1))
+    }
+
+    private fun showRangePicker() {
+        val shown = period ?: return
+        if (overview == null || childFragmentManager.findFragmentByTag(TAG_RANGE_PICKER) != null) {
+            return
+        }
+        val today = today()
+        val first = overview?.firstDate?.takeIf { !it.isAfter(today) }
+        val validators = listOfNotNull(
+            first?.let { DateValidatorPointForward.from(utcMillis(it)) },
+            DateValidatorPointBackward.before(utcMillis(today)),
+        )
+        val selectedStart = first?.let { maxOf(shown.start, it) } ?: shown.start
+        val selectedEnd = minOf(shown.endInclusive, today)
+        val constraints = CalendarConstraints.Builder()
+            .setEnd(utcMillis(today))
+            .setOpenAt(utcMillis(first?.let { maxOf(selectedEnd, it) } ?: selectedEnd))
+            .setValidator(CompositeDateValidator.allOf(validators))
+        first?.let { constraints.setStart(utcMillis(it)) }
+
+        val builder = MaterialDatePicker.Builder.dateRangePicker()
+            .setTitleText(R.string.statistics_custom_range)
+            .setCalendarConstraints(constraints.build())
+        if (!selectedEnd.isBefore(selectedStart)) {
+            builder.setSelection(DateRange(utcMillis(selectedStart), utcMillis(selectedEnd)))
+        }
+        val picker = builder.build()
+        listenToRangePicker(picker)
+        picker.show(childFragmentManager, TAG_RANGE_PICKER)
+    }
+
+    private fun listenToRangePicker(picker: MaterialDatePicker<DateRange<Long, Long>>) {
+        picker.addOnPositiveButtonClickListener { selection ->
+            val start = selection.first ?: return@addOnPositiveButtonClickListener
+            val end = selection.second ?: return@addOnPositiveButtonClickListener
+            val custom = StatisticsPeriod.custom(utcDate(start), utcDate(end))
+            if (_binding != null && overview != null) {
+                showPeriod(custom)
+            } else {
+                period = custom
+                kind = PeriodKind.CUSTOM
+            }
+        }
+    }
+
+    private fun utcMillis(date: LocalDate) = date.atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()
+
+    private fun utcDate(millis: Long) = Instant.ofEpochMilli(millis).atZone(ZoneOffset.UTC).toLocalDate()
+
+    /**
      * Cancels any load still running for another period.
      */
     private fun showPeriod(newPeriod: StatisticsPeriod) {
         period = newPeriod
+        kind = newPeriod.kind
+        renderTabs(newPeriod)
         renderHeader(newPeriod)
 
         loadJob?.cancel()
@@ -185,12 +274,33 @@ class SportStatisticsFragment : Fragment() {
     }
 
     /**
+     * No tab is highlighted while a custom range is shown.
+     */
+    private fun renderTabs(shown: StatisticsPeriod) {
+        val tabs = binding.sportPeriodTabs
+        val colors = tabTextColors ?: return
+        if (shown.kind == PeriodKind.CUSTOM) {
+            tabs.selectTab(null)
+            tabs.tabTextColors = ColorStateList.valueOf(colors.defaultColor)
+            tabs.setSelectedTabIndicatorColor(HIDDEN_INDICATOR_COLOR)
+        } else {
+            tabs.tabTextColors = colors
+            tabs.setSelectedTabIndicatorColor(MaterialColors.getColor(tabs, R.attr.subtab_active))
+        }
+    }
+
+    /**
      * Period title and arrows, limited to the range with workouts.
      */
     private fun renderHeader(shown: StatisticsPeriod) {
         binding.sportPeriodTitle.text = periodTitle(shown)
 
         val overview = overview ?: return
+        if (shown.kind == PeriodKind.CUSTOM) {
+            binding.sportPeriodPrevious.isEnabled = overview.firstDate?.isBefore(shown.start) == true
+            binding.sportPeriodNext.isEnabled = shown.endInclusive.isBefore(today())
+            return
+        }
         val earliest = overview.firstDate?.let { StatisticsPeriod.containing(kind, it).start }
         val latestDate = overview.lastDate?.takeIf { it.isAfter(today()) } ?: today()
         val latest = StatisticsPeriod.containing(kind, latestDate).start
@@ -199,7 +309,7 @@ class SportStatisticsFragment : Fragment() {
     }
 
     /**
-     * Locale-formatted, e.g. "Sep 22 – 28, 2026", "September 2026", "2026".
+     * Locale-formatted, e.g. "Sep 22 - 28, 2026", "September 2026", "2026", "Sep 3, 2025 - Feb 1, 2026".
      */
     private fun periodTitle(shown: StatisticsPeriod): String {
         fun millis(date: LocalDate) = date.atTime(LocalTime.NOON).toInstant(ZoneOffset.UTC).toEpochMilli()
@@ -213,7 +323,7 @@ class SportStatisticsFragment : Fragment() {
         ).toString()
 
         return when (shown.kind) {
-            PeriodKind.WEEK -> range(shown.start, shown.endInclusive, DateUtils.FORMAT_ABBREV_MONTH)
+            PeriodKind.WEEK, PeriodKind.CUSTOM -> range(shown.start, shown.endInclusive, DateUtils.FORMAT_ABBREV_MONTH)
             PeriodKind.MONTH -> range(shown.start, shown.start, DateUtils.FORMAT_NO_MONTH_DAY)
             PeriodKind.YEAR -> shown.start.year.toString()
         }
@@ -254,7 +364,8 @@ class SportStatisticsFragment : Fragment() {
             }
         }
 
-        val spec = SportChartSpecBuilder.build(stats, charts.first(), charts.getOrNull(1))
+        val barLabel = if (stats.period.kind == PeriodKind.CUSTOM) customBarLabeler(stats.period) else null
+        val spec = SportChartSpecBuilder.build(stats, charts.first(), charts.getOrNull(1), barLabel)
         binding.sportChart.selectionContent = { x -> selection(stats, x.toInt(), charts, formatter) }
         binding.sportChart.setSpec(spec)
         binding.sportChart.contentDescription =
@@ -283,18 +394,35 @@ class SportStatisticsFragment : Fragment() {
     }
 
     /**
-     * Locale-formatted, e.g. "Wed, Sep 24", "Sep 24, 2026", "September 2026".
+     * Locale-formatted, e.g. "Wed, Sep 24", "Sep 24, 2026", "September 2026", "Sep 1 - 7, 2026".
      */
     private fun slotTitle(period: StatisticsPeriod, slot: Int): String {
-        val locale = Locale.getDefault()
-        fun format(skeleton: String, date: LocalDate) =
-            DateTimeFormatter.ofPattern(DateFormat.getBestDateTimePattern(locale, skeleton), locale).format(date)
-
-        return when (period.kind) {
-            PeriodKind.WEEK -> format("EEEMMMd", period.start.plusDays(slot - 1L))
-            PeriodKind.MONTH -> format("yMMMd", period.start.plusDays(slot - 1L))
-            PeriodKind.YEAR -> format("yMMMM", period.start.withMonth(slot))
+        val (first, last) = period.barDates(slot)
+        return when {
+            period.kind == PeriodKind.WEEK -> formatDate("EEEMMMd", first)
+            period.barUnit == BarUnit.DAY -> formatDate("yMMMd", first)
+            period.barUnit == BarUnit.MONTH && period.kind == PeriodKind.YEAR -> formatDate("yMMMM", first)
+            else -> periodTitle(StatisticsPeriod.custom(first, last))
         }
+    }
+
+    /**
+     * Bar start dates, e.g. "Sep 1", or month names, e.g. "Sep", with the year when the range spans years.
+     */
+    private fun customBarLabeler(period: StatisticsPeriod): (Int) -> String {
+        val spansYears = period.start.year != period.endInclusive.year
+        return { slot ->
+            val first = period.barDates(slot).first
+            when (period.barUnit) {
+                BarUnit.DAY, BarUnit.WEEK -> formatDate("MMMd", first)
+                BarUnit.MONTH -> formatDate(if (spansYears) "MMMyy" else "MMM", first)
+            }
+        }
+    }
+
+    private fun formatDate(skeleton: String, date: LocalDate): String {
+        val locale = Locale.getDefault()
+        return DateTimeFormatter.ofPattern(DateFormat.getBestDateTimePattern(locale, skeleton), locale).format(date)
     }
 
     private fun chartDescription(
@@ -303,11 +431,22 @@ class SportStatisticsFragment : Fragment() {
         label: String,
         formatter: WorkoutValueFormatter,
     ): String = getString(
-        when {
-            stats.period.kind == PeriodKind.YEAR && metric.average -> R.string.statistics_chart_description_monthly_average
-            stats.period.kind == PeriodKind.YEAR -> R.string.statistics_chart_description_monthly
-            metric.average -> R.string.statistics_chart_description_daily_average
-            else -> R.string.statistics_chart_description_daily
+        when (stats.period.barUnit) {
+            BarUnit.DAY -> if (metric.average) {
+                R.string.statistics_chart_description_daily_average
+            } else {
+                R.string.statistics_chart_description_daily
+            }
+            BarUnit.WEEK -> if (metric.average) {
+                R.string.statistics_chart_description_weekly_average
+            } else {
+                R.string.statistics_chart_description_weekly
+            }
+            BarUnit.MONTH -> if (metric.average) {
+                R.string.statistics_chart_description_monthly_average
+            } else {
+                R.string.statistics_chart_description_monthly
+            }
         },
         label,
         periodTitle(stats.period),
@@ -381,6 +520,12 @@ class SportStatisticsFragment : Fragment() {
         private const val ARG_KIND_CODE = "kindCode"
         private const val STATE_KIND = "kind"
         private const val STATE_PERIOD_START = "periodStart"
+        private const val STATE_PERIOD_END = "periodEnd"
+        private const val TAG_RANGE_PICKER = "rangePicker"
+
+        // Color.TRANSPARENT would remove the tint instead of hiding the indicator
+        private const val HIDDEN_INDICATOR_COLOR = 0x00000001
+        private val PRESET_KINDS = listOf(PeriodKind.WEEK, PeriodKind.MONTH, PeriodKind.YEAR)
         private const val PREF_CHART_CONFIG_PREFIX = "sport_statistics_chart_"
         private const val METERS_PER_KM = 1000.0
         private const val METERS_PER_100 = 100.0

@@ -25,12 +25,17 @@ class MetricChart(
 
 object SportChartSpecBuilder {
     /**
-     * Chart spec for a period. [second] gets its own y axis.
+     * Chart spec for a period. [second] gets its own y axis. [barLabel] labels the bars of a custom period.
      */
-    fun build(stats: PeriodStats, first: MetricChart, second: MetricChart? = null): ChartSpec {
+    fun build(
+        stats: PeriodStats,
+        first: MetricChart,
+        second: MetricChart? = null,
+        barLabel: ((Int) -> String)? = null,
+    ): ChartSpec {
         val firstPoints = points(stats, first)
         if (second != null && firstPoints.isEmpty()) {
-            return build(stats, second)
+            return build(stats, second, barLabel = barLabel)
         }
         val secondPoints = second?.let { points(stats, it) }.orEmpty()
         val shownSecond = second?.takeIf { secondPoints.any { it.y != 0.0 } }
@@ -44,9 +49,11 @@ object SportChartSpecBuilder {
                     PeriodKind.WEEK -> ChartValueFormat.DAY_OF_WEEK
                     PeriodKind.MONTH -> ChartValueFormat.DAY_OF_MONTH
                     PeriodKind.YEAR -> ChartValueFormat.MONTH_OF_YEAR
+                    PeriodKind.CUSTOM -> ChartValueFormat.BAR_INDEX
                 },
                 minimum = 1.0,
                 maximum = stats.period.barCount.toDouble(),
+                labeler = barLabel?.let { label -> { x -> label(x.toInt()) } },
             ),
             yAxis = yAxis(first, firstPoints),
             endYAxis = shownSecond?.let { yAxis(it, secondPoints) },
