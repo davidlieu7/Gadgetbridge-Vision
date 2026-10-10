@@ -25,6 +25,8 @@ import static nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.Dev
 import static nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsPreferenceConst.PREF_INACTIVITY_START;
 import static nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsPreferenceConst.PREF_INACTIVITY_THRESHOLD_EXTENDED;
 import static nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsPreferenceConst.PREF_VIBRATION_ENABLE;
+import static nodomain.freeyourgadget.gadgetbridge.service.btle.BLETypeConversions.toUint16;
+import static nodomain.freeyourgadget.gadgetbridge.service.btle.BLETypeConversions.toUnsigned;
 
 import java.util.Collections;
 import java.util.HashMap;
@@ -38,10 +40,11 @@ final class FitProSettings {
     }
 
     static Map<String, Object> decode(final byte[] data) {
+        // FitPro encodes 16-bit fields big-endian; toUint16 expects little-endian byte order.
         if (data == null || data.length < 8 || data[0] != FitProConstants.DATA_HEADER ||
-                unsignedShort(data, 1) != data.length - 3 ||
+                toUint16(data[2], data[1]) != data.length - 3 ||
                 data[3] != FitProConstants.CMD_GROUP_REQUEST_DATA || data[4] != 1 ||
-                unsignedShort(data, 6) != data.length - 8) {
+                toUint16(data[7], data[6]) != data.length - 8) {
             return Collections.emptyMap();
         }
         return switch (data[5]) {
@@ -67,8 +70,8 @@ final class FitProSettings {
         if (data.length != 13 || !isBoolean(data[8])) {
             return Collections.emptyMap();
         }
-        final int start = unsignedShort(data, 9);
-        final int end = unsignedShort(data, 11);
+        final int start = toUint16(data[10], data[9]);
+        final int end = toUint16(data[12], data[11]);
         if (start >= 24 * 60 || end >= 24 * 60) {
             return Collections.emptyMap();
         }
@@ -81,20 +84,16 @@ final class FitProSettings {
 
     private static Map<String, Object> decodeLongSitReminder(final byte[] data) {
         if (data.length != 16 || !isBoolean(data[9]) ||
-                data[12] < 3 || data[12] > 8 || (data[13] & 0xff) >= 24 ||
-                (data[14] & 0xff) >= 24 || data[15] != 0x7f) {
+                data[12] < 3 || data[12] > 8 || toUnsigned(data[13]) >= 24 ||
+                toUnsigned(data[14]) >= 24 || data[15] != 0x7f) {
             return Collections.emptyMap();
         }
         final Map<String, Object> preferences = new HashMap<>();
         preferences.put(PREF_INACTIVITY_ENABLE, data[9] == 1);
         preferences.put(PREF_INACTIVITY_THRESHOLD_EXTENDED, Integer.toString(data[12]));
-        preferences.put(PREF_INACTIVITY_START, formatTime((data[13] & 0xff) * 60));
-        preferences.put(PREF_INACTIVITY_END, formatTime((data[14] & 0xff) * 60));
+        preferences.put(PREF_INACTIVITY_START, formatTime(toUnsigned(data[13]) * 60));
+        preferences.put(PREF_INACTIVITY_END, formatTime(toUnsigned(data[14]) * 60));
         return preferences;
-    }
-
-    private static int unsignedShort(final byte[] data, final int offset) {
-        return ((data[offset] & 0xff) << 8) | (data[offset + 1] & 0xff);
     }
 
     private static String formatTime(final int minutes) {
