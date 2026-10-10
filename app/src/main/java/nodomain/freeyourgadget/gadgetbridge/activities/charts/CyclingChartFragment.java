@@ -92,7 +92,13 @@ public class CyclingChartFragment extends AbstractChartFragment<CyclingChartFrag
         long averageNumSamples;
 
         public CyclingChartsDataBuilder(final List<CyclingSample> samples) {
-            this.samples = samples;
+            // Samples from a cadence-only sensor carry no distance to chart
+            this.samples = new ArrayList<>();
+            for (CyclingSample sample : samples) {
+                if (sample.getDistance() != null) {
+                    this.samples.add(sample);
+                }
+            }
         }
 
         private void reset() {

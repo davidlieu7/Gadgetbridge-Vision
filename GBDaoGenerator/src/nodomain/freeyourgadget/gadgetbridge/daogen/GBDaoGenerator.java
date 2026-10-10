@@ -110,7 +110,7 @@ public class GBDaoGenerator {
             outputDir.mkdirs();
         }
 
-        final Schema schema = new Schema(155, MAIN_PACKAGE + ".entities");
+        final Schema schema = new Schema(156, MAIN_PACKAGE + ".entities");
 
         final List<Entity> sampleProvidersToGenerate = new LinkedList<>();
         final List<Entity> batterySampleProvidersToGenerate = new LinkedList<>();
@@ -1120,6 +1120,8 @@ public class GBDaoGenerator {
         cyclingSample.addIntProperty("RevolutionCount");
         cyclingSample.addFloatProperty("Distance");
         cyclingSample.addFloatProperty("Speed");
+        cyclingSample.addIntProperty("Cadence")
+                .javaDocGetterAndSetter("Crank cadence in revolutions per minute.");
         return cyclingSample;
     }
 

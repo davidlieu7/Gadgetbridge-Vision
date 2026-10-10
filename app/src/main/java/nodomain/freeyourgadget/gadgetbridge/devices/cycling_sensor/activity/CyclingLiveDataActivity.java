@@ -12,6 +12,7 @@ import android.widget.Toast;
 import androidx.localbroadcastmanager.content.LocalBroadcastManager;
 
 import java.util.List;
+import java.util.Locale;
 
 import nodomain.freeyourgadget.gadgetbridge.GBApplication;
 import nodomain.freeyourgadget.gadgetbridge.R;
@@ -24,7 +25,7 @@ import nodomain.freeyourgadget.gadgetbridge.model.DistanceUnit;
 import nodomain.freeyourgadget.gadgetbridge.util.GB;
 
 public class CyclingLiveDataActivity extends AbstractGBActivity {
-    private TextView speedView, tripDistanceView, totalDistanceView;
+    private TextView speedView, cadenceView, tripDistanceView, totalDistanceView;
     private GBDevice selectedDevice;
     private float tripStartDistance = 0, tripCurrentDistance = 0;
     private float toUnitFactor = 1;
@@ -57,6 +58,7 @@ public class CyclingLiveDataActivity extends AbstractGBActivity {
         setContentView(R.layout.activity_cycling_live_data);
 
         speedView = findViewById(R.id.cycling_data_speed);
+        cadenceView = findViewById(R.id.cycling_data_cadence);
         tripDistanceView = findViewById(R.id.cycling_data_trip_distance);
         totalDistanceView = findViewById(R.id.cycling_data_total_distance);
 
@@ -130,18 +132,27 @@ public class CyclingLiveDataActivity extends AbstractGBActivity {
                 return;
             }
 
-            Float metersPerSecond = sample.getSpeed();
-            if(metersPerSecond != null) {
-                float kmh = metersPerSecond * 3.6f * toUnitFactor;
-                speedView.setText(String.format("%.1f %s", kmh, getString(speedStringResource)));
-            }else{
-                speedView.setText(String.format("%.1f %s", 0f, getString(speedStringResource)));
+            // A sample without wheel data, e.g. from a cadence-only sensor, has no distance
+            if (sample.getDistance() != null) {
+                Float metersPerSecond = sample.getSpeed();
+                if(metersPerSecond != null) {
+                    float kmh = metersPerSecond * 3.6f * toUnitFactor;
+                    speedView.setText(String.format("%.1f %s", kmh, getString(speedStringResource)));
+                }else{
+                    speedView.setText(String.format("%.1f %s", 0f, getString(speedStringResource)));
+                }
+
+                tripCurrentDistance = sample.getDistance();
+
+                tripDistanceView.setText(getString(tripStringResource, ((tripCurrentDistance - tripStartDistance) * toUnitFactor) / 1000));
+                totalDistanceView.setText(getString(totalStringResource, (tripCurrentDistance * toUnitFactor) / 1000));
             }
 
-            tripCurrentDistance = sample.getDistance();
-
-            tripDistanceView.setText(getString(tripStringResource, ((tripCurrentDistance - tripStartDistance) * toUnitFactor) / 1000));
-            totalDistanceView.setText(getString(totalStringResource, (tripCurrentDistance * toUnitFactor) / 1000));
+            Integer cadence = sample.getCadence();
+            if (cadence != null) {
+                cadenceView.setVisibility(View.VISIBLE);
+                cadenceView.setText(String.format(Locale.getDefault(), "%d %s", cadence, getString(R.string.unit_rpm)));
+            }
         }
     };
 

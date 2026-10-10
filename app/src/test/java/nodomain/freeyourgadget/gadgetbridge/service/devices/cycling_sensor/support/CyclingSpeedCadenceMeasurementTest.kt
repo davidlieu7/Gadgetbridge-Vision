@@ -26,6 +26,12 @@ class CyclingSpeedCadenceMeasurementTest {
         lastRevolutionTimeTicks = ticks
     }
 
+    private fun crank(revolutions: Int, ticks: Int) = CyclingSpeedCadenceMeasurement().apply {
+        cadenceDataPresent = true
+        crankRevolutionCount = revolutions
+        lastCrankRevolutionTimeTicks = ticks
+    }
+
     @Test
     fun wheelOnly() {
         val m = CyclingSpeedCadenceMeasurement.fromPayload(hex("01 e8030000 0004"))
@@ -103,5 +109,21 @@ class CyclingSpeedCadenceMeasurementTest {
     @Test
     fun speedSince_noTimePassed_isNull() {
         assertNull(wheel(1000, 1024).speedSince(wheel(1000, 1024), 2.0f))
+    }
+
+    @Test
+    fun cadenceSince_twoRevolutionsInOneAndAHalfSeconds() {
+        assertEquals(80, crank(102, 1024 + 1536).cadenceSince(crank(100, 1024)))
+    }
+
+    @Test
+    fun cadenceSince_acrossRevolutionAndEventTimeRollover() {
+        // 0xFFFF -> 0x0001 is 2 revolutions, 0xFC00 -> 0x0200 is 1536 ticks
+        assertEquals(80, crank(0x0001, 0x0200).cadenceSince(crank(0xFFFF, 0xFC00)))
+    }
+
+    @Test
+    fun cadenceSince_noNewCrankEvent_isNull() {
+        assertNull(crank(100, 1024).cadenceSince(crank(100, 1024)))
     }
 }

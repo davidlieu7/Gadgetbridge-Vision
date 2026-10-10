@@ -99,10 +99,54 @@ public class CyclingSensorSupport extends CyclingSensorBaseSupport {
             return revolutionsPerSecond * wheelCircumferenceMeters;
         }
 
+        /**
+         * Cadence in rpm since the previous crank measurement, or null if no crank event time passed.
+         * Crank revolutions and event times (1/1024 s) are 16-bit counters that roll over.
+         */
+        Integer cadenceSince(CyclingSpeedCadenceMeasurement previous) {
+            int ticksPassed = (lastCrankRevolutionTimeTicks - previous.lastCrankRevolutionTimeTicks) & 0xFFFF;
+            if (ticksPassed == 0) {
+                return null;
+            }
+
+            int revolutionsDelta = (crankRevolutionCount - previous.crankRevolutionCount) & 0xFFFF;
+            return Math.round(revolutionsDelta * 60f * 1024f / ticksPassed);
+        }
+
         @NonNull
         @Override
         public String toString() {
             return String.format("Measurement revolutions: %d, time ticks %d", revolutionCount, lastRevolutionTimeTicks);
+        }
+    }
+
+    /**
+     * Turns successive crank measurements into a cadence. Reports 0 once no new crank event
+     * arrived for {@link #IDLE_MILLIS}, and null while there is nothing new to report, so a
+     * slow cadence does not flicker to 0 between two crank events.
+     */
+    static class CrankCadenceTracker {
+        // Without a new crank event for this long, the rider has stopped pedaling
+        static final long IDLE_MILLIS = 3_000;
+        // Event times roll over every 64 s, so an older measurement cannot be compared
+        static final long MAX_GAP_MILLIS = 30_000;
+
+        private CyclingSpeedCadenceMeasurement last = null;
+        private long lastMillis = 0;
+        private long lastEventMillis = 0;
+
+        Integer update(CyclingSpeedCadenceMeasurement current, long nowMillis) {
+            boolean comparable = last != null && nowMillis - lastMillis <= MAX_GAP_MILLIS;
+            Integer cadence = comparable ? current.cadenceSince(last) : null;
+            last = current;
+            lastMillis = nowMillis;
+
+            if (cadence != null || !comparable) {
+                lastEventMillis = nowMillis;
+            } else if (nowMillis - lastEventMillis > IDLE_MILLIS) {
+                cadence = 0;
+            }
+            return cadence;
         }
     }
 
@@ -118,8 +162,9 @@ public class CyclingSensorSupport extends CyclingSensorBaseSupport {
 
     private float wheelCircumferenceMeters;
 
-    private CyclingSpeedCadenceMeasurement lastReportedMeasurement = null;
-    private long lastMeasurementTime = 0;
+    private CyclingSpeedCadenceMeasurement lastWheelMeasurement = null;
+    private long lastWheelMeasurementTime = 0;
+    private final CrankCadenceTracker crankCadenceTracker = new CrankCadenceTracker();
 
     private BluetoothGattCharacteristic batteryCharacteristic = null;
 
@@ -181,35 +226,41 @@ public class CyclingSensorSupport extends CyclingSensorBaseSupport {
             return;
         }
 
-        if(!measurement.revolutionDataPresent){
+        if(!measurement.revolutionDataPresent && !measurement.cadenceDataPresent){
             return;
         }
 
-        handleCyclingSpeedMeasurement(measurement);
+        handleCyclingMeasurement(measurement);
     }
 
-    private void handleCyclingSpeedMeasurement(CyclingSpeedCadenceMeasurement currentMeasurement) {
+    private void handleCyclingMeasurement(CyclingSpeedCadenceMeasurement currentMeasurement) {
         logger.debug("Measurement " + currentMeasurement);
 
         long now = System.currentTimeMillis();
 
-        Float speed = null;
-
-        long lastMeasurementDelta = (now - lastMeasurementTime);
-
-        if(lastMeasurementDelta <= 30_000){
-            speed = currentMeasurement.speedSince(lastReportedMeasurement, wheelCircumferenceMeters);
-        }
-
-        lastReportedMeasurement = currentMeasurement;
-        lastMeasurementTime = now;
-
         CyclingSample sample = new CyclingSample();
 
+        // Revolution count, speed and distance stay null when the packet holds no wheel data,
+        // e.g. from a cadence-only sensor
         if (currentMeasurement.revolutionDataPresent) {
+            Float speed = null;
+
+            long lastMeasurementDelta = (now - lastWheelMeasurementTime);
+
+            if(lastMeasurementDelta <= 30_000){
+                speed = currentMeasurement.speedSince(lastWheelMeasurement, wheelCircumferenceMeters);
+            }
+
+            lastWheelMeasurement = currentMeasurement;
+            lastWheelMeasurementTime = now;
+
             sample.setRevolutionCount(currentMeasurement.revolutionCount);
             sample.setSpeed(speed);
             sample.setDistance(currentMeasurement.revolutionCount * wheelCircumferenceMeters);
+        }
+
+        if (currentMeasurement.cadenceDataPresent) {
+            sample.setCadence(crankCadenceTracker.update(currentMeasurement, now));
         }
 
         sample.setTimestamp(now);
