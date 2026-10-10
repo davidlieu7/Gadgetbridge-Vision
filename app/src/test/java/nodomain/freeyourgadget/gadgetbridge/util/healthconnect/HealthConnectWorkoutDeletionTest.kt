@@ -25,12 +25,11 @@ import nodomain.freeyourgadget.gadgetbridge.util.healthconnect.syncers.WorkoutSy
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
 import org.junit.Test
-import java.time.Instant
 import kotlin.reflect.KClass
 
 class HealthConnectWorkoutDeletionTest {
     @Test
-    fun deleteWorkoutFromHealthConnect_deletesExactIdsAndSkipsLegacySessionByDefault() = runBlocking {
+    fun deleteWorkoutFromHealthConnect_deletesExactIdsAndNeverRangeDeletes() = runBlocking {
         val client = CapturingClient()
         val snapshot = testSnapshot()
 
@@ -51,21 +50,7 @@ class HealthConnectWorkoutDeletionTest {
     }
 
     @Test
-    fun deleteWorkoutFromHealthConnect_skipsLegacySessionWhenIdDeleteSucceedsEvenWhenExplicitlyAllowed() = runBlocking {
-        val client = CapturingClient()
-
-        HealthConnectWorkoutDeletion.deleteWorkoutFromHealthConnect(
-            client,
-            allWorkoutPermissions(),
-            testSnapshot(),
-            allowSessionDeleteWithoutChildRecords = true
-        )
-
-        assertTrue(client.rangeDeletes.isEmpty())
-    }
-
-    @Test
-    fun deleteWorkoutFromHealthConnect_deletesLegacySessionOnlyWhenSessionIdMissing() = runBlocking {
+    fun deleteWorkoutFromHealthConnect_missingSessionIdDoesNotFallBackToRangeDelete() = runBlocking {
         val client = CapturingClient(
             idDeleteFailures = mapOf(
                 ExerciseSessionRecord::class to IllegalArgumentException("No records found for clientRecordId")
@@ -75,16 +60,15 @@ class HealthConnectWorkoutDeletionTest {
         HealthConnectWorkoutDeletion.deleteWorkoutFromHealthConnect(
             client,
             allWorkoutPermissions(),
-            testSnapshot(),
-            allowSessionDeleteWithoutChildRecords = true
+            testSnapshot()
         )
 
-        assertEquals(1, client.rangeDeletes.size)
-        assertEquals(ExerciseSessionRecord::class, client.rangeDeletes.single().recordType)
+        assertEquals(expectedDeleteOrder(), client.idDeletes.map { it.recordType })
+        assertTrue(client.rangeDeletes.isEmpty())
     }
 
     @Test
-    fun deleteWorkoutFromHealthConnect_skipsSessionWhenChildPermissionMissingByDefault() = runBlocking {
+    fun deleteWorkoutFromHealthConnect_skipsSessionWhenChildPermissionMissing() = runBlocking {
         val client = CapturingClient()
         val grantedPermissions = setOf(HealthPermission.getWritePermission(ExerciseSessionRecord::class))
 
@@ -95,7 +79,7 @@ class HealthConnectWorkoutDeletionTest {
     }
 
     @Test
-    fun deleteWorkoutFromHealthConnect_missingChildRecordDoesNotKeepSessionByDefault() = runBlocking {
+    fun deleteWorkoutFromHealthConnect_missingChildRecordDoesNotKeepSession() = runBlocking {
         val client = CapturingClient(
             idDeleteFailures = mapOf(
                 PowerRecord::class to IllegalArgumentException("No records found for clientRecordId")
@@ -113,7 +97,7 @@ class HealthConnectWorkoutDeletionTest {
     }
 
     @Test
-    fun deleteWorkoutFromHealthConnect_childFailureKeepsSessionByDefaultAndAttemptsChildrenFirst() = runBlocking {
+    fun deleteWorkoutFromHealthConnect_childFailureKeepsSessionAndAttemptsChildrenFirst() = runBlocking {
         val client = CapturingClient(
             idDeleteFailures = mapOf(
                 HeartRateRecord::class to IllegalStateException("Health Connect delete failed")
@@ -131,11 +115,7 @@ class HealthConnectWorkoutDeletionTest {
         assertTrue(client.rangeDeletes.isEmpty())
     }
 
-    private fun testSnapshot() = HealthConnectWorkoutDeletion.WorkoutSummarySnapshot(
-        summaryId = 42L,
-        startTime = Instant.parse("2026-06-01T10:00:00Z"),
-        endTime = Instant.parse("2026-06-01T11:00:00Z")
-    )
+    private fun testSnapshot() = HealthConnectWorkoutDeletion.WorkoutSummarySnapshot(summaryId = 42L)
 
     private fun allWorkoutPermissions(): Set<String> {
         return WorkoutSyncerUtils.WORKOUT_RECORD_TYPES

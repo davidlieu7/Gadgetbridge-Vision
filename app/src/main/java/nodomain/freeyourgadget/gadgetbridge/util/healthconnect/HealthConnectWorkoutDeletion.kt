@@ -21,17 +21,14 @@ import androidx.health.connect.client.HealthConnectClient
 import androidx.health.connect.client.permission.HealthPermission
 import androidx.health.connect.client.records.ExerciseSessionRecord
 import androidx.health.connect.client.records.Record
-import androidx.health.connect.client.time.TimeRangeFilter
 import kotlinx.coroutines.DelicateCoroutinesApi
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.launch
 import nodomain.freeyourgadget.gadgetbridge.GBApplication
 import nodomain.freeyourgadget.gadgetbridge.entities.BaseActivitySummary
-import nodomain.freeyourgadget.gadgetbridge.util.GBPrefs
 import nodomain.freeyourgadget.gadgetbridge.util.healthconnect.syncers.WorkoutSyncerUtils
 import org.slf4j.LoggerFactory
-import java.time.Instant
 import java.util.Locale
 import kotlin.reflect.KClass
 
@@ -41,34 +38,20 @@ internal object HealthConnectWorkoutDeletion {
     private enum class ClientRecordDeleteResult {
         DELETED,
         NOT_FOUND,
-        FAILED,
-        SKIPPED
+        FAILED
     }
 
     data class WorkoutSummarySnapshot(
-        val summaryId: Long,
-        val startTime: Instant,
-        val endTime: Instant
+        val summaryId: Long
     )
 
     fun snapshot(summary: BaseActivitySummary): WorkoutSummarySnapshot? {
         val summaryId = summary.id
-        val startTime = summary.startTime
-        val endTime = summary.endTime
-        if (summaryId == null || startTime == null || endTime == null) {
-            LOG.warn(
-                "Unable to snapshot workout for Health Connect deletion: id={}, start={}, end={}",
-                summaryId,
-                startTime,
-                endTime
-            )
+        if (summaryId == null) {
+            LOG.warn("Unable to snapshot workout for Health Connect deletion: no database id.")
             return null
         }
-        return WorkoutSummarySnapshot(
-            summaryId = summaryId,
-            startTime = startTime.toInstant(),
-            endTime = endTime.toInstant()
-        )
+        return WorkoutSummarySnapshot(summaryId = summaryId)
     }
 
     @OptIn(DelicateCoroutinesApi::class)
@@ -100,19 +83,10 @@ internal object HealthConnectWorkoutDeletion {
                     HealthConnectPermissionManager.PREF_KEY_LAST_GRANTED_HC_PERMISSIONS,
                     emptySet()
                 ) ?: emptySet()
-                val allowSessionDeleteWithoutChildRecords = GBApplication.getPrefs().preferences.getBoolean(
-                    GBPrefs.HEALTH_CONNECT_DELETE_ORPHANED_WORKOUT_SESSIONS,
-                    false
-                )
 
                 for (snapshot in snapshots) {
                     try {
-                        deleteWorkoutFromHealthConnect(
-                            healthConnectClient,
-                            grantedPermissions,
-                            snapshot,
-                            allowSessionDeleteWithoutChildRecords
-                        )
+                        deleteWorkoutFromHealthConnect(healthConnectClient, grantedPermissions, snapshot)
                     } catch (e: Exception) {
                         LOG.warn("Failed to delete workout {} from Health Connect.", snapshot.summaryId, e)
                     }
@@ -126,8 +100,7 @@ internal object HealthConnectWorkoutDeletion {
     internal suspend fun deleteWorkoutFromHealthConnect(
         healthConnectClient: HealthConnectClient,
         grantedPermissions: Set<String>,
-        snapshot: WorkoutSummarySnapshot,
-        allowSessionDeleteWithoutChildRecords: Boolean = false
+        snapshot: WorkoutSummarySnapshot
     ) {
         var childRecordsDeleted = true
         val childRecordTypes = WorkoutSyncerUtils.WORKOUT_RECORD_TYPES
@@ -148,60 +121,31 @@ internal object HealthConnectWorkoutDeletion {
                 ClientRecordDeleteResult.DELETED,
                 ClientRecordDeleteResult.NOT_FOUND -> Unit
 
-                ClientRecordDeleteResult.FAILED,
-                ClientRecordDeleteResult.SKIPPED -> childRecordsDeleted = false
+                ClientRecordDeleteResult.FAILED -> childRecordsDeleted = false
             }
         }
 
-        val sessionDeleteResult = deleteExerciseSessionByClientRecordId(
-            healthConnectClient,
-            grantedPermissions,
-            snapshot,
-            childRecordsDeleted,
-            allowSessionDeleteWithoutChildRecords
-        )
-
-        when {
-            allowSessionDeleteWithoutChildRecords && sessionDeleteResult == ClientRecordDeleteResult.NOT_FOUND -> {
-                deleteLegacyExerciseSession(healthConnectClient, grantedPermissions, snapshot)
-            }
-
-            allowSessionDeleteWithoutChildRecords -> {
-                LOG.debug(
-                    "Skipping legacy Health Connect exercise deletion for workout {} because clientRecordId deletion result was {}.",
-                    snapshot.summaryId,
-                    sessionDeleteResult
-                )
-            }
-
-            else -> {
-                LOG.debug(
-                    "Skipping legacy Health Connect exercise deletion for workout {} because unmatched session deletion is disabled.",
-                    snapshot.summaryId
-                )
-            }
-        }
+        deleteExerciseSessionByClientRecordId(healthConnectClient, grantedPermissions, snapshot, childRecordsDeleted)
     }
 
     private suspend fun deleteExerciseSessionByClientRecordId(
         healthConnectClient: HealthConnectClient,
         grantedPermissions: Set<String>,
         snapshot: WorkoutSummarySnapshot,
-        childRecordsDeleted: Boolean,
-        allowSessionDeleteWithoutChildRecords: Boolean
-    ): ClientRecordDeleteResult {
+        childRecordsDeleted: Boolean
+    ) {
         if (!hasWritePermission(grantedPermissions, ExerciseSessionRecord::class)) {
-            return ClientRecordDeleteResult.SKIPPED
+            return
         }
-        if (!childRecordsDeleted && !allowSessionDeleteWithoutChildRecords) {
+        if (!childRecordsDeleted) {
             LOG.warn(
                 "Skipping Health Connect ExerciseSessionRecord deletion for workout {} because some child records could not be deleted.",
                 snapshot.summaryId
             )
-            return ClientRecordDeleteResult.SKIPPED
+            return
         }
 
-        return deleteRecordByClientRecordId(
+        deleteRecordByClientRecordId(
             healthConnectClient,
             ExerciseSessionRecord::class,
             WorkoutSyncerUtils.RECORD_TYPE_SESSION,
@@ -248,44 +192,6 @@ internal object HealthConnectWorkoutDeletion {
                 )
                 return ClientRecordDeleteResult.FAILED
             }
-        }
-    }
-
-    private suspend fun deleteLegacyExerciseSession(
-        healthConnectClient: HealthConnectClient,
-        grantedPermissions: Set<String>,
-        snapshot: WorkoutSummarySnapshot
-    ) {
-        if (!hasWritePermission(grantedPermissions, ExerciseSessionRecord::class)) {
-            return
-        }
-        if (!snapshot.endTime.isAfter(snapshot.startTime)) {
-            LOG.warn(
-                "Skipping legacy Health Connect exercise deletion for workout {}: invalid range {} to {}.",
-                snapshot.summaryId,
-                snapshot.startTime,
-                snapshot.endTime
-            )
-            return
-        }
-
-        try {
-            healthConnectClient.deleteRecords(
-                ExerciseSessionRecord::class,
-                TimeRangeFilter.between(snapshot.startTime, snapshot.endTime)
-            )
-            LOG.debug(
-                "Deleted legacy Health Connect ExerciseSessionRecord(s) for workout {} in range {} to {}.",
-                snapshot.summaryId,
-                snapshot.startTime,
-                snapshot.endTime
-            )
-        } catch (e: Exception) {
-            LOG.warn(
-                "Failed to delete legacy Health Connect ExerciseSessionRecord(s) for workout {}.",
-                snapshot.summaryId,
-                e
-            )
         }
     }
 
