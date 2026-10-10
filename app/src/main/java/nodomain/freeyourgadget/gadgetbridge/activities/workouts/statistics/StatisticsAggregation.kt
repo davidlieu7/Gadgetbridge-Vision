@@ -186,30 +186,14 @@ enum class SportMetric(
 enum class PeriodKind { WEEK, MONTH, YEAR, CUSTOM }
 
 /**
- * What one bar of a period covers.
- */
-enum class BarUnit { DAY, WEEK, MONTH }
-
-/**
  * A calendar week (Mon-Sun), month or year, created with [containing], or a range of days, created with [custom].
- * Custom week bars start on the range's first day.
+ * Years have a bar per month, the others a bar per day.
  */
 data class StatisticsPeriod(val kind: PeriodKind, val start: LocalDate, private val customEnd: LocalDate? = null) {
     val endInclusive: LocalDate
         get() = if (kind == PeriodKind.CUSTOM) checkNotNull(customEnd) else next().start.minusDays(1)
 
     val dayCount: Long get() = ChronoUnit.DAYS.between(start, endInclusive) + 1
-
-    val barUnit: BarUnit
-        get() = when (kind) {
-            PeriodKind.WEEK, PeriodKind.MONTH -> BarUnit.DAY
-            PeriodKind.YEAR -> BarUnit.MONTH
-            PeriodKind.CUSTOM -> when {
-                dayCount <= MAX_DAY_BARS -> BarUnit.DAY
-                dayCount <= MAX_WEEK_BARS * DAYS_PER_WEEK -> BarUnit.WEEK
-                else -> BarUnit.MONTH
-            }
-        }
 
     val barCount: Int get() = barOf(endInclusive)
 
@@ -230,30 +214,19 @@ data class StatisticsPeriod(val kind: PeriodKind, val start: LocalDate, private 
     /**
      * 1-based bar for [date].
      */
-    internal fun barOf(date: LocalDate): Int = when (barUnit) {
-        BarUnit.DAY -> ChronoUnit.DAYS.between(start, date).toInt() + 1
-        BarUnit.WEEK -> (ChronoUnit.DAYS.between(start, date) / DAYS_PER_WEEK).toInt() + 1
-        BarUnit.MONTH -> ChronoUnit.MONTHS.between(YearMonth.from(start), YearMonth.from(date)).toInt() + 1
+    internal fun barOf(date: LocalDate): Int = if (kind == PeriodKind.YEAR) {
+        ChronoUnit.MONTHS.between(YearMonth.from(start), YearMonth.from(date)).toInt() + 1
+    } else {
+        ChronoUnit.DAYS.between(start, date).toInt() + 1
     }
 
     /**
-     * First and last day of [bar], within the period.
+     * First day of [bar].
      */
-    fun barDates(bar: Int): Pair<LocalDate, LocalDate> {
-        val index = bar - 1L
-        val (first, last) = when (barUnit) {
-            BarUnit.DAY -> start.plusDays(index).let { it to it }
-            BarUnit.WEEK -> start.plusWeeks(index).let { it to it.plusDays(DAYS_PER_WEEK - 1L) }
-            BarUnit.MONTH -> YearMonth.from(start).plusMonths(index).let { it.atDay(1) to it.atEndOfMonth() }
-        }
-        return maxOf(first, start) to minOf(last, endInclusive)
-    }
+    fun barStart(bar: Int): LocalDate =
+        if (kind == PeriodKind.YEAR) start.plusMonths(bar - 1L) else start.plusDays(bar - 1L)
 
     companion object {
-        private const val DAYS_PER_WEEK = 7
-        private const val MAX_DAY_BARS = 31
-        private const val MAX_WEEK_BARS = 26
-
         fun containing(kind: PeriodKind, date: LocalDate) = StatisticsPeriod(
             kind,
             when (kind) {

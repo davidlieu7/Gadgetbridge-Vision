@@ -394,31 +394,22 @@ class SportStatisticsFragment : Fragment() {
     }
 
     /**
-     * Locale-formatted, e.g. "Wed, Sep 24", "Sep 24, 2026", "September 2026", "Sep 1 - 7, 2026".
+     * Locale-formatted, e.g. "Wed, Sep 24", "Sep 24, 2026", "September 2026".
      */
     private fun slotTitle(period: StatisticsPeriod, slot: Int): String {
-        val (first, last) = period.barDates(slot)
-        return when {
-            period.kind == PeriodKind.WEEK -> formatDate("EEEMMMd", first)
-            period.barUnit == BarUnit.DAY -> formatDate("yMMMd", first)
-            period.barUnit == BarUnit.MONTH && period.kind == PeriodKind.YEAR -> formatDate("yMMMM", first)
-            else -> periodTitle(StatisticsPeriod.custom(first, last))
+        val date = period.barStart(slot)
+        return when (period.kind) {
+            PeriodKind.WEEK -> formatDate("EEEMMMd", date)
+            PeriodKind.YEAR -> formatDate("yMMMM", date)
+            PeriodKind.MONTH, PeriodKind.CUSTOM -> formatDate("yMMMd", date)
         }
     }
 
     /**
-     * Bar start dates, e.g. "Sep 1", or month names, e.g. "Sep", with the year when the range spans years.
+     * Locale-formatted, e.g. "Sep 1".
      */
-    private fun customBarLabeler(period: StatisticsPeriod): (Int) -> String {
-        val spansYears = period.start.year != period.endInclusive.year
-        return { slot ->
-            val first = period.barDates(slot).first
-            when (period.barUnit) {
-                BarUnit.DAY, BarUnit.WEEK -> formatDate("MMMd", first)
-                BarUnit.MONTH -> formatDate(if (spansYears) "MMMyy" else "MMM", first)
-            }
-        }
-    }
+    private fun customBarLabeler(period: StatisticsPeriod): (Int) -> String =
+        { slot -> formatDate("MMMd", period.barStart(slot)) }
 
     private fun formatDate(skeleton: String, date: LocalDate): String {
         val locale = Locale.getDefault()
@@ -431,21 +422,17 @@ class SportStatisticsFragment : Fragment() {
         label: String,
         formatter: WorkoutValueFormatter,
     ): String = getString(
-        when (stats.period.barUnit) {
-            BarUnit.DAY -> when (metric.aggregation) {
-                MetricAggregation.TOTAL -> R.string.statistics_chart_description_daily
-                MetricAggregation.AVERAGE -> R.string.statistics_chart_description_daily_average
-                MetricAggregation.MAXIMUM -> R.string.statistics_chart_description_daily_maximum
-            }
-            BarUnit.WEEK -> when (metric.aggregation) {
-                MetricAggregation.TOTAL -> R.string.statistics_chart_description_weekly
-                MetricAggregation.AVERAGE -> R.string.statistics_chart_description_weekly_average
-                MetricAggregation.MAXIMUM -> R.string.statistics_chart_description_weekly_maximum
-            }
-            BarUnit.MONTH -> when (metric.aggregation) {
+        if (stats.period.kind == PeriodKind.YEAR) {
+            when (metric.aggregation) {
                 MetricAggregation.TOTAL -> R.string.statistics_chart_description_monthly
                 MetricAggregation.AVERAGE -> R.string.statistics_chart_description_monthly_average
                 MetricAggregation.MAXIMUM -> R.string.statistics_chart_description_monthly_maximum
+            }
+        } else {
+            when (metric.aggregation) {
+                MetricAggregation.TOTAL -> R.string.statistics_chart_description_daily
+                MetricAggregation.AVERAGE -> R.string.statistics_chart_description_daily_average
+                MetricAggregation.MAXIMUM -> R.string.statistics_chart_description_daily_maximum
             }
         },
         label,
