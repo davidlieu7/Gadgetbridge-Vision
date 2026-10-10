@@ -31,7 +31,6 @@ import nodomain.freeyourgadget.gadgetbridge.service.devices.soundcore.protocol.i
 import nodomain.freeyourgadget.gadgetbridge.util.Prefs;
 
 public class SoundcoreV20iProtocol extends SoundcoreProtocolImplV1 {
-    private static final int DEVICE_INFO_HEADER_LENGTH = 30;
     private static final int LEFT_LONG_PRESS_OFFSET = 65;
     private static final int LONG_PRESS_FUNCTION_PREFIX = 0xf0;
     private static final int TAP_FUNCTION_CODE_MASK = 0x0f;
@@ -45,10 +44,7 @@ public class SoundcoreV20iProtocol extends SoundcoreProtocolImplV1 {
 
     @Override
     protected GBDeviceEvent[] decodeDeviceInfo(final byte[] payload) {
-        if (payload.length < DEVICE_INFO_HEADER_LENGTH) {
-            return new GBDeviceEvent[0];
-        }
-        if (payload.length > LEFT_LONG_PRESS_OFFSET) {
+        if (payload.length > 65) {
             final String function = decodeLongPressFunction(payload[LEFT_LONG_PRESS_OFFSET]);
             if (function != null) {
                 getDevicePrefs().getPreferences().edit().putString(
@@ -56,28 +52,8 @@ public class SoundcoreV20iProtocol extends SoundcoreProtocolImplV1 {
                         function).apply();
             }
         }
-        final GBDeviceEvent[] batteries = decodeBatteryInfo(new byte[]{payload[2], payload[3]});
-        return new GBDeviceEvent[]{
-            batteries[0],
-            batteries[1],
-            buildVersionInfo(
-                readString(payload, 4, 5),
-                readString(payload, 9, 5),
-                readString(payload, 14, 16)
-            )
-        };
-    }
 
-    @Override
-    protected GBDeviceEvent[] decodeBatteryInfo(final byte[] payload) {
-        if (payload.length < 2) {
-            return new GBDeviceEvent[0];
-        }
-        // Two-earbud coordinators use indices 0 and 1, without a charging-case slot.
-        return new GBDeviceEvent[]{
-                buildBatteryInfo(0, Byte.toUnsignedInt(payload[0]) * getBatteryMultiplier()),
-                buildBatteryInfo(1, Byte.toUnsignedInt(payload[1]) * getBatteryMultiplier())
-        };
+        return decodeStandardEarbudDeviceInfo(payload);
     }
 
     private static String decodeLongPressFunction(final byte function) {
@@ -128,10 +104,6 @@ public class SoundcoreV20iProtocol extends SoundcoreProtocolImplV1 {
                 return encodeControlFunction(config.equals(
                         DeviceSettingsPreferenceConst.PREF_SOUNDCORE_CONTROL_LONG_PRESS_ACTION_RIGHT),
                         (byte) 0x01, functionByte);
-            case DeviceSettingsPreferenceConst.PREF_SOUNDCORE_GAMING_MODE:
-                return encodeBooleanCommand(CMD_SET_GAMING_MODE, prefs.getBoolean(config, false));
-            case SoundcoreV20iCoordinator.PREF_LIGHTS_ENABLED:
-                return encodeBooleanCommand(CMD_SET_LIGHTS_ENABLED, prefs.getBoolean(config, false));
             case SoundcoreV20iCoordinator.PREF_LIGHT_MODE:
                 final int mode;
                 try {
@@ -140,15 +112,6 @@ public class SoundcoreV20iProtocol extends SoundcoreProtocolImplV1 {
                     return null;
                 }
                 return mode >= 0 && mode <= 3 ? encodeByteCommand(CMD_SET_LIGHT_MODE, (byte) mode) : null;
-            case DeviceSettingsPreferenceConst.PREF_SOUNDCORE_AUTO_POWER_OFF:
-                final int duration;
-                try {
-                    duration = Integer.parseInt(prefs.getString(config, "2"));
-                } catch (NumberFormatException e) {
-                    return null;
-                }
-                return duration >= 0 && duration <= 4
-                        ? encodeAutoPowerOff(CMD_SET_AUTO_POWER_OFF, duration, (byte) 0x03) : null;
             default:
                 return super.encodeSendConfiguration(config);
         }

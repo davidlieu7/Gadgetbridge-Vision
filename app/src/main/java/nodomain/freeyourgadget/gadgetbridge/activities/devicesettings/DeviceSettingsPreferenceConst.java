@@ -554,6 +554,7 @@ public class DeviceSettingsPreferenceConst {
     public static final String PREF_SOUNDCORE_FIT_TEST = "pref_soundcore_fit_test";
     public static final String PREF_SOUNDCORE_LDAC_MODE = "pref_soundcore_ldac_mode";
     public static final String PREF_SOUNDCORE_GAMING_MODE = "pref_soundcore_gaming_mode";
+    public static final String PREF_SOUNDCORE_LIGHTS_ENABLED = "pref_soundcore_colorful_lights";
     public static final String PREF_SOUNDCORE_ADAPTIVE_DIRECTION = "pref_soundcore_adaptive_direction";
     public static final String PREF_SOUNDCORE_EQUALIZER_PRESET = "pref_soundcore_equalizer_preset";
     public static final String PREF_SOUNDCORE_EQUALIZER_CUSTOM = "pref_soundcore_equalizer_custom";
