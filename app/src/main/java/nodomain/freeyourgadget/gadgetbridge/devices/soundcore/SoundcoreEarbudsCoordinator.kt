@@ -48,6 +48,7 @@ abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator(
         VocalMode,
         TouchControls,
         TouchControlDisable,
+        TouchControlTapDisable,
         WearingDetection,
         WearingTone,
         SurroundSound,
@@ -67,26 +68,31 @@ abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator(
         @androidx.annotation.StringRes val title: Int,
         val leftPreference: String,
         val rightPreference: String,
+        val disabledPreference: String,
     ) {
         SINGLE_TAP(
             R.string.single_tap,
             DeviceSettingsPreferenceConst.PREF_SOUNDCORE_CONTROL_SINGLE_TAP_ACTION_LEFT,
             DeviceSettingsPreferenceConst.PREF_SOUNDCORE_CONTROL_SINGLE_TAP_ACTION_RIGHT,
+            DeviceSettingsPreferenceConst.PREF_SOUNDCORE_CONTROL_SINGLE_TAP_DISABLED,
         ),
         DOUBLE_TAP(
             R.string.double_tap,
             DeviceSettingsPreferenceConst.PREF_SOUNDCORE_CONTROL_DOUBLE_TAP_ACTION_LEFT,
             DeviceSettingsPreferenceConst.PREF_SOUNDCORE_CONTROL_DOUBLE_TAP_ACTION_RIGHT,
+            DeviceSettingsPreferenceConst.PREF_SOUNDCORE_CONTROL_DOUBLE_TAP_DISABLED,
         ),
         TRIPLE_TAP(
             R.string.triple_tap,
             DeviceSettingsPreferenceConst.PREF_SOUNDCORE_CONTROL_TRIPLE_TAP_ACTION_LEFT,
             DeviceSettingsPreferenceConst.PREF_SOUNDCORE_CONTROL_TRIPLE_TAP_ACTION_RIGHT,
+            DeviceSettingsPreferenceConst.PREF_SOUNDCORE_CONTROL_TRIPLE_TAP_DISABLED,
         ),
         LONG_PRESS(
             R.string.long_press,
             DeviceSettingsPreferenceConst.PREF_SOUNDCORE_CONTROL_LONG_PRESS_ACTION_LEFT,
             DeviceSettingsPreferenceConst.PREF_SOUNDCORE_CONTROL_LONG_PRESS_ACTION_RIGHT,
+            DeviceSettingsPreferenceConst.PREF_SOUNDCORE_CONTROL_LONG_PRESS_DISABLED,
         ),
     }
 
@@ -309,19 +315,36 @@ abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator(
                         )
                         supportedButtonActions.forEach { action ->
                             category(key = "pref_header_${action.name.lowercase()}", title = action.title) {
+                                val supportsTapDisable = has(Capability.TouchControlTapDisable)
+                                val actionDependency = if (supportsTapDisable) {
+                                    action.disabledPreference
+                                } else {
+                                    DeviceSettingsPreferenceConst.PREF_SOUNDCORE_CONTROL_TOUCH_DISABLED
+                                }
+                                if (supportsTapDisable) {
+                                    switchSetting(
+                                        key = action.disabledPreference,
+                                        title = R.string.prefs_touch_lock,
+                                        summary = R.string.prefs_touch_lock_summary,
+                                        icon = R.drawable.ic_lock_open,
+                                        defaultValue = false,
+                                        disableDependentsState = true,
+                                        dependency = DeviceSettingsPreferenceConst.PREF_SOUNDCORE_CONTROL_TOUCH_DISABLED,
+                                    )
+                                }
                                 list(
                                     key = action.leftPreference,
                                     title = R.string.prefs_left,
                                     icon = R.drawable.ic_touch,
                                     entries = getSupportedTapFunctions(action).map { ListEntry.Res(it.value, it.label) },
-                                    dependency = DeviceSettingsPreferenceConst.PREF_SOUNDCORE_CONTROL_TOUCH_DISABLED,
+                                    dependency = actionDependency,
                                 )
                                 list(
                                     key = action.rightPreference,
                                     title = R.string.prefs_right,
                                     icon = R.drawable.ic_touch,
                                     entries = getSupportedTapFunctions(action).map { ListEntry.Res(it.value, it.label) },
-                                    dependency = DeviceSettingsPreferenceConst.PREF_SOUNDCORE_CONTROL_TOUCH_DISABLED,
+                                    dependency = actionDependency,
                                 )
                             }
                         }

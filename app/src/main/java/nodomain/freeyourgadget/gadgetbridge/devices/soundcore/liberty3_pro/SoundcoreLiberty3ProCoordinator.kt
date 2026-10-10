@@ -43,6 +43,7 @@ class SoundcoreLiberty3ProCoordinator : SoundcoreEarbudsCoordinator() {
         Capability.WindNoiseReduction,
         Capability.VocalMode,
         Capability.TouchControls,
+        Capability.TouchControlTapDisable,
         Capability.TouchTone,
         Capability.WearingDetection,
         Capability.WearingTone,
