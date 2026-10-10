@@ -58,7 +58,12 @@ import nodomain.freeyourgadget.gadgetbridge.util.BcdUtil;
 import nodomain.freeyourgadget.gadgetbridge.model.Alarm;
 import nodomain.freeyourgadget.gadgetbridge.model.Reminder;
 import nodomain.freeyourgadget.gadgetbridge.model.DeviceService;
+import nodomain.freeyourgadget.gadgetbridge.database.DBHandler;
 import nodomain.freeyourgadget.gadgetbridge.database.DBHelper;
+import nodomain.freeyourgadget.gadgetbridge.devices.casio.gbx100.CasioGBX100SampleProvider;
+import nodomain.freeyourgadget.gadgetbridge.entities.CasioGBX100ActivitySample;
+import nodomain.freeyourgadget.gadgetbridge.entities.Device;
+import nodomain.freeyourgadget.gadgetbridge.entities.User;
 import nodomain.freeyourgadget.gadgetbridge.service.btle.TransactionBuilder;
 import nodomain.freeyourgadget.gadgetbridge.devices.casio.CasioConstants;
 
@@ -392,6 +397,53 @@ public abstract class Casio2C2DSupport extends CasioSupport {
         buf.putDouble(lon);
         buf.put((byte) 0x04);
         return buf.array();
+    }
+
+    // ── Activity DB helpers (used by the CONVOY fetch operations) ────────────
+
+    public CasioGBX100ActivitySample getSumWithinRange(int ts_from, int ts_to) {
+        int steps = 0, calories = 0;
+        try (DBHandler db = GBApplication.acquireDB()) {
+            User user     = DBHelper.getUser(db.getDaoSession());
+            Device device = DBHelper.getDevice(this.getDevice(), db.getDaoSession());
+            CasioGBX100SampleProvider provider =
+                    new CasioGBX100SampleProvider(this.getDevice(), db.getDaoSession());
+            List<CasioGBX100ActivitySample> samples =
+                    provider.getActivitySamples(ts_from, ts_to);
+            for (CasioGBX100ActivitySample s : samples) {
+                if (s.getDevice().equals(device) && s.getUser().equals(user)) {
+                    steps    += s.getSteps();
+                    calories += s.getCalories();
+                }
+            }
+        } catch (Exception e) {
+            LOG.error("Error fetching step sum: {}", e.getMessage());
+        }
+        CasioGBX100ActivitySample ret = new CasioGBX100ActivitySample();
+        ret.setSteps(steps);
+        ret.setCalories(calories);
+        return ret;
+    }
+
+    public void stepCountDataFetched(int totalSteps, int totalCalories,
+                                     ArrayList<CasioGBX100ActivitySample> data) {
+        LOG.info("Steps fetched: total={} kcal={}", totalSteps, totalCalories);
+        try (DBHandler db = GBApplication.acquireDB()) {
+            User user     = DBHelper.getUser(db.getDaoSession());
+            Device device = DBHelper.getDevice(this.getDevice(), db.getDaoSession());
+            CasioGBX100SampleProvider provider =
+                    new CasioGBX100SampleProvider(this.getDevice(), db.getDaoSession());
+            for (CasioGBX100ActivitySample s : data) {
+                s.setDevice(device);
+                s.setUser(user);
+                s.setProvider(provider);
+                provider.addGBActivitySample(s);
+            }
+        } catch (Exception e) {
+            GB.toast(getContext(), "Error saving steps: " + e.getLocalizedMessage(),
+                    Toast.LENGTH_LONG, GB.ERROR, e);
+            GB.updateTransferNotification(null, "Data transfer failed", false, 0, getContext());
+        }
     }
 
     /** Writes a full clock-slot set (slot 0 = home, slots 1+ = world) inside the 0x21
