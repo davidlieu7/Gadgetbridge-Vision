@@ -31,6 +31,11 @@ import java.util.ArrayList;
 import java.util.List;
 
 import nodomain.freeyourgadget.gadgetbridge.GBApplication;
+import nodomain.freeyourgadget.gadgetbridge.database.DBHelper;
+import nodomain.freeyourgadget.gadgetbridge.devices.GenericDurationSampleProvider;
+import nodomain.freeyourgadget.gadgetbridge.devices.xiaomi.XiaomiSampleProvider;
+import nodomain.freeyourgadget.gadgetbridge.entities.GenericDurationSample;
+import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
 import nodomain.freeyourgadget.gadgetbridge.proto.xiaomi.AxisSensor;
 import nodomain.freeyourgadget.gadgetbridge.proto.xiaomi.Health;
 import nodomain.freeyourgadget.gadgetbridge.proto.xiaomi.RawSensorBatch;
@@ -80,7 +85,9 @@ public class XiaomiSleepAsAndroidWorkoutTest extends TestBase {
     public void setUp() throws Exception {
         super.setUp();
         support = Mockito.mock(XiaomiSupport.class);
-        Mockito.when(support.getDevice()).thenReturn(createDummyGDevice("00:11:22:33:44:55"));
+        final GBDevice device = createDummyGDevice("00:11:22:33:44:55");
+        DBHelper.getDevice(device, daoSession);
+        Mockito.when(support.getDevice()).thenReturn(device);
         health = new XiaomiHealthService(support);
         health.getSleepAsAndroidManager().setSender(Mockito.mock(SleepAsAndroidSender.class));
     }
@@ -489,7 +496,12 @@ public class XiaomiSleepAsAndroidWorkoutTest extends TestBase {
     }
 
     private List<long[]> recordedWindows() {
-        return XiaomiPreferences.sleepAsAndroidWindows(support.getDevice().getAddress());
+        final List<long[]> windows = new ArrayList<>();
+        for (final GenericDurationSample window : new GenericDurationSampleProvider(support.getDevice(), daoSession)
+                .getSamplesOverlapping(XiaomiSampleProvider.DURATION_TYPE_SLEEP_AS_ANDROID, 0, Long.MAX_VALUE)) {
+            windows.add(new long[]{window.getTimestamp(), window.getEndTimestamp()});
+        }
+        return windows;
     }
 
     @Test

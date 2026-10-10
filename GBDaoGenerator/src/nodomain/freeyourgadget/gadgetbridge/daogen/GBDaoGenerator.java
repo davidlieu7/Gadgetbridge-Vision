@@ -110,7 +110,7 @@ public class GBDaoGenerator {
             outputDir.mkdirs();
         }
 
-        final Schema schema = new Schema(152, MAIN_PACKAGE + ".entities");
+        final Schema schema = new Schema(153, MAIN_PACKAGE + ".entities");
 
         final List<Entity> sampleProvidersToGenerate = new LinkedList<>();
         final List<Entity> batterySampleProvidersToGenerate = new LinkedList<>();
@@ -314,6 +314,7 @@ public class GBDaoGenerator {
         sampleProvidersToGenerate.add(addGenericSleepScoreSample(schema, user, device));
         sampleProvidersToGenerate.add(addGenericBodyEnergySample(schema, user, device));
         addGenericHydrationSample(schema, user, device);
+        addGenericDurationSample(schema, user, device);
 
         validateSerializableEntities(schema);
 
@@ -2785,6 +2786,18 @@ public class GBDaoGenerator {
         sleepStageSample.addIntProperty("duration").notNull().codeBeforeGetter(OVERRIDE);
         sleepStageSample.addIntProperty("stage").notNull().codeBeforeGetter(OVERRIDE);
         return sleepStageSample;
+    }
+
+    /**
+     * A span of time from {@code timestamp} to {@code endTimestamp}, both in milliseconds. The
+     * meaning of {@code type} is device-specific.
+     */
+    private static Entity addGenericDurationSample(Schema schema, Entity user, Entity device) {
+        Entity sample = addEntity(schema, "GenericDurationSample");
+        addCommonTimeSampleProperties("AbstractTimeSample", sample, user, device);
+        sample.addIntProperty("type").notNull().primaryKey();
+        sample.addLongProperty("endTimestamp").notNull();
+        return sample;
     }
 
     private static Entity addGenericTrainingLoadAcuteSample(Schema schema, Entity user, Entity device) {

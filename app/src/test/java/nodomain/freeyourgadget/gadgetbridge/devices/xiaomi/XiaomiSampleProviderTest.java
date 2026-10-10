@@ -25,14 +25,15 @@ import java.util.Date;
 import java.util.List;
 
 import nodomain.freeyourgadget.gadgetbridge.database.DBHelper;
+import nodomain.freeyourgadget.gadgetbridge.devices.GenericDurationSampleProvider;
 import nodomain.freeyourgadget.gadgetbridge.entities.BaseActivitySummary;
 import nodomain.freeyourgadget.gadgetbridge.entities.Device;
+import nodomain.freeyourgadget.gadgetbridge.entities.GenericDurationSample;
 import nodomain.freeyourgadget.gadgetbridge.entities.User;
 import nodomain.freeyourgadget.gadgetbridge.entities.XiaomiActivitySample;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
 import nodomain.freeyourgadget.gadgetbridge.model.ActivityKind;
 import nodomain.freeyourgadget.gadgetbridge.model.ActivitySample;
-import nodomain.freeyourgadget.gadgetbridge.service.devices.xiaomi.XiaomiPreferences;
 import nodomain.freeyourgadget.gadgetbridge.test.TestBase;
 
 /**
@@ -44,9 +45,6 @@ public class XiaomiSampleProviderTest extends TestBase {
     private static final String ADDRESS = "00:11:22:33:44:55";
 
     private static final int WINDOW_SECONDS = 3600;
-
-    /** Entries are pruned once they are this old, so the test works in the recent past. */
-    private static final long WINDOW_MAX_AGE_MS = 30L * 24 * 60 * 60 * 1000L;
 
     /** Stored kcal are scaled to milli-kcal on read. */
     private static final int STORED_CALORIES = 5;
@@ -95,8 +93,16 @@ public class XiaomiSampleProviderTest extends TestBase {
     }
 
     private void storeWindow(final int startSeconds) {
-        XiaomiPreferences.rememberSleepAsAndroidWindow(
-                ADDRESS, startSeconds * 1000L, (startSeconds + WINDOW_SECONDS) * 1000L);
+        storeWindow(gbDevice, startSeconds);
+    }
+
+    private void storeWindow(final GBDevice device, final int startSeconds) {
+        final GenericDurationSampleProvider windows = new GenericDurationSampleProvider(device, daoSession);
+        final GenericDurationSample window = windows.createSample();
+        window.setTimestamp(startSeconds * 1000L);
+        window.setEndTimestamp((startSeconds + WINDOW_SECONDS) * 1000L);
+        window.setType(XiaomiSampleProvider.DURATION_TYPE_SLEEP_AS_ANDROID);
+        Assert.assertTrue(windows.persistSamples(window, null));
     }
 
     private void storeWorkout(final int startSeconds, final int endSeconds) {
@@ -162,14 +168,22 @@ public class XiaomiSampleProviderTest extends TestBase {
     }
 
     @Test
-    public void aWindowPastItsThirtiethDayIsForgotten() {
-        final int ancient = (int) ((System.currentTimeMillis() - WINDOW_MAX_AGE_MS) / 1000) - WINDOW_SECONDS;
-        storeSamples(ancient + 1800, windowStartSeconds + 1800);
-        storeWindow(ancient);
-        storeWindow(windowStartSeconds);
+    public void aNightMonthsAgoIsStillCovered() {
+        final int monthsAgo = windowStartSeconds - 90 * 86400;
+        storeSamples(monthsAgo + 1800);
+        storeWindow(monthsAgo);
 
-        Assert.assertEquals(READ_CALORIES, caloriesAt(ancient + 1800));
-        Assert.assertEquals(0, caloriesAt(windowStartSeconds + 1800));
+        Assert.assertEquals(0, caloriesAt(monthsAgo + 1800));
+    }
+
+    @Test
+    public void aWindowOfAnotherDeviceIsIgnored() {
+        final GBDevice otherDevice = createDummyGDevice("66:77:88:99:AA:BB");
+        DBHelper.getDevice(otherDevice, daoSession);
+        storeSamples(windowStartSeconds + 1800);
+        storeWindow(otherDevice, windowStartSeconds);
+
+        Assert.assertEquals(READ_CALORIES, caloriesAt(windowStartSeconds + 1800));
     }
 
     /**

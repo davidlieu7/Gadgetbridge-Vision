@@ -25,6 +25,10 @@ import org.slf4j.LoggerFactory;
 import java.util.TimeZone;
 
 import nodomain.freeyourgadget.gadgetbridge.GBApplication;
+import nodomain.freeyourgadget.gadgetbridge.database.DBHandler;
+import nodomain.freeyourgadget.gadgetbridge.devices.GenericDurationSampleProvider;
+import nodomain.freeyourgadget.gadgetbridge.devices.xiaomi.XiaomiSampleProvider;
+import nodomain.freeyourgadget.gadgetbridge.entities.GenericDurationSample;
 import nodomain.freeyourgadget.gadgetbridge.proto.xiaomi.AxisSensor;
 import nodomain.freeyourgadget.gadgetbridge.proto.xiaomi.Health;
 import nodomain.freeyourgadget.gadgetbridge.proto.xiaomi.RawSensorBatch;
@@ -35,7 +39,6 @@ import nodomain.freeyourgadget.gadgetbridge.proto.xiaomi.WorkoutStatusWatch;
 import nodomain.freeyourgadget.gadgetbridge.proto.xiaomi.WorkoutStatusWatchSport;
 import nodomain.freeyourgadget.gadgetbridge.proto.xiaomi.XiaomiProto;
 import nodomain.freeyourgadget.gadgetbridge.service.SleepAsAndroidSender;
-import nodomain.freeyourgadget.gadgetbridge.service.devices.xiaomi.XiaomiPreferences;
 
 /**
  * The band side of a Sleep as Android session, which runs over a hidden synthetic workout that
@@ -277,13 +280,27 @@ public final class XiaomiSleepAsAndroidManager {
         final long startedMs = health.getDevicePrefs().getLong(PREF_SESSION_STARTED_TS, 0L);
         final long now = System.currentTimeMillis();
         if (startedMs > 0 && now > startedMs && now - startedMs <= SESSION_MAX_AGE_MS) {
-            XiaomiPreferences.rememberSleepAsAndroidWindow(address, startedMs, now);
+            recordWindow(startedMs, now);
         }
 
         GBApplication.getDeviceSpecificSharedPrefs(address)
                 .edit()
                 .remove(PREF_SESSION_STARTED_TS)
                 .apply();
+    }
+
+    private void recordWindow(final long startMs, final long endMs) {
+        try (DBHandler db = GBApplication.acquireDB()) {
+            final GenericDurationSampleProvider provider =
+                    new GenericDurationSampleProvider(health.getSupport().getDevice(), db.getDaoSession());
+            final GenericDurationSample window = provider.createSample();
+            window.setTimestamp(startMs);
+            window.setEndTimestamp(endMs);
+            window.setType(XiaomiSampleProvider.DURATION_TYPE_SLEEP_AS_ANDROID);
+            provider.persistSamples(window, health.getSupport().getContext());
+        } catch (final Exception e) {
+            LOG.error("Failed to record the Sleep as Android window", e);
+        }
     }
 
     private String deviceAddress() {

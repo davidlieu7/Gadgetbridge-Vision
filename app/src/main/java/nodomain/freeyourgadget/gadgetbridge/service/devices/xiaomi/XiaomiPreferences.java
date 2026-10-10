@@ -16,17 +16,13 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 package nodomain.freeyourgadget.gadgetbridge.service.devices.xiaomi;
 
-import androidx.annotation.Nullable;
-
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Collections;
 import java.util.Date;
 import java.util.GregorianCalendar;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
-import java.util.Set;
 import java.util.TimeZone;
 
 import nodomain.freeyourgadget.gadgetbridge.GBApplication;
@@ -62,72 +58,8 @@ public final class XiaomiPreferences {
     public static final String FEAT_WIDGETS = "feat_widgets";
     public static final String FEAT_MULTIPLE_WEATHER_LOCATIONS = "feat_multiple_weather_locations";
 
-    /**
-     * Wall-clock spans a Sleep as Android synthetic workout covered, as {@code "<startMs>-<endMs>"}
-     * entries. The band charges those minutes to that workout at a rate its sport type fixes, so
-     * the calories it reports for them were never burnt.
-     */
-    public static final String PREF_SAA_SESSION_WINDOWS = "xiaomi_saa_session_windows";
-
-    private static final long SAA_WINDOW_MAX_AGE_MS = 30L * 24 * 60 * 60 * 1000L;
-
     private XiaomiPreferences() {
         // util class
-    }
-
-    /**
-     * The recorded Sleep as Android windows, oldest first, each as a {@code {startMs, endMs}} pair.
-     */
-    public static List<long[]> sleepAsAndroidWindows(final String deviceAddress) {
-        final Set<String> stored = GBApplication.getDeviceSpecificSharedPrefs(deviceAddress)
-                .getStringSet(PREF_SAA_SESSION_WINDOWS, Collections.emptySet());
-
-        final List<long[]> windows = new ArrayList<>(stored.size());
-        for (final String entry : stored) {
-            final long[] window = parseWindow(entry);
-            if (window != null) {
-                windows.add(window);
-            }
-        }
-        windows.sort((a, b) -> Long.compare(a[0], b[0]));
-
-        return windows;
-    }
-
-    public static void rememberSleepAsAndroidWindow(final String deviceAddress,
-                                                    final long startMs,
-                                                    final long endMs) {
-        final long oldest = System.currentTimeMillis() - SAA_WINDOW_MAX_AGE_MS;
-
-        final Set<String> entries = new HashSet<>();
-        for (final long[] window : sleepAsAndroidWindows(deviceAddress)) {
-            if (window[1] >= oldest) {
-                entries.add(window[0] + "-" + window[1]);
-            }
-        }
-        entries.add(startMs + "-" + endMs);
-
-        GBApplication.getDeviceSpecificSharedPrefs(deviceAddress)
-                .edit()
-                .putStringSet(PREF_SAA_SESSION_WINDOWS, entries)
-                .apply();
-    }
-
-    @Nullable
-    private static long[] parseWindow(final String entry) {
-        // Both bounds are epoch milliseconds, so the separator cannot be mistaken for a sign.
-        final int separator = entry.indexOf('-');
-        if (separator <= 0) {
-            return null;
-        }
-
-        try {
-            final long start = Long.parseLong(entry.substring(0, separator));
-            final long end = Long.parseLong(entry.substring(separator + 1));
-            return end > start ? new long[]{start, end} : null;
-        } catch (final NumberFormatException e) {
-            return null;
-        }
     }
 
     public static String prefFromHourMin(final WearCommon.HourMinute hourMinute) {

@@ -30,12 +30,14 @@ import de.greenrobot.dao.AbstractDao;
 import de.greenrobot.dao.Property;
 import nodomain.freeyourgadget.gadgetbridge.database.DBHelper;
 import nodomain.freeyourgadget.gadgetbridge.devices.AbstractSampleProvider;
+import nodomain.freeyourgadget.gadgetbridge.devices.GenericDurationSampleProvider;
 import nodomain.freeyourgadget.gadgetbridge.devices.XiaomiSleepStageSampleProvider;
 import nodomain.freeyourgadget.gadgetbridge.devices.XiaomiSleepTimeSampleProvider;
 import nodomain.freeyourgadget.gadgetbridge.entities.BaseActivitySummary;
 import nodomain.freeyourgadget.gadgetbridge.entities.BaseActivitySummaryDao;
 import nodomain.freeyourgadget.gadgetbridge.entities.DaoSession;
 import nodomain.freeyourgadget.gadgetbridge.entities.Device;
+import nodomain.freeyourgadget.gadgetbridge.entities.GenericDurationSample;
 import nodomain.freeyourgadget.gadgetbridge.entities.XiaomiActivitySample;
 import nodomain.freeyourgadget.gadgetbridge.entities.XiaomiActivitySampleDao;
 import nodomain.freeyourgadget.gadgetbridge.entities.XiaomiSleepStageSample;
@@ -43,11 +45,13 @@ import nodomain.freeyourgadget.gadgetbridge.entities.XiaomiSleepTimeSample;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
 import nodomain.freeyourgadget.gadgetbridge.model.ActivityKind;
 import nodomain.freeyourgadget.gadgetbridge.model.ActivitySample;
-import nodomain.freeyourgadget.gadgetbridge.service.devices.xiaomi.XiaomiPreferences;
 import nodomain.freeyourgadget.gadgetbridge.util.RangeMap;
 
 public class XiaomiSampleProvider extends AbstractSampleProvider<XiaomiActivitySample> {
     private static final Logger LOG = LoggerFactory.getLogger(XiaomiSampleProvider.class);
+
+    /** {@link GenericDurationSample} type of a span a Sleep as Android synthetic workout covered. */
+    public static final int DURATION_TYPE_SLEEP_AS_ANDROID = 1;
 
     public XiaomiSampleProvider(final GBDevice device, final DaoSession session) {
         super(device, session);
@@ -125,15 +129,16 @@ public class XiaomiSampleProvider extends AbstractSampleProvider<XiaomiActivityS
     private void dropSleepAsAndroidCalories(final List<XiaomiActivitySample> samples,
                                             final int timestamp_from,
                                             final int timestamp_to) {
-        final List<long[]> windows = XiaomiPreferences.sleepAsAndroidWindows(getDevice().getAddress());
+        final List<GenericDurationSample> windows = new GenericDurationSampleProvider(getDevice(), getSession())
+                .getSamplesOverlapping(DURATION_TYPE_SLEEP_AS_ANDROID, timestamp_from * 1000L, timestamp_to * 1000L);
         if (windows.isEmpty()) {
             return;
         }
 
         final RangeMap<Long, Boolean> synthetic = new RangeMap<>(RangeMap.Mode.LOWER_BOUND);
-        for (final long[] window : windows) {
-            synthetic.put(window[0], Boolean.TRUE);
-            synthetic.put(window[1] + 1, Boolean.FALSE);
+        for (final GenericDurationSample window : windows) {
+            synthetic.put(window.getTimestamp(), Boolean.TRUE);
+            synthetic.put(window.getEndTimestamp() + 1, Boolean.FALSE);
         }
 
         // A window can outlast the sleep it covered: a session the band never closed is only closed
