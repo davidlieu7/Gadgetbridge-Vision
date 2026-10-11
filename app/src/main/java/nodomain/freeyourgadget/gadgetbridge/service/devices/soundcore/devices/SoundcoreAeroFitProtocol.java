@@ -1,15 +1,11 @@
 package nodomain.freeyourgadget.gadgetbridge.service.devices.soundcore.devices;
 
-import static nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsPreferenceConst.PREF_SOUNDCORE_BATTERY_LOW_TONE;
-import static nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsPreferenceConst.PREF_SOUNDCORE_CONTROL_TOUCH_DISABLED;
-import static nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsPreferenceConst.PREF_SOUNDCORE_TOUCH_TONE;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEvent;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.soundcore.protocol.impl.v1.SoundcoreProtocolImplV1;
-import nodomain.freeyourgadget.gadgetbridge.util.Prefs;
 
 public class SoundcoreAeroFitProtocol extends SoundcoreProtocolImplV1 {
 
@@ -17,24 +13,6 @@ public class SoundcoreAeroFitProtocol extends SoundcoreProtocolImplV1 {
 
     public SoundcoreAeroFitProtocol(GBDevice device) {
         super(device);
-    }
-
-    @Override
-    protected GBDeviceEvent[] decodeDeviceInfo(final byte[] payload) {
-        if (payload.length < 30) {
-            LOG.warn("CMD_GET_DEVICE_INFO payload too short: {} bytes", payload.length);
-            return new GBDeviceEvent[0];
-        }
-
-        final String firmware1 = readString(payload, 4, 5);
-        final String firmware2 = readString(payload, 9, 5);
-        final String serialNumber = readString(payload, 14, 16);
-        final GBDeviceEvent[] batteryEvents = handleBatteryInfo(new byte[]{payload[2], payload[3]});
-        return new GBDeviceEvent[]{
-                batteryEvents[0],
-                batteryEvents[1],
-                buildVersionInfo(firmware1, firmware2, serialNumber)
-        };
     }
 
     @Override

@@ -283,8 +283,19 @@ public abstract class SoundcoreProtocolImplV1 extends AbstractSoundcoreProtocol 
         }
     }
 
-    /** Hook for the device-specific CMD_GET_DEVICE_INFO payload layout. */
+    /** Decodes the standard earbud header, trying firmware offsets 4 and 6 in order. */
     protected GBDeviceEvent[] decodeDeviceInfo(final byte[] payload) {
+        if (payload != null) {
+            for (final int firmwareOffset : new int[]{4, 6}) {
+                if (payload.length >= firmwareOffset + 26
+                        && readString(payload, firmwareOffset, 5).matches("[0-9]{2}\\.[0-9]{2}")
+                        && readString(payload, firmwareOffset + 5, 5).matches("[0-9]{2}\\.[0-9]{2}")) {
+                    return decodeStandardEarbudDeviceInfo(payload, firmwareOffset);
+                }
+            }
+        }
+
+        // LOG.warn("CMD_GET_DEVICE_INFO has no valid firmware layout: {} bytes", payload == null ? 0 : payload.length);
         return new GBDeviceEvent[0];
     }
 
@@ -293,7 +304,11 @@ public abstract class SoundcoreProtocolImplV1 extends AbstractSoundcoreProtocol 
      * layout for its common header and adds its own settings afterwards.
      */
     protected final GBDeviceEvent[] decodeStandardEarbudDeviceInfo(final byte[] payload) {
-        if (payload == null || payload.length < 32) {
+        return decodeStandardEarbudDeviceInfo(payload, 6);
+    }
+
+    protected final GBDeviceEvent[] decodeStandardEarbudDeviceInfo(final byte[] payload, final int firmwareOffset) {
+        if (payload == null || firmwareOffset > payload.length - 26) {
             return new GBDeviceEvent[0];
         }
 
@@ -302,9 +317,9 @@ public abstract class SoundcoreProtocolImplV1 extends AbstractSoundcoreProtocol 
             batteryEvents[0],
             batteryEvents[1],
             buildVersionInfo(
-                readString(payload, 6, 5), // firmware1
-                readString(payload, 11, 5), // firmware2
-                readString(payload, 16, 16) // serialnumber
+                readString(payload, firmwareOffset, 5), // firmware1
+                readString(payload, firmwareOffset + 5, 5), // firmware2
+                readString(payload, firmwareOffset + 10, 16) // serialnumber
             )
         };
     }
