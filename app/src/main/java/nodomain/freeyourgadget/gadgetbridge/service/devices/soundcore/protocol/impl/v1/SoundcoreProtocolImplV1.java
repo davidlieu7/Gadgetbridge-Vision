@@ -1,7 +1,5 @@
 package nodomain.freeyourgadget.gadgetbridge.service.devices.soundcore.protocol.impl.v1;
 
-import static nodomain.freeyourgadget.gadgetbridge.util.GB.lazyHexdump;
-
 import android.content.Context;
 import android.content.Intent;
 import android.content.SharedPreferences;
@@ -95,16 +93,6 @@ public class SoundcoreProtocolImplV1 extends AbstractSoundcoreProtocol {
 
     public SoundcoreProtocolImplV1(final GBDevice device) {
         super(device);
-    }
-
-    @Override
-    protected SoundcorePacket decodePacket(final byte[] responseData) {
-        final SoundcorePacket packet = super.decodePacket(responseData);
-        if (packet != null) {
-            LOG.debug("Received packet: command={}, payload={}",
-                    String.format("0x%04x", packet.getCommand()), lazyHexdump(packet.getPayload()));
-        }
-        return packet;
     }
 
     @Override
