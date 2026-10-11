@@ -59,6 +59,8 @@ abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator(
         AudioEqualizer,
         GamingMode,
         VoicePrompts,
+        AudioBalance,
+        ColorfulLights,
         ButtonBrightness,
         LDAC,
         AdaptiveDirection,
@@ -157,6 +159,7 @@ abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator(
         PLAYPAUSE(6, R.string.pref_media_playpause),
         VOICE_ASSISTANT(5, R.string.pref_title_touch_voice_assistant),
         AMBIENT_SOUND_CONTROL(4, R.string.sony_button_mode_ambient_sound_control),
+        COLORFUL_LIGHTS(14, R.string.soundcore_colorful_lights),
         NONE(15, R.string.none),
 
         ;
@@ -353,6 +356,15 @@ abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator(
         fun has(capability: Capability) = capabilities.contains(capability)
         fun has(anyOf: Array<Capability>) = anyOf.any { capabilities.contains(it) }
 
+        if (has(Capability.AudioBalance)) {
+            val prefs = GBApplication.getDevicePrefs(device)
+            val key = DeviceSettingsPreferenceConst.PREF_SOUNDCORE_AUDIO_BALANCE
+            if (prefs.preferences.all[key] is String) {
+                val balance = prefs.getInt(key, 0).takeIf { it in -6..6 } ?: 0
+                prefs.preferences.edit().putInt(key, balance).apply()
+            }
+        }
+
         return deviceSettings {
             if (has(arrayOf(Capability.TouchControls, Capability.TouchControlDisable, Capability.TouchTone))) {
                 screen(
@@ -427,12 +439,22 @@ abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator(
                 }
             }
 
-            if (has(arrayOf(Capability.AudioEqualizer, Capability.SurroundSound, Capability.GamingMode, Capability.LDAC))) {
+            if (has(arrayOf(Capability.AudioEqualizer, Capability.SurroundSound, Capability.GamingMode, Capability.LDAC, Capability.AudioBalance))) {
                 screen(
                     key = "pref_soundcore_audio",
                     title = R.string.pref_header_audio,
                     icon = R.drawable.ic_music_note,
                 ) {
+                    if (has(Capability.AudioBalance)) {
+                        seekbar(
+                            key = DeviceSettingsPreferenceConst.PREF_SOUNDCORE_AUDIO_BALANCE,
+                            title = R.string.pref_balance,
+                            icon = R.drawable.ic_balance,
+                            min = -6,
+                            max = 6,
+                            defaultValue = 0,
+                        )
+                    }
                     if (has(Capability.GamingMode)) {
                         switchSetting(
                             key = DeviceSettingsPreferenceConst.PREF_SOUNDCORE_GAMING_MODE,
@@ -672,6 +694,61 @@ abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator(
                     }
                 }
             }
+            if (has(Capability.ColorfulLights)) {
+                screen(
+                    key = "pref_soundcore_light_screen",
+                    title = R.string.soundcore_colorful_lights,
+                    icon = R.drawable.ic_led_color,
+                ) {
+                    switchSetting(
+                        key = DeviceSettingsPreferenceConst.PREF_SOUNDCORE_LIGHTS_ENABLED,
+                        title = R.string.soundcore_colorful_lights,
+                        icon = R.drawable.ic_lightbulb,
+                    )
+                    list(
+                        key = DeviceSettingsPreferenceConst.PREF_SOUNDCORE_LIGHT_MODE,
+                        title = R.string.soundcore_light_mode,
+                        icon = R.drawable.ic_light_mode_auto,
+                        entries = listOf(
+                            ListEntry.Res("1", R.string.soundcore_light_effect_on),
+                            ListEntry.Res("2", R.string.soundcore_light_effect_breathing),
+                            ListEntry.Res("3", R.string.soundcore_light_effect_flash),
+                            ListEntry.Res("0", R.string.soundcore_light_effect_music),
+                        ),
+                        defaultValue = "0",
+                        dependency = DeviceSettingsPreferenceConst.PREF_SOUNDCORE_LIGHTS_ENABLED,
+                    )
+                    seekbar(
+                        key = DeviceSettingsPreferenceConst.PREF_SOUNDCORE_LIGHT_INTENSITY,
+                        title = R.string.soundcore_light_intensity,
+                        icon = R.drawable.ic_wb_sunny,
+                        min = 1, max = 10, defaultValue = 5,
+                        dependency = DeviceSettingsPreferenceConst.PREF_SOUNDCORE_LIGHTS_ENABLED,
+                    )
+                    seekbar(
+                        key = DeviceSettingsPreferenceConst.PREF_SOUNDCORE_LIGHT_AUTO_OFF,
+                        title = R.string.soundcore_light_auto_off,
+                        icon = R.drawable.ic_timer,
+                        min = 1, max = 120, defaultValue = 45,
+                        dependency = DeviceSettingsPreferenceConst.PREF_SOUNDCORE_LIGHTS_ENABLED,
+                    )
+                    val channels = listOf(
+                        Triple(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_LIGHT_COLOR_RED, R.string.red, 23),
+                        Triple(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_LIGHT_COLOR_GREEN, R.string.green, 187),
+                        Triple(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_LIGHT_COLOR_BLUE, R.string.blue, 239),
+                    )
+                    channels.forEach { (key, title, initialValue) ->
+                        seekbar(
+                            key = key, title = title,
+                            icon = R.drawable.ic_led_color,
+                            min = 0, max = 255, defaultValue = initialValue,
+                            dependency = DeviceSettingsPreferenceConst.PREF_SOUNDCORE_LIGHTS_ENABLED,
+                            visibleWhen = { prefs -> prefs.getString(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_LIGHT_MODE, "0") != "0" },
+                        )
+                    }
+                }
+            }
+
             if (has(arrayOf(Capability.WearingDetection, Capability.WearingTone, Capability.FitTest, Capability.AutoPowerOff, Capability.BatteryLowTone, Capability.VoicePrompts, Capability.ButtonBrightness))) {
                 category(key = "pref_header_soundcore_general", title = R.string.pref_header_general) {
                     if (has(Capability.WearingDetection)) {

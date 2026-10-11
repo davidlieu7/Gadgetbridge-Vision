@@ -25,12 +25,20 @@ import nodomain.freeyourgadget.gadgetbridge.activities.multipoint.MultipointDevi
 import nodomain.freeyourgadget.gadgetbridge.activities.multipoint.MultipointPairingActivity;
 import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEvent;
 import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreEarbudsCoordinator;
-import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreV20iCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.soundcore.protocol.impl.v1.SoundcoreProtocolImplV1;
 import nodomain.freeyourgadget.gadgetbridge.util.Prefs;
 
 public class SoundcoreV20iProtocol extends SoundcoreProtocolImplV1 {
+    // NOTE: different than Motion 300, uses same code as SET_TOUCH_TONE.
+    private static final short CMD_SET_VOICE_PROMPTS = (short) 0x8301;
+
+    public static final short CMD_SET_AUDIO_BALANCE = (short) 0x8c10;
+    public static final short CMD_SET_LIGHT_INTENSITY = (short) 0x820e;
+    public static final short CMD_SET_LIGHT_AUTO_OFF = (short) 0x840e;
+    public static final short CMD_SET_LIGHT_COLOR = (short) 0x850e;
+    public static final short CMD_SET_LIGHT_MODE = (short) 0x860e;
+
     private static final int LEFT_LONG_PRESS_OFFSET = 65;
     private static final int LONG_PRESS_FUNCTION_PREFIX = 0xf0;
     private static final int TAP_FUNCTION_CODE_MASK = 0x0f;
@@ -92,19 +100,27 @@ public class SoundcoreV20iProtocol extends SoundcoreProtocolImplV1 {
     public byte[] encodeSendConfiguration(final String config) {
         final Prefs prefs = getDevicePrefs();
         switch (config) {
-            case DeviceSettingsPreferenceConst.PREF_SOUNDCORE_CONTROL_LONG_PRESS_ACTION_LEFT:
-            case DeviceSettingsPreferenceConst.PREF_SOUNDCORE_CONTROL_LONG_PRESS_ACTION_RIGHT:
-                final SoundcoreEarbudsCoordinator.TapFunction function;
-                try {
-                    function = SoundcoreEarbudsCoordinator.TapFunction.valueOf(prefs.getString(config, "NONE"));
-                } catch (IllegalArgumentException e) {
+            case DeviceSettingsPreferenceConst.PREF_SOUNDCORE_VOICE_PROMPTS:
+                return encodeBooleanCommand(CMD_SET_VOICE_PROMPTS, prefs.getBoolean(config, true));
+            case DeviceSettingsPreferenceConst.PREF_SOUNDCORE_AUDIO_BALANCE:
+                final int balance = prefs.getInt(config, 0);
+                return balance >= -6 && balance <= 6
+                        ? encodeByteCommand(CMD_SET_AUDIO_BALANCE, (byte) (100 + balance)) : null;
+            case DeviceSettingsPreferenceConst.PREF_SOUNDCORE_LIGHT_INTENSITY: // 1-10
+                return encodeByteCommand(CMD_SET_LIGHT_INTENSITY, prefs.getInt(config, 5));
+            case DeviceSettingsPreferenceConst.PREF_SOUNDCORE_LIGHT_AUTO_OFF:  // 1-120
+                return encodeByteCommand(CMD_SET_LIGHT_AUTO_OFF, prefs.getInt(config, 45));
+            case DeviceSettingsPreferenceConst.PREF_SOUNDCORE_LIGHT_COLOR_RED:
+            case DeviceSettingsPreferenceConst.PREF_SOUNDCORE_LIGHT_COLOR_GREEN:
+            case DeviceSettingsPreferenceConst.PREF_SOUNDCORE_LIGHT_COLOR_BLUE:
+                final int red = prefs.getInt(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_LIGHT_COLOR_RED, 23);
+                final int green = prefs.getInt(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_LIGHT_COLOR_GREEN, 187);
+                final int blue = prefs.getInt(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_LIGHT_COLOR_BLUE, 239);
+                if (red < 0 || red > 255 || green < 0 || green > 255 || blue < 0 || blue > 255) {
                     return null;
                 }
-                final byte functionByte = (byte) (LONG_PRESS_FUNCTION_PREFIX | function.getCode());
-                return encodeControlFunction(config.equals(
-                        DeviceSettingsPreferenceConst.PREF_SOUNDCORE_CONTROL_LONG_PRESS_ACTION_RIGHT),
-                        (byte) 0x01, functionByte);
-            case SoundcoreV20iCoordinator.PREF_LIGHT_MODE:
+                return encodeCommand(CMD_SET_LIGHT_COLOR, new byte[]{(byte) red, (byte) green, (byte) blue});
+            case DeviceSettingsPreferenceConst.PREF_SOUNDCORE_LIGHT_MODE:
                 final int mode;
                 try {
                     mode = Integer.parseInt(prefs.getString(config, "0"));
@@ -115,6 +131,11 @@ public class SoundcoreV20iProtocol extends SoundcoreProtocolImplV1 {
             default:
                 return super.encodeSendConfiguration(config);
         }
+    }
+
+    @Override
+    protected int getTapFunctionGroup(final SoundcoreEarbudsCoordinator.ButtonAction action) {
+        return action == SoundcoreEarbudsCoordinator.ButtonAction.DOUBLE_TAP ? 6 : 15;
     }
 
     private void decodePairedDevicesPayload(final byte[] payload) {
