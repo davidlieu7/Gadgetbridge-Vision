@@ -43,6 +43,17 @@ open class SoundcoreSleepA30Protocol(device: GBDevice?) : SoundcoreProtocolImplV
                                     val minutes: Int, val repetition: Int, val snooze: Boolean)
 
     private val currentFunctions = intArrayOf(-1, -1, -1, -1)
+    private var localAudioSelector: Byte? = null
+
+    override fun encodeDeviceInfoRequest(): ByteArray {
+        localAudioSelector = null
+        return super.encodeDeviceInfoRequest()
+    }
+
+    override fun encodeLocalPlayback(playing: Boolean): ByteArray? {
+        val selector = localAudioSelector ?: return null
+        return encodeCommand(CMD_SET_LOCAL_PLAYBACK, byteArrayOf(selector, encodeBoolean(playing)))
+    }
 
     override fun decodeResponse(responseData: ByteArray?): Array<GBDeviceEvent>? {
         if (responseData != null && responseData.size >= 7) {
@@ -74,6 +85,9 @@ open class SoundcoreSleepA30Protocol(device: GBDevice?) : SoundcoreProtocolImplV
         val preferences = GBDeviceEventUpdatePreferences()
         decodeBooleanPreference(payload, 65, PREF_SOUNDCORE_LISTENING_MODE, preferences, "0", "1")
         decodeBooleanPreference(payload, 69, PREF_SOUNDCORE_BATTERY_LOW_TONE, preferences)
+        localAudioSelector = payload[72]
+        decodeBooleanPreference(payload, 73, PREF_SOUNDCORE_LOCAL_PLAYBACK, preferences)
+        decodeLocalVolume(payload[71], preferences)
         decodeBooleanPreference(payload, 137, PREF_SOUNDCORE_POWER_OFF_TONE, preferences)
         decodeBooleanPreference(payload, 138, PREF_SOUNDCORE_MODE_TONE, preferences)
         decodeBooleanPreference(payload, 141, PREF_SOUNDCORE_CALLS_ENABLED, preferences)
@@ -87,6 +101,11 @@ open class SoundcoreSleepA30Protocol(device: GBDevice?) : SoundcoreProtocolImplV
             GBDeviceEventSendBytes(encodeRequest(CMD_GET_SLEEP_SETTINGS)),
             GBDeviceEventSendBytes(encodeRequest(CMD_NOTIFY_LISTENING_MODE))
         )
+    }
+
+    private fun decodeLocalVolume(value: Byte, prefs: GBDeviceEventUpdatePreferences) {
+        val volume = value.toInt() and 0xff
+        prefs.withPreference(PREF_SOUNDCORE_LOCAL_VOLUME, volume)
     }
 
     private fun decodeBooleanPreference(
@@ -139,14 +158,12 @@ open class SoundcoreSleepA30Protocol(device: GBDevice?) : SoundcoreProtocolImplV
             }
             CMD_NOTIFY_LOCAL_AUDIO -> {
                 if (payload.size == 11) {
+                    localAudioSelector = payload[0]
                     val preferences = GBDeviceEventUpdatePreferences()
                     if (payload[9] in 0..1) {
                         preferences.withPreference(PREF_SOUNDCORE_LOCAL_PLAYBACK, payload[9] == 1.toByte())
                     }
-                    val volume = payload[10].toInt() and 0xff
-                    if (volume <= 65) {
-                        preferences.withPreference(PREF_SOUNDCORE_LOCAL_VOLUME, volume)
-                    }
+                    decodeLocalVolume(payload[10], preferences)
                     if (preferences.preferences.isNotEmpty()) {
                         result = arrayOf(preferences)
                     }
