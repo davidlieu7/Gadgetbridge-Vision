@@ -22,6 +22,7 @@ import android.content.SharedPreferences;
 import android.location.Location;
 import android.os.Handler;
 import android.os.Looper;
+import android.widget.Toast;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -134,15 +135,13 @@ public class CasioGGB100DeviceSupport extends Casio2C2DSupport
     // ── App information ──────────────────────────────────────────────────────
 
     // What the official app writes to APP_INFO at pairing time. The watch keeps it
-    // across connections. Last byte = capabilities, 2 = BT time adjustment supported.
+    // across connections. Last byte = capabilities, 2 = BT time adjustment supported
     private static final byte[] APP_INFO_TOKEN = {
             0x22, 0x55, (byte) 0xf6, 0x55, 0x69,
             0x26, (byte) 0x2c, (byte) 0x6b, (byte) 0xb9, (byte) 0x7b, 0x02
     };
 
-    /**
-     * Leave the stored token alone: the official app writes it once at pairing.
-     */
+    /** Leave the stored token alone: the official app writes it once at pairing */
     private void checkAppInformation(byte[] data) {
         if (data.length >= 12 && data[11] == 0x02) {
             return;
@@ -154,6 +153,32 @@ public class CasioGGB100DeviceSupport extends Casio2C2DSupport
         write(arr);
     }
 
+
+    // ── Data fetch ────────────────────────────────────────────────────────────
+
+    @Override
+    public void onFetchRecordedData(int dataTypes) {
+        try {
+            new FetchStepCountDataOperation(this).perform();
+        } catch (IOException e) {
+            GB.toast(getContext(), "Error fetching step data",
+                    Toast.LENGTH_SHORT, GB.ERROR, e);
+            startFetchMissionLogData();
+        }
+    }
+
+    public void onStepCountFetchFinished() {
+        startFetchMissionLogData();
+    }
+
+    private void startFetchMissionLogData() {
+        try {
+            new FetchMissionLogDataOperation(this).perform();
+        } catch (IOException e) {
+            GB.toast(getContext(), "Error fetching sport data",
+                    Toast.LENGTH_SHORT, GB.ERROR, e);
+        }
+    }
 
     // ── Phone finder ──────────────────────────────────────────────────────────
 
@@ -285,48 +310,29 @@ public class CasioGGB100DeviceSupport extends Casio2C2DSupport
             namePacket[0] = Casio2C2DSupport.FEATURE_WATCH_NAME;
             System.arraycopy(nameBytes, 0, namePacket, 1, nameBytes.length);
             write(namePacket);
-            setInitialized();
 
             byte connectionReason = data[8];
             LOG.debug("Connection reason is: " + Byte.toString(connectionReason));
 
             if (connectionReason == 0x02) {
                 LOG.debug("Watch requests phone finder");
-                // Already handled by the feature, this is redundant.
+                setInitialized();
                 return true;
             } else if (connectionReason == 0x07) {
                 LOG.debug("Watch requests a location indicator");
+                setInitialized();
                 req(Casio2C2DSupport.FEATURE_LOCATION_INDICATOR);
                 return true;
             }
-            // else if (connectionReason == 0x00) {
-            //     LOG.debug("Watch fresh pairing connection");
-            // } else if (connectionReason == 0x01) {
-            //     LOG.debug("Watch connected");
-            // } else if (connectionReason == 0x03) {
-            //     LOG.debug("Watch requests a scheduled sync");
-            // } else if (connectionReason == 0x04) {
-            //     LOG.debug("Watch requests a manual sync");
-            // } else if (connectionReason == 0x08) {
-            //     LOG.debug("Watch requests a mission log connection");
-            // }
 
-            if (connectionReason != 0x04) {
-                // if await link.request_echo(FEAT_BLE_SETTINGS, label="request BLE_SETTINGS 0x11") is None:
-                //     return False
-                // await cmd_status(link)
-                // await cmd_newdata(link)
+            // Long sync flows for pairing (0x00), connect (0x01), scheduled sync (0x03),
+            // manual sync (0x04), mission log (0x08))
+            try {
+                new InitOperation(this, connectionReason).perform();
+            } catch (IOException e) {
+                GB.toast(getContext(), "Initializing Casio GG-B100 failed",
+                        Toast.LENGTH_SHORT, GB.ERROR, e);
             }
-
-            // if not await version_round(link):
-            //     return False
-
-            // if not await link.city_block(gps_chunks()):
-            //         return False
-            if (connectionReason != 0x04) {
-                // await link.request(FEAT_MODE_CUST, label="request MODE_CUST 0x38")
-            }
-            // await link.write_time()
 
             return true;
         } else if (feat == Casio2C2DSupport.FEATURE_ALERT_LEVEL) {
