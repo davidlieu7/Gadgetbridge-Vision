@@ -36,7 +36,6 @@ import nodomain.freeyourgadget.gadgetbridge.service.devices.soundcore.protocol.i
 abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator() {
     enum class Capability {
         FindDevice,
-        FindIndividualEarbuds,
         Multipoint,
         Transparency,
         NoiseControl,
@@ -173,6 +172,9 @@ abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator(
 
     override fun supportsFindDevice(device: GBDevice): Boolean =
         getCapabilities(device).contains(Capability.FindDevice)
+
+    override fun supportsFindDevicePerEarbud(device: GBDevice): Boolean =
+        supportsFindDevice(device) && getDeviceKind(device) == DeviceCoordinator.DeviceKind.EARBUDS
 
     override fun getSupportedDeviceSpecificConnectionSettings(): IntArray =
         connectionSettings + super.getSupportedDeviceSpecificConnectionSettings()
@@ -521,25 +523,6 @@ abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator(
                             }
                         }
                     }
-                }
-            }
-
-            if (has(Capability.FindIndividualEarbuds)) {
-                listOf(
-                    DeviceSettingsPreferenceConst.PREF_SOUNDCORE_FIND_LEFT_EARBUD to R.string.earfun_earbud_mode_left,
-                    DeviceSettingsPreferenceConst.PREF_SOUNDCORE_FIND_RIGHT_EARBUD to R.string.earfun_earbud_mode_right,
-                ).forEach { (key, title) ->
-                    list(
-                        key = key,
-                        title = title,
-                        summary = R.string.earfun_find_headphones,
-                        icon = R.drawable.ic_action_find_lost_device,
-                        entries = listOf(
-                            ListEntry.Res("0", R.string.off),
-                            ListEntry.Res("1", R.string.earfun_find_headphones_hint),
-                        ),
-                        defaultValue = "0",
-                    )
                 }
             }
 

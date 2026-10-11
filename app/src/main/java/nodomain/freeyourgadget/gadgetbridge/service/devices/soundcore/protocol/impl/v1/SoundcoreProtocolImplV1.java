@@ -2,6 +2,7 @@ package nodomain.freeyourgadget.gadgetbridge.service.devices.soundcore.protocol.
 
 import android.content.SharedPreferences;
 import android.content.Intent;
+import androidx.annotation.NonNull;
 import androidx.localbroadcastmanager.content.LocalBroadcastManager;
 import java.util.ArrayList;
 import java.util.List;
@@ -16,6 +17,7 @@ import java.util.Arrays;
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsPreferenceConst;
 import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEvent;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
+import nodomain.freeyourgadget.gadgetbridge.model.FindDeviceTarget;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.soundcore.AbstractSoundcoreProtocol;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.soundcore.SoundcorePacket;
 import nodomain.freeyourgadget.gadgetbridge.util.Prefs;
@@ -352,9 +354,14 @@ public abstract class SoundcoreProtocolImplV1 extends AbstractSoundcoreProtocol 
 
     @Override
     public byte[] encodeFindDevice(final boolean start) {
+        return encodeFindDevice(start, FindDeviceTarget.ALL);
+    }
+
+    @Override
+    public byte[] encodeFindDevice(final boolean start, @NonNull final FindDeviceTarget target) {
         return encodeCommand(CMD_SET_FIND_DEVICE, new byte[]{
-                encodeBoolean(start), // left
-                encodeBoolean(start), // right
+                encodeBoolean(start && target != FindDeviceTarget.RIGHT), // left
+                encodeBoolean(start && target != FindDeviceTarget.LEFT), // right
                 0x00
         });
     }

@@ -184,22 +184,6 @@ public class SoundcoreA30iProtocol extends SoundcoreProtocolImplV1 {
                 int duration = Integer.parseInt(prefs.getString(PREF_SOUNDCORE_AUTO_POWER_OFF, "3"));
                 return encodeAutoPowerOff(CMD_SET_AUTO_POWER_OFF, duration, (byte) 0x03);
 
-            case DeviceSettingsPreferenceConst.PREF_SOUNDCORE_FIND_LEFT_EARBUD:
-                // It enables/disables a loud sound on the left earbud.
-                // IMPORTANT: Warn the user before enabling it, so they
-                // can remove their headphones from their ears to prevent
-                // potential hearing damage.
-                boolean find_left_earbud = prefs.getInt(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_FIND_LEFT_EARBUD, 0) == 0;
-                return encode_find_earbud(true, find_left_earbud);
-
-            case DeviceSettingsPreferenceConst.PREF_SOUNDCORE_FIND_RIGHT_EARBUD:
-                // It enables/disables a loud sound on the right earbud.
-                // IMPORTANT: Warn the user before enabling it, so they
-                // can remove their headphones from their ears to prevent
-                // potential hearing damage.
-                boolean find_right_earbud = prefs.getInt(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_FIND_RIGHT_EARBUD, 0) == 0;
-                return encode_find_earbud(false, find_right_earbud);
-
             case DeviceSettingsPreferenceConst.PREF_SOUNDCORE_ANC_MODE, DeviceSettingsPreferenceConst.PREF_SOUNDCORE_AMBIENT_SOUND_CONTROL,
                  DeviceSettingsPreferenceConst.PREF_SONY_AMBIENT_SOUND_LEVEL, DeviceSettingsPreferenceConst.PREF_SOUNDCORE_WIND_NOISE_REDUCTION:
                 // It sets the ANC mode. It always sends the same command (with different values),
@@ -284,36 +268,6 @@ public class SoundcoreA30iProtocol extends SoundcoreProtocolImplV1 {
         return encodeCommand(CMD_SET_AUDIO_MODE, buf.array());
     }
 
-
-    /**
-     * If disable_find_device_tone is false, one of the earbuds will play a loud sound
-     * (depending on: is_left_earbud).
-     * IMPORTANT: Warn the user before setting disable_find_device_tone to false, so
-     * they can remove their headphones from their ears, to prevent potential hearing damage.
-     */
-    private byte[] encode_find_earbud(boolean is_left_earbud, boolean disable_find_device_tone){
-        if(disable_find_device_tone){
-            return encodeCommand(CMD_SET_FIND_DEVICE, new byte[]{
-                    0x00, // left
-                    0x00, // right
-                    0x00
-            });
-        }else {
-            if (is_left_earbud) {
-                return encodeCommand(CMD_SET_FIND_DEVICE, new byte[]{
-                        0x01, // left
-                        0x00, // right
-                        0x00
-                });
-            } else {
-                return encodeCommand(CMD_SET_FIND_DEVICE, new byte[]{
-                        0x00, // left
-                        0x01, // right
-                        0x00
-                });
-            }
-        }
-    }
 
     /** Sent after CMD_GET_DEVICE_INFO, to finalise the session with the device. */
     public byte[] encodeSessionInitRequest() {

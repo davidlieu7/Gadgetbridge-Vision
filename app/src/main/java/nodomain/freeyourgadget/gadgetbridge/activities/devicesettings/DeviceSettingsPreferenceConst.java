@@ -574,8 +574,6 @@ public class DeviceSettingsPreferenceConst {
     public static final String PREF_SOUNDCORE_EQUALIZER_BAND8_VALUE = "pref_soundcore_equalizer_band8_value";
     public static final String PREF_SOUNDCORE_EQUALIZER_BAND9_FREQ = "pref_soundcore_equalizer_band9_freq";
     public static final String PREF_SOUNDCORE_EQUALIZER_BAND9_VALUE = "pref_soundcore_equalizer_band9_value";
-    public static final String PREF_SOUNDCORE_FIND_LEFT_EARBUD = "pref_soundcore_find_left_earbud";
-    public static final String PREF_SOUNDCORE_FIND_RIGHT_EARBUD = "pref_soundcore_find_right_earbud";
     public static final String PREF_SOUNDCORE_A30I_DISABLE_OPTION_AMBIENT_MODE = "pref_soundcore_a30i_disable_option_ambient_mode";
     public static final String PREF_SOUNDCORE_A30I_DISABLE_OPTION_AMBIENT_SOUND_LEVEL = "pref_soundcore_a30i_disable_option_ambient_sound_level";
     public static final String PREF_SOUNDCORE_A30I_DISABLE_OPTION_WIND_NOISE_REDUCTION = "pref_soundcore_a30i_disable_option_wind_noise_reduction";

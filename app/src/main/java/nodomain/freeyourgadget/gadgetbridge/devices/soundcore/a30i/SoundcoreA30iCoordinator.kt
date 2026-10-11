@@ -39,7 +39,6 @@ class SoundcoreA30iCoordinator : SoundcoreEarbudsCoordinator() {
         Capability.NoiseCancellationModes,
         Capability.AdaptiveNoiseCancellation,
         Capability.FindDevice,
-        Capability.FindIndividualEarbuds,
         Capability.BatteryLowTone,
         Capability.WindNoiseReduction,
         Capability.SurroundSound,
