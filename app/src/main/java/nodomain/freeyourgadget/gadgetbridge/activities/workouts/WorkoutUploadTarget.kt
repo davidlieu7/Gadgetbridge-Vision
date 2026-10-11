@@ -47,6 +47,9 @@ data class TrackUpdateResult(
     val unsupported: Boolean = false
 )
 
+/** Whether a service still holds an activity it was given. [FAILED] means it could not be asked. */
+enum class RemoteLookup { PRESENT, GONE, FAILED }
+
 /**
  * One online fitness tracker, described by what it accepts and by what it can still change on an
  * activity after the initial upload. [WorkoutUploadWorker] drives every service through this, so
@@ -137,6 +140,12 @@ interface WorkoutUploadTarget {
         photoFile: File?,
         previousMediaId: Int?
     ): WorkoutUploader.PhotoSyncResult?
+
+    /**
+     * Asks the service whether it still holds [remoteActivityId], which it no longer does once the
+     * user deleted it there. Null when the service offers no way to tell. Blocking.
+     */
+    fun lookupRemote(context: Context, remoteActivityId: String): RemoteLookup?
 }
 
 /** Every supported upload target. */
@@ -237,6 +246,9 @@ object EndurainUploadTarget : WorkoutUploadTarget {
         photoFile: File?,
         previousMediaId: Int?
     ) = WorkoutUploader.syncEndurainPhotoBlocking(context, remoteActivityId, photoFile, previousMediaId)
+
+    override fun lookupRemote(context: Context, remoteActivityId: String) =
+        WorkoutUploader.lookupEndurainActivityBlocking(context, remoteActivityId)
 }
 
 object WandererUploadTarget : WorkoutUploadTarget {
@@ -304,4 +316,7 @@ object WandererUploadTarget : WorkoutUploadTarget {
         photoFile: File?,
         previousMediaId: Int?
     ): WorkoutUploader.PhotoSyncResult? = null
+
+    override fun lookupRemote(context: Context, remoteActivityId: String) =
+        WorkoutUploader.lookupWandererTrailBlocking(context, remoteActivityId)
 }

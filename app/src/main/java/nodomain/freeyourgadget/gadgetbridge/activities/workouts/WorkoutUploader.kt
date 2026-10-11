@@ -158,6 +158,10 @@ object WorkoutUploader {
      * since when it does. A service that already holds it as it stands is left alone, so asking
      * for an upload twice does not leave a second activity behind.
      *
+     * With [verifyRemote], the service is first asked whether it still holds the activity the row
+     * names, and one deleted there is uploaded afresh. That costs a request, so it is meant for an
+     * upload the user asked for, not for every background run.
+     *
      * [summaryData] supplies the exported session fields; see [buildFitFile].
      *
      * Blocking: call from an IO context.
@@ -168,13 +172,31 @@ object WorkoutUploader {
         provider: ActivityTrackProvider?,
         target: WorkoutUploadTarget,
         summary: BaseActivitySummary,
-        summaryData: ActivitySummaryData? = null
+        summaryData: ActivitySummaryData? = null,
+        verifyRemote: Boolean = false
     ): SyncOutcome {
         val id = summary.id ?: return SyncOutcome.NotApplicable
         val sourceHash = WorkoutUploadStore.sourceHashOf(summary)
         val row = WorkoutUploadStore.rowsForSummaries(listOf(id))[id]?.get(target.service)
         if (row == null || row.status != WorkoutUploadStore.STATUS_SUCCESS) {
             return uploadNew(context, gbDevice, provider, target, summary, sourceHash, summaryData)
+        }
+        val remoteId = row.remoteActivityId
+        if (verifyRemote && remoteId != null) {
+            when (target.lookupRemote(context, remoteId)) {
+                RemoteLookup.GONE -> {
+                    LOG.info("Service {} no longer holds activity {} of summary {}, uploading it again",
+                        target.service, remoteId, id)
+                    // Dropped first so that a failed upload leaves a failed first attempt, which the
+                    // background worker picks up again, rather than a row naming an activity that
+                    // no longer exists.
+                    WorkoutUploadStore.delete(id, target.service)
+                    return uploadNew(context, gbDevice, provider, target, summary, sourceHash, summaryData)
+                }
+
+                RemoteLookup.FAILED -> return SyncOutcome.Failed(null)
+                RemoteLookup.PRESENT, null -> Unit
+            }
         }
         if (row.sourceHash == sourceHash && row.lastError == null) {
             return SyncOutcome.AlreadyInStep
@@ -494,6 +516,43 @@ object WorkoutUploader {
             }.start()
         }
         return if (latch.await(DEFAULT_UPLOAD_TIMEOUT_SECONDS, TimeUnit.SECONDS)) success else false
+    }
+
+    /**
+     * Whether the Endurain activity [remoteActivityId] still exists. Refreshes the access token
+     * first, since a lookup with an expired one fails. Blocking; call off the main thread.
+     */
+    fun lookupEndurainActivityBlocking(context: Context, remoteActivityId: String): RemoteLookup {
+        val activityId = remoteActivityId.toIntOrNull() ?: return RemoteLookup.FAILED
+        val serverUrl = GBApplication.getPrefs().preferences.getString(PREF_ENDURAIN_SERVER, null)
+            ?: return RemoteLookup.FAILED
+        val tokenManager = EndurainTokenManager(context)
+        val apiClient = EndurainApiClient(serverUrl, tokenManager)
+
+        val latch = CountDownLatch(1)
+        var lookup = RemoteLookup.FAILED
+        tokenManager.performTokenRefresh(serverUrl) {
+            Thread {
+                lookup = when (apiClient.getActivityDetails(activityId)) {
+                    is EndurainActivityLookup.Found -> RemoteLookup.PRESENT
+                    is EndurainActivityLookup.Gone -> RemoteLookup.GONE
+                    is EndurainActivityLookup.Failed -> RemoteLookup.FAILED
+                }
+                latch.countDown()
+            }.start()
+        }
+        return if (latch.await(DEFAULT_UPLOAD_TIMEOUT_SECONDS, TimeUnit.SECONDS)) lookup else RemoteLookup.FAILED
+    }
+
+    /** Whether the Wanderer trail [trailId] still exists. Blocking; call off the main thread. */
+    fun lookupWandererTrailBlocking(context: Context, trailId: String): RemoteLookup {
+        val serverUrl = GBApplication.getPrefs().preferences.getString(PREF_WANDERER_SERVER, null)
+            ?: return RemoteLookup.FAILED
+        return when (WandererApiClient(serverUrl, WandererTokenManager(context)).trailExists(trailId)) {
+            true -> RemoteLookup.PRESENT
+            false -> RemoteLookup.GONE
+            null -> RemoteLookup.FAILED
+        }
     }
 
     /**

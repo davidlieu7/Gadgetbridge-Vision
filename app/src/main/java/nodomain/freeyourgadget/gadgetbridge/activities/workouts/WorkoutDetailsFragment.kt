@@ -712,7 +712,8 @@ class WorkoutDetailsFragment : Fragment(), MenuProvider {
     /**
      * Sends the workout to [target], which uploads it, brings the activity the service already
      * holds in line with it, or leaves the service alone when it is already in step. Asking twice
-     * therefore does not leave a second activity behind. See [WorkoutUploader.syncWorkout].
+     * therefore does not leave a second activity behind, and an activity deleted on the service is
+     * uploaded again. See [WorkoutUploader.syncWorkout].
      */
     private fun uploadTo(target: WorkoutUploadTarget) {
         val workout = currentWorkout ?: return
@@ -723,7 +724,8 @@ class WorkoutDetailsFragment : Fragment(), MenuProvider {
             val outcome = withContext(Dispatchers.IO) {
                 val provider = gbDevice.deviceCoordinator.getActivityTrackProvider(gbDevice, context)
                 WorkoutUploader.syncWorkout(
-                    context, gbDevice, provider, target, workout.summary, workout.data
+                    context, gbDevice, provider, target, workout.summary, workout.data,
+                    verifyRemote = true
                 )
             }
             if (!isAdded) return@launch

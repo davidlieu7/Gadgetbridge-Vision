@@ -173,6 +173,31 @@ class WandererApiClient(
     }
 
     /**
+     * Whether the trail [trailId] still exists: true or false, or null when the request failed.
+     * Blocking. Wanderer answers 404 both for a deleted trail and for one this account cannot
+     * see, which for a trail it uploaded itself means the same thing.
+     */
+    fun trailExists(trailId: String): Boolean? {
+        return try {
+            val response = InternetUtils.doStringRequestWithStatus(
+                uri = "$baseUrl/api/v1/trail/$trailId".toUri(),
+                requestHeaders = buildHeaders()
+            )
+            when (response.statusCode) {
+                in 200..299 -> true
+                404 -> false
+                else -> {
+                    LOG.warn("Looking up trail {} failed (status {})", trailId, response.statusCode)
+                    null
+                }
+            }
+        } catch (e: Exception) {
+            LOG.error("Error looking up trail {}", trailId, e)
+            null
+        }
+    }
+
+    /**
      * Upload activity file (GPX)
      */
     fun uploadActivity(file: File, callback: (String?, String?) -> Unit) {
