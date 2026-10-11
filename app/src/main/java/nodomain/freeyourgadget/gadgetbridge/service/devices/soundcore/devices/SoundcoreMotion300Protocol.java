@@ -20,7 +20,6 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.nio.ByteBuffer;
-import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -132,17 +131,7 @@ public class SoundcoreMotion300Protocol extends SoundcoreProtocolImplV1 {
         byte voicePrompts = buf.get();
         byte autoPowerOffEnabled = buf.get();
         byte autoPowerOffDuration = buf.get();
-        byte[] firmwareBytes = new byte[5];
-        byte[] serialBytes = new byte[17];
-
-        buf.get(firmwareBytes);
-        buf.get(serialBytes);
-
-        String fwVersion = new String(firmwareBytes, StandardCharsets.UTF_8);
-        String serialNumber = new String(serialBytes, StandardCharsets.UTF_8);
-
-        GBDeviceEventVersionInfo versionInfo = new GBDeviceEventVersionInfo();
-        versionInfo.fwVersion = fwVersion;
+        final GBDeviceEventVersionInfo versionInfo = buildVersionInfo(payload, 7, 17);
         batteryInfo.state = batteryCharging == (byte)0x00 ? BatteryState.BATTERY_NORMAL : BatteryState.BATTERY_CHARGING;
         batteryInfo.level = decodeBatteryLevel(batteryLevel);
 
@@ -154,7 +143,6 @@ public class SoundcoreMotion300Protocol extends SoundcoreProtocolImplV1 {
         return new GBDeviceEvent[] {
             versionInfo,
             batteryInfo,
-            new GBDeviceEventUpdateDeviceInfo("SERIAL: ", serialNumber),
             new GBDeviceEventUpdatePreferences(PREF_SOUNDCORE_VOICE_PROMPTS, voicePrompts != (byte)0x00),
             new GBDeviceEventUpdatePreferences(PREF_SOUNDCORE_AUTO_POWER_OFF, String.valueOf(autoPowerOffDuration + 1)),
             new GBDeviceEventSendBytes(encodeRequest(CMD_GET_LDAC_MODE)),

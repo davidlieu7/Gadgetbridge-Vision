@@ -29,6 +29,25 @@ public abstract class AbstractSoundcoreProtocol extends GBDeviceProtocol {
         return info;
     }
 
+    protected GBDeviceEventVersionInfo buildVersionInfo(String firmware1, String serialNumber) {
+        return buildVersionInfo(firmware1, "", serialNumber);
+    }
+
+    protected final GBDeviceEventVersionInfo buildVersionInfo(final byte[] payload,
+                                                              final int firmwareOffset) {
+        return buildVersionInfo(payload, firmwareOffset, 16);
+    }
+
+    /** Reads a single five-byte firmware version followed by the model's serial field. */
+    protected final GBDeviceEventVersionInfo buildVersionInfo(final byte[] payload,
+                                                              final int firmwareOffset,
+                                                              final int serialLength) {
+        return buildVersionInfo(
+                readString(payload, firmwareOffset, 5),
+                readString(payload, firmwareOffset + 5, serialLength)
+        );
+    }
+
     protected String readString(byte[] data, int position, int size) {
         if (position + size > data.length) throw new IllegalStateException();
         return new String(data, position, size, StandardCharsets.UTF_8);

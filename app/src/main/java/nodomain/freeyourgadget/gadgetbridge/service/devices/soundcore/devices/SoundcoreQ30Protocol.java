@@ -35,11 +35,9 @@ public class SoundcoreQ30Protocol extends SoundcoreProtocolImplV1 {
         decodeEqualizer(Arrays.copyOfRange(payload, 2, 12));
         decodeAudioMode(Arrays.copyOfRange(payload, 35, 39));
 
-        final String firmware1 = readString(payload, 39, 5);
-        final String serialNumber = readString(payload, 44, 16);
         return new GBDeviceEvent[]{
                 handleBatteryInfo(payload[0], 0)[0],
-                buildVersionInfo(firmware1, "", serialNumber)
+                buildVersionInfo(payload, 39)
         };
     }
 
