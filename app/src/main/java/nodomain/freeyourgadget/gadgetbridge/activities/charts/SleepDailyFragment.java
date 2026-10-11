@@ -441,20 +441,22 @@ public class SleepDailyFragment extends SleepFragment<SleepDailyFragment.MyChart
         final WorkoutValueFormatter workoutValueFormatter = new WorkoutValueFormatter();
         final List<StatTileData> stats = new ArrayList<>();
 
-        stats.add(new StatTileData(
-                heartRateMin > 0 ? workoutValueFormatter.formatValue(heartRateMin, UNIT_BPM) : getString(R.string.stats_empty_value),
-                getString(R.string.minHR)
-        ));
+        if (supportsHeartrate(getChartsHost().getDevice())) {
+            stats.add(new StatTileData(
+                    heartRateMin > 0 ? workoutValueFormatter.formatValue(heartRateMin, UNIT_BPM) : getString(R.string.stats_empty_value),
+                    getString(R.string.minHR)
+            ));
 
-        stats.add(new StatTileData(
-                heartRateMax > 0 ? workoutValueFormatter.formatValue(heartRateMax, UNIT_BPM) : getString(R.string.stats_empty_value),
-                getString(R.string.maxHR)
-        ));
+            stats.add(new StatTileData(
+                    heartRateMax > 0 ? workoutValueFormatter.formatValue(heartRateMax, UNIT_BPM) : getString(R.string.stats_empty_value),
+                    getString(R.string.maxHR)
+            ));
 
-        stats.add(new StatTileData(
-                heartRateAvg > 0 ? workoutValueFormatter.formatValue(heartRateAvg, UNIT_BPM) : getString(R.string.stats_empty_value),
-                getString(R.string.averageHR)
-        ));
+            stats.add(new StatTileData(
+                    heartRateAvg > 0 ? workoutValueFormatter.formatValue(heartRateAvg, UNIT_BPM) : getString(R.string.stats_empty_value),
+                    getString(R.string.averageHR)
+            ));
+        }
 
         if (intensityTotal > 0) {
             stats.add(new StatTileData(
