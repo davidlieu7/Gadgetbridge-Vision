@@ -67,6 +67,7 @@ public abstract class TestBase {
 
     @After
     public void tearDown() throws Exception {
+        if (dbHandler != null) { dbHandler.close(); }
         GBDatabaseManager.closeDatabase();
     }
 

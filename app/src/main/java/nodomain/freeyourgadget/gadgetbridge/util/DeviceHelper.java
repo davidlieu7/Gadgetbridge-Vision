@@ -192,7 +192,7 @@ public class DeviceHelper {
 
     private List<GBDevice> getDatabaseDevices() {
         List<GBDevice> result = new ArrayList<>();
-        try (DBHandler lockHandler = GBApplication.acquireDB()) {
+        try (DBHandler lockHandler = GBApplication.acquireDbReadOnly()) {
             List<Device> activeDevices = DBHelper.getActiveDevices(lockHandler.getDaoSession());
             for (Device dbDevice : activeDevices) {
                 GBDevice gbDevice = toGBDevice(dbDevice);

@@ -41,6 +41,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
 
 import nodomain.freeyourgadget.gadgetbridge.GBApplication;
 import nodomain.freeyourgadget.gadgetbridge.database.DBHandler;
@@ -71,6 +73,8 @@ public class DeviceManager {
     public static final String ACTION_REFRESH_DEVICELIST
             = "nodomain.freeyourgadget.gadgetbridge.devices.devicemanager.action.set_version";
     private final Context context;
+    private final ExecutorService databaseExecutor = Executors.newSingleThreadExecutor();
+    private int refreshGeneration;
     /**
      * This list is final, it will never be recreated. Only its contents change.
      * This allows direct access to the list from ListAdapters.
@@ -119,12 +123,7 @@ public class DeviceManager {
                             deviceList.add(dev);
                             newDevice = true;
                         }
-                        if (dev.isInitialized()) {
-                            try (DBHandler dbHandler = GBApplication.acquireDB()) {
-                                DBHelper.getDevice(dev, dbHandler.getDaoSession()); // implicitly creates the device in database if not present, and updates device attributes
-                            } catch (Exception ignore) {
-                            }
-                        }
+                        persistDevice(dev);
                     }
                     updateSelectedDevices();
                     if (newDevice) {
@@ -153,7 +152,7 @@ public class DeviceManager {
         filterGlobal.addAction(BluetoothDevice.ACTION_BOND_STATE_CHANGED);
         ContextCompat.registerReceiver(context, mReceiver, filterGlobal, ContextCompat.RECEIVER_EXPORTED);
 
-        refreshPairedDevices();
+        updatePairedDevices(DeviceHelper.getInstance().getAvailableDevices());
     }
 
     private void updateDeviceName(BluetoothDevice device, String newName) {
@@ -184,8 +183,32 @@ public class DeviceManager {
         notifyDevicesChanged();
     }
 
+    private void persistDevice(final GBDevice device) {
+        if (!device.isInitialized()) {
+            return;
+        }
+        databaseExecutor.execute(() -> {
+            try (DBHandler dbHandler = GBApplication.acquireDB()) {
+                DBHelper.getDevice(device, dbHandler.getDaoSession());
+            } catch (final Exception e) {
+                LOG.warn("Failed to update device attributes", e);
+            }
+        });
+    }
+
     private void refreshPairedDevices() {
-        final Set<GBDevice> availableDevices = DeviceHelper.getInstance().getAvailableDevices();
+        final int generation = ++refreshGeneration;
+        databaseExecutor.execute(() -> {
+            final Set<GBDevice> availableDevices = DeviceHelper.getInstance().getAvailableDevices();
+            handler.post(() -> {
+                if (generation == refreshGeneration) {
+                    updatePairedDevices(availableDevices);
+                }
+            });
+        });
+    }
+
+    private void updatePairedDevices(final Set<GBDevice> availableDevices) {
         final List<GBDevice> addedDevices = new ArrayList<>();
         if (knownAddresses != null) {
             for (final GBDevice availableDevice : availableDevices) {
