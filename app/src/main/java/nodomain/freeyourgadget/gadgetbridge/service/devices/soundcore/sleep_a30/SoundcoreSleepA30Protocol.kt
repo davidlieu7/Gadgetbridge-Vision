@@ -79,7 +79,14 @@ open class SoundcoreSleepA30Protocol(device: GBDevice?) : SoundcoreProtocolImplV
         decodeBooleanPreference(payload, 141, PREF_SOUNDCORE_CALLS_ENABLED, preferences)
         decodeBooleanPreference(payload, 143, PREF_SOUNDCORE_SNORE_MASKING, preferences)
         decodeBooleanPreference(payload, 147, PREF_SOUNDCORE_ANC_TONE, preferences)
-        return arrayOf(batteries[0], batteries[1], version, preferences)
+        val events = arrayOf<GBDeviceEvent>(batteries[0], batteries[1], version, preferences)
+        if (version.fwVersion?.trim { it.isWhitespace() || it == '\u0000' }.isNullOrEmpty()) {
+            return events
+        }
+        return events + arrayOf(
+            GBDeviceEventSendBytes(encodeRequest(CMD_GET_SLEEP_SETTINGS)),
+            GBDeviceEventSendBytes(encodeRequest(CMD_NOTIFY_LISTENING_MODE))
+        )
     }
 
     private fun decodeBooleanPreference(
@@ -193,10 +200,6 @@ open class SoundcoreSleepA30Protocol(device: GBDevice?) : SoundcoreProtocolImplV
         cancelSleepHistory()
         return arrayOf(SoundcoreSleepHistoryEvent(report))
     }
-
-    override fun encodeDeviceInfoRequest(): ByteArray =
-        super.encodeDeviceInfoRequest() + encodeRequest(CMD_GET_SLEEP_SETTINGS) +
-            encodeRequest(CMD_NOTIFY_LISTENING_MODE)
 
     private fun decodeAutoStop(payload: ByteArray): Array<GBDeviceEvent> {
         if (payload.size != 8 || payload[0] !in 0..1) return emptyArray()

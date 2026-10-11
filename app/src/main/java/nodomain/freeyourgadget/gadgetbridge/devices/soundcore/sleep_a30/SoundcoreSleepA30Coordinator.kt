@@ -34,6 +34,7 @@ class SoundcoreSleepA30Coordinator : SoundcoreEarbudsCoordinator() {
     override fun supportsDataFetching(device: GBDevice): Boolean = true
     override fun supportsSleepMeasurement(device: GBDevice): Boolean = true
     override fun supportsSleepScore(device: GBDevice): Boolean = true
+    override fun supportsAwakeSleep(device: GBDevice): Boolean = true
 
     override fun getSampleProvider(device: GBDevice, session: nodomain.freeyourgadget.gadgetbridge.entities.DaoSession) =
         SoundcoreSleepSampleProvider(device, session)
