@@ -1,8 +1,6 @@
 package nodomain.freeyourgadget.gadgetbridge.service.devices.soundcore.sport_x20;
 
 import android.content.SharedPreferences;
-import android.widget.Toast;
-
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -13,8 +11,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import nodomain.freeyourgadget.gadgetbridge.GBApplication;
-import nodomain.freeyourgadget.gadgetbridge.R;
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsPreferenceConst;
 import nodomain.freeyourgadget.gadgetbridge.activities.multipoint.MultipointDevice;
 import nodomain.freeyourgadget.gadgetbridge.activities.multipoint.MultipointPairingActivity;
@@ -23,7 +19,6 @@ import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreEarbudsCo
 import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreEarbudsCoordinator.TapFunction;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.soundcore.protocol.impl.v1.SoundcoreProtocolImplV1;
-import nodomain.freeyourgadget.gadgetbridge.util.GB;
 import nodomain.freeyourgadget.gadgetbridge.util.Prefs;
 import nodomain.freeyourgadget.gadgetbridge.util.StringUtils;
 
@@ -149,31 +144,7 @@ public class SoundcoreSportX20Protocol extends SoundcoreProtocolImplV1 {
             decodeEqualizer(payload);
             return new GBDeviceEvent[0];
         }
-        if (command == CMD_SET_FIT_TEST) {
-            if (payload.length >= 2) {
-                decodeFitTestResult(payload);
-            }
-            return new GBDeviceEvent[0];
-        }
-        LOG.debug("Unknown incoming message - command: {} ({} bytes)", command, payload.length);
-        return new GBDeviceEvent[0];
-    }
-
-    /**
-     * Decodes a 14-byte fit-test result payload from the device and shows a Toast.
-     * payload[0] = left ear: 0x01 = excellent seal, 0x02 = poor seal
-     * payload[1] = right ear: 0x01 = excellent seal, 0x02 = poor seal
-     */
-    private void decodeFitTestResult(final byte[] payload) {
-        final android.content.Context ctx = GBApplication.getContext();
-        final String excellent = ctx.getString(R.string.pref_soundcore_fit_test_excellent_seal);
-        final String poor      = ctx.getString(R.string.pref_soundcore_fit_test_poor_seal);
-        final String left  = (payload[0] == 0x01) ? excellent : poor;
-        final String right = (payload[1] == 0x01) ? excellent : poor;
-        final int severity = (payload[0] == 0x01 && payload[1] == 0x01) ? GB.INFO : GB.WARN;
-        final String message = ctx.getString(R.string.pref_soundcore_fit_test_result, left, right);
-        LOG.debug("Fit test result: left={} right={}", left, right);
-        GB.toast(message, Toast.LENGTH_LONG, severity);
+        return super.decodeCommand(command, payload);
     }
 
     /**
@@ -319,7 +290,6 @@ public class SoundcoreSportX20Protocol extends SoundcoreProtocolImplV1 {
         activeSourceAddress = payload[0] == 0x01 ? formatMacAddress(payload, 1) : null;
         broadcastPairedDevices(pairedDevices, activeSourceAddress);
     }
-
 
     /** Maps a low-nibble TapFunction code (0–15) back to the TapFunction enum. */
     private static TapFunction functionFromCode(final int code) {

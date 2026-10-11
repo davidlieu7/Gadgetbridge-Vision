@@ -1,13 +1,22 @@
 package nodomain.freeyourgadget.gadgetbridge.service.devices.soundcore.protocol.impl.v1;
 
-import android.content.SharedPreferences;
+import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
+import android.widget.Toast;
+
 import androidx.annotation.NonNull;
 import androidx.localbroadcastmanager.content.LocalBroadcastManager;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
+
 import nodomain.freeyourgadget.gadgetbridge.GBApplication;
+import nodomain.freeyourgadget.gadgetbridge.R;
 import nodomain.freeyourgadget.gadgetbridge.activities.multipoint.MultipointDevice;
 import nodomain.freeyourgadget.gadgetbridge.activities.multipoint.MultipointPairingActivity;
 import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreEarbudsCoordinator;
@@ -24,9 +33,12 @@ import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
 import nodomain.freeyourgadget.gadgetbridge.model.FindDeviceTarget;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.soundcore.AbstractSoundcoreProtocol;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.soundcore.SoundcorePacket;
+import nodomain.freeyourgadget.gadgetbridge.util.GB;
 import nodomain.freeyourgadget.gadgetbridge.util.Prefs;
 
 public abstract class SoundcoreProtocolImplV1 extends AbstractSoundcoreProtocol {
+    private static final Logger LOG = LoggerFactory.getLogger(SoundcoreProtocolImplV1.class);
+
     public static final short CMD_GET_DEVICE_INFO = (short) 0x0101;
     public static final short CMD_GET_EXTENDED_INFO = (short) 0x0105;
     // Session handshake sent after CMD_GET_DEVICE_INFO; device ACKs with empty payload
@@ -405,12 +417,37 @@ public abstract class SoundcoreProtocolImplV1 extends AbstractSoundcoreProtocol 
     }
 
     /**
-     * Hook for commands without a common payload contract, including device-specific commands
-     * and acknowledgements. Returning an empty array marks the packet as consumed; returning
-     * {@code null} preserves the standard unsupported-response behavior.
+     * Handles shared commands; model-specific overrides delegate unrecognized commands here.
+     * Unknown commands are logged here and consumed without emitting device events.
      */
     protected GBDeviceEvent[] decodeCommand(final short command, final byte[] payload) {
-        return null;
+        if (command == CMD_SET_FIT_TEST) {
+            if (payload.length >= 2) {
+                decodeFitTestResult(payload);
+            }
+            return new GBDeviceEvent[0];
+        }
+
+        LOG.debug("Unknown incoming message - command: {} ({} bytes): {}",
+                command, payload.length, GB.lazyHexdump(payload));
+        return new GBDeviceEvent[0];
+    }
+
+    /**
+     * Decodes the first two bytes of a fit-test result and shows a Toast.
+     * payload[0] = left ear: 0x01 = excellent seal, 0x02 = poor seal
+     * payload[1] = right ear: 0x01 = excellent seal, 0x02 = poor seal
+     */
+    private void decodeFitTestResult(final byte[] payload) {
+        final Context ctx = GBApplication.getContext();
+        final String excellent = ctx.getString(R.string.pref_soundcore_fit_test_excellent_seal);
+        final String poor = ctx.getString(R.string.pref_soundcore_fit_test_poor_seal);
+        final String left = (payload[0] == 0x01) ? excellent : poor;
+        final String right = (payload[1] == 0x01) ? excellent : poor;
+        final int severity = (payload[0] == 0x01 && payload[1] == 0x01) ? GB.INFO : GB.WARN;
+        final String message = ctx.getString(R.string.pref_soundcore_fit_test_result, left, right);
+        LOG.debug("Fit test result: left={} right={}", left, right);
+        GB.toast(message, Toast.LENGTH_LONG, severity);
     }
 
     /** Requests the paired-device list from the device. */

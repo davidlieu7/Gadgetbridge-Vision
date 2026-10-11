@@ -12,8 +12,6 @@ public class SoundcoreLibertyProtocol extends SoundcoreProtocolImplV1 {
 
     private static final Logger LOG = LoggerFactory.getLogger(SoundcoreLibertyProtocol.class);
 
-    private static final short CMD_GET_UNKNOWN_DATA_8D01 = (short) 0x8d01;
-    private static final short CMD_GET_UNKNOWN_DATA_8205 = (short) 0x8205;
     private static final int BATTERY_MULTIPLIER = 20;
 
     public SoundcoreLibertyProtocol(GBDevice device) {
@@ -42,23 +40,6 @@ public class SoundcoreLibertyProtocol extends SoundcoreProtocolImplV1 {
     }
 
     @Override
-    protected GBDeviceEvent[] decodeExtendedInfo(final byte[] payload) {
-        LOG.debug("Unknown incoming extended information, {} bytes", payload.length);
-        return new GBDeviceEvent[0];
-    }
-
-    @Override
-    protected GBDeviceEvent[] decodeCommand(final short command, final byte[] payload) {
-        if (command == CMD_GET_UNKNOWN_DATA_8D01 || command == CMD_GET_UNKNOWN_DATA_8205) {
-            LOG.debug("Unknown incoming message - command: {} ({} bytes)", command, payload.length);
-            return new GBDeviceEvent[0];
-        }
-
-        LOG.debug("Unknown incoming message - command: {} ({} bytes)", command, payload.length);
-        return new GBDeviceEvent[0];
-    }
-
-    @Override
     protected boolean appendAdvancedAudioModeStateByte() {
         return true;
     }
@@ -73,17 +54,4 @@ public class SoundcoreLibertyProtocol extends SoundcoreProtocolImplV1 {
             default: throw new IllegalArgumentException("Unknown button action: " + buttonAction);
         }
     }
-
-    byte[] encodeMysteryDataRequest1() {
-        byte[] payload = new byte[]{0x00};
-        return encodeCommand(CMD_GET_UNKNOWN_DATA_8D01, payload);
-    }
-    byte[] encodeMysteryDataRequest2() {
-        return encodeRequest(CMD_GET_EXTENDED_INFO);
-    }
-    byte[] encodeMysteryDataRequest3() {
-        byte[] payload = new byte[]{0x00};
-        return encodeCommand(CMD_GET_UNKNOWN_DATA_8205, payload);
-    }
-
 }

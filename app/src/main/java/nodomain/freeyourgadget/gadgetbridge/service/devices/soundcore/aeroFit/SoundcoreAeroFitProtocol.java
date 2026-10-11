@@ -69,10 +69,4 @@ public class SoundcoreAeroFitProtocol extends SoundcoreProtocolImplV1 {
                 payload[0] == 0x01, payload[1] == 0x01);
         return new GBDeviceEvent[0];
     }
-
-    @Override
-    protected GBDeviceEvent[] decodeCommand(final short command, final byte[] payload) {
-        LOG.debug("Unknown incoming message - command: {} ({} bytes)", command, payload.length);
-        return new GBDeviceEvent[0];
-    }
 }

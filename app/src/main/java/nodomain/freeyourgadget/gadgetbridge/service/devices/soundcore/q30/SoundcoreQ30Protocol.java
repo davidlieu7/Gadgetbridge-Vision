@@ -62,8 +62,7 @@ public class SoundcoreQ30Protocol extends SoundcoreProtocolImplV1 {
             decodeEqualizer(payload);
             return new GBDeviceEvent[0];
         }
-        LOG.debug("Unknown incoming message - command: {} ({} bytes)", command, payload.length);
-        return new GBDeviceEvent[0];
+        return super.decodeCommand(command, payload);
     }
 
 
