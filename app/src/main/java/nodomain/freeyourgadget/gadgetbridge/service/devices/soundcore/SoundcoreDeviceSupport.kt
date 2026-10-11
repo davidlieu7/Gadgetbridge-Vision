@@ -27,6 +27,9 @@ import nodomain.freeyourgadget.gadgetbridge.activities.multipoint.MultipointPair
 import nodomain.freeyourgadget.gadgetbridge.util.kotlin.getParcelableCompat
 import android.content.Context
 import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreEarbudsCoordinator
+import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEvent
+import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEventUpdateDeviceState
+import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEventVersionInfo
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice
 import nodomain.freeyourgadget.gadgetbridge.service.btbr.TransactionBuilder
 import nodomain.freeyourgadget.gadgetbridge.service.devices.soundcore.protocol.impl.v1.SoundcoreProtocolImplV1
@@ -35,6 +38,7 @@ import java.util.UUID
 
 open class SoundcoreDeviceSupport : AbstractHeadphoneSerialDeviceSupportV2<SoundcoreProtocolImplV1>() {
     private var multipointReceiverRegistered = false
+    private var firmwareReceivedForConnection = false
 
     private val multipointReceiver = object : BroadcastReceiver() {
         override fun onReceive(context: Context, intent: Intent) {
@@ -78,8 +82,51 @@ open class SoundcoreDeviceSupport : AbstractHeadphoneSerialDeviceSupportV2<Sound
         }
     }
 
+    override fun disconnect() {
+        synchronized(ConnectionMonitor) {
+            firmwareReceivedForConnection = false
+            super.disconnect()
+        }
+    }
+
+    override fun dropConnection() {
+        synchronized(ConnectionMonitor) {
+            firmwareReceivedForConnection = false
+            super.dropConnection()
+        }
+    }
+
+    override fun evaluateGBDeviceEvent(deviceEvent: GBDeviceEvent) {
+        synchronized(ConnectionMonitor) {
+            if (deviceEvent is GBDeviceEventUpdateDeviceState) {
+                if (deviceEvent.state == GBDevice.State.INITIALIZED &&
+                    (!firmwareReceivedForConnection || !isConnected || getDevice().state == GBDevice.State.INITIALIZED)
+                ) {
+                    return
+                }
+                if (deviceEvent.state == GBDevice.State.NOT_CONNECTED ||
+                    deviceEvent.state == GBDevice.State.WAITING_FOR_RECONNECT
+                ) {
+                    firmwareReceivedForConnection = false
+                }
+            }
+
+            super.evaluateGBDeviceEvent(deviceEvent)
+
+            if (deviceEvent is GBDeviceEventVersionInfo &&
+                !deviceEvent.fwVersion?.trim { it.isWhitespace() || it == '\u0000' }.isNullOrEmpty() &&
+                !firmwareReceivedForConnection && isConnected &&
+                (getDevice().state == GBDevice.State.CONNECTED || getDevice().state == GBDevice.State.INITIALIZING)
+            ) {
+                firmwareReceivedForConnection = true
+                super.evaluateGBDeviceEvent(GBDeviceEventUpdateDeviceState(GBDevice.State.INITIALIZED))
+            }
+        }
+    }
+
     override fun dispose() {
         synchronized(ConnectionMonitor) {
+            firmwareReceivedForConnection = false
             if (multipointReceiverRegistered) {
                 LocalBroadcastManager.getInstance(getContext()).unregisterReceiver(multipointReceiver)
                 multipointReceiverRegistered = false
@@ -134,7 +181,8 @@ open class SoundcoreDeviceSupport : AbstractHeadphoneSerialDeviceSupportV2<Sound
         return UUID.fromString("$UUID_DEVICE_CTRL_PREFIX${serviceSuffix.toString(16)}")
     }
 
-    override fun initializeDevice(builder: TransactionBuilder): TransactionBuilder {
+    override fun initializeDevice(builder: TransactionBuilder): TransactionBuilder = synchronized(ConnectionMonitor) {
+        firmwareReceivedForConnection = false
         val coordinator = getDevice().deviceCoordinator as SoundcoreEarbudsCoordinator
         val delayMillis = coordinator.getConnectDelayMillis()
         if (delayMillis > 0) {
@@ -150,8 +198,7 @@ open class SoundcoreDeviceSupport : AbstractHeadphoneSerialDeviceSupportV2<Sound
         if (coordinator.supportsSessionInitRequest()) {
             builder.write(*mDeviceProtocol.encodeSessionInitRequest())
         }
-        builder.setDeviceState(GBDevice.State.INITIALIZED)
-        return builder
+        builder
     }
 
     private companion object {
