@@ -60,6 +60,13 @@ public abstract class SoundcoreProtocolImplV1 extends AbstractSoundcoreProtocol 
     public static final short CMD_SET_EQUALIZER = (short) 0x8703;
     public static final short CMD_SET_FIT_TEST = (short) 0x0109;
 
+    public static final short CMD_SET_VOICE_PROMPTS = (short) 0x9001;
+    public static final short CMD_SET_BUTTON_BRIGHTNESS = (short) 0x9210;
+    public static final short CMD_SET_LDAC_MODE = (short) 0xff01;
+    public static final short CMD_SET_ADAPTIVE_DIRECTION = (short) 0x8a02;
+    public static final short CMD_SET_EQUALIZER_PRESET = (short) 0x8b02;
+    public static final short CMD_POWER_OFF = (short) 0x8901;
+
     private static final int DEFAULT_BATTERY_MULTIPLIER = 10;
     private static final int DEFAULT_BATTERY_OFFSET = 0;
 
@@ -85,6 +92,16 @@ public abstract class SoundcoreProtocolImplV1 extends AbstractSoundcoreProtocol 
                 return encodeBooleanCommand(CMD_SET_GAMING_MODE, prefs.getBoolean(config, false));
             case DeviceSettingsPreferenceConst.PREF_SOUNDCORE_AUTO_POWER_OFF:
                 return encodeAutoPowerOffConfiguration(prefs);
+            case DeviceSettingsPreferenceConst.PREF_SOUNDCORE_VOICE_PROMPTS:
+                return encodeBooleanCommand(CMD_SET_VOICE_PROMPTS, prefs.getBoolean(config, true));
+            case DeviceSettingsPreferenceConst.PREF_SOUNDCORE_LDAC_MODE:
+                return encodeBooleanCommand(CMD_SET_LDAC_MODE, prefs.getBoolean(config, true));
+            case DeviceSettingsPreferenceConst.PREF_SOUNDCORE_ADAPTIVE_DIRECTION:
+                return encodeBooleanCommand(CMD_SET_ADAPTIVE_DIRECTION, prefs.getBoolean(config, true));
+            case DeviceSettingsPreferenceConst.PREF_SOUNDCORE_BUTTON_BRIGHTNESS:
+                return encodeByteCommand(CMD_SET_BUTTON_BRIGHTNESS, Integer.parseInt(prefs.getString(config, "0")));
+            case DeviceSettingsPreferenceConst.PREF_SOUNDCORE_EQUALIZER_PRESET:
+                return encodeByteCommand(CMD_SET_EQUALIZER_PRESET, Integer.parseInt(prefs.getString(config, "0")));
             default:
                 return super.encodeSendConfiguration(config);
         }
@@ -388,6 +405,10 @@ public abstract class SoundcoreProtocolImplV1 extends AbstractSoundcoreProtocol 
         intent.putParcelableArrayListExtra(
                 MultipointPairingActivity.EXTRA_DEVICE_LIST, new ArrayList<>(devices));
         LocalBroadcastManager.getInstance(GBApplication.getContext()).sendBroadcast(intent);
+    }
+
+    public byte[] encodePowerOff() {
+        return encodeRequest(CMD_POWER_OFF);
     }
 
     public byte[] encodeDeviceInfoRequest() {

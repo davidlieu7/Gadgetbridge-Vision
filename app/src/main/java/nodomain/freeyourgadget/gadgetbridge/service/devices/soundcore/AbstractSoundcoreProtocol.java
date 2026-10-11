@@ -59,6 +59,10 @@ public abstract class AbstractSoundcoreProtocol extends GBDeviceProtocol {
         return encodeCommand(command, new byte[]{value});
     }
 
+    protected byte[] encodeByteCommand(final short command, final int value) {
+        return encodeCommand(command, new byte[]{(byte) value});
+    }
+
     /**
      * 0: No Auto Power off
      * 1: Auto Power off 10 min

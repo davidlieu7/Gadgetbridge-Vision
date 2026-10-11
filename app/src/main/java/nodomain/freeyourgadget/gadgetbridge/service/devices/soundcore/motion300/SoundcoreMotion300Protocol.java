@@ -48,18 +48,12 @@ public class SoundcoreMotion300Protocol extends SoundcoreProtocolImplV1 {
     private static final short CMD_GET_EQUALIZER = (short)0x8902;
     private static final short CMD_GET_CURRENT_DIRECTION = (short)0x8c02;
 
-    private static final short CMD_SET_VOICE_PROMPTS = (short)0x9001;
-    private static final short CMD_SET_BUTTON_BRIGHTNESS = (short)0x9210;
-    private static final short CMD_SET_LDAC_MODE = (short)0xff01;
-    private static final short CMD_SET_ADAPTIVE_DIRECTION = (short)0x8a02;
-    private static final short CMD_SET_EQUALIZER_PRESET = (short)0x8b02;
     private static final short CMD_SET_EQUALIZER_CUSTOM = (short)0x8d02;
 
     private static final short CMD_NOTIFY_VOLUME_INFO = (short)0x0901;
     private static final short CMD_NOTIFY_PLAYBACK_INFO = (short)0x2101;
     private static final short CMD_NOTIFY_BASS_MODE = (short)0x8e02;
 
-    private static final short CMD_POWER_OFF = (short)0x8901;
 
     public static final String[] EQUALIZER_PREFS_FREQ = new String[] {
         PREF_SOUNDCORE_EQUALIZER_BAND1_FREQ,
@@ -256,18 +250,6 @@ public class SoundcoreMotion300Protocol extends SoundcoreProtocolImplV1 {
         Prefs prefs = getDevicePrefs();
 
         switch (config) {
-            case PREF_SOUNDCORE_VOICE_PROMPTS:
-                return encodeBooleanPreference(prefs, PREF_SOUNDCORE_VOICE_PROMPTS, CMD_SET_VOICE_PROMPTS);
-            case PREF_SOUNDCORE_BUTTON_BRIGHTNESS:
-                return encodeBytePreference(prefs, PREF_SOUNDCORE_BUTTON_BRIGHTNESS, CMD_SET_BUTTON_BRIGHTNESS);
-            case PREF_SOUNDCORE_AUTO_POWER_OFF:
-                return encodeAutoPowerOffPreference(prefs);
-            case PREF_SOUNDCORE_LDAC_MODE:
-                return encodeBooleanPreference(prefs, PREF_SOUNDCORE_LDAC_MODE, CMD_SET_LDAC_MODE);
-            case PREF_SOUNDCORE_ADAPTIVE_DIRECTION:
-                return encodeBooleanPreference(prefs, PREF_SOUNDCORE_ADAPTIVE_DIRECTION, CMD_SET_ADAPTIVE_DIRECTION);
-            case PREF_SOUNDCORE_EQUALIZER_PRESET:
-                return encodeBytePreference(prefs, PREF_SOUNDCORE_EQUALIZER_PRESET, CMD_SET_EQUALIZER_PRESET);
             case PREF_SOUNDCORE_EQUALIZER_DIRECTION:
                 return encodeRequest(CMD_GET_EQUALIZER);
             case PREF_SOUNDCORE_EQUALIZER_BAND1_FREQ:
@@ -295,23 +277,9 @@ public class SoundcoreMotion300Protocol extends SoundcoreProtocolImplV1 {
     }
 
     @Override
-    public byte[] encodePowerOff() {
-        return encodeRequest(CMD_POWER_OFF);
-    }
-
-    private byte[] encodeBooleanPreference(Prefs prefs, String pref, short cmd) {
-        boolean enabled = prefs.getBoolean(pref, true);
-        return encodeBooleanCommand(cmd, enabled);
-    }
-
-    private byte[] encodeBytePreference(Prefs prefs, String pref, short cmd) {
-        byte value = (byte)Integer.parseInt(prefs.getString(pref, "0"));
-        return encodeByteCommand(cmd, value);
-    }
-
-    private byte[] encodeAutoPowerOffPreference(Prefs prefs) {
+    public byte[] encodeAutoPowerOffConfiguration(Prefs prefs) {
         final int duration = Integer.parseInt(prefs.getString(PREF_SOUNDCORE_AUTO_POWER_OFF, "2"));
-        return encodeAutoPowerOff(CMD_SET_AUTO_POWER_OFF, duration, (byte)0x00);
+        return encodeAutoPowerOff(CMD_SET_AUTO_POWER_OFF, duration, (byte) 0x00);
     }
 
     private byte[] encodeCustomEqualizer(Prefs prefs) {
