@@ -25,6 +25,7 @@ import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.Device
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.ListEntry
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.components.multipointPairing
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.deviceSettings
+import nodomain.freeyourgadget.gadgetbridge.activities.multipoint.MultipointPairingActivity
 import nodomain.freeyourgadget.gadgetbridge.devices.AbstractBLClassicDeviceCoordinator
 import nodomain.freeyourgadget.gadgetbridge.devices.DeviceCoordinator
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice
@@ -170,7 +171,14 @@ abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator(
         get() = emptyList()
 
     /* TIP: Override this function in case you need conditions/exclusions based on Action. */
-    open fun getSupportedTapFunctions(action: ButtonAction): List<TapFunction> = supportedTapFunctions
+    open fun getSupportedTapFunctions(action: ButtonAction): List<TapFunction> =
+        when (action) {
+            ButtonAction.SINGLE_TAP -> supportedTapFunctions.filterNot {
+                it == TapFunction.VOICE_ASSISTANT ||
+                it == TapFunction.AMBIENT_SOUND_CONTROL
+            }
+            else -> supportedTapFunctions
+        }
 
     override fun getDefaultIconResource(): Int = R.drawable.ic_device_galaxy_buds
 
@@ -181,7 +189,16 @@ abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator(
         SoundcoreDeviceSupport::class.java
 
     /** Multipoint activity commands supported by this model. */
-    open fun getSupportedMultipointActions(): Set<String> = emptySet()
+    open fun getSupportedMultipointActions(): Set<String> = setOf(
+        MultipointPairingActivity.ACTION_MULTIPOINT_ENABLE,
+        MultipointPairingActivity.ACTION_MULTIPOINT_DISABLE,
+        MultipointPairingActivity.ACTION_MULTIPOINT_GET_DEVICES,
+        MultipointPairingActivity.ACTION_MULTIPOINT_GET_STATUS,
+        MultipointPairingActivity.ACTION_MULTIPOINT_CONNECT_DEVICE,
+        MultipointPairingActivity.ACTION_MULTIPOINT_DISCONNECT_DEVICE,
+        MultipointPairingActivity.ACTION_MULTIPOINT_FORGET_DEVICE,
+        MultipointPairingActivity.ACTION_MULTIPOINT_START_PAIRING,
+    )
 
     /** Creates the protocol implementation for this model. */
     open fun createProtocol(device: GBDevice): SoundcoreProtocolImplV1 =
@@ -270,7 +287,9 @@ abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator(
 
     open fun getEqualizerVolumeRange(): IntRange = -6..6
 
-    open fun getSupportedEqualizerBands(): IntArray = intArrayOf()
+    open fun getSupportedEqualizerBands(): IntArray = intArrayOf(
+        100, 200, 400, 800, 1600, 3200, 6400, 12800,
+    )
 
     /** Per-band frequency choices in protocol index order. */
     open fun getSupportedEqualizerBandsRanges(): Array<IntArray> = emptyArray()

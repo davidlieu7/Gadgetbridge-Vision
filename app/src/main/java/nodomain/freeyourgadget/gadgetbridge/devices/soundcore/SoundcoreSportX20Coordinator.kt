@@ -19,7 +19,6 @@ package nodomain.freeyourgadget.gadgetbridge.devices.soundcore
 import nodomain.freeyourgadget.gadgetbridge.R
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice
 import nodomain.freeyourgadget.gadgetbridge.service.devices.soundcore.devices.SoundcoreSportX20Protocol
-import nodomain.freeyourgadget.gadgetbridge.activities.multipoint.MultipointPairingActivity
 import java.util.regex.Pattern
 
 class SoundcoreSportX20Coordinator : SoundcoreEarbudsCoordinator() {
@@ -45,10 +44,6 @@ class SoundcoreSportX20Coordinator : SoundcoreEarbudsCoordinator() {
         Capability.AudioEqualizer,
     )
 
-    override fun getSupportedEqualizerBands(): IntArray = intArrayOf(
-        100, 200, 400, 800, 1600, 3200, 6400, 12800,
-    )
-
     override fun getCustomEqualizerPresetArray(): Int = R.array.soundcore_sport_x20_equalizer_preset_names
 
     override val supportedButtonActions: List<ButtonAction> = listOf(
@@ -68,26 +63,6 @@ class SoundcoreSportX20Coordinator : SoundcoreEarbudsCoordinator() {
         TapFunction.NONE,
     )
 
-    override fun getSupportedTapFunctions(action: ButtonAction): List<TapFunction> =
-        when (action) {
-            ButtonAction.SINGLE_TAP -> supportedTapFunctions.filterNot {
-                it == TapFunction.VOICE_ASSISTANT ||
-                it == TapFunction.AMBIENT_SOUND_CONTROL
-            }
-            else -> supportedTapFunctions
-        }
-
     override fun createProtocol(device: GBDevice): SoundcoreSportX20Protocol =
         SoundcoreSportX20Protocol(device)
-
-    override fun getSupportedMultipointActions(): Set<String> = setOf(
-        MultipointPairingActivity.ACTION_MULTIPOINT_ENABLE,
-        MultipointPairingActivity.ACTION_MULTIPOINT_DISABLE,
-        MultipointPairingActivity.ACTION_MULTIPOINT_GET_DEVICES,
-        MultipointPairingActivity.ACTION_MULTIPOINT_GET_STATUS,
-        MultipointPairingActivity.ACTION_MULTIPOINT_CONNECT_DEVICE,
-        MultipointPairingActivity.ACTION_MULTIPOINT_DISCONNECT_DEVICE,
-        MultipointPairingActivity.ACTION_MULTIPOINT_FORGET_DEVICE,
-        MultipointPairingActivity.ACTION_MULTIPOINT_START_PAIRING,
-    )
 }
