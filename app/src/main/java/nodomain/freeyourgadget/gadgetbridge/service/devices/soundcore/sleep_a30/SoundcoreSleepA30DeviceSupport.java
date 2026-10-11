@@ -35,6 +35,9 @@ import java.util.concurrent.TimeUnit;
 import nodomain.freeyourgadget.gadgetbridge.R;
 import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.sleep_a30.SoundcoreSleepA30AudioInstallHandler;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.soundcore.SoundcoreDeviceSupport;
+import nodomain.freeyourgadget.gadgetbridge.service.devices.soundcore.SoundcoreSleepHistory;
+import nodomain.freeyourgadget.gadgetbridge.service.devices.soundcore.SoundcoreSleepHistoryEvent;
+import nodomain.freeyourgadget.gadgetbridge.service.devices.soundcore.SoundcoreSleepHistoryStorage;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.soundcore.SoundcorePacket;
 import nodomain.freeyourgadget.gadgetbridge.util.GB;
 import org.slf4j.Logger;
@@ -49,6 +52,8 @@ public final class SoundcoreSleepA30DeviceSupport extends SoundcoreDeviceSupport
     private Upload active;
     private final ByteArrayOutputStream controlBuffer = new ByteArrayOutputStream();
     private boolean disposed;
+    private boolean historyFetchActive;
+    private ScheduledFuture<?> historyTimeout;
 
     private static final class Upload {
         volatile BluetoothSocket socket;
@@ -60,6 +65,53 @@ public final class SoundcoreSleepA30DeviceSupport extends SoundcoreDeviceSupport
         ScheduledFuture<?> timeout;
         long timeoutVersion;
         int lastPercent = -1;
+    }
+
+    @Override public synchronized void onFetchRecordedData(int dataTypes) {
+        if (disposed || historyFetchActive || getDevice().isBusy() || !getDevice().isInitialized() ||
+                !getDevice().isConnected()) return;
+        SoundcoreSleepA30Protocol protocol = (SoundcoreSleepA30Protocol) mDeviceProtocol;
+        byte[] request = protocol.encodeFetchRecordedData(dataTypes);
+        if (request == null) return;
+        historyFetchActive = true;
+        getDevice().setBusyTask(R.string.busy_task_fetch_activity_data, getContext());
+        getDevice().sendDeviceUpdateIntent(getContext());
+        historyTimeout = timer.schedule(() -> {
+            synchronized (SoundcoreSleepA30DeviceSupport.this) {
+                LOG.warn("Sleep A30 history fetch timed out");
+                finishHistoryFetch();
+            }
+        }, 30, TimeUnit.SECONDS);
+        evaluateGBDeviceEvent(new nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEventSendBytes(request));
+    }
+
+    @Override public synchronized void evaluateGBDeviceEvent(
+            nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEvent event) {
+        if (!(event instanceof SoundcoreSleepHistoryEvent)) {
+            super.evaluateGBDeviceEvent(event);
+            return;
+        }
+        if (!historyFetchActive) return;
+        SoundcoreSleepHistory.Report report = ((SoundcoreSleepHistoryEvent) event).getReport();
+        try {
+            if (report == null) LOG.warn("Invalid Sleep A30 history snapshot");
+            else SoundcoreSleepHistoryStorage.persist(getDevice(), report);
+        } catch (Exception e) {
+            LOG.error("Unable to save Sleep A30 history", e);
+        } finally {
+            finishHistoryFetch();
+        }
+    }
+
+    private synchronized void finishHistoryFetch() {
+        if (historyTimeout != null) historyTimeout.cancel(false);
+        historyTimeout = null;
+        ((SoundcoreSleepA30Protocol) mDeviceProtocol).cancelSleepHistory();
+        if (!historyFetchActive) return;
+        historyFetchActive = false;
+        getDevice().unsetBusyTask();
+        getDevice().sendDeviceUpdateIntent(getContext());
+        GB.signalActivityDataFinish(getDevice());
     }
 
     @Override public synchronized void onInstallApp(Uri uri, Bundle options) {
@@ -229,6 +281,7 @@ public final class SoundcoreSleepA30DeviceSupport extends SoundcoreDeviceSupport
     }
 
     @Override public void disconnect() {
+        finishHistoryFetch();
         cancelUpload();
         synchronized (this) { controlBuffer.reset(); }
         super.disconnect();
@@ -237,6 +290,7 @@ public final class SoundcoreSleepA30DeviceSupport extends SoundcoreDeviceSupport
     @Override public synchronized nodomain.freeyourgadget.gadgetbridge.service.btbr.TransactionBuilder initializeDevice(
             nodomain.freeyourgadget.gadgetbridge.service.btbr.TransactionBuilder builder) {
         controlBuffer.reset();
+        finishHistoryFetch();
         cancelUpload();
         return super.initializeDevice(builder);
     }
@@ -244,6 +298,7 @@ public final class SoundcoreSleepA30DeviceSupport extends SoundcoreDeviceSupport
     @Override public void dispose() {
         synchronized (this) {
             disposed = true;
+            finishHistoryFetch();
             cancelUpload();
         }
         worker.shutdownNow();

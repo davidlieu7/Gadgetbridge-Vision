@@ -25,9 +25,15 @@ import org.slf4j.LoggerFactory
 import java.util.ArrayList
 import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEventUpdatePreferences
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice
+import nodomain.freeyourgadget.gadgetbridge.service.btle.BLETypeConversions
+import nodomain.freeyourgadget.gadgetbridge.service.devices.soundcore.SoundcoreSleepHistory
+import nodomain.freeyourgadget.gadgetbridge.service.devices.soundcore.SoundcoreSleepHistoryEvent
 import nodomain.freeyourgadget.gadgetbridge.service.devices.soundcore.protocol.impl.v1.SoundcoreProtocolImplV1
 
 open class SoundcoreSleepA30Protocol(device: GBDevice?) : SoundcoreProtocolImplV1(device) {
+    private var stagePages: SoundcoreSleepHistory.Pages? = null
+    private var sessionPages: SoundcoreSleepHistory.Pages? = null
+
     private var pendingAlarms: List<AlarmRequest>? = null
     private val alarmCommands = ArrayDeque<ByteArray>()
     private var awaitingAlarmWrite = false
@@ -37,6 +43,23 @@ open class SoundcoreSleepA30Protocol(device: GBDevice?) : SoundcoreProtocolImplV
                                     val minutes: Int, val repetition: Int, val snooze: Boolean)
 
     private val currentFunctions = intArrayOf(-1, -1, -1, -1)
+
+    override fun decodeResponse(responseData: ByteArray?): Array<GBDeviceEvent>? {
+        if (responseData != null && responseData.size >= 7) {
+            val command = BLETypeConversions.toUint16(responseData, 5).toShort()
+            if (command == CMD_GET_SLEEP_STAGES || command == CMD_GET_SLEEP_SESSIONS) {
+                if (responseData.size < 10) return null
+                val length = BLETypeConversions.toUint16(responseData, 7)
+                var checksum = 0
+                for (i in 0 until responseData.lastIndex) checksum += responseData[i].toInt()
+                if (length != responseData.size || (checksum and 255) != (responseData.last().toInt() and 255)) {
+                    LOG.warn("Invalid Sleep A30 history packet length or checksum")
+                    return null
+                }
+            }
+        }
+        return super.decodeResponse(responseData)
+    }
 
     protected override fun getBatteryOffset(): Int = BATTERY_OFFSET
 
@@ -98,6 +121,10 @@ open class SoundcoreSleepA30Protocol(device: GBDevice?) : SoundcoreProtocolImplV
         if (payload == null) return emptyArray()
         var result: Array<GBDeviceEvent> = emptyArray()
         when (command) {
+            CMD_GET_SLEEP_STAGES,
+            CMD_GET_SLEEP_SESSIONS -> {
+                return decodeSleepHistory(command, payload)
+            }
             CMD_GET_ALARMS -> result = decodeAlarms(payload)
             CMD_GET_SLEEP_SETTINGS -> result = decodeAutoStop(payload)
             CMD_NOTIFY_LISTENING_MODE -> {
@@ -131,6 +158,42 @@ open class SoundcoreSleepA30Protocol(device: GBDevice?) : SoundcoreProtocolImplV
         }
         // Empty setter responses are acknowledgements, not settings readback.
         return result
+    }
+
+    @Synchronized
+    override fun encodeFetchRecordedData(dataTypes: Int): ByteArray? {
+        if (dataTypes and (nodomain.freeyourgadget.gadgetbridge.model.RecordedDataTypes.TYPE_ACTIVITY or
+                nodomain.freeyourgadget.gadgetbridge.model.RecordedDataTypes.TYPE_SLEEP) == 0) return null
+        stagePages = SoundcoreSleepHistory.Pages(7)
+        sessionPages = null
+        return encodeRequest(CMD_GET_SLEEP_STAGES)
+    }
+
+    @Synchronized
+    fun cancelSleepHistory() {
+        stagePages = null
+        sessionPages = null
+    }
+
+    @Synchronized
+    private fun decodeSleepHistory(command: Short, payload: ByteArray): Array<GBDeviceEvent> {
+        val stages = stagePages ?: return emptyArray()
+        // Once stages are complete, additional stage streams must not replace that snapshot.
+        if (command == CMD_GET_SLEEP_STAGES && sessionPages != null) return emptyArray()
+        val pages = if (command == CMD_GET_SLEEP_STAGES) stages else sessionPages
+            ?: return emptyArray()
+        if (!pages.accept(payload)) {
+            cancelSleepHistory()
+            return arrayOf(SoundcoreSleepHistoryEvent(null))
+        }
+        if (!pages.complete) return emptyArray()
+        if (command == CMD_GET_SLEEP_STAGES) {
+            sessionPages = SoundcoreSleepHistory.Pages(14)
+            return arrayOf(GBDeviceEventSendBytes(encodeRequest(CMD_GET_SLEEP_SESSIONS)))
+        }
+        val report = SoundcoreSleepHistory.buildReport(stages.records(), pages.records())
+        cancelSleepHistory()
+        return arrayOf(SoundcoreSleepHistoryEvent(report))
     }
 
     override fun encodeDeviceInfoRequest(): ByteArray =

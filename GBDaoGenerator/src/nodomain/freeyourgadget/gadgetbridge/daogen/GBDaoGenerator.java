@@ -110,7 +110,7 @@ public class GBDaoGenerator {
             outputDir.mkdirs();
         }
 
-        final Schema schema = new Schema(157, MAIN_PACKAGE + ".entities");
+        final Schema schema = new Schema(158, MAIN_PACKAGE + ".entities");
 
         final List<Entity> sampleProvidersToGenerate = new LinkedList<>();
         final List<Entity> batterySampleProvidersToGenerate = new LinkedList<>();
@@ -315,6 +315,7 @@ public class GBDaoGenerator {
         sampleProvidersToGenerate.add(addGlucoseSample(schema, user, device));
         addGenericMetricsSample(schema, user, device);
         sampleProvidersToGenerate.add(addGenericSleepScoreSample(schema, user, device));
+        addSoundcoreSleepSamples(schema, user, device);
         sampleProvidersToGenerate.add(addGenericBodyEnergySample(schema, user, device));
         addGenericHydrationSample(schema, user, device);
         addGenericDurationSample(schema, user, device);
@@ -2910,6 +2911,23 @@ public class GBDaoGenerator {
         sample.addLongProperty("metricExtra").codeBeforeGetterAndSetter(OVERRIDE);
 
         return sample;
+    }
+
+    private static void addSoundcoreSleepSamples(Schema schema, Entity user, Entity device) {
+        Entity stage = addEntity(schema, "SoundcoreSleepStageSample");
+        addCommonTimeSampleProperties("AbstractTimeSample", stage, user, device);
+        stage.addLongProperty("endTimestamp").notNull();
+        stage.addIntProperty("rawKind").notNull();
+        stage.addIntProperty("rollovers").notNull();
+        stage.addIntProperty("flags").notNull();
+        Entity session = addEntity(schema, "SoundcoreSleepSessionSample");
+        addCommonTimeSampleProperties("AbstractTimeSample", session, user, device);
+        session.addLongProperty("endTimestamp").notNull();
+        session.addIntProperty("type").notNull();
+        session.addIntProperty("sleepScore").notNull();
+        session.addIntProperty("unknownCount").notNull();
+        session.addIntProperty("duration").notNull();
+        session.addIntProperty("unknownValue").notNull();
     }
 
     private static Entity addGenericSleepScoreSample(Schema schema, Entity user, Entity device) {

@@ -23,6 +23,7 @@ import nodomain.freeyourgadget.gadgetbridge.R
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsPreferenceConst
 import nodomain.freeyourgadget.gadgetbridge.devices.DeviceCardAction
 import nodomain.freeyourgadget.gadgetbridge.devices.deviceCardAction
+import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreSleepSampleProvider
 import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreEarbudsCoordinator
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice
 import nodomain.freeyourgadget.gadgetbridge.service.DeviceSupport
@@ -30,6 +31,27 @@ import nodomain.freeyourgadget.gadgetbridge.service.devices.soundcore.sleep_a30.
 import nodomain.freeyourgadget.gadgetbridge.service.devices.soundcore.sleep_a30.SoundcoreSleepA30DeviceSupport
 
 class SoundcoreSleepA30Coordinator : SoundcoreEarbudsCoordinator() {
+    override fun supportsDataFetching(device: GBDevice): Boolean = true
+    override fun supportsSleepMeasurement(device: GBDevice): Boolean = true
+    override fun supportsSleepScore(device: GBDevice): Boolean = true
+
+    override fun getSampleProvider(device: GBDevice, session: nodomain.freeyourgadget.gadgetbridge.entities.DaoSession) =
+        SoundcoreSleepSampleProvider(device, session)
+
+    override fun getSleepScoreProvider(device: GBDevice, session: nodomain.freeyourgadget.gadgetbridge.entities.DaoSession) =
+        nodomain.freeyourgadget.gadgetbridge.devices.GenericSleepScoreSampleProvider(device, session)
+
+    override fun getAllDeviceDao(session: nodomain.freeyourgadget.gadgetbridge.entities.DaoSession):
+        MutableMap<de.greenrobot.dao.AbstractDao<*, *>, de.greenrobot.dao.Property> =
+        super.getAllDeviceDao(session).toMutableMap().apply {
+            put(session.genericSleepScoreSampleDao,
+                nodomain.freeyourgadget.gadgetbridge.entities.GenericSleepScoreSampleDao.Properties.DeviceId)
+            put(session.soundcoreSleepStageSampleDao,
+                nodomain.freeyourgadget.gadgetbridge.entities.SoundcoreSleepStageSampleDao.Properties.DeviceId)
+            put(session.soundcoreSleepSessionSampleDao,
+                nodomain.freeyourgadget.gadgetbridge.entities.SoundcoreSleepSessionSampleDao.Properties.DeviceId)
+        }
+
     override fun getModelName(): String = "D1301"
 
     override fun getSupportedDeviceName(): Pattern = Pattern.compile("soundcore Sleep A30")

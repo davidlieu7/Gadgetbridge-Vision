@@ -102,6 +102,8 @@ public class SoundcoreProtocolImplV1 extends AbstractSoundcoreProtocol {
     public static final short CMD_SET_SLEEP_AUDIO = (short) 0x8515;
     public static final short CMD_SET_SLEEP_AUTO_SWITCH = (short) 0x8f15;
     public static final short CMD_GET_SLEEP_SETTINGS = (short) 0x0315;
+    public static final short CMD_GET_SLEEP_STAGES = (short) 0x0415;
+    public static final short CMD_GET_SLEEP_SESSIONS = (short) 0x8815;
     public static final short CMD_SET_CALLS_ENABLED = (short) 0x7510;
     public static final short CMD_SET_POWER_OFF_TONE = (short) 0x9e10;
     public static final short CMD_SET_ANC_TONE = (short) 0x7710;
