@@ -55,6 +55,10 @@ public class SoundcoreV20iProtocol extends SoundcoreProtocolImplV1 {
             return events;
         }
 
+        // TODO CHECK
+        // payload[61] -> SoundcoreEarbudsCoordinator.ButtonAction.DOUBLE_TAP
+        // payload[65] -> SoundcoreEarbudsCoordinator.ButtonAction.LONG_PRESS
+
         if (payload.length > LEFT_LONG_PRESS_OFFSET) {
             final SoundcoreEarbudsCoordinator.ButtonAction action = SoundcoreEarbudsCoordinator.ButtonAction.LONG_PRESS;
             final int encodedFunction = Byte.toUnsignedInt(payload[LEFT_LONG_PRESS_OFFSET]);

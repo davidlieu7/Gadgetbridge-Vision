@@ -698,7 +698,7 @@ abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator(
                 screen(
                     key = "pref_soundcore_light_screen",
                     title = R.string.soundcore_colorful_lights,
-                    icon = R.drawable.ic_led_color,
+                    icon = R.drawable.ic_lightbulb,
                 ) {
                     switchSetting(
                         key = DeviceSettingsPreferenceConst.PREF_SOUNDCORE_LIGHTS_ENABLED,
