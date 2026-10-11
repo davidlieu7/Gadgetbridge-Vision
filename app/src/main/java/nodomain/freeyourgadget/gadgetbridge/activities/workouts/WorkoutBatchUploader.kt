@@ -104,7 +104,7 @@ object WorkoutBatchUploader {
                     val provider = providers.getOrPut(gbDevice.address) {
                         gbDevice.deviceCoordinator.getActivityTrackProvider(gbDevice, context)
                     }
-                    WorkoutUploader.syncWorkout(context, gbDevice, provider, target, summary)
+                    WorkoutUploader.syncWorkout(context, gbDevice, provider, target, summary, verifyRemote = true)
                 } catch (e: Exception) {
                     LOG.error("Sending summary {} to service {} failed", summary.id, target.service, e)
                     WorkoutUploader.SyncOutcome.Failed(null)

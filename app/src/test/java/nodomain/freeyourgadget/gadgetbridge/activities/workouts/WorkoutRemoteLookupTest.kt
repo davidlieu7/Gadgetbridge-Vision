@@ -17,14 +17,17 @@
 package nodomain.freeyourgadget.gadgetbridge.activities.workouts
 
 import android.content.Context
+import android.net.Uri
 import androidx.fragment.app.Fragment
 import nodomain.freeyourgadget.gadgetbridge.GBApplication
 import nodomain.freeyourgadget.gadgetbridge.R
 import nodomain.freeyourgadget.gadgetbridge.entities.BaseActivitySummary
+import nodomain.freeyourgadget.gadgetbridge.entities.WorkoutUpload
 import nodomain.freeyourgadget.gadgetbridge.externalservices.AuthStyle
 import nodomain.freeyourgadget.gadgetbridge.model.ActivityKind
 import nodomain.freeyourgadget.gadgetbridge.test.TestBase
 import org.junit.Assert.assertEquals
+import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
@@ -46,9 +49,8 @@ class WorkoutRemoteLookupTest : TestBase() {
         var uploads = 0
 
         override val id = "fake"
-        override val nameRes = R.string.service_name_endurain
+        override val nameRes = R.string.service_name_fittrackee
         override val authStyle = AuthStyle.LOGIN
-        override val serverPrefKey: String? = null
         override val service = 97
         override val capabilities = UploadCapabilities(
             listOf(WorkoutPayloadFormat.FIT),
@@ -61,6 +63,7 @@ class WorkoutRemoteLookupTest : TestBase() {
         override fun isLoggedIn(context: Context) = true
         override fun showSetup(fragment: Fragment) {}
         override fun logout(context: Context) = true
+        override fun onLoginCallback(context: Context, uri: Uri) {}
         override fun activityUrl(context: Context, remoteActivityId: String): String? = null
 
         override fun upload(context: Context, summary: BaseActivitySummary, payload: File): WorkoutUploader.UploadResult {
@@ -69,7 +72,23 @@ class WorkoutRemoteLookupTest : TestBase() {
             else WorkoutUploader.UploadResult(false, null, null)
         }
 
-        override fun updateMetadata(context: Context, remoteActivityId: String, summary: BaseActivitySummary) = true
+        override fun updateMetadata(context: Context, remoteActivityId: String, summary: BaseActivitySummary) =
+            MetadataUpdateResult.Updated
+
+        override fun updateTrack(
+            context: Context,
+            remoteActivityId: String,
+            payload: File,
+            summary: BaseActivitySummary,
+            row: WorkoutUpload
+        ) = TrackUpdateResult.Updated
+
+        override fun syncPhoto(
+            context: Context,
+            remoteActivityId: String,
+            photoFile: File?,
+            previousMediaRef: String?
+        ) = WorkoutUploader.PhotoSyncResult(true, null)
 
         override fun lookupRemote(context: Context, remoteActivityId: String): RemoteLookup {
             lookedUp.add(remoteActivityId)
@@ -88,7 +107,8 @@ class WorkoutRemoteLookupTest : TestBase() {
     private fun recordInStep(target: FakeTarget) {
         WorkoutUploadStore.recordSuccess(
             9L, target.service, "old", null,
-            sourceHash = WorkoutUploadStore.sourceHashOf(summary)
+            sourceHash = WorkoutUploadStore.sourceHashOf(summary),
+            payloadHash = WorkoutUploader.payloadHashFor(target, summary)
         )
     }
 
@@ -129,22 +149,21 @@ class WorkoutRemoteLookupTest : TestBase() {
     fun anActivityDeletedOnTheServiceIsUploadedAgain() {
         val target = FakeTarget(RemoteLookup.GONE)
         recordInStep(target)
-        assertEquals(WorkoutUploader.SyncOutcome.Uploaded, sync(target))
+        assertEquals(WorkoutUploader.SyncOutcome.Uploaded(), sync(target))
         assertEquals("new-1", row(target).remoteActivityId)
-        assertEquals(WorkoutUploadStore.STATUS_SUCCESS, row(target).status)
+        assertNull(row(target).lastError)
     }
 
     @Test
-    fun aDeletedActivityThatCannotBeSentAgainIsUploadedOnTheNextRequest() {
+    fun aDeletedActivityThatCannotBeSentAgainIsRecordedAsLost() {
         val target = FakeTarget(RemoteLookup.GONE, uploadSucceeds = false)
         recordInStep(target)
-        assertTrue(sync(target) is WorkoutUploader.SyncOutcome.Failed)
+        assertEquals(WorkoutUploader.SyncOutcome.Failed(null), sync(target))
         val row = row(target)
-        assertNull(row.remoteActivityId)
-        assertEquals(
-            WorkoutUploader.SyncAction.UPLOAD,
-            WorkoutUploader.syncActionFor(row, WorkoutUploadStore.sourceHashOf(summary))
-        )
+        assertTrue(WorkoutUploader.isLost(row))
+        assertNotNull(row.lastError)
+        // A lost row is uploaded again on the next request, without asking the service first.
+        assertEquals(WorkoutUploader.SyncAction.UPLOAD, WorkoutUploader.syncActionFor(row, row.sourceHash!!))
     }
 
     @Test

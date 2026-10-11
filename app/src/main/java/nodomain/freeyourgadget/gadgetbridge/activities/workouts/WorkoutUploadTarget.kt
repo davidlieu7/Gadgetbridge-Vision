@@ -335,6 +335,12 @@ interface WorkoutUploadTarget : ExternalService {
     fun deleteRemote(context: Context, remoteActivityId: String): Boolean = false
 
     /**
+     * Asks the service whether it still holds [remoteActivityId], which it no longer does once the
+     * user deleted it there. Called only when [UploadCapabilities.canLookUp]. Blocking.
+     */
+    fun lookupRemote(context: Context, remoteActivityId: String): RemoteLookup = RemoteLookup.FAILED
+
+    /**
      * Finds the activity an upload became, for a service that takes the file and imports it later
      * without naming the result. Called only for a row recorded without an activity id and without
      * a source fingerprint, which is how [WorkoutUploader] records an upload that named no id.

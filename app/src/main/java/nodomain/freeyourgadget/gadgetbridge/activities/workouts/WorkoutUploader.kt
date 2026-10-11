@@ -180,7 +180,30 @@ object WorkoutUploader {
         val sourceHash = WorkoutUploadStore.sourceHashOf(summary)
         val row = WorkoutUploadStore.rowsForSummaries(listOf(id))[id]?.get(target.service)
             ?.takeIf { WorkoutUploadTargets.holds(context, target, it) }
-        return when (syncActionFor(row, sourceHash)) {
+        val action = syncActionFor(row, sourceHash)
+        val remoteId = row?.remoteActivityId
+        if (verifyRemote && action != SyncAction.UPLOAD && remoteId != null && target.capabilities.canLookUp) {
+            renewExpiredCredentials(context, target)
+            when (target.lookupRemote(context, remoteId)) {
+                RemoteLookup.GONE -> {
+                    LOG.info("Service {} no longer holds activity {} of summary {}, uploading it again",
+                        target.service, remoteId, id)
+                    val outcome = uploadNew(context, gbDevice, provider, target, summary, sourceHash, summaryData)
+                    if (outcome !is SyncOutcome.Uploaded) {
+                        // The row would otherwise still name the deleted activity.
+                        recordWithoutId(
+                            target, row, sourceHash,
+                            context.getString(R.string.service_remote_deleted, context.getString(target.nameRes))
+                        )
+                    }
+                    return outcome
+                }
+
+                RemoteLookup.FAILED -> return SyncOutcome.Failed(null)
+                RemoteLookup.PRESENT -> Unit
+            }
+        }
+        return when (action) {
             SyncAction.UPLOAD ->
                 uploadNew(context, gbDevice, provider, target, summary, sourceHash, summaryData)
 

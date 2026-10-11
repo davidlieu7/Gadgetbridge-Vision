@@ -24,6 +24,7 @@ import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import nodomain.freeyourgadget.gadgetbridge.R
 import nodomain.freeyourgadget.gadgetbridge.activities.workouts.MetadataUpdateResult
 import nodomain.freeyourgadget.gadgetbridge.activities.workouts.RecreateOrder
+import nodomain.freeyourgadget.gadgetbridge.activities.workouts.RemoteLookup
 import nodomain.freeyourgadget.gadgetbridge.activities.workouts.RemoteOp
 import nodomain.freeyourgadget.gadgetbridge.activities.workouts.RemoteSnapshot
 import nodomain.freeyourgadget.gadgetbridge.activities.workouts.UploadCapabilities
@@ -71,7 +72,7 @@ object FitTrackeeService : WorkoutUploadTarget {
         // FIT first: it carries heart rate and cadence, which a GPX does not. A workout without a
         // track still exports one, which upload() leaves unsent.
         formats = listOf(WorkoutPayloadFormat.FIT, WorkoutPayloadFormat.GPX),
-        activity = setOf(RemoteOp.CREATE, RemoteOp.REPLACE, RemoteOp.DELETE),
+        activity = setOf(RemoteOp.CREATE, RemoteOp.REPLACE, RemoteOp.DELETE, RemoteOp.READ),
         metadata = setOf(RemoteOp.UPDATE),
         // A media item is uploaded on its own, attached to the workout, and deleted by id.
         media = setOf(RemoteOp.CREATE, RemoteOp.REPLACE, RemoteOp.DELETE),
@@ -278,6 +279,15 @@ object FitTrackeeService : WorkoutUploadTarget {
     override fun deleteRemote(context: Context, remoteActivityId: String): Boolean {
         val server = serverUrl() ?: return false
         return FitTrackeeApiClient(server, FitTrackeeTokenManager(context)).deleteWorkout(remoteActivityId)
+    }
+
+    override fun lookupRemote(context: Context, remoteActivityId: String): RemoteLookup {
+        val server = serverUrl() ?: return RemoteLookup.FAILED
+        return when (FitTrackeeApiClient(server, FitTrackeeTokenManager(context)).getWorkout(remoteActivityId)) {
+            is FitTrackeeWorkoutLookup.Found -> RemoteLookup.PRESENT
+            is FitTrackeeWorkoutLookup.Gone -> RemoteLookup.GONE
+            is FitTrackeeWorkoutLookup.Failed -> RemoteLookup.FAILED
+        }
     }
 
     /**

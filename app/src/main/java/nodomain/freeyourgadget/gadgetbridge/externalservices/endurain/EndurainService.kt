@@ -26,6 +26,7 @@ import nodomain.freeyourgadget.gadgetbridge.R
 import nodomain.freeyourgadget.gadgetbridge.activities.workouts.MetadataUpdateResult
 import nodomain.freeyourgadget.gadgetbridge.activities.workouts.RemoteOp
 import nodomain.freeyourgadget.gadgetbridge.activities.workouts.RecreateOrder
+import nodomain.freeyourgadget.gadgetbridge.activities.workouts.RemoteLookup
 import nodomain.freeyourgadget.gadgetbridge.activities.workouts.RemoteSnapshot
 import nodomain.freeyourgadget.gadgetbridge.activities.workouts.UploadCapabilities
 import nodomain.freeyourgadget.gadgetbridge.activities.workouts.WorkoutPayloadFormat
@@ -54,7 +55,7 @@ object EndurainService : WorkoutUploadTarget {
         formats = listOf(WorkoutPayloadFormat.FIT),
         // No endpoint replaces an activity's track, so changing one means delete plus re-upload,
         // which gives the activity a new id. See snapshotRemote.
-        activity = setOf(RemoteOp.CREATE, RemoteOp.REPLACE, RemoteOp.DELETE),
+        activity = setOf(RemoteOp.CREATE, RemoteOp.REPLACE, RemoteOp.DELETE, RemoteOp.READ),
         metadata = setOf(RemoteOp.UPDATE),
         // Media is listed, deleted and uploaded, so a photo changes by way of a new media entry.
         media = setOf(RemoteOp.CREATE, RemoteOp.REPLACE, RemoteOp.DELETE)
@@ -115,6 +116,9 @@ object EndurainService : WorkoutUploadTarget {
     // snapshotRemote compares the remote activity against what was uploaded and gives up when
     // it no longer matches.
     override val keepsRemoteEdits = true
+
+    override fun credentialsExpired(context: Context): Boolean =
+        EndurainTokenManager(context).isAccessTokenExpired()
 
     override fun refreshCredentials(context: Context): Boolean {
         val server = serverUrl() ?: return false
@@ -265,6 +269,16 @@ object EndurainService : WorkoutUploadTarget {
         return EndurainApiClient(server, EndurainTokenManager(context)).deleteActivity(activityId)
     }
 
+    override fun lookupRemote(context: Context, remoteActivityId: String): RemoteLookup {
+        val activityId = remoteActivityId.toIntOrNull() ?: return RemoteLookup.FAILED
+        val server = serverUrl() ?: return RemoteLookup.FAILED
+        return when (EndurainApiClient(server, EndurainTokenManager(context)).getActivityDetails(activityId)) {
+            is EndurainActivityLookup.Found -> RemoteLookup.PRESENT
+            is EndurainActivityLookup.Gone -> RemoteLookup.GONE
+            is EndurainActivityLookup.Failed -> RemoteLookup.FAILED
+        }
+    }
+
     /** Uploads the replacement, then restores on it what [snapshotRemote] read off the original. */
     override fun upload(
         context: Context,
@@ -283,16 +297,6 @@ object EndurainService : WorkoutUploadTarget {
             details
         )
         return result
-    }
-
-    override fun lookupRemote(context: Context, remoteActivityId: String): RemoteLookup {
-        val activityId = remoteActivityId.toIntOrNull() ?: return RemoteLookup.FAILED
-        val server = serverUrl() ?: return RemoteLookup.FAILED
-        return when (EndurainApiClient(server, EndurainTokenManager(context)).getActivityDetails(activityId)) {
-            is EndurainActivityLookup.Found -> RemoteLookup.PRESENT
-            is EndurainActivityLookup.Gone -> RemoteLookup.GONE
-            is EndurainActivityLookup.Failed -> RemoteLookup.FAILED
-        }
     }
 
     /**

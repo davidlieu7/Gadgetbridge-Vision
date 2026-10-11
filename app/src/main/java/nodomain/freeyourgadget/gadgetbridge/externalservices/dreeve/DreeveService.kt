@@ -22,6 +22,7 @@ import nodomain.freeyourgadget.gadgetbridge.R
 import nodomain.freeyourgadget.gadgetbridge.activities.workouts.MetadataUpdateResult
 import nodomain.freeyourgadget.gadgetbridge.activities.workouts.RecreateOrder
 import nodomain.freeyourgadget.gadgetbridge.activities.workouts.RemoteIdResolution
+import nodomain.freeyourgadget.gadgetbridge.activities.workouts.RemoteLookup
 import nodomain.freeyourgadget.gadgetbridge.activities.workouts.RemoteOp
 import nodomain.freeyourgadget.gadgetbridge.activities.workouts.RemoteSnapshot
 import nodomain.freeyourgadget.gadgetbridge.activities.workouts.UploadCapabilities
@@ -55,7 +56,7 @@ object DreeveService : WorkoutUploadTarget {
     override val capabilities = UploadCapabilities(
         formats = listOf(WorkoutPayloadFormat.FIT),
         // No endpoint writes a new track onto an activity, so a changed track replaces it.
-        activity = setOf(RemoteOp.CREATE, RemoteOp.REPLACE, RemoteOp.DELETE),
+        activity = setOf(RemoteOp.CREATE, RemoteOp.REPLACE, RemoteOp.DELETE, RemoteOp.READ),
         // PATCH /api/v1/activities/{id} takes the name and the sport type.
         metadata = setOf(RemoteOp.UPDATE),
         media = emptySet()
@@ -143,6 +144,13 @@ object DreeveService : WorkoutUploadTarget {
 
     override fun deleteRemote(context: Context, remoteActivityId: String): Boolean =
         client(context)?.deleteActivity(remoteActivityId) ?: false
+
+    override fun lookupRemote(context: Context, remoteActivityId: String): RemoteLookup =
+        when (client(context)?.getActivity(remoteActivityId)) {
+            is DreeveActivityLookup.Found -> RemoteLookup.PRESENT
+            is DreeveActivityLookup.Gone -> RemoteLookup.GONE
+            is DreeveActivityLookup.Failed, null -> RemoteLookup.FAILED
+        }
 
     override fun updateMetadata(
         context: Context,

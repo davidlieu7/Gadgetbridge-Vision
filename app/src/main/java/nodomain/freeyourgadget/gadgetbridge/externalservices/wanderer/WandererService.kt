@@ -20,6 +20,7 @@ import android.content.Context
 import androidx.fragment.app.Fragment
 import nodomain.freeyourgadget.gadgetbridge.R
 import nodomain.freeyourgadget.gadgetbridge.activities.workouts.MetadataUpdateResult
+import nodomain.freeyourgadget.gadgetbridge.activities.workouts.RemoteLookup
 import nodomain.freeyourgadget.gadgetbridge.activities.workouts.RemoteOp
 import nodomain.freeyourgadget.gadgetbridge.activities.workouts.TrackUpdateResult
 import nodomain.freeyourgadget.gadgetbridge.activities.workouts.UploadCapabilities
@@ -48,7 +49,7 @@ object WandererService : WorkoutUploadTarget {
         formats = listOf(WorkoutPayloadFormat.GPX),
         // trail/form/{id} writes the new track onto the existing trail, so its id and whatever the
         // user did to it survive.
-        activity = setOf(RemoteOp.CREATE, RemoteOp.UPDATE),
+        activity = setOf(RemoteOp.CREATE, RemoteOp.UPDATE, RemoteOp.READ),
         // trail/form/{id} also takes the fields beside the file, so a name can be written on
         // its own without sending the track again.
         metadata = setOf(RemoteOp.UPDATE),
