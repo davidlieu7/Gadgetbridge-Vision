@@ -73,12 +73,9 @@ public class SoundcoreQ30Protocol extends SoundcoreProtocolImplV1 {
             case DeviceSettingsPreferenceConst.PREF_SOUNDCORE_AMBIENT_SOUND_CONTROL:
             case DeviceSettingsPreferenceConst.PREF_SOUNDCORE_ANC_MODE:
                 return encodeAudioMode();
-
             default:
-                LOG.debug("Unsupported CONFIG: " + config);
+                return super.encodeSendConfiguration(config);
         }
-
-        return super.encodeSendConfiguration(config);
     }
 
     /**
@@ -93,21 +90,19 @@ public class SoundcoreQ30Protocol extends SoundcoreProtocolImplV1 {
     private byte[] encodeAudioMode() {
         Prefs prefs = getDevicePrefs();
 
-        final AmbientSoundMode ambientSoundMode = AmbientSoundMode.fromPreference(prefs.getString(
+        final AmbientSoundMode ambientSoundMode = AmbientSoundMode.fromPreference(
+            prefs.getString(
                 DeviceSettingsPreferenceConst.PREF_SOUNDCORE_AMBIENT_SOUND_CONTROL,
-                "off"
-        ));
+                AmbientSoundMode.OFF.toString()
+            )
+        );
 
-        if (ambientSoundMode == null) {
-            LOG.error("Invalid Ambient Mode selected");
-            return null;
-        }
-
-        final AncMode ancMode = AncMode.fromPreference(prefs.getString(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_ANC_MODE, "transport"));
-        if (ancMode == null) {
-            LOG.error("Invalid ANC Mode selected");
-            return null;
-        }
+        final AncMode ancMode = AncMode.fromPreference(
+            prefs.getString(
+                DeviceSettingsPreferenceConst.PREF_SOUNDCORE_ANC_MODE,
+                AncMode.TRANSPORT.toString()
+            )
+        );
 
         byte[] payload = new byte[]{ambientSoundMode.toByte(), ancMode.toByte(), 0x01};
         return encodeCommand(CMD_SET_AUDIO_MODE, payload);
@@ -166,10 +161,5 @@ public class SoundcoreQ30Protocol extends SoundcoreProtocolImplV1 {
         int band6 = Byte.toUnsignedInt(payload[7]);
         int band7 = Byte.toUnsignedInt(payload[8]);
         int band8 = Byte.toUnsignedInt(payload[9]);
-    }
-
-
-    byte[] encodeMysteryDataRequest2() {
-        return encodeRequest(CMD_GET_EXTENDED_INFO);
     }
 }
