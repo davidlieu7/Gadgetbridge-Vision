@@ -47,6 +47,8 @@ public final class XiaomiPreferences {
     public static final String FEAT_DISPLAY_ITEMS = "feat_display_items";
     public static final String FEAT_STRESS = "feat_stress";
     public static final String FEAT_SPO2 = "feat_spo2";
+    public static final String FEAT_IRREGULAR_RHYTHM_ALERT = "feat_irregular_rhythm_alert";
+    public static final String FEAT_SLEEP_RESPIRATORY_RATE = "feat_sleep_respiratory_rate";
     public static final String FEAT_PASSWORD = "feat_password";
     public static final String FEAT_INACTIVITY = "feat_inactivity";
     public static final String FEAT_SLEEP_MODE_SCHEDULE = "feat_sleep_mode_schedule";

@@ -49,6 +49,7 @@ import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSpec
 import nodomain.freeyourgadget.gadgetbridge.activities.xiaomi.XiaomiVibrationPatternsActivity;
 import nodomain.freeyourgadget.gadgetbridge.devices.huami.HuamiConst;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
+import nodomain.freeyourgadget.gadgetbridge.service.devices.xiaomi.XiaomiPreferences;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.xiaomi.activity.XiaomiActivityFileFetcher;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.xiaomi.activity.XiaomiActivityFileId;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.xiaomi.activity.XiaomiActivityParser;
@@ -92,6 +93,16 @@ public class XiaomiSettingsCustomizer implements DeviceSpecificSettingsCustomize
         final Preference hrAlertActivePref = handler.findPreference(DeviceSettingsPreferenceConst.PREF_HEARTRATE_ALERT_ACTIVE_HIGH_THRESHOLD);
         if (hrAlertActivePref != null) {
             hrAlertActivePref.setVisible(false);
+        }
+
+        final Preference irregularRhythmAlertPref = handler.findPreference(DeviceSettingsPreferenceConst.PREF_HEARTRATE_ALERT_IRREGULAR_RHYTHM);
+        if (irregularRhythmAlertPref != null) {
+            irregularRhythmAlertPref.setVisible(prefs.getBoolean(XiaomiPreferences.FEAT_IRREGULAR_RHYTHM_ALERT, false));
+        }
+
+        final Preference sleepRespiratoryRatePref = handler.findPreference(DeviceSettingsPreferenceConst.PREF_HEARTRATE_SLEEP_RESPIRATORY_RATE_MONITORING);
+        if (sleepRespiratoryRatePref != null) {
+            sleepRespiratoryRatePref.setVisible(prefs.getBoolean(XiaomiPreferences.FEAT_SLEEP_RESPIRATORY_RATE, false));
         }
 
         populateOrHideListPreference(HuamiConst.PREF_DISPLAY_ITEMS_SORTABLE, handler, prefs);

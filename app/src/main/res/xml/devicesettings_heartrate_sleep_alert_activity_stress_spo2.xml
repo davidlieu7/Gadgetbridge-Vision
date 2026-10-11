@@ -25,6 +25,14 @@
                 android:key="heartrate_sleep_breathing_quality_monitoring"
                 android:layout="@layout/preference_checkbox"
                 android:title="@string/pref_sleep_breathing_quality_monitoring" />
+
+            <SwitchPreferenceCompat
+                android:defaultValue="false"
+                android:icon="@drawable/ic_activity_sleep"
+                android:key="heartrate_sleep_respiratory_rate_monitoring"
+                android:layout="@layout/preference_checkbox"
+                android:title="@string/pref_sleep_respiratory_rate_monitoring"
+                app:isPreferenceVisible="false" />
         </PreferenceCategory>
 
         <PreferenceCategory
@@ -83,6 +91,14 @@
                 android:key="heartrate_alert_active_high_threshold"
                 app:useSimpleSummaryProvider="true"
                 android:title="@string/prefs_heartrate_alert_active_high_threshold" />
+
+            <SwitchPreferenceCompat
+                android:defaultValue="false"
+                android:icon="@drawable/ic_heartrate"
+                android:key="heartrate_alert_irregular_rhythm"
+                android:layout="@layout/preference_checkbox"
+                android:title="@string/pref_heartrate_alert_irregular_rhythm"
+                app:isPreferenceVisible="false" />
         </PreferenceCategory>
 
         <!-- Stress Monitoring -->

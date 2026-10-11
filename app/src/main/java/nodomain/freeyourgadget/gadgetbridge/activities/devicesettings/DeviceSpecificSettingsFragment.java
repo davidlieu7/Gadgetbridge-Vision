@@ -826,6 +826,8 @@ public class DeviceSpecificSettingsFragment extends AbstractPreferenceFragment i
         addPreferenceHandlerFor(PREF_HEARTRATE_STRESS_MONITORING);
         addPreferenceHandlerFor(PREF_HEARTRATE_STRESS_RELAXATION_REMINDER);
         addPreferenceHandlerFor(PREF_HEARTRATE_SLEEP_BREATHING_QUALITY_MONITORING);
+        addPreferenceHandlerFor(PREF_HEARTRATE_SLEEP_RESPIRATORY_RATE_MONITORING);
+        addPreferenceHandlerFor(PREF_HEARTRATE_ALERT_IRREGULAR_RHYTHM);
         addPreferenceHandlerFor(PREF_SPO2_ALL_DAY_MONITORING);
         addPreferenceHandlerFor(PREF_SPO2_MEASUREMENT_INTERVAL);
         addPreferenceHandlerFor(PREF_SPO2_MEASUREMENT_TIME);

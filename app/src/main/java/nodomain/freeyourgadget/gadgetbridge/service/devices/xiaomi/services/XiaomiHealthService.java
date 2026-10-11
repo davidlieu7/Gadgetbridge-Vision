@@ -312,6 +312,8 @@ public class XiaomiHealthService extends AbstractXiaomiService {
                 return true;
             case DeviceSettingsPreferenceConst.PREF_HEARTRATE_USE_FOR_SLEEP_DETECTION:
             case DeviceSettingsPreferenceConst.PREF_HEARTRATE_SLEEP_BREATHING_QUALITY_MONITORING:
+            case DeviceSettingsPreferenceConst.PREF_HEARTRATE_SLEEP_RESPIRATORY_RATE_MONITORING:
+            case DeviceSettingsPreferenceConst.PREF_HEARTRATE_ALERT_IRREGULAR_RHYTHM:
             case DeviceSettingsPreferenceConst.PREF_HEARTRATE_MEASUREMENT_INTERVAL:
             case DeviceSettingsPreferenceConst.PREF_HEARTRATE_ALERT_ENABLED:
             case DeviceSettingsPreferenceConst.PREF_HEARTRATE_ALERT_HIGH_THRESHOLD:
@@ -577,6 +579,12 @@ public class XiaomiHealthService extends AbstractXiaomiService {
         eventUpdatePreferences.withPreference(DeviceSettingsPreferenceConst.PREF_HEARTRATE_USE_FOR_SLEEP_DETECTION, heartRate.getAdvancedMonitoring().getEnabled());
         eventUpdatePreferences.withPreference(DeviceSettingsPreferenceConst.PREF_HEARTRATE_SLEEP_BREATHING_QUALITY_MONITORING, heartRate.getBreathingScore() == 1);
 
+        // 0 = the watch does not have the toggle, 1 = on, 2 = off
+        eventUpdatePreferences.withPreference(XiaomiPreferences.FEAT_IRREGULAR_RHYTHM_ALERT, heartRate.getIrregularRhythmAlert() != 0);
+        eventUpdatePreferences.withPreference(DeviceSettingsPreferenceConst.PREF_HEARTRATE_ALERT_IRREGULAR_RHYTHM, heartRate.getIrregularRhythmAlert() == 1);
+        eventUpdatePreferences.withPreference(XiaomiPreferences.FEAT_SLEEP_RESPIRATORY_RATE, heartRate.getSleepRespiratoryRate() != 0);
+        eventUpdatePreferences.withPreference(DeviceSettingsPreferenceConst.PREF_HEARTRATE_SLEEP_RESPIRATORY_RATE_MONITORING, heartRate.getSleepRespiratoryRate() == 1);
+
         eventUpdatePreferences.withPreference(
                 DeviceSettingsPreferenceConst.PREF_HEARTRATE_ALERT_HIGH_THRESHOLD,
                 String.valueOf(heartRate.getAlarmHighEnabled() ? heartRate.getAlarmHighThreshold() : 0)
@@ -595,9 +603,11 @@ public class XiaomiHealthService extends AbstractXiaomiService {
 
         final boolean sleepDetection = prefs.getBoolean(DeviceSettingsPreferenceConst.PREF_HEARTRATE_USE_FOR_SLEEP_DETECTION, false);
         final boolean sleepBreathingQuality = prefs.getBoolean(DeviceSettingsPreferenceConst.PREF_HEARTRATE_SLEEP_BREATHING_QUALITY_MONITORING, false);
+        final boolean sleepRespiratoryRate = prefs.getBoolean(DeviceSettingsPreferenceConst.PREF_HEARTRATE_SLEEP_RESPIRATORY_RATE_MONITORING, false);
         final int intervalSeconds = prefs.getInt(DeviceSettingsPreferenceConst.PREF_HEARTRATE_MEASUREMENT_INTERVAL, 0);
         final int alertHigh = prefs.getInt(DeviceSettingsPreferenceConst.PREF_HEARTRATE_ALERT_HIGH_THRESHOLD, 0);
         final int alertLow = prefs.getInt(DeviceSettingsPreferenceConst.PREF_HEARTRATE_ALERT_LOW_THRESHOLD, 0);
+        final boolean irregularRhythmAlert = prefs.getBoolean(DeviceSettingsPreferenceConst.PREF_HEARTRATE_ALERT_IRREGULAR_RHYTHM, false);
 
         int intervalMin;
         if (intervalSeconds == -1) {
@@ -608,12 +618,14 @@ public class XiaomiHealthService extends AbstractXiaomiService {
         }
 
         LOG.debug(
-                "Set heart rate config: sleepDetection={}, sleepBreathingQuality={}, intervalSeconds={}, alertHigh={}, alertLow={}",
+                "Set heart rate config: sleepDetection={}, sleepBreathingQuality={}, sleepRespiratoryRate={}, intervalSeconds={}, alertHigh={}, alertLow={}, irregularRhythmAlert={}",
                 sleepDetection,
                 sleepBreathingQuality,
+                sleepRespiratoryRate,
                 intervalSeconds,
                 alertHigh,
-                alertLow
+                alertLow,
+                irregularRhythmAlert
         );
 
         final var heartRate = HeartRate.newBuilder()
@@ -628,6 +640,13 @@ public class XiaomiHealthService extends AbstractXiaomiService {
                         .setAlarmLowEnabled(alertLow > 0)
                         .setAlarmLowThreshold(alertLow))
                 .setUnknown7(1);
+
+        if (prefs.getBoolean(XiaomiPreferences.FEAT_IRREGULAR_RHYTHM_ALERT, false)) {
+            heartRate.setIrregularRhythmAlert(irregularRhythmAlert ? 1 : 2);
+        }
+        if (prefs.getBoolean(XiaomiPreferences.FEAT_SLEEP_RESPIRATORY_RATE, false)) {
+            heartRate.setSleepRespiratoryRate(sleepRespiratoryRate ? 1 : 2);
+        }
 
         getSupport().sendCommand(
                 "set heart rate config",

@@ -1287,6 +1287,8 @@
     <string name="prefs_reserve_reminder_calendar_summary">Number of calendar events that will be synchronized</string>
     <string name="miband_prefs_hr_sleep_detection">Use heart rate sensor to improve sleep detection</string>
     <string name="pref_sleep_breathing_quality_monitoring">Sleep breathing quality monitoring</string>
+    <string name="pref_sleep_respiratory_rate_monitoring">Sleep breathing rate monitoring</string>
+    <string name="pref_heartrate_alert_irregular_rhythm">Irregular heart rhythm alert</string>
     <string name="miband_prefs_device_time_offset_hours">Device time offset in hours (for detecting sleep of shift workers)</string>
     <string name="prefs_find_phone">Find phone</string>
     <string name="prefs_enable_find_phone">Turn on \"Find phone\"</string>

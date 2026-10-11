@@ -97,7 +97,9 @@ message HeartRate {
   optional AdvancedMonitoring advancedMonitoring = 5;
   optional uint32 unknown7 = 7; // 1
   optional HeartRateAlarmLow heartRateAlarmLow = 8;
-  optional uint32 breathingScore = 9; // 1 on, 2 off
+  optional uint32 breathingScore = 9; // 0 unsupported, 1 on, 2 off
+  optional uint32 irregularRhythmAlert = 10; // 0 unsupported, 1 on, 2 off
+  optional uint32 sleepRespiratoryRate = 11; // 0 unsupported, 1 on, 2 off
 }
 
 message AdvancedMonitoring {
