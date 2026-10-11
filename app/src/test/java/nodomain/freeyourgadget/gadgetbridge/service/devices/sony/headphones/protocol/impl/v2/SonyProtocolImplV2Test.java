@@ -47,7 +47,6 @@ import nodomain.freeyourgadget.gadgetbridge.devices.sony.headphones.SonyHeadphon
 import nodomain.freeyourgadget.gadgetbridge.devices.sony.headphones.prefs.AmbientSoundControlButtonMode;
 import nodomain.freeyourgadget.gadgetbridge.devices.sony.headphones.prefs.AudioUpsampling;
 import nodomain.freeyourgadget.gadgetbridge.devices.sony.headphones.prefs.AutomaticPowerOff;
-import nodomain.freeyourgadget.gadgetbridge.devices.sony.headphones.prefs.ConnectTwoDevices;
 import nodomain.freeyourgadget.gadgetbridge.devices.sony.headphones.prefs.EqualizerCustomBands;
 import nodomain.freeyourgadget.gadgetbridge.devices.sony.headphones.prefs.EqualizerPreset;
 import nodomain.freeyourgadget.gadgetbridge.devices.sony.headphones.prefs.PauseWhenTakenOff;
@@ -354,18 +353,18 @@ public class SonyProtocolImplV2Test {
         coordinator.setConnectTwoDevicesNeedsApply(false);
 
         assertRequest(protocol.getConnectTwoDevices(), 0x0c, "d6:d2");
-        assertRequests(protocol::setConnectTwoDevices, new LinkedHashMap<ConnectTwoDevices, String>() {{
-            put(new ConnectTwoDevices(true), "d8:d2:00:00");
-            put(new ConnectTwoDevices(false), "d8:d2:00:01");
+        assertRequests(protocol::setConnectTwoDevices, new LinkedHashMap<Boolean, String>() {{
+            put(true, "d8:d2:00:00");
+            put(false, "d8:d2:00:01");
         }});
         assertNull(protocol.applyConnectTwoDevices());
     }
 
     @Test
     public void connectTwoDevicesKeepsLegacyApplySequence() {
-        assertRequests(protocol::setConnectTwoDevices, new LinkedHashMap<ConnectTwoDevices, String>() {{
-            put(new ConnectTwoDevices(true), "d8:d1:00:00");
-            put(new ConnectTwoDevices(false), "d8:d1:00:01");
+        assertRequests(protocol::setConnectTwoDevices, new LinkedHashMap<Boolean, String>() {{
+            put(true, "d8:d1:00:00");
+            put(false, "d8:d1:00:01");
         }});
         assertRequest(protocol.applyConnectTwoDevices(), 0x0c, "98:00:06:01");
     }
@@ -672,7 +671,27 @@ public class SonyProtocolImplV2Test {
                 MessageType.COMMAND_1,
                 new byte[]{(byte) 0xd7, (byte) 0xd2, 0x00, 0x00}
         );
-        assertPrefs(events, new ConnectTwoDevices(true).toPreferences());
+        assertEquals(1, events.size());
+        final SonyHeadphonesMultipointEvent event = (SonyHeadphonesMultipointEvent) events.get(0);
+        assertEquals(SonyHeadphonesMultipointEvent.Type.STATUS, event.getType());
+        assertTrue(event.isEnabled());
+    }
+
+    @Test
+    public void handleSystemControlMultipointStatus() {
+        List<? extends GBDeviceEvent> events = protocol.handleSystemControl(
+                new byte[]{0x00, 0x00, 0x06, 0x01}
+        );
+        assertEquals(1, events.size());
+        SonyHeadphonesMultipointEvent event = (SonyHeadphonesMultipointEvent) events.get(0);
+        assertEquals(SonyHeadphonesMultipointEvent.Type.STATUS, event.getType());
+        assertTrue(event.isEnabled());
+
+        events = protocol.handleSystemControl(new byte[]{0x00, 0x00, 0x06, 0x00});
+        assertEquals(1, events.size());
+        event = (SonyHeadphonesMultipointEvent) events.get(0);
+        assertEquals(SonyHeadphonesMultipointEvent.Type.STATUS, event.getType());
+        assertFalse(event.isEnabled());
     }
 
     @Test

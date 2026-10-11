@@ -40,7 +40,6 @@ import java.util.List;
 import java.util.UUID;
 
 import nodomain.freeyourgadget.gadgetbridge.GBApplication;
-import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsPreferenceConst;
 import nodomain.freeyourgadget.gadgetbridge.activities.multipoint.MultipointDevice;
 import nodomain.freeyourgadget.gadgetbridge.activities.multipoint.MultipointPairingActivity;
 import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEvent;
@@ -132,13 +131,13 @@ public class SonyHeadphonesSupport extends AbstractHeadphoneSerialDeviceSupportV
 
             switch (action) {
                 case MultipointPairingActivity.ACTION_MULTIPOINT_ENABLE:
-                    setConnectTwoDevices(true);
+                    sendMultipointRequests(mDeviceProtocol.buildSetMultipointEnabledRequest(true));
                     break;
                 case MultipointPairingActivity.ACTION_MULTIPOINT_DISABLE:
-                    setConnectTwoDevices(false);
+                    sendMultipointRequests(mDeviceProtocol.buildSetMultipointEnabledRequest(false));
                     break;
                 case MultipointPairingActivity.ACTION_MULTIPOINT_GET_STATUS:
-                    broadcastMultipointStatus(isConnectTwoDevicesEnabled());
+                    sendMultipointRequests(mDeviceProtocol.buildMultipointStatusRequest());
                     break;
                 case MultipointPairingActivity.ACTION_MULTIPOINT_GET_DEVICES:
                     if (!lastKnownMultipointDevices.isEmpty()) {
@@ -233,24 +232,6 @@ public class SonyHeadphonesSupport extends AbstractHeadphoneSerialDeviceSupportV
         evaluateGBDeviceEvent(new SonyHeadphonesEnqueueRequestEvent(requests));
     }
 
-    private boolean isConnectTwoDevicesEnabled() {
-        return GBApplication.getDeviceSpecificSharedPrefs(getDevice().getAddress())
-                .getBoolean(DeviceSettingsPreferenceConst.PREF_SONY_CONNECT_TWO_DEVICES, false);
-    }
-
-    private void setConnectTwoDevices(final boolean enabled) {
-        LOG.info("Setting connect to two devices: {}", enabled);
-
-        GBApplication.getDeviceSpecificSharedPrefs(getDevice().getAddress())
-                .edit()
-                .putBoolean(DeviceSettingsPreferenceConst.PREF_SONY_CONNECT_TWO_DEVICES, enabled)
-                .apply();
-
-        onSendConfiguration(DeviceSettingsPreferenceConst.PREF_SONY_CONNECT_TWO_DEVICES);
-
-        broadcastMultipointStatus(enabled);
-    }
-
     private void broadcastMultipointDevices() {
         final List<MultipointDevice> devices = new ArrayList<>(lastKnownMultipointDevices.size());
 
@@ -264,10 +245,6 @@ public class SonyHeadphonesSupport extends AbstractHeadphoneSerialDeviceSupportV
         }
 
         SonyHeadphonesMultipointEvent.deviceList(devices).evaluate(getContext(), getDevice());
-    }
-
-    private void broadcastMultipointStatus(final boolean enabled) {
-        SonyHeadphonesMultipointEvent.status(enabled).evaluate(getContext(), getDevice());
     }
 
     @Override

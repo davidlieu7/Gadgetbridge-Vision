@@ -56,7 +56,6 @@ import nodomain.freeyourgadget.gadgetbridge.devices.sony.headphones.prefs.Surrou
 import nodomain.freeyourgadget.gadgetbridge.devices.sony.headphones.prefs.TouchSensor;
 import nodomain.freeyourgadget.gadgetbridge.devices.sony.headphones.prefs.VoiceAssistant;
 import nodomain.freeyourgadget.gadgetbridge.devices.sony.headphones.prefs.CaptureVoiceDuringCall;
-import nodomain.freeyourgadget.gadgetbridge.devices.sony.headphones.prefs.ConnectTwoDevices;
 import nodomain.freeyourgadget.gadgetbridge.devices.sony.headphones.prefs.ServiceLink;
 import nodomain.freeyourgadget.gadgetbridge.devices.sony.headphones.prefs.WideAreaTap;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
@@ -318,15 +317,6 @@ public class SonyHeadphonesProtocol extends GBDeviceProtocol {
             case DeviceSettingsPreferenceConst.PREF_SONY_NOTIFICATION_VOICE_GUIDE_VOLUME:
                 configRequest = protocolImpl.setVoiceNotificationsVolume(VoiceNotifications.fromPreferences(prefs));
                 break;
-            case DeviceSettingsPreferenceConst.PREF_SONY_CONNECT_TWO_DEVICES: {
-                final ConnectTwoDevices connectTwoDevices = ConnectTwoDevices.fromPreferences(prefs);
-                configRequest = protocolImpl.setConnectTwoDevices(connectTwoDevices);
-                final Request applyRequest = protocolImpl.applyConnectTwoDevices();
-                if (applyRequest != null) {
-                    enqueueRequests(Collections.singletonList(applyRequest));
-                }
-                break;
-            }
             case DeviceSettingsPreferenceConst.PREF_SONY_SPEAK_TO_CHAT:
                 configRequest = protocolImpl.setSpeakToChatEnabled(SpeakToChatEnabled.fromPreferences(prefs));
                 break;
@@ -446,6 +436,36 @@ public class SonyHeadphonesProtocol extends GBDeviceProtocol {
         }
 
         return checkSupported(protocolImpl.getMultipointDevices());
+    }
+
+    public List<Request> buildMultipointStatusRequest() {
+        if (protocolImpl == null) {
+            LOG.error("No protocol implementation, ignoring multipoint request");
+            return Collections.emptyList();
+        }
+
+        final Request request = protocolImpl.getConnectTwoDevices();
+
+        return checkSupported(request != null ? Collections.singletonList(request) : Collections.emptyList());
+    }
+
+    public List<Request> buildSetMultipointEnabledRequest(final boolean enabled) {
+        if (protocolImpl == null) {
+            LOG.error("No protocol implementation, ignoring multipoint request");
+            return Collections.emptyList();
+        }
+
+        final List<Request> requests = new ArrayList<>();
+        final Request setRequest = protocolImpl.setConnectTwoDevices(enabled);
+        if (setRequest != null) {
+            requests.add(setRequest);
+        }
+        final Request applyRequest = protocolImpl.applyConnectTwoDevices();
+        if (applyRequest != null) {
+            requests.add(applyRequest);
+        }
+
+        return checkSupported(requests);
     }
 
     public List<Request> buildMultipointConnectionRequest(final String address, final MultipointAction action) {

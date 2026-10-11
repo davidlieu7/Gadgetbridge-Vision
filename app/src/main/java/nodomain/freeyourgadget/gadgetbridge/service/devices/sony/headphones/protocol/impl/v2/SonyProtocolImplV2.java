@@ -58,7 +58,6 @@ import nodomain.freeyourgadget.gadgetbridge.devices.sony.headphones.prefs.TouchS
 import nodomain.freeyourgadget.gadgetbridge.devices.sony.headphones.prefs.VoiceAssistant;
 import nodomain.freeyourgadget.gadgetbridge.devices.sony.headphones.prefs.VoiceNotifications;
 import nodomain.freeyourgadget.gadgetbridge.devices.sony.headphones.prefs.CaptureVoiceDuringCall;
-import nodomain.freeyourgadget.gadgetbridge.devices.sony.headphones.prefs.ConnectTwoDevices;
 import nodomain.freeyourgadget.gadgetbridge.devices.sony.headphones.prefs.ServiceLink;
 import nodomain.freeyourgadget.gadgetbridge.devices.sony.headphones.prefs.WideAreaTap;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
@@ -407,8 +406,8 @@ public class SonyProtocolImplV2 extends SonyProtocolImplV1 {
     }
 
     @Override
-    public Request setConnectTwoDevices(final ConnectTwoDevices config) {
-        return setGeneralSetting(SonyHeadphonesCapabilities.ConnectTwoDevices, config.isEnabled());
+    public Request setConnectTwoDevices(final boolean enabled) {
+        return setGeneralSetting(SonyHeadphonesCapabilities.ConnectTwoDevices, enabled);
     }
 
     @Override
@@ -1373,36 +1372,40 @@ public class SonyProtocolImplV2 extends SonyProtocolImplV1 {
 
         final int type = Byte.toUnsignedInt(payload[1]);
         final boolean enabled = payload[3] == (byte) 0x00;
-        final GBDeviceEventUpdatePreferences event = new GBDeviceEventUpdatePreferences();
-        boolean handled = false;
+        final List<GBDeviceEvent> events = new ArrayList<>();
+        final GBDeviceEventUpdatePreferences preferencesEvent = new GBDeviceEventUpdatePreferences();
+        boolean hasPreferences = false;
 
         if (matchesGeneralSetting(SonyHeadphonesCapabilities.WideAreaTap, type)) {
             LOG.debug("Wide Area Tap: {}", enabled);
-            event.withPreferences(new WideAreaTap(enabled).toPreferences());
-            handled = true;
+            preferencesEvent.withPreferences(new WideAreaTap(enabled).toPreferences());
+            hasPreferences = true;
         }
         if (matchesGeneralSetting(SonyHeadphonesCapabilities.ConnectTwoDevices, type)) {
             LOG.debug("Connect Two Devices: {}", enabled);
-            event.withPreferences(new ConnectTwoDevices(enabled).toPreferences());
-            handled = true;
+            events.add(SonyHeadphonesMultipointEvent.status(enabled));
         }
         if (matchesGeneralSetting(SonyHeadphonesCapabilities.TouchSensorSingle, type)) {
             LOG.debug("Touch Sensor: {}", enabled);
-            event.withPreferences(new TouchSensor(enabled).toPreferences());
-            handled = true;
+            preferencesEvent.withPreferences(new TouchSensor(enabled).toPreferences());
+            hasPreferences = true;
         }
         if (matchesGeneralSetting(SonyHeadphonesCapabilities.CaptureVoiceDuringCall, type)) {
             LOG.debug("Capture Voice During Call: {}", enabled);
-            event.withPreferences(new CaptureVoiceDuringCall(enabled).toPreferences());
-            handled = true;
+            preferencesEvent.withPreferences(new CaptureVoiceDuringCall(enabled).toPreferences());
+            hasPreferences = true;
         }
 
-        if (!handled) {
+        if (hasPreferences) {
+            events.add(preferencesEvent);
+        }
+
+        if (events.isEmpty()) {
             LOG.warn("Unknown general setting type {}", String.format("%02x", type));
             return Collections.emptyList();
         }
 
-        return Collections.singletonList(event);
+        return events;
     }
 
     public List<? extends GBDeviceEvent> handleMultipointDevices(final byte[] payload) {
@@ -1570,8 +1573,7 @@ public class SonyProtocolImplV2 extends SonyProtocolImplV1 {
             // Connect Two Devices (dual device mode)
             final boolean enabled = payload[3] == (byte) 0x01;
             LOG.debug("Connect Two Devices: {}", enabled);
-            return Collections.singletonList(new GBDeviceEventUpdatePreferences()
-                    .withPreferences(new ConnectTwoDevices(enabled).toPreferences()));
+            return Collections.singletonList(SonyHeadphonesMultipointEvent.status(enabled));
         }
 
         LOG.debug("Unhandled system control subcode 0x{}", String.format("%02x", subcode));

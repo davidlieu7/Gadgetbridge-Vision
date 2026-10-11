@@ -42,7 +42,6 @@ import nodomain.freeyourgadget.gadgetbridge.devices.sony.headphones.prefs.TouchS
 import nodomain.freeyourgadget.gadgetbridge.devices.sony.headphones.prefs.VoiceAssistant;
 import nodomain.freeyourgadget.gadgetbridge.devices.sony.headphones.prefs.VoiceNotifications;
 import nodomain.freeyourgadget.gadgetbridge.devices.sony.headphones.prefs.CaptureVoiceDuringCall;
-import nodomain.freeyourgadget.gadgetbridge.devices.sony.headphones.prefs.ConnectTwoDevices;
 import nodomain.freeyourgadget.gadgetbridge.devices.sony.headphones.prefs.ServiceLink;
 import nodomain.freeyourgadget.gadgetbridge.devices.sony.headphones.prefs.WideAreaTap;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
@@ -122,7 +121,7 @@ public abstract class AbstractSonyProtocolImpl {
 
     public abstract Request applyServiceLink(final ServiceLink config);
 
-    public abstract Request setConnectTwoDevices(final ConnectTwoDevices config);
+    public abstract Request setConnectTwoDevices(final boolean enabled);
 
     public abstract Request getConnectTwoDevices();
 

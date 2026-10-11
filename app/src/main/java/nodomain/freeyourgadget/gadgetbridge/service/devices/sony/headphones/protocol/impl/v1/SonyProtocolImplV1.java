@@ -48,7 +48,6 @@ import nodomain.freeyourgadget.gadgetbridge.devices.sony.headphones.prefs.Automa
 import nodomain.freeyourgadget.gadgetbridge.devices.sony.headphones.prefs.ButtonFunctionNcAmbient;
 import nodomain.freeyourgadget.gadgetbridge.devices.sony.headphones.prefs.ButtonModes;
 import nodomain.freeyourgadget.gadgetbridge.devices.sony.headphones.prefs.CaptureVoiceDuringCall;
-import nodomain.freeyourgadget.gadgetbridge.devices.sony.headphones.prefs.ConnectTwoDevices;
 import nodomain.freeyourgadget.gadgetbridge.devices.sony.headphones.prefs.ServiceLink;
 import nodomain.freeyourgadget.gadgetbridge.devices.sony.headphones.prefs.EqualizerCustomBands;
 import nodomain.freeyourgadget.gadgetbridge.devices.sony.headphones.prefs.EqualizerPreset;
@@ -394,7 +393,7 @@ public class SonyProtocolImplV1 extends AbstractSonyProtocolImpl {
     }
 
     @Override
-    public Request setConnectTwoDevices(final ConnectTwoDevices config) {
+    public Request setConnectTwoDevices(final boolean enabled) {
         LOG.warn("Connect two devices not implemented for V1");
         return null;
     }
