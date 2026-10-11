@@ -332,15 +332,8 @@ public class SoundcoreSportX20Protocol extends SoundcoreProtocolImplV1 {
     }
 
     @Override
-    protected byte[] encodeEqualizerPresetConfiguration(final String config, final Prefs prefs) {
-        return encodeAdditionalConfiguration(config);
-    }
-
-    @Override
-    protected byte[] encodeAdditionalConfiguration(final String config) {
+    public byte[] encodeSendConfiguration(final String config) {
         switch (config) {
-            case DeviceSettingsPreferenceConst.PREF_SOUNDCORE_3D_SURROUND:
-                return encodeBooleanCommand(CMD_SET_3D_SURROUND, getDevicePrefs().getBoolean(config, false));
             case DeviceSettingsPreferenceConst.PREF_SOUNDCORE_EQUALIZER_PRESET:
             case DeviceSettingsPreferenceConst.PREF_SOUNDCORE_EQUALIZER_BAND1_VALUE:
             case DeviceSettingsPreferenceConst.PREF_SOUNDCORE_EQUALIZER_BAND2_VALUE:
@@ -351,10 +344,8 @@ public class SoundcoreSportX20Protocol extends SoundcoreProtocolImplV1 {
             case DeviceSettingsPreferenceConst.PREF_SOUNDCORE_EQUALIZER_BAND7_VALUE:
             case DeviceSettingsPreferenceConst.PREF_SOUNDCORE_EQUALIZER_BAND8_VALUE:
                 return encodeEqualizer();
-            case DeviceSettingsPreferenceConst.PREF_SOUNDCORE_FIT_TEST:
-                return encodeCommand(CMD_SET_FIT_TEST, new byte[]{0x0a});
             default:
-                return super.encodeAdditionalConfiguration(config);
+                return super.encodeSendConfiguration(config);
         }
     }
 

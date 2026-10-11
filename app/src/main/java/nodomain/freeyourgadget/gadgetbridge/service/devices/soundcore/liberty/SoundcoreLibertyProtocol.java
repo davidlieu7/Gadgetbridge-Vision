@@ -3,7 +3,6 @@ package nodomain.freeyourgadget.gadgetbridge.service.devices.soundcore.liberty;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsPreferenceConst;
 import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEvent;
 import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreEarbudsCoordinator.ButtonAction;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
@@ -15,8 +14,6 @@ public class SoundcoreLibertyProtocol extends SoundcoreProtocolImplV1 {
 
     private static final short CMD_GET_UNKNOWN_DATA_8D01 = (short) 0x8d01;
     private static final short CMD_GET_UNKNOWN_DATA_8205 = (short) 0x8205;
-    private static final short CMD_SET_WEARING_DETECTION = (short) 0x8101;
-    private static final short CMD_SET_WEARING_TONE = (short) 0x8c01;
     private static final int BATTERY_MULTIPLIER = 20;
 
     public SoundcoreLibertyProtocol(GBDevice device) {
@@ -74,20 +71,6 @@ public class SoundcoreLibertyProtocol extends SoundcoreProtocolImplV1 {
             case TRIPLE_TAP: return 4;
             case LONG_PRESS: return 5;
             default: throw new IllegalArgumentException("Unknown button action: " + buttonAction);
-        }
-    }
-
-    @Override
-    protected byte[] encodeAdditionalConfiguration(final String config) {
-        switch (config) {
-            case DeviceSettingsPreferenceConst.PREF_SOUNDCORE_WEARING_DETECTION:
-                return encodeBooleanCommand(CMD_SET_WEARING_DETECTION,
-                        getDevicePrefs().getBoolean(config, false));
-            case DeviceSettingsPreferenceConst.PREF_SOUNDCORE_WEARING_TONE:
-                return encodeBooleanCommand(CMD_SET_WEARING_TONE,
-                        getDevicePrefs().getBoolean(config, false));
-            default:
-                return super.encodeAdditionalConfiguration(config);
         }
     }
 

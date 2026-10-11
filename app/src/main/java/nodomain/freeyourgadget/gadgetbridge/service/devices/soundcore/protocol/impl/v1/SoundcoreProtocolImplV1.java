@@ -51,6 +51,8 @@ public abstract class SoundcoreProtocolImplV1 extends AbstractSoundcoreProtocol 
     public static final short CMD_SET_TAP_CONTROLS_ENABLE = (short) 0x9410;
     public static final short CMD_RESET_TAP_CONTROLS = (short) 0x8204;
     public static final short CMD_SET_TOUCH_TONE = (short) 0x8301;
+    public static final short CMD_SET_WEARING_DETECTION = (short) 0x8101;
+    public static final short CMD_SET_WEARING_TONE = (short) 0x8c01;
     public static final short CMD_SET_TOUCH_LOCK = (short) 0x8304;
     public static final short CMD_SET_AUTO_POWER_OFF = (short) 0x8601;
     public static final short CMD_SET_FIND_DEVICE = (short) 0x8910;
@@ -117,8 +119,14 @@ public abstract class SoundcoreProtocolImplV1 extends AbstractSoundcoreProtocol 
                 return encodeBooleanCommand(CMD_SET_TAP_CONTROLS_ENABLE, prefs.getBoolean(config, false));
             case DeviceSettingsPreferenceConst.PREF_SOUNDCORE_TOUCH_TONE:
                 return encodeBooleanCommand(CMD_SET_TOUCH_TONE, prefs.getBoolean(config, false));
+            case DeviceSettingsPreferenceConst.PREF_SOUNDCORE_WEARING_DETECTION:
+                return encodeBooleanCommand(CMD_SET_WEARING_DETECTION, prefs.getBoolean(config, false));
+            case DeviceSettingsPreferenceConst.PREF_SOUNDCORE_WEARING_TONE:
+                return encodeBooleanCommand(CMD_SET_WEARING_TONE, prefs.getBoolean(config, false));
             case DeviceSettingsPreferenceConst.PREF_SOUNDCORE_BATTERY_LOW_TONE:
                 return encodeBooleanCommand(CMD_SET_BATTERY_LOW_TONE, prefs.getBoolean(config, false));
+            case DeviceSettingsPreferenceConst.PREF_SOUNDCORE_3D_SURROUND:
+                return encodeBooleanCommand(CMD_SET_3D_SURROUND, prefs.getBoolean(config, false));
             case DeviceSettingsPreferenceConst.PREF_SOUNDCORE_GAMING_MODE:
                 return encodeBooleanCommand(CMD_SET_GAMING_MODE, prefs.getBoolean(config, false));
             case DeviceSettingsPreferenceConst.PREF_SOUNDCORE_AUTO_POWER_OFF:
@@ -132,21 +140,15 @@ public abstract class SoundcoreProtocolImplV1 extends AbstractSoundcoreProtocol 
             case DeviceSettingsPreferenceConst.PREF_SOUNDCORE_BUTTON_BRIGHTNESS:
                 return encodeByteCommand(CMD_SET_BUTTON_BRIGHTNESS, Integer.parseInt(prefs.getString(config, "0")));
             case DeviceSettingsPreferenceConst.PREF_SOUNDCORE_EQUALIZER_PRESET:
-                return encodeEqualizerPresetConfiguration(config, prefs);
+                return encodeByteCommand(CMD_SET_EQUALIZER_PRESET, Integer.parseInt(prefs.getString(config, "0")));
+            case DeviceSettingsPreferenceConst.PREF_SOUNDCORE_FIT_TEST:
+                return encodeCommand(CMD_SET_FIT_TEST, new byte[]{0x0a});
             default:
-                return encodeAdditionalConfiguration(config);
+                return super.encodeSendConfiguration(config);
         }
     }
 
     protected boolean appendAdvancedAudioModeStateByte() { return false; }
-
-    protected byte[] encodeEqualizerPresetConfiguration(final String config, final Prefs prefs) {
-        return encodeByteCommand(CMD_SET_EQUALIZER_PRESET, Integer.parseInt(prefs.getString(config, "0")));
-    }
-
-    protected byte[] encodeAdditionalConfiguration(final String config) {
-        return super.encodeSendConfiguration(config);
-    }
 
     private byte[] encodeConfiguredTapFunction(final String config, final Prefs prefs) {
         // Action: single tap, double tap, hold.
