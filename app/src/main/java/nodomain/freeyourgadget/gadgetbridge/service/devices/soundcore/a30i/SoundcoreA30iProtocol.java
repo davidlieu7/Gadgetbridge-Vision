@@ -1,14 +1,10 @@
 package nodomain.freeyourgadget.gadgetbridge.service.devices.soundcore.a30i;
 
-import static nodomain.freeyourgadget.gadgetbridge.util.GB.hexdump;
-
 import androidx.annotation.Nullable;
-
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.List;
 
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsPreferenceConst;
@@ -16,13 +12,10 @@ import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreEarbudsCo
 import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreEarbudsCoordinator.AmbientSoundMode;
 import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEvent;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
-import nodomain.freeyourgadget.gadgetbridge.service.devices.soundcore.SoundcorePacket;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.soundcore.protocol.impl.v1.SoundcoreProtocolImplV1;
 import nodomain.freeyourgadget.gadgetbridge.util.Prefs;
 
 public class SoundcoreA30iProtocol extends SoundcoreProtocolImplV1 {
-
-    private static final Logger LOG = LoggerFactory.getLogger(SoundcoreA30iProtocol.class);
 
     private static final int battery_earphone_left = 0;
     private static final int battery_earphone_right = 1;
@@ -31,68 +24,83 @@ public class SoundcoreA30iProtocol extends SoundcoreProtocolImplV1 {
         super(device);
     }
 
+    @Override
+    protected GBDeviceEvent[] decodeDeviceInfo(final byte[] payload) {
+        if (payload == null || payload.length < 78) {
+            return new GBDeviceEvent[0];
+        }
+
+        final List<GBDeviceEvent> devEvts = new ArrayList<>();
+
+        // Firmware Version and Serial Number
+        String firmware1 = readString(payload, 6, 5);
+        String firmware2 = readString(payload, 11, 5);
+        String serialNumber = readString(payload, 16, 16);
+        devEvts.add(buildVersionInfo(firmware1, firmware2, serialNumber));
+
+        // Battery Info
+        Collections.addAll(devEvts, decodeBatteryInfo(new byte[]{payload[2], payload[3]}));
+
+        //-------------------------------------------------------------------------
+        // Active Noise Cancelling [63 to 70 (7 bytes)]
+        final AmbientSoundMode ambientSoundControl = getAmbientSoundControl(payload[64], payload[67]);
+        final AncMode ancMode = AncMode.fromByte(payload[70]);
+        int noiseCancellingLevel = getNoiseCancellingLevel(payload[65]);
+        boolean wind_noise_reduction = payload[68] == 0x01;
+        //-------------------------------------------------------------------------
+        boolean touchTone = payload[72] == 0x01;
+        boolean surround3d = payload[74] == 0x01;
+        boolean low_battery = payload[77] == 0x01;
+        // AutoPowerOff duration=0 means never (disabled); 1=10min, 2=20min, 3=30min, 4=60min.
+        final boolean autoPowerEnabled = payload[75] == 0x01;
+        final int autoPowerDuration = autoPowerEnabled ? (payload[76] & 0xFF) + 1 : 0;
+
+        getDevicePrefs().getPreferences().edit()
+                .putString(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_AMBIENT_SOUND_CONTROL, ambientSoundControl != null ? ambientSoundControl.toString() : "Unknown Mode")
+                .putString(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_ANC_MODE, ancMode != null ? ancMode.toString() : "Unknown Mode")
+                .putInt(DeviceSettingsPreferenceConst.PREF_SONY_AMBIENT_SOUND_LEVEL, noiseCancellingLevel)
+                .putBoolean(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_WIND_NOISE_REDUCTION, wind_noise_reduction)
+
+                .putBoolean(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_3D_SURROUND, surround3d)
+                .putBoolean(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_BATTERY_LOW_TONE, low_battery)
+                .putBoolean(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_TOUCH_TONE, touchTone)
+                .putString(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_AUTO_POWER_OFF, String.valueOf(autoPowerDuration))
+                .apply();
+
+        return devEvts.toArray(new GBDeviceEvent[0]);
+    }
+
+    @Override
+    protected int getBatteryOffset() {
+        return 1;
+    }
+
+    @Override
+    protected int[] getBatteryIndexes(final int payloadLength) {
+        return new int[]{battery_earphone_left, battery_earphone_right};
+    }
+
     @Nullable
     @Override
-    public GBDeviceEvent[] decodeResponse(byte[] responseData) {
-        SoundcorePacket packet = decodePacket(responseData);
+    public byte[] encodeSendConfiguration(final String config) {
+        switch (config) {
+            case DeviceSettingsPreferenceConst.PREF_SOUNDCORE_ANC_MODE:
+            case DeviceSettingsPreferenceConst.PREF_SOUNDCORE_AMBIENT_SOUND_CONTROL:
+            case DeviceSettingsPreferenceConst.PREF_SOUNDCORE_WIND_NOISE_REDUCTION:
+            case DeviceSettingsPreferenceConst.PREF_SONY_AMBIENT_SOUND_LEVEL:
+                final Prefs prefs = getDevicePrefs();
+                final AmbientSoundMode ambientSoundControl = AmbientSoundMode.fromPreference(
+                        prefs.getString(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_AMBIENT_SOUND_CONTROL, AmbientSoundMode.OFF.toString()));
+                final AncMode ancMode = AncMode.fromPreference(
+                        prefs.getString(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_ANC_MODE, AncMode.TRANSPORT.toString()));
+                final int noiseCancellingLevel = prefs.getInt(DeviceSettingsPreferenceConst.PREF_SONY_AMBIENT_SOUND_LEVEL, 0);
+                final boolean windNoiseReduction = prefs.getBoolean(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_WIND_NOISE_REDUCTION, false);
 
-        if (packet == null)
-            return null;
-
-        List<GBDeviceEvent> devEvts = new ArrayList<>();
-
-        byte[] payload = packet.getPayload();
-        short cmd = packet.getCommand();
-
-        if (cmd == CMD_GET_DEVICE_INFO) {
-            // Firmware Version and Serial Number
-            String firmware1 = readString(payload, 6, 5);
-            String firmware2 = readString(payload, 11, 5);
-            String serialNumber = readString(payload, 16, 16);
-            devEvts.add(buildVersionInfo(firmware1, firmware2, serialNumber));
-
-            // Battery Info
-            handleBatteryInfo(devEvts, payload[2], payload[3]);
-
-            //-------------------------------------------------------------------------
-            // Active Noise Cancelling [63 to 70 (7 bytes)]
-            final AmbientSoundMode ambientSoundControl = getAmbientSoundControl(payload[64], payload[67]);
-            final AncMode ancMode = AncMode.fromByte(payload[70]);
-            int noiseCancellingLevel = getNoiseCancellingLevel(payload[65]);
-            boolean wind_noise_reduction = payload[68] == 0x01;
-            //-------------------------------------------------------------------------
-            boolean touchTone = payload[72] == 0x01;
-            boolean surround3d = payload[74] == 0x01;
-            boolean low_battery = payload[77] == 0x01;
-            // AutoPowerOff duration=0 means never (disabled); 1=10min, 2=20min, 3=30min, 4=60min.
-            final boolean autoPowerEnabled = payload[75] == 0x01;
-            final int autoPowerDuration = autoPowerEnabled ? (payload[76] & 0xFF) + 1 : 0;
-
-            getDevicePrefs().getPreferences().edit()
-                    .putString(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_AMBIENT_SOUND_CONTROL, ambientSoundControl != null ? ambientSoundControl.toString() : "Unknown Mode")
-                    .putString(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_ANC_MODE, ancMode != null ? ancMode.toString() : "Unknown Mode")
-                    .putInt(DeviceSettingsPreferenceConst.PREF_SONY_AMBIENT_SOUND_LEVEL, noiseCancellingLevel)
-                    .putBoolean(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_WIND_NOISE_REDUCTION, wind_noise_reduction)
-
-                    .putBoolean(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_3D_SURROUND, surround3d)
-                    .putBoolean(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_BATTERY_LOW_TONE, low_battery)
-                    .putBoolean(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_TOUCH_TONE, touchTone)
-                    .putString(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_AUTO_POWER_OFF, String.valueOf(autoPowerDuration))
-                    .apply();
-
-            LOG.debug("Message: CMD_GET_DEVICE_INFO");
-
-        }else if(cmd == CMD_SESSION_INIT) {
-            LOG.debug("Message: Initialisation finished!");
-        }else if(cmd == CMD_NOTIFY_BATTERY_INFO){
-            handleBatteryInfo(devEvts, payload[0], payload[1]);
-            LOG.debug("Message: CMD_NOTIFY_BATTERY_INFO");
-        }else {
-            LOG.debug("cmd          :" + cmd);
-            LOG.debug("Payload      :" + hexdump(payload));
-            LOG.debug("Respond Data:" + hexdump(responseData));
+                final byte[] command = encodeAudioMode(ambientSoundControl, ancMode, noiseCancellingLevel, windNoiseReduction);
+                return command != null ? command : super.encodeSendConfiguration(config);
+            default:
+                return super.encodeSendConfiguration(config);
         }
-        return devEvts.toArray(new GBDeviceEvent[devEvts.size()]);
     }
 
     /**
@@ -124,61 +132,6 @@ public class SoundcoreA30iProtocol extends SoundcoreProtocolImplV1 {
             case 0x02 -> AmbientSoundMode.OFF;
             default -> null;
         };
-    }
-
-    /**
-     * It calculates the Battery Level for both In-Ear speaker.
-     */
-    private void handleBatteryInfo(List<GBDeviceEvent> devEvts, byte batteryLeft, byte batteryRight) {
-        int batteryLeftLevel = (batteryLeft + 1) * 10;
-        int batteryRightLevel = (batteryRight + 1) * 10;
-        devEvts.add(buildBatteryInfo(battery_earphone_left, batteryLeftLevel));
-        devEvts.add(buildBatteryInfo(battery_earphone_right, batteryRightLevel));
-    }
-
-    @Nullable
-    @Override
-    public byte[] encodeSendConfiguration(String config) {
-        Prefs prefs = getDevicePrefs();
-
-        switch (config) {
-            // Control
-            case DeviceSettingsPreferenceConst.PREF_SOUNDCORE_TOUCH_TONE:
-                // It enables/disables the sound if the user touches the device button.
-                final boolean touchTone = prefs.getBoolean(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_TOUCH_TONE, false);
-                return encodeBooleanCommand(CMD_SET_TOUCH_TONE, touchTone);
-
-            case DeviceSettingsPreferenceConst.PREF_SOUNDCORE_3D_SURROUND:
-                // It enables/disables the 3D-surround sound.
-                final boolean surround3d = prefs.getBoolean(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_3D_SURROUND, false);
-                return encodeBooleanCommand(CMD_SET_3D_SURROUND, surround3d);
-
-            case DeviceSettingsPreferenceConst.PREF_SOUNDCORE_BATTERY_LOW_TONE:
-                // It enables/disables the low battery tone of the device at 20% and 10%.
-                final boolean low_battery = prefs.getBoolean(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_BATTERY_LOW_TONE, false);
-                return encodeBooleanCommand(CMD_SET_BATTERY_LOW_TONE, low_battery);
-
-            case DeviceSettingsPreferenceConst.PREF_SOUNDCORE_ANC_MODE, DeviceSettingsPreferenceConst.PREF_SOUNDCORE_AMBIENT_SOUND_CONTROL,
-                 DeviceSettingsPreferenceConst.PREF_SONY_AMBIENT_SOUND_LEVEL, DeviceSettingsPreferenceConst.PREF_SOUNDCORE_WIND_NOISE_REDUCTION:
-                // It sets the ANC mode. It always sends the same command (with different values),
-                // independent of which part of the ANC setting was changed.
-                final AmbientSoundMode ambientSoundControl = AmbientSoundMode.fromPreference(
-                        prefs.getString(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_AMBIENT_SOUND_CONTROL, AmbientSoundMode.OFF.toString()));
-                final AncMode ancMode = AncMode.fromPreference(
-                        prefs.getString(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_ANC_MODE, AncMode.TRANSPORT.toString()));
-                int noiseCancellingLevel = prefs.getInt(DeviceSettingsPreferenceConst.PREF_SONY_AMBIENT_SOUND_LEVEL, 0);
-                boolean wind_noise_reduction = prefs.getBoolean(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_WIND_NOISE_REDUCTION, false);
-
-                byte[] audioModeCommand = encodeAudioMode(ambientSoundControl, ancMode, noiseCancellingLevel, wind_noise_reduction);
-                if (audioModeCommand != null) {
-                    return audioModeCommand;
-                }
-                return super.encodeSendConfiguration(config);
-
-            default:
-                LOG.debug("Unsupported CONFIG: " + config);
-        }
-        return super.encodeSendConfiguration(config);
     }
 
     /**
@@ -226,17 +179,5 @@ public class SoundcoreA30iProtocol extends SoundcoreProtocolImplV1 {
 
         buf.put(ancMode.toByte());
         return encodeCommand(CMD_SET_AUDIO_MODE, buf.array());
-    }
-
-
-    /** Sent after CMD_GET_DEVICE_INFO, to finalise the session with the device. */
-    public byte[] encodeSessionInitRequest() {
-        return encodeRequest(CMD_SESSION_INIT);
-    }
-
-    /** Request more device info during init; currently not used because
-     * it is unclear which additional information are in the returned message. */
-    public byte[] encodeSessionInitMoreInfoRequest() {
-        return encodeRequest(CMD_GET_EXTENDED_INFO);
     }
 }

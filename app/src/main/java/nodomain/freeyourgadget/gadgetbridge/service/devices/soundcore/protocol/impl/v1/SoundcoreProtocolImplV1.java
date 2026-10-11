@@ -306,7 +306,7 @@ public abstract class SoundcoreProtocolImplV1 extends AbstractSoundcoreProtocol 
 
     /**
      * Decodes the common left/right[/case] battery notification layout. Protocols only need to
-     * override the multiplier and offset when their wire encoding differs from the defaults.
+     * override the multiplier, offset, or battery indexes when their layout differs.
      */
     protected GBDeviceEvent[] decodeBatteryInfo(final byte[] payload) {
         if (payload == null || payload.length < 2) {
@@ -345,9 +345,7 @@ public abstract class SoundcoreProtocolImplV1 extends AbstractSoundcoreProtocol 
             return new GBDeviceEvent[0];
         }
 
-        final int[] batteryIndexes = payload.length >= 3
-                ? new int[]{battery_earphone_left, battery_earphone_right, battery_case}
-                : new int[]{battery_earphone_left, battery_earphone_right};
+        final int[] batteryIndexes = getBatteryIndexes(payload.length);
         final GBDeviceEvent[] events = new GBDeviceEvent[batteryIndexes.length];
         for (int index = 0; index < batteryIndexes.length; index++) {
             events[index] = buildBatteryInfo(
@@ -356,6 +354,13 @@ public abstract class SoundcoreProtocolImplV1 extends AbstractSoundcoreProtocol 
             );
         }
         return events;
+    }
+
+    /** Maps the available battery bytes to device slots, ignoring unrelated trailing data. */
+    protected int[] getBatteryIndexes(final int payloadLength) {
+        return payloadLength >= 3
+                ? new int[]{battery_earphone_left, battery_earphone_right, battery_case}
+                : new int[]{battery_earphone_left, battery_earphone_right};
     }
 
     /** Builds a battery event for devices, such as Q30, with one battery value. */
