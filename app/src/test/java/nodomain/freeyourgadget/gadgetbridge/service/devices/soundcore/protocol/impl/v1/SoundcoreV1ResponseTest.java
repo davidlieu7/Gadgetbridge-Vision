@@ -12,7 +12,7 @@ import org.junit.Test;
 import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEvent;
 import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEventBatteryInfo;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
-import nodomain.freeyourgadget.gadgetbridge.service.devices.soundcore.devices.SoundcoreAeroFitProtocol;
+import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreAeroFit2Coordinator;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.soundcore.devices.SoundcoreLibertyProtocol;
 
 public class SoundcoreV1ResponseTest {
@@ -145,12 +145,14 @@ public class SoundcoreV1ResponseTest {
 
     @Test
     public void aeroFitKeepsItsOneBasedTenPercentBatteryEncoding() {
-        final TestAeroFitProtocol protocol = new TestAeroFitProtocol();
+        final GBDevice device = org.mockito.Mockito.mock(GBDevice.class);
+        org.mockito.Mockito.when(device.getDeviceCoordinator()).thenReturn(new SoundcoreAeroFit2Coordinator());
+        final SoundcoreProtocolImplV1 protocol = new SoundcoreAeroFit2Coordinator().createProtocol(device);
         final byte[] info = new byte[30];
         info[2] = 0;
         info[3] = 9;
-        putAscii(info, 4, "1.001");
-        putAscii(info, 9, "2.002");
+        putAscii(info, 4, "12.34");
+        putAscii(info, 9, "56.78");
         putAscii(info, 14, "1234567890123456");
 
         final GBDeviceEvent[] events = protocol.decodeResponse(
@@ -213,9 +215,4 @@ public class SoundcoreV1ResponseTest {
         }
     }
 
-    private static final class TestAeroFitProtocol extends SoundcoreAeroFitProtocol {
-        private TestAeroFitProtocol() {
-            super((GBDevice) null);
-        }
-    }
 }

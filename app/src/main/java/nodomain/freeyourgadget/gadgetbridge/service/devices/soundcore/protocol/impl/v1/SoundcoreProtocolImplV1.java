@@ -38,7 +38,7 @@ import nodomain.freeyourgadget.gadgetbridge.service.devices.soundcore.SoundcoreP
 import nodomain.freeyourgadget.gadgetbridge.util.GB;
 import nodomain.freeyourgadget.gadgetbridge.util.Prefs;
 
-public abstract class SoundcoreProtocolImplV1 extends AbstractSoundcoreProtocol {
+public class SoundcoreProtocolImplV1 extends AbstractSoundcoreProtocol {
     private static final Logger LOG = LoggerFactory.getLogger(SoundcoreProtocolImplV1.class);
 
     public static final short CMD_GET_DEVICE_INFO = (short) 0x0101;
@@ -91,7 +91,7 @@ public abstract class SoundcoreProtocolImplV1 extends AbstractSoundcoreProtocol 
     public static final int battery_earphone_left = 1;
     public static final int battery_earphone_right = 2;
 
-    protected SoundcoreProtocolImplV1(final GBDevice device) {
+    public SoundcoreProtocolImplV1(final GBDevice device) {
         super(device);
     }
 

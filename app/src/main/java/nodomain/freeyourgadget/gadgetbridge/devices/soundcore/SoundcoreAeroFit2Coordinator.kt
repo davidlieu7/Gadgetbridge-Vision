@@ -19,7 +19,6 @@ package nodomain.freeyourgadget.gadgetbridge.devices.soundcore
 import nodomain.freeyourgadget.gadgetbridge.R
 import nodomain.freeyourgadget.gadgetbridge.devices.DeviceCoordinator
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice
-import nodomain.freeyourgadget.gadgetbridge.service.devices.soundcore.devices.SoundcoreAeroFitProtocol
 import java.util.regex.Pattern
 
 class SoundcoreAeroFit2Coordinator : SoundcoreEarbudsCoordinator() {
@@ -42,9 +41,6 @@ class SoundcoreAeroFit2Coordinator : SoundcoreEarbudsCoordinator() {
         Capability.TouchTone,
         Capability.BatteryLowTone,
     )
-
-    override fun createProtocol(device: GBDevice): SoundcoreAeroFitProtocol =
-        SoundcoreAeroFitProtocol(device)
 
     override fun getBatteryProperties(): BatteryProperties = BatteryProperties(multiplier = 10, offset = 1)
 

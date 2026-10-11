@@ -185,7 +185,7 @@ abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator(
 
     /** Creates the protocol implementation for this model. */
     open fun createProtocol(device: GBDevice): SoundcoreProtocolImplV1 =
-        throw UnsupportedOperationException("Soundcore coordinator must provide its protocol factory")
+        SoundcoreProtocolImplV1(device)
 
     /** Overrides the model-derived control service for devices using a different service. */
     open fun getServiceUUID(): UUID? = null
