@@ -3,9 +3,6 @@ package nodomain.freeyourgadget.gadgetbridge.service.devices.soundcore.a30i;
 import androidx.annotation.Nullable;
 
 import java.nio.ByteBuffer;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.List;
 
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsPreferenceConst;
 import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreEarbudsCoordinator.AncMode;
@@ -19,6 +16,7 @@ public class SoundcoreA30iProtocol extends SoundcoreProtocolImplV1 {
 
     private static final int battery_earphone_left = 0;
     private static final int battery_earphone_right = 1;
+    private static final byte[] NOISE_CANCELLING_LEVEL_BYTES = {0x15, 0x25, 0x35, 0x45, 0x51};
 
     public SoundcoreA30iProtocol(GBDevice device) {
         super(device);
@@ -29,17 +27,6 @@ public class SoundcoreA30iProtocol extends SoundcoreProtocolImplV1 {
         if (payload == null || payload.length < 78) {
             return new GBDeviceEvent[0];
         }
-
-        final List<GBDeviceEvent> devEvts = new ArrayList<>();
-
-        // Firmware Version and Serial Number
-        String firmware1 = readString(payload, 6, 5);
-        String firmware2 = readString(payload, 11, 5);
-        String serialNumber = readString(payload, 16, 16);
-        devEvts.add(buildVersionInfo(firmware1, firmware2, serialNumber));
-
-        // Battery Info
-        Collections.addAll(devEvts, decodeBatteryInfo(new byte[]{payload[2], payload[3]}));
 
         //-------------------------------------------------------------------------
         // Active Noise Cancelling [63 to 70 (7 bytes)]
@@ -67,7 +54,7 @@ public class SoundcoreA30iProtocol extends SoundcoreProtocolImplV1 {
                 .putString(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_AUTO_POWER_OFF, String.valueOf(autoPowerDuration))
                 .apply();
 
-        return devEvts.toArray(new GBDeviceEvent[0]);
+        return decodeStandardEarbudDeviceInfo(payload);
     }
 
     @Override
@@ -106,15 +93,13 @@ public class SoundcoreA30iProtocol extends SoundcoreProtocolImplV1 {
     /**
      * It returns the current ANC level.
      */
-    private int getNoiseCancellingLevel(byte noise_level){
-        return switch (noise_level) {
-            case 0x51 -> 5;
-            case 0x45 -> 4;
-            case 0x35 -> 3;
-            case 0x25 -> 2;
-            case 0x15 -> 1;
-            default -> 1;
-        };
+    private int getNoiseCancellingLevel(final byte noiseLevel) {
+        for (int i = 0; i < NOISE_CANCELLING_LEVEL_BYTES.length; i++) {
+            if (NOISE_CANCELLING_LEVEL_BYTES[i] == noiseLevel) {
+                return i + 1;
+            }
+        }
+        return 1;
     }
 
     /**
@@ -151,16 +136,7 @@ public class SoundcoreA30iProtocol extends SoundcoreProtocolImplV1 {
 
         buf.put(mode);
 
-        switch (noiseCancellingLevel){
-            case 5 -> buf.put((byte) 0x51);
-            case 4 -> buf.put((byte) 0x45);
-            case 3 -> buf.put((byte) 0x35);
-            case 2 -> buf.put((byte) 0x25);
-            case 1 -> buf.put((byte) 0x15);
-            default -> {
-                return null;
-            }
-        }
+        buf.put(NOISE_CANCELLING_LEVEL_BYTES[noiseCancellingLevel - 1]);
 
         buf.put(mode); // Probably a duplicated value cached from before.
 
