@@ -549,6 +549,9 @@ public class XiaomiSleepAsAndroidWorkoutTest extends TestBase {
         ageTheStoredSession(13 * 60 * 60_000L);
 
         openSession(true);
+        // The session start is wall-clock time, which idle() does not advance, so without this the
+        // replacement start and the stop can fall in the same millisecond and record no window.
+        ageTheStoredSession(1_000L);
         health.getSleepAsAndroidManager().stop();
         idle(OPEN_DELAY_MS);
 
