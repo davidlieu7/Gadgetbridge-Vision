@@ -77,6 +77,7 @@ import nodomain.freeyourgadget.gadgetbridge.service.devices.huami.zeppos.service
 import nodomain.freeyourgadget.gadgetbridge.service.devices.huami.zeppos.services.ZeppOsPhoneService;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.huami.zeppos.services.ZeppOsRemindersService;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.huami.zeppos.services.ZeppOsShortcutCardsService;
+import nodomain.freeyourgadget.gadgetbridge.service.devices.huami.zeppos.services.ZeppOsTodoService;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.huami.zeppos.services.filetransfer.ZeppOsFileTransferImpl;
 import nodomain.freeyourgadget.gadgetbridge.util.FileUtils;
 
@@ -329,7 +330,38 @@ public abstract class ZeppOsCoordinator extends HuamiCoordinator {
 
     @Override
     public int getReminderSlotCount(final GBDevice device) {
+        if (ZeppOsTodoService.usesTodoService(getPrefs(device))) {
+            return ZeppOsTodoService.getSlotCount(getPrefs(device));
+        }
         return ZeppOsRemindersService.getSlotCount(getPrefs(device));
+    }
+
+    @Override
+    public int getMaximumReminderMessageLength(@NonNull final GBDevice device) {
+        return ZeppOsTodoService.usesTodoService(getPrefs(device))
+                ? ZeppOsTodoService.MAX_TEXT_BYTES : getMaximumReminderMessageLength();
+    }
+
+    @Override
+    public int getMaximumReminderMessageBytes(@NonNull final GBDevice device) {
+        return ZeppOsTodoService.usesTodoService(getPrefs(device))
+                ? ZeppOsTodoService.MAX_TEXT_BYTES : Integer.MAX_VALUE;
+    }
+
+    @Override
+    public boolean getReminderMessageRequired(@NonNull final GBDevice device) {
+        return ZeppOsTodoService.usesTodoService(getPrefs(device));
+    }
+
+    @Override
+    public boolean getRemindersLimitToDeviceCapacity(@NonNull final GBDevice device) {
+        return !ZeppOsTodoService.usesTodoService(getPrefs(device));
+    }
+
+    @Override
+    public boolean getReserveReminderSlotsForCalendar(@NonNull final GBDevice device) {
+        // Calendar events use endpoint 0x0007, not To-do capacity.
+        return !ZeppOsTodoService.usesTodoService(getPrefs(device)) && getReserveReminderSlotsForCalendar();
     }
 
     @Override

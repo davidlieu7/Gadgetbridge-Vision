@@ -659,37 +659,40 @@ public class DBHelper {
     }
 
     /**
-     * Returns all user-configurable reminders for the given user and device. The list is sorted by
+     * Returns user-configurable reminders for the given user and device. The list is sorted by
      * {@link Reminder#getDate}. Calendar events that may also be modeled as reminders are not stored
      * in the database and hence not returned by this method.
-     * @param gbDevice the device for which the alarms shall be loaded
+     * @param gbDevice the device for which reminders shall be loaded
      * @return the list of reminders for the given device
      */
     @NonNull
     public static List<Reminder> getReminders(@NonNull GBDevice gbDevice) {
-        final DeviceCoordinator coordinator = gbDevice.getDeviceCoordinator();
-
-        final int reservedSlots = GBApplication.getDevicePrefs(gbDevice).getReservedReminderCalendarSlots();
-        final int reminderSlots = coordinator.getReminderSlotCount(gbDevice);
-
         try (DBHandler db = GBApplication.acquireDB()) {
-            final DaoSession daoSession = db.getDaoSession();
-            final User user = getUser(daoSession);
-            final Device dbDevice = DBHelper.findDevice(gbDevice, daoSession);
-            if (dbDevice != null) {
-                final ReminderDao reminderDao = daoSession.getReminderDao();
-                final Long deviceId = dbDevice.getId();
-                final QueryBuilder<Reminder> qb = reminderDao.queryBuilder();
-                qb.where(
-                        ReminderDao.Properties.UserId.eq(user.getId()),
-                        ReminderDao.Properties.DeviceId.eq(deviceId)).orderAsc(ReminderDao.Properties.Date).limit(reminderSlots - reservedSlots);
-                return qb.build().list();
-            }
+            return getReminders(gbDevice, db.getDaoSession());
         } catch (final Exception e) {
             LOG.error("Error reading reminders from db", e);
+            return Collections.emptyList();
         }
+    }
 
-        return Collections.emptyList();
+    /** Reads saved reminders without converting database failures into an empty list. */
+    @NonNull
+    public static List<Reminder> getReminders(@NonNull final GBDevice gbDevice, @NonNull final DaoSession daoSession) {
+        final DeviceCoordinator coordinator = gbDevice.getDeviceCoordinator();
+        final int reservedSlots = GBApplication.getDevicePrefs(gbDevice).getReservedReminderCalendarSlots();
+        final int reminderSlots = coordinator.getReminderSlotCount(gbDevice);
+        final User user = getUser(daoSession);
+        final Device dbDevice = DBHelper.findDevice(gbDevice, daoSession);
+        if (dbDevice == null) {
+            throw new IllegalStateException("Device is missing from the reminder database");
+        }
+        final QueryBuilder<Reminder> qb = daoSession.getReminderDao().queryBuilder();
+        qb.where(ReminderDao.Properties.UserId.eq(user.getId()),
+                ReminderDao.Properties.DeviceId.eq(dbDevice.getId())).orderAsc(ReminderDao.Properties.Date);
+        if (coordinator.getRemindersLimitToDeviceCapacity(gbDevice)) {
+            qb.limit(reminderSlots - reservedSlots);
+        }
+        return qb.build().list();
     }
 
     @NonNull

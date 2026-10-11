@@ -53,6 +53,7 @@ import nodomain.freeyourgadget.gadgetbridge.entities.Reminder;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
 import nodomain.freeyourgadget.gadgetbridge.util.DateTimeUtils;
 import nodomain.freeyourgadget.gadgetbridge.util.GB;
+import nodomain.freeyourgadget.gadgetbridge.util.Utf8ByteLengthFilter;
 
 public class ReminderDetails extends AbstractGBActivity {
     private Reminder reminder;
@@ -138,7 +139,10 @@ public class ReminderDetails extends AbstractGBActivity {
             cardTime.setVisibility(View.GONE);
         }
 
-        reminderText.setFilters(new InputFilter[]{new InputFilter.LengthFilter(coordinator.getMaximumReminderMessageLength())});
+        reminderText.setFilters(new InputFilter[]{
+                new InputFilter.LengthFilter(coordinator.getMaximumReminderMessageLength(device)),
+                new Utf8ByteLengthFilter(coordinator.getMaximumReminderMessageBytes(device))
+        });
         reminderText.addTextChangedListener(new TextWatcher() {
             @Override
             public void beforeTextChanged(final CharSequence s, int start, int count, int after) {
@@ -158,6 +162,10 @@ public class ReminderDetails extends AbstractGBActivity {
         fab.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View view) {
+                if (coordinator.getReminderMessageRequired(device) && reminderText.length() == 0) {
+                    reminderText.setError(getString(R.string.subtitle_list_custom_value_required));
+                    return;
+                }
                 updateReminder();
                 ReminderDetails.this.setResult(1);
                 finish();

@@ -900,6 +900,24 @@ public interface DeviceCoordinator {
      */
     int getMaximumReminderMessageLength();
 
+    default int getMaximumReminderMessageLength(@NonNull final GBDevice device) {
+        return getMaximumReminderMessageLength();
+    }
+
+    /** Optional UTF-8 byte limit, in addition to the character limit. */
+    default int getMaximumReminderMessageBytes(@NonNull final GBDevice device) {
+        return Integer.MAX_VALUE;
+    }
+
+    default boolean getReminderMessageRequired(@NonNull final GBDevice device) {
+        return false;
+    }
+
+    /** Whether saved reminders outside the current device capacity should be hidden. */
+    default boolean getRemindersLimitToDeviceCapacity(@NonNull final GBDevice device) {
+        return true;
+    }
+
     /**
      * Indicates the maximum number of reminder slots available in the device.
      */
@@ -914,6 +932,10 @@ public interface DeviceCoordinator {
      * Indicates whether some reminder slots are used for calendar events.
      */
     boolean getReserveReminderSlotsForCalendar();
+
+    default boolean getReserveReminderSlotsForCalendar(@NonNull final GBDevice device) {
+        return getReserveReminderSlotsForCalendar();
+    }
 
     /**
      * Indicates the maximum number of canned replies available in the device.

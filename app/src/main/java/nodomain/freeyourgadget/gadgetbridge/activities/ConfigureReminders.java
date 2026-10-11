@@ -37,6 +37,7 @@ import com.google.android.material.floatingactionbutton.FloatingActionButton;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.TimeZone;
 import java.util.List;
@@ -203,7 +204,11 @@ public class ConfigureReminders extends AbstractGBActivity {
 
     private void sendRemindersToDevice() {
         if (gbDevice.isInitialized()) {
-            GBApplication.deviceService(gbDevice).onSetReminders(mGBReminderListAdapter.getReminderList());
+            try (DBHandler db = GBApplication.acquireDB()) {
+                GBApplication.deviceService(gbDevice).onSetReminders(new ArrayList<>(DBHelper.getReminders(gbDevice, db.getDaoSession())));
+            } catch (final Exception e) {
+                LOG.error("Unable to read reminders for synchronization", e);
+            }
         }
     }
 }

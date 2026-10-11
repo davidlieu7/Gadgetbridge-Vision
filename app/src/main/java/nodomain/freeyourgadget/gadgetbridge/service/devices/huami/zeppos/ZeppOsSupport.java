@@ -62,6 +62,7 @@ import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEventAppInfo;
 import nodomain.freeyourgadget.gadgetbridge.capabilities.loyaltycards.LoyaltyCard;
 import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEventDisplayMessage;
 import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEventScreenshot;
+import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEventUpdatePreferences;
 import nodomain.freeyourgadget.gadgetbridge.devices.huami.zeppos.ZeppOsMapsInstallHandler;
 import nodomain.freeyourgadget.gadgetbridge.devices.huami.zeppos.ZeppOsMusicInstallHandler;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
@@ -123,6 +124,7 @@ import nodomain.freeyourgadget.gadgetbridge.service.devices.huami.zeppos.service
 import nodomain.freeyourgadget.gadgetbridge.service.devices.huami.zeppos.services.ZeppOsMusicService;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.huami.zeppos.services.ZeppOsNotificationService;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.huami.zeppos.services.ZeppOsRemindersService;
+import nodomain.freeyourgadget.gadgetbridge.service.devices.huami.zeppos.services.ZeppOsTodoService;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.huami.zeppos.services.ZeppOsServicesService;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.huami.zeppos.services.ZeppOsShortcutCardsService;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.huami.zeppos.services.ZeppOsConfigService;
@@ -198,6 +200,7 @@ public class ZeppOsSupport extends AbstractBluetoothDeviceSupport
     private final ZeppOsDisplayItemsService displayItemsService = new ZeppOsDisplayItemsService(this);
     private final ZeppOsHttpService httpService = new ZeppOsHttpService(this, fileTransferService);
     private final ZeppOsRemindersService remindersService = new ZeppOsRemindersService(this);
+    private final ZeppOsTodoService todoService = new ZeppOsTodoService(this);
     private final ZeppOsLoyaltyCardService loyaltyCardService = new ZeppOsLoyaltyCardService(this);
     private final ZeppOsVoiceMemosService voiceMemosService = new ZeppOsVoiceMemosService(this);
     private final ZeppOsMapsService mapsService = new ZeppOsMapsService(this, httpService);
@@ -244,6 +247,7 @@ public class ZeppOsSupport extends AbstractBluetoothDeviceSupport
         put(displayItemsService.getEndpoint(), displayItemsService);
         put(httpService.getEndpoint(), httpService);
         put(remindersService.getEndpoint(), remindersService);
+        put(todoService.getEndpoint(), todoService);
         put(loyaltyCardService.getEndpoint(), loyaltyCardService);
         put(musicService.getEndpoint(), musicService);
         put(voiceMemosService.getEndpoint(), voiceMemosService);
@@ -472,7 +476,25 @@ public class ZeppOsSupport extends AbstractBluetoothDeviceSupport
     @Override
     public void onSetReminders(final ArrayList<? extends Reminder> reminders) {
         final ZeppOsTransactionBuilder builder = createZeppOsTransactionBuilder("onSetReminders");
-        remindersService.sendReminders(builder, reminders);
+        if (useTodoReminders()) {
+            todoService.sendReminders(builder, reminders);
+        } else {
+            remindersService.sendReminders(builder, reminders);
+        }
+        builder.queue();
+    }
+
+    private boolean useTodoReminders() {
+        return mSupportedServices.contains(todoService.getEndpoint())
+                && !(todoService.hasUnsupportedVersion() && mSupportedServices.contains(remindersService.getEndpoint()));
+    }
+
+    public void onTodoCapabilitiesUnsupported() {
+        if (!mSupportedServices.contains(remindersService.getEndpoint())) { return; }
+        evaluateGBDeviceEvent(new GBDeviceEventUpdatePreferences(ZeppOsTodoService.PREF_VERSION, 0));
+        evaluateGBDeviceEvent(new GBDeviceEventUpdatePreferences(ZeppOsTodoService.PREF_SLOT_COUNT, 0));
+        final ZeppOsTransactionBuilder builder = createZeppOsTransactionBuilder("initialize legacy reminders");
+        remindersService.initialize(builder);
         builder.queue();
     }
 
@@ -968,6 +990,10 @@ public class ZeppOsSupport extends AbstractBluetoothDeviceSupport
         LOG.info("2021 initializeServices...");
 
         final ZeppOsTransactionBuilder builder = createZeppOsTransactionBuilder("initialize services");
+        if (!mSupportedServices.contains(todoService.getEndpoint())) {
+            evaluateGBDeviceEvent(new GBDeviceEventUpdatePreferences(ZeppOsTodoService.PREF_VERSION, 0));
+            evaluateGBDeviceEvent(new GBDeviceEventUpdatePreferences(ZeppOsTodoService.PREF_SLOT_COUNT, 0));
+        }
 
         // At this point we got the service list from phase 3, so we know which
         // services are supported, and whether they are encrypted or not
@@ -987,6 +1013,10 @@ public class ZeppOsSupport extends AbstractBluetoothDeviceSupport
 
         for (AbstractZeppOsService service : mServiceMap.values()) {
             if (mSupportedServices.contains(service.getEndpoint())) {
+                if (service == remindersService && mSupportedServices.contains(todoService.getEndpoint())) {
+                    // Both endpoints may be advertised; only the selected reminder protocol may sync.
+                    continue;
+                }
                 // Only initialize supported services
                 service.initialize(builder);
             }
@@ -1213,6 +1243,9 @@ public class ZeppOsSupport extends AbstractBluetoothDeviceSupport
         }
 
         final AbstractZeppOsService service = mServiceMap.get(type);
+        if (service == remindersService && useTodoReminders()) {
+            return;
+        }
         if (service != null) {
             service.handlePayload(payload);
             return;

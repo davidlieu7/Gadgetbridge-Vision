@@ -114,7 +114,7 @@ public class DevicePrefs extends Prefs {
     }
 
     public int getReservedReminderCalendarSlots() {
-        if (!gbDevice.getDeviceCoordinator().getReserveReminderSlotsForCalendar())
+        if (!gbDevice.getDeviceCoordinator().getReserveReminderSlotsForCalendar(gbDevice))
             return 0;
         if (!getBoolean(DeviceSettingsPreferenceConst.PREF_SYNC_CALENDAR, false))
             return 0;
