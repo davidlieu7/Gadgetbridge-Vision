@@ -100,36 +100,24 @@ public class CasioGGB100DeviceSupport extends Casio2C2DSupport
     // ── Write helpers ─────────────────────────────────────────────────────────
 
     private void req(byte feat) {
-        try {
-            TransactionBuilder b = createTransactionBuilder("req_" + String.format("%02x", feat));
-            b.setCallback(this);
-            writeAllFeaturesRequest(b, new byte[]{feat});
-            b.queueImmediately();
-        } catch (IOException e) {
-            LOG.error("req failed: {}", e.getMessage());
-        }
+        TransactionBuilder b = createTransactionBuilder("req_" + String.format("%02x", feat));
+        b.setCallback(this);
+        writeAllFeaturesRequest(b, new byte[]{feat});
+        b.queue();
     }
 
     private void req(byte feat, byte slot) {
-        try {
-            TransactionBuilder b = createTransactionBuilder("req_" + String.format("%02x", feat));
-            b.setCallback(this);
-            writeAllFeaturesRequest(b, new byte[]{feat, slot});
-            b.queueImmediately();
-        } catch (IOException e) {
-            LOG.error("req slot failed: {}", e.getMessage());
-        }
+        TransactionBuilder b = createTransactionBuilder("req_" + String.format("%02x", feat));
+        b.setCallback(this);
+        writeAllFeaturesRequest(b, new byte[]{feat, slot});
+        b.queue();
     }
 
     private void write(byte[] data) {
-        try {
-            TransactionBuilder b = createTransactionBuilder("write_" + String.format("%02x", data[0]));
-            b.setCallback(this);
-            writeAllFeatures(b, data);
-            b.queueImmediately();
-        } catch (IOException e) {
-            LOG.error("write failed: {}", e.getMessage());
-        }
+        TransactionBuilder b = createTransactionBuilder("write_" + String.format("%02x", data[0]));
+        b.setCallback(this);
+        writeAllFeatures(b, data);
+        b.queue();
     }
 
     // ── App information ──────────────────────────────────────────────────────
