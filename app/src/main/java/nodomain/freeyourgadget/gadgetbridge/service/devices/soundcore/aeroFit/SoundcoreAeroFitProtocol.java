@@ -58,15 +58,4 @@ public class SoundcoreAeroFitProtocol extends SoundcoreProtocolImplV1 {
         return BATTERY_OFFSET;
     }
 
-    @Override
-    protected GBDeviceEvent[] decodeChargingInfo(final byte[] payload) {
-        if (payload.length < 2) {
-            LOG.warn("CMD_NOTIFY_CHARGING_INFO payload too short: {} bytes", payload.length);
-            return new GBDeviceEvent[0];
-        }
-
-        LOG.info("Left Earbud in Charging Case: {}, Right Earbud in Charging Case: {}",
-                payload[0] == 0x01, payload[1] == 0x01);
-        return new GBDeviceEvent[0];
-    }
 }

@@ -27,10 +27,12 @@ import java.util.Arrays;
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsPreferenceConst;
 import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreEarbudsCoordinator.AmbientSoundMode;
 import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEvent;
+import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEventBatteryInfo;
 import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreEarbudsCoordinator.ButtonAction;
 import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreEarbudsCoordinator.TapFunction;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
 import nodomain.freeyourgadget.gadgetbridge.model.FindDeviceTarget;
+import nodomain.freeyourgadget.gadgetbridge.model.BatteryState;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.soundcore.AbstractSoundcoreProtocol;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.soundcore.SoundcorePacket;
 import nodomain.freeyourgadget.gadgetbridge.util.GB;
@@ -387,9 +389,33 @@ public abstract class SoundcoreProtocolImplV1 extends AbstractSoundcoreProtocol 
         return handleBatteryInfo(battery, batteryIndex, DEFAULT_BATTERY_MULTIPLIER);
     }
 
-    /** Hook for the device-specific CMD_NOTIFY_CHARGING_INFO payload layout. */
+    /** Decodes the two earbud flags; trailing bytes do not describe a case battery here. */
     protected GBDeviceEvent[] decodeChargingInfo(final byte[] payload) {
-        return new GBDeviceEvent[0];
+        if (payload == null || payload.length < 2) {
+            LOG.warn("CMD_NOTIFY_CHARGING_INFO payload too short: {} bytes", payload == null ? 0 : payload.length);
+            return new GBDeviceEvent[0];
+        }
+
+        LOG.info("Left Earbud in Charging Case: {}, Right Earbud in Charging Case: {}",
+                payload[0] == 0x01, payload[1] == 0x01);
+
+        final int[] batteryIndexes = getBatteryIndexes(2);
+        final List<GBDeviceEvent> events = new ArrayList<>(2);
+        for (int index = 0; index < 2; index++) {
+            if (payload[index] != 0x00 && payload[index] != 0x01) {
+                LOG.warn("Unknown charging flag for earbud {}: {}", index, payload[index] & 0xff);
+                continue;
+            }
+
+            final int batteryIndex = batteryIndexes[index];
+            final GBDeviceEventBatteryInfo batteryInfo = buildBatteryInfo(
+                    batteryIndex, getDevice().getBatteryLevel(batteryIndex));
+            batteryInfo.voltage = getDevice().getBatteryVoltage(batteryIndex);
+            batteryInfo.state = payload[index] == 0x01
+                    ? BatteryState.BATTERY_CHARGING : BatteryState.BATTERY_NORMAL;
+            events.add(batteryInfo);
+        }
+        return events.toArray(new GBDeviceEvent[0]);
     }
 
     /** Hook for the device-specific CMD_NOTIFY_PAIRED_DEVICES payload layout. */
