@@ -20,7 +20,7 @@ import nodomain.freeyourgadget.gadgetbridge.activities.multipoint.MultipointDevi
 import nodomain.freeyourgadget.gadgetbridge.activities.multipoint.MultipointPairingActivity;
 import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEvent;
 import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreEarbudsCoordinator;
-import nodomain.freeyourgadget.gadgetbridge.devices.sony.headphones.prefs.AmbientSoundControlButtonMode;
+import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreEarbudsCoordinator.TapFunction;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.soundcore.protocol.impl.v1.SoundcoreProtocolImplV1;
 import nodomain.freeyourgadget.gadgetbridge.util.GB;
@@ -332,60 +332,15 @@ public class SoundcoreSportX20Protocol extends SoundcoreProtocolImplV1 {
     }
 
     @Override
-    public byte[] encodeSendConfiguration(final String config) {
-        final Prefs prefs = getDevicePrefs();
-        String prefString;
+    protected byte[] encodeEqualizerPresetConfiguration(final String config, final Prefs prefs) {
+        return encodeAdditionalConfiguration(config);
+    }
 
+    @Override
+    protected byte[] encodeAdditionalConfiguration(final String config) {
         switch (config) {
-            case DeviceSettingsPreferenceConst.PREF_SOUNDCORE_AMBIENT_SOUND_CONTROL:
-            case DeviceSettingsPreferenceConst.PREF_SOUNDCORE_WIND_NOISE_REDUCTION:
-            case DeviceSettingsPreferenceConst.PREF_SOUNDCORE_TRANSPARENCY_VOCAL_MODE:
-            case DeviceSettingsPreferenceConst.PREF_SOUNDCORE_ADAPTIVE_NOISE_CANCELLING:
-            case DeviceSettingsPreferenceConst.PREF_SONY_AMBIENT_SOUND_LEVEL:
-                return encodeAdvancedAudioMode(false);
-
-            case DeviceSettingsPreferenceConst.PREF_SOUNDCORE_CONTROL_SINGLE_TAP_ACTION_LEFT:
-                prefString = prefs.getString(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_CONTROL_SINGLE_TAP_ACTION_LEFT, "PLAYPAUSE");
-                return encodeControlFunction(TapAction.SINGLE_TAP, false, TapFunction.valueOf(prefString));
-            case DeviceSettingsPreferenceConst.PREF_SOUNDCORE_CONTROL_SINGLE_TAP_ACTION_RIGHT:
-                prefString = prefs.getString(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_CONTROL_SINGLE_TAP_ACTION_RIGHT, "PLAYPAUSE");
-                return encodeControlFunction(TapAction.SINGLE_TAP, true, TapFunction.valueOf(prefString));
-
-            case DeviceSettingsPreferenceConst.PREF_SOUNDCORE_CONTROL_DOUBLE_TAP_ACTION_LEFT:
-                prefString = prefs.getString(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_CONTROL_DOUBLE_TAP_ACTION_LEFT, "MEDIA_PREV");
-                return encodeControlFunction(TapAction.DOUBLE_TAP, false, TapFunction.valueOf(prefString));
-            case DeviceSettingsPreferenceConst.PREF_SOUNDCORE_CONTROL_DOUBLE_TAP_ACTION_RIGHT:
-                prefString = prefs.getString(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_CONTROL_DOUBLE_TAP_ACTION_RIGHT, "MEDIA_NEXT");
-                return encodeControlFunction(TapAction.DOUBLE_TAP, true, TapFunction.valueOf(prefString));
-
-            case DeviceSettingsPreferenceConst.PREF_SOUNDCORE_CONTROL_LONG_PRESS_ACTION_LEFT:
-                prefString = prefs.getString(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_CONTROL_LONG_PRESS_ACTION_LEFT, "AMBIENT_SOUND_CONTROL");
-                return encodeControlFunction(TapAction.LONG_PRESS, false, TapFunction.valueOf(prefString));
-            case DeviceSettingsPreferenceConst.PREF_SOUNDCORE_CONTROL_LONG_PRESS_ACTION_RIGHT:
-                prefString = prefs.getString(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_CONTROL_LONG_PRESS_ACTION_RIGHT, "AMBIENT_SOUND_CONTROL");
-                return encodeControlFunction(TapAction.LONG_PRESS, true, TapFunction.valueOf(prefString));
-
-            case DeviceSettingsPreferenceConst.PREF_SONY_AMBIENT_SOUND_CONTROL_BUTTON_MODE:
-                switch (AmbientSoundControlButtonMode.fromPreferences(prefs.getPreferences())) {
-                    case NC_AS_OFF:
-                        return encodeControlAmbientMode(true, true, true);
-                    case NC_AS:
-                        return encodeControlAmbientMode(true, true, false);
-                    case NC_OFF:
-                        return encodeControlAmbientMode(true, false, true);
-                    case AS_OFF:
-                        return encodeControlAmbientMode(false, true, true);
-                }
-                return null;
-
-            case DeviceSettingsPreferenceConst.PREF_SOUNDCORE_TOUCH_TONE:
-                final boolean pressAlert = prefs.getBoolean(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_TOUCH_TONE, false);
-                return encodeBooleanCommand(CMD_SET_TOUCH_TONE, pressAlert);
-
             case DeviceSettingsPreferenceConst.PREF_SOUNDCORE_3D_SURROUND:
-                final boolean surround3d = prefs.getBoolean(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_3D_SURROUND, false);
-                return encodeBooleanCommand(CMD_SET_3D_SURROUND, surround3d);
-
+                return encodeBooleanCommand(CMD_SET_3D_SURROUND, getDevicePrefs().getBoolean(config, false));
             case DeviceSettingsPreferenceConst.PREF_SOUNDCORE_EQUALIZER_PRESET:
             case DeviceSettingsPreferenceConst.PREF_SOUNDCORE_EQUALIZER_BAND1_VALUE:
             case DeviceSettingsPreferenceConst.PREF_SOUNDCORE_EQUALIZER_BAND2_VALUE:
@@ -396,32 +351,11 @@ public class SoundcoreSportX20Protocol extends SoundcoreProtocolImplV1 {
             case DeviceSettingsPreferenceConst.PREF_SOUNDCORE_EQUALIZER_BAND7_VALUE:
             case DeviceSettingsPreferenceConst.PREF_SOUNDCORE_EQUALIZER_BAND8_VALUE:
                 return encodeEqualizer();
-
             case DeviceSettingsPreferenceConst.PREF_SOUNDCORE_FIT_TEST:
                 return encodeCommand(CMD_SET_FIT_TEST, new byte[]{0x0a});
-
             default:
-                return super.encodeSendConfiguration(config);
+                return super.encodeAdditionalConfiguration(config);
         }
-    }
-
-    private byte[] encodeControlFunction(final TapAction action, final boolean right, final TapFunction function) {
-        final byte functionByte;
-        switch (action) {
-            case SINGLE_TAP:
-                functionByte = (byte) (16 * 6 + function.getCode());
-                break;
-            case DOUBLE_TAP:
-                functionByte = (byte) (16 * 3 + function.getCode());
-                break;
-            case LONG_PRESS:
-                functionByte = (byte) (16 * 4 + function.getCode());
-                break;
-            default:
-                return null;
-        }
-
-        return encodeControlFunction(right, action.getCode(), functionByte);
     }
 
     private byte[] encodeEqualizer() {

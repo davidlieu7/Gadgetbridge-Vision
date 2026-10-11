@@ -11,11 +11,14 @@ import nodomain.freeyourgadget.gadgetbridge.GBApplication;
 import nodomain.freeyourgadget.gadgetbridge.activities.multipoint.MultipointDevice;
 import nodomain.freeyourgadget.gadgetbridge.activities.multipoint.MultipointPairingActivity;
 import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreEarbudsCoordinator;
+import nodomain.freeyourgadget.gadgetbridge.devices.sony.headphones.prefs.AmbientSoundControlButtonMode;
 
 import java.util.Arrays;
 
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsPreferenceConst;
 import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEvent;
+import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreEarbudsCoordinator.ButtonAction;
+import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreEarbudsCoordinator.TapFunction;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
 import nodomain.freeyourgadget.gadgetbridge.model.FindDeviceTarget;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.soundcore.AbstractSoundcoreProtocol;
@@ -82,6 +85,34 @@ public abstract class SoundcoreProtocolImplV1 extends AbstractSoundcoreProtocol 
     public byte[] encodeSendConfiguration(final String config) {
         final Prefs prefs = getDevicePrefs();
         switch (config) {
+            case DeviceSettingsPreferenceConst.PREF_SOUNDCORE_AMBIENT_SOUND_CONTROL:
+            case DeviceSettingsPreferenceConst.PREF_SOUNDCORE_WIND_NOISE_REDUCTION:
+            case DeviceSettingsPreferenceConst.PREF_SOUNDCORE_TRANSPARENCY_VOCAL_MODE:
+            case DeviceSettingsPreferenceConst.PREF_SOUNDCORE_ADAPTIVE_NOISE_CANCELLING:
+            case DeviceSettingsPreferenceConst.PREF_SONY_AMBIENT_SOUND_LEVEL:
+                return encodeAdvancedAudioMode(appendAdvancedAudioModeStateByte());
+            case DeviceSettingsPreferenceConst.PREF_SOUNDCORE_CONTROL_SINGLE_TAP_ACTION_LEFT:
+            case DeviceSettingsPreferenceConst.PREF_SOUNDCORE_CONTROL_SINGLE_TAP_ACTION_RIGHT:
+            case DeviceSettingsPreferenceConst.PREF_SOUNDCORE_CONTROL_DOUBLE_TAP_ACTION_LEFT:
+            case DeviceSettingsPreferenceConst.PREF_SOUNDCORE_CONTROL_DOUBLE_TAP_ACTION_RIGHT:
+            case DeviceSettingsPreferenceConst.PREF_SOUNDCORE_CONTROL_LONG_PRESS_ACTION_LEFT:
+            case DeviceSettingsPreferenceConst.PREF_SOUNDCORE_CONTROL_LONG_PRESS_ACTION_RIGHT:
+            case DeviceSettingsPreferenceConst.PREF_SOUNDCORE_CONTROL_TRIPLE_TAP_ACTION_LEFT:
+            case DeviceSettingsPreferenceConst.PREF_SOUNDCORE_CONTROL_TRIPLE_TAP_ACTION_RIGHT:
+                return encodeConfiguredTapFunction(config, prefs);
+            case DeviceSettingsPreferenceConst.PREF_SOUNDCORE_CONTROL_SINGLE_TAP_DISABLED:
+            case DeviceSettingsPreferenceConst.PREF_SOUNDCORE_CONTROL_DOUBLE_TAP_DISABLED:
+            case DeviceSettingsPreferenceConst.PREF_SOUNDCORE_CONTROL_TRIPLE_TAP_DISABLED:
+            case DeviceSettingsPreferenceConst.PREF_SOUNDCORE_CONTROL_LONG_PRESS_DISABLED:
+                return encodeConfiguredTapLock(config, prefs);
+            case DeviceSettingsPreferenceConst.PREF_SONY_AMBIENT_SOUND_CONTROL_BUTTON_MODE:
+                switch (AmbientSoundControlButtonMode.fromPreferences(prefs.getPreferences())) {
+                    case NC_AS_OFF: return encodeControlAmbientMode(true, true, true);
+                    case NC_AS: return encodeControlAmbientMode(true, true, false);
+                    case NC_OFF: return encodeControlAmbientMode(true, false, true);
+                    case AS_OFF: return encodeControlAmbientMode(false, true, true);
+                }
+                return null;
             case DeviceSettingsPreferenceConst.PREF_SOUNDCORE_CONTROL_TOUCH_DISABLED:
                 return encodeBooleanCommand(CMD_SET_TAP_CONTROLS_ENABLE, prefs.getBoolean(config, false));
             case DeviceSettingsPreferenceConst.PREF_SOUNDCORE_TOUCH_TONE:
@@ -101,9 +132,75 @@ public abstract class SoundcoreProtocolImplV1 extends AbstractSoundcoreProtocol 
             case DeviceSettingsPreferenceConst.PREF_SOUNDCORE_BUTTON_BRIGHTNESS:
                 return encodeByteCommand(CMD_SET_BUTTON_BRIGHTNESS, Integer.parseInt(prefs.getString(config, "0")));
             case DeviceSettingsPreferenceConst.PREF_SOUNDCORE_EQUALIZER_PRESET:
-                return encodeByteCommand(CMD_SET_EQUALIZER_PRESET, Integer.parseInt(prefs.getString(config, "0")));
+                return encodeEqualizerPresetConfiguration(config, prefs);
             default:
-                return super.encodeSendConfiguration(config);
+                return encodeAdditionalConfiguration(config);
+        }
+    }
+
+    protected boolean appendAdvancedAudioModeStateByte() { return false; }
+
+    protected byte[] encodeEqualizerPresetConfiguration(final String config, final Prefs prefs) {
+        return encodeByteCommand(CMD_SET_EQUALIZER_PRESET, Integer.parseInt(prefs.getString(config, "0")));
+    }
+
+    protected byte[] encodeAdditionalConfiguration(final String config) {
+        return super.encodeSendConfiguration(config);
+    }
+
+    private byte[] encodeConfiguredTapFunction(final String config, final Prefs prefs) {
+        // Action: single tap, double tap, hold.
+        // Function: play, pause, next.
+        for (final ButtonAction buttonAction : ButtonAction.values()) {
+            final boolean right = config.equals(buttonAction.getRightPreference());
+            if (!right && !config.equals(buttonAction.getLeftPreference())) {
+                continue;
+            }
+
+            final TapFunction function = TapFunction.valueOf(prefs.getString(config, TapFunction.NONE.getValue()));
+            // The action byte identifies the gesture; the function byte packs a model-specific
+            // gesture group in the high nibble and the assigned function in the low nibble.
+            final byte action = encodeButtonAction(buttonAction);
+            final byte functionByte = (byte) ((getTapFunctionGroup(buttonAction) << 4) | function.getCode());
+            return encodeControlFunction(right, action, functionByte);
+        }
+        throw new IllegalArgumentException("Unknown tap function preference: " + config);
+    }
+
+    private byte[] encodeConfiguredTapLock(final String config, final Prefs prefs) {
+        for (final ButtonAction buttonAction : ButtonAction.values()) {
+            if (!config.equals(buttonAction.getDisabledPreference())) {
+                continue;
+            }
+
+            final byte action = encodeButtonAction(buttonAction);
+            final boolean disabled = prefs.getBoolean(config, false);
+            final byte enabledByte = (action == 0x02 || action == 0x05) // Single or Triple tap?
+                    ? encodeBoolean(!disabled)
+                    : (!disabled ? (byte) 0x11 : (byte) 0x10);
+            return encodeCommand(CMD_SET_TOUCH_LOCK, new byte[]{0x00, action, enabledByte});
+        }
+        throw new IllegalArgumentException("Unknown tap lock preference: " + config);
+    }
+
+    /** Returns the model-specific high nibble of the function byte, not the gesture action byte. */
+    protected int getTapFunctionGroup(final ButtonAction buttonAction) {
+        switch (buttonAction) {
+            case SINGLE_TAP: return 6;
+            case DOUBLE_TAP: return 3;
+            case TRIPLE_TAP:
+            case LONG_PRESS: return 4;
+            default: throw new IllegalArgumentException("Unknown button action: " + buttonAction);
+        }
+    }
+
+    private byte encodeButtonAction(final ButtonAction buttonAction) {
+        switch (buttonAction) {
+            case SINGLE_TAP: return 0x02;
+            case DOUBLE_TAP: return 0x00;
+            case TRIPLE_TAP: return 0x05;
+            case LONG_PRESS: return 0x01;
+            default: throw new IllegalArgumentException("Unknown button action: " + buttonAction);
         }
     }
 
