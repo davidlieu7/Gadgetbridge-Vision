@@ -205,6 +205,10 @@ abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator(
 
     override fun getBatteryCount(device: GBDevice): Int = 3
 
+    data class BatteryProperties(val multiplier: Int = 20, val offset: Int = 0)
+
+    open fun getBatteryProperties(): BatteryProperties = BatteryProperties()
+
     override fun getBatteryConfig(device: GBDevice): Array<BatteryConfig> =
         when (getBatteryCount(device)) {
             1 -> arrayOf(BatteryConfig(0, R.drawable.ic_battery, R.string.battery))

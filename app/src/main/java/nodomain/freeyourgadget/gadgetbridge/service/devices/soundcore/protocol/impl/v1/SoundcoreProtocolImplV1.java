@@ -87,9 +87,6 @@ public abstract class SoundcoreProtocolImplV1 extends AbstractSoundcoreProtocol 
     public static final short CMD_SET_EQUALIZER_PRESET = (short) 0x8b02;
     public static final short CMD_POWER_OFF = (short) 0x8901;
 
-    private static final int DEFAULT_BATTERY_MULTIPLIER = 10;
-    private static final int DEFAULT_BATTERY_OFFSET = 0;
-
     public static final int battery_case = 0;
     public static final int battery_earphone_left = 1;
     public static final int battery_earphone_right = 2;
@@ -300,9 +297,7 @@ public abstract class SoundcoreProtocolImplV1 extends AbstractSoundcoreProtocol 
             return new GBDeviceEvent[0];
         }
 
-        final GBDeviceEvent[] batteryEvents = handleBatteryInfo(
-            new byte[]{payload[2], payload[3]}, getBatteryMultiplier(), getBatteryOffset()
-        );
+        final GBDeviceEvent[] batteryEvents = handleBatteryInfo(new byte[]{payload[2], payload[3]});
         return new GBDeviceEvent[]{
             batteryEvents[0],
             batteryEvents[1],
@@ -319,43 +314,25 @@ public abstract class SoundcoreProtocolImplV1 extends AbstractSoundcoreProtocol 
         return new GBDeviceEvent[0];
     }
 
-    /**
-     * Decodes the common left/right[/case] battery notification layout. Protocols only need to
-     * override the multiplier, offset, or battery indexes when their layout differs.
-     */
+    /** Decodes the common left/right[/case] battery notification layout. */
     protected GBDeviceEvent[] decodeBatteryInfo(final byte[] payload) {
-        if (payload == null || payload.length < 2) {
-            return new GBDeviceEvent[0];
-        }
-        return handleBatteryInfo(payload, getBatteryMultiplier(), getBatteryOffset());
+        return handleBatteryInfo(payload);
     }
 
-    protected int getBatteryMultiplier() {
-        return DEFAULT_BATTERY_MULTIPLIER;
+    /** Converts a raw battery value using the concrete device model's encoding. */
+    protected final int decodeBatteryLevel(final byte rawValue) {
+        final SoundcoreEarbudsCoordinator.BatteryProperties settings =
+                ((SoundcoreEarbudsCoordinator) getDevice().getDeviceCoordinator()).getBatteryProperties();
+        return (rawValue + settings.getOffset()) * settings.getMultiplier();
     }
 
-    protected int getBatteryOffset() {
-        return DEFAULT_BATTERY_OFFSET;
+    /** Builds a battery event for devices, such as Q30, with one battery value. */
+    protected final GBDeviceEvent[] handleBatteryInfo(final byte battery, final int batteryIndex) {
+        return new GBDeviceEvent[]{buildBatteryInfo(batteryIndex, decodeBatteryLevel(battery))};
     }
 
-    /**
-     * Builds battery events for the earbud/case notification payload used by V1 earbuds.
-     * The first two bytes contain left and right earbuds; an optional third byte contains the
-     * charging case. Any additional bytes are ignored. The payload values are deliberately kept
-     * in their original wire format: concrete protocols provide the multiplier and optional offset.
-     */
-    protected final GBDeviceEvent[] handleBatteryInfo(final byte[] payload, final int multiplier) {
-        return handleBatteryInfo(payload, multiplier, DEFAULT_BATTERY_OFFSET);
-    }
-
-    /** Uses the default 10x multiplier and zero raw-value offset. */
+    /** Builds earbud/case events, ignoring bytes after the optional charging-case value. */
     protected final GBDeviceEvent[] handleBatteryInfo(final byte[] payload) {
-        return handleBatteryInfo(payload, DEFAULT_BATTERY_MULTIPLIER, DEFAULT_BATTERY_OFFSET);
-    }
-
-    protected final GBDeviceEvent[] handleBatteryInfo(final byte[] payload,
-                                                       final int multiplier,
-                                                       final int offset) {
         if (payload == null || payload.length < 2) {
             return new GBDeviceEvent[0];
         }
@@ -363,10 +340,7 @@ public abstract class SoundcoreProtocolImplV1 extends AbstractSoundcoreProtocol 
         final int[] batteryIndexes = getBatteryIndexes(payload.length);
         final GBDeviceEvent[] events = new GBDeviceEvent[batteryIndexes.length];
         for (int index = 0; index < batteryIndexes.length; index++) {
-            events[index] = buildBatteryInfo(
-                    batteryIndexes[index],
-                    (payload[index] + offset) * multiplier
-            );
+            events[index] = buildBatteryInfo(batteryIndexes[index], decodeBatteryLevel(payload[index]));
         }
         return events;
     }
@@ -376,17 +350,6 @@ public abstract class SoundcoreProtocolImplV1 extends AbstractSoundcoreProtocol 
         return payloadLength >= 3
                 ? new int[]{battery_earphone_left, battery_earphone_right, battery_case}
                 : new int[]{battery_earphone_left, battery_earphone_right};
-    }
-
-    /** Builds a battery event for devices, such as Q30, with one battery value. */
-    protected final GBDeviceEvent[] handleBatteryInfo(final byte battery,
-                                                       final int batteryIndex,
-                                                       final int multiplier) {
-        return new GBDeviceEvent[]{buildBatteryInfo(batteryIndex, battery * multiplier)};
-    }
-
-    protected final GBDeviceEvent[] handleBatteryInfo(final byte battery, final int batteryIndex) {
-        return handleBatteryInfo(battery, batteryIndex, DEFAULT_BATTERY_MULTIPLIER);
     }
 
     /** Decodes the two earbud flags; trailing bytes do not describe a case battery here. */

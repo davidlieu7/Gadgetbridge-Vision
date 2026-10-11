@@ -12,8 +12,6 @@ public class SoundcoreLibertyProtocol extends SoundcoreProtocolImplV1 {
 
     private static final Logger LOG = LoggerFactory.getLogger(SoundcoreLibertyProtocol.class);
 
-    private static final int BATTERY_MULTIPLIER = 20;
-
     public SoundcoreLibertyProtocol(GBDevice device) {
         super(device);
     }
@@ -26,11 +24,6 @@ public class SoundcoreLibertyProtocol extends SoundcoreProtocolImplV1 {
         }
 
         return decodeStandardEarbudDeviceInfo(payload);
-    }
-
-    @Override
-    protected int getBatteryMultiplier() {
-        return BATTERY_MULTIPLIER;
     }
 
     @Override

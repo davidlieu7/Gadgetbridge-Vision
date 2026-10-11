@@ -25,8 +25,6 @@ import nodomain.freeyourgadget.gadgetbridge.util.StringUtils;
 public class SoundcoreSportX20Protocol extends SoundcoreProtocolImplV1 {
     private static final Logger LOG = LoggerFactory.getLogger(SoundcoreSportX20Protocol.class);
 
-    private static final int BATTERY_MULTIPLIER = 20;
-
     // Offsets within CMD_GET_DEVICE_INFO payload for the equalizer preset and band values.
     // [38]    = preset ID (0x00–0x15 = named preset, 0xfe = custom)
     // [39]    = 0x00 for named presets, 0xfe for custom
@@ -107,11 +105,6 @@ public class SoundcoreSportX20Protocol extends SoundcoreProtocolImplV1 {
         // common Liberty header still carries battery and version information.
         decodeControlFunctionsFromDeviceInfo(payload);
         return decodeStandardEarbudDeviceInfo(payload);
-    }
-
-    @Override
-    protected int getBatteryMultiplier() {
-        return BATTERY_MULTIPLIER;
     }
 
     @Override

@@ -63,11 +63,6 @@ public class SoundcoreA30iProtocol extends SoundcoreProtocolImplV1 {
     }
 
     @Override
-    protected int getBatteryOffset() {
-        return 1;
-    }
-
-    @Override
     protected int[] getBatteryIndexes(final int payloadLength) {
         return new int[]{battery_earphone_left, battery_earphone_right};
     }

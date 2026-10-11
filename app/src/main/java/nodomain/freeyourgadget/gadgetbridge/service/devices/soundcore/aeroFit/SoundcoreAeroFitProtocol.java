@@ -15,9 +15,6 @@ public class SoundcoreAeroFitProtocol extends SoundcoreProtocolImplV1 {
 
     private static final Logger LOG = LoggerFactory.getLogger(SoundcoreAeroFitProtocol.class);
 
-    private static final int BATTERY_MULTIPLIER = 10;
-    private static final int BATTERY_OFFSET = 1;
-
     public SoundcoreAeroFitProtocol(GBDevice device) {
         super(device);
     }
@@ -32,9 +29,7 @@ public class SoundcoreAeroFitProtocol extends SoundcoreProtocolImplV1 {
         final String firmware1 = readString(payload, 4, 5);
         final String firmware2 = readString(payload, 9, 5);
         final String serialNumber = readString(payload, 14, 16);
-        final GBDeviceEvent[] batteryEvents = handleBatteryInfo(
-                new byte[]{payload[2], payload[3]}, BATTERY_MULTIPLIER, BATTERY_OFFSET
-        );
+        final GBDeviceEvent[] batteryEvents = handleBatteryInfo(new byte[]{payload[2], payload[3]});
         return new GBDeviceEvent[]{
                 batteryEvents[0],
                 batteryEvents[1],
@@ -47,15 +42,4 @@ public class SoundcoreAeroFitProtocol extends SoundcoreProtocolImplV1 {
         LOG.debug("Incoming information about connected devices, {} bytes", payload.length);
         return new GBDeviceEvent[0];
     }
-
-    @Override
-    protected int getBatteryMultiplier() {
-        return BATTERY_MULTIPLIER;
-    }
-
-    @Override
-    protected int getBatteryOffset() {
-        return BATTERY_OFFSET;
-    }
-
 }

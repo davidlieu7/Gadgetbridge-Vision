@@ -20,7 +20,6 @@ public class SoundcoreQ30Protocol extends SoundcoreProtocolImplV1 {
     private static final Logger LOG = LoggerFactory.getLogger(SoundcoreQ30Protocol.class);
 
     private static final short CMD_SET_EQUALIZER = (short) 0x8102;
-    private static final int BATTERY_MULTIPLIER = 20;
 
     public SoundcoreQ30Protocol(GBDevice device) {
         super(device);
@@ -39,7 +38,7 @@ public class SoundcoreQ30Protocol extends SoundcoreProtocolImplV1 {
         final String firmware1 = readString(payload, 39, 5);
         final String serialNumber = readString(payload, 44, 16);
         return new GBDeviceEvent[]{
-                handleBatteryInfo(payload[0], 0, BATTERY_MULTIPLIER)[0],
+                handleBatteryInfo(payload[0], 0)[0],
                 buildVersionInfo(firmware1, "", serialNumber)
         };
     }

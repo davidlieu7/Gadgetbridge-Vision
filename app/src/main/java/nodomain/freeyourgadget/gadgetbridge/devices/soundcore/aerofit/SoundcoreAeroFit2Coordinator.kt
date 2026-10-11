@@ -47,6 +47,8 @@ class SoundcoreAeroFit2Coordinator : SoundcoreEarbudsCoordinator() {
     override fun createProtocol(device: GBDevice): SoundcoreAeroFitProtocol =
         SoundcoreAeroFitProtocol(device)
 
+    override fun getBatteryProperties(): BatteryProperties = BatteryProperties(multiplier = 10, offset = 1)
+
     override fun supportsExtendedInfoRequest(): Boolean = false
 
     override fun supportsSessionInitRequest(): Boolean = false

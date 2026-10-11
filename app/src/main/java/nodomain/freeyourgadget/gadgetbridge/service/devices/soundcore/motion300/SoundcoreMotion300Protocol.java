@@ -144,7 +144,7 @@ public class SoundcoreMotion300Protocol extends SoundcoreProtocolImplV1 {
         GBDeviceEventVersionInfo versionInfo = new GBDeviceEventVersionInfo();
         versionInfo.fwVersion = fwVersion;
         batteryInfo.state = batteryCharging == (byte)0x00 ? BatteryState.BATTERY_NORMAL : BatteryState.BATTERY_CHARGING;
-        batteryInfo.level = batteryLevel * 20;
+        batteryInfo.level = decodeBatteryLevel(batteryLevel);
 
         LOG.debug(
             "Device info: volume={}, battery={}, charging={}, playing={}, prompts={}, autoOff={}, autoOffDuration={}",
@@ -236,7 +236,7 @@ public class SoundcoreMotion300Protocol extends SoundcoreProtocolImplV1 {
         if (payload.length != 1)
             return null;
 
-        batteryInfo.level = payload[0] * 20;
+        batteryInfo.level = decodeBatteryLevel(payload[0]);
 
         return new GBDeviceEvent[] { batteryInfo };
     }

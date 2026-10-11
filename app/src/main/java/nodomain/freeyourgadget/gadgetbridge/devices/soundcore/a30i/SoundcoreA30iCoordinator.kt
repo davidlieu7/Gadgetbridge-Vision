@@ -51,5 +51,7 @@ class SoundcoreA30iCoordinator : SoundcoreEarbudsCoordinator() {
     /* Battery case not reported */
     override fun getBatteryCount(device: GBDevice): Int = 2
 
+    override fun getBatteryProperties(): BatteryProperties = BatteryProperties(multiplier = 10, offset = 1)
+
     override fun createProtocol(device: GBDevice): SoundcoreA30iProtocol = SoundcoreA30iProtocol(device)
 }
