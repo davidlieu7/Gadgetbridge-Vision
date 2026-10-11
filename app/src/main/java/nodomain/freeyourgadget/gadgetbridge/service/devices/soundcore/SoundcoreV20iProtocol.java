@@ -40,8 +40,6 @@ public class SoundcoreV20iProtocol extends SoundcoreProtocolImplV1 {
     public static final short CMD_SET_LIGHT_MODE = (short) 0x860e;
 
     private static final int LEFT_LONG_PRESS_OFFSET = 65;
-    private static final int LONG_PRESS_FUNCTION_PREFIX = 0xf0;
-    private static final int TAP_FUNCTION_CODE_MASK = 0x0f;
 
     private final List<MultipointDevice> pairedDevices = new ArrayList<>();
     private String activeSourceAddress;
@@ -52,30 +50,31 @@ public class SoundcoreV20iProtocol extends SoundcoreProtocolImplV1 {
 
     @Override
     protected GBDeviceEvent[] decodeDeviceInfo(final byte[] payload) {
-        if (payload.length > 65) {
-            final String function = decodeLongPressFunction(payload[LEFT_LONG_PRESS_OFFSET]);
-            if (function != null) {
-                getDevicePrefs().getPreferences().edit().putString(
-                        DeviceSettingsPreferenceConst.PREF_SOUNDCORE_CONTROL_LONG_PRESS_ACTION_LEFT,
-                        function).apply();
+        final GBDeviceEvent[] events = decodeStandardEarbudDeviceInfo(payload, 4);
+        if (events.length == 0) {
+            return events;
+        }
+
+        if (payload.length > LEFT_LONG_PRESS_OFFSET) {
+            final SoundcoreEarbudsCoordinator.ButtonAction action = SoundcoreEarbudsCoordinator.ButtonAction.LONG_PRESS;
+            final int encodedFunction = Byte.toUnsignedInt(payload[LEFT_LONG_PRESS_OFFSET]);
+            if ((encodedFunction >>> 4) == getTapFunctionGroup(action)) {
+                for (final SoundcoreEarbudsCoordinator.TapFunction function : SoundcoreEarbudsCoordinator.TapFunction.values()) {
+                    if (function.getCode() == (encodedFunction & 0x0f)) {
+                        getDevicePrefs().getPreferences().edit().putString(
+                                action.getLeftPreference(), function.getValue()).apply();
+                        break;
+                    }
+                }
             }
         }
 
-        return decodeStandardEarbudDeviceInfo(payload);
+        return events;
     }
 
-    private static String decodeLongPressFunction(final byte function) {
-        final int encodedFunction = Byte.toUnsignedInt(function);
-        if ((encodedFunction & LONG_PRESS_FUNCTION_PREFIX) != LONG_PRESS_FUNCTION_PREFIX) {
-            return null;
-        }
-        final int code = encodedFunction & TAP_FUNCTION_CODE_MASK;
-        for (SoundcoreEarbudsCoordinator.TapFunction tapFunction : SoundcoreEarbudsCoordinator.TapFunction.values()) {
-            if (tapFunction.getCode() == code) {
-                return tapFunction.name();
-            }
-        }
-        return null;
+    @Override
+    protected int[] getBatteryIndexes(final int payloadLength) {
+        return new int[]{0, 1};
     }
 
     @Override

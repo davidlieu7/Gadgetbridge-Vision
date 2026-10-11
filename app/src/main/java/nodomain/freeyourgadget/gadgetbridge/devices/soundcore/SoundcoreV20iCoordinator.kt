@@ -38,6 +38,8 @@ class SoundcoreV20iCoordinator : SoundcoreEarbudsCoordinator() {
 
     override fun getBatteryCount(device: GBDevice): Int = 2
 
+    override fun getBatteryProperties(): BatteryProperties = BatteryProperties(multiplier = 10, offset = 1)
+
     override fun getDefaultCapabilities(): Set<Capability> = setOf(
         Capability.FindDevice,
         Capability.Multipoint,
