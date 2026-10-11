@@ -356,15 +356,6 @@ abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator(
         fun has(capability: Capability) = capabilities.contains(capability)
         fun has(anyOf: Array<Capability>) = anyOf.any { capabilities.contains(it) }
 
-        if (has(Capability.AudioBalance)) {
-            val prefs = GBApplication.getDevicePrefs(device)
-            val key = DeviceSettingsPreferenceConst.PREF_SOUNDCORE_AUDIO_BALANCE
-            if (prefs.preferences.all[key] is String) {
-                val balance = prefs.getInt(key, 0).takeIf { it in -6..6 } ?: 0
-                prefs.preferences.edit().putInt(key, balance).apply()
-            }
-        }
-
         return deviceSettings {
             if (has(arrayOf(Capability.TouchControls, Capability.TouchControlDisable, Capability.TouchTone))) {
                 screen(
