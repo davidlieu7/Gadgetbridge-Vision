@@ -61,13 +61,11 @@ open class SoundcoreSleepA30Protocol(device: GBDevice?) : SoundcoreProtocolImplV
         return super.decodeResponse(responseData)
     }
 
-    protected override fun getBatteryOffset(): Int = BATTERY_OFFSET
-
     protected override fun decodeDeviceInfo(payload: ByteArray?): Array<GBDeviceEvent> {
         if (payload == null || payload.size < 51) return emptyArray()
         // Sleep A30's version header starts two bytes earlier than Liberty's.
         decodeTapControls(payload.copyOfRange(45, 51))
-        val batteries = handleBatteryInfo(byteArrayOf(payload[2], payload[3]), batteryMultiplier, batteryOffset)
+        val batteries = handleBatteryInfo(byteArrayOf(payload[2], payload[3]))
         val version = buildVersionInfo(
             readString(payload, 4, 5),
             readString(payload, 36, 5), // charging case, fw2
@@ -316,13 +314,6 @@ open class SoundcoreSleepA30Protocol(device: GBDevice?) : SoundcoreProtocolImplV
             PREF_SOUNDCORE_ANC_TONE -> encodeBooleanCommand(CMD_SET_ANC_TONE, prefs.getBoolean(config, false))
             PREF_SOUNDCORE_MODE_TONE -> encodeBooleanCommand(CMD_SET_MODE_TONE, prefs.getBoolean(config, false))
             PREF_SOUNDCORE_CONTROL_RESET -> encodeRequest(CMD_RESET_TAP_CONTROLS)
-            PREF_SOUNDCORE_FIND_LEFT_EARBUD, PREF_SOUNDCORE_FIND_RIGHT_EARBUD -> encodeCommand(
-                CMD_SET_FIND_DEVICE,
-                byteArrayOf(
-                    encodeBoolean(prefs.getString(PREF_SOUNDCORE_FIND_LEFT_EARBUD, "0") == "1"),
-                    encodeBoolean(prefs.getString(PREF_SOUNDCORE_FIND_RIGHT_EARBUD, "0") == "1"), 0
-                )
-            )
             PREF_SOUNDCORE_CONTROL_DOUBLE_TAP_ACTION_LEFT, PREF_SOUNDCORE_CONTROL_DOUBLE_TAP_ACTION_RIGHT,
             PREF_SOUNDCORE_CONTROL_TRIPLE_TAP_ACTION_LEFT, PREF_SOUNDCORE_CONTROL_TRIPLE_TAP_ACTION_RIGHT -> {
                 val function = try {
@@ -345,7 +336,6 @@ open class SoundcoreSleepA30Protocol(device: GBDevice?) : SoundcoreProtocolImplV
         private val LOG = LoggerFactory.getLogger(SoundcoreSleepA30Protocol::class.java)
 
         const val ACTION_TOGGLE_LOCAL_PLAYBACK = "soundcore_toggle_local_playback"
-        private const val BATTERY_OFFSET = 1
         private val AUTO_STOP_PRESETS = setOf(10, 20, 30, 60, 90)
 
         private val TAP_PREFERENCES = arrayOf(

@@ -74,6 +74,7 @@ class SoundcoreSleepA30Coordinator : SoundcoreEarbudsCoordinator() {
 
     override fun getCustomActions(): List<DeviceCardAction> = listOf(
         deviceCardAction {
+            id = "soundcore_local_audio"
             isVisible = { device ->
                 device.isConnected && GBApplication.getDevicePrefs(device)
                     .getString(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_LISTENING_MODE, "0") == "1"
