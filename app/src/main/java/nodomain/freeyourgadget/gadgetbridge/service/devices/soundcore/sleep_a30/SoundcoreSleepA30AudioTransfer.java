@@ -19,6 +19,7 @@ package nodomain.freeyourgadget.gadgetbridge.service.devices.soundcore.sleep_a30
 import java.io.EOFException;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.InterruptedIOException;
 import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.Arrays;
@@ -29,13 +30,21 @@ public final class SoundcoreSleepA30AudioTransfer {
     private final InputStream input;
     private final OutputStream output;
     private final Runnable beforeWait;
+    private final Sleeper sleeper;
+
+    interface Sleeper { void sleep(long millis) throws InterruptedException; }
 
     public interface Progress { void acknowledged(int bytes, int total); }
 
     public SoundcoreSleepA30AudioTransfer(InputStream input, OutputStream output, Runnable beforeWait) {
+        this(input, output, beforeWait, Thread::sleep);
+    }
+
+    SoundcoreSleepA30AudioTransfer(InputStream input, OutputStream output, Runnable beforeWait, Sleeper sleeper) {
         this.input = input;
         this.output = output;
         this.beforeWait = beforeWait;
+        this.sleeper = sleeper;
     }
 
     public void upload(SoundcoreSleepA30Audio audio, Progress progress) throws IOException {
@@ -56,19 +65,35 @@ public final class SoundcoreSleepA30AudioTransfer {
         exchange(0x86, audio.configuration(), 0x87, new byte[]{1});
         for (int offset = 0; offset < bytes.length; ) {
             int end = Math.min(offset + 32768, bytes.length);
-            for (int p = offset; p < end; p += 656) send(0x85, Arrays.copyOfRange(bytes, p, Math.min(p + 656, end)));
+            for (int p = offset; p < end; p += 656) {
+                paceDataPacket();
+                send(0x85, Arrays.copyOfRange(bytes, p, Math.min(p + 656, end)));
+            }
             long crc = SoundcoreSleepA30Audio.crc32(bytes, offset, end - offset);
             byte[] checkpoint = Arrays.copyOf(BEST, 8);
             SoundcoreSleepA30Audio.put32(checkpoint, 4, crc);
             byte[] acknowledgement = new byte[5];
             acknowledgement[0] = 1;
             SoundcoreSleepA30Audio.put32(acknowledgement, 1, crc);
+            paceDataPacket();
             exchange(0x82, checkpoint, 0x83, acknowledgement);
             offset = end;
             progress.acknowledged(offset, bytes.length);
         }
         exchange(0x88, new byte[0], 0x84, new byte[]{1});
         exchange(0x92, BEST, 0x93, new byte[]{1});
+    }
+
+    private void paceDataPacket() throws IOException {
+        beforeWait.run();
+        try {
+            sleeper.sleep(50);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            InterruptedIOException failure = new InterruptedIOException("Audio upload interrupted while pacing");
+            failure.initCause(e);
+            throw failure;
+        }
     }
 
     private void exchange(int opcode, byte[] payload, int expectedOpcode, byte[] expected) throws IOException {
@@ -78,11 +103,11 @@ public final class SoundcoreSleepA30AudioTransfer {
 
     private void send(int opcode, byte[] payload) throws IOException {
         beforeWait.run();
-        byte[] header = new byte[5];
-        header[0] = (byte) opcode;
-        SoundcoreSleepA30Audio.put32(header, 1, payload.length);
-        output.write(header);
-        output.write(payload);
+        byte[] packet = new byte[5 + payload.length];
+        packet[0] = (byte) opcode;
+        SoundcoreSleepA30Audio.put32(packet, 1, payload.length);
+        System.arraycopy(payload, 0, packet, 5, payload.length);
+        output.write(packet);
         output.flush();
     }
 
