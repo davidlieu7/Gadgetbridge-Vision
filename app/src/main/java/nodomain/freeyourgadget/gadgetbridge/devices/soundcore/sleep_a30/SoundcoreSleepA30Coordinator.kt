@@ -59,7 +59,7 @@ class SoundcoreSleepA30Coordinator : SoundcoreEarbudsCoordinator() {
 
     override fun getDeviceNameResource(): Int = R.string.devicetype_soundcore_sleep_a30
 
-    override fun getServiceUUID(): UUID = UUID.fromString("0cf12d31-fac3-4553-bd80-d6832e7d1301")
+    override fun getBatteryProperties(): BatteryProperties = BatteryProperties(multiplier = 10, offset = 1)
 
     override fun getDeviceSupportClass(device: GBDevice): Class<out DeviceSupport> =
         SoundcoreSleepA30DeviceSupport::class.java
