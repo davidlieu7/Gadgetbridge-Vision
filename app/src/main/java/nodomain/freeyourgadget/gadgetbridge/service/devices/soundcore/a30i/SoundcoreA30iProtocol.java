@@ -12,6 +12,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsPreferenceConst;
+import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreEarbudsCoordinator.AncMode;
+import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreEarbudsCoordinator.AmbientSoundMode;
 import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEvent;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.soundcore.SoundcorePacket;
@@ -24,14 +26,6 @@ public class SoundcoreA30iProtocol extends SoundcoreProtocolImplV1 {
 
     private static final int battery_earphone_left = 0;
     private static final int battery_earphone_right = 1;
-    private static final String OFF = "off";
-    private static final String TRANSPARENCY = "transparency";
-    private static final String NOISE_CANCELLING = "noise_cancelling";
-    private static final String ADAPTIVE_ANC = "adaptive_anc";
-    private static final String AMBIENT_SOUND = "ambient_sound";
-    private static final String TRANSPORT = "transport";
-    private static final String OUTDOOR = "outdoor";
-    private static final String INDOOR = "indoor";
 
     public SoundcoreA30iProtocol(GBDevice device) {
         super(device);
@@ -62,8 +56,8 @@ public class SoundcoreA30iProtocol extends SoundcoreProtocolImplV1 {
 
             //-------------------------------------------------------------------------
             // Active Noise Cancelling [63 to 70 (7 bytes)]
-            String ambientSoundControl = getAmbientSoundControl(payload[64], payload[67]);
-            String ancMode = getANCmode(payload[70]);
+            final AmbientSoundMode ambientSoundControl = getAmbientSoundControl(payload[64], payload[67]);
+            final AncMode ancMode = AncMode.fromByte(payload[70]);
             int noiseCancellingLevel = getNoiseCancellingLevel(payload[65]);
             boolean wind_noise_reduction = payload[68] == 0x01;
             //-------------------------------------------------------------------------
@@ -75,8 +69,8 @@ public class SoundcoreA30iProtocol extends SoundcoreProtocolImplV1 {
             final int autoPowerDuration = autoPowerEnabled ? (payload[76] & 0xFF) + 1 : 0;
 
             getDevicePrefs().getPreferences().edit()
-                    .putString(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_AMBIENT_SOUND_CONTROL, ambientSoundControl)
-                    .putString(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_ANC_MODE, ancMode)
+                    .putString(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_AMBIENT_SOUND_CONTROL, ambientSoundControl != null ? ambientSoundControl.toString() : "Unknown Mode")
+                    .putString(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_ANC_MODE, ancMode != null ? ancMode.toString() : "Unknown Mode")
                     .putInt(DeviceSettingsPreferenceConst.PREF_SONY_AMBIENT_SOUND_LEVEL, noiseCancellingLevel)
                     .putBoolean(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_WIND_NOISE_REDUCTION, wind_noise_reduction)
 
@@ -116,31 +110,19 @@ public class SoundcoreA30iProtocol extends SoundcoreProtocolImplV1 {
     }
 
     /**
-     * It returns the current ANC mode.
-     */
-    private String getANCmode(byte ancMode){
-        return switch (ancMode) {
-            case 0x00 -> TRANSPORT;
-            case 0x01 -> OUTDOOR;
-            case 0x02 -> INDOOR;
-            default -> "Unknown Mode";
-        };
-    }
-
-    /**
      * It returns the current ambient sound control.
      */
-    private String getAmbientSoundControl(byte ambientSoundControlSelection, byte mode){
+    private AmbientSoundMode getAmbientSoundControl(byte ambientSoundControlSelection, byte mode) {
         return switch (ambientSoundControlSelection) {
             case 0x00 -> switch (mode) {
-                case 0x00 -> NOISE_CANCELLING;
-                case 0x01 -> ADAPTIVE_ANC;
-                case 0x02 -> AMBIENT_SOUND;
-                default -> "Unknown Mode";
+                case 0x00 -> AmbientSoundMode.NOISE_CANCELLING;
+                case 0x01 -> AmbientSoundMode.ADAPTIVE_ANC;
+                case 0x02 -> AmbientSoundMode.AMBIENT_SOUND;
+                default -> null;
             };
-            case 0x01 -> TRANSPARENCY;
-            case 0x02 -> OFF;
-            default -> "Unknown Mode";
+            case 0x01 -> AmbientSoundMode.TRANSPARENCY;
+            case 0x02 -> AmbientSoundMode.OFF;
+            default -> null;
         };
     }
 
@@ -180,18 +162,18 @@ public class SoundcoreA30iProtocol extends SoundcoreProtocolImplV1 {
                  DeviceSettingsPreferenceConst.PREF_SONY_AMBIENT_SOUND_LEVEL, DeviceSettingsPreferenceConst.PREF_SOUNDCORE_WIND_NOISE_REDUCTION:
                 // It sets the ANC mode. It always sends the same command (with different values),
                 // independent of which part of the ANC setting was changed.
-                String ambientSoundControl = prefs.getString(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_AMBIENT_SOUND_CONTROL, OFF);
-                String ancMode = prefs.getString(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_ANC_MODE, TRANSPORT);
+                final AmbientSoundMode ambientSoundControl = AmbientSoundMode.fromPreference(
+                        prefs.getString(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_AMBIENT_SOUND_CONTROL, AmbientSoundMode.OFF.toString()));
+                final AncMode ancMode = AncMode.fromPreference(
+                        prefs.getString(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_ANC_MODE, AncMode.TRANSPORT.toString()));
                 int noiseCancellingLevel = prefs.getInt(DeviceSettingsPreferenceConst.PREF_SONY_AMBIENT_SOUND_LEVEL, 0);
                 boolean wind_noise_reduction = prefs.getBoolean(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_WIND_NOISE_REDUCTION, false);
 
-                byte[] ANC_result = build_ANC_mode_value(ambientSoundControl, ancMode, noiseCancellingLevel, wind_noise_reduction);
-                if(ANC_result != null) {
-                    return ANC_result;
-                }else {
-                    // An unsupported action was selected; do not send the result to the device.
-                    return super.encodeSendConfiguration(config);
+                byte[] audioModeCommand = encodeAudioMode(ambientSoundControl, ancMode, noiseCancellingLevel, wind_noise_reduction);
+                if (audioModeCommand != null) {
+                    return audioModeCommand;
                 }
+                return super.encodeSendConfiguration(config);
 
             default:
                 LOG.debug("Unsupported CONFIG: " + config);
@@ -204,18 +186,15 @@ public class SoundcoreA30iProtocol extends SoundcoreProtocolImplV1 {
      * It always needs all information, independent of the mode.
      * @return The content for the ANC command; it returns null if an unknown value was requested.
      */
-    private byte[] build_ANC_mode_value(String ambientSoundControl, String ancMode, int noiseCancellingLevel, boolean wind_noise_reduction){
-        ByteBuffer buf = ByteBuffer.allocate(7);
-        byte mode; // ANC mode seems to be twice in the array.
-
-        switch (ambientSoundControl) {
-            case OFF -> mode = 0x02;
-            case TRANSPARENCY -> mode = 0x01;
-            case NOISE_CANCELLING, ADAPTIVE_ANC, AMBIENT_SOUND -> mode = 0x00;
-            default -> {
-                return null;
-            }
+    private byte[] encodeAudioMode(AmbientSoundMode ambientSoundControl, AncMode ancMode, int noiseCancellingLevel, boolean wind_noise_reduction) {
+        if (ambientSoundControl == null || ancMode == null) {
+            return null;
         }
+        ByteBuffer buf = ByteBuffer.allocate(7);
+        // A30i ambient sound is an ANC subtype, not its transparency mode.
+        final byte mode = ambientSoundControl == AmbientSoundMode.AMBIENT_SOUND
+                ? AmbientSoundMode.NOISE_CANCELLING.toByte()
+                : ambientSoundControl.toByte();
 
         buf.put(mode);
 
@@ -241,22 +220,11 @@ public class SoundcoreA30iProtocol extends SoundcoreProtocolImplV1 {
             }
         }
 
-        if (wind_noise_reduction) {
-            buf.put((byte) 0x01);
-        }else {
-            buf.put((byte) 0x00);
-        }
+        buf.put(encodeBoolean(wind_noise_reduction));
 
         buf.put((byte) 0x00); // Byte seems to be unused.
 
-        switch (ancMode){
-            case OUTDOOR -> buf.put((byte) 0x01);
-            case INDOOR -> buf.put((byte) 0x02);
-            case TRANSPORT -> buf.put((byte) 0x00);
-            default -> {
-                return null;
-            }
-        }
+        buf.put(ancMode.toByte());
         return encodeCommand(CMD_SET_AUDIO_MODE, buf.array());
     }
 

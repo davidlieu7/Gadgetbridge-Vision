@@ -95,6 +95,55 @@ abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator(
         ),
     }
 
+    enum class AncMode(
+        private val preferenceValue: String,
+        private val byteValue: Byte,
+    ) {
+        TRANSPORT("transport", 0x00),
+        OUTDOOR("outdoor", 0x01),
+        INDOOR("indoor", 0x02);
+
+        override fun toString(): String = preferenceValue
+
+        fun toByte(): Byte = byteValue
+
+        companion object {
+            @JvmStatic
+            fun fromPreference(preferenceValue: String?): AncMode? =
+                entries.find { it.preferenceValue == preferenceValue }
+
+            /** Unknown codes retain the calling protocol's fallback. */
+            @JvmStatic
+            fun fromByte(byteValue: Byte): AncMode? = entries.find { it.byteValue == byteValue }
+        }
+    }
+
+    enum class AmbientSoundMode(
+        private val preferenceValue: String,
+        private val byteValue: Byte,
+    ) {
+        NOISE_CANCELLING("noise_cancelling", 0x00),
+        AMBIENT_SOUND("ambient_sound", 0x01),
+        OFF("off", 0x02),
+        // Model-specific aliases follow the standard modes to preserve fromByte lookups.
+        TRANSPARENCY("transparency", 0x01),
+        ADAPTIVE_ANC("adaptive_anc", 0x00);
+
+        override fun toString(): String = preferenceValue
+
+        fun toByte(): Byte = byteValue
+
+        companion object {
+            @JvmStatic
+            fun fromPreference(preferenceValue: String?): AmbientSoundMode? =
+                entries.find { it.preferenceValue == preferenceValue }
+
+            @JvmStatic
+            fun fromByte(byteValue: Byte): AmbientSoundMode =
+                entries.find { it.byteValue == byteValue } ?: OFF
+        }
+    }
+
     enum class TapFunction(
         val code: Int,
         @androidx.annotation.StringRes val label: Int,

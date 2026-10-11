@@ -8,6 +8,8 @@ import org.slf4j.LoggerFactory;
 import java.util.Arrays;
 
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsPreferenceConst;
+import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreEarbudsCoordinator.AmbientSoundMode;
+import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreEarbudsCoordinator.AncMode;
 import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEvent;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.soundcore.protocol.impl.v1.SoundcoreProtocolImplV1;
@@ -91,33 +93,23 @@ public class SoundcoreQ30Protocol extends SoundcoreProtocolImplV1 {
     private byte[] encodeAudioMode() {
         Prefs prefs = getDevicePrefs();
 
-        final Byte ambient_sound_mode = encodeAmbientSoundMode(prefs.getString(
+        final AmbientSoundMode ambientSoundMode = AmbientSoundMode.fromPreference(prefs.getString(
                 DeviceSettingsPreferenceConst.PREF_SOUNDCORE_AMBIENT_SOUND_CONTROL,
                 "off"
         ));
 
-        if (ambient_sound_mode == null) {
+        if (ambientSoundMode == null) {
             LOG.error("Invalid Ambient Mode selected");
             return null;
         }
 
-        byte anc_mode;
-        switch (prefs.getString(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_ANC_MODE, "transport")) {
-            case "transport":
-                anc_mode = 0x00;
-                break;
-            case "outdoor":
-                anc_mode = 0x01;
-                break;
-            case "indoor":
-                anc_mode = 0x02;
-                break;
-            default:
-                LOG.error("Invalid ANC Mode selected");
-                return null;
+        final AncMode ancMode = AncMode.fromPreference(prefs.getString(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_ANC_MODE, "transport"));
+        if (ancMode == null) {
+            LOG.error("Invalid ANC Mode selected");
+            return null;
         }
 
-        byte[] payload = new byte[]{ambient_sound_mode.byteValue(), anc_mode, 0x01};
+        byte[] payload = new byte[]{ambientSoundMode.toByte(), ancMode.toByte(), 0x01};
         return encodeCommand(CMD_SET_AUDIO_MODE, payload);
     }
 
@@ -131,23 +123,15 @@ public class SoundcoreQ30Protocol extends SoundcoreProtocolImplV1 {
         }
         SharedPreferences prefs = getDevicePrefs().getPreferences();
         SharedPreferences.Editor editor = prefs.edit();
-        String ambient_sound_mode = decodeAmbientSoundMode(payload[0]);
-        String anc_mode = "transport";
-
-        if (payload[1] == 0x00) {
-            anc_mode = "transport";
-        } else if (payload[1] == 0x01) {
-            anc_mode = "outdoor";
-        } else if (payload[1] == 0x02) {
-            anc_mode = "indoor";
-        }
+        final AmbientSoundMode ambientSoundMode = AmbientSoundMode.fromByte(payload[0]);
+        final AncMode ancMode = AncMode.fromByte(payload[1]);
 
         // payload has two more bytes
         // payload[2] always 1 ?
         // payload[3] checksum ?
 
-        editor.putString(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_AMBIENT_SOUND_CONTROL, ambient_sound_mode);
-        editor.putString(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_ANC_MODE, anc_mode);
+        editor.putString(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_AMBIENT_SOUND_CONTROL, ambientSoundMode.toString());
+        editor.putString(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_ANC_MODE, (ancMode != null ? ancMode : AncMode.TRANSPORT).toString());
         editor.apply();
     }
 

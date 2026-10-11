@@ -16,6 +16,7 @@ import nodomain.freeyourgadget.gadgetbridge.devices.sony.headphones.prefs.Ambien
 import java.util.Arrays;
 
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsPreferenceConst;
+import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreEarbudsCoordinator.AmbientSoundMode;
 import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEvent;
 import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreEarbudsCoordinator.ButtonAction;
 import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreEarbudsCoordinator.TapFunction;
@@ -570,7 +571,7 @@ public abstract class SoundcoreProtocolImplV1 extends AbstractSoundcoreProtocol 
     */
     protected byte[] encodeAdvancedAudioMode(final boolean appendStateByte) {
         final Prefs prefs = getDevicePrefs();
-        final Byte ambientSoundMode = encodeAmbientSoundMode(prefs.getString(
+        final AmbientSoundMode ambientSoundMode = AmbientSoundMode.fromPreference(prefs.getString(
                 DeviceSettingsPreferenceConst.PREF_SOUNDCORE_AMBIENT_SOUND_CONTROL,
                 "off"
         ));
@@ -602,7 +603,7 @@ public abstract class SoundcoreProtocolImplV1 extends AbstractSoundcoreProtocol 
         ));
 
         final byte[] payload = new byte[]{
-                ambientSoundMode.byteValue(),
+                ambientSoundMode.toByte(),
                 ancStrength.byteValue(),
                 vocalMode,
                 adaptiveAnc,
@@ -627,7 +628,7 @@ public abstract class SoundcoreProtocolImplV1 extends AbstractSoundcoreProtocol 
 
         editor.putString(
                 DeviceSettingsPreferenceConst.PREF_SOUNDCORE_AMBIENT_SOUND_CONTROL,
-                decodeAmbientSoundMode(payload[0])
+                AmbientSoundMode.fromByte(payload[0]).toString()
         );
         editor.putInt(
                 DeviceSettingsPreferenceConst.PREF_SONY_AMBIENT_SOUND_LEVEL,
@@ -646,31 +647,6 @@ public abstract class SoundcoreProtocolImplV1 extends AbstractSoundcoreProtocol 
                 payload[4] == 0x01
         );
         editor.apply();
-    }
-
-    protected Byte encodeAmbientSoundMode(final String ambientMode) {
-        switch (ambientMode) {
-            case "noise_cancelling":
-                return (byte) 0x00;
-            case "ambient_sound":
-                return (byte) 0x01;
-            case "off":
-                return (byte) 0x02;
-            default:
-                return null;
-        }
-    }
-
-    protected String decodeAmbientSoundMode(final byte ambientMode) {
-        switch (ambientMode) {
-            case 0x00:
-                return "noise_cancelling";
-            case 0x01:
-                return "ambient_sound";
-            case 0x02:
-            default:
-                return "off";
-        }
     }
 
     protected Byte encodeAncStrength(final int strength) {
