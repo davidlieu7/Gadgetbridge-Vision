@@ -1,4 +1,4 @@
-package nodomain.freeyourgadget.gadgetbridge.service.devices.soundcore.sport_x20;
+package nodomain.freeyourgadget.gadgetbridge.service.devices.soundcore.devices;
 
 import android.content.SharedPreferences;
 

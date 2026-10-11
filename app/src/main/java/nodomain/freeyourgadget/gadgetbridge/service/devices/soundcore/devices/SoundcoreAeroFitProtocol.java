@@ -1,4 +1,4 @@
-package nodomain.freeyourgadget.gadgetbridge.service.devices.soundcore.aeroFit;
+package nodomain.freeyourgadget.gadgetbridge.service.devices.soundcore.devices;
 
 import static nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsPreferenceConst.PREF_SOUNDCORE_BATTERY_LOW_TONE;
 import static nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsPreferenceConst.PREF_SOUNDCORE_CONTROL_TOUCH_DISABLED;

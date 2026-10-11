@@ -14,12 +14,11 @@
 
     You should have received a copy of the GNU Affero General Public License
     along with this program.  If not, see <https://www.gnu.org/licenses/>. */
-package nodomain.freeyourgadget.gadgetbridge.devices.soundcore.a30i
+package nodomain.freeyourgadget.gadgetbridge.devices.soundcore
 
 import nodomain.freeyourgadget.gadgetbridge.R
-import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreEarbudsCoordinator
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice
-import nodomain.freeyourgadget.gadgetbridge.service.devices.soundcore.a30i.SoundcoreA30iProtocol
+import nodomain.freeyourgadget.gadgetbridge.service.devices.soundcore.devices.SoundcoreA30iProtocol
 import java.util.regex.Pattern
 
 class SoundcoreA30iCoordinator : SoundcoreEarbudsCoordinator() {

@@ -1,4 +1,4 @@
-package nodomain.freeyourgadget.gadgetbridge.service.devices.soundcore.liberty;
+package nodomain.freeyourgadget.gadgetbridge.service.devices.soundcore.devices;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;

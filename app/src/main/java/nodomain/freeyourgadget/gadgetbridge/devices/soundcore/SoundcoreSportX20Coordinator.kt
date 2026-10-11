@@ -14,12 +14,11 @@
 
     You should have received a copy of the GNU Affero General Public License
     along with this program.  If not, see <https://www.gnu.org/licenses/>. */
-package nodomain.freeyourgadget.gadgetbridge.devices.soundcore.sport_x20
+package nodomain.freeyourgadget.gadgetbridge.devices.soundcore
 
 import nodomain.freeyourgadget.gadgetbridge.R
-import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreEarbudsCoordinator
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice
-import nodomain.freeyourgadget.gadgetbridge.service.devices.soundcore.sport_x20.SoundcoreSportX20Protocol
+import nodomain.freeyourgadget.gadgetbridge.service.devices.soundcore.devices.SoundcoreSportX20Protocol
 import nodomain.freeyourgadget.gadgetbridge.activities.multipoint.MultipointPairingActivity
 import java.util.regex.Pattern
 

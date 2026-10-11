@@ -1,4 +1,4 @@
-package nodomain.freeyourgadget.gadgetbridge.service.devices.soundcore.q30;
+package nodomain.freeyourgadget.gadgetbridge.service.devices.soundcore.devices;
 
 import android.content.SharedPreferences;
 

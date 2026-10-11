@@ -12,8 +12,8 @@ import org.junit.Test;
 import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEvent;
 import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEventBatteryInfo;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
-import nodomain.freeyourgadget.gadgetbridge.service.devices.soundcore.aeroFit.SoundcoreAeroFitProtocol;
-import nodomain.freeyourgadget.gadgetbridge.service.devices.soundcore.liberty.SoundcoreLibertyProtocol;
+import nodomain.freeyourgadget.gadgetbridge.service.devices.soundcore.devices.SoundcoreAeroFitProtocol;
+import nodomain.freeyourgadget.gadgetbridge.service.devices.soundcore.devices.SoundcoreLibertyProtocol;
 
 public class SoundcoreV1ResponseTest {
     @Test

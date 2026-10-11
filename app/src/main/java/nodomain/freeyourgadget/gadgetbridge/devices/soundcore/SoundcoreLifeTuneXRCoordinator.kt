@@ -14,18 +14,17 @@
 
     You should have received a copy of the GNU Affero General Public License
     along with this program.  If not, see <https://www.gnu.org/licenses/>. */
-package nodomain.freeyourgadget.gadgetbridge.devices.soundcore.life_tune
+package nodomain.freeyourgadget.gadgetbridge.devices.soundcore
 
 import nodomain.freeyourgadget.gadgetbridge.R
-import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.q30.SoundcoreQ30Coordinator
 import java.util.regex.Pattern
 
-open class SoundcoreLifeTuneCoordinator : SoundcoreQ30Coordinator() {
+open class SoundcoreLifeTuneXRCoordinator : SoundcoreQ30Coordinator() {
     override fun getModelName(): String = "A3029"
 
-    override fun getSupportedDeviceName(): Pattern = Pattern.compile("Soundcore Life Tune")
+    override fun getSupportedDeviceName(): Pattern = Pattern.compile("Soundcore Life Tune XR")
 
-    override fun getDeviceNameResource(): Int = R.string.devicetype_soundcore_life_tune
+    override fun getDeviceNameResource(): Int = R.string.devicetype_soundcore_life_tune_xr
 
     override fun getDefaultCapabilities(): Set<Capability> = setOf(
         Capability.NoiseControl,

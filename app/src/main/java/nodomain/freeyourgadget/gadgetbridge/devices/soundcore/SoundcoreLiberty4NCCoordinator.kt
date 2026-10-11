@@ -14,12 +14,11 @@
 
     You should have received a copy of the GNU Affero General Public License
     along with this program.  If not, see <https://www.gnu.org/licenses/>. */
-package nodomain.freeyourgadget.gadgetbridge.devices.soundcore.liberty4_nc
+package nodomain.freeyourgadget.gadgetbridge.devices.soundcore
 
 import nodomain.freeyourgadget.gadgetbridge.R
-import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreEarbudsCoordinator
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice
-import nodomain.freeyourgadget.gadgetbridge.service.devices.soundcore.liberty.SoundcoreLibertyProtocol
+import nodomain.freeyourgadget.gadgetbridge.service.devices.soundcore.devices.SoundcoreLibertyProtocol
 import java.util.regex.Pattern
 
 class SoundcoreLiberty4NCCoordinator : SoundcoreEarbudsCoordinator() {

@@ -1,4 +1,4 @@
-package nodomain.freeyourgadget.gadgetbridge.service.devices.soundcore.a30i;
+package nodomain.freeyourgadget.gadgetbridge.service.devices.soundcore.devices;
 
 import androidx.annotation.Nullable;
 
