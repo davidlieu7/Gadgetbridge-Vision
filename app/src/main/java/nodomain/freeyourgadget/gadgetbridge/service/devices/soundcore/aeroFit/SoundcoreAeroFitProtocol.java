@@ -75,27 +75,4 @@ public class SoundcoreAeroFitProtocol extends SoundcoreProtocolImplV1 {
         LOG.debug("Unknown incoming message - command: {} ({} bytes)", command, payload.length);
         return new GBDeviceEvent[0];
     }
-
-    @Override
-    public byte[] encodeSendConfiguration(String config) {
-        Prefs prefs = getDevicePrefs();
-
-        switch (config) {
-            // Control
-            case PREF_SOUNDCORE_CONTROL_TOUCH_DISABLED:
-                boolean touchDisabled = prefs.getBoolean(PREF_SOUNDCORE_CONTROL_TOUCH_DISABLED, false);
-                return encodeBooleanCommand(CMD_SET_TAP_CONTROLS_ENABLE, touchDisabled);
-
-            // Miscellaneous Settings
-            case PREF_SOUNDCORE_TOUCH_TONE:
-                boolean touchTone = prefs.getBoolean(PREF_SOUNDCORE_TOUCH_TONE, false);
-                return encodeBooleanCommand(CMD_SET_TOUCH_TONE, touchTone);
-            case PREF_SOUNDCORE_BATTERY_LOW_TONE:
-                boolean batteryLowTone = prefs.getBoolean(PREF_SOUNDCORE_BATTERY_LOW_TONE, false);
-                return encodeBooleanCommand(CMD_SET_BATTERY_LOW_TONE, batteryLowTone);
-            default:
-                return super.encodeSendConfiguration(config);
-        }
-    }
-
 }

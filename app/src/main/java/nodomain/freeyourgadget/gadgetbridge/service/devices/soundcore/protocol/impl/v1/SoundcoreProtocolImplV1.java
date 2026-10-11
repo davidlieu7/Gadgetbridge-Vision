@@ -75,6 +75,12 @@ public abstract class SoundcoreProtocolImplV1 extends AbstractSoundcoreProtocol 
     public byte[] encodeSendConfiguration(final String config) {
         final Prefs prefs = getDevicePrefs();
         switch (config) {
+            case DeviceSettingsPreferenceConst.PREF_SOUNDCORE_CONTROL_TOUCH_DISABLED:
+                return encodeBooleanCommand(CMD_SET_TAP_CONTROLS_ENABLE, prefs.getBoolean(config, false));
+            case DeviceSettingsPreferenceConst.PREF_SOUNDCORE_TOUCH_TONE:
+                return encodeBooleanCommand(CMD_SET_TOUCH_TONE, prefs.getBoolean(config, false));
+            case DeviceSettingsPreferenceConst.PREF_SOUNDCORE_BATTERY_LOW_TONE:
+                return encodeBooleanCommand(CMD_SET_BATTERY_LOW_TONE, prefs.getBoolean(config, false));
             case DeviceSettingsPreferenceConst.PREF_SOUNDCORE_GAMING_MODE:
                 return encodeBooleanCommand(CMD_SET_GAMING_MODE, prefs.getBoolean(config, false));
             case DeviceSettingsPreferenceConst.PREF_SOUNDCORE_AUTO_POWER_OFF:
