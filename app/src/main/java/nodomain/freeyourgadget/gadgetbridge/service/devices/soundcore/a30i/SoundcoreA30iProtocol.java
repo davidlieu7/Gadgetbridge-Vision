@@ -23,6 +23,11 @@ public class SoundcoreA30iProtocol extends SoundcoreProtocolImplV1 {
     }
 
     @Override
+    protected void decodeAudioMode(final byte[] payload) {
+        // A30i audio settings use a separate seven-byte layout in device info.
+    }
+
+    @Override
     protected GBDeviceEvent[] decodeDeviceInfo(final byte[] payload) {
         if (payload == null || payload.length < 78) {
             return new GBDeviceEvent[0];

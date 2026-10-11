@@ -110,12 +110,6 @@ public class SoundcoreSportX20Protocol extends SoundcoreProtocolImplV1 {
     }
 
     @Override
-    protected GBDeviceEvent[] decodeAudioMode(final byte[] payload) {
-        decodeAdvancedAudioMode(payload);
-        return new GBDeviceEvent[0];
-    }
-
-    @Override
     protected int getBatteryMultiplier() {
         return BATTERY_MULTIPLIER;
     }
@@ -210,7 +204,7 @@ public class SoundcoreSportX20Protocol extends SoundcoreProtocolImplV1 {
         final byte[] audioPayload = java.util.Arrays.copyOfRange(
                 payload, DEVICE_INFO_AUDIO_OFFSET, DEVICE_INFO_AUDIO_OFFSET + DEVICE_INFO_AUDIO_LENGTH);
         LOG.debug("Decoding audio state from CMD_GET_DEVICE_INFO mirror: {}", StringUtils.bytesToHex(audioPayload));
-        decodeAdvancedAudioMode(audioPayload);
+        decodeAudioMode(audioPayload);
 
         // 3D surround sound boolean at offset 124 (0x01=on, 0x00=off).
         final boolean surround3d = payload[DEVICE_INFO_3D_SURROUND_OFFSET] == 0x01;

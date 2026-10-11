@@ -257,7 +257,8 @@ public abstract class SoundcoreProtocolImplV1 extends AbstractSoundcoreProtocol 
             case CMD_NOTIFY_CHARGING_INFO:
                 return decodeChargingInfo(payload);
             case CMD_NOTIFY_AUDIO_MODE:
-                return decodeAudioMode(payload);
+                decodeAudioMode(payload);
+                return new GBDeviceEvent[0];
             case CMD_NOTIFY_PAIRED_DEVICES:
                 return decodePairedDevices(payload);
             case CMD_NOTIFY_CONNECTION_STATUS:
@@ -388,11 +389,6 @@ public abstract class SoundcoreProtocolImplV1 extends AbstractSoundcoreProtocol 
 
     /** Hook for the device-specific CMD_NOTIFY_CHARGING_INFO payload layout. */
     protected GBDeviceEvent[] decodeChargingInfo(final byte[] payload) {
-        return new GBDeviceEvent[0];
-    }
-
-    /** Hook for the device-specific CMD_NOTIFY_AUDIO_MODE payload layout. */
-    protected GBDeviceEvent[] decodeAudioMode(final byte[] payload) {
         return new GBDeviceEvent[0];
     }
 
@@ -661,7 +657,8 @@ public abstract class SoundcoreProtocolImplV1 extends AbstractSoundcoreProtocol 
         return encodeCommand(CMD_SET_AUDIO_MODE, payload);
     }
 
-    protected void decodeAdvancedAudioMode(final byte[] payload) {
+    /** Decodes the shared five-field Liberty/Sport X20 audio layout; ignores trailing state bytes. */
+    protected void decodeAudioMode(final byte[] payload) {
         if (payload.length < 5) {
             return;
         }

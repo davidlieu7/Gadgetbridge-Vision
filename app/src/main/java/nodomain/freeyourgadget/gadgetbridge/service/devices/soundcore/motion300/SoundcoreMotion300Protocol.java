@@ -86,6 +86,11 @@ public class SoundcoreMotion300Protocol extends SoundcoreProtocolImplV1 {
     }
 
     @Override
+    protected void decodeAudioMode(final byte[] payload) {
+        // Motion 300 does not use the shared earbud audio-mode layout.
+    }
+
+    @Override
     public GBDeviceEvent[] decodeResponse(byte[] data) {
         final SoundcorePacket packet = decodePacket(data);
 

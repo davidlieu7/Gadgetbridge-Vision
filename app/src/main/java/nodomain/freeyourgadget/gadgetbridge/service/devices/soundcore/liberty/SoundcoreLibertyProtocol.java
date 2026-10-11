@@ -29,12 +29,6 @@ public class SoundcoreLibertyProtocol extends SoundcoreProtocolImplV1 {
     }
 
     @Override
-    protected GBDeviceEvent[] decodeAudioMode(final byte[] payload) {
-        decodeAdvancedAudioMode(payload);
-        return new GBDeviceEvent[0];
-    }
-
-    @Override
     protected int getBatteryMultiplier() {
         return BATTERY_MULTIPLIER;
     }

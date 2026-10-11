@@ -44,12 +44,6 @@ public class SoundcoreQ30Protocol extends SoundcoreProtocolImplV1 {
         };
     }
 
-    @Override
-    protected GBDeviceEvent[] decodeAudioMode(final byte[] payload) {
-        decodeAudioModePayload(payload);
-        return new GBDeviceEvent[0];
-    }
-
     /** Q30 reports its single battery in CMD_GET_DEVICE_INFO, not the earbud/case notification layout. */
     @Override
     protected GBDeviceEvent[] decodeBatteryInfo(final byte[] payload) {
@@ -110,7 +104,8 @@ public class SoundcoreQ30Protocol extends SoundcoreProtocolImplV1 {
     /**
      * Gets triggered when the button on the device is pressed or transparency toggled with the right palm.
      */
-    private void decodeAudioModePayload(byte[] payload) {
+    @Override
+    protected void decodeAudioMode(final byte[] payload) {
         if (payload.length < 2) {
             LOG.warn("Audio mode payload too short: {} bytes", payload.length);
             return;
