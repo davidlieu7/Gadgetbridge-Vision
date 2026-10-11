@@ -367,6 +367,7 @@ dependencies {
     implementation libs.androidsvg
     implementation libs.jsoup
     implementation libs.kaitai.struct.runtime
+    implementation libs.zxing.core
 
     // Bouncy Castle is included directly in GB, to avoid pulling the entire dependency
     // It's included in the org.bouncycastle.shaded package, to fix conflicts with roboelectric

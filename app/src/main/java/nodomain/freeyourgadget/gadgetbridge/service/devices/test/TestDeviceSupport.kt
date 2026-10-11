@@ -21,6 +21,7 @@ import android.content.Context
 import android.os.Handler
 import android.os.Looper
 import nodomain.freeyourgadget.gadgetbridge.R
+import nodomain.freeyourgadget.gadgetbridge.capabilities.loyaltycards.CatimaManager
 import nodomain.freeyourgadget.gadgetbridge.capabilities.loyaltycards.LoyaltyCard
 import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEventBatteryInfo
 import nodomain.freeyourgadget.gadgetbridge.devices.test.TestDeviceCoordinator
@@ -129,6 +130,8 @@ open class TestDeviceSupport : AbstractBluetoothDeviceSupport() {
         for (card in cards) {
             LOG.debug("Loyalty card: {}", card.toStringFull())
         }
+
+        CatimaManager.notifySynced(context, device, true)
     }
 
     protected val coordinator: TestDeviceCoordinator

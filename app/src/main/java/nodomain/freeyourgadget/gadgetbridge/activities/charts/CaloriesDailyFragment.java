@@ -222,11 +222,13 @@ public class CaloriesDailyFragment extends AbstractChartFragment<CaloriesDailyFr
         final String kcal = getString(R.string.calories_unit);
         dateView.setText(data.formattedDate);
 
+        final int activeColor = ContextCompat.getColor(requireContext(), R.color.calories_color);
+        final int restingColor = ContextCompat.getColor(requireContext(), R.color.calories_resting_color);
         final List<StatTileData> stats = new ArrayList<>();
         if (supportsActiveCalories()) {
-            stats.add(new StatTileData(String.format(Locale.getDefault(), "%d %s", activeCalories, kcal), getString(R.string.active_calories_short)));
+            stats.add(new StatTileData(String.format(Locale.getDefault(), "%d %s", activeCalories, kcal), getString(R.string.active_calories_short), null, null, null, null, activeColor));
         }
-        stats.add(new StatTileData(String.format(Locale.getDefault(), "%d %s", restingCalories, kcal), getString(R.string.hr_resting)));
+        stats.add(new StatTileData(String.format(Locale.getDefault(), "%d %s", restingCalories, kcal), getString(R.string.hr_resting), null, null, null, null, restingColor));
         if (supportsActiveCalories()) {
             stats.add(new StatTileData(String.format(Locale.getDefault(), "%d %s", ACTIVE_CALORIES_GOAL, kcal), getString(R.string.active_calories_goal)));
         }

@@ -47,7 +47,7 @@
             android:id="@+id/steps_stats_container"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="@dimen/chart_section_spacing"
+            android:layout_marginTop="@dimen/chart_gauge_bottom_spacing"
             android:layout_marginBottom="15dp"
             android:layout_marginStart="15dp"
             android:layout_marginEnd="15dp"

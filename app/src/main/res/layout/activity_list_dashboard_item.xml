@@ -20,29 +20,38 @@
             android:gravity="center"
             android:orientation="horizontal">
 
-            <com.github.mikephil.charting.charts.PieChart
-                android:id="@+id/activity_dashboard_piechart1"
+            <FrameLayout
+                android:id="@+id/activity_dashboard_gauge1"
                 android:layout_width="110dp"
                 android:layout_height="110dp"
                 android:layout_gravity="bottom|center"
                 android:layout_marginBottom="0dp"
-                android:layout_weight="1" />
+                android:layout_weight="1">
 
-            <com.github.mikephil.charting.charts.PieChart
-                android:id="@+id/activity_dashboard_piechart2"
-                android:layout_width="110dp"
-                android:layout_height="110dp"
-                android:layout_gravity="bottom|center"
-                android:layout_marginBottom="0dp"
-                android:layout_weight="1" />
+                <include layout="@layout/activity_gauge" />
+            </FrameLayout>
 
-            <com.github.mikephil.charting.charts.PieChart
-                android:id="@+id/activity_dashboard_piechart3"
+            <FrameLayout
+                android:id="@+id/activity_dashboard_gauge2"
                 android:layout_width="110dp"
                 android:layout_height="110dp"
                 android:layout_gravity="bottom|center"
                 android:layout_marginBottom="0dp"
-                android:layout_weight="1" />
+                android:layout_weight="1">
+
+                <include layout="@layout/activity_gauge" />
+            </FrameLayout>
+
+            <FrameLayout
+                android:id="@+id/activity_dashboard_gauge3"
+                android:layout_width="110dp"
+                android:layout_height="110dp"
+                android:layout_gravity="bottom|center"
+                android:layout_marginBottom="0dp"
+                android:layout_weight="1">
+
+                <include layout="@layout/activity_gauge" />
+            </FrameLayout>
             <!--
                                 <com.github.mikephil.charting.charts.PieChart
                                     android:id="@+id/activity_dashboard_piechart4"
@@ -123,10 +132,10 @@
 
         </LinearLayout>
     </LinearLayout>
+
     <View
-        android:layout_below="@id/activity_list_summary_dashboard"
         android:layout_width="match_parent"
         android:layout_height="1dp"
-        android:background="?attr/row_separator"
-        />
+        android:layout_below="@id/activity_list_summary_dashboard"
+        android:background="?attr/row_separator" />
 </RelativeLayout>

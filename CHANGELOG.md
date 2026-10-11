@@ -2,6 +2,40 @@
 
 <!-- For contributors: do not modify this file - the project maintainers will update it as needed -->
 
+#### Next version (WIP)
+
+* Initial support for BRAZ/7HARRY (FitPro)
+* Refresh alarms list and details / charts
+* Add companion pairing hint to device cards
+* Add file installer device card item for debug builds
+* Charts: Display workout intervals from track segments
+* Configure and hide device card items
+* Cycling sensor: Fix CSC measurement parsing for combined sensors
+* Fossil: Add quick settings
+* Garmin: Add card item to send waypoints
+* Garmin: Add support for custom apps for navigation and loyalty cards
+* Garmin: Add workout templates extra reps, load category
+* Garmin: Fix workout templates step names
+* Garmin: Remove unsupported capabilities
+* Health Connect: Implement deletion of activities
+* Mi Body Composition Scale: Only read impedance when the flag is set
+* Quick Settings: Long press to device settings
+* Sleep as Android: Fix alarms skipped outside of tracking
+* Test device: Fix test HR samples
+* Test device: Improve configuration of enabled features
+* Update some old dialogs to Material 3
+* Workout details: Display HR zone thresholds and time percentages
+* Workout templates: Add button to duplicate steps
+* Workout templates: Allow sharing workouts
+* Workout templates: Simplify step value labels
+* Workout Templates: Use cards in the template list and editor
+* Workouts: Add statistics overview
+* Workouts: Update filter screen to Material 3
+* Xiaomi-protobuf: Always allow raw summary, details and GPS sharing
+* Xiaomi-protobuf: Fix reprocessing getting stuck when there are no files
+* Xiaomi-protobuf: Keep activities that fail to be parsed
+* Xiaomi-protobuf: Sleep As Android improvements
+
 #### 0.95.1
 
 * Fix build reproducibility

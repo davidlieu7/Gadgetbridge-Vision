@@ -1,4 +1,5 @@
    <RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
@@ -56,6 +57,7 @@
                         android:id="@+id/vo2max_running_gauge_value"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
+                        android:includeFontPadding="false"
                         android:text="@string/stats_empty_value"
                         android:textColor="?attr/textColorPrimary"
                         android:textSize="30sp" />
@@ -64,6 +66,8 @@
                         android:id="@+id/vo2max_running_gauge_label"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
+                        android:layout_marginTop="-4dp"
+                        android:includeFontPadding="false"
                         android:text="@string/activity_type_running" />
 
                 </LinearLayout>
@@ -99,6 +103,7 @@
                         android:id="@+id/vo2max_cycling_gauge_value"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
+                        android:includeFontPadding="false"
                         android:text="@string/stats_empty_value"
                         android:textColor="?attr/textColorPrimary"
                         android:textSize="30sp" />
@@ -107,6 +112,8 @@
                         android:id="@+id/vo2max_cycling_gauge_label"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
+                        android:layout_marginTop="-4dp"
+                        android:includeFontPadding="false"
                         android:text="@string/title_cycling" />
 
                 </LinearLayout>
@@ -142,6 +149,7 @@
                         android:id="@+id/vo2max_gauge_value"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
+                        android:includeFontPadding="false"
                         android:text="@string/stats_empty_value"
                         android:textColor="?attr/textColorPrimary"
                         android:textSize="30sp" />
@@ -150,12 +158,19 @@
                         android:id="@+id/vo2max_gauge_label"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
+                        android:layout_marginTop="-4dp"
+                        android:includeFontPadding="false"
                         android:text="@string/menuitem_vo2_max" />
 
                 </LinearLayout>
 
             </RelativeLayout>
         </GridLayout>
+
+        <nodomain.freeyourgadget.gadgetbridge.activities.workouts.SectionHeaderView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            app:sectionTitle="@string/vo2max_trend" />
 
         <LinearLayout
             android:layout_width="match_parent"

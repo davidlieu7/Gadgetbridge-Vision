@@ -41,6 +41,7 @@ import nodomain.freeyourgadget.gadgetbridge.activities.charts.mpchart.DaySelecti
 import nodomain.freeyourgadget.gadgetbridge.activities.charts.mpchart.GbChartView;
 import nodomain.freeyourgadget.gadgetbridge.activities.charts.spec.ChartSeries;
 import nodomain.freeyourgadget.gadgetbridge.activities.charts.spec.ChartSpec;
+import nodomain.freeyourgadget.gadgetbridge.activities.workouts.SectionHeaderView;
 import nodomain.freeyourgadget.gadgetbridge.activities.workouts.StatTileData;
 import nodomain.freeyourgadget.gadgetbridge.activities.workouts.StatTileGridUtilKt;
 import nodomain.freeyourgadget.gadgetbridge.activities.workouts.WorkoutValueFormatter;
@@ -103,6 +104,8 @@ public class HeartRatePeriodFragment extends AbstractChartFragment<HeartRatePeri
         hrLineChart.dismissSelectionOnTapOutside(rootView);
         hrLegend = rootView.findViewById(R.id.heart_rate_chart_legend);
         hrStatsContainer = rootView.findViewById(R.id.hr_stats_container);
+        final SectionHeaderView chartHeader = rootView.findViewById(R.id.hr_chart_header);
+        chartHeader.setTitle(getString(TOTAL_DAYS == 1 ? R.string.day_timeline : R.string.heart_rate_daily));
 
         refresh();
 

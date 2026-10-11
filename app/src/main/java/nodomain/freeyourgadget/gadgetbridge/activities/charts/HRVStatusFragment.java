@@ -59,6 +59,7 @@ import nodomain.freeyourgadget.gadgetbridge.activities.charts.spec.ChartSeries;
 import nodomain.freeyourgadget.gadgetbridge.activities.charts.spec.ChartSpec;
 import nodomain.freeyourgadget.gadgetbridge.widgets.impl.HrvWidget;
 import nodomain.freeyourgadget.gadgetbridge.activities.dashboard.GaugeDrawer;
+import nodomain.freeyourgadget.gadgetbridge.activities.workouts.SectionHeaderView;
 import nodomain.freeyourgadget.gadgetbridge.activities.workouts.StatTileData;
 import nodomain.freeyourgadget.gadgetbridge.activities.workouts.StatTileGridUtilKt;
 import nodomain.freeyourgadget.gadgetbridge.database.DBHandler;
@@ -106,6 +107,7 @@ public class HRVStatusFragment extends AbstractChartFragment<HRVStatusFragment.H
     private TextView mDateView;
     private TextView mHRVGaugeValue;
     private TextView mHRVGaugeStatus;
+    private LinearLayout mHRVStatusPeriodStatsContainer;
     protected int TEXT_COLOR;
     protected int HRV_AVERAGE_COLOR;
     protected int HRV_RANGE_COLOR;
@@ -168,6 +170,18 @@ public class HRVStatusFragment extends AbstractChartFragment<HRVStatusFragment.H
         mHRVGaugeValue = rootView.findViewById(R.id.hrv_gauge_value);
         mHRVGaugeStatus = rootView.findViewById(R.id.hrv_gauge_status);
         mHRVStatusDataTypeGroup = rootView.findViewById(R.id.hrv_status_chart_data_type_group);
+        mHRVStatusPeriodStatsContainer = rootView.findViewById(R.id.hrv_status_period_stats_container);
+
+        if (viewMode != ViewMode.LAST_NIGHT) {
+            rootView.findViewById(R.id.hrv_gauge).setVisibility(View.GONE);
+            mHRVStatusStatsContainer.setVisibility(View.GONE);
+            mHRVStatusPeriodStatsContainer.setVisibility(View.VISIBLE);
+            final SectionHeaderView chartHeader = rootView.findViewById(R.id.hrv_chart_header);
+            chartHeader.setTitle(getString(R.string.hrv_status_trend));
+            final ViewGroup.MarginLayoutParams params = (ViewGroup.MarginLayoutParams) chartHeader.getLayoutParams();
+            params.topMargin = getResources().getDimensionPixelSize(R.dimen.chart_section_spacing);
+            chartHeader.setLayoutParams(params);
+        }
 
         gaugeDrawer = new GaugeDrawer();
         setupPeriodDataTypeChips(inflater);
@@ -339,10 +353,14 @@ public class HRVStatusFragment extends AbstractChartFragment<HRVStatusFragment.H
         mHRVGaugeStatus.setTextColor(statusColor);
 
         final boolean lastNight = viewMode == ViewMode.LAST_NIGHT;
-        final int nightlyAvgLabel = lastNight ? R.string.hrv_status_last_night : R.string.hrv_status_nightly_avg;
-        final int highestNightlyAvgLabel = lastNight ? R.string.hrv_status_last_night_highest_5 : R.string.hrv_status_highest_nightly_avg;
-        final int nightlyAvgValue = lastNight ? today.lastNight : weeklyData.getPeriodNightlyAverage();
-        final int highestNightlyAvgValue = lastNight ? today.lastNight5MinHigh : weeklyData.getHighestNightlyAverage();
+        if (!lastNight) {
+            mHRVStatusPeriodStatsContainer.removeAllViews();
+            final List<StatTileData> periodStats = new ArrayList<>();
+            periodStats.add(new StatTileData(formatHrvStatusValue(weeklyData.getPeriodNightlyAverage()), getString(R.string.hrv_status_nightly_avg)));
+            periodStats.add(new StatTileData(formatHrvStatusValue(weeklyData.getHighestNightlyAverage()), getString(R.string.hrv_status_highest_nightly_avg)));
+            StatTileGridUtilKt.addStatTileGrid(mHRVStatusPeriodStatsContainer, requireContext(), periodStats, 0);
+            return;
+        }
 
         mHRVStatusStatsContainer.removeAllViews();
         final List<StatTileData> stats = new ArrayList<>();
@@ -364,8 +382,8 @@ public class HRVStatusFragment extends AbstractChartFragment<HRVStatusFragment.H
                         ? getString(R.string.hrv_status_baseline, today.baseLineBalancedLower, today.baseLineBalancedUpper) : "-",
                 getString(R.string.hrv_status_baseline_label)
         ));
-        stats.add(new StatTileData(formatHrvStatusValue(nightlyAvgValue), getString(nightlyAvgLabel)));
-        stats.add(new StatTileData(formatHrvStatusValue(highestNightlyAvgValue), getString(highestNightlyAvgLabel)));
+        stats.add(new StatTileData(formatHrvStatusValue(today.lastNight), getString(R.string.hrv_status_last_night)));
+        stats.add(new StatTileData(formatHrvStatusValue(today.lastNight5MinHigh), getString(R.string.hrv_status_last_night_highest_5)));
         StatTileGridUtilKt.addStatTileGrid(mHRVStatusStatsContainer, requireContext(), stats, 0);
 
         final float value = HrvWidget.calculateGaugeValue(today.weeklyAvg, today.baseLineLowUpper, today.baseLineBalancedLower, today.baseLineBalancedUpper);

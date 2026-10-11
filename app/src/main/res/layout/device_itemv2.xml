@@ -203,29 +203,38 @@
                 android:gravity="center"
                 android:orientation="horizontal">
 
-                <com.github.mikephil.charting.charts.PieChart
-                    android:id="@+id/activity_dashboard_piechart1"
+                <FrameLayout
+                    android:id="@+id/device_card_gauge_steps"
                     android:layout_width="0dp"
-                    android:layout_height="104dp"
+                    android:layout_height="wrap_content"
                     android:layout_weight="1"
                     android:contentDescription="@string/live_activity_total_steps"
-                    android:tooltipText="@string/live_activity_total_steps" />
+                    android:tooltipText="@string/live_activity_total_steps">
 
-                <com.github.mikephil.charting.charts.PieChart
-                    android:id="@+id/activity_dashboard_piechart2"
+                    <include layout="@layout/activity_gauge" />
+                </FrameLayout>
+
+                <FrameLayout
+                    android:id="@+id/device_card_gauge_distance"
                     android:layout_width="0dp"
-                    android:layout_height="104dp"
+                    android:layout_height="wrap_content"
                     android:layout_weight="1"
                     android:contentDescription="@string/activity_list_summary_distance"
-                    android:tooltipText="@string/activity_list_summary_distance" />
+                    android:tooltipText="@string/activity_list_summary_distance">
 
-                <com.github.mikephil.charting.charts.PieChart
-                    android:id="@+id/activity_dashboard_piechart3"
+                    <include layout="@layout/activity_gauge" />
+                </FrameLayout>
+
+                <FrameLayout
+                    android:id="@+id/device_card_gauge_sleep"
                     android:layout_width="0dp"
-                    android:layout_height="104dp"
+                    android:layout_height="wrap_content"
                     android:layout_weight="1"
                     android:contentDescription="@string/sleepchart_your_sleep"
-                    android:tooltipText="@string/sleepchart_your_sleep" />
+                    android:tooltipText="@string/sleepchart_your_sleep">
+
+                    <include layout="@layout/activity_gauge" />
+                </FrameLayout>
             </LinearLayout>
         </LinearLayout>
     </com.google.android.material.card.MaterialCardView>

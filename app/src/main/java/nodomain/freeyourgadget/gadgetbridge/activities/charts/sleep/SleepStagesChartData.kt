@@ -43,25 +43,24 @@ object SleepStagesChartData {
         if (seconds.isEmpty() && hrPoints.isEmpty()) {
             return ChartSpec.EMPTY
         }
-        val areas = List(labels.size) { mutableListOf<ChartPoint>() }
+        // One area per stretch of a stage, so separate stretches aren't joined along the bottom
+        val areas = mutableListOf<Pair<Int, MutableList<ChartPoint>>>()
         for (i in seconds.indices) {
             val x = seconds[i].toDouble()
             val stage = stages[i]
             if (i == 0) {
-                areas[stage].add(ChartPoint(x, 0.0))
+                areas += stage to mutableListOf(ChartPoint(x, 0.0))
             } else if (stages[i - 1] != stage) {
                 val previous = stages[i - 1]
                 val ramp = previous != notWornStage && stage != notWornStage
-                areas[stage].add(ChartPoint(x, 0.0))
-                areas[previous].add(ChartPoint(x, if (ramp) values[i] else values[i - 1]))
-                areas[previous].add(ChartPoint(x, 0.0))
+                areas.last().second += ChartPoint(x, if (ramp) values[i] else values[i - 1])
+                areas.last().second += ChartPoint(x, 0.0)
+                areas += stage to mutableListOf(ChartPoint(x, 0.0))
             }
-            areas[stage].add(ChartPoint(x, values[i]))
+            areas.last().second += ChartPoint(x, values[i])
         }
-        val series = areas.mapIndexedNotNull { stage, points ->
-            points.takeIf { it.isNotEmpty() }?.let {
-                ChartSeries("stage_$stage", labels[stage], it, SeriesStyle.Line(colors[stage], filled = true, solidFill = true), selectable = false)
-            }
+        val series = areas.mapIndexed { index, (stage, points) ->
+            ChartSeries("stage_${stage}_$index", labels[stage], points, SeriesStyle.Line(colors[stage], filled = true, solidFill = true), selectable = false)
         } + listOfNotNull(
             ChartSeries("samples", "", seconds.indices.map { ChartPoint(seconds[it].toDouble(), values[it]) }, SeriesStyle.Line(markerColor, showLine = false)),
             ChartSeries("hr", hrLabel, hrPoints, SeriesStyle.Line(hrColor, curve = LineCurve.FLAT_AT_POINTS, maxGap = hrMaxGapSeconds), AxisSide.END)

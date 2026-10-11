@@ -58,7 +58,7 @@ object TemperatureChartData {
     }
 
     /**
-     * The min-max range of each day with its average as a dot; NaN marks a day without data.
+     * The min-max range of each day with its average as a line; NaN marks a day without data and breaks the line.
      */
     @JvmStatic
     fun periodSpec(
@@ -85,7 +85,7 @@ object TemperatureChartData {
         return ChartSpec(
             series = listOf(
                 ChartSeries("range", rangeLabel, ranges, SeriesStyle.Range(rangeColor, DAY_RANGE_WIDTH)),
-                ChartSeries("average", averageLabel, averages, SeriesStyle.Line(averageColor, showPoints = true, showLine = false)),
+                ChartSeries("average", averageLabel, averages, SeriesStyle.Line(averageColor, maxGap = 1.0)),
             ).filter { it.points.isNotEmpty() },
             xAxis = AxisSpec(
                 format = ChartValueFormat.EPOCH_DAY,

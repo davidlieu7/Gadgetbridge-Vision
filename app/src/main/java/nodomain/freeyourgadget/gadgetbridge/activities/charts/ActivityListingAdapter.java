@@ -17,7 +17,6 @@
 package nodomain.freeyourgadget.gadgetbridge.activities.charts;
 
 import android.content.Context;
-import android.graphics.Color;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -25,24 +24,17 @@ import android.widget.LinearLayout;
 import android.widget.TextView;
 
 import androidx.annotation.NonNull;
-import androidx.appcompat.content.res.AppCompatResources;
-
-import com.github.mikephil.charting.animation.Easing;
-import com.github.mikephil.charting.charts.PieChart;
-import com.github.mikephil.charting.data.PieData;
-import com.github.mikephil.charting.data.PieDataSet;
-import com.github.mikephil.charting.data.PieEntry;
-import com.github.mikephil.charting.utils.MPPointF;
-import com.google.android.material.color.MaterialColors;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.text.DecimalFormat;
-import java.util.ArrayList;
+import java.util.Locale;
 import java.util.concurrent.TimeUnit;
 
 import nodomain.freeyourgadget.gadgetbridge.R;
+import nodomain.freeyourgadget.gadgetbridge.activities.dashboard.ActivityGauge;
+import nodomain.freeyourgadget.gadgetbridge.activities.dashboard.GaugeDrawer;
 import nodomain.freeyourgadget.gadgetbridge.adapter.AbstractActivityListingAdapter;
 import nodomain.freeyourgadget.gadgetbridge.model.ActivityListItem;
 import nodomain.freeyourgadget.gadgetbridge.model.ActivitySession;
@@ -51,10 +43,8 @@ import nodomain.freeyourgadget.gadgetbridge.util.DateTimeUtils;
 import nodomain.freeyourgadget.gadgetbridge.util.FormatUtils;
 
 public class ActivityListingAdapter extends AbstractActivityListingAdapter<ActivitySession> {
-    public static final String CHART_COLOR_START = "#e74c3c";
-    public static final String CHART_COLOR_END = "#2ecc71";
     protected static final Logger LOG = LoggerFactory.getLogger(ActivityListingAdapter.class);
-    protected final int ANIM_TIME = 250;
+    private final GaugeDrawer gaugeDrawer = new GaugeDrawer();
     ActivityUser activityUser = new ActivityUser();
     int stepsGoal = activityUser.getStepsGoal();
     int distanceGoalMeters = activityUser.getDistanceGoalMeters();
@@ -76,53 +66,8 @@ public class ActivityListingAdapter extends AbstractActivityListingAdapter<Activ
         };
     }
 
-    private void setChartsData(PieChart pieChart, float value, float target, String label, Context context) {
-        ArrayList<PieEntry> entries = new ArrayList<>();
-        entries.add(new PieEntry<>(value, null, AppCompatResources.getDrawable(context, R.drawable.ic_star_gold), null));
-
-        Easing.EasingFunction animationEffect = Easing.INSTANCE.getEaseInOutSine();
-
-        if (value < target) {
-            entries.add(new PieEntry<>(target - value, null, null, null));
-        }
-
-        pieChart.setCenterText(String.format("%d%%\n%s", (int) (value * 100 / target), label));
-        float colorValue = Math.max(0, Math.min(1, value / target));
-        int chartColor = interpolateColor(Color.parseColor(CHART_COLOR_START), Color.parseColor(CHART_COLOR_END), colorValue);
-
-        PieDataSet dataSet = new PieDataSet(entries, "");
-        dataSet.setDrawIconsEnabled(false);
-        dataSet.setIconsOffset(new MPPointF(0, -66));
-
-        if (colorValue == 1) {
-            dataSet.setDrawIconsEnabled(true);
-        }
-        dataSet.setSliceSpace(0f);
-        dataSet.setSelectionShift(5f);
-        dataSet.setColors(chartColor, MaterialColors.getColor(pieChart, com.google.android.material.R.attr.colorSurfaceContainerHighest));
-
-        PieData data = new PieData(dataSet);
-        data.setValueTextSize(0f);
-        data.setValueTextColor(Color.WHITE);
-
-        pieChart.setData(data);
-        pieChart.invalidate();
-        pieChart.animateY(ANIM_TIME, animationEffect);
-    }
-
-    private float interpolate(float a, float b, float proportion) {
-        return (a + ((b - a) * proportion));
-    }
-
-    private int interpolateColor(int a, int b, float proportion) {
-        float[] hsva = new float[3];
-        float[] hsvb = new float[3];
-        Color.colorToHSV(a, hsva);
-        Color.colorToHSV(b, hsvb);
-        for (int i = 0; i < 3; i++) {
-            hsvb[i] = interpolate(hsva[i], hsvb[i], proportion);
-        }
-        return Color.HSVToColor(hsvb);
+    private static String formatPercent(final float value, final float target) {
+        return String.format(Locale.getDefault(), "%d%%", (int) (value * 100 / target));
     }
 
     public static class ActivityItemViewHolder extends AbstractActivityListingViewHolder<ActivitySession> {
@@ -158,9 +103,9 @@ public class ActivityListingAdapter extends AbstractActivityListingAdapter<Activ
     }
 
     public class DashboardViewHolder extends AbstractActivityListingViewHolder<ActivitySession> {
-        final PieChart ActiveStepsChart;
-        final PieChart DistanceChart;
-        final PieChart ActiveTimeChart;
+        final ActivityGauge ActiveStepsChart;
+        final ActivityGauge DistanceChart;
+        final ActivityGauge ActiveTimeChart;
         final TextView stepLabel;
         final TextView stepTotalLabel;
         final TextView distanceLabel;
@@ -181,9 +126,9 @@ public class ActivityListingAdapter extends AbstractActivityListingAdapter<Activ
         public DashboardViewHolder(@NonNull final View itemView) {
             super(itemView);
 
-            ActiveStepsChart = itemView.findViewById(R.id.activity_dashboard_piechart1);
-            DistanceChart = itemView.findViewById(R.id.activity_dashboard_piechart2);
-            ActiveTimeChart = itemView.findViewById(R.id.activity_dashboard_piechart3);
+            ActiveStepsChart = new ActivityGauge(itemView.findViewById(R.id.activity_dashboard_gauge1));
+            DistanceChart = new ActivityGauge(itemView.findViewById(R.id.activity_dashboard_gauge2));
+            ActiveTimeChart = new ActivityGauge(itemView.findViewById(R.id.activity_dashboard_gauge3));
             stepLabel = itemView.findViewById(R.id.line_layout_step_label);
             stepTotalLabel = itemView.findViewById(R.id.line_layout_total_step_label);
             distanceLabel = itemView.findViewById(R.id.line_layout_distance_label);
@@ -204,17 +149,14 @@ public class ActivityListingAdapter extends AbstractActivityListingAdapter<Activ
 
         @Override
         public void fill(final int position, final ActivitySession session, final boolean selected) {
-            setUpChart(ActiveStepsChart);
-            int steps = session.getActiveSteps();
-            setChartsData(ActiveStepsChart, steps, stepsGoal, getContext().getString(R.string.activity_list_summary_active_steps), getContext());
+            final int steps = session.getActiveSteps();
+            ActiveStepsChart.update(gaugeDrawer, steps, stepsGoal, formatPercent(steps, stepsGoal), getContext().getString(R.string.activity_list_summary_active_steps));
 
-            setUpChart(DistanceChart);
-            float distance = session.getDistance();
-            setChartsData(DistanceChart, distance, distanceGoalMeters, getContext().getString(R.string.distance), getContext());
+            final float distance = session.getDistance();
+            DistanceChart.update(gaugeDrawer, distance, distanceGoalMeters, formatPercent(distance, distanceGoalMeters), getContext().getString(R.string.distance));
 
-            setUpChart(ActiveTimeChart);
-            long duration = session.getEndTime().getTime() - session.getStartTime().getTime();
-            setChartsData(ActiveTimeChart, duration, activeTimeGoalTimeMillis, getContext().getString(R.string.activity_list_summary_active_time), getContext());
+            final long duration = session.getEndTime().getTime() - session.getStartTime().getTime();
+            ActiveTimeChart.update(gaugeDrawer, duration, activeTimeGoalTimeMillis, formatPercent(duration, activeTimeGoalTimeMillis), getContext().getString(R.string.activity_list_summary_active_time));
 
             durationLabel.setText(DateTimeUtils.formatDurationHoursMinutes(duration, TimeUnit.MILLISECONDS));
             sessionCountLabel.setText(String.valueOf(session.getSessionCount()));
@@ -267,23 +209,6 @@ public class ActivityListingAdapter extends AbstractActivityListingAdapter<Activ
                 countLayout.setVisibility(View.GONE);
                 durationLayout.setVisibility(View.GONE);
             }
-        }
-
-        private void setUpChart(PieChart DashboardChart) {
-            DashboardChart.setNoDataText("");
-            DashboardChart.setNoDataIconEnabled(false);
-            DashboardChart.getLegend().setEnabled(false);
-            DashboardChart.setDrawHoleEnabled(true);
-            DashboardChart.setHoleColor(Color.TRANSPARENT);
-            DashboardChart.getDescription().setText("");
-            DashboardChart.setTransparentCircleAlpha(0);
-            DashboardChart.setHoleRadius(82f);
-            DashboardChart.setTransparentCircleRadius(0f);
-            DashboardChart.setCenterTextColor(MaterialColors.getColor(DashboardChart, com.google.android.material.R.attr.colorOnSurface));
-            DashboardChart.setDrawCenterTextEnabled(true);
-            DashboardChart.setRotationEnabled(true);
-            DashboardChart.setHighlightPerTapEnabled(true);
-            DashboardChart.setCenterTextOffset(0, 0);
         }
     }
 }

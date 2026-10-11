@@ -19,14 +19,16 @@ package nodomain.freeyourgadget.gadgetbridge.devices.soundcore.sport_x20
 import nodomain.freeyourgadget.gadgetbridge.R
 import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreEarbudsCoordinator
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice
-import nodomain.freeyourgadget.gadgetbridge.service.DeviceSupport
-import nodomain.freeyourgadget.gadgetbridge.service.devices.soundcore.sport_x20.SoundcoreSportX20DeviceSupport
+import nodomain.freeyourgadget.gadgetbridge.service.devices.soundcore.sport_x20.SoundcoreSportX20Protocol
+import nodomain.freeyourgadget.gadgetbridge.activities.multipoint.MultipointPairingActivity
 import java.util.regex.Pattern
 
 class SoundcoreSportX20Coordinator : SoundcoreEarbudsCoordinator() {
-    override fun getDeviceNameResource(): Int = R.string.devicetype_soundcore_sport_x20
+    override fun getModelName(): String = "A3968"
 
     override fun getSupportedDeviceName(): Pattern = Pattern.compile("soundcore Sport X20")
+
+    override fun getDeviceNameResource(): Int = R.string.devicetype_soundcore_sport_x20
 
     override fun getDefaultCapabilities(): Set<Capability> = setOf(
         Capability.FindDevice,
@@ -47,6 +49,8 @@ class SoundcoreSportX20Coordinator : SoundcoreEarbudsCoordinator() {
     override fun getSupportedEqualizerBands(): IntArray = intArrayOf(
         100, 200, 400, 800, 1600, 3200, 6400, 12800,
     )
+
+    override fun getCustomEqualizerPresetArray(): Int = R.array.soundcore_sport_x20_equalizer_preset_names
 
     override val supportedButtonActions: List<ButtonAction> = listOf(
         ButtonAction.SINGLE_TAP,
@@ -74,6 +78,17 @@ class SoundcoreSportX20Coordinator : SoundcoreEarbudsCoordinator() {
             else -> supportedTapFunctions
         }
 
-    override fun getDeviceSupportClass(device: GBDevice): Class<out DeviceSupport> =
-        SoundcoreSportX20DeviceSupport::class.java
+    override fun createProtocol(device: GBDevice): SoundcoreSportX20Protocol =
+        SoundcoreSportX20Protocol(device)
+
+    override fun getSupportedMultipointActions(): Set<String> = setOf(
+        MultipointPairingActivity.ACTION_MULTIPOINT_ENABLE,
+        MultipointPairingActivity.ACTION_MULTIPOINT_DISABLE,
+        MultipointPairingActivity.ACTION_MULTIPOINT_GET_DEVICES,
+        MultipointPairingActivity.ACTION_MULTIPOINT_GET_STATUS,
+        MultipointPairingActivity.ACTION_MULTIPOINT_CONNECT_DEVICE,
+        MultipointPairingActivity.ACTION_MULTIPOINT_DISCONNECT_DEVICE,
+        MultipointPairingActivity.ACTION_MULTIPOINT_FORGET_DEVICE,
+        MultipointPairingActivity.ACTION_MULTIPOINT_START_PAIRING,
+    )
 }

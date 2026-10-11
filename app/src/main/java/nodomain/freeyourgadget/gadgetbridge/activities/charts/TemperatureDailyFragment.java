@@ -16,7 +16,6 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 package nodomain.freeyourgadget.gadgetbridge.activities.charts;
 
-import android.graphics.Color;
 import android.os.Bundle;
 import android.text.format.DateFormat;
 import android.view.LayoutInflater;
@@ -64,6 +63,7 @@ public class TemperatureDailyFragment extends AbstractChartFragment<TemperatureD
     protected static final Logger LOG = LoggerFactory.getLogger(TemperatureDailyFragment.class);
 
     protected int TEMPERATURE_COLOR;
+    protected int TEMPERATURE_AVG_COLOR;
 
     private TextView dateView;
     private LinearLayout statsContainer;
@@ -100,6 +100,7 @@ public class TemperatureDailyFragment extends AbstractChartFragment<TemperatureD
     @Override
     protected void init() {
         TEMPERATURE_COLOR = ContextCompat.getColor(requireContext(), R.color.chart_temperature);
+        TEMPERATURE_AVG_COLOR = ContextCompat.getColor(requireContext(), R.color.chart_temperature_average);
     }
 
     @Override
@@ -161,7 +162,7 @@ public class TemperatureDailyFragment extends AbstractChartFragment<TemperatureD
         final long dayStart = DateTimeUtils.dayStart(date).getTime() / 1000L;
         final ChartSpec spec = nodomain.freeyourgadget.gadgetbridge.activities.charts.temperature.TemperatureChartData.daySpec(
                 dayStart, seconds, values, average, GBApplication.getPrefs().getBoolean("charts_show_average", true),
-                temperatureUnit == TemperatureUnit.CELSIUS ? 3 : 6, getTitle(), TEMPERATURE_COLOR, Color.CYAN
+                temperatureUnit == TemperatureUnit.CELSIUS ? 3 : 6, getTitle(), TEMPERATURE_COLOR, TEMPERATURE_AVG_COLOR
         );
         tempLineChart.setSelectionContent(x -> {
             final long time = Math.round(x);
@@ -182,7 +183,7 @@ public class TemperatureDailyFragment extends AbstractChartFragment<TemperatureD
 
         final List<ChartSeries> legendSeries = new ArrayList<>(spec.getSeries());
         if (!spec.getSeries().isEmpty() && !spec.getLimitLines().isEmpty()) {
-            legendSeries.add(ChartLegendView.lineItem(getString(R.string.hr_average), Color.CYAN));
+            legendSeries.add(ChartLegendView.lineItem(getString(R.string.hr_average), TEMPERATURE_AVG_COLOR));
         }
         tempLegend.setSeries(legendSeries);
     }

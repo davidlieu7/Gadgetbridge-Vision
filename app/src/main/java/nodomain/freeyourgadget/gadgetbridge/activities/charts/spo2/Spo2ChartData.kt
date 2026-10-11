@@ -64,7 +64,7 @@ object Spo2ChartData {
     }
 
     /**
-     * The min-max range of each day with its average as a dot.
+     * The min-max range of each day with its average as a line. A day without data breaks the line.
      */
     @JvmStatic
     fun periodSpec(
@@ -87,7 +87,7 @@ object Spo2ChartData {
         return ChartSpec(
             series = listOf(
                 ChartSeries("range", rangeLabel, ranges, SeriesStyle.Range(rangeColor, DAY_RANGE_WIDTH)),
-                ChartSeries("average", averageLabel, averages, SeriesStyle.Line(averageColor, showPoints = true, showLine = false)),
+                ChartSeries("average", averageLabel, averages, SeriesStyle.Line(averageColor, maxGap = 1.0)),
             ).filter { it.points.isNotEmpty() },
             xAxis = AxisSpec(
                 format = ChartValueFormat.EPOCH_DAY,

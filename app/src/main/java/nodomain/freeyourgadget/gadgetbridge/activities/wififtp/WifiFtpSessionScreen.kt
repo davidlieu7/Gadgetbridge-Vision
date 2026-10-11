@@ -196,8 +196,8 @@ class WifiFtpSessionScreen(
         }
 
         if (progressDialog == null) {
-            val view = LayoutInflater.from(activity).inflate(R.layout.dialog_wifi_ftp_progress, null)
-            progressText = view.findViewById(R.id.wifi_ftp_progress_text)
+            val view = LayoutInflater.from(activity).inflate(R.layout.dialog_progress, null)
+            progressText = view.findViewById(R.id.progress_text)
             progressDialog = MaterialAlertDialogBuilder(activity)
                 .setTitle(R.string.wifi_ftp_explainer_title)
                 .setView(view)

@@ -20,7 +20,7 @@ public class SoundcoreQ30Protocol extends SoundcoreProtocolImplV1 {
     private static final short CMD_SET_EQUALIZER = (short) 0x8102;
     private static final int BATTERY_MULTIPLIER = 20;
 
-    protected SoundcoreQ30Protocol(GBDevice device) {
+    public SoundcoreQ30Protocol(GBDevice device) {
         super(device);
     }
 

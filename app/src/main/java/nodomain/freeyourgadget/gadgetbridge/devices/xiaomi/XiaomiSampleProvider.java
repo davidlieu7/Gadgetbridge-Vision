@@ -22,14 +22,22 @@ import androidx.annotation.Nullable;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.Collections;
+import java.util.Date;
 import java.util.List;
 
 import de.greenrobot.dao.AbstractDao;
 import de.greenrobot.dao.Property;
+import nodomain.freeyourgadget.gadgetbridge.database.DBHelper;
 import nodomain.freeyourgadget.gadgetbridge.devices.AbstractSampleProvider;
+import nodomain.freeyourgadget.gadgetbridge.devices.GenericDurationSampleProvider;
 import nodomain.freeyourgadget.gadgetbridge.devices.XiaomiSleepStageSampleProvider;
 import nodomain.freeyourgadget.gadgetbridge.devices.XiaomiSleepTimeSampleProvider;
+import nodomain.freeyourgadget.gadgetbridge.entities.BaseActivitySummary;
+import nodomain.freeyourgadget.gadgetbridge.entities.BaseActivitySummaryDao;
 import nodomain.freeyourgadget.gadgetbridge.entities.DaoSession;
+import nodomain.freeyourgadget.gadgetbridge.entities.Device;
+import nodomain.freeyourgadget.gadgetbridge.entities.GenericDurationSample;
 import nodomain.freeyourgadget.gadgetbridge.entities.XiaomiActivitySample;
 import nodomain.freeyourgadget.gadgetbridge.entities.XiaomiActivitySampleDao;
 import nodomain.freeyourgadget.gadgetbridge.entities.XiaomiSleepStageSample;
@@ -41,6 +49,9 @@ import nodomain.freeyourgadget.gadgetbridge.util.RangeMap;
 
 public class XiaomiSampleProvider extends AbstractSampleProvider<XiaomiActivitySample> {
     private static final Logger LOG = LoggerFactory.getLogger(XiaomiSampleProvider.class);
+
+    /** {@link GenericDurationSample} type of a span a Sleep as Android synthetic workout covered. */
+    public static final int DURATION_TYPE_SLEEP_AS_ANDROID = 1;
 
     public XiaomiSampleProvider(final GBDevice device, final DaoSession session) {
         super(device, session);
@@ -96,6 +107,7 @@ public class XiaomiSampleProvider extends AbstractSampleProvider<XiaomiActivityS
         final List<XiaomiActivitySample> samples = super.getGBActivitySamples(timestamp_from, timestamp_to);
 
         convertCalories(samples);
+        dropSleepAsAndroidCalories(samples, timestamp_from, timestamp_to);
         overlaySleep(samples, timestamp_from, timestamp_to);
 
         return samples;
@@ -105,6 +117,61 @@ public class XiaomiSampleProvider extends AbstractSampleProvider<XiaomiActivityS
         for (XiaomiActivitySample sample : samples) {
             sample.setActiveCalories(sample.getActiveCalories() * 1000);
         }
+    }
+
+    /**
+     * Sleep as Android needs the band's raw accelerometer stream, which only runs while a workout
+     * is open, so Gadgetbridge opens a synthetic one for the night. The band bills those minutes as
+     * exercise at a rate its sport type fixes, regardless of heart rate or movement, and the
+     * per-minute figures it later hands over carry that bill. Nobody burnt them, so they read as
+     * zero.
+     */
+    private void dropSleepAsAndroidCalories(final List<XiaomiActivitySample> samples,
+                                            final int timestamp_from,
+                                            final int timestamp_to) {
+        final List<GenericDurationSample> windows = new GenericDurationSampleProvider(getDevice(), getSession())
+                .getSamplesOverlapping(DURATION_TYPE_SLEEP_AS_ANDROID, timestamp_from * 1000L, timestamp_to * 1000L);
+        if (windows.isEmpty()) {
+            return;
+        }
+
+        final RangeMap<Long, Boolean> synthetic = new RangeMap<>(RangeMap.Mode.LOWER_BOUND);
+        for (final GenericDurationSample window : windows) {
+            synthetic.put(window.getTimestamp(), Boolean.TRUE);
+            synthetic.put(window.getEndTimestamp() + 1, Boolean.FALSE);
+        }
+
+        // A window can outlast the sleep it covered: a session the band never closed is only closed
+        // on the next connection, which can be hours later. A workout the wearer really did in the
+        // meantime keeps the calories it earned.
+        final RangeMap<Long, Boolean> workouts = new RangeMap<>(RangeMap.Mode.LOWER_BOUND);
+        for (final BaseActivitySummary workout : workoutsOverlapping(timestamp_from, timestamp_to)) {
+            workouts.put(workout.getStartTime().getTime(), Boolean.TRUE);
+            workouts.put(workout.getEndTime().getTime() + 1, Boolean.FALSE);
+        }
+
+        for (final XiaomiActivitySample sample : samples) {
+            final long timestamp = sample.getTimestamp() * 1000L;
+            if (Boolean.TRUE.equals(synthetic.get(timestamp))
+                    && !Boolean.TRUE.equals(workouts.get(timestamp))) {
+                sample.setActiveCalories(0);
+            }
+        }
+    }
+
+    private List<BaseActivitySummary> workoutsOverlapping(final int timestamp_from, final int timestamp_to) {
+        final Device device = DBHelper.findDevice(getDevice(), getSession());
+        if (device == null) {
+            return Collections.emptyList();
+        }
+
+        return getSession().getBaseActivitySummaryDao().queryBuilder()
+                .where(
+                        BaseActivitySummaryDao.Properties.DeviceId.eq(device.getId()),
+                        BaseActivitySummaryDao.Properties.StartTime.le(new Date(timestamp_to * 1000L)),
+                        BaseActivitySummaryDao.Properties.EndTime.ge(new Date(timestamp_from * 1000L))
+                )
+                .build().list();
     }
 
     /**

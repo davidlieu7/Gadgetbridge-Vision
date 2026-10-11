@@ -37,6 +37,7 @@ import nodomain.freeyourgadget.gadgetbridge.model.RecordedDataTypes
 import nodomain.freeyourgadget.gadgetbridge.util.AndroidUtils
 import nodomain.freeyourgadget.gadgetbridge.util.DateTimeUtils
 import nodomain.freeyourgadget.gadgetbridge.util.GB
+import nodomain.freeyourgadget.gadgetbridge.util.healthconnect.HealthConnectWorkoutDeletion
 import nodomain.freeyourgadget.gadgetbridge.util.WorkoutFilterUtils
 import nodomain.freeyourgadget.gadgetbridge.util.healthconnect.HealthConnectWorkoutSync
 import nodomain.freeyourgadget.gadgetbridge.util.kotlin.applyAccentColors
@@ -439,13 +440,17 @@ class WorkoutListActivity : AbstractListActivity<BaseActivitySummary>() {
     }
 
     private fun deleteItems(items: List<BaseActivitySummary>) {
+        val healthConnectSnapshots = mutableListOf<HealthConnectWorkoutDeletion.WorkoutSummarySnapshot>()
         items.forEach { item ->
+            val healthConnectSnapshot = HealthConnectWorkoutDeletion.snapshot(item)
             try {
                 item.delete()
+                healthConnectSnapshot?.let { healthConnectSnapshots.add(it) }
             } catch (_: Exception) {
                 // pass delete error
             }
         }
+        HealthConnectWorkoutDeletion.deleteWorkoutsFromHealthConnect(this, healthConnectSnapshots)
         refresh()
     }
 

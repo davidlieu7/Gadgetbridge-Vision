@@ -43,8 +43,10 @@ import java.util.Locale;
 import kotlin.jvm.functions.Function1;
 
 import nodomain.freeyourgadget.gadgetbridge.R;
+import nodomain.freeyourgadget.gadgetbridge.activities.charts.mpchart.ChartLegendView;
 import nodomain.freeyourgadget.gadgetbridge.activities.charts.mpchart.DaySelections;
 import nodomain.freeyourgadget.gadgetbridge.activities.charts.mpchart.GbChartView;
+import nodomain.freeyourgadget.gadgetbridge.activities.charts.spec.ChartSpec;
 import nodomain.freeyourgadget.gadgetbridge.activities.charts.race.RacePredictionChartData;
 import nodomain.freeyourgadget.gadgetbridge.activities.workouts.StatTileData;
 import nodomain.freeyourgadget.gadgetbridge.activities.workouts.StatTileGridUtilKt;
@@ -56,7 +58,6 @@ import nodomain.freeyourgadget.gadgetbridge.util.DateTimeUtils;
 
 public class RacePredictionPeriodFragment extends AbstractChartFragment<RacePredictionPeriodFragment.RacePredictionData> {
     private static final String ARG_TOTAL_DAYS = "totalDays";
-    private static final String ARG_SHOW_TILES = "showTiles";
     private static final String STATE_SELECTED_METRIC = "selectedMetric";
     private static final int DEFAULT_TOTAL_DAYS = 30;
 
@@ -69,22 +70,21 @@ public class RacePredictionPeriodFragment extends AbstractChartFragment<RacePred
     private static final MetricSample.Metric DEFAULT_METRIC = MetricSample.Metric.GENERIC_RACE_PREDICTOR_5K;
 
     private int totalDays;
-    private boolean showTiles;
     private GBDevice device;
     private MetricSample.Metric selectedMetric = DEFAULT_METRIC;
 
     private TextView dateView;
     private GbChartView raceChart;
+    private ChartLegendView raceLegend;
     private ChipGroup metricChipGroup;
     private LinearLayout statsContainer;
 
     protected int LINE_COLOR;
 
-    public static RacePredictionPeriodFragment newInstance(final int totalDays, final boolean showTiles) {
+    public static RacePredictionPeriodFragment newInstance(final int totalDays) {
         final RacePredictionPeriodFragment fragment = new RacePredictionPeriodFragment();
         final Bundle args = new Bundle();
         args.putInt(ARG_TOTAL_DAYS, totalDays);
-        args.putBoolean(ARG_SHOW_TILES, showTiles);
         fragment.setArguments(args);
         return fragment;
     }
@@ -107,25 +107,23 @@ public class RacePredictionPeriodFragment extends AbstractChartFragment<RacePred
     @Override
     protected void init() {
         totalDays = getArguments() != null ? getArguments().getInt(ARG_TOTAL_DAYS, DEFAULT_TOTAL_DAYS) : DEFAULT_TOTAL_DAYS;
-        showTiles = getArguments() != null && getArguments().getBoolean(ARG_SHOW_TILES, false);
         LINE_COLOR = MaterialColors.getColor(requireContext(), R.attr.accent_color, getResources().getColor(R.color.accent));
     }
 
     @Override
     public View onCreateView(final LayoutInflater inflater, final ViewGroup container, final Bundle savedInstanceState) {
-        final int layoutRes = showTiles ? R.layout.fragment_race_prediction_month : R.layout.fragment_race_prediction_period;
-        final View rootView = inflater.inflate(layoutRes, container, false);
+        final View rootView = inflater.inflate(R.layout.fragment_race_prediction_month, container, false);
+        rootView.setOnScrollChangeListener((v, scrollX, scrollY, oldScrollX, oldScrollY) ->
+                getChartsHost().enableSwipeRefresh(scrollY == 0));
 
         device = getChartsHost().getDevice();
         dateView = rootView.findViewById(R.id.race_prediction_date_view);
         raceChart = rootView.findViewById(R.id.race_prediction_chart);
         raceChart.setZoomable(true);
         raceChart.dismissSelectionOnTapOutside(rootView);
+        raceLegend = rootView.findViewById(R.id.race_prediction_chart_legend);
         metricChipGroup = rootView.findViewById(R.id.race_prediction_chip_group);
-
-        if (showTiles) {
-            statsContainer = rootView.findViewById(R.id.race_prediction_stats_container);
-        }
+        statsContainer = rootView.findViewById(R.id.race_prediction_stats_container);
 
         if (savedInstanceState != null) {
             final String savedMetricName = savedInstanceState.getString(STATE_SELECTED_METRIC);
@@ -200,21 +198,17 @@ public class RacePredictionPeriodFragment extends AbstractChartFragment<RacePred
             }
         }
 
-        Double[] latestValues = null;
-        Double[] trendDeltas = null;
-        if (showTiles) {
-            final long asOfMillis = DateTimeUtils.dayEnd(new Date(getTSEnd() * 1000L)).getTime();
-            latestValues = new Double[METRICS_IN_CHIP_ORDER.length];
-            trendDeltas = new Double[METRICS_IN_CHIP_ORDER.length];
-            for (int i = 0; i < METRICS_IN_CHIP_ORDER.length; i++) {
-                final MetricSample latest = GenericMetricSampleProvider.getLatestMetricSampleBefore(db, device, METRICS_IN_CHIP_ORDER[i], asOfMillis);
-                latestValues[i] = latest != null ? latest.getMetricScore() : null;
-                if (latest != null) {
-                    final MetricSample baseline = GenericMetricSampleProvider.getLatestMetricSampleBefore(db, device, METRICS_IN_CHIP_ORDER[i], windowStartMillis);
-                    if (baseline != null) {
-                        final double delta = latest.getMetricScore() - baseline.getMetricScore();
-                        trendDeltas[i] = delta != 0 ? delta : null;
-                    }
+        final long asOfMillis = DateTimeUtils.dayEnd(new Date(getTSEnd() * 1000L)).getTime();
+        final Double[] latestValues = new Double[METRICS_IN_CHIP_ORDER.length];
+        final Double[] trendDeltas = new Double[METRICS_IN_CHIP_ORDER.length];
+        for (int i = 0; i < METRICS_IN_CHIP_ORDER.length; i++) {
+            final MetricSample latest = GenericMetricSampleProvider.getLatestMetricSampleBefore(db, device, METRICS_IN_CHIP_ORDER[i], asOfMillis);
+            latestValues[i] = latest != null ? latest.getMetricScore() : null;
+            if (latest != null) {
+                final MetricSample baseline = GenericMetricSampleProvider.getLatestMetricSampleBefore(db, device, METRICS_IN_CHIP_ORDER[i], windowStartMillis);
+                if (baseline != null) {
+                    final double delta = latest.getMetricScore() - baseline.getMetricScore();
+                    trendDeltas[i] = delta != 0 ? delta : null;
                 }
             }
         }
@@ -245,11 +239,11 @@ public class RacePredictionPeriodFragment extends AbstractChartFragment<RacePred
                 epochDays, x, Collections.singletonList(label), Collections.singletonList(LINE_COLOR),
                 Collections.singletonList(timeText), getString(R.string.stats_empty_value)
         ));
-        raceChart.setSpec(RacePredictionChartData.spec(epochDays, seconds, label, LINE_COLOR));
+        final ChartSpec spec = RacePredictionChartData.spec(epochDays, seconds, label, LINE_COLOR);
+        raceChart.setSpec(spec);
+        raceLegend.setSeries(spec.getSeries());
 
-        if (showTiles) {
-            updateTiles(data.latestValues, data.trendDeltas);
-        }
+        updateTiles(data.latestValues, data.trendDeltas);
     }
 
     private void updateTiles(@Nullable final Double[] latestValues, @Nullable final Double[] trendDeltas) {

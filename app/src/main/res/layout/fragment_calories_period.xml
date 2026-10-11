@@ -36,6 +36,11 @@
                 android:layout_height="wrap_content" />
         </LinearLayout>
 
+        <nodomain.freeyourgadget.gadgetbridge.activities.workouts.SectionHeaderView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            app:sectionTitle="@string/calories_daily_active" />
+
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="250sp"

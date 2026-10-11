@@ -52,6 +52,7 @@ import nodomain.freeyourgadget.gadgetbridge.R;
 import nodomain.freeyourgadget.gadgetbridge.activities.charts.mpchart.DaySelections;
 import nodomain.freeyourgadget.gadgetbridge.activities.charts.mpchart.GbChartView;
 import nodomain.freeyourgadget.gadgetbridge.activities.charts.solar.SolarChargingChartData;
+import nodomain.freeyourgadget.gadgetbridge.activities.workouts.SectionHeaderView;
 import nodomain.freeyourgadget.gadgetbridge.activities.workouts.StatTileData;
 import nodomain.freeyourgadget.gadgetbridge.activities.workouts.StatTileGridUtilKt;
 import nodomain.freeyourgadget.gadgetbridge.activities.workouts.WorkoutValueFormatter;
@@ -72,15 +73,17 @@ public class SolarChargingPeriodFragment extends AbstractChartFragment<SolarChar
     private enum SolarMetric {
         // yAxisMinScale: the y-axis maximum never drops below this, so a quiet
         // day/week doesn't render as a chart with barely any visible scale.
-        LUX_HOURS(R.string.solar_charging_lux_hours, 50),
-        BATTERY_GAIN(R.string.solar_charging_battery_gain, 60);
+        LUX_HOURS(R.string.solar_charging_lux_hours, 50, R.string.solar_charging_daily_lux_hours),
+        BATTERY_GAIN(R.string.solar_charging_battery_gain, 60, R.string.solar_charging_daily_battery_gain);
 
         final int labelResId;
         final double yAxisMinScale;
+        final int headerResId;
 
-        SolarMetric(final int labelResId, final double yAxisMinScale) {
+        SolarMetric(final int labelResId, final double yAxisMinScale, final int headerResId) {
             this.labelResId = labelResId;
             this.yAxisMinScale = yAxisMinScale;
+            this.headerResId = headerResId;
         }
     }
 
@@ -91,6 +94,7 @@ public class SolarChargingPeriodFragment extends AbstractChartFragment<SolarChar
     private LinearLayout statsContainer;
     private GbChartView chart;
     private ChipGroup metricChipGroup;
+    private SectionHeaderView chartHeader;
 
     @Override
     protected boolean isSingleDay() {
@@ -127,6 +131,7 @@ public class SolarChargingPeriodFragment extends AbstractChartFragment<SolarChar
         statsContainer = rootView.findViewById(R.id.solar_charging_period_stats_container);
         chart = rootView.findViewById(R.id.solar_charging_period_chart);
         metricChipGroup = rootView.findViewById(R.id.solar_charging_period_chip_group);
+        chartHeader = rootView.findViewById(R.id.solar_charging_period_chart_header);
 
         if (savedInstanceState != null) {
             final String savedMetricName = savedInstanceState.getString(STATE_SELECTED_METRIC);
@@ -140,6 +145,7 @@ public class SolarChargingPeriodFragment extends AbstractChartFragment<SolarChar
         }
 
         setupMetricChips(inflater);
+        chartHeader.setTitle(getString(selectedMetric.headerResId));
         chart.dismissSelectionOnTapOutside(rootView);
         refresh();
 
@@ -170,6 +176,7 @@ public class SolarChargingPeriodFragment extends AbstractChartFragment<SolarChar
             final SolarMetric metric = (SolarMetric) checkedChip.getTag();
             if (metric != selectedMetric) {
                 selectedMetric = metric;
+                chartHeader.setTitle(getString(metric.headerResId));
                 refresh();
             }
         });

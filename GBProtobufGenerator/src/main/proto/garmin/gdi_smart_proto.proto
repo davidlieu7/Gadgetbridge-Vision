@@ -28,6 +28,7 @@ message Smart {
     optional InstalledAppsService installed_apps_service = 3;
     optional DataTransferService data_transfer_service = 7;
     optional DeviceStatusService device_status_service = 8;
+    optional Service9 service9 = 9;
     optional Service10 service10 = 10;
     optional Service11 service11 = 11;
     optional FindMyWatchService find_my_watch_service = 12;
@@ -60,6 +61,15 @@ message UUID {
     required fixed64 lower = 2;
 }
 
+message Service9 {
+    message Message1 {
+    }
+    message Message3 {
+    }
+    optional Message1 unk1 = 1;
+    optional Message3 unk3 = 3;
+}
+
 message Service10 {
     message AudioLocale {
         message Locale {
@@ -88,8 +98,11 @@ message Service11 {
     message Message11 {
         optional bytes unk1 = 1;
     }
-    optional Message11 unk9 = 9;
+    message Message16 {
+    }
+    optional Message9 unk9 = 9;
     optional Message11 unk11 = 11;
+    optional Message16 unk16 = 16;
 }
 
 message Service14 {

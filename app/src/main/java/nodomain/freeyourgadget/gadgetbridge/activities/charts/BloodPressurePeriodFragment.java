@@ -116,7 +116,8 @@ public class BloodPressurePeriodFragment extends AbstractChartFragment<BloodPres
     public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
         View rootView = inflater.inflate(R.layout.fragment_blood_pressure_period, container, false);
 
-        rootView.setOnScrollChangeListener((v, scrollX, scrollY, oldScrollX, oldScrollY) ->
+        final View scrollView = rootView.findViewById(R.id.bp_scroll_view);
+        scrollView.setOnScrollChangeListener((v, scrollX, scrollY, oldScrollX, oldScrollY) ->
             getChartsHost().enableSwipeRefresh(scrollY == 0)
         );
 
@@ -125,7 +126,7 @@ public class BloodPressurePeriodFragment extends AbstractChartFragment<BloodPres
         mChart = rootView.findViewById(R.id.blood_pressure_chart);
         mLegend = rootView.findViewById(R.id.blood_pressure_period_legend);
         mChart.setZoomable(TOTAL_DAYS > 7);
-        mChart.dismissSelectionOnTapOutside(rootView.findViewById(R.id.bp_scroll_view));
+        mChart.dismissSelectionOnTapOutside(scrollView);
 
         FloatingActionButton exportFab = rootView.findViewById(R.id.bp_export_fab);
         exportFab.setOnClickListener(v -> showExportDialog());

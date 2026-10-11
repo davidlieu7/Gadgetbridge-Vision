@@ -29,7 +29,7 @@
         <ImageView
             android:layout_weight="2"
             android:layout_marginTop="@dimen/chart_section_spacing"
-            android:layout_marginBottom="@dimen/chart_section_spacing"
+            android:layout_marginBottom="@dimen/chart_gauge_bottom_spacing"
             android:id="@+id/sleep_stages_gauge"
             android:layout_width="180dp"
             android:layout_height="180dp"
@@ -42,14 +42,19 @@
             android:layout_height="wrap_content"
             android:layout_marginStart="15dp"
             android:layout_marginEnd="15dp"
+            android:layout_marginBottom="15dp"
             android:orientation="vertical" />
+
+        <nodomain.freeyourgadget.gadgetbridge.activities.workouts.SectionHeaderView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            app:sectionTitle="@string/last_night_timeline" />
 
         <nodomain.freeyourgadget.gadgetbridge.activities.charts.sleep.SleepDetailsView
             android:id="@+id/sleep_details"
             android:layout_width="fill_parent"
             android:layout_height="300dp"
             android:layout_marginStart="2dp"
-            android:layout_marginTop="15dp"
             android:layout_marginEnd="2dp"
             android:layout_marginBottom="15dp"
             android:layout_weight="4" />
