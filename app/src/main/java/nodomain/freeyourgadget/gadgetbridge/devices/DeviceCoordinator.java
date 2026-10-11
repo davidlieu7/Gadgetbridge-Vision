@@ -175,6 +175,7 @@ public interface DeviceCoordinator {
         CAMERA,
         VACUUM,
         GAMEPAD,
+        GYM_EQUIPMENT,
     }
 
     /**

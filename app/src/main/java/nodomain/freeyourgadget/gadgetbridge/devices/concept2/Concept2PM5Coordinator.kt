@@ -50,5 +50,5 @@ class Concept2PM5Coordinator : AbstractBLEDeviceCoordinator() {
     // The monitor runs on batteries but does not report their level.
     override fun getBatteryCount(device: GBDevice): Int = 0
 
-    override fun getDeviceKind(device: GBDevice): DeviceCoordinator.DeviceKind = DeviceCoordinator.DeviceKind.UNKNOWN
+    override fun getDeviceKind(device: GBDevice): DeviceCoordinator.DeviceKind = DeviceCoordinator.DeviceKind.GYM_EQUIPMENT
 }
