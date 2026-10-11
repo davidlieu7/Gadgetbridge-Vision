@@ -965,6 +965,8 @@
     <string name="spo2_perc_85">85%</string>
     <string name="spo2_perc_90">90%</string>
     <string name="spo2_off">Off</string>
+    <string name="spo2_mode_sleep">During sleep</string>
+    <string name="spo2_mode_all_day">All day</string>
     <string name="interval_one_hour">once an hour</string>
     <string name="interval_1_hour">every 1 hour</string>
     <string name="interval_2_hour">every 2 hours</string>

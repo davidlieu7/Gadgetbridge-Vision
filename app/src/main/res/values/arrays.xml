@@ -3141,6 +3141,18 @@
         <item>0</item>
     </string-array>
 
+    <string-array name="prefs_spo2_monitoring_mode">
+        <item>@string/spo2_off</item>
+        <item>@string/spo2_mode_sleep</item>
+        <item>@string/spo2_mode_all_day</item>
+    </string-array>
+
+    <string-array name="prefs_spo2_monitoring_mode_values">
+        <item>0</item>
+        <item>1</item>
+        <item>2</item>
+    </string-array>
+
     <string-array name="prefs_zetime_heartrate_measurement_interval">
         <item name="0">@string/off</item>
         <item name="300">@string/interval_five_minutes</item>

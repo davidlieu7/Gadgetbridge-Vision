@@ -170,6 +170,9 @@ public class XiaomiHealthService extends AbstractXiaomiService {
     private final Handler gpsTimeoutHandler = new Handler();
     private final Handler workoutAliveHandler = new Handler();
 
+    // Last SpO2 config the watch reported, so a write keeps the fields Gadgetbridge has no setting for
+    private SpO2 lastSpo2Config;
+
     private final Set<Integer> currentGoals = new LinkedHashSet<>();
     private final Set<Integer> supportedGoals = new LinkedHashSet<>();
 
@@ -272,6 +275,7 @@ public class XiaomiHealthService extends AbstractXiaomiService {
         }
         sleepAsAndroidManager.reset();
         resumeLocationAfterReconnect();
+        lastSpo2Config = null;
 
         setUserInfo();
         getSupport().sendCommand("get spo2 config", COMMAND_TYPE, CMD_CONFIG_SPO2_GET);
@@ -327,6 +331,7 @@ public class XiaomiHealthService extends AbstractXiaomiService {
                 setHeartRateConfig();
                 return true;
             case DeviceSettingsPreferenceConst.PREF_SPO2_ALL_DAY_MONITORING:
+            case DeviceSettingsPreferenceConst.PREF_SPO2_MONITORING_MODE:
             case DeviceSettingsPreferenceConst.PREF_SPO2_LOW_ALERT_THRESHOLD:
                 setSpo2Config();
                 return true;
@@ -522,15 +527,17 @@ public class XiaomiHealthService extends AbstractXiaomiService {
     }
 
     private void handleSpo2Config(final SpO2 spo2) {
-        LOG.debug("Got SpO2 config");
+        LOG.debug("Got SpO2 config: allDayCapable={}, mode={}, interval={}", spo2.getAllDayCapable(), spo2.getMode(), spo2.getInterval());
+
+        lastSpo2Config = spo2;
 
         final GBDeviceEventUpdatePreferences eventUpdatePreferences = new GBDeviceEventUpdatePreferences()
                 .withPreference(XiaomiPreferences.FEAT_SPO2, true)
-                // The band reports a numeric mode (0 = off, 1 = sleep-only, 2 = all-day);
-                // only all-day maps to the on/off preference in Gadgetbridge.
-                // Sleep-only is valid on the wire but is not shown in the on-watch
-                // UI nor in the vendor app UI of Mi Band 10, so it reads as off here.
+                // Watches reporting interval 0 have the plain all-day switch, see SpO2 in wear_fitness.proto
+                .withPreference(XiaomiPreferences.FEAT_SPO2_MODE_CHOICE, spo2.getInterval() != 0)
+                .withPreference(XiaomiPreferences.FEAT_SPO2_ALL_DAY, spo2.getAllDayCapable() != 0)
                 .withPreference(DeviceSettingsPreferenceConst.PREF_SPO2_ALL_DAY_MONITORING, spo2.getMode() == Spo2Mode.SPO2_MODE_ALL_DAY)
+                .withPreference(DeviceSettingsPreferenceConst.PREF_SPO2_MONITORING_MODE, String.valueOf(spo2.getMode().getNumber()))
                 .withPreference(
                         DeviceSettingsPreferenceConst.PREF_SPO2_LOW_ALERT_THRESHOLD,
                         String.valueOf(spo2.getAlarmLow().getAlarmLowEnabled() ? spo2.getAlarmLow().getAlarmLowThreshold() : 0)
@@ -540,23 +547,32 @@ public class XiaomiHealthService extends AbstractXiaomiService {
     }
 
     private void setSpo2Config() {
-        LOG.debug("Set SpO2 config");
-
         final Prefs prefs = getDevicePrefs();
         final boolean allDayMonitoring = prefs.getBoolean(DeviceSettingsPreferenceConst.PREF_SPO2_ALL_DAY_MONITORING, false);
         final int lowAlertThreshold = prefs.getInt(DeviceSettingsPreferenceConst.PREF_SPO2_LOW_ALERT_THRESHOLD, 0);
+
+        final Spo2Mode mode;
+        if (prefs.getBoolean(XiaomiPreferences.FEAT_SPO2_MODE_CHOICE, false)) {
+            final Spo2Mode chosen = Spo2Mode.forNumber(prefs.getInt(DeviceSettingsPreferenceConst.PREF_SPO2_MONITORING_MODE, 0));
+            mode = chosen != null ? chosen : Spo2Mode.SPO2_MODE_OFF;
+        } else {
+            mode = allDayMonitoring ? Spo2Mode.SPO2_MODE_ALL_DAY : Spo2Mode.SPO2_MODE_OFF;
+        }
+
+        LOG.debug("Set SpO2 config: mode={}, lowAlertThreshold={}", mode, lowAlertThreshold);
 
         final var spo2alarmLowBuilder = Spo2AlarmLow.newBuilder()
                 .setAlarmLowEnabled(lowAlertThreshold != 0);
 
         if (lowAlertThreshold != 0) {
             spo2alarmLowBuilder.setAlarmLowThreshold(lowAlertThreshold);
+        } else if (lastSpo2Config != null && lastSpo2Config.getAlarmLow().hasAlarmLowThreshold()) {
+            // keep the threshold the watch last reported, so turning the alert back on on the watch restores it
+            spo2alarmLowBuilder.setAlarmLowThreshold(lastSpo2Config.getAlarmLow().getAlarmLowThreshold());
         }
 
-        final var spo2 = SpO2.newBuilder()
-                .setUnknown1(1)
-                .setMode(allDayMonitoring ? Spo2Mode.SPO2_MODE_ALL_DAY : Spo2Mode.SPO2_MODE_OFF)
-                .setAlarmLow(spo2alarmLowBuilder);
+        final var spo2 = lastSpo2Config != null ? lastSpo2Config.toBuilder() : SpO2.newBuilder().setAllDayCapable(1);
+        spo2.setMode(mode).setAlarmLow(spo2alarmLowBuilder);
 
         getSupport().sendCommand(
                 "set spo2 config",
