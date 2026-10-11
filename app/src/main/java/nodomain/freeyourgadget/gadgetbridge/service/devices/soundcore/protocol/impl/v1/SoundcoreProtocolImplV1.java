@@ -641,7 +641,7 @@ public class SoundcoreProtocolImplV1 extends AbstractSoundcoreProtocol {
             return null;
         }
 
-        final Byte ancStrength = encodeAncStrength(prefs.getInt(
+        final Byte ancStrength = encodeNoiseCancellationLevel(prefs.getInt(
                 DeviceSettingsPreferenceConst.PREF_SONY_AMBIENT_SOUND_LEVEL,
                 0
         ));
@@ -694,7 +694,7 @@ public class SoundcoreProtocolImplV1 extends AbstractSoundcoreProtocol {
         );
         editor.putInt(
                 DeviceSettingsPreferenceConst.PREF_SONY_AMBIENT_SOUND_LEVEL,
-                decodeAncStrength(payload[1])
+                decodeNoiseCancellationLevel(payload[1])
         );
         editor.putBoolean(
                 DeviceSettingsPreferenceConst.PREF_SOUNDCORE_TRANSPARENCY_VOCAL_MODE,
@@ -711,23 +711,23 @@ public class SoundcoreProtocolImplV1 extends AbstractSoundcoreProtocol {
         editor.apply();
     }
 
-    protected Byte encodeAncStrength(final int strength) {
-        if (strength < 0 || strength > 2) {
+    protected Byte encodeNoiseCancellationLevel(final int strength) {
+        final byte[] levels = ((SoundcoreEarbudsCoordinator) getDevice().getDeviceCoordinator())
+                .getNoiseCancellationLevelRange();
+        if (strength < 0 || strength >= levels.length) {
             return null;
         }
-
-        return (byte) ((strength + 1) << 4);
+        return levels[strength];
     }
 
-    protected int decodeAncStrength(final byte strength) {
-        switch (strength & 0x30) {
-            case 0x20:
-                return 1;
-            case 0x30:
-                return 2;
-            case 0x10:
-            default:
-                return 0;
+    protected int decodeNoiseCancellationLevel(final byte strength) {
+        final byte[] levels = ((SoundcoreEarbudsCoordinator) getDevice().getDeviceCoordinator())
+                .getNoiseCancellationLevelRange();
+        for (int i = 0; i < levels.length; i++) {
+            if ((levels[i] & 0xF0) == (strength & 0xF0)) {
+                return i;
+            }
         }
+        return 0;
     }
 }

@@ -45,7 +45,7 @@ class SoundcoreA30iCoordinator : SoundcoreEarbudsCoordinator() {
         Capability.TouchTone,
     )
 
-    override fun getNoiseCancellationLevelRange(): IntRange = 1..5
+    override fun getNoiseCancellationLevelRange(): ByteArray = byteArrayOf(0x15, 0x25, 0x35, 0x45, 0x51)
 
     /* Battery case not reported */
     override fun getBatteryCount(device: GBDevice): Int = 2

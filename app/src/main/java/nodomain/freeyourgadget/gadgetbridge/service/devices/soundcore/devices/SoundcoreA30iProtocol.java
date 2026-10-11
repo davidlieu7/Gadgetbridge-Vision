@@ -16,7 +16,6 @@ public class SoundcoreA30iProtocol extends SoundcoreProtocolImplV1 {
 
     private static final int battery_earphone_left = 0;
     private static final int battery_earphone_right = 1;
-    private static final byte[] NOISE_CANCELLING_LEVEL_BYTES = {0x15, 0x25, 0x35, 0x45, 0x51};
 
     public SoundcoreA30iProtocol(GBDevice device) {
         super(device);
@@ -37,7 +36,7 @@ public class SoundcoreA30iProtocol extends SoundcoreProtocolImplV1 {
         // Active Noise Cancelling [63 to 70 (7 bytes)]
         final AmbientSoundMode ambientSoundControl = getAmbientSoundControl(payload[64], payload[67]);
         final AncMode ancMode = AncMode.fromByte(payload[70]);
-        int noiseCancellingLevel = getNoiseCancellingLevel(payload[65]);
+        int noiseCancellingLevel = decodeNoiseCancellationLevel(payload[65]);
         boolean wind_noise_reduction = payload[68] == 0x01;
         //-------------------------------------------------------------------------
         boolean touchTone = payload[72] == 0x01;
@@ -91,18 +90,6 @@ public class SoundcoreA30iProtocol extends SoundcoreProtocolImplV1 {
     }
 
     /**
-     * It returns the current ANC level.
-     */
-    private int getNoiseCancellingLevel(final byte noiseLevel) {
-        for (int i = 0; i < NOISE_CANCELLING_LEVEL_BYTES.length; i++) {
-            if (NOISE_CANCELLING_LEVEL_BYTES[i] == noiseLevel) {
-                return i + 1;
-            }
-        }
-        return 1;
-    }
-
-    /**
      * It returns the current ambient sound control.
      */
     private AmbientSoundMode getAmbientSoundControl(byte ambientSoundControlSelection, byte mode) {
@@ -128,6 +115,10 @@ public class SoundcoreA30iProtocol extends SoundcoreProtocolImplV1 {
         if (ambientSoundControl == null || ancMode == null) {
             return null;
         }
+        final Byte ancStrength = encodeNoiseCancellationLevel(noiseCancellingLevel);
+        if (ancStrength == null) {
+            return null;
+        }
         ByteBuffer buf = ByteBuffer.allocate(7);
         // A30i ambient sound is an ANC subtype, not its transparency mode.
         final byte mode = ambientSoundControl == AmbientSoundMode.AMBIENT_SOUND
@@ -136,7 +127,7 @@ public class SoundcoreA30iProtocol extends SoundcoreProtocolImplV1 {
 
         buf.put(mode);
 
-        buf.put(NOISE_CANCELLING_LEVEL_BYTES[noiseCancellingLevel - 1]);
+        buf.put(ancStrength.byteValue());
 
         buf.put(mode); // Probably a duplicated value cached from before.
 
