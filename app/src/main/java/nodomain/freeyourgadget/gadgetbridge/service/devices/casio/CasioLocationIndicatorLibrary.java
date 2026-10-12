@@ -62,9 +62,9 @@ public class CasioLocationIndicatorLibrary {
 
     public boolean add(CasioLocationPoint p) {
         locations.add(p);
-        if (activeIndex == -1) {
-            activeIndex = locations.size() - 1;
-        }
+        // Always use the new location added by the watch as the active one; 
+        // this is expected by watch manual
+        activeIndex = locations.size() - 1;
         return true;
     }
 
