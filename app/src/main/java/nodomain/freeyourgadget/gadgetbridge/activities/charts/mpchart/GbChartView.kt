@@ -59,6 +59,7 @@ class GbChartView @JvmOverloads constructor(
     private val tooltip = ChartTooltipPainter(context, theme)
     private val accessibility = ChartSlotAccessibilityHelper(this)
     private val pointPaint = Paint(Paint.ANTI_ALIAS_FLAG)
+    private val stagesRenderer = StagesRenderer()
     private val gestures = GestureDetector(context, object : GestureDetector.SimpleOnGestureListener() {
         override fun onDown(e: MotionEvent) = true
 
@@ -97,6 +98,11 @@ class GbChartView @JvmOverloads constructor(
      */
     var selectionEnabled = true
 
+    /**
+     * Minimum width of the end axis. Above zero, the space is kept even without an end axis, so the plot doesn't shift.
+     */
+    var endAxisMinWidthDp = 0f
+
     var zoomable = false
         set(value) {
             field = value
@@ -109,7 +115,9 @@ class GbChartView @JvmOverloads constructor(
         private set
 
     init {
-        renderer = RoundedCandleRenderer.Combined(this, animator, viewPortHandler)
+        renderer = RoundedCandleRenderer.Combined(this, animator, viewPortHandler).apply {
+            drawBehindData = { canvas -> drawStages(canvas) }
+        }
         isClipDataToContentEnabled = false
         rendererXAxis = xAxisLabels
         description.isEnabled = false
@@ -152,7 +160,7 @@ class GbChartView @JvmOverloads constructor(
         clearSelection()
         configureXAxis(spec.xAxis)
         configureYAxis(axisLeft, spec.yAxis)
-        configureYAxis(axisRight, spec.endYAxis)
+        configureEndAxis(spec.endYAxis)
         configureLimitLines(spec)
         barLayout = barLayoutFor(spec, 0f)
         data = ChartDataBuilder.build(spec, barLayout!!, BAR_CORNER_DP, xOrigin)
@@ -319,7 +327,7 @@ class GbChartView @JvmOverloads constructor(
         val textColors = axes.map { it.textColor }
         select(null)
         background = ColorDrawable(Color.WHITE)
-        axes.forEach { it.textColor = Color.BLACK }
+        axes.filter { it.textColor != Color.TRANSPARENT }.forEach { it.textColor = Color.BLACK }
         legend.isEnabled = true
         legend.textColor = Color.BLACK
         notifyDataSetChanged()
@@ -413,6 +421,14 @@ class GbChartView @JvmOverloads constructor(
         if (spec == null || data == null) return
         drawSelectedPoints(canvas, spec, selected)
         selection?.let { drawTooltip(canvas, it, selected) }
+    }
+
+    private fun drawStages(canvas: Canvas) {
+        val spec = spec ?: return
+        for (series in spec.series.filter { it.style is SeriesStyle.Stages }) {
+            val trans = getTransformer(if (series.axis == AxisSide.END) AxisDependency.RIGHT else AxisDependency.LEFT)
+            stagesRenderer.draw(canvas, series, xOrigin, trans, viewPortHandler)
+        }
     }
 
     private fun timeLabelsFor(spec: AxisSpec): List<Double>? {
@@ -537,6 +553,19 @@ class GbChartView @JvmOverloads constructor(
         axis.isGranularityEnabled = spec.format == ChartValueFormat.INTEGER
         spec.minimum?.let { axis.axisMinimum = it.toFloat() } ?: axis.resetAxisMinimum()
         spec.maximum?.let { axis.axisMaximum = it.toFloat() } ?: axis.resetAxisMaximum()
+    }
+
+    private fun configureEndAxis(spec: AxisSpec?) {
+        configureYAxis(axisRight, spec)
+        axisRight.minWidth = endAxisMinWidthDp
+        val reserved = spec == null && endAxisMinWidthDp > 0f
+        axisRight.textColor = if (reserved) Color.TRANSPARENT else theme.textColor
+        if (reserved) {
+            axisRight.isEnabled = true
+            axisRight.isDrawLabelsEnabled = true
+            axisRight.axisMinimum = 0f
+            axisRight.axisMaximum = 1f
+        }
     }
 
     private fun formatterFor(label: (Double) -> String) = IAxisValueFormatter { value, _ -> label(value.toDouble()) }

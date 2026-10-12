@@ -37,6 +37,11 @@ sealed interface SeriesStyle {
      * with [Column] series.
      */
     data class Range(val color: Int, val width: Float? = null) : SeriesStyle
+
+    /**
+     * A hypnogram: each point's row y lasts until the next point, coloured by [colors]. A y outside [colors] is a gap.
+     */
+    data class Stages(val colors: List<Int>) : SeriesStyle
 }
 
 /**

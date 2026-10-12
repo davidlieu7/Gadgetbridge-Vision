@@ -41,6 +41,7 @@ import java.util.GregorianCalendar;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.TimeUnit;
 
 import de.greenrobot.dao.query.QueryBuilder;
 import kotlin.jvm.functions.Function1;
@@ -49,7 +50,6 @@ import nodomain.freeyourgadget.gadgetbridge.GBApplication;
 import nodomain.freeyourgadget.gadgetbridge.R;
 import nodomain.freeyourgadget.gadgetbridge.activities.HeartRateUtils;
 import nodomain.freeyourgadget.gadgetbridge.activities.charts.mpchart.ChartSelection;
-import nodomain.freeyourgadget.gadgetbridge.activities.charts.sleep.SleepDetailsView;
 import nodomain.freeyourgadget.gadgetbridge.activities.charts.sleep.SleepStagesChartData;
 import nodomain.freeyourgadget.gadgetbridge.activities.charts.spec.ChartSpec;
 import nodomain.freeyourgadget.gadgetbridge.activities.workouts.WorkoutValueFormatter;
@@ -65,6 +65,7 @@ import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
 import nodomain.freeyourgadget.gadgetbridge.model.ActivityKind;
 import nodomain.freeyourgadget.gadgetbridge.model.ActivitySample;
 import nodomain.freeyourgadget.gadgetbridge.model.ActivitySummaryParser;
+import nodomain.freeyourgadget.gadgetbridge.util.DateTimeUtils;
 import nodomain.freeyourgadget.gadgetbridge.util.Prefs;
 
 public abstract class AbstractActivityChartFragment<D extends ChartsData> extends AbstractChartFragment<D> {
@@ -339,30 +340,39 @@ public abstract class AbstractActivityChartFragment<D extends ChartsData> extend
         };
     }
 
-    public List<SleepDetailsView.SleepDetail> prepareStages(List<? extends ActivitySample> samples) {
-        List<SleepDetailsView.SleepDetail> result = new ArrayList<>();
-        if (samples.isEmpty()) {
-            return result;
+    /**
+     * Deep, light, REM and awake sleep as rows of a hypnogram.
+     */
+    protected ChartSpec hypnogramSpec(final StageSamples samples) {
+        final ActivityConfig[] configs = stageConfigs();
+        final int[] colors = new int[getIndexOfActivity(ActivityKind.AWAKE_SLEEP) + 1];
+        for (int i = 0; i < colors.length; i++) {
+            colors[i] = configs[i].color;
         }
-        int currentType = getIndexOfActivity(samples.get(0).getKind());
-        long timestamp = samples.get(0).getTimestamp() * 1000L;
-        int duration = 0;
-        int color = getColorFor(samples.get(0).getKind());
+        return SleepStagesChartData.hypnogramSpec(samples.seconds, samples.stages, colors);
+    }
 
-        for (ActivitySample sample : samples) {
-            int value = getIndexOfActivity(sample.getKind());
-            if (value != currentType) {
-                result.add(new SleepDetailsView.SleepDetail(currentType, duration, timestamp, color));
-                currentType = value;
-                timestamp = sample.getTimestamp() * 1000L;
-                duration = 0;
-                color = getColorFor(sample.getKind());
-            }
-            duration++;
+    /**
+     * Tooltip for a time on a sleep chart: the stage then, with its stretch for {@code showStretch}, and the overlay value.
+     */
+    protected Function1<Double, ChartSelection> sleepSelection(final StageSamples samples, final boolean showStretch,
+                                                               final SleepStagesChartData.Overlay overlay) {
+        final ActivityConfig[] configs = stageConfigs();
+        final String[] labels = new String[configs.length];
+        final int[] colors = new int[configs.length];
+        for (int i = 0; i < configs.length; i++) {
+            labels[i] = configs[i].label;
+            colors[i] = configs[i].color;
         }
-
-        result.add(new SleepDetailsView.SleepDetail(currentType, duration, timestamp, color));
-        return result;
+        labels[getIndexOfActivity(ActivityKind.DEEP_SLEEP)] = getString(R.string.sleep_colored_stats_deep);
+        labels[getIndexOfActivity(ActivityKind.LIGHT_SLEEP)] = getString(R.string.sleep_colored_stats_light);
+        labels[getIndexOfActivity(ActivityKind.REM_SLEEP)] = getString(R.string.sleep_colored_stats_rem);
+        final java.text.DateFormat timeFormat = DateFormat.getTimeFormat(requireContext());
+        return SleepStagesChartData.selection(
+                samples.seconds, samples.stages, labels, colors, showStretch, overlay,
+                time -> timeFormat.format(new Date(time * 1000L)),
+                duration -> DateTimeUtils.formatDurationHoursMinutes(duration, TimeUnit.SECONDS)
+        );
     }
 
     protected int getIndexOfActivity(ActivityKind kind) {

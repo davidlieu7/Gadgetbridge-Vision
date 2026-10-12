@@ -4532,6 +4532,14 @@
         <item>23</item>
     </string-array>
 
+    <string-array name="pref_chart_sleep_day_chart_entries">
+        <item>@string/pref_chart_sleep_day_chart_hypnogram</item>
+        <item>@string/pref_chart_sleep_day_chart_legacy</item>
+    </string-array>
+    <string-array name="pref_chart_sleep_day_chart_values">
+        <item>hypnogram</item>
+        <item>legacy</item>
+    </string-array>
     <string-array name="sleep_range_entries">
         <item>@string/pref_chart_sleep_range_rolling_24h</item>
         <item>@string/pref_chart_sleep_range_noon</item>

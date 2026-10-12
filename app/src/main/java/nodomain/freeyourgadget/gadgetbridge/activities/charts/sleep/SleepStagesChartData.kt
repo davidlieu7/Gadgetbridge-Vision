@@ -1,5 +1,6 @@
 package nodomain.freeyourgadget.gadgetbridge.activities.charts.sleep
 
+import nodomain.freeyourgadget.gadgetbridge.activities.charts.mpchart.ChartSelection
 import nodomain.freeyourgadget.gadgetbridge.activities.charts.spec.AxisSide
 import nodomain.freeyourgadget.gadgetbridge.activities.charts.spec.AxisSpec
 import nodomain.freeyourgadget.gadgetbridge.activities.charts.spec.ChartPoint
@@ -12,6 +13,115 @@ import nodomain.freeyourgadget.gadgetbridge.activities.charts.spec.SeriesStyle
 
 object SleepStagesChartData {
     private const val MAX_INTENSITY = 1.0
+
+    /**
+     * A line on the end axis over a sleep chart, e.g. heart rate or SpO2.
+     */
+    data class Overlay(
+        val label: String,
+        val color: Int,
+        val points: List<ChartPoint>,
+        val maxGap: Double?,
+        val minimum: Double,
+        val maximum: Double,
+        val average: Double?,
+        val averageColor: Int,
+        val format: ChartValueFormat,
+        val valueText: (Double) -> String,
+    )
+
+    /**
+     * One row per stage index below [colors] size, from the first stage at the bottom up. Other stages are gaps.
+     */
+    @JvmStatic
+    fun hypnogramSpec(seconds: LongArray, stages: IntArray, colors: IntArray): ChartSpec {
+        if (seconds.isEmpty()) {
+            return ChartSpec.EMPTY
+        }
+        val points = seconds.indices.map {
+            ChartPoint(seconds[it].toDouble(), if (stages[it] in colors.indices) stages[it].toDouble() else -1.0)
+        }
+        return ChartSpec(
+            series = listOf(ChartSeries("stages", "", points, SeriesStyle.Stages(colors.toList()))),
+            xAxis = AxisSpec(format = ChartValueFormat.TIME_OF_DAY, minimum = points.first().x, maximum = points.last().x),
+            yAxis = AxisSpec(format = ChartValueFormat.DECIMAL, minimum = -0.5, maximum = colors.size - 0.5, showLabels = false),
+        )
+    }
+
+    /**
+     * [spec] with [overlay] as a line on the end axis, and its average as a limit line.
+     */
+    @JvmStatic
+    fun withOverlay(spec: ChartSpec, overlay: Overlay?): ChartSpec {
+        if (overlay == null || overlay.points.isEmpty() || spec.isEmpty) {
+            return spec
+        }
+        val line = ChartSeries(
+            "overlay", overlay.label, overlay.points,
+            SeriesStyle.Line(overlay.color, curve = LineCurve.FLAT_AT_POINTS, maxGap = overlay.maxGap), AxisSide.END,
+        )
+        return spec.copy(
+            series = spec.series + line,
+            endYAxis = AxisSpec(format = overlay.format, minimum = overlay.minimum, maximum = overlay.maximum),
+            limitLines = spec.limitLines + listOfNotNull(
+                overlay.average?.let { LimitLineSpec(value = it, color = overlay.averageColor, axis = AxisSide.END) }
+            ),
+        )
+    }
+
+    /**
+     * Tooltip for a time: the stage then, with its stretch for [showStretch], and the [overlay] value.
+     */
+    @JvmStatic
+    fun selection(
+        seconds: LongArray,
+        stages: IntArray,
+        labels: Array<String>,
+        colors: IntArray,
+        showStretch: Boolean,
+        overlay: Overlay?,
+        timeText: (Long) -> String,
+        durationText: (Long) -> String,
+    ): (Double) -> ChartSelection = { x ->
+        val time = Math.round(x)
+        val title = timeText(time)
+        val rows = mutableListOf<ChartSelection.Row>()
+        val found = seconds.asList().binarySearch(time)
+        val i = if (found >= 0) found else -found - 2
+        if (i >= 0) {
+            val stage = stages[i]
+            val stretch = if (showStretch) stretchAt(seconds, stages, i) else null
+            val text = if (stretch == null) {
+                labels[stage]
+            } else {
+                "${labels[stage]} ${timeText(stretch.first)} – ${timeText(stretch.second)} (${durationText(stretch.second - stretch.first)})"
+            }
+            rows += ChartSelection.Row(colors[stage], text)
+        }
+        overlay?.let { overlayValueAt(it, x) }?.let { rows += ChartSelection.Row(overlay.color, overlay.valueText(it)) }
+        ChartSelection(title, rows, (listOf(title) + rows.map { it.text }).joinToString(". ", postfix = "."))
+    }
+
+    /**
+     * Start and end of the run of equal stages around sample [index].
+     */
+    @JvmStatic
+    fun stretchAt(seconds: LongArray, stages: IntArray, index: Int): Pair<Long, Long> {
+        var first = index
+        while (first > 0 && stages[first - 1] == stages[index]) first--
+        var next = index + 1
+        while (next < stages.size && stages[next] == stages[index]) next++
+        return seconds[first] to seconds[minOf(next, seconds.size - 1)]
+    }
+
+    /**
+     * The latest overlay value at or before [x], within its max gap.
+     */
+    private fun overlayValueAt(overlay: Overlay, x: Double): Double? {
+        val point = overlay.points.lastOrNull { it.x <= x } ?: return null
+        if (overlay.maxGap != null && x - point.x > overlay.maxGap) return null
+        return point.y
+    }
 
     /**
      * Movement per stage as solid areas over the night, with heart rate on an end axis. [stages] index into

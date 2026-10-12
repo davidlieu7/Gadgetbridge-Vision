@@ -37,6 +37,7 @@ class ChartLegendView @JvmOverloads constructor(
                 is SeriesStyle.Column -> style.color
                 is SeriesStyle.Line -> style.color
                 is SeriesStyle.Range -> style.color
+                is SeriesStyle.Stages -> style.colors.firstOrNull() ?: continue
             }
             val item = LinearLayout(context).apply {
                 orientation = LinearLayout.HORIZONTAL

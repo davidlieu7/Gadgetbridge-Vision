@@ -98,6 +98,7 @@ internal object ChartDataBuilder {
         val bands = ranges.filter { (it.style as SeriesStyle.Range).width == null }
         val candles = ranges - bands.toSet()
         val lines = spec.series.filter { it.style is SeriesStyle.Line && it.points.isNotEmpty() }
+        val stages = spec.series.filter { it.style is SeriesStyle.Stages && it.points.isNotEmpty() }
         require(columns.isEmpty() || bands.isEmpty()) { "Range and column series can't share a chart" }
         val step = layout.width + layout.gap
         return CombinedData().apply {
@@ -117,8 +118,11 @@ internal object ChartDataBuilder {
             if (candles.isNotEmpty()) {
                 candleData = CandleData(candles.map { candleDataSet(it, xOrigin) })
             }
-            if (lines.isNotEmpty()) {
-                lineData = LineData(lines.flatMap { series -> segments(series).map { lineDataSet(series, it, xOrigin) } })
+            if (lines.isNotEmpty() || stages.isNotEmpty()) {
+                lineData = LineData(
+                    stages.map { stagesDataSet(it, xOrigin) } +
+                        lines.flatMap { series -> segments(series).map { lineDataSet(series, it, xOrigin) } }
+                )
             }
         }
     }
@@ -179,6 +183,20 @@ internal object ChartDataBuilder {
         return CandleDataSet(entries, series.label).apply {
             color = style.color
             barSpace = ((1f - (style.width ?: 1f)) / 2f).coerceIn(0f, MAX_CANDLE_SPACE)
+            isHighlightEnabled = false
+            isDrawValuesEnabled = false
+            axisDependency = axisDependency(series)
+        }
+    }
+
+    /**
+     * Invisible entries that keep the x range of a [SeriesStyle.Stages] series. [StagesRenderer] draws it.
+     */
+    private fun stagesDataSet(series: ChartSeries, xOrigin: Double): LineDataSet<Float> {
+        val entries = series.points.map { Entry(x = (it.x - xOrigin).toFloat(), y = it.y.toFloat(), data = it.x.toFloat()) }
+        return LineDataSet(entries, series.label).apply {
+            color = Color.TRANSPARENT
+            isDrawCirclesEnabled = false
             isHighlightEnabled = false
             isDrawValuesEnabled = false
             axisDependency = axisDependency(series)

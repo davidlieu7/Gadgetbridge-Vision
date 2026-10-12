@@ -50,14 +50,18 @@
             android:layout_height="wrap_content"
             app:sectionTitle="@string/last_night_timeline" />
 
-        <nodomain.freeyourgadget.gadgetbridge.activities.charts.sleep.SleepDetailsView
-            android:id="@+id/sleep_details"
+        <nodomain.freeyourgadget.gadgetbridge.activities.charts.mpchart.GbChartView
+            android:id="@+id/sleepchart"
             android:layout_width="fill_parent"
             android:layout_height="300dp"
-            android:layout_marginStart="2dp"
-            android:layout_marginEnd="2dp"
-            android:layout_marginBottom="15dp"
             android:layout_weight="4" />
+
+        <nodomain.freeyourgadget.gadgetbridge.activities.charts.mpchart.ChartLegendView
+            android:id="@+id/sleepchart_legend"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:layout_marginBottom="10dp" />
 
         <nodomain.freeyourgadget.gadgetbridge.activities.charts.ChartChipScrollView
             android:layout_width="match_parent"
@@ -83,21 +87,8 @@
             android:layout_height="wrap_content"
             android:layout_marginStart="15dp"
             android:layout_marginEnd="15dp"
+            android:layout_marginBottom="25dp"
             android:orientation="vertical"/>
-
-        <nodomain.freeyourgadget.gadgetbridge.activities.charts.mpchart.GbChartView
-            android:id="@+id/sleepchart"
-            android:layout_width="fill_parent"
-            android:layout_height="300dp"
-            android:layout_marginTop="15dp"
-            android:layout_weight="4" />
-
-        <nodomain.freeyourgadget.gadgetbridge.activities.charts.mpchart.ChartLegendView
-            android:id="@+id/sleepchart_legend"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:layout_marginBottom="25dp" />
 
     </LinearLayout>
 </ScrollView>

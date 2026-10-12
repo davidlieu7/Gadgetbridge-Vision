@@ -62,6 +62,15 @@
             android:title="@string/pref_title_chart_sleep_rolling_24_hour"
             app:iconSpaceReserved="false" />
 
+        <ListPreference
+            android:defaultValue="hypnogram"
+            android:entries="@array/pref_chart_sleep_day_chart_entries"
+            android:entryValues="@array/pref_chart_sleep_day_chart_values"
+            android:key="chart_sleep_day_chart"
+            android:summary="%s"
+            android:title="@string/pref_title_chart_sleep_day_chart"
+            app:iconSpaceReserved="false" />
+
         <SwitchPreferenceCompat
             android:defaultValue="true"
             android:key="charts_show_average"
