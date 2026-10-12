@@ -805,7 +805,10 @@ class WeatherSpec() : Parcelable {
             horizon: SolarEvents.Horizon = SolarEvents.Horizon.SUNRISE_SUNSET,
         ): SolarEvents.Day {
             val zonedDate = date.toZonedDateTime()
-            return SolarEvents.spa().forDate(
+            // Grena3 avoids the expensive Math.fma fallback on Android. Its supported years are
+            // 2010–2110; keep SPA at the boundaries to cover time zone and delta-T offsets.
+            val calculator = if (zonedDate.year in 2011..2109) SolarEvents.grena3() else SolarEvents.spa()
+            return calculator.forDate(
                 zonedDate.toLocalDate(),
                 zonedDate.zone,
                 location.latitude,
