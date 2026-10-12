@@ -565,7 +565,7 @@ public class FitProDeviceSupport extends AbstractBTLESingleDeviceSupport {
         short size = (short) (ByteBuffer.wrap(new byte[]{length_high, length_low}).getShort() + 3);
         byte[] sizeArray = ByteBuffer.allocate(2).putShort(size).array();
         builder.write(writeCharacteristic, new byte[]{FitProConstants.DATA_HEADER_ACK, 0, 5, command_group, 1, sizeArray[0], sizeArray[1], 1});
-        builder.queue();
+        builder.queueResponse();
     }
 
     @Override
