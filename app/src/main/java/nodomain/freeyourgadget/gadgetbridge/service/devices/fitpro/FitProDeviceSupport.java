@@ -30,6 +30,10 @@ import static nodomain.freeyourgadget.gadgetbridge.devices.fitpro.FitProConstant
 import static nodomain.freeyourgadget.gadgetbridge.devices.fitpro.FitProConstants.CMD_GROUP_REQUEST_DATA;
 import static nodomain.freeyourgadget.gadgetbridge.devices.fitpro.FitProConstants.CMD_GROUP_RESET;
 import static nodomain.freeyourgadget.gadgetbridge.devices.fitpro.FitProConstants.CMD_HEART_RATE_MEASUREMENT;
+import static nodomain.freeyourgadget.gadgetbridge.devices.fitpro.FitProConstants.CMD_GET_DEVICE_VIBRATIONS;
+import static nodomain.freeyourgadget.gadgetbridge.devices.fitpro.FitProConstants.CMD_GET_DISPLAY_ON_LIFT;
+import static nodomain.freeyourgadget.gadgetbridge.devices.fitpro.FitProConstants.CMD_GET_DND;
+import static nodomain.freeyourgadget.gadgetbridge.devices.fitpro.FitProConstants.CMD_GET_LONG_SIT_REMINDER;
 import static nodomain.freeyourgadget.gadgetbridge.devices.fitpro.FitProConstants.CMD_NOTIFICATIONS_ENABLE;
 import static nodomain.freeyourgadget.gadgetbridge.devices.fitpro.FitProConstants.CMD_NOTIFICATION_CALL;
 import static nodomain.freeyourgadget.gadgetbridge.devices.fitpro.FitProConstants.CMD_NOTIFICATION_MESSAGE;
@@ -229,6 +233,19 @@ public class FitProDeviceSupport extends AbstractBTLESingleDeviceSupport {
         builder.write(writeCharacteristic, craftData(CMD_GROUP_REQUEST_DATA, (byte) 0xf));
         builder.write(writeCharacteristic, craftData(CMD_GROUP_REQUEST_DATA, CMD_GET_HW_INFO));
         builder.write(writeCharacteristic, craftData(CMD_GROUP_BAND_INFO, CMD_RX_BAND_INFO));
+
+        builder.write(writeCharacteristic, craftData(CMD_GROUP_REQUEST_DATA, CMD_GET_DISPLAY_ON_LIFT));
+        builder.write(writeCharacteristic, craftData(CMD_GROUP_REQUEST_DATA, CMD_GET_LONG_SIT_REMINDER));
+        builder.write(writeCharacteristic, craftData(CMD_GROUP_REQUEST_DATA, CMD_GET_DEVICE_VIBRATIONS));
+        builder.write(writeCharacteristic, craftData(CMD_GROUP_REQUEST_DATA, CMD_GET_DND));
+        builder.write(writeCharacteristic, craftData(CMD_GROUP_REQUEST_DATA, CMD_GET_DISPLAY_ON_LIFT));
+        builder.write(writeCharacteristic, craftData(CMD_GROUP_REQUEST_DATA, CMD_GET_LONG_SIT_REMINDER));
+        builder.write(writeCharacteristic, craftData(CMD_GROUP_REQUEST_DATA, CMD_GET_DEVICE_VIBRATIONS));
+        builder.write(writeCharacteristic, craftData(CMD_GROUP_REQUEST_DATA, CMD_GET_DND));
+        builder.write(writeCharacteristic, craftData(CMD_GROUP_REQUEST_DATA, CMD_GET_DISPLAY_ON_LIFT));
+        builder.write(writeCharacteristic, craftData(CMD_GROUP_REQUEST_DATA, CMD_GET_LONG_SIT_REMINDER));
+        builder.write(writeCharacteristic, craftData(CMD_GROUP_REQUEST_DATA, CMD_GET_DEVICE_VIBRATIONS));
+        builder.write(writeCharacteristic, craftData(CMD_GROUP_REQUEST_DATA, CMD_GET_DND));
 
         builder.setDeviceState(GBDevice.State.INITIALIZED);
         return builder;
