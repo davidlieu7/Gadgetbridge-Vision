@@ -23,6 +23,7 @@ import org.slf4j.LoggerFactory;
 
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.Semaphore;
 import java.util.function.BiPredicate;
 
 /**
@@ -31,10 +32,14 @@ import java.util.function.BiPredicate;
  */
 public final class ResponseWait {
     private static final Logger LOG = LoggerFactory.getLogger(ResponseWait.class);
+    private static final long MIN_MESSAGE_INTERVAL_NANOS = TimeUnit.MILLISECONDS.toNanos(50);
     private volatile Pending pending;
 
     public static final class Pending {
         final CountDownLatch latch = new CountDownLatch(1);
+        private final Semaphore wake = new Semaphore(0);
+        private final CountDownLatch cancelled = new CountDownLatch(1);
+        private final long armedAtNanos = System.nanoTime();
         private final byte[] request;
         private final BiPredicate<byte[], byte[]> matcher;
 
@@ -66,15 +71,55 @@ public final class ResponseWait {
         try {
             if (ticket.matcher == null || ticket.matcher.test(ticket.request, response)) {
                 ticket.latch.countDown();
+                ticket.wake.release();
             }
         } catch (RuntimeException e) {
             LOG.warn("Response matcher failed, keeping the message pending until timeout", e);
         }
     }
 
+    @FunctionalInterface
+    public interface WhileWaiting {
+        void run() throws InterruptedException;
+    }
+
+    /** Wake the transport worker to service protocol replies, without accepting a response. */
+    public void wakeUp() {
+        Pending ticket = pending;
+        if (ticket != null) {
+            ticket.wake.release();
+        }
+    }
+
     public boolean await(Pending ticket, long timeoutMillis) throws InterruptedException {
+        return await(ticket, timeoutMillis, () -> {});
+    }
+
+    /** Service transport work on the waiting thread, retaining this request and its deadline. */
+    public boolean await(Pending ticket, long timeoutMillis, WhileWaiting whileWaiting)
+            throws InterruptedException {
+        final long deadline = System.nanoTime() + TimeUnit.MILLISECONDS.toNanos(timeoutMillis);
         try {
-            return ticket.latch.await(timeoutMillis, TimeUnit.MILLISECONDS);
+            while (ticket.cancelled.getCount() != 0) {
+                if (Thread.interrupted()) {
+                    throw new InterruptedException();
+                }
+                whileWaiting.run();
+                if (ticket.cancelled.getCount() == 0) {
+                    break;
+                }
+                final long now = System.nanoTime();
+                final long responseRemaining = deadline - now;
+                final boolean responseFinished = ticket.latch.getCount() == 0 || responseRemaining <= 0;
+                final long spacingRemaining = timeoutMillis > 0
+                        ? MIN_MESSAGE_INTERVAL_NANOS - (now - ticket.armedAtNanos) : 0;
+                if (responseFinished && spacingRemaining <= 0) {
+                    break;
+                }
+                ticket.wake.tryAcquire(responseFinished ? spacingRemaining : responseRemaining,
+                        TimeUnit.NANOSECONDS);
+            }
+            return ticket.latch.getCount() == 0;
         } finally {
             synchronized (this) {
                 if (pending == ticket) {
@@ -88,6 +133,8 @@ public final class ResponseWait {
         Pending ticket = pending;
         pending = null;
         if (ticket != null) {
+            ticket.cancelled.countDown();
+            ticket.wake.release();
             ticket.latch.countDown();
         }
     }

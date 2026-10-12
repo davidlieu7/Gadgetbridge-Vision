@@ -78,7 +78,8 @@ public class TransactionBuilder {
     /**
      * Pace every logical write in this transaction, including writes already added. After
      * transport completion, wait up to timeoutMillis for an incoming BLE characteristic notification.
-     * Zero (the default) disables response waiting without changing transport serialization.
+     * Enabled pacing also keeps at least 50 ms between logical writes, including fast replies.
+     * Zero (the default) disables response waiting and minimum spacing without changing transport serialization.
      * Any incoming data is only a best-effort reply: unrelated or late data may release a write.
      * Timeouts continue without retries, including after the last write before the next transaction.
      */
@@ -92,8 +93,8 @@ public class TransactionBuilder {
      * logical message. The matcher runs on the receive thread, after the normal device callback;
      * it must be fast and must not throw. Matcher exceptions are logged and leave the wait armed.
      * BLE chunks are sent with normal GATT serialization; only the final chunk waits for a reply.
-     * Transactions queued by receive callbacks (such as phone ACKs) cannot overtake this one;
-     * protocols that require such an ACK before replying may need the timeout fallback.
+     * Receive callbacks can send required phone ACKs with {@link #queueResponse()}, which
+     * services write-only replies during the wait without releasing this request.
      */
     @NonNull
     public TransactionBuilder queueMessages(@IntRange(from = 0) long timeoutMillis,
@@ -423,6 +424,20 @@ public class TransactionBuilder {
             return;
         }
         queue.add(mTransaction);
+    }
+
+    /**
+     * Queue protocol replies in FIFO order, also while another transaction awaits a device reply.
+     * Only unpaced writes are allowed: ACKs must not wait for another ACK or change callbacks.
+     * GATT writes remain serialized on the queue worker, never on the receive callback thread.
+     */
+    public void queueResponse() {
+        if (mTransaction.getMessageTimeout() != 0 || mTransaction.isModifyGattCallback()
+                || mTransaction.getActions().stream().anyMatch(action -> !(action instanceof WriteAction))) {
+            throw new IllegalArgumentException("Response transactions must contain only unpaced writes without callbacks");
+        }
+        mTransaction.setResponse();
+        queue();
     }
 
     @VisibleForTesting()

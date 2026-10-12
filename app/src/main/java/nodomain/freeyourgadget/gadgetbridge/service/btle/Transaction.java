@@ -39,11 +39,20 @@ public class Transaction extends AbstractTransaction {
 
     private boolean modifyGattCallback;
 
+    private boolean response;
     private long messageTimeout;
     private BiPredicate<byte[], byte[]> responseMatcher;
 
     public Transaction(String taskName) {
         super(taskName);
+    }
+
+    void setResponse() {
+        response = true;
+    }
+
+    boolean isResponse() {
+        return response;
     }
 
     public void setMessageQueue(long timeoutMillis, @Nullable BiPredicate<byte[], byte[]> matcher) {

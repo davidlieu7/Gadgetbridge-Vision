@@ -93,6 +93,58 @@ public class BtLEQueueResponseTest extends TestBase {
         callback.onCharacteristicChanged(gatt, characteristic, new byte[]{value});
     }
 
+    // Phone ACKs must not wait behind the initialization transaction, reverse their order,
+    // overlap an unfinished GATT write, release the request gate, or hide write failures.
+    @Test
+    public void responseWritesInterleaveInFifoOrderWithoutReleasingRequestGate() throws Exception {
+        java.util.concurrent.BlockingQueue<byte[]> sent = new java.util.concurrent.LinkedBlockingQueue<>();
+        when(gatt.writeCharacteristic(any(BluetoothGattCharacteristic.class))).thenAnswer(invocation -> {
+            sent.add(characteristic.getValue().clone());
+            return true;
+        });
+        twoWrites(10000).queueMessages(10000, (request, response) -> request[0] == response[0]).queue();
+        assertArrayEquals(new byte[]{1}, sent.poll(1, TimeUnit.SECONDS));
+        new TransactionBuilder("ack one", support, 0).write(characteristic, (byte) 9).queueResponse();
+        new TransactionBuilder("ack two", support, 0).write(characteristic, (byte) 10).queueResponse();
+        assertNull(sent.poll(30, TimeUnit.MILLISECONDS));
+        completeWrite();
+        assertArrayEquals(new byte[]{9}, sent.poll(1, TimeUnit.SECONDS));
+        assertNull(sent.poll(30, TimeUnit.MILLISECONDS));
+        completeWrite();
+        assertArrayEquals(new byte[]{10}, sent.poll(1, TimeUnit.SECONDS));
+        completeWrite();
+        assertNull(sent.poll(30, TimeUnit.MILLISECONDS));
+        respond((byte) 1);
+        assertArrayEquals(new byte[]{2}, sent.poll(1, TimeUnit.SECONDS));
+    }
+
+    @Test
+    public void failedResponseWriteAbortsRemainingRequestActions() throws Exception {
+        java.util.concurrent.BlockingQueue<byte[]> sent = new java.util.concurrent.LinkedBlockingQueue<>();
+        when(gatt.writeCharacteristic(any(BluetoothGattCharacteristic.class))).thenAnswer(invocation -> {
+            byte[] bytes = characteristic.getValue().clone();
+            sent.add(bytes);
+            return bytes[0] != 9;
+        });
+        twoWrites(10000).queue();
+        assertArrayEquals(new byte[]{1}, sent.poll(1, TimeUnit.SECONDS));
+        completeWrite();
+        new TransactionBuilder("ack", support, 0).write(characteristic, (byte) 9).queueResponse();
+        CountDownLatch following = new CountDownLatch(1);
+        new TransactionBuilder("after failure", support, 0).run(following::countDown).queue();
+        assertArrayEquals(new byte[]{9}, sent.poll(1, TimeUnit.SECONDS));
+        assertTrue(following.await(1, TimeUnit.SECONDS));
+        assertNull(sent.poll(30, TimeUnit.MILLISECONDS));
+    }
+
+    @Test
+    public void responseTransactionsRejectPacingAndNonWriteActions() {
+        assertThrows(IllegalArgumentException.class, () ->
+                twoWrites(1000).queueResponse());
+        assertThrows(IllegalArgumentException.class, () ->
+                new TransactionBuilder("not a write", support, 0).run(() -> {}).queueResponse());
+    }
+
     @Test
     public void gattCompletionDoesNotCountAsDeviceReply() throws Exception {
         twoWrites(10000).queue();

@@ -25,12 +25,134 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import static org.junit.Assert.*;
 
 public class ResponseWaitTest {
+    // Reply servicing can fail through lost wakeups, accepting an ACK as a reply, extending
+    // the timeout, starving ACKs after a matched reply, or ignoring cancellation.
+    @Test
+    public void queuedWorkWakesWaitWithoutAcceptingAReply() throws Exception {
+        ResponseWait wait = new ResponseWait();
+        ResponseWait.Pending pending = wait.arm(new byte[]{1}, null);
+        CountDownLatch serviced = new CountDownLatch(2);
+        CountDownLatch started = new CountDownLatch(1);
+        Thread thread = new Thread(() -> {
+            try {
+                started.countDown();
+                wait.await(pending, 10000, serviced::countDown);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            }
+        });
+        thread.start();
+        assertTrue(started.await(1, TimeUnit.SECONDS));
+        wait.wakeUp();
+        assertTrue(serviced.await(1, TimeUnit.SECONDS));
+        assertEquals(1, pending.latch.getCount());
+        wait.cancel();
+        thread.join(1000);
+        assertFalse(thread.isAlive());
+    }
+
+    @Test
+    public void wakeBeforeAwaitAndImmediateResponseStillServiceQueuedWork() throws Exception {
+        ResponseWait wait = new ResponseWait();
+        ResponseWait.Pending pending = wait.arm(new byte[]{1}, null);
+        wait.wakeUp();
+        wait.onResponse(pending, new byte[]{1});
+        AtomicBoolean serviced = new AtomicBoolean();
+        assertTrue(wait.await(pending, 2000, () -> serviced.set(true)));
+        assertTrue(serviced.get());
+    }
+
+    @Test
+    public void repeatedWorkWakeupsDoNotRestartResponseTimeout() throws Exception {
+        ResponseWait wait = new ResponseWait();
+        ResponseWait.Pending pending = wait.arm(new byte[]{1}, null);
+        long started = System.nanoTime();
+        assertFalse(wait.await(pending, 70, () -> {
+            Thread.sleep(5);
+            wait.wakeUp();
+        }));
+        assertTrue(TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started) < 250);
+    }
+
     @Test
     public void capturesImmediateResponseBeforeAwait() throws Exception {
         ResponseWait wait = new ResponseWait();
         ResponseWait.Pending pending = wait.arm(new byte[]{1}, null);
         wait.onResponse(pending, new byte[]{2});
         assertTrue(wait.await(pending, 0));
+        assertNull(wait.getPending());
+    }
+
+    // Failure scenarios: immediate/duplicate replies permit a burst; timeout bypasses pacing;
+    // slow replies receive an unnecessary extra delay; cancellation leaves pacing blocked;
+    // timeout zero changes legacy behavior; stale replies release a newer request.
+    @Test
+    public void immediateRepliesStillSpaceLogicalWrites() throws Exception {
+        ResponseWait wait = new ResponseWait();
+        long started = System.nanoTime();
+        for (int i = 0; i < 14; i++) {
+            ResponseWait.Pending pending = wait.arm(new byte[]{(byte) i}, null);
+            wait.onResponse(pending, new byte[]{1});
+            assertTrue(wait.await(pending, 2000));
+        }
+        assertTrue(TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started) >= 700);
+    }
+
+    @Test
+    public void shortTimeoutStillHonorsMinimumSpacing() throws Exception {
+        ResponseWait wait = new ResponseWait();
+        long started = System.nanoTime();
+        ResponseWait.Pending pending = wait.arm(new byte[]{1}, null);
+        assertFalse(wait.await(pending, 1));
+        assertTrue(TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started) >= 50);
+    }
+
+    @Test
+    public void slowReplyDoesNotReceiveAnAdditionalPacingDelay() throws Exception {
+        ResponseWait wait = new ResponseWait();
+        ResponseWait.Pending pending = wait.arm(new byte[]{1}, null);
+        Thread.sleep(80);
+        wait.onResponse(pending, new byte[]{1});
+        long started = System.nanoTime();
+        assertTrue(wait.await(pending, 2000));
+        assertTrue(TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started) < 40);
+    }
+
+    @Test
+    public void cancellationAfterReplySkipsRemainingSpacing() throws Exception {
+        ResponseWait wait = new ResponseWait();
+        ResponseWait.Pending pending = wait.arm(new byte[]{1}, null);
+        wait.onResponse(pending, new byte[]{1});
+        wait.cancel();
+        long started = System.nanoTime();
+        assertTrue(wait.await(pending, 2000));
+        assertTrue(TimeUnit.NANOSECONDS.toMillis(System.nanoTime() - started) < 40);
+        assertNull(wait.getPending());
+    }
+
+    @Test
+    public void cancellationUnblocksPacingAfterImmediateReply() throws Exception {
+        ResponseWait wait = new ResponseWait();
+        ResponseWait.Pending pending = wait.arm(new byte[]{1}, null);
+        wait.onResponse(pending, new byte[]{1});
+        CountDownLatch started = new CountDownLatch(1);
+        CountDownLatch finished = new CountDownLatch(1);
+        Thread thread = new Thread(() -> {
+            started.countDown();
+            try {
+                wait.await(pending, 2000);
+            } catch (InterruptedException e) {
+                Thread.currentThread().interrupt();
+            } finally {
+                finished.countDown();
+            }
+        });
+        thread.start();
+        assertTrue(started.await(1, TimeUnit.SECONDS));
+        assertFalse(finished.await(10, TimeUnit.MILLISECONDS));
+        wait.cancel();
+        assertTrue(finished.await(1, TimeUnit.SECONDS));
+        thread.join(1000);
         assertNull(wait.getPending());
     }
 

@@ -222,7 +222,7 @@ public final class BtLEQueue implements Thread.UncaughtExceptionHandler {
                                     }
                                 }
                                 if (response != null && !mAbortTransaction && !mDisposed.get()) {
-                                    if (!mResponseWait.await(response, transaction.getMessageTimeout())) {
+                                    if (!mResponseWait.await(response, transaction.getMessageTimeout(), this::runResponses)) {
                                         LOG.debug("Response timeout for #{} in {}", actionIndex, transaction.getTaskName());
                                     }
                                 }
@@ -246,6 +246,46 @@ public final class BtLEQueue implements Thread.UncaughtExceptionHandler {
                 }
             }
             LOG.debug("mDispatchThread: thread {} finished", getThreadLabel());
+        }
+
+        private void runResponses() throws InterruptedException {
+            for (AbstractTransaction queued : mTransactions) {
+                if (mAbortTransaction || mDisposed.get()) {
+                    return;
+                }
+                if (!(queued instanceof Transaction reply) || !reply.isResponse()
+                        || !mTransactions.remove(reply)) {
+                    continue;
+                }
+                // The original write has completed. Preserve its callback and wait state while
+                // sending required protocol replies; do not arm or replace its response ticket.
+                final BluetoothGattCharacteristic savedCharacteristic = mWaitCharacteristic;
+                final CountDownLatch savedLatch = mWaitForActionResultLatch;
+                try {
+                    for (BtLEAction action : reply.getActions()) {
+                        if (mAbortTransaction || mDisposed.get()) {
+                            return;
+                        }
+                        mWaitCharacteristic = action.getCharacteristic();
+                        mWaitForActionResultLatch = new CountDownLatch(1);
+                        if (!action.run(mBluetoothGatt)) {
+                            LOG.error("Response write failed in {}", reply.getTaskName());
+                            abortCurrentTransaction();
+                            return;
+                        }
+                        if (action.expectsResult()) {
+                            mWaitForActionResultLatch.await();
+                        }
+                        if (mAbortTransaction) {
+                            abortCurrentTransaction();
+                            return;
+                        }
+                    }
+                } finally {
+                    mWaitCharacteristic = savedCharacteristic;
+                    mWaitForActionResultLatch = savedLatch;
+                }
+            }
         }
     }
 
@@ -557,6 +597,9 @@ public final class BtLEQueue implements Thread.UncaughtExceptionHandler {
         LOG.debug("add: {}", transaction);
         if (!transaction.isEmpty()) {
             mTransactions.addLast(transaction);
+            if (transaction.isResponse()) {
+                mResponseWait.wakeUp();
+            }
         }
     }
 

@@ -62,7 +62,8 @@ public class TransactionBuilder {
     /**
      * Pace every logical write in this transaction, including writes already added. After
      * transport completion, wait up to timeoutMillis for an incoming socket read.
-     * Zero (the default) disables response waiting without changing transport serialization.
+     * Enabled pacing also keeps at least 50 ms between logical writes, including fast replies.
+     * Zero (the default) disables response waiting and minimum spacing without changing transport serialization.
      * Any incoming data is only a best-effort reply: unrelated or late data may release a write.
      * Timeouts continue without retries, including after the last write before the next transaction.
      */
