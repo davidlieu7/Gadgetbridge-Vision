@@ -41,6 +41,8 @@ import java.util.concurrent.atomic.AtomicLong;
 import nodomain.freeyourgadget.gadgetbridge.GBApplication;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
 import nodomain.freeyourgadget.gadgetbridge.service.DeviceSupport;
+import nodomain.freeyourgadget.gadgetbridge.service.ResponseWait;
+import nodomain.freeyourgadget.gadgetbridge.service.btbr.actions.WriteAction;
 import nodomain.freeyourgadget.gadgetbridge.util.GB;
 
 public final class BtBRQueue {
@@ -57,6 +59,7 @@ public final class BtBRQueue {
     private final UUID mService;
 
     private final AtomicBoolean mDisposed;
+    private final ResponseWait mResponseWait = new ResponseWait();
 
     private final Context mContext;
     private final int mBufferSize;
@@ -104,14 +107,18 @@ public final class BtBRQueue {
                                 mIsAux ? "aux ch " + mRfcommChannel : "main", GB.hexdump(buffer, 0, nRead));
                     }
 
+                    final ResponseWait.Pending response = nRead > 0 ? mResponseWait.getPending() : null;
+                    final byte[] value = Arrays.copyOf(buffer, nRead);
+                    final byte[] responseValue = response != null ? value.clone() : value;
                     try {
                         // Tag the data with the channel this socket was opened on, so it matches
                         // what the write side uses to address it. The primary socket reports its
                         // own channel, which is RFCOMM_CHANNEL_UNSPECIFIED when resolved via SDP.
-                        mCallback.onSocketRead(Arrays.copyOf(buffer, nRead), mRfcommChannel);
+                        mCallback.onSocketRead(value, mRfcommChannel);
                     } catch (Throwable ex) {
                         LOG.error("Failed to process received bytes in onSocketRead callback: ", ex);
                     }
+                    mResponseWait.onResponse(response, responseValue);
                 }
 
                 cleanup();
@@ -266,20 +273,40 @@ public final class BtBRQueue {
                             }
 
                             for (BtBRAction action : transaction.getActions()) {
+                                if (transaction.getMessageTimeout() > 0 && (mDisposed.get() || !isConnected())) {
+                                    break;
+                                }
                                 if (LOG.isDebugEnabled()) {
                                     LOG.debug("About to run action on {}: {}",
                                             mIsAux ? "aux ch " + mRfcommChannel : "main", action);
                                 }
 
+                                ResponseWait.Pending response = null;
+                                if (transaction.getMessageTimeout() > 0 && action instanceof WriteAction write) {
+                                    response = mResponseWait.arm(write.getValue(), transaction.getResponseMatcher());
+                                }
+                                if (response != null && (mDisposed.get() || !isConnected())) {
+                                    break;
+                                }
                                 if (action.run(mBtSocket)) {
                                     LOG.debug("Action ok: {}", action);
+                                    if (response != null && !mDisposed.get() && isConnected()) {
+                                        if (!mResponseWait.await(response, transaction.getMessageTimeout())) {
+                                            LOG.debug("Response timeout in {}", transaction.getTaskName());
+                                        }
+                                    }
                                 } else {
                                     LOG.error("Action returned false, cancelling further actions in transaction: {}", action);
                                     break;
                                 }
                             }
+                        } catch (InterruptedException ex) {
+                            Thread.currentThread().interrupt();
+                            LOG.debug("Interrupted while waiting for a device response", ex);
                         } catch (Throwable ex) {
                             LOG.error("IO Write Thread died: ", ex);
+                        } finally {
+                            mResponseWait.cancel();
                         }
 
                         return;
@@ -372,6 +399,7 @@ public final class BtBRQueue {
         }
 
         mBtSocket = null;
+        mResponseWait.cancel();
         if (!mIsAux)
             setDeviceConnectionState(GBDevice.State.NOT_CONNECTED);
     }
@@ -389,6 +417,7 @@ public final class BtBRQueue {
                 LOG.error("IO exception while closing socket in closeSocket(): ", e);
             }
         }
+        mResponseWait.cancel();
     }
 
     /**
@@ -429,6 +458,7 @@ public final class BtBRQueue {
             }
             mBtSocket = null;
         }
+        mResponseWait.cancel();
     }
 
     public void dispose() {

@@ -19,6 +19,7 @@ package nodomain.freeyourgadget.gadgetbridge.service.btbr;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
+import java.util.function.BiPredicate;
 
 import androidx.annotation.Nullable;
 
@@ -34,8 +35,28 @@ public class Transaction extends AbstractTransaction {
     @Nullable
     SocketCallback socketCallback;
 
+    private long messageTimeout;
+    private BiPredicate<byte[], byte[]> responseMatcher;
+
     public Transaction(String taskName) {
         super(taskName);
+    }
+
+    public void setMessageQueue(long timeoutMillis, @Nullable BiPredicate<byte[], byte[]> matcher) {
+        if (timeoutMillis < 0) {
+            throw new IllegalArgumentException("Message timeout must not be negative");
+        }
+        messageTimeout = timeoutMillis;
+        responseMatcher = matcher;
+    }
+
+    public long getMessageTimeout() {
+        return messageTimeout;
+    }
+
+    @Nullable
+    public BiPredicate<byte[], byte[]> getResponseMatcher() {
+        return responseMatcher;
     }
 
     public void add(BtBRAction action) {

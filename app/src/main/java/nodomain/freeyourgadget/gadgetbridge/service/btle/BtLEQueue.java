@@ -59,6 +59,7 @@ import nodomain.freeyourgadget.gadgetbridge.R;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice.State;
 import nodomain.freeyourgadget.gadgetbridge.service.DeviceSupport;
+import nodomain.freeyourgadget.gadgetbridge.service.ResponseWait;
 import nodomain.freeyourgadget.gadgetbridge.service.btle.actions.WriteAction;
 import nodomain.freeyourgadget.gadgetbridge.util.GB;
 
@@ -82,6 +83,7 @@ public final class BtLEQueue implements Thread.UncaughtExceptionHandler {
 
     private final BlockingDeque<AbstractTransaction> mTransactions;
     private final AtomicBoolean mDisposed;
+    private final ResponseWait mResponseWait = new ResponseWait();
     private volatile boolean mAbortTransaction;
     private volatile boolean mAbortServerTransaction;
     private volatile boolean mPauseTransaction;
@@ -201,6 +203,14 @@ public final class BtLEQueue implements Thread.UncaughtExceptionHandler {
                                 // always be the last action in the transaction
                                 internalGattCallback.Delegate.setTransactionGattCallback(listenerAction.getGattCallback());
                             }
+                            ResponseWait.Pending response = null;
+                            if (transaction.getMessageTimeout() > 0 && action instanceof WriteAction write
+                                    && write.getMessage() != null) {
+                                response = mResponseWait.arm(write.getMessage(), transaction.getResponseMatcher());
+                            }
+                            if (mAbortTransaction || mDisposed.get()) {
+                                break;
+                            }
                             if (action.run(mBluetoothGatt)) {
                                 // check again, maybe due to some condition, action did not need to write, so we can't wait
                                 boolean waitForResult = action.expectsResult();
@@ -209,6 +219,11 @@ public final class BtLEQueue implements Thread.UncaughtExceptionHandler {
                                     mWaitForActionResultLatch = null;
                                     if (mAbortTransaction) {
                                         break;
+                                    }
+                                }
+                                if (response != null && !mAbortTransaction && !mDisposed.get()) {
+                                    if (!mResponseWait.await(response, transaction.getMessageTimeout())) {
+                                        LOG.debug("Response timeout for #{} in {}", actionIndex, transaction.getTaskName());
                                     }
                                 }
                             } else {
@@ -225,6 +240,7 @@ public final class BtLEQueue implements Thread.UncaughtExceptionHandler {
                     crashed = true;
                     mConnectionLatch = null;
                 } finally {
+                    mResponseWait.cancel();
                     mWaitForActionResultLatch = null;
                     mWaitCharacteristic = null;
                 }
@@ -399,6 +415,7 @@ public final class BtLEQueue implements Thread.UncaughtExceptionHandler {
     void disconnect() {
         synchronized (mGattMonitor) {
             LOG.debug("disconnect: BtLEQueue_{}", mQueueIdx);
+            abortCurrentTransaction();
             mGattConnectTimeoutHandler.removeCallbacksAndMessages(null);
             BluetoothGatt gatt = mBluetoothGatt;
             if (gatt != null) {
@@ -428,6 +445,7 @@ public final class BtLEQueue implements Thread.UncaughtExceptionHandler {
         mTransactions.clear();
         mPauseTransaction = false;
         mAbortTransaction = true;
+        mResponseWait.cancel();
         mAbortServerTransaction = true;
         mGattConnectTimeoutHandler.removeCallbacksAndMessages(null);
         final CountDownLatch clientLatch = mWaitForActionResultLatch;
@@ -547,6 +565,7 @@ public final class BtLEQueue implements Thread.UncaughtExceptionHandler {
      */
     public void abortCurrentTransaction() {
         mAbortTransaction = true;
+        mResponseWait.cancel();
         final CountDownLatch latch = mWaitForActionResultLatch;
         if (latch != null) {
             latch.countDown();
@@ -865,6 +884,8 @@ public final class BtLEQueue implements Thread.UncaughtExceptionHandler {
                 return;
             }
 
+            final ResponseWait.Pending response = mResponseWait.getPending();
+            final byte[] responseValue = response != null ? value.clone() : value;
             final GattCallback callback = getCallbackToUse();
             if (callback != null) {
                 try {
@@ -875,6 +896,7 @@ public final class BtLEQueue implements Thread.UncaughtExceptionHandler {
             } else {
                 LOG.info("onCharacteristicChanged: ignored, no GattCallback registered");
             }
+            mResponseWait.onResponse(response, responseValue);
         }
 
         @Override

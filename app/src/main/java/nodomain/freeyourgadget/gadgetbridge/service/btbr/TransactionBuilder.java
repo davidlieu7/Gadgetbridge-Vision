@@ -27,6 +27,7 @@ import androidx.annotation.VisibleForTesting;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.util.function.BiPredicate;
 import java.util.function.Predicate;
 
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
@@ -50,6 +51,40 @@ public class TransactionBuilder {
     TransactionBuilder(String taskName, @NonNull AbstractBTBRDeviceSupport deviceSupport) {
         mTransaction = new Transaction(taskName);
         mDeviceSupport = deviceSupport;
+    }
+
+    /** Enable response-paced writes with a 2000 ms timeout. */
+    @NonNull
+    public TransactionBuilder queueMessages() {
+        return queueMessages(2000);
+    }
+
+    /**
+     * Pace every logical write in this transaction, including writes already added. After
+     * transport completion, wait up to timeoutMillis for an incoming socket read.
+     * Zero (the default) disables response waiting without changing transport serialization.
+     * Any incoming data is only a best-effort reply: unrelated or late data may release a write.
+     * Timeouts continue without retries, including after the last write before the next transaction.
+     */
+    @NonNull
+    public TransactionBuilder queueMessages(@IntRange(from = 0) long timeoutMillis) {
+        return queueMessages(timeoutMillis, null);
+    }
+
+    /**
+     * Like {@link #queueMessages(long)}, but accept only replies matched against the outgoing
+     * logical message. The matcher runs on the receive thread, after the normal device callback;
+     * it must be fast and must not throw. Matcher exceptions are logged and leave the wait armed.
+     * Socket reads are raw fragments, not necessarily complete protocol messages. A matcher
+     * must handle fragmentation if the protocol requires it.
+     * Transactions queued by receive callbacks (such as phone ACKs) cannot overtake this one;
+     * protocols that require such an ACK before replying may need the timeout fallback.
+     */
+    @NonNull
+    public TransactionBuilder queueMessages(@IntRange(from = 0) long timeoutMillis,
+                                             @Nullable BiPredicate<byte[], byte[]> responseMatcher) {
+        mTransaction.setMessageQueue(timeoutMillis, responseMatcher);
+        return this;
     }
 
     @NonNull

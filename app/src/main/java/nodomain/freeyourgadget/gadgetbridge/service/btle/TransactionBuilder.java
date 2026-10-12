@@ -36,6 +36,7 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.util.Arrays;
 import java.util.UUID;
+import java.util.function.BiPredicate;
 import java.util.function.Predicate;
 
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
@@ -66,6 +67,39 @@ public class TransactionBuilder {
         mTransaction = new Transaction(taskName);
         mDeviceSupport = deviceSupport;
         mDeviceIdx = deviceIdx;
+    }
+
+    /** Enable response-paced writes with a 2000 ms timeout. */
+    @NonNull
+    public TransactionBuilder queueMessages() {
+        return queueMessages(2000);
+    }
+
+    /**
+     * Pace every logical write in this transaction, including writes already added. After
+     * transport completion, wait up to timeoutMillis for an incoming BLE characteristic notification.
+     * Zero (the default) disables response waiting without changing transport serialization.
+     * Any incoming data is only a best-effort reply: unrelated or late data may release a write.
+     * Timeouts continue without retries, including after the last write before the next transaction.
+     */
+    @NonNull
+    public TransactionBuilder queueMessages(@IntRange(from = 0) long timeoutMillis) {
+        return queueMessages(timeoutMillis, null);
+    }
+
+    /**
+     * Like {@link #queueMessages(long)}, but accept only replies matched against the outgoing
+     * logical message. The matcher runs on the receive thread, after the normal device callback;
+     * it must be fast and must not throw. Matcher exceptions are logged and leave the wait armed.
+     * BLE chunks are sent with normal GATT serialization; only the final chunk waits for a reply.
+     * Transactions queued by receive callbacks (such as phone ACKs) cannot overtake this one;
+     * protocols that require such an ACK before replying may need the timeout fallback.
+     */
+    @NonNull
+    public TransactionBuilder queueMessages(@IntRange(from = 0) long timeoutMillis,
+                                             @Nullable BiPredicate<byte[], byte[]> responseMatcher) {
+        mTransaction.setMessageQueue(timeoutMillis, responseMatcher);
+        return this;
     }
 
     /// Invokes a read operation on a given characteristic. The result will be made
@@ -194,7 +228,8 @@ public class TransactionBuilder {
             if (end > data.length) {
                 end = data.length;
             }
-            WriteAction action = new WriteAction(characteristic, Arrays.copyOfRange(data, start, end));
+            WriteAction action = new WriteAction(characteristic, Arrays.copyOfRange(data, start, end),
+                    false, end == data.length ? data.clone() : null);
             add(action);
         }
 

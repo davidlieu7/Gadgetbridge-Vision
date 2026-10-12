@@ -23,6 +23,7 @@ import android.bluetooth.BluetoothGattCharacteristic;
 import android.bluetooth.BluetoothStatusCodes;
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -43,15 +44,23 @@ public class WriteAction extends BtLEAction {
 
     private final byte[] value;
     private final boolean legacyCompat;
+    private final byte[] message;
 
     public WriteAction(@NonNull BluetoothGattCharacteristic characteristic, @NonNull byte[] value) {
         this(characteristic, value, false);
     }
 
     public WriteAction(@NonNull BluetoothGattCharacteristic characteristic, @NonNull byte[] value, boolean legacyCompat) {
+        this(characteristic, value, legacyCompat, value);
+    }
+
+    /** message is the full logical payload, or null for an intermediate chunk. */
+    public WriteAction(@NonNull BluetoothGattCharacteristic characteristic, @NonNull byte[] value,
+                       boolean legacyCompat, @Nullable byte[] message) {
         super(characteristic);
         this.value = value;
         this.legacyCompat = legacyCompat;
+        this.message = message;
     }
 
     @Override
@@ -100,6 +109,11 @@ public class WriteAction extends BtLEAction {
             LOG.error("setting value of characteristic {} failed", characteristic.getUuid());
         }
         return false;
+    }
+
+    @Nullable
+    public byte[] getMessage() {
+        return message;
     }
 
     public byte[] getValue() {
