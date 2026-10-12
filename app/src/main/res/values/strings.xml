@@ -3859,6 +3859,9 @@
     <string name="body_composition_percent">%1$.1f %%</string>
     <string name="body_composition_kcal">%1$d kcal</string>
     <string name="body_composition_ohm">%1$d Ω</string>
+    <string name="body_composition_impedance_frequency">%1$s kHz</string>
+    <string name="body_composition_impedance_section">Section %1$d</string>
+    <string name="body_composition_impedance_section_frequency">Section %1$d, %2$s kHz</string>
     <string name="pref_title_chart_weight_body_composition">Body composition values</string>
     <string name="pref_summary_chart_weight_body_composition">Values shown below the weight chart. BMI only needs the weight and your height; the others need a scale that reports impedance</string>
     <string name="redmi_buds_5_pro_anc_balanced">Balanced</string>
@@ -5155,6 +5158,7 @@
     <string name="unit_fahrenheit">℉</string>
     <string name="unit_hours">h</string>
     <string name="unit_percentage">%</string>
+    <string name="unit_ohm">Ω</string>
     <string name="unit_ml_kg_min">ml/kg/min</string>
     <string name="unit_kg">kg</string>
     <string name="unit_lb">lb</string>

@@ -29,6 +29,7 @@ import androidx.core.content.ContextCompat;
 
 import com.github.mikephil.charting.charts.Chart;
 
+import java.text.DecimalFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -44,10 +45,13 @@ import nodomain.freeyourgadget.gadgetbridge.activities.charts.mpchart.ChartSelec
 import nodomain.freeyourgadget.gadgetbridge.activities.charts.mpchart.GbChartView;
 import nodomain.freeyourgadget.gadgetbridge.activities.charts.spec.ChartSeries;
 import nodomain.freeyourgadget.gadgetbridge.activities.charts.spec.ChartSpec;
+import nodomain.freeyourgadget.gadgetbridge.activities.charts.weight.ImpedanceChartData;
 import nodomain.freeyourgadget.gadgetbridge.activities.charts.weight.WeightChartData;
 import nodomain.freeyourgadget.gadgetbridge.database.DBHandler;
 import nodomain.freeyourgadget.gadgetbridge.devices.DeviceCoordinator;
+import nodomain.freeyourgadget.gadgetbridge.devices.GenericImpedanceSampleProvider;
 import nodomain.freeyourgadget.gadgetbridge.devices.TimeSampleProvider;
+import nodomain.freeyourgadget.gadgetbridge.entities.GenericImpedanceSample;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
 import nodomain.freeyourgadget.gadgetbridge.model.ActivityUser;
 import nodomain.freeyourgadget.gadgetbridge.model.WeightSample;
@@ -64,6 +68,8 @@ public class WeightChartFragment extends AbstractChartFragment<WeightChartFragme
 
     private GbChartView chart;
     private ChartLegendView legend;
+    private GbChartView impedanceChart;
+    private ChartLegendView impedanceLegend;
     private TextView textTimeSpan;
     private TextView textWeightLatest;
     private static final String PREF_BODY_COMPOSITION_VALUES = "chart_weight_body_composition";
@@ -116,7 +122,35 @@ public class WeightChartFragment extends AbstractChartFragment<WeightChartFragme
         for (WeightSample sample : samples) {
             compositions.add(BodyCompositionEstimates.composition(db.getDaoSession(), sample));
         }
-        return new WeightChartsData(samples, compositions, latestSample, composition, bmi);
+        return new WeightChartsData(samples, compositions, impedances(db, device, samples, tsStart, tsEnd),
+                latestSample, composition, bmi);
+    }
+
+    /**
+     * The readings from the impedance table, which can hold several per weigh-in, or else the single value most
+     * scales store with the weight.
+     */
+    private static List<ImpedanceChartData.Reading> impedances(final DBHandler db, final GBDevice device,
+                                                               final List<? extends WeightSample> samples,
+                                                               final long tsStart, final long tsEnd) {
+        final long[] weighIns = new long[samples.size()];
+        for (int i = 0; i < weighIns.length; i++) {
+            weighIns[i] = samples.get(i).getTimestamp() / 1000L;
+        }
+        final List<ImpedanceChartData.Reading> stored = new ArrayList<>();
+        for (final GenericImpedanceSample row : new GenericImpedanceSampleProvider(device, db.getDaoSession()).getAllSamples(tsStart, tsEnd)) {
+            stored.add(new ImpedanceChartData.Reading(row.getTimestamp() / 1000L, row.getBodySectionIdx(), row.getFrequencyHz(), row.getImpedanceOhm()));
+        }
+        final List<ImpedanceChartData.Reading> readings = ImpedanceChartData.atWeighIns(stored, weighIns);
+        if (!readings.isEmpty()) {
+            return readings;
+        }
+        for (final WeightSample sample : samples) {
+            if (sample.getImpedanceOhm() != null) {
+                readings.add(new ImpedanceChartData.Reading(sample.getTimestamp() / 1000L, 0, -1, sample.getImpedanceOhm()));
+            }
+        }
+        return readings;
     }
 
     @Override
@@ -130,6 +164,7 @@ public class WeightChartFragment extends AbstractChartFragment<WeightChartFragme
     @Override
     protected void updateChartsnUIThread(WeightChartsData chartsData) {
         updateChart(chartsData.samples, chartsData.compositions);
+        updateImpedanceChart(chartsData.impedances);
         textTimeSpan.setText(DateTimeUtils.formatDaysUntil(totalDays, getTSEnd()));
 
         WeightSample latestSample = chartsData.getLatestSample();
@@ -212,6 +247,60 @@ public class WeightChartFragment extends AbstractChartFragment<WeightChartFragme
         legend.setSeries(legendSeries.size() > 1 ? legendSeries : Collections.emptyList());
     }
 
+    private void updateImpedanceChart(final List<ImpedanceChartData.Reading> readings) {
+        final List<ImpedanceChartData.Group> groups = ImpedanceChartData.groups(readings);
+        final boolean show = !groups.isEmpty() && enabledBodyCompositionValues().contains("impedance");
+        impedanceChart.setVisibility(show ? View.VISIBLE : View.GONE);
+        impedanceLegend.setVisibility(show && groups.size() > 1 ? View.VISIBLE : View.GONE);
+        if (!show) {
+            return;
+        }
+        final boolean oneSection = groups.get(0).getSection() == groups.get(groups.size() - 1).getSection();
+        final List<String> labels = new ArrayList<>(groups.size());
+        final int[] colors = new int[groups.size()];
+        for (int i = 0; i < groups.size(); i++) {
+            labels.add(impedanceLabel(groups.get(i), groups.size() == 1, oneSection));
+            colors[i] = groups.size() == 1
+                    ? ContextCompat.getColor(requireContext(), R.color.chart_weight_impedance)
+                    : Color.HSVToColor(new float[]{360f * i / groups.size(), 0.6f, 0.85f});
+        }
+        final ChartSpec spec = ImpedanceChartData.spec(getTSStart(), getTSEnd(), readings, groups, labels, colors, getString(R.string.unit_ohm));
+        impedanceChart.setSelectionContent(x -> {
+            final long time = Math.round(x);
+            final String title = DateFormat.getDateFormat(requireContext()).format(new Date(time * 1000L));
+            final List<ChartSelection.Row> rows = new ArrayList<>();
+            final StringBuilder description = new StringBuilder(title).append('.');
+            for (int i = 0; i < groups.size(); i++) {
+                for (final ImpedanceChartData.Reading reading : readings) {
+                    if (reading.getSeconds() == time && reading.getSection() == groups.get(i).getSection()
+                            && reading.getFrequencyHz() == groups.get(i).getFrequencyHz()) {
+                        final String value = getString(R.string.body_composition_ohm, Math.round(reading.getOhm()));
+                        rows.add(new ChartSelection.Row(colors[i], groups.size() == 1 ? value : labels.get(i) + ": " + value));
+                        description.append(' ').append(labels.get(i)).append(' ').append(value).append('.');
+                    }
+                }
+            }
+            return new ChartSelection(title, rows, description.toString());
+        });
+        impedanceChart.setSpec(spec);
+        impedanceLegend.setSeries(groups.size() > 1 ? spec.getSeries() : Collections.emptyList());
+    }
+
+    private String impedanceLabel(final ImpedanceChartData.Group group, final boolean only, final boolean oneSection) {
+        if (only) {
+            return getString(R.string.body_composition_impedance);
+        }
+        final String kHz = new DecimalFormat("0.##").format(group.getFrequencyHz() / 1000.0);
+        if (oneSection) {
+            return group.getFrequencyHz() < 0
+                    ? getString(R.string.body_composition_impedance)
+                    : getString(R.string.body_composition_impedance_frequency, kHz);
+        }
+        return group.getFrequencyHz() < 0
+                ? getString(R.string.body_composition_impedance_section, group.getSection())
+                : getString(R.string.body_composition_impedance_section_frequency, group.getSection(), kHz);
+    }
+
     private void updateBodyComposition(@Nullable final WeightSample sample,
                                        @Nullable final BodyCompositionCalculator.BodyComposition composition,
                                        @Nullable final Float bmi) {
@@ -275,6 +364,8 @@ public class WeightChartFragment extends AbstractChartFragment<WeightChartFragme
 
         chart = rootView.findViewById(R.id.weight_chart);
         legend = rootView.findViewById(R.id.weight_chart_legend);
+        impedanceChart = rootView.findViewById(R.id.weight_impedance_chart);
+        impedanceLegend = rootView.findViewById(R.id.weight_impedance_legend);
         textTimeSpan = rootView.findViewById(R.id.weight_time_span_text);
         textWeightLatest = rootView.findViewById(R.id.weight_latest_text);
         textWeightTarget = rootView.findViewById(R.id.weight_target_text);
@@ -288,6 +379,7 @@ public class WeightChartFragment extends AbstractChartFragment<WeightChartFragme
 
         chart.setZoomable(true);
         chart.dismissSelectionOnTapOutside(rootView);
+        impedanceChart.dismissSelectionOnTapOutside(rootView);
 
         refresh();
 
@@ -305,16 +397,19 @@ public class WeightChartFragment extends AbstractChartFragment<WeightChartFragme
     protected static class WeightChartsData extends ChartsData {
         private final List<? extends WeightSample> samples;
         private final List<BodyCompositionCalculator.BodyComposition> compositions;
+        private final List<ImpedanceChartData.Reading> impedances;
         private final WeightSample latestSample;
         private final BodyCompositionCalculator.BodyComposition composition;
         private final Float bmi;
 
         public WeightChartsData(List<? extends WeightSample> samples,
                                 List<BodyCompositionCalculator.BodyComposition> compositions,
+                                List<ImpedanceChartData.Reading> impedances,
                                 WeightSample latestSample,
                                 @Nullable BodyCompositionCalculator.BodyComposition composition, @Nullable Float bmi) {
             this.samples = samples;
             this.compositions = compositions;
+            this.impedances = impedances;
             this.latestSample = latestSample;
             this.composition = composition;
             this.bmi = bmi;

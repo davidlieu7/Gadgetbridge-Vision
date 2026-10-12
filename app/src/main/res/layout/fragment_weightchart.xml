@@ -24,6 +24,21 @@
         android:layout_height="wrap_content"
         android:layout_marginTop="8dp" />
 
+    <!-- Impedance in Ohms fits neither axis above, so it has a chart of its own. -->
+    <nodomain.freeyourgadget.gadgetbridge.activities.charts.mpchart.GbChartView
+        android:id="@+id/weight_impedance_chart"
+        android:layout_width="match_parent"
+        android:layout_height="160dp"
+        android:layout_marginTop="8dp"
+        android:visibility="gone" />
+
+    <nodomain.freeyourgadget.gadgetbridge.activities.charts.mpchart.ChartLegendView
+        android:id="@+id/weight_impedance_legend"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="8dp"
+        android:visibility="gone" />
+
     <!-- Values wrap into rows of three; hidden ones let the following move up. -->
     <com.google.android.flexbox.FlexboxLayout
         android:layout_width="match_parent"

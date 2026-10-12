@@ -175,6 +175,7 @@
     <color name="chart_weight_body_fat" type="color">#F9A825</color>
     <color name="chart_weight_body_water" type="color">#26A69A</color>
     <color name="chart_weight_muscle_mass" type="color">#E53935</color>
+    <color name="chart_weight_impedance" type="color">#7E57C2</color>
     <color name="chart_battery_voltage" type="color">#3F84E5</color>
     <color name="chart_battery_current" type="color">#00796B</color>
     <color name="chart_battery_power" type="color">#6A0DAD</color>
