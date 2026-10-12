@@ -45,6 +45,9 @@ open class SoundcoreSleepA30Protocol(device: GBDevice?) : SoundcoreProtocolImplV
     private val currentFunctions = intArrayOf(-1, -1, -1, -1)
     private var localAudioSelector: Byte? = null
 
+    // TODO: Implement encodeSetTime() using command 0xA601 once its timestamp timezone
+    // semantics and trailing six-byte field are understood (10-byte payload, LE32 seconds first).
+
     override fun encodeDeviceInfoRequest(): ByteArray {
         localAudioSelector = null
         return super.encodeDeviceInfoRequest()
