@@ -17,6 +17,7 @@
 package nodomain.freeyourgadget.gadgetbridge.devices.casio.ggb100;
 
 import android.app.Activity;
+import android.content.Context;
 import android.content.SharedPreferences;
 import android.bluetooth.BluetoothDevice;
 
@@ -42,6 +43,7 @@ import nodomain.freeyourgadget.gadgetbridge.entities.CasioGBX100ActivitySampleDa
 import nodomain.freeyourgadget.gadgetbridge.entities.DaoSession;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
 import nodomain.freeyourgadget.gadgetbridge.model.ActivitySample;
+import nodomain.freeyourgadget.gadgetbridge.model.ActivitySummaryParser;
 import nodomain.freeyourgadget.gadgetbridge.service.DeviceSupport;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.casio.ggb100.CasioGGB100DeviceSupport;
 import nodomain.freeyourgadget.gadgetbridge.util.preferences.DevicePrefs;
@@ -100,6 +102,11 @@ public class CasioGGB100DeviceCoordinator extends Casio2C2DDeviceCoordinator {
     @Override
     public SampleProvider<? extends ActivitySample> getSampleProvider(GBDevice device, DaoSession session) {
         return new CasioGBX100SampleProvider(device, session);
+    }
+
+    @Override
+    public ActivitySummaryParser getActivitySummaryParser(final GBDevice device, final Context context) {
+        return (summary, forDetails) -> summary;
     }
 
     @Override

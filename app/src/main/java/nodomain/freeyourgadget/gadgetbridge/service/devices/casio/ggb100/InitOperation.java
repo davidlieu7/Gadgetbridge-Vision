@@ -100,6 +100,7 @@ public class InitOperation extends AbstractBTLEOperation<CasioGGB100DeviceSuppor
 
     // Block fetch (h0011/CONVOY) state
     private byte mFetchFeature = 0;
+    private int mNewDataFlags = FetchMissionLogDataOperation.NEW_DATA_UNKNOWN;
     private int mExpectedLength = -1;
     private final ByteArrayOutputStream mBuffer = new ByteArrayOutputStream();
     private final Handler mFetchTimeoutHandler = new Handler(Looper.getMainLooper());
@@ -207,7 +208,7 @@ public class InitOperation extends AbstractBTLEOperation<CasioGGB100DeviceSuppor
             if (mBuffer.size() >= expected) {
                 final byte[] payload = mBuffer.toByteArray();
                 if (mFetchFeature == Casio2C2DSupport.FEATURE_MISSION_LOG_DATA) {
-                    FetchMissionLogDataOperation.parseMissionLog(mSupport, payload);
+                    FetchMissionLogDataOperation.parseMissionLog(mSupport, payload, mNewDataFlags);
                 } else {
                     FetchStepCountDataOperation.parseLifeLog(mSupport, payload);
                 }
@@ -322,6 +323,7 @@ public class InitOperation extends AbstractBTLEOperation<CasioGGB100DeviceSuppor
                 if (feat == Casio2C2DSupport.FEATURE_NEW_DATA_STATUS) {
                     if (data.length > 1) {
                         int flags = data[1];
+                        mNewDataFlags = flags;
                         StringBuilder parts = new StringBuilder();
                         if ((flags & 0x01) != 0) parts.append("mission boundary record(s) ");
                         if ((flags & 0x02) != 0) parts.append("mission-log series/point data ");
