@@ -89,6 +89,7 @@ import nodomain.freeyourgadget.gadgetbridge.entities.GenericTrainingLoadChronicS
 import nodomain.freeyourgadget.gadgetbridge.entities.HealthConnectSleepSessionDao;
 import nodomain.freeyourgadget.gadgetbridge.entities.HealthConnectSyncStateDao;
 import nodomain.freeyourgadget.gadgetbridge.entities.HealthConnectWorkoutSyncFailureDao;
+import nodomain.freeyourgadget.gadgetbridge.entities.GenericWeightSampleDao;
 import nodomain.freeyourgadget.gadgetbridge.entities.InternetFirewallRuleDao;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
 import nodomain.freeyourgadget.gadgetbridge.install.InstallHandlerV2;
@@ -264,6 +265,7 @@ public abstract class AbstractDeviceCoordinator implements DeviceCoordinator {
                 deleteBy(session.getHealthConnectSleepSessionDao(), HealthConnectSleepSessionDao.Properties.DeviceId, device.getId());
                 deleteBy(session.getHealthConnectWorkoutSyncFailureDao(), HealthConnectWorkoutSyncFailureDao.Properties.DeviceId, device.getId());
                 deleteBy(session.getInternetFirewallRuleDao(), InternetFirewallRuleDao.Properties.DeviceId, device.getId());
+                deleteBy(session.getGenericWeightSampleDao(), GenericWeightSampleDao.Properties.DeviceId, device.getId());
                 WorkoutTemplateRepository.INSTANCE.deleteByDevice(session, device.getId());
                 session.getDeviceDao().delete(device);
             } else {
@@ -472,7 +474,7 @@ public abstract class AbstractDeviceCoordinator implements DeviceCoordinator {
     @Override
     @Nullable
     public TimeSampleProvider<? extends WeightSample> getWeightSampleProvider(GBDevice device, DaoSession session) {
-        return null;
+        return supportsWeightMeasurement(device) ? new GenericWeightSampleProvider(device, session) : null;
     }
 
     @Override
@@ -925,7 +927,8 @@ public abstract class AbstractDeviceCoordinator implements DeviceCoordinator {
 
     @Override
     public boolean supportsWeightMeasurement(@NonNull GBDevice device) {
-        return false;
+        final DeviceKind kind = getDeviceKind(device);
+        return kind == DeviceKind.WATCH || kind == DeviceKind.FITNESS_BAND;
     }
 
     @Override
