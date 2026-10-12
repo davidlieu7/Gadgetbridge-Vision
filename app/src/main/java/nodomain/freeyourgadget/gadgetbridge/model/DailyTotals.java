@@ -97,8 +97,8 @@ public class DailyTotals implements Serializable {
         ActivityAmounts totalAmounts;
         ActivityAmounts amountsSleep;
 
-        totalAmounts = analysis.calculateActivityAmounts(getSamplesOfDay(handler, day, 0, device));
-        amountsSleep = analysis.calculateActivityAmounts(getSamplesOfDay(handler, day, -12, device));
+        totalAmounts = analysis.calculateActivityAmounts(getSamplesOfDay(handler, day, device));
+        amountsSleep = analysis.calculateActivityAmounts(getSleepSamples(handler, day, device));
 
         long[] sleep = getTotalsSleepForActivityAmounts(amountsSleep);
 
@@ -121,7 +121,7 @@ public class DailyTotals implements Serializable {
         ActivityAnalysis analysis = new ActivityAnalysis();
         ActivityAmounts totalAmounts;
 
-        totalAmounts = analysis.calculateActivityAmounts(getSamplesOfDay(handler, day, 0, device));
+        totalAmounts = analysis.calculateActivityAmounts(getSamplesOfDay(handler, day, device));
 
         long totalSteps = 0;
         for (ActivityAmount amount : totalAmounts.getAmounts()) {
@@ -154,7 +154,21 @@ public class DailyTotals implements Serializable {
         return new long[]{totalMinutesLightSleep, totalMinutesDeepSleep, totalMinutesRemSleep, totalMinutesAwakeSleep};
     }
 
-    private static List<? extends ActivitySample> getSamplesOfDay(DBHandler db, Calendar day, int offsetHours, GBDevice device) {
+    private static List<? extends ActivitySample> getSleepSamples(DBHandler db, Calendar day, GBDevice device) {
+        final String rangeMode = GBApplication.getPrefs().getString("chart_sleep_range_mode", "18:00");
+        final Calendar end = (Calendar) day.clone();
+        if (!"24h".equals(rangeMode)) {
+            end.set(Calendar.HOUR_OF_DAY, "18:00".equals(rangeMode) ? 18 : 12);
+            end.set(Calendar.MINUTE, 0);
+            end.set(Calendar.SECOND, 0);
+            end.set(Calendar.MILLISECOND, 0);
+        }
+        final Calendar start = (Calendar) end.clone();
+        start.add(Calendar.DATE, -1);
+        return getSamples(db, device, (int) (start.getTimeInMillis() / 1000), (int) (end.getTimeInMillis() / 1000));
+    }
+
+    private static List<? extends ActivitySample> getSamplesOfDay(DBHandler db, Calendar day, GBDevice device) {
         int startTs;
         int endTs;
 
@@ -162,7 +176,6 @@ public class DailyTotals implements Serializable {
         day.set(Calendar.HOUR_OF_DAY, 0);
         day.set(Calendar.MINUTE, 0);
         day.set(Calendar.SECOND, 0);
-        day.add(Calendar.HOUR, offsetHours);
 
         startTs = (int) (day.getTimeInMillis() / 1000);
         endTs = startTs + 24 * 60 * 60 - 1;
