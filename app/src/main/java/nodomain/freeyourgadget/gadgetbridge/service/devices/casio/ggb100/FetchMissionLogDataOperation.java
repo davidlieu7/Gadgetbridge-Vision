@@ -54,7 +54,7 @@ import static nodomain.freeyourgadget.gadgetbridge.model.ActivitySummaryEntries.
 import static nodomain.freeyourgadget.gadgetbridge.model.ActivitySummaryEntries.UNIT_SECONDS;
 import static nodomain.freeyourgadget.gadgetbridge.model.ActivitySummaryEntries.UNIT_MINUTES;
 import static nodomain.freeyourgadget.gadgetbridge.model.ActivitySummaryEntries.UNIT_NONE;
-import static nodomain.freeyourgadget.gadgetbridge.model.ActivitySummaryEntries.GROUP_ELEVATION;
+import static nodomain.freeyourgadget.gadgetbridge.model.ActivitySummaryEntries.GROUP_LAPS;
 
 
 public class FetchMissionLogDataOperation extends AbstractCasioConvoyFetchOperation<CasioGGB100DeviceSupport> {
@@ -183,9 +183,9 @@ public class FetchMissionLogDataOperation extends AbstractCasioConvoyFetchOperat
                 summary.setDevice(device);
                 summary.setUser(user);
                 sd = new ActivitySummaryData();
-                sd.add("elevation_header", new ActivitySummaryTableRowEntry(GROUP_ELEVATION,
-                        Arrays.asList(new ActivitySummaryValue("#"),
-                                new ActivitySummaryValue("minutes"),
+                sd.add("elevation_header", new ActivitySummaryTableRowEntry(GROUP_LAPS,
+                        Arrays.asList(new ActivitySummaryValue("workout_lap"),
+                                new ActivitySummaryValue("lap_time"),
                                 new ActivitySummaryValue("Elevation")),
                         true, true));
             }
@@ -212,7 +212,7 @@ public class FetchMissionLogDataOperation extends AbstractCasioConvoyFetchOperat
                 prevAlt = alt;
                 added++;
                 lastTs = ts;
-                sd.add("sample_" + (storedRows + added), new ActivitySummaryTableRowEntry(GROUP_ELEVATION,
+                sd.add("sample_" + (storedRows + added), new ActivitySummaryTableRowEntry(GROUP_LAPS,
                         Arrays.asList(new ActivitySummaryValue(storedRows + added, UNIT_NONE),
                                 new ActivitySummaryValue((ts - baseTs) / 60, UNIT_MINUTES),
                                 new ActivitySummaryValue(alt, UNIT_METERS)),
