@@ -59,15 +59,23 @@
             android:layout_marginBottom="15dp"
             android:layout_weight="4" />
 
-        <com.google.android.material.chip.ChipGroup
-            android:id="@+id/sleep_chart_overlay_group"
-            android:layout_width="fill_parent"
+        <nodomain.freeyourgadget.gadgetbridge.activities.charts.ChartChipScrollView
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_weight="4"
-            app:singleSelection="true"
-            android:layout_marginStart="10dp"
-            android:layout_marginEnd="10dp"
-            android:layout_marginBottom="10dp"/>
+            android:paddingStart="10dp"
+            android:paddingEnd="10dp"
+            android:clipToPadding="false"
+            android:scrollbars="none">
+
+            <com.google.android.material.chip.ChipGroup
+                android:id="@+id/sleep_chart_overlay_group"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                app:singleLine="true"
+                app:singleSelection="true"
+                android:layout_marginBottom="10dp" />
+
+        </nodomain.freeyourgadget.gadgetbridge.activities.charts.ChartChipScrollView>
 
         <LinearLayout
             android:id="@+id/sleep_stats_container"

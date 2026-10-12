@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
@@ -35,12 +36,21 @@
         android:layout_height="wrap_content"
         android:layout_marginTop="8dp" />
 
-    <com.google.android.material.chip.ChipGroup
-        android:id="@+id/battery_chart_chip_group"
+    <nodomain.freeyourgadget.gadgetbridge.activities.charts.ChartChipScrollView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginStart="10dp"
-        android:layout_marginTop="8dp"
-        android:layout_marginEnd="10dp" />
+        android:paddingStart="10dp"
+        android:paddingEnd="10dp"
+        android:clipToPadding="false"
+        android:scrollbars="none">
+
+        <com.google.android.material.chip.ChipGroup
+            android:id="@+id/battery_chart_chip_group"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            app:singleLine="true"
+            android:layout_marginTop="8dp" />
+
+    </nodomain.freeyourgadget.gadgetbridge.activities.charts.ChartChipScrollView>
 
 </LinearLayout>
