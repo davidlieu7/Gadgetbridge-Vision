@@ -35,6 +35,7 @@ import com.google.android.material.chip.Chip;
 import com.google.android.material.chip.ChipGroup;
 import com.google.android.material.tabs.TabLayout;
 
+import java.text.DecimalFormat;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
@@ -54,6 +55,7 @@ import nodomain.freeyourgadget.gadgetbridge.activities.charts.mpchart.ChartSelec
 import nodomain.freeyourgadget.gadgetbridge.activities.charts.mpchart.GbChartView;
 import nodomain.freeyourgadget.gadgetbridge.activities.charts.spec.ChartSeries;
 import nodomain.freeyourgadget.gadgetbridge.activities.charts.spec.ChartSpec;
+import nodomain.freeyourgadget.gadgetbridge.activities.charts.weight.ImpedanceChartData;
 import nodomain.freeyourgadget.gadgetbridge.activities.charts.weight.WeightChartData;
 import nodomain.freeyourgadget.gadgetbridge.activities.charts.weight.WeightMeasurementRow;
 import nodomain.freeyourgadget.gadgetbridge.activities.charts.weight.WeightMeasurements;
@@ -63,7 +65,9 @@ import nodomain.freeyourgadget.gadgetbridge.activities.workouts.StatTileData;
 import nodomain.freeyourgadget.gadgetbridge.activities.workouts.StatTileGridUtilKt;
 import nodomain.freeyourgadget.gadgetbridge.database.DBHandler;
 import nodomain.freeyourgadget.gadgetbridge.devices.DeviceCoordinator;
+import nodomain.freeyourgadget.gadgetbridge.devices.GenericImpedanceSampleProvider;
 import nodomain.freeyourgadget.gadgetbridge.devices.TimeSampleProvider;
+import nodomain.freeyourgadget.gadgetbridge.entities.GenericImpedanceSample;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
 import nodomain.freeyourgadget.gadgetbridge.model.ActivityUser;
 import nodomain.freeyourgadget.gadgetbridge.model.WeightSample;
@@ -82,6 +86,7 @@ public class WeightChartFragment extends AbstractChartFragment<WeightChartFragme
     private static final String PREF_SHOW_GOAL_LINE = "chart_weight_show_goal_line";
     private static final int MAX_SELECTED_SERIES = 2;
     private static final String SERIES_WEIGHT = "weight";
+    private static final String SERIES_IMPEDANCE = "impedance";
 
     private WeightUnit weightUnit = WeightUnit.KILOGRAM;
     private int weightTargetKg;
@@ -161,7 +166,35 @@ public class WeightChartFragment extends AbstractChartFragment<WeightChartFragme
             weights[i] = allSamples.get(i).getWeightKg();
         }
         List<WeightMeasurementRow> rows = WeightMeasurements.rows(timestamps, weights);
-        return new WeightChartsData(samples, chartSamples, beforeRange != null, compositions, latestSample, latestInRange, composition, bmi, manualEntry, tsStart / 1000, rows);
+        return new WeightChartsData(samples, chartSamples, beforeRange != null, compositions,
+                impedances(db, device, samples, tsStart, tsEnd), latestSample, latestInRange, composition, bmi, manualEntry, tsStart / 1000, rows);
+    }
+
+    /**
+     * The readings from the impedance table, which can hold several per weigh-in, or else the single value most
+     * scales store with the weight.
+     */
+    private static List<ImpedanceChartData.Reading> impedances(final DBHandler db, final GBDevice device,
+                                                               final List<? extends WeightSample> samples,
+                                                               final long tsStart, final long tsEnd) {
+        final long[] weighIns = new long[samples.size()];
+        for (int i = 0; i < weighIns.length; i++) {
+            weighIns[i] = samples.get(i).getTimestamp() / 1000L;
+        }
+        final List<ImpedanceChartData.Reading> stored = new ArrayList<>();
+        for (final GenericImpedanceSample row : new GenericImpedanceSampleProvider(device, db.getDaoSession()).getAllSamples(tsStart, tsEnd)) {
+            stored.add(new ImpedanceChartData.Reading(row.getTimestamp() / 1000L, row.getBodySectionIdx(), row.getFrequencyHz(), row.getImpedanceOhm()));
+        }
+        final List<ImpedanceChartData.Reading> readings = ImpedanceChartData.atWeighIns(stored, weighIns);
+        if (!readings.isEmpty()) {
+            return readings;
+        }
+        for (final WeightSample sample : samples) {
+            if (sample.getImpedanceOhm() != null) {
+                readings.add(new ImpedanceChartData.Reading(sample.getTimestamp() / 1000L, 0, -1, sample.getImpedanceOhm()));
+            }
+        }
+        return readings;
     }
 
     @Override
@@ -174,7 +207,7 @@ public class WeightChartFragment extends AbstractChartFragment<WeightChartFragme
 
     @Override
     protected void updateChartsnUIThread(WeightChartsData chartsData) {
-        updateChart(chartsData.chartSamples, chartsData.compositions, chartsData.startTs, chartsData.carriedIn);
+        updateChart(chartsData.chartSamples, chartsData.compositions, chartsData.impedances, chartsData.startTs, chartsData.carriedIn);
         textTimeSpan.setText(DateTimeUtils.formatDaysUntil(daysBetween(chartsData.startTs, getTSEnd()), getTSEnd()));
 
         WeightSample latestSample = chartsData.getLatestSample();
@@ -187,6 +220,7 @@ public class WeightChartFragment extends AbstractChartFragment<WeightChartFragme
 
     private void updateChart(final List<? extends WeightSample> samples,
                              final List<BodyCompositionCalculator.BodyComposition> compositions,
+                             final List<ImpedanceChartData.Reading> impedances,
                              final long startTs,
                              final boolean carriedIn) {
         final int n = samples.size();
@@ -237,6 +271,12 @@ public class WeightChartFragment extends AbstractChartFragment<WeightChartFragme
         for (final WeightChartData.PercentLine line : availableLines) {
             availableKeys.add(line.getKey());
         }
+        final List<ImpedanceChartData.Group> impedanceGroups = enabled.contains("impedance")
+                ? ImpedanceChartData.groups(impedances)
+                : Collections.emptyList();
+        if (!impedanceGroups.isEmpty()) {
+            availableKeys.add(SERIES_IMPEDANCE);
+        }
         selectedSeries.retainAll(availableKeys);
         if (selectedSeries.isEmpty()) {
             selectedSeries.addAll(availableKeys.subList(0, Math.min(MAX_SELECTED_SERIES, availableKeys.size())));
@@ -247,13 +287,30 @@ public class WeightChartFragment extends AbstractChartFragment<WeightChartFragme
                 visibleLines.add(line);
             }
         }
-        updateSeriesChips(weightAvailable, availableLines);
+        updateSeriesChips(weightAvailable, availableLines, !impedanceGroups.isEmpty());
 
         final boolean weightShown = selectedSeries.contains(SERIES_WEIGHT);
-        final ChartSpec spec = WeightChartData.spec(
+        final ChartSpec weightSpec = WeightChartData.spec(
                 startTs, getTSEnd(), seconds, weights, showGoalLine ? weightFromKg(weightTargetKg) : 0, label, color, Color.GRAY,
                 visibleLines, getString(R.string.unit_percentage), carriedIn, weightShown
         );
+        final boolean impedanceShown = selectedSeries.contains(SERIES_IMPEDANCE);
+        final int[] impedanceColors = new int[impedanceGroups.size()];
+        final ChartSpec spec;
+        if (impedanceShown) {
+            final boolean oneSection = impedanceGroups.get(0).getSection() == impedanceGroups.get(impedanceGroups.size() - 1).getSection();
+            final List<String> impedanceLabels = new ArrayList<>(impedanceGroups.size());
+            for (int i = 0; i < impedanceGroups.size(); i++) {
+                impedanceLabels.add(impedanceLabel(impedanceGroups.get(i), impedanceGroups.size() == 1, oneSection));
+                impedanceColors[i] = impedanceGroups.size() == 1
+                        ? ContextCompat.getColor(requireContext(), R.color.chart_weight_impedance)
+                        : Color.HSVToColor(new float[]{360f * i / impedanceGroups.size(), 0.6f, 0.85f});
+            }
+            spec = ImpedanceChartData.addTo(weightSpec, startTs, getTSEnd(), impedances, impedanceGroups, impedanceLabels,
+                    impedanceColors, getString(R.string.unit_ohm));
+        } else {
+            spec = weightSpec;
+        }
         chart.setSelectionContent(x -> {
             final long time = Math.round(x);
             final String title = DateFormat.getDateFormat(requireContext()).format(new Date(time * 1000L));
@@ -273,6 +330,19 @@ public class WeightChartFragment extends AbstractChartFragment<WeightChartFragme
                         final String value = formatPercent((float) line.getValues()[i]);
                         rows.add(new ChartSelection.Row(line.getColor(), value));
                         description.append(' ').append(line.getLabel()).append(' ').append(value).append('.');
+                    }
+                    if (impedanceShown) {
+                        for (int g = 0; g < impedanceGroups.size(); g++) {
+                            for (final ImpedanceChartData.Reading reading : impedances) {
+                                if (reading.getSeconds() == time && reading.getSection() == impedanceGroups.get(g).getSection()
+                                        && reading.getFrequencyHz() == impedanceGroups.get(g).getFrequencyHz()) {
+                                    final String value = getString(R.string.body_composition_ohm, Math.round(reading.getOhm()));
+                                    rows.add(new ChartSelection.Row(impedanceColors[g], value));
+                                    description.append(' ').append(getString(R.string.body_composition_impedance))
+                                            .append(' ').append(value).append('.');
+                                }
+                            }
+                        }
                     }
                     return new ChartSelection(title, rows, description.toString());
                 }
@@ -306,9 +376,10 @@ public class WeightChartFragment extends AbstractChartFragment<WeightChartFragme
      * One chip per data set with data, shown when there are at least two. At most two are selected; picking another
      * drops the one selected first, and the only selected one cannot be turned off.
      */
-    private void updateSeriesChips(final boolean weightAvailable, final List<WeightChartData.PercentLine> availableLines) {
+    private void updateSeriesChips(final boolean weightAvailable, final List<WeightChartData.PercentLine> availableLines,
+                                   final boolean impedanceAvailable) {
         seriesChips.removeAllViews();
-        final int available = availableLines.size() + (weightAvailable ? 1 : 0);
+        final int available = availableLines.size() + (weightAvailable ? 1 : 0) + (impedanceAvailable ? 1 : 0);
         seriesScroll.setVisibility(available >= 2 ? View.VISIBLE : View.GONE);
         if (available < 2) {
             return;
@@ -319,6 +390,24 @@ public class WeightChartFragment extends AbstractChartFragment<WeightChartFragme
         for (final WeightChartData.PercentLine line : availableLines) {
             addSeriesChip(line.getKey(), line.getLabel());
         }
+        if (impedanceAvailable) {
+            addSeriesChip(SERIES_IMPEDANCE, getString(R.string.body_composition_impedance));
+        }
+    }
+
+    private String impedanceLabel(final ImpedanceChartData.Group group, final boolean only, final boolean oneSection) {
+        if (only) {
+            return getString(R.string.body_composition_impedance);
+        }
+        final String kHz = new DecimalFormat("0.##").format(group.getFrequencyHz() / 1000.0);
+        if (oneSection) {
+            return group.getFrequencyHz() < 0
+                    ? getString(R.string.body_composition_impedance)
+                    : getString(R.string.body_composition_impedance_frequency, kHz);
+        }
+        return group.getFrequencyHz() < 0
+                ? getString(R.string.body_composition_impedance_section, group.getSection())
+                : getString(R.string.body_composition_impedance_section_frequency, group.getSection(), kHz);
     }
 
     private void addSeriesChip(final String key, final String label) {
@@ -553,6 +642,7 @@ public class WeightChartFragment extends AbstractChartFragment<WeightChartFragme
         private final List<? extends WeightSample> chartSamples;
         private final boolean carriedIn;
         private final List<BodyCompositionCalculator.BodyComposition> compositions;
+        private final List<ImpedanceChartData.Reading> impedances;
         private final WeightSample latestSample;
         private final WeightSample latestInRange;
         private final BodyCompositionCalculator.BodyComposition composition;
@@ -565,6 +655,7 @@ public class WeightChartFragment extends AbstractChartFragment<WeightChartFragme
                                 List<? extends WeightSample> chartSamples,
                                 boolean carriedIn,
                                 List<BodyCompositionCalculator.BodyComposition> compositions,
+                                List<ImpedanceChartData.Reading> impedances,
                                 WeightSample latestSample, @Nullable WeightSample latestInRange,
                                 @Nullable BodyCompositionCalculator.BodyComposition composition, @Nullable Float bmi,
                                 boolean manualEntry, long startTs, List<WeightMeasurementRow> measurements) {
@@ -572,6 +663,7 @@ public class WeightChartFragment extends AbstractChartFragment<WeightChartFragme
             this.chartSamples = chartSamples;
             this.carriedIn = carriedIn;
             this.compositions = compositions;
+            this.impedances = impedances;
             this.latestSample = latestSample;
             this.latestInRange = latestInRange;
             this.composition = composition;
