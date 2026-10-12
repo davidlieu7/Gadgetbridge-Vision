@@ -68,16 +68,20 @@ public class FetchMissionLogDataOperation extends AbstractCasioConvoyFetchOperat
 
     @Override
     protected void parsePayload(byte[] data) {
+        parseMissionLog(getSupport(), data);
+    }
+
+    public static void parseMissionLog(Casio2C2DSupport support, byte[] data) {
         if (data.length < MISSION_LOG_LENGTH) {
             LOG.warn("Mission log too short: {} bytes", data.length);
             return;
         }
 
         parseAltitudeRecords(data);
-        parseAndSaveSeries(data);
+        parseAndSaveSeries(support, data);
     }
 
-    private void parseAltitudeRecords(byte[] data) {
+    private static void parseAltitudeRecords(byte[] data) {
         for (int i = 0; i < RECORD_COUNT; i++) {
             final int base = RECORDS_OFFSET + i * RECORD_STRIDE;
             if (data[base + 2] == (byte) 0xff) continue; // empty slot
@@ -90,7 +94,7 @@ public class FetchMissionLogDataOperation extends AbstractCasioConvoyFetchOperat
         }
     }
 
-    private void parseAndSaveSeries(byte[] data) {
+    private static void parseAndSaveSeries(Casio2C2DSupport support, byte[] data) {
         if (data[0] == (byte) 0xff) {
             LOG.debug("No altitude series stored");
             return;
@@ -145,7 +149,7 @@ public class FetchMissionLogDataOperation extends AbstractCasioConvoyFetchOperat
 
         try (DBHandler dbHandler = GBApplication.acquireDB()) {
             final DaoSession session = dbHandler.getDaoSession();
-            final Device device = DBHelper.getDevice(getDevice(), session);
+            final Device device = DBHelper.getDevice(support.getDevice(), session);
             final User user = DBHelper.getUser(session);
             summary.setDevice(device);
             summary.setUser(user);
@@ -165,13 +169,13 @@ public class FetchMissionLogDataOperation extends AbstractCasioConvoyFetchOperat
             session.getBaseActivitySummaryDao().insertOrReplace(summary);
             LOG.info("Saved mission starting {} to database", startTime);
         } catch (Exception e) {
-            GB.toast(getContext(), "Error saving mission log: " + e.getLocalizedMessage(),
+            GB.toast(support.getContext(), "Error saving mission log: " + e.getLocalizedMessage(),
                     Toast.LENGTH_LONG, GB.ERROR, e);
         }
     }
 
     /** BCD timestamp, yy mm dd hh mm [ss], UTC. */
-    private Date parseBcdUtc(byte[] p, int offset, boolean withSeconds) {
+    private static Date parseBcdUtc(byte[] p, int offset, boolean withSeconds) {
         final int year = 2000 + BcdUtil.fromBcd8(p[offset]);
         final int month = BcdUtil.fromBcd8(p[offset + 1]) - 1; // 0-based
         final int day = BcdUtil.fromBcd8(p[offset + 2]);

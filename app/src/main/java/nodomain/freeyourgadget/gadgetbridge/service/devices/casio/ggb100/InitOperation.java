@@ -19,15 +19,20 @@ package nodomain.freeyourgadget.gadgetbridge.service.devices.casio.ggb100;
 import android.bluetooth.BluetoothGatt;
 import android.bluetooth.BluetoothGattCharacteristic;
 import android.location.Location;
+import android.os.Handler;
+import android.os.Looper;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.time.ZonedDateTime;
 import java.util.UUID;
 
 import nodomain.freeyourgadget.gadgetbridge.devices.casio.CasioConstants;
+import nodomain.freeyourgadget.gadgetbridge.externalevents.opentracks.OpenTracksController;
+import nodomain.freeyourgadget.gadgetbridge.model.ActivityKind;
 import nodomain.freeyourgadget.gadgetbridge.service.btle.AbstractBTLEOperation;
 import nodomain.freeyourgadget.gadgetbridge.service.btle.TransactionBuilder;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.casio.Casio2C2DSupport;
@@ -43,8 +48,9 @@ import nodomain.freeyourgadget.gadgetbridge.webview.CurrentPosition;
  *   2. status block (0x05 param 0x1c) - fetched on CONVOY/h0011, not ALL_REQ;
  *      skipped for now (TODO)
  *   3. request NEW_DATA_STATUS (0x37) → log pending-data flags
- *   4. mission-log (0x19) + LIFE LOG (0x11) block fetches on h0011 - TODO, a
- *      separate FetchSportDataOperation-style piece
+ *   4. mission-log (0x19) + LIFE LOG (0x11) block fetches on h0011/CONVOY,
+ *      each completed with an ACK - this is what confirms a mission START/GOAL
+ *      on the watch side
  * Reasons 00 / 01 / 03 / 08:
  *   5. version_round: VER_INFO / WATCH_COND / VER_INFO / WATCH_COND
  *   6. city block: DST_WATCH_STATE (0x1d) echo → DST_SETTING (0x1e) slots
@@ -82,11 +88,21 @@ public class InitOperation extends AbstractBTLEOperation<CasioGGB100DeviceSuppor
     private static final int S_UNKNOWN_36     = 12;
     private static final int S_MODE_CUST      = 13;
     private static final int S_DONE           = 14;
+    private static final int S_FETCH_MISSION  = 15;
+    private static final int S_FETCH_LIFELOG  = 16;
+
+    private static final int FETCH_TIMEOUT_MS = 15_000;
 
     private int mState;
     private final byte mConnectionReason;
     private byte[] mDstSetting0 = null;
     private byte[] mWorldCity0 = null;
+
+    // Block fetch (h0011/CONVOY) state
+    private byte mFetchFeature = 0;
+    private int mExpectedLength = -1;
+    private final ByteArrayOutputStream mBuffer = new ByteArrayOutputStream();
+    private final Handler mFetchTimeoutHandler = new Handler(Looper.getMainLooper());
 
     private final CasioGGB100DeviceSupport mSupport;
 
@@ -107,31 +123,98 @@ public class InitOperation extends AbstractBTLEOperation<CasioGGB100DeviceSuppor
     }
 
     private void req(byte[] request) {
-        try {
-            TransactionBuilder b = createTransactionBuilder("req_" + String.format("%02x", request[0]));
-            b.setCallback(this);
-            mSupport.writeAllFeaturesRequest(b, request);
-            b.queueImmediately();
-        } catch (IOException e) {
-            LOG.error("req failed: {}", e.getMessage());
-        }
+        TransactionBuilder b = createTransactionBuilder("req_" + String.format("%02x", request[0]));
+        mSupport.writeAllFeaturesRequest(b, request);
+        b.queue();
     }
 
     private void write(byte[] data) {
-        try {
-            TransactionBuilder b = createTransactionBuilder("write_" + String.format("%02x", data[0]));
-            b.setCallback(this);
-            mSupport.writeAllFeatures(b, data);
-            b.queueImmediately();
-        } catch (IOException e) {
-            LOG.error("write failed: {}", e.getMessage());
-        }
+        TransactionBuilder b = createTransactionBuilder("write_" + String.format("%02x", data[0]));
+        mSupport.writeAllFeatures(b, data);
+        b.queue();
     }
 
     // ── Time write ────────────────────────────────────────────────────────────
 
     private void writeCurrentTime() {
         write(Casio2C2DSupport.buildCurrentTimePacket(ZonedDateTime.now()));
+    }
+
+    // ── Block fetch (mission log 0x19 / LIFE LOG 0x11 on DATA_REQ_SP + CONVOY) ──
+
+    // Reasons 00/01/03/08 fetch mission and life log after NEW_DATA; send back an ACK
+    private void beginBlockFetch(byte feat) {
+        mFetchFeature = feat;
+        mBuffer.reset();
+        mExpectedLength = -1;
+        mFetchTimeoutHandler.postDelayed(this::onFetchTimeout, FETCH_TIMEOUT_MS);
+        TransactionBuilder b = createTransactionBuilder("fetch_" + String.format("%02x", feat));
+        // the official app toggles the DATA_REQ/CONVOY CCCDs off and on around
+        // every fetch
+        b.notify(CasioConstants.CASIO_DATA_REQUEST_SP_CHARACTERISTIC_UUID, false);
+        b.notify(CasioConstants.CASIO_CONVOY_CHARACTERISTIC_UUID, false);
+        b.notify(CasioConstants.CASIO_DATA_REQUEST_SP_CHARACTERISTIC_UUID, true);
+        b.notify(CasioConstants.CASIO_CONVOY_CHARACTERISTIC_UUID, true);
+        b.writeLegacy(getCharacteristic(CasioConstants.CASIO_DATA_REQUEST_SP_CHARACTERISTIC_UUID),
+                new byte[]{0x00, feat, 0x00, 0x00, 0x00});
+        b.queue();
+    }
+
+    private void ackBlockFetch() {
+        TransactionBuilder b = createTransactionBuilder("fetch_ack_" + String.format("%02x", mFetchFeature));
+        b.writeLegacy(getCharacteristic(CasioConstants.CASIO_DATA_REQUEST_SP_CHARACTERISTIC_UUID),
+                new byte[]{0x04, mFetchFeature, 0x00, 0x00, 0x00});
+        b.queue();
+    }
+
+    private void endBlockFetch() {
+        mFetchTimeoutHandler.removeCallbacksAndMessages(null);
+        TransactionBuilder b = createTransactionBuilder("fetch_end");
+        b.notify(CasioConstants.CASIO_DATA_REQUEST_SP_CHARACTERISTIC_UUID, false);
+        b.notify(CasioConstants.CASIO_CONVOY_CHARACTERISTIC_UUID, false);
+        b.queue();
+    }
+
+    private void onFetchTimeout() {
+        mFetchTimeoutHandler.removeCallbacksAndMessages(null);
+        LOG.warn("Init[fetch 0x{}] timed out — continuing", String.format("%02x", mFetchFeature));
+        advanceFetch();
+    }
+
+    private void advanceFetch() {
+        mFetchTimeoutHandler.removeCallbacksAndMessages(null);
+        if (mState == S_FETCH_MISSION) {
+            mState = S_FETCH_LIFELOG;
+            beginBlockFetch(Casio2C2DSupport.FEATURE_LIFE_LOG);
+        } else {
+            endBlockFetch();
+            startVersionRound();
+        }
+    }
+
+    private void handleBlockFetchCharacteristicChanged(UUID uuid, byte[] data) {
+        if (uuid.equals(CasioConstants.CASIO_DATA_REQUEST_SP_CHARACTERISTIC_UUID)) {
+            // echo with the total payload length
+            if (data.length >= 4 && data[0] == 0x00 && data[1] == mFetchFeature) {
+                mExpectedLength = (data[2] & 0xff) | ((data[3] & 0xff) << 8);
+                LOG.debug("Init[fetch 0x{}] incoming: {} bytes",
+                        String.format("%02x", mFetchFeature), mExpectedLength);
+            }
+        } else if (uuid.equals(CasioConstants.CASIO_CONVOY_CHARACTERISTIC_UUID)) {
+            mBuffer.write(data, 0, data.length);
+            final int expected = mExpectedLength > 0 ? mExpectedLength
+                    : (mFetchFeature == Casio2C2DSupport.FEATURE_MISSION_LOG_DATA ? 294 : 160);
+            if (mBuffer.size() >= expected) {
+                final byte[] payload = mBuffer.toByteArray();
+                if (mFetchFeature == Casio2C2DSupport.FEATURE_MISSION_LOG_DATA) {
+                    FetchMissionLogDataOperation.parseMissionLog(mSupport, payload);
+                } else {
+                    FetchStepCountDataOperation.parseLifeLog(mSupport, payload);
+                }
+                ackBlockFetch();
+                advanceFetch();
+            }
+        }
     }
 
     // ── Flow entry points ────────────────────────────────────────────────────
@@ -189,6 +272,12 @@ public class InitOperation extends AbstractBTLEOperation<CasioGGB100DeviceSuppor
     }
 
     @Override
+    protected void operationFinished() throws IOException {
+        mFetchTimeoutHandler.removeCallbacksAndMessages(null);
+        super.operationFinished();
+    }
+
+    @Override
     public TransactionBuilder performInitialized(String taskName) throws IOException {
         throw new UnsupportedOperationException("This IS the initialization class");
     }
@@ -202,6 +291,14 @@ public class InitOperation extends AbstractBTLEOperation<CasioGGB100DeviceSuppor
         UUID uuid = characteristic.getUuid();
 
         if (data == null || data.length == 0) return true;
+
+        if (mState == S_FETCH_MISSION || mState == S_FETCH_LIFELOG) {
+            if (uuid.equals(CasioConstants.CASIO_DATA_REQUEST_SP_CHARACTERISTIC_UUID)
+                    || uuid.equals(CasioConstants.CASIO_CONVOY_CHARACTERISTIC_UUID)) {
+                handleBlockFetchCharacteristicChanged(uuid, data);
+                return true;
+            }
+        }
 
         if (!uuid.equals(CasioConstants.CASIO_ALL_FEATURES_CHARACTERISTIC_UUID)) {
             return super.onCharacteristicChanged(gatt, characteristic, data);
@@ -233,10 +330,18 @@ public class InitOperation extends AbstractBTLEOperation<CasioGGB100DeviceSuppor
                         }
                         LOG.info("Init[NEW_DATA] flags=0x{}: {}", String.format("%02x", flags),
                                 parts.length() > 0 ? parts.toString().trim() : "nothing pending");
+
+                        if (flags == 0x01) {
+                            LOG.info("Init[NEW_DATA] mission START — starting OpenTracks recording");
+                            OpenTracksController.startRecording(getContext(), ActivityKind.ACTIVITY);
+                        } else if (flags == 0x03) {
+                            LOG.info("Init[NEW_DATA] mission GOAL — stopping OpenTracks recording");
+                            OpenTracksController.stopRecording(getContext());
+                        }
                     }
-                    // TODO: reasons 00/01/03/08 then fetch the mission-log (0x19)
-                    // and LIFE LOG (0x11) blocks on h0011, regardless of flags
-                    startVersionRound();
+                    // Reasons 00/01/03/08 fetch the mission log and life log blocks
+                    mState = S_FETCH_MISSION;
+                    beginBlockFetch(Casio2C2DSupport.FEATURE_MISSION_LOG_DATA);
                 }
                 break;
 

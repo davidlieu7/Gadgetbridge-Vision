@@ -41,7 +41,7 @@ public class FetchStepCountDataOperation extends AbstractCasioConvoyFetchOperati
 
     @Override
     protected void parsePayload(byte[] data) {
-        parseLifeLog(data);
+        parseLifeLog(getSupport(), data);
     }
 
     @Override
@@ -49,7 +49,7 @@ public class FetchStepCountDataOperation extends AbstractCasioConvoyFetchOperati
         getSupport().onStepCountFetchFinished();
     }
 
-    private void parseLifeLog(byte[] data) {
+    public static void parseLifeLog(Casio2C2DSupport support, byte[] data) {
         if (data.length < LIFE_LOG_LENGTH) {
             LOG.warn("Life log too short: {} bytes", data.length);
             return;
@@ -126,7 +126,7 @@ public class FetchStepCountDataOperation extends AbstractCasioConvoyFetchOperati
                 totalSteps, totalKcal, samples.size());
 
         // Today bin not cleared by the ACK, we have to check if data exist already
-        final CasioGBX100ActivitySample sum = getSupport().getSumWithinRange(tsDayStart, tsNow);
+        final CasioGBX100ActivitySample sum = support.getSumWithinRange(tsDayStart, tsNow);
         final int remainSteps = (int) totalSteps - sum.getSteps() - stepsTodayFromBins;
         final int remainKcal = (int) totalKcal - sum.getCalories() - kcalTodayFromBins;
         if (remainSteps > 0 && remainKcal > 0) {
@@ -138,6 +138,6 @@ public class FetchStepCountDataOperation extends AbstractCasioConvoyFetchOperati
             samples.add(0, sample);
         }
 
-        getSupport().stepCountDataFetched((int) totalSteps, (int) totalKcal, samples);
+        support.stepCountDataFetched((int) totalSteps, (int) totalKcal, samples);
     }
 }
