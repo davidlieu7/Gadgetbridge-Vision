@@ -61,6 +61,7 @@ import nodomain.freeyourgadget.gadgetbridge.devices.GarminSpo2SampleProvider;
 import nodomain.freeyourgadget.gadgetbridge.devices.GarminStressSampleProvider;
 import nodomain.freeyourgadget.gadgetbridge.devices.GenericTrainingLoadAcuteSampleProvider;
 import nodomain.freeyourgadget.gadgetbridge.devices.GenericTrainingLoadChronicSampleProvider;
+import nodomain.freeyourgadget.gadgetbridge.devices.GenericWeightSampleProvider;
 import nodomain.freeyourgadget.gadgetbridge.devices.HydrationSampleProvider;
 import nodomain.freeyourgadget.gadgetbridge.devices.InstallHandler;
 import nodomain.freeyourgadget.gadgetbridge.devices.SampleProvider;
@@ -85,6 +86,7 @@ import nodomain.freeyourgadget.gadgetbridge.entities.GarminSleepStatsSampleDao;
 import nodomain.freeyourgadget.gadgetbridge.entities.GarminSpo2SampleDao;
 import nodomain.freeyourgadget.gadgetbridge.entities.GarminStressSampleDao;
 import nodomain.freeyourgadget.gadgetbridge.entities.GenericHydrationSampleDao;
+import nodomain.freeyourgadget.gadgetbridge.entities.GenericWeightSampleDao;
 import nodomain.freeyourgadget.gadgetbridge.entities.GenericMetricSampleDao;
 import nodomain.freeyourgadget.gadgetbridge.entities.GenericTrainingLoadAcuteSample;
 import nodomain.freeyourgadget.gadgetbridge.entities.GenericTrainingLoadAcuteSampleDao;
@@ -111,6 +113,7 @@ import nodomain.freeyourgadget.gadgetbridge.model.RestingMetabolicRateSample;
 import nodomain.freeyourgadget.gadgetbridge.model.SleepScoreSample;
 import nodomain.freeyourgadget.gadgetbridge.model.Spo2Sample;
 import nodomain.freeyourgadget.gadgetbridge.model.StressSample;
+import nodomain.freeyourgadget.gadgetbridge.model.WeightSample;
 import nodomain.freeyourgadget.gadgetbridge.model.WorkoutLoadSample;
 import nodomain.freeyourgadget.gadgetbridge.service.DeviceSupport;
 import nodomain.freeyourgadget.gadgetbridge.service.btle.BluetoothCompanyIdentifiers;
@@ -189,6 +192,7 @@ public abstract class GarminCoordinator extends AbstractBLEDeviceCoordinator {
             put(session.getGenericTrainingLoadChronicSampleDao(), GenericTrainingLoadChronicSampleDao.Properties.DeviceId);
             put(session.getGenericMetricSampleDao(), GenericMetricSampleDao.Properties.DeviceId);
             put(session.getGenericHydrationSampleDao(), GenericHydrationSampleDao.Properties.DeviceId);
+            put(session.getGenericWeightSampleDao(), GenericWeightSampleDao.Properties.DeviceId);
         }};
     }
 
@@ -422,6 +426,16 @@ public abstract class GarminCoordinator extends AbstractBLEDeviceCoordinator {
     @Override
     public boolean supportsAppListFetching(@NonNull final GBDevice device) {
         return true;
+    }
+
+    @Override
+    public boolean supportsWeightMeasurement(@NonNull final GBDevice device) {
+        return true;
+    }
+
+    @Override
+    public TimeSampleProvider<? extends WeightSample> getWeightSampleProvider(final GBDevice device, final DaoSession session) {
+        return new GenericWeightSampleProvider(device, session);
     }
 
     @Override

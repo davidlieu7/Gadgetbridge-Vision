@@ -1,6 +1,7 @@
 package nodomain.freeyourgadget.gadgetbridge.activities.charts.weight
 
 import nodomain.freeyourgadget.gadgetbridge.activities.charts.spec.AxisSide
+import nodomain.freeyourgadget.gadgetbridge.activities.charts.spec.SeriesStyle
 import org.junit.Assert
 import org.junit.Test
 
@@ -66,6 +67,56 @@ class WeightChartDataTest {
         val spec = WeightChartData.spec(
             seconds.first(), seconds.last(), seconds, DoubleArray(3), 75.0, "Weight", 1, 2,
             listOf(WeightChartData.PercentLine("body_fat", "Body fat", 3, doubleArrayOf(25.0, 25.0, 25.0))), "%"
+        )
+
+        Assert.assertTrue(spec.isEmpty)
+    }
+
+    @Test
+    fun `a reading from before the range leads the line in without a dot or a selection`() {
+        val spec = WeightChartData.spec(
+            500_000L, 2_000_000L, longArrayOf(500_000L, 1_000_000L, 1_086_400L), doubleArrayOf(81.0, 80.0, 79.5),
+            0.0, "Weight", 1, 2, emptyList(), "%", true,
+        )
+
+        val weight = spec.series.single { it.key == "weight" }
+        Assert.assertEquals(listOf(1_000_000.0, 1_086_400.0), weight.points.map { it.x })
+        val leadIn = spec.series.single { it.key == "weight_lead_in" }
+        Assert.assertFalse(leadIn.selectable)
+        Assert.assertFalse((leadIn.style as SeriesStyle.Line).showPoints)
+        Assert.assertEquals(listOf(500_000.0 to 81.0, 1_000_000.0 to 80.0), leadIn.points.map { it.x to it.y })
+        Assert.assertEquals(82.0, spec.yAxis.maximum!!, 0.001)
+    }
+
+    @Test
+    fun `a reading from before an empty range is drawn flat to its end`() {
+        val spec = WeightChartData.spec(
+            500_000L, 2_000_000L, longArrayOf(500_000L), doubleArrayOf(81.0),
+            0.0, "Weight", 1, 2, emptyList(), "%", true,
+        )
+
+        Assert.assertEquals(listOf("weight_lead_in"), spec.series.map { it.key })
+        Assert.assertEquals(listOf(500_000.0 to 81.0, 2_000_000.0 to 81.0), spec.series.single().points.map { it.x to it.y })
+    }
+
+    @Test
+    fun `without the weight only the percent lines and no goal are drawn`() {
+        val spec = WeightChartData.spec(
+            seconds.first(), seconds.last(), seconds, weights, 75.0, "Weight", 1, 2,
+            listOf(WeightChartData.PercentLine("body_fat", "Body fat", 3, doubleArrayOf(25.0, 24.5, 24.0))), "%",
+            false, false,
+        )
+
+        Assert.assertEquals(listOf("body_fat"), spec.series.map { it.key })
+        Assert.assertTrue(spec.limitLines.isEmpty())
+        Assert.assertFalse(spec.yAxis.showLabels)
+        Assert.assertNotNull(spec.endYAxis)
+    }
+
+    @Test
+    fun `without the weight and without percent lines the chart is empty`() {
+        val spec = WeightChartData.spec(
+            seconds.first(), seconds.last(), seconds, weights, 75.0, "Weight", 1, 2, emptyList(), "%", false, false,
         )
 
         Assert.assertTrue(spec.isEmpty)

@@ -314,6 +314,10 @@
             android:label="@string/notifications_app_icon_upload"
             android:parentActivityName=".activities.devicesettings.DeviceSettingsActivity" />
         <activity
+            android:name=".activities.charts.weight.WeightMeasurementsActivity"
+            android:label="@string/weight_measurements"
+            android:parentActivityName=".activities.charts.ActivityChartsActivity" />
+        <activity
             android:name=".activities.workouts.templates.WorkoutTemplateListActivity"
             android:label="@string/pref_workout_templates_title"
             android:parentActivityName=".activities.devicesettings.DeviceSettingsActivity" />

@@ -46,6 +46,7 @@ import org.slf4j.LoggerFactory;
 import nodomain.freeyourgadget.gadgetbridge.GBApplication;
 import nodomain.freeyourgadget.gadgetbridge.R;
 import nodomain.freeyourgadget.gadgetbridge.devices.DeviceManager;
+import nodomain.freeyourgadget.gadgetbridge.util.UserWeight;
 
 public class AboutUserPreferencesActivity extends AbstractSettingsActivityV2 {
     private static final Logger LOG = LoggerFactory.getLogger(AboutUserPreferencesActivity.class);
@@ -104,6 +105,9 @@ public class AboutUserPreferencesActivity extends AbstractSettingsActivityV2 {
             }
 
             pref.setOnPreferenceChangeListener((preference, newVal) -> {
+                if (PREF_USER_WEIGHT_KG.equals(prefKey)) {
+                    recordWeight(String.valueOf(newVal));
+                }
                 if (sendToDevice) {
                     GBApplication.deviceService().onSendConfiguration(prefKey);
                 }
@@ -114,6 +118,19 @@ public class AboutUserPreferencesActivity extends AbstractSettingsActivityV2 {
                 }
                 return true;
             });
+        }
+
+        private void recordWeight(final String value) {
+            final double kg;
+            try {
+                kg = Double.parseDouble(value);
+            } catch (final NumberFormatException e) {
+                return;
+            }
+            if (kg < UserWeight.MIN_KG || kg > UserWeight.MAX_KG) {
+                return;
+            }
+            new Thread(() -> UserWeight.addRecordForAllDevices(kg, System.currentTimeMillis())).start();
         }
     }
 }

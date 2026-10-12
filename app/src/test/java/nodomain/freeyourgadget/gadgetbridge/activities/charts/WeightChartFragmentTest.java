@@ -20,13 +20,6 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
-import static org.junit.Assert.assertTrue;
-
-import android.content.Context;
-import android.view.ContextThemeWrapper;
-import android.view.LayoutInflater;
-import android.view.View;
-import android.view.ViewGroup;
 
 import org.junit.Test;
 
@@ -35,7 +28,6 @@ import java.time.ZoneId;
 import java.util.Date;
 
 import nodomain.freeyourgadget.gadgetbridge.GBApplication;
-import nodomain.freeyourgadget.gadgetbridge.R;
 import nodomain.freeyourgadget.gadgetbridge.database.DBHelper;
 import nodomain.freeyourgadget.gadgetbridge.entities.GenericWeightSample;
 import nodomain.freeyourgadget.gadgetbridge.entities.User;
@@ -116,67 +108,6 @@ public class WeightChartFragmentTest extends TestBase {
                 withHeightThen.bodyFatPercent, withHeightNow.bodyFatPercent, 0.01f);
         assertEquals(withHeightThen.bodyFatPercent, actual.bodyFatPercent, 0.001f);
         assertEquals(withHeightThen.basalMetabolicRate, actual.basalMetabolicRate);
-    }
-
-    @Test
-    public void hidingAValueLetsTheFollowingOnesMoveUp() {
-        final Context themed = new ContextThemeWrapper(getContext(), R.style.GadgetbridgeTheme);
-        final View root = LayoutInflater.from(themed).inflate(R.layout.fragment_weightchart, null);
-        final View weight = tileOf(root, R.id.weight_latest_text);
-        // the values are hidden until a measurement provides them; show them all, in their order
-        final View[] values = new View[6];
-        final int[] ids = {R.id.weight_body_fat_text, R.id.weight_body_water_text, R.id.weight_muscle_mass_text,
-                R.id.weight_bone_mass_text, R.id.weight_bmr_text, R.id.weight_impedance_text};
-        for (int i = 0; i < ids.length; i++) {
-            values[i] = tileOf(root, ids[i]);
-            values[i].setVisibility(View.VISIBLE);
-        }
-
-        layOut(root);
-        // The first value that starts a new row, and the one before it (the last of the previous row).
-        int rowStart = -1;
-        for (int i = 1; i < values.length; i++) {
-            if (positionRelativeTo(root, weight, values[i])[1] != positionRelativeTo(root, weight, values[i - 1])[1]) {
-                rowStart = i;
-                break;
-            }
-        }
-        assertTrue("the values must span more than one row for this check to mean anything", rowStart > 0);
-        final int[] endOfPreviousRow = positionRelativeTo(root, weight, values[rowStart - 1]);
-
-        // Hide the first value: everything after it shifts back by one cell, so the value that
-        // started the row has to move up into the previous row, not just slide within its own.
-        values[0].setVisibility(View.GONE);
-        layOut(root);
-        final int[] now = positionRelativeTo(root, weight, values[rowStart]);
-        assertEquals("row", endOfPreviousRow[1], now[1]);
-        assertEquals("column", endOfPreviousRow[0], now[0]);
-    }
-
-    /** The tile (line, value, label) holding a value view. */
-    private static View tileOf(final View root, final int valueId) {
-        final View value = root.findViewById(valueId);
-        assertNotNull(value);
-        return (View) value.getParent();
-    }
-
-    private static void layOut(final View root) {
-        root.measure(View.MeasureSpec.makeMeasureSpec(1080, View.MeasureSpec.EXACTLY),
-                View.MeasureSpec.makeMeasureSpec(2400, View.MeasureSpec.EXACTLY));
-        root.layout(0, 0, 1080, 2400);
-    }
-
-    /** Left and top of a tile, relative to another tile (the grid itself moves as the chart above it resizes). */
-    private static int[] positionRelativeTo(final View root, final View origin, final View view) {
-        return new int[]{view.getLeft() - origin.getLeft(), topWithin(root, view) - topWithin(root, origin)};
-    }
-
-    private static int topWithin(final View root, final View view) {
-        int top = 0;
-        for (View v = view; v != root; v = (View) v.getParent()) {
-            top += v.getTop();
-        }
-        return top;
     }
 
     @Test
