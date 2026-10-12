@@ -30,18 +30,14 @@ import nodomain.freeyourgadget.gadgetbridge.util.kotlin.stringUntilNullTerminato
 import org.slf4j.LoggerFactory
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
-import java.util.LinkedList
-import java.util.Queue
 import java.util.UUID
 import kotlin.math.floor
 
 class ShokzSupport : AbstractHeadphoneBTBRDeviceSupport(LOG, MAX_MTU) {
     private val packetBuffer: ByteBuffer = ByteBuffer.allocate(MAX_MTU).order(ByteOrder.LITTLE_ENDIAN)
 
-    private val messageQueue: Queue<ShokzMessage> = LinkedList()
-    private var pendingMessage: ShokzMessage? = null
-    private var timeoutRetries = 0
-    private val timeoutHandler = Handler(Looper.getMainLooper())
+    // The queue matcher runs after onSocketRead, so only use commands parsed in that read.
+    private val receivedCommands = mutableListOf<ShokzCommand>()
 
     private val shokzCoordinator: ShokzCoordinator?
         get() = gbDevice.deviceCoordinator as? ShokzCoordinator
@@ -69,42 +65,36 @@ class ShokzSupport : AbstractHeadphoneBTBRDeviceSupport(LOG, MAX_MTU) {
 
     override fun initializeDevice(builder: TransactionBuilder): TransactionBuilder {
         packetBuffer.clear()
-        timeoutHandler.removeCallbacksAndMessages(null)
-        messageQueue.clear()
-        pendingMessage = null
-        timeoutRetries = 0
+        receivedCommands.clear()
+        builder.queueMessages(2000) { request, _ -> matchesResponse(request) }
 
         builder.setDeviceState(GBDevice.State.INITIALIZING)
 
         val supportsMp3 = shokzCoordinator?.supportsMp3() ?: true
         val supportsControls = shokzCoordinator?.supportsControls() ?: true
 
-        // Send the fw version request directly, but queue everything else, otherwise the device does not respond to all
         builder.write(*encodeCommand(ShokzCommand.FIRMWARE_GET))
 
-        pendingMessage = ShokzMessage(ShokzCommand.FIRMWARE_GET)
-        timeoutHandler.postDelayed({ onCommandTimeout() }, 2000L)
         if (supportsMp3) {
-            queueCommand(ShokzCommand.MEDIA_SOURCE_GET)
+            builder.write(*encodeCommand(ShokzCommand.MEDIA_SOURCE_GET))
         }
-        queueCommand(ShokzCommand.BATTERY_GET)
-        queueCommand(ShokzCommand.EQUALIZER_GET)
-        queueCommand(ShokzCommand.PLAYBACK_STATUS_GET)
-        queueCommand(ShokzCommand.VOLUME_GET)
+        builder.write(*encodeCommand(ShokzCommand.BATTERY_GET))
+        builder.write(*encodeCommand(ShokzCommand.EQUALIZER_GET))
+        builder.write(*encodeCommand(ShokzCommand.PLAYBACK_STATUS_GET))
+        builder.write(*encodeCommand(ShokzCommand.VOLUME_GET))
         if (supportsMp3) {
-            queueCommand(ShokzCommand.MP3_PLAYBACK_MODE_GET)
+            builder.write(*encodeCommand(ShokzCommand.MP3_PLAYBACK_MODE_GET))
         }
         if (supportsControls) {
-            queueCommand(ShokzCommand.CONTROLS_GET)
+            builder.write(*encodeCommand(ShokzCommand.CONTROLS_GET))
         }
-        queueCommand(ShokzCommand.LANGUAGE_GET)
+        builder.write(*encodeCommand(ShokzCommand.LANGUAGE_GET))
 
         return builder
     }
 
     override fun dispose() {
         synchronized(ConnectionMonitor) {
-            timeoutHandler.removeCallbacksAndMessages(null)
             batteryPollHandler.removeCallbacksAndMessages(null)
             LocalBroadcastManager.getInstance(context).unregisterReceiver(multipointBroadcastReceiver)
             super.dispose()
@@ -112,6 +102,7 @@ class ShokzSupport : AbstractHeadphoneBTBRDeviceSupport(LOG, MAX_MTU) {
     }
 
     override fun onSocketRead(data: ByteArray) {
+        receivedCommands.clear()
         packetBuffer.put(data)
         packetBuffer.flip()
 
@@ -170,16 +161,10 @@ class ShokzSupport : AbstractHeadphoneBTBRDeviceSupport(LOG, MAX_MTU) {
                 }
             }
 
-            var sendNext: Boolean
             try {
-                sendNext = handlePayload(payload)
+                handlePayload(payload)
             } catch (e: Exception) {
                 LOG.error("Failed to handle payload", e)
-                sendNext = true
-            }
-
-            if (sendNext) {
-                sendNextCommand()
             }
         }
 
@@ -330,7 +315,7 @@ class ShokzSupport : AbstractHeadphoneBTBRDeviceSupport(LOG, MAX_MTU) {
         return group == ShokzCommand.MULTIPOINT_DEVICES_RET.group && code == ShokzCommand.MULTIPOINT_DEVICES_RET.code
     }
 
-    private fun handlePayload(payload: ByteArray): Boolean {
+    private fun handlePayload(payload: ByteArray) {
         if (LOG.isTraceEnabled) {
             LOG.trace("Processing payload: {}", payload.toHexString())
         }
@@ -339,39 +324,39 @@ class ShokzSupport : AbstractHeadphoneBTBRDeviceSupport(LOG, MAX_MTU) {
         val unk1 = buf.getInt() // 0x01
         if (unk1 != 0x01) {
             LOG.warn("Unexpected unk1 0x{}", unk1.toHexString())
-            return true
+            return
         }
         val len = buf.getInt()
         if (len != buf.remaining()) {
             LOG.warn("Unexpected number of bytes in payload: got 0x{}, expected 0x{}", buf.remaining(), len)
-            return true
+            return
         }
         val unk2 = buf.getInt() // 0x02
         if (unk2 != 0x02) {
             LOG.warn("Unexpected unk2 0x{}", unk2.toHexString())
-            return true
+            return
         }
         val unk3 = buf.getInt() // 0x04
         if (unk3 != 0x04) {
             LOG.warn("Unexpected unk3 0x{}", unk3.toHexString())
-            return true
+            return
         }
         val group = buf.getInt()
         val unk4 = buf.getInt() // 0x03
         if (unk4 != 0x03) {
             LOG.warn("Unexpected unk4 0x{}", unk4.toHexString())
-            return true
+            return
         }
         val unk5 = buf.getInt() // 0x04
         if (unk5 != 0x04) {
             LOG.warn("Unexpected unk5 0x{}", unk5.toHexString())
-            return true
+            return
         }
         val code = buf.getInt()
         val unk6 = buf.getInt() // 0x04
         if (unk6 != 0x04) {
             LOG.warn("Unexpected unk6 0x{}", unk6.toHexString())
-            return true
+            return
         }
         val argsLength = buf.getInt()
         val args = ByteArray(argsLength)
@@ -380,14 +365,11 @@ class ShokzSupport : AbstractHeadphoneBTBRDeviceSupport(LOG, MAX_MTU) {
         val command = ShokzCommand.getCommand(group, code)
         if (command == null) {
             LOG.warn("Unknown command: group 0x{}, code 0x{}", group.toHexString(), code.toHexString())
-            return true
+            return
         }
 
+        receivedCommands.add(command)
         handleCommand(command, args)
-
-        return pendingMessage?.let { msg ->
-            (msg.command.code or MASK_RESPONSE) == command.code
-        } ?: false
     }
 
     private fun handleCommand(command: ShokzCommand, args: ByteArray) {
@@ -753,11 +735,15 @@ class ShokzSupport : AbstractHeadphoneBTBRDeviceSupport(LOG, MAX_MTU) {
         command: ShokzCommand,
         args: ByteArray = byteArrayOf()
     ) {
-        messageQueue.add(ShokzMessage(command, args))
+        val builder = createTransactionBuilder(command.name.lowercase())
+        when (command) {
+            ShokzCommand.MULTIPOINT_PAIR_SECOND_FINISH,
+            ShokzCommand.MULTIPOINT_START_PAIR_REQ -> Unit
 
-        if (pendingMessage == null) {
-            sendNextCommand()
+            else -> builder.queueMessages(2000) { request, _ -> matchesResponse(request) }
         }
+        builder.write(*encodeCommand(command, args))
+        builder.queue()
     }
 
     private fun rearmBatteryPollTimer() {
@@ -770,46 +756,12 @@ class ShokzSupport : AbstractHeadphoneBTBRDeviceSupport(LOG, MAX_MTU) {
         }
     }
 
-    private fun onCommandTimeout() {
-        if (timeoutRetries++ < 3) {
-            LOG.warn("Timed out waiting for response, retrying attempt {}", timeoutRetries)
-            pendingMessage?.let { msg ->
-                sendMessage(msg)
-                return
-            }
-        }
-        LOG.warn("Timed out waiting for response, giving up")
-        sendNextCommand()
-    }
-
-    private fun sendNextCommand() {
-        timeoutHandler.removeCallbacksAndMessages(null)
-        timeoutRetries = 0
-
-        pendingMessage = messageQueue.poll()
-        pendingMessage?.let { msg ->
-            LOG.debug("Sending next command in queue: {}", msg.command)
-            sendMessage(msg)
-            return
-        }
-        LOG.debug("No more commands in the queue")
-    }
-
-    private fun sendMessage(message: ShokzMessage) {
-        val builder = createTransactionBuilder(message.command.name.lowercase())
-        builder.write(*encodeCommand(message.command, message.args))
-        builder.queue()
-
-        when (message.command) {
-            ShokzCommand.MULTIPOINT_PAIR_SECOND_FINISH,
-            ShokzCommand.MULTIPOINT_START_PAIR_REQ -> {
-                sendNextCommand()
-            }
-
-            else -> {
-                timeoutHandler.postDelayed({ onCommandTimeout() }, 2000L)
-            }
-        }
+    private fun matchesResponse(request: ByteArray): Boolean {
+        if (request.size < 44) return false
+        val buf = ByteBuffer.wrap(request).order(ByteOrder.LITTLE_ENDIAN)
+        val group = buf.getInt(28)
+        val code = buf.getInt(40) or MASK_RESPONSE
+        return receivedCommands.any { it.group == group && it.code == code }
     }
 
     private fun setupMultipointBroadcastReceiver() {
