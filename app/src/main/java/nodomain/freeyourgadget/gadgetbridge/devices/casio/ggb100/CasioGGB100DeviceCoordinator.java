@@ -17,6 +17,7 @@
 package nodomain.freeyourgadget.gadgetbridge.devices.casio.ggb100;
 
 import android.app.Activity;
+import android.content.SharedPreferences;
 import android.bluetooth.BluetoothDevice;
 
 import org.slf4j.Logger;
@@ -31,6 +32,7 @@ import java.util.regex.Pattern;
 import de.greenrobot.dao.AbstractDao;
 import de.greenrobot.dao.Property;
 import nodomain.freeyourgadget.gadgetbridge.R;
+import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsPreferenceConst;
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSpecificSettingsCustomizer;
 import nodomain.freeyourgadget.gadgetbridge.devices.SampleProvider;
 import nodomain.freeyourgadget.gadgetbridge.devices.casio.Casio2C2DDeviceCoordinator;
@@ -42,9 +44,18 @@ import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
 import nodomain.freeyourgadget.gadgetbridge.model.ActivitySample;
 import nodomain.freeyourgadget.gadgetbridge.service.DeviceSupport;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.casio.ggb100.CasioGGB100DeviceSupport;
+import nodomain.freeyourgadget.gadgetbridge.util.preferences.DevicePrefs;
 
 public class CasioGGB100DeviceCoordinator extends Casio2C2DDeviceCoordinator {
     protected static final Logger LOG = LoggerFactory.getLogger(CasioGGB100DeviceCoordinator.class);
+
+    @Override
+    protected void applyDefaultPreferences(final DevicePrefs devicePreferences, final SharedPreferences.Editor editor) {
+        editor.putString(
+                DeviceSettingsPreferenceConst.PREFS_DEVICE_CHARTS_TABS,
+                "activity,activitylist,stepsweek"
+        );
+    }
 
     @Override
     protected Pattern getSupportedDeviceName() {
@@ -78,6 +89,11 @@ public class CasioGGB100DeviceCoordinator extends Casio2C2DDeviceCoordinator {
 
     @Override
     public boolean supportsActivityTracking(@NonNull GBDevice device) {
+        return true;
+    }
+    
+    @Override
+    public boolean supportsRecordedActivities(@NonNull final GBDevice device) {
         return true;
     }
 
