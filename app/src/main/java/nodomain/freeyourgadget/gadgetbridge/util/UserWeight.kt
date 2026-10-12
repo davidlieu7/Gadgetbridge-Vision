@@ -9,15 +9,12 @@ import nodomain.freeyourgadget.gadgetbridge.entities.GenericWeightSampleDao
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice
 import nodomain.freeyourgadget.gadgetbridge.model.ActivityUser
 import nodomain.freeyourgadget.gadgetbridge.model.WeightUnit
-import org.slf4j.LoggerFactory
 import kotlin.math.roundToInt
 
 /**
  * Keeps the user's weight in About you, the weight records and the devices in step.
  */
 object UserWeight {
-    private val LOG = LoggerFactory.getLogger(UserWeight::class.java)
-
     const val MIN_KG = 20.0
     const val MAX_KG = 500.0
 
@@ -93,24 +90,6 @@ object UserWeight {
         }
         setProfileWeight(after.weightKg.toDouble())
         return true
-    }
-
-    /**
-     * Adds a record at [timestampMillis] for every known device that supports manual entry.
-     */
-    @JvmStatic
-    fun addRecordForAllDevices(kg: Double, timestampMillis: Long) {
-        try {
-            GBApplication.acquireDB().use { db ->
-                for (device in GBApplication.app().deviceManager.devices) {
-                    if (supportsManualEntry(device, db.daoSession)) {
-                        addRecord(db.daoSession, device, kg, timestampMillis)
-                    }
-                }
-            }
-        } catch (e: Exception) {
-            LOG.error("Failed to add weight records", e)
-        }
     }
 
     /**
