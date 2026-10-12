@@ -1,6 +1,8 @@
 package nodomain.freeyourgadget.gadgetbridge.service.devices.fitpro;
 
 import static junit.framework.TestCase.assertEquals;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.assertFalse;
 import static nodomain.freeyourgadget.gadgetbridge.devices.fitpro.FitProConstants.CMD_FIND_BAND;
 import static nodomain.freeyourgadget.gadgetbridge.devices.fitpro.FitProConstants.CMD_GET_HW_INFO;
 import static nodomain.freeyourgadget.gadgetbridge.devices.fitpro.FitProConstants.CMD_GROUP_GENERAL;
@@ -65,5 +67,44 @@ public class FitProDeviceSupportTest {
             k++;
         }
         return byteArray;
+    }
+    @Test
+    public void matchesCompleteReadbackAndAckByGroupAndCommand() {
+        byte[] request = FitProDeviceSupport.craftData(CMD_GROUP_REQUEST_DATA, CMD_GET_HW_INFO);
+        byte[] readback = FitProDeviceSupport.craftData(CMD_GROUP_REQUEST_DATA, CMD_GET_HW_INFO, VALUE_ON);
+        assertTrue(FitProDeviceSupport.matchesReply(request, readback));
+        assertTrue(FitProDeviceSupport.matchesReply(request,
+                new byte[]{(byte) 0xdc, 0, 5, CMD_GROUP_REQUEST_DATA, CMD_GET_HW_INFO, 0, 8, 1}));
+        assertFalse(FitProDeviceSupport.matchesReply(request,
+                FitProDeviceSupport.craftData(CMD_GROUP_GENERAL, CMD_GET_HW_INFO)));
+        assertFalse(FitProDeviceSupport.matchesReply(request,
+                FitProDeviceSupport.craftData(CMD_GROUP_REQUEST_DATA, CMD_FIND_BAND)));
+    }
+
+    @Test
+    public void rejectsMalformedAndIncompleteFrames() {
+        byte[] request = FitProDeviceSupport.craftData(CMD_GROUP_REQUEST_DATA, CMD_GET_HW_INFO);
+        assertFalse(FitProDeviceSupport.matchesReply(null, request));
+        assertFalse(FitProDeviceSupport.matchesReply(new byte[0], request));
+        assertFalse(FitProDeviceSupport.matchesReply(java.util.Arrays.copyOf(request, 7), request));
+        assertFalse(FitProDeviceSupport.matchesReply(request, new byte[0]));
+        assertFalse(FitProDeviceSupport.matchesReply(request, null));
+        assertFalse(FitProDeviceSupport.matchesReply(request, java.util.Arrays.copyOf(request, 7)));
+        byte[] badLength = request.clone();
+        badLength[2]++;
+        assertFalse(FitProDeviceSupport.matchesReply(badLength, request));
+        assertFalse(FitProDeviceSupport.matchesReply(request, badLength));
+        byte[] badPayloadLength = request.clone();
+        badPayloadLength[7]++;
+        assertFalse(FitProDeviceSupport.matchesReply(request, badPayloadLength));
+        byte[] badType = request.clone();
+        badType[4] = 0;
+        assertFalse(FitProDeviceSupport.matchesReply(request, badType));
+        assertFalse(FitProDeviceSupport.matchesReply(request,
+                new byte[]{(byte) 0xdc, 0, 5, CMD_GROUP_REQUEST_DATA, CMD_GET_HW_INFO, 0, 8, 0}));
+        assertFalse(FitProDeviceSupport.matchesReply(request,
+                new byte[]{(byte) 0xdc, 0, 6, CMD_GROUP_REQUEST_DATA, CMD_GET_HW_INFO, 0, 8, 1}));
+        assertFalse(FitProDeviceSupport.matchesReply(request,
+                new byte[]{(byte) 0xdc, 0, 5, CMD_GROUP_REQUEST_DATA, CMD_GET_HW_INFO, 0, 8, 1, 0}));
     }
 }

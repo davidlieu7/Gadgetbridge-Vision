@@ -85,6 +85,7 @@ import static nodomain.freeyourgadget.gadgetbridge.devices.fitpro.FitProConstant
 import static nodomain.freeyourgadget.gadgetbridge.devices.fitpro.FitProConstants.VALUE_SET_LONG_SIT_REMINDER_ON;
 import static nodomain.freeyourgadget.gadgetbridge.devices.fitpro.FitProConstants.VALUE_SET_NOTIFICATIONS_ENABLE_OFF;
 import static nodomain.freeyourgadget.gadgetbridge.devices.fitpro.FitProConstants.VALUE_SET_NOTIFICATIONS_ENABLE_ON;
+import static nodomain.freeyourgadget.gadgetbridge.service.btle.BLETypeConversions.toUint16;
 
 import android.bluetooth.BluetoothGatt;
 import android.bluetooth.BluetoothGattCharacteristic;
@@ -107,7 +108,6 @@ import java.text.DateFormat;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.GregorianCalendar;
@@ -216,26 +216,19 @@ public class FitProDeviceSupport extends AbstractBTLESingleDeviceSupport {
         // - band seems to drain battery really fast
         // - the wait time is needed as the band must process each command
         // - (implementation based on individual requests did not work, the wait is still needed)
+        // NEW: Preserve initialization order, waiting for each command's reply or timeout.
+        builder.queueMessages(2000, FitProDeviceSupport::matchesReply);
 
         builder.write(writeCharacteristic, craftData(CMD_GROUP_GENERAL, FitProConstants.CMD_INIT1, (byte) 0x2));
         setTime(builder);
-        builder.sleep(200);
         builder.write(writeCharacteristic, craftData(CMD_GROUP_REQUEST_DATA, FitProConstants.CMD_INIT1));
-        builder.sleep(200);
         builder.write(writeCharacteristic, craftData(CMD_GROUP_REQUEST_DATA, FitProConstants.CMD_INIT2));
-        builder.sleep(200);
         setLanguage(builder);
-        builder.sleep(200);
         builder.write(writeCharacteristic, craftData(CMD_GROUP_GENERAL, FitProConstants.CMD_INIT3, VALUE_ON));
-        builder.sleep(200);
         builder.write(writeCharacteristic, craftData(CMD_GROUP_REQUEST_DATA, VALUE_ON));
-        builder.sleep(200);
         builder.write(writeCharacteristic, craftData(CMD_GROUP_REQUEST_DATA, (byte) 0xf));
-        builder.sleep(200);
         builder.write(writeCharacteristic, craftData(CMD_GROUP_REQUEST_DATA, CMD_GET_HW_INFO));
-        builder.sleep(200);
         builder.write(writeCharacteristic, craftData(CMD_GROUP_BAND_INFO, CMD_RX_BAND_INFO));
-        builder.sleep(200);
 
         builder.setDeviceState(GBDevice.State.INITIALIZED);
         return builder;
@@ -272,6 +265,23 @@ public class FitProDeviceSupport extends AbstractBTLESingleDeviceSupport {
         handleGBDeviceEvent(versionCmd);
     }
 
+    private static boolean isDataFrame(byte[] data) {
+        return data != null && data.length >= 8 && data[0] == FitProConstants.DATA_HEADER
+                && data[4] == 1 && toUint16(data[2], data[1]) == data.length - 3
+                && toUint16(data[7], data[6]) == data.length - 8;
+    }
+
+    private static boolean isAckFrame(byte[] data) {
+        return data != null && data.length == 8 && data[0] == FitProConstants.DATA_HEADER_ACK
+                && toUint16(data[2], data[1]) == 5 && data[7] == 1;
+    }
+
+    static boolean matchesReply(byte[] request, byte[] response) {
+        if (!isDataFrame(request)) return false;
+        if (isAckFrame(response)) return request[3] == response[3] && request[5] == response[4];
+        return isDataFrame(response) && request[3] == response[3] && request[5] == response[5];
+    }
+
     @Override
     public boolean onCharacteristicChanged(BluetoothGatt gatt,
                                            BluetoothGattCharacteristic characteristic,
@@ -279,17 +289,14 @@ public class FitProDeviceSupport extends AbstractBTLESingleDeviceSupport {
         super.onCharacteristicChanged(gatt, characteristic, data);
         UUID characteristicUUID = characteristic.getUuid();
         debugPrintArray(data, "FitPro received value");
-        if (data[0] != FitProConstants.DATA_HEADER) {
-            if (debugEnabled) {
-                LOG.info("FitPro, packet not starting with 0xcd: " + data[0]);
-                debugPrintArray(new byte[]{data[0]}, "first byte");
-                LOG.info("Characteristic changed UUID: " + characteristicUUID);
-                LOG.info("Characteristic changed service: " + characteristic.getService().getCharacteristics());
-                debugPrintArray(data, "value bytes");
+        if (!UUID_CHARACTERISTIC_RX.equals(characteristicUUID)) return false;
+        if (isAckFrame(data)) {
+            if (data[3] == CMD_GROUP_RECEIVE_SPORTS_DATA && data[4] == CMD_REQUEST_STEPS_DATA1) {
+                indicateFinishedFetchingOperation();
             }
-            indicateFinishedFetchingOperation();
             return false;
         }
+        if (!isDataFrame(data)) return false;
 
         if (data != null && data.length > 5) {
             byte command = data[3];
@@ -870,13 +877,9 @@ public class FitProDeviceSupport extends AbstractBTLESingleDeviceSupport {
         return result;
     }
 
-    // send chucked up data
     public void writeChunkedData(TransactionBuilder builder, byte[] data) {
-        for (int start = 0; start < data.length; start += mtuSize) {
-            int end = start + mtuSize;
-            if (end > data.length) end = data.length;
-            builder.write(writeCharacteristic, Arrays.copyOfRange(data, start, end));
-        }
+        builder.queueMessages(2000, FitProDeviceSupport::matchesReply)
+                .writeChunkedData(writeCharacteristic, data, mtuSize);
     }
 
     @Override
