@@ -192,10 +192,12 @@ open class SoundcoreDeviceSupport : AbstractHeadphoneSerialDeviceSupportV2<Sound
         builder.write(*mDeviceProtocol.encodeDeviceInfoRequest())
         // 2. Request extended info (firmware details, serial, additional settings)
         if (coordinator.supportsExtendedInfoRequest()) {
+            builder.sleep(300)
             builder.write(*mDeviceProtocol.encodeExtendedInfoRequest())
         }
         // 3. Session-init handshake - the device ACKs with an empty response
         if (coordinator.supportsSessionInitRequest()) {
+            builder.sleep(300)
             builder.write(*mDeviceProtocol.encodeSessionInitRequest())
         }
         builder
