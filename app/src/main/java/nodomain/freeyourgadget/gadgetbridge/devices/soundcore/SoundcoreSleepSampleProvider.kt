@@ -78,6 +78,7 @@ class SoundcoreSleepSampleProvider(private val device: GBDevice, private val ses
             it.provider = this
             it.timestamp = timestamp
             it.rawKind = when (record.rawKind and 15) {
+                1 -> ActivityKind.AWAKE_SLEEP.code
                 2 -> ActivityKind.LIGHT_SLEEP.code
                 3 -> ActivityKind.DEEP_SLEEP.code
                 else -> ActivityKind.UNKNOWN.code

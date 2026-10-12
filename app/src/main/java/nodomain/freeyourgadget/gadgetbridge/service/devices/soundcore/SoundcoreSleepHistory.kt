@@ -36,25 +36,37 @@ object SoundcoreSleepHistory {
     data class Interval(val start: Long, val end: Long, val stage: Int, val position: Int)
     data class Report(val records: List<Record>, val sessions: List<Session>, val intervals: List<Interval>)
 
-    class Pages(private val recordSize: Int) {
-        private val pages = sortedMapOf<Int, ByteArray>()
-        private var total = 0
-        private var selector: Int? = null
-        val complete: Boolean get() = total > 0 && pages.size == total
+    class Pages(private val recordSize: Int, private val requiredSelectors: Set<Int> = emptySet()) {
+        private class Stream(val total: Int) {
+            val pages = sortedMapOf<Int, ByteArray>()
+            val complete: Boolean get() = pages.size == total
+        }
+
+        private val streams = sortedMapOf<Int, Stream>()
+        val complete: Boolean get() = streams.isNotEmpty() &&
+            (requiredSelectors.isEmpty() || streams.keys.containsAll(requiredSelectors)) &&
+            streams.values.all { it.complete }
 
         fun accept(payload: ByteArray): Boolean {
             val page = decodePage(payload, recordSize) ?: return false
-            if ((selector != null && page.selector != selector) ||
-                (total != 0 && page.total != total)) return false
-            val previous = pages[page.index]
-            if (previous != null) return previous.contentEquals(payload)
-            total = page.total
-            selector = page.selector
-            pages[page.index] = payload.copyOf()
+            if (requiredSelectors.isEmpty()) {
+                // A stage request binds to whichever selector responds first.
+                if (streams.isNotEmpty() && page.selector !in streams) return false
+            } else if (page.selector !in requiredSelectors) return false
+            val stream = streams[page.selector]
+            if (stream != null) {
+                if (stream.total != page.total) return false
+                val previous = stream.pages[page.index]
+                if (previous != null) return previous.contentEquals(payload)
+            }
+            val target = stream ?: Stream(page.total).also { streams[page.selector] = it }
+            target.pages[page.index] = payload.copyOf()
             return true
         }
 
-        fun records(): List<ByteArray> = pages.values.flatMap { decodePage(it, recordSize)!!.records }
+        fun records(): List<ByteArray> = streams.values.flatMap { stream ->
+            stream.pages.values.flatMap { decodePage(it, recordSize)!!.records }
+        }
     }
 
     @JvmStatic fun decodePage(payload: ByteArray, recordSize: Int): Page? {

@@ -213,7 +213,9 @@ open class SoundcoreSleepA30Protocol(device: GBDevice?) : SoundcoreProtocolImplV
         }
         if (!pages.complete) return emptyArray()
         if (command == CMD_GET_SLEEP_STAGES) {
-            sessionPages = SoundcoreSleepHistory.Pages(14)
+            // Session responses contain two independently paginated selectors, in either order.
+            // Completing the first one alone can omit the latest night.
+            sessionPages = SoundcoreSleepHistory.Pages(14, setOf(0, 1))
             return arrayOf(GBDeviceEventSendBytes(encodeRequest(CMD_GET_SLEEP_SESSIONS)))
         }
         val report = SoundcoreSleepHistory.buildReport(stages.records(), pages.records())
