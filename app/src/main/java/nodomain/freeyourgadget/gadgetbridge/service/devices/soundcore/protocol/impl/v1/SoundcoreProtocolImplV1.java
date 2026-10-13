@@ -11,6 +11,7 @@ import androidx.localbroadcastmanager.content.LocalBroadcastManager;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
@@ -92,6 +93,9 @@ public class SoundcoreProtocolImplV1 extends AbstractSoundcoreProtocol {
     public static final int battery_case = 0;
     public static final int battery_earphone_left = 1;
     public static final int battery_earphone_right = 2;
+
+    private final List<MultipointDevice> pairedDevices = new ArrayList<>();
+    private String activeSourceAddress;
 
     public SoundcoreProtocolImplV1(final GBDevice device) {
         super(device);
@@ -415,6 +419,58 @@ public class SoundcoreProtocolImplV1 extends AbstractSoundcoreProtocol {
     /** Hook for the device-specific CMD_NOTIFY_CONNECTION_STATUS payload layout. */
     protected GBDeviceEvent[] decodeConnectionStatus(final byte[] payload) {
         return new GBDeviceEvent[0];
+    }
+
+    /**
+     * Decodes the paired-device list sent by the device (CMD_NOTIFY_PAIRED_DEVICES) and broadcasts
+     * it to {@link MultipointPairingActivity}.
+     *
+     * Payload layout:
+     * <pre>
+     * [0..1]   = unknown header (01 01 even with two connected devices)
+     * then, per paired device:
+     *   [0]      = entry length (including this byte), e.g. 0x28 = 40
+     *   [1]      = connection flag (0x01 = connected, 0x00 = not connected)
+     *   [2..7]   = 6-byte Bluetooth address, little-endian
+     *   [8..]    = device name, UTF-8, zero-padded, (entry length - 8) bytes
+     * </pre>
+     */
+    protected final void decodePairedDevicesPayload(final byte[] payload) {
+        if (payload.length < 2) {
+            return;
+        }
+        final List<MultipointDevice> devices = new ArrayList<>();
+        int offset = 2; // skip the 2-byte header
+        while (offset + 8 <= payload.length) {
+            final int entrySize = Byte.toUnsignedInt(payload[offset]);
+            if (entrySize < 8 || offset + entrySize > payload.length) {
+                break;
+            }
+            final boolean connected = payload[offset + 1] != 0;
+            final String address = formatMacAddress(payload, offset + 2);
+            final int nameLen = entrySize - 8;
+            int nameEnd = 0;
+            while (nameEnd < nameLen && payload[offset + 8 + nameEnd] != 0) {
+                nameEnd++;
+            }
+            final String name = new String(payload, offset + 8, nameEnd, StandardCharsets.UTF_8);
+            LOG.debug("Paired device: addr={} name='{}' connected={}", address, name, connected);
+            devices.add(new MultipointDevice(address, name, connected, false, ((SoundcoreEarbudsCoordinator) getDevice().getDeviceCoordinator())
+                    .getSupportedMultipointActions().contains(MultipointPairingActivity.ACTION_MULTIPOINT_FORGET_DEVICE)));
+            offset += entrySize;
+        }
+        pairedDevices.clear();
+        pairedDevices.addAll(devices);
+        broadcastPairedDevices(pairedDevices, activeSourceAddress);
+    }
+
+    protected final void decodeConnectionStatusPayload(final byte[] payload) {
+        if (payload.length != 7 || (payload[0] != 0x00 && payload[0] != 0x01)) {
+            LOG.warn("Invalid connection status payload");
+            return;
+        }
+        activeSourceAddress = payload[0] == 0x01 ? formatMacAddress(payload, 1) : null;
+        broadcastPairedDevices(pairedDevices, activeSourceAddress);
     }
 
     /** Hook for the device-specific CMD_NOTIFY_DEVICE_STATE payload layout. */

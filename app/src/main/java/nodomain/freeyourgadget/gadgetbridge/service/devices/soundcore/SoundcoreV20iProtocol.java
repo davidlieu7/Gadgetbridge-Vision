@@ -16,13 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 package nodomain.freeyourgadget.gadgetbridge.service.devices.soundcore;
 
-import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
-import java.util.List;
-
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsPreferenceConst;
-import nodomain.freeyourgadget.gadgetbridge.activities.multipoint.MultipointDevice;
-import nodomain.freeyourgadget.gadgetbridge.activities.multipoint.MultipointPairingActivity;
 import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEvent;
 import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreEarbudsCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
@@ -39,9 +33,6 @@ public class SoundcoreV20iProtocol extends SoundcoreProtocolImplV1 {
     public static final short CMD_SET_LIGHT_MODE = (short) 0x860e;
 
     private static final int LEFT_LONG_PRESS_OFFSET = 65;
-
-    private final List<MultipointDevice> pairedDevices = new ArrayList<>();
-    private String activeSourceAddress;
 
     public SoundcoreV20iProtocol(final GBDevice device) {
         super(device);
@@ -132,42 +123,4 @@ public class SoundcoreV20iProtocol extends SoundcoreProtocolImplV1 {
     protected int getTapFunctionGroup(final SoundcoreEarbudsCoordinator.ButtonAction action) {
         return action == SoundcoreEarbudsCoordinator.ButtonAction.DOUBLE_TAP ? 6 : 15;
     }
-
-    private void decodePairedDevicesPayload(final byte[] payload) {
-        if (payload.length < 2) {
-            return;
-        }
-        final List<MultipointDevice> devices = new ArrayList<>();
-        int offset = 2; // skip the 2-byte header
-        while (offset + 8 <= payload.length) {
-            final int entrySize = Byte.toUnsignedInt(payload[offset]);
-            if (entrySize < 8 || offset + entrySize > payload.length) {
-                break;
-            }
-            final boolean connected = payload[offset + 1] != 0;
-            final String address = formatMacAddress(payload, offset + 2);
-            final int nameLen = entrySize - 8;
-            int nameEnd = 0;
-            while (nameEnd < nameLen && payload[offset + 8 + nameEnd] != 0) {
-                nameEnd++;
-            }
-            final String name = new String(payload, offset + 8, nameEnd, StandardCharsets.UTF_8);
-            devices.add(new MultipointDevice(address, name, connected, false, ((SoundcoreEarbudsCoordinator) getDevice().getDeviceCoordinator())
-                    .getSupportedMultipointActions().contains(MultipointPairingActivity.ACTION_MULTIPOINT_FORGET_DEVICE)));
-            offset += entrySize;
-        }
-        pairedDevices.clear();
-        pairedDevices.addAll(devices);
-        broadcastPairedDevices(pairedDevices, activeSourceAddress);
-    }
-
-    private void decodeConnectionStatusPayload(final byte[] payload) {
-        if (payload.length != 7 || (payload[0] != 0x00 && payload[0] != 0x01)) {
-            return;
-        }
-        activeSourceAddress = payload[0] == 0x01 ? formatMacAddress(payload, 1) : null;
-        broadcastPairedDevices(pairedDevices, activeSourceAddress);
-    }
-
-
 }
