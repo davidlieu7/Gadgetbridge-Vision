@@ -23,6 +23,7 @@ import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSett
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSpecificSettingsScreen
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.DeviceSettingsSpec
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.ListEntry
+import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.components.keepActivityDataOnDevice
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.components.multipointPairing
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.deviceSettings
 import nodomain.freeyourgadget.gadgetbridge.activities.multipoint.MultipointPairingActivity
@@ -839,6 +840,9 @@ abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator(
                         )
                     }
                 }
+            }
+            if (supportsDataFetching(device)) {
+                keepActivityDataOnDevice()
             }
             if (has(arrayOf(Capability.WearingDetection, Capability.WearingTone, Capability.FitTest, Capability.AutoPowerOff, Capability.VoicePrompts, Capability.ButtonBrightness))) {
                 category(key = "pref_header_soundcore_general", title = R.string.pref_header_general) {

@@ -33,6 +33,9 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import nodomain.freeyourgadget.gadgetbridge.R;
+import nodomain.freeyourgadget.gadgetbridge.GBApplication;
+import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsPreferenceConst;
+import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEventSendBytes;
 import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.sleep_a30.SoundcoreSleepA30AudioInstallHandler;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.soundcore.SoundcoreDeviceSupport;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.soundcore.SoundcoreSleepHistory;
@@ -95,7 +98,16 @@ public final class SoundcoreSleepA30DeviceSupport extends SoundcoreDeviceSupport
         SoundcoreSleepHistory.Report report = ((SoundcoreSleepHistoryEvent) event).getReport();
         try {
             if (report == null) LOG.warn("Invalid Sleep A30 history snapshot");
-            else SoundcoreSleepHistoryStorage.persist(getDevice(), report);
+            else {
+                SoundcoreSleepHistoryStorage.persist(getDevice(), report);
+                boolean keepData = GBApplication.getDevicePrefs(getDevice()).getBoolean(
+                        DeviceSettingsPreferenceConst.PREF_KEEP_ACTIVITY_DATA_ON_DEVICE, false);
+                byte[] acknowledgements = ((SoundcoreSleepA30Protocol) mDeviceProtocol)
+                        .encodeSleepHistoryAcknowledgements(keepData);
+                if (acknowledgements != null) {
+                    super.evaluateGBDeviceEvent(new GBDeviceEventSendBytes(acknowledgements));
+                }
+            }
         } catch (Exception e) {
             LOG.error("Unable to save Sleep A30 history", e);
         } finally {

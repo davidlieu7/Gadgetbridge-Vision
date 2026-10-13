@@ -33,6 +33,9 @@ import nodomain.freeyourgadget.gadgetbridge.service.devices.soundcore.protocol.i
 open class SoundcoreSleepA30Protocol(device: GBDevice?) : SoundcoreProtocolImplV1(device) {
     private var stagePages: SoundcoreSleepHistory.Pages? = null
     private var sessionPages: SoundcoreSleepHistory.Pages? = null
+    private var sessionAcknowledgementTimestamp: Long? = null
+    private var stageAcknowledgementTimestamp: Long? = null
+    private var historyReadyForAcknowledgement = false
 
     private var pendingAlarms: List<AlarmRequest>? = null
     private val alarmCommands = ArrayDeque<ByteArray>()
@@ -189,6 +192,7 @@ open class SoundcoreSleepA30Protocol(device: GBDevice?) : SoundcoreProtocolImplV
     override fun encodeFetchRecordedData(dataTypes: Int): ByteArray? {
         if (dataTypes and (nodomain.freeyourgadget.gadgetbridge.model.RecordedDataTypes.TYPE_ACTIVITY or
                 nodomain.freeyourgadget.gadgetbridge.model.RecordedDataTypes.TYPE_SLEEP) == 0) return null
+        cancelSleepHistory()
         stagePages = SoundcoreSleepHistory.Pages(7)
         sessionPages = null
         return encodeRequest(CMD_GET_SLEEP_STAGES)
@@ -198,6 +202,27 @@ open class SoundcoreSleepA30Protocol(device: GBDevice?) : SoundcoreProtocolImplV
     fun cancelSleepHistory() {
         stagePages = null
         sessionPages = null
+        sessionAcknowledgementTimestamp = null
+        stageAcknowledgementTimestamp = null
+        historyReadyForAcknowledgement = false
+    }
+
+    /** Called only after the complete snapshot has been committed to the database. */
+    @Synchronized
+    fun encodeSleepHistoryAcknowledgements(keepData: Boolean): ByteArray? {
+        if (!historyReadyForAcknowledgement) return null
+        val sessionTimestamp = sessionAcknowledgementTimestamp
+        val stageTimestamp = stageAcknowledgementTimestamp
+        cancelSleepHistory()
+        if (keepData) return null
+        // Preserve each stream's raw boundary, not a merged summary's start or end.
+        val sessions = sessionTimestamp?.let {
+            encodeCommand(CMD_ACK_SLEEP_SESSIONS, byteArrayOf(0) + BLETypeConversions.fromUint32(it.toInt()))
+        } ?: byteArrayOf()
+        val stages = stageTimestamp?.let {
+            encodeCommand(CMD_ACK_SLEEP_STAGES, byteArrayOf(1) + BLETypeConversions.fromUint32(it.toInt()))
+        } ?: byteArrayOf()
+        return (sessions + stages).takeIf { it.isNotEmpty() }
     }
 
     @Synchronized
@@ -211,6 +236,17 @@ open class SoundcoreSleepA30Protocol(device: GBDevice?) : SoundcoreProtocolImplV
             cancelSleepHistory()
             return arrayOf(SoundcoreSleepHistoryEvent(null))
         }
+        val page = SoundcoreSleepHistory.decodePage(payload, if (command == CMD_GET_SLEEP_STAGES) 7 else 14)!!
+        val timestamp = page.records.maxOfOrNull {
+            BLETypeConversions.toUint32(it, 0).toLong() and 0xffffffffL
+        }
+        if (timestamp != null) {
+            if (command == CMD_GET_SLEEP_STAGES && page.selector == 1) {
+                stageAcknowledgementTimestamp = maxOf(stageAcknowledgementTimestamp ?: 0L, timestamp)
+            } else if (command == CMD_GET_SLEEP_SESSIONS && page.selector == 0) {
+                sessionAcknowledgementTimestamp = maxOf(sessionAcknowledgementTimestamp ?: 0L, timestamp)
+            }
+        }
         if (!pages.complete) return emptyArray()
         if (command == CMD_GET_SLEEP_STAGES) {
             // Session responses contain two independently paginated selectors, in either order.
@@ -219,7 +255,10 @@ open class SoundcoreSleepA30Protocol(device: GBDevice?) : SoundcoreProtocolImplV
             return arrayOf(GBDeviceEventSendBytes(encodeRequest(CMD_GET_SLEEP_SESSIONS)))
         }
         val report = SoundcoreSleepHistory.buildReport(stages.records(), pages.records())
-        cancelSleepHistory()
+        stagePages = null
+        sessionPages = null
+        historyReadyForAcknowledgement = report != null
+        if (report == null) cancelSleepHistory()
         return arrayOf(SoundcoreSleepHistoryEvent(report))
     }
 
@@ -359,6 +398,9 @@ open class SoundcoreSleepA30Protocol(device: GBDevice?) : SoundcoreProtocolImplV
 
     companion object {
         private val LOG = LoggerFactory.getLogger(SoundcoreSleepA30Protocol::class.java)
+
+        private const val CMD_ACK_SLEEP_SESSIONS: Short = 0x8915.toShort()
+        private const val CMD_ACK_SLEEP_STAGES: Short = 0x8315.toShort()
 
         const val ACTION_TOGGLE_LOCAL_PLAYBACK = "soundcore_toggle_local_playback"
         private val AUTO_STOP_PRESETS = setOf(10, 20, 30, 60, 90)
