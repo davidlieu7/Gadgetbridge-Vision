@@ -250,6 +250,12 @@ abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator(
     override fun supportsFindDevicePerEarbud(device: GBDevice): Boolean =
         supportsFindDevice(device) && getDeviceKind(device) == DeviceCoordinator.DeviceKind.EARBUDS
 
+    override fun supportsLedColor(device: GBDevice): Boolean =
+        supports(device, Capability.ColorfulLights)
+
+    override fun supportsRgbLedColor(device: GBDevice): Boolean =
+        supports(device, Capability.ColorfulLights)
+
     override fun getSupportedDeviceSpecificConnectionSettings(): IntArray =
         connectionSettings + super.getSupportedDeviceSpecificConnectionSettings()
 

@@ -36,7 +36,6 @@ public class SoundcoreV20iProtocol extends SoundcoreProtocolImplV1 {
     public static final short CMD_SET_AUDIO_BALANCE = (short) 0x8c10;
     public static final short CMD_SET_LIGHT_INTENSITY = (short) 0x820e;
     public static final short CMD_SET_LIGHT_AUTO_OFF = (short) 0x840e;
-    public static final short CMD_SET_LIGHT_COLOR = (short) 0x850e;
     public static final short CMD_SET_LIGHT_MODE = (short) 0x860e;
 
     private static final int LEFT_LONG_PRESS_OFFSET = 65;
@@ -122,7 +121,7 @@ public class SoundcoreV20iProtocol extends SoundcoreProtocolImplV1 {
                 if (red < 0 || red > 255 || green < 0 || green > 255 || blue < 0 || blue > 255) {
                     return null;
                 }
-                return encodeCommand(CMD_SET_LIGHT_COLOR, new byte[]{(byte) red, (byte) green, (byte) blue});
+                return encodeLedColor((red << 16) | (green << 8) | blue);
             case DeviceSettingsPreferenceConst.PREF_SOUNDCORE_LIGHT_MODE:
                 final int mode;
                 try {
