@@ -102,18 +102,31 @@ object SoundcoreSleepHistory {
                 it.end - it.start > MAX_SESSION_SECONDS || it.score > 100 }) return null
         val latest = sessions.groupBy { it.start }.values.map { versions -> versions.maxBy { it.end } }
             .sortedBy { it.start }
-        val intervals = latest.flatMap { session ->
+        // Independently measured summaries may differ slightly in their boundaries. Merge only
+        // same-type versions covering exactly the same nonterminal stage records; empty histories
+        // provide no evidence of identity. Keep the endpoint that also includes the terminal marker.
+        val canonical = mutableListOf<Session>()
+        for (session in latest) {
+            val points = sorted.filter { it.stage != 4 && it.timestamp in session.start..session.end }
+            val mirror = if (points.isEmpty()) -1 else canonical.indexOfFirst { other ->
+                other.type == session.type &&
+                    sorted.filter { it.stage != 4 && it.timestamp in other.start..other.end } == points
+            }
+            if (mirror < 0) canonical.add(session)
+            else if (session.end > canonical[mirror].end) canonical[mirror] = session
+        }
+        val intervals = canonical.flatMap { session ->
             val points = sorted.filter { it.timestamp in session.start..session.end }
             // The last sleep transition precedes the terminal stage-4 record. Its timestamp is
             // the sleep endpoint; the short tail leading to the terminal record is not sleep.
-            val ambiguous = latest.any { other -> other != session &&
+            val ambiguous = canonical.any { other -> other != session &&
                 points.any { it.timestamp in other.start..other.end } }
             if (ambiguous || points.size < 3 || points.last().stage != 4) emptyList()
             else points.dropLast(1).zipWithNext().map { (a, b) ->
                 Interval(a.timestamp, b.timestamp, a.stage, a.position)
             }
         }
-        return Report(sorted, latest, intervals)
+        return Report(sorted, canonical.sortedBy { it.start }, intervals)
     }
 }
 
