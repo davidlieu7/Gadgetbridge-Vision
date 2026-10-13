@@ -4173,14 +4173,11 @@
     <string name="soundcore_adaptive_direction_title">Adaptive Direction</string>
     <string name="soundcore_adaptive_direction_summary">Adjust equalizer preset automatically based on device direction</string>
     <string name="soundcore_colorful_lights">Colorful lights</string>
+    <string name="soundcore_light_mode">Light mode</string>
     <string name="soundcore_light_effect_on">Light on</string>
     <string name="soundcore_light_effect_breathing">Breathing</string>
     <string name="soundcore_light_effect_flash">Flash</string>
     <string name="soundcore_light_effect_music">Music follows</string>
-    <string name="soundcore_light_intensity">Light intensity</string>
-    <string name="soundcore_light_auto_off">Automatically turn lights off (minutes)</string>
-    <string name="soundcore_light_mode">Light mode</string>
-    <string name="soundcore_light_mode_i">Mode %d</string>
     <string name="haylou_s35_anc_eq_classic">Classic</string>
     <string name="haylou_s35_anc_eq_bass">Bass</string>
     <string name="soundcore_equalizer_preset">Preset</string>

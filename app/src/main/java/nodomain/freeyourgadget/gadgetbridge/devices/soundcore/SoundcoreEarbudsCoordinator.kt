@@ -462,14 +462,14 @@ abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator(
                     )
                     seekbar(
                         key = DeviceSettingsPreferenceConst.PREF_SOUNDCORE_LIGHT_INTENSITY,
-                        title = R.string.soundcore_light_intensity,
+                        title = R.string.menuitem_brightness,
                         icon = R.drawable.ic_wb_sunny,
                         min = 1, max = 10, defaultValue = 5,
                         dependency = DeviceSettingsPreferenceConst.PREF_SOUNDCORE_LIGHTS_ENABLED,
                     )
                     seekbar(
                         key = DeviceSettingsPreferenceConst.PREF_SOUNDCORE_LIGHT_AUTO_OFF,
-                        title = R.string.soundcore_light_auto_off,
+                        title = R.string.sony_automatic_power_off,
                         icon = R.drawable.ic_timer,
                         min = 1, max = 120, defaultValue = 45,
                         dependency = DeviceSettingsPreferenceConst.PREF_SOUNDCORE_LIGHTS_ENABLED,
