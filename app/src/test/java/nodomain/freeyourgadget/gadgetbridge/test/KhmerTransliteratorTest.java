@@ -53,6 +53,20 @@ public class KhmerTransliteratorTest extends TestCase {
     }
 
     @Test
+    public void testWordBoundaries() {
+        // a word ending in a vowel must not drop the inherent vowel of the next word
+        Assert.assertEquals("ka kâ", transliterator.transliterate("កា ក"));
+        Assert.assertEquals("ka kâ", transliterator.transliterate("កា​ក"));
+        Assert.assertEquals("ka.kâ", transliterator.transliterate("កា។ក"));
+    }
+
+    @Test
+    public void testPrivateUseCharactersAreKept() {
+        final String text = "xyz ា";
+        Assert.assertEquals("xyz a", transliterator.transliterate(text));
+    }
+
+    @Test
     public void testEmpty() {
         Assert.assertEquals("", transliterator.transliterate(""));
         Assert.assertNull(transliterator.transliterate(null));

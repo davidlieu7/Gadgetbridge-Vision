@@ -31,7 +31,8 @@ import nodomain.freeyourgadget.gadgetbridge.util.language.Transliterator;
  * Every Khmer consonant belongs to an a-series or an o-series, which decides how the following
  * vowel is read. As in the CLDR rules, a consonant writes its sound and leaves a marker for its
  * inherent vowel in front of the remaining text. Subscripts and vowel signs consume the marker;
- * a marker nothing consumed is written as the inherent vowel "â" or "ô".
+ * a marker that nothing consumes is written as the inherent vowel "â" or "ô". Only runs of Khmer
+ * text go through these rules; everything else is copied unchanged.
  * <p>
  * Additions to the CLDR rules:
  * <ul>
@@ -41,6 +42,7 @@ import nodomain.freeyourgadget.gadgetbridge.util.language.Transliterator;
  * <li>no inherent vowel on a final consonant: when the word already has a vowel and the consonant
  * ends the word or comes before a consonant that starts a new syllable</li>
  * <li>zero-width space becomes a space; zero-width (non-)joiner and ៎ are removed; ៕ becomes "."</li>
+ * <li>digits, punctuation and zero-width space end a word, like an ordinary space</li>
  * </ul>
  */
 public class KhmerTransliterator implements Transliterator {
@@ -79,12 +81,14 @@ public class KhmerTransliterator implements Transliterator {
             // digits and punctuation
             {"០", "0"}, {"១", "1"}, {"២", "2"}, {"៣", "3"}, {"៤", "4"}, {"៥", "5"}, {"៦", "6"}, {"៧", "7"}, {"៨", "8"}, {"៩", "9"},
             {"៖", ":"}, {"ៗ", "&c."}, {"។", "."}, {"ៈ", "u’"}, {"៕", "."},
-            // signs without a romanization, and word separators
+            // signs without a romanization, and zero-width (non-)joiners
             {"៉", ""}, {"៊", ""}, {"់", ""}, {"៌", ""}, {"៍", ""}, {"៎", ""}, {"៏", ""}, {"័", ""}, {"្", ""},
-            {"​", " "}, {"‌", ""}, {"‍", ""},
+            {"‌", ""}, {"‍", ""},
     };
     private static final String INDEPENDENT_VOWELS = "ឥឦឧឨឩឪឫឬឭឮឯឰឱឳឲ";
     private static final String SIGNS_WITHOUT_SOUND = "៉៊់៌៍៎៏័";
+    private static final String WORD_ENDS = "០១២៣៤៥៦៧៨៩៖ៗ។៕";
+    private static final char ZERO_WIDTH_SPACE = '\u200B';
 
     private static final class Rule {
         final String output;
@@ -136,8 +140,27 @@ public class KhmerTransliterator implements Transliterator {
         if (txt == null || txt.isEmpty()) {
             return txt;
         }
-        final StringBuilder input = new StringBuilder(txt);
+        // the markers are private-use characters, so they must never meet text from outside the runs
         final StringBuilder output = new StringBuilder(txt.length() * 2);
+        int pos = 0;
+        while (pos < txt.length()) {
+            int end = pos;
+            while (end < txt.length() && isInRun(txt.charAt(end))) {
+                end++;
+            }
+            if (end > pos) {
+                transliterateRun(txt.substring(pos, end), output);
+                pos = end;
+            } else {
+                final char c = txt.charAt(pos++);
+                output.append(c == ZERO_WIDTH_SPACE ? ' ' : c);
+            }
+        }
+        return Normalizer.normalize(output, Normalizer.Form.NFC);
+    }
+
+    private static void transliterateRun(final String run, final StringBuilder output) {
+        final StringBuilder input = new StringBuilder(run);
         boolean hadVowel = false;
         int pos = 0;
         while (pos < input.length()) {
@@ -158,7 +181,7 @@ public class KhmerTransliterator implements Transliterator {
             if (rule != null) {
                 length++; // undo the last decrement
                 output.append(rule.output);
-                hadVowel |= rule.isVowel;
+                hadVowel = WORD_ENDS.indexOf(input.charAt(pos)) < 0 && (hadVowel || rule.isVowel);
                 input.replace(pos, pos + length, rule.keep);
                 continue;
             }
@@ -183,17 +206,14 @@ public class KhmerTransliterator implements Transliterator {
                 }
             } else {
                 output.append(c);
-                if (!isKhmer(c)) {
-                    hadVowel = false;
-                }
             }
             pos++;
         }
-        return Normalizer.normalize(output, Normalizer.Form.NFC);
     }
 
-    private static boolean isKhmer(final char c) {
-        return (c >= 'ក' && c <= '៿') || (c >= '᧠' && c <= '᧿');
+    private static boolean isInRun(final char c) {
+        // Khmer, Khmer Symbols, and the zero-width (non-)joiners used inside words
+        return (c >= 'ក' && c <= '៿') || (c >= '᧠' && c <= '᧿') || c == '\u200C' || c == '\u200D';
     }
 
     private static boolean isKhmerLetter(final char c) {
