@@ -596,6 +596,7 @@ import nodomain.freeyourgadget.gadgetbridge.devices.wearfit.WearFitCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.withingssteelhr.WithingsSteelHRDeviceCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.xiaomi.watches.MiBand10Coordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.xiaomi.watches.MiBand10ProCoordinator;
+import nodomain.freeyourgadget.gadgetbridge.devices.xiaomi.watches.MiBand11Coordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.xiaomi.watches.MiBand4CCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.xiaomi.watches.MiBand7ProCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.xiaomi.watches.MiBand8ActiveCoordinator;
@@ -705,6 +706,7 @@ public enum DeviceType {
     MIBAND9PRO(MiBand9ProCoordinator.class),
     MIBAND10(MiBand10Coordinator.class),
     MIBAND10PRO(MiBand10ProCoordinator.class),
+    MIBAND11(MiBand11Coordinator.class),
     MIWATCHLITE(MiWatchLiteCoordinator.class),
     MIWATCHCOLORSPORT(MiWatchColorSportCoordinator.class),
     REDMIBUDS3PRO(RedmiBuds3ProCoordinator.class),
