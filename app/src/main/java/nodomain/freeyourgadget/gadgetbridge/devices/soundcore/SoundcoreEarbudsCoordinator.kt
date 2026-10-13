@@ -436,6 +436,62 @@ abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator(
                 }
             }
 
+            if (has(Capability.ColorfulLights)) {
+                screen(
+                    key = "pref_soundcore_light_screen",
+                    title = R.string.soundcore_colorful_lights,
+                    icon = R.drawable.ic_lightbulb,
+                ) {
+                    switchSetting(
+                        key = DeviceSettingsPreferenceConst.PREF_SOUNDCORE_LIGHTS_ENABLED,
+                        title = R.string.soundcore_colorful_lights,
+                        icon = R.drawable.ic_lightbulb,
+                    )
+                    list(
+                        key = DeviceSettingsPreferenceConst.PREF_SOUNDCORE_LIGHT_MODE,
+                        title = R.string.soundcore_light_mode,
+                        icon = R.drawable.ic_light_mode_auto,
+                        entries = listOf(
+                            ListEntry.Res("1", R.string.soundcore_light_effect_on),
+                            ListEntry.Res("2", R.string.soundcore_light_effect_breathing),
+                            ListEntry.Res("3", R.string.soundcore_light_effect_flash),
+                            ListEntry.Res("0", R.string.soundcore_light_effect_music),
+                        ),
+                        defaultValue = "0",
+                        dependency = DeviceSettingsPreferenceConst.PREF_SOUNDCORE_LIGHTS_ENABLED,
+                    )
+                    seekbar(
+                        key = DeviceSettingsPreferenceConst.PREF_SOUNDCORE_LIGHT_INTENSITY,
+                        title = R.string.soundcore_light_intensity,
+                        icon = R.drawable.ic_wb_sunny,
+                        min = 1, max = 10, defaultValue = 5,
+                        dependency = DeviceSettingsPreferenceConst.PREF_SOUNDCORE_LIGHTS_ENABLED,
+                    )
+                    seekbar(
+                        key = DeviceSettingsPreferenceConst.PREF_SOUNDCORE_LIGHT_AUTO_OFF,
+                        title = R.string.soundcore_light_auto_off,
+                        icon = R.drawable.ic_timer,
+                        min = 1, max = 120, defaultValue = 45,
+                        dependency = DeviceSettingsPreferenceConst.PREF_SOUNDCORE_LIGHTS_ENABLED,
+                    )
+                    val channels = listOf(
+                        Triple(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_LIGHT_COLOR_RED, R.string.red, 23),
+                        Triple(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_LIGHT_COLOR_GREEN, R.string.green, 187),
+                        Triple(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_LIGHT_COLOR_BLUE, R.string.blue, 239),
+                    )
+                    channels.forEach { (key, title, initialValue) ->
+                        seekbar(
+                            key = key, title = title,
+                            icon = R.drawable.ic_led_color,
+                            min = 0,
+                            max = 255,
+                            defaultValue = initialValue,
+                            dependency = DeviceSettingsPreferenceConst.PREF_SOUNDCORE_LIGHTS_ENABLED,
+                        )
+                    }
+                }
+            }
+
             if (has(arrayOf(Capability.AudioEqualizer, Capability.SurroundSound, Capability.GamingMode, Capability.LDAC, Capability.AudioBalance))) {
                 screen(
                     key = "pref_soundcore_audio",
@@ -687,60 +743,6 @@ abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator(
                             key = DeviceSettingsPreferenceConst.PREF_SOUNDCORE_TRANSPARENCY_VOCAL_MODE,
                             title = R.string.sony_ambient_sound_focus_voice,
                             icon = R.drawable.ic_voice,
-                        )
-                    }
-                }
-            }
-            if (has(Capability.ColorfulLights)) {
-                screen(
-                    key = "pref_soundcore_light_screen",
-                    title = R.string.soundcore_colorful_lights,
-                    icon = R.drawable.ic_lightbulb,
-                ) {
-                    switchSetting(
-                        key = DeviceSettingsPreferenceConst.PREF_SOUNDCORE_LIGHTS_ENABLED,
-                        title = R.string.soundcore_colorful_lights,
-                        icon = R.drawable.ic_lightbulb,
-                    )
-                    list(
-                        key = DeviceSettingsPreferenceConst.PREF_SOUNDCORE_LIGHT_MODE,
-                        title = R.string.soundcore_light_mode,
-                        icon = R.drawable.ic_light_mode_auto,
-                        entries = listOf(
-                            ListEntry.Res("1", R.string.soundcore_light_effect_on),
-                            ListEntry.Res("2", R.string.soundcore_light_effect_breathing),
-                            ListEntry.Res("3", R.string.soundcore_light_effect_flash),
-                            ListEntry.Res("0", R.string.soundcore_light_effect_music),
-                        ),
-                        defaultValue = "0",
-                        dependency = DeviceSettingsPreferenceConst.PREF_SOUNDCORE_LIGHTS_ENABLED,
-                    )
-                    seekbar(
-                        key = DeviceSettingsPreferenceConst.PREF_SOUNDCORE_LIGHT_INTENSITY,
-                        title = R.string.soundcore_light_intensity,
-                        icon = R.drawable.ic_wb_sunny,
-                        min = 1, max = 10, defaultValue = 5,
-                        dependency = DeviceSettingsPreferenceConst.PREF_SOUNDCORE_LIGHTS_ENABLED,
-                    )
-                    seekbar(
-                        key = DeviceSettingsPreferenceConst.PREF_SOUNDCORE_LIGHT_AUTO_OFF,
-                        title = R.string.soundcore_light_auto_off,
-                        icon = R.drawable.ic_timer,
-                        min = 1, max = 120, defaultValue = 45,
-                        dependency = DeviceSettingsPreferenceConst.PREF_SOUNDCORE_LIGHTS_ENABLED,
-                    )
-                    val channels = listOf(
-                        Triple(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_LIGHT_COLOR_RED, R.string.red, 23),
-                        Triple(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_LIGHT_COLOR_GREEN, R.string.green, 187),
-                        Triple(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_LIGHT_COLOR_BLUE, R.string.blue, 239),
-                    )
-                    channels.forEach { (key, title, initialValue) ->
-                        seekbar(
-                            key = key, title = title,
-                            icon = R.drawable.ic_led_color,
-                            min = 0, max = 255, defaultValue = initialValue,
-                            dependency = DeviceSettingsPreferenceConst.PREF_SOUNDCORE_LIGHTS_ENABLED,
-                            visibleWhen = { prefs -> prefs.getString(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_LIGHT_MODE, "0") != "0" },
                         )
                     }
                 }

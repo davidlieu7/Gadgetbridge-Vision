@@ -188,11 +188,12 @@ open class SoundcoreDeviceSupport : AbstractHeadphoneSerialDeviceSupportV2<Sound
 
     private fun updateLedColor() {
         val prefs = GBApplication.getDevicePrefs(getDevice())
+        val enabled = prefs.getBoolean(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_LIGHTS_ENABLED, false)
         val red = prefs.getInt(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_LIGHT_COLOR_RED, 23)
         val green = prefs.getInt(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_LIGHT_COLOR_GREEN, 187)
         val blue = prefs.getInt(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_LIGHT_COLOR_BLUE, 239)
         // This is the configured color, not device readback.
-        getDevice().setExtraInfo("led_color", Color.rgb(red, green, blue))
+        getDevice().setExtraInfo("led_color", if (enabled) Color.rgb(red, green, blue) else null)
     }
 
     override fun onSendConfiguration(config: String) {
@@ -235,6 +236,7 @@ open class SoundcoreDeviceSupport : AbstractHeadphoneSerialDeviceSupportV2<Sound
 
     private companion object {
         val LED_COLOR_PREFERENCES = setOf(
+            DeviceSettingsPreferenceConst.PREF_SOUNDCORE_LIGHTS_ENABLED,
             DeviceSettingsPreferenceConst.PREF_SOUNDCORE_LIGHT_COLOR_RED,
             DeviceSettingsPreferenceConst.PREF_SOUNDCORE_LIGHT_COLOR_GREEN,
             DeviceSettingsPreferenceConst.PREF_SOUNDCORE_LIGHT_COLOR_BLUE,
