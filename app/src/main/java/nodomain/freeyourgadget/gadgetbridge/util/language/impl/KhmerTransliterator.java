@@ -43,6 +43,8 @@ import nodomain.freeyourgadget.gadgetbridge.util.language.Transliterator;
  * ends the word or comes before a consonant that starts a new syllable</li>
  * <li>zero-width space becomes a space; zero-width (non-)joiner and ៎ are removed; ៕ becomes "."</li>
  * <li>digits, punctuation and zero-width space end a word, like an ordinary space</li>
+ * <li>the output stays within Latin-1, which watch fonts usually cover: the breve is dropped
+ * (ŏ becomes o), œ becomes "oe" and ’ becomes '</li>
  * </ul>
  */
 public class KhmerTransliterator implements Transliterator {
@@ -156,7 +158,7 @@ public class KhmerTransliterator implements Transliterator {
                 output.append(c == ZERO_WIDTH_SPACE ? ' ' : c);
             }
         }
-        return Normalizer.normalize(output, Normalizer.Form.NFC);
+        return toLatin1(Normalizer.normalize(output, Normalizer.Form.NFD));
     }
 
     private static void transliterateRun(final String run, final StringBuilder output) {
@@ -209,6 +211,29 @@ public class KhmerTransliterator implements Transliterator {
             }
             pos++;
         }
+    }
+
+    /**
+     * Expects decomposed text, so a breve is always a separate combining character.
+     */
+    private static String toLatin1(final String decomposed) {
+        final StringBuilder sb = new StringBuilder(decomposed.length());
+        for (int i = 0; i < decomposed.length(); i++) {
+            final char c = decomposed.charAt(i);
+            switch (c) {
+                case '\u0306': // combining breve
+                    break;
+                case 'œ':
+                    sb.append("oe");
+                    break;
+                case '’':
+                    sb.append('\'');
+                    break;
+                default:
+                    sb.append(c);
+            }
+        }
+        return Normalizer.normalize(sb, Normalizer.Form.NFC);
     }
 
     private static boolean isInRun(final char c) {
