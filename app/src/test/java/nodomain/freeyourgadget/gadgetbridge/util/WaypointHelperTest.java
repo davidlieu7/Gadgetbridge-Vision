@@ -293,7 +293,8 @@ public class WaypointHelperTest extends TestBase {
         Assert.assertFalse(WaypointHelper.Companion.containsShortPlusCode("-34.603889, -58.381389"));
 
         // not Plus Codes
-        final String[] invalid = {"8FVC2222+2", "8FVC2222+22+", "CAFE+22", "1600+Amphitheatre+Parkway", "QM9X+83Z"};
+        // a code needs digits before the "+": "+855" alone is a valid short code, but here a phone prefix
+        final String[] invalid = {"8FVC2222+2", "8FVC2222+22+", "CAFE+22", "1600+Amphitheatre+Parkway", "QM9X+83Z", "Call +855 23 999 999"};
         for (String input : invalid) {
             Assert.assertNull(input, WaypointHelper.Companion.fromText(input, saigon));
         }

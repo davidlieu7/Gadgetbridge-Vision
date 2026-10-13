@@ -145,6 +145,10 @@ object OpenLocationCode {
     @JvmStatic
     @JvmOverloads
     fun encode(latitude: Double, longitude: Double, codeLength: Int = PAIR_CODE_LENGTH): String {
+        // the specification allows 2 to 10 digits in pairs, then any length
+        require(codeLength >= 2 && (codeLength >= PAIR_CODE_LENGTH || codeLength % 2 == 0)) {
+            "Illegal code length $codeLength"
+        }
         val length = min(codeLength, MAX_DIGIT_COUNT)
         var lat = latitude.coerceIn(-90.0, 90.0)
         val lng = normalizeLongitude(longitude)

@@ -92,4 +92,13 @@ public class OpenLocationCodeTest {
             Assert.assertEquals(v[3] + " near " + v[1] + "," + v[2], expected, OpenLocationCode.recoverNearest(v[3], lat, lng));
         }
     }
+
+    @Test
+    public void TestEncodeLength() {
+        for (final int length : new int[]{-1, 0, 1, 3, 9}) {
+            Assert.assertThrows("length " + length, IllegalArgumentException.class, () -> OpenLocationCode.encode(47.0, 8.0, length));
+        }
+        Assert.assertEquals("8F000000+", OpenLocationCode.encode(47.0, 8.0, 2));
+        Assert.assertEquals("8FVC2222+222", OpenLocationCode.encode(47.0, 8.0, 11));
+    }
 }
