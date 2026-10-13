@@ -51,7 +51,8 @@ public final class Fit3Settings {
 
     /**
      * Preference keys - the generic Gadgetbridge ones, matching the
-     * {@code android:key}s in devicesettings_samsung_fit3.xml. They have to be
+     * {@code android:key}s in devicesettings_samsung_fit3_vibration.xml and
+     * devicesettings_samsung_fit3_display.xml. They have to be
      * generic: {@code onSendConfiguration} is only called for keys
      * {@code DeviceSpecificSettingsFragment} attaches a change handler to, and
      * that is a fixed list of known keys.

@@ -191,24 +191,40 @@ public class SamsungFit3Coordinator extends AbstractBLEDeviceCoordinator {
 
     @Override
     public DeviceSpecificSettings getDeviceSpecificSettings(@NonNull GBDevice device) {
-        DeviceSpecificSettings settings = new DeviceSpecificSettings(new int[]{
-                R.xml.devicesettings_samsung_fit3,
-                R.xml.devicesettings_key_vibration,
-                R.xml.devicesettings_always_on_display,
-                R.xml.devicesettings_liftwrist_display_noshed,
-                R.xml.devicesettings_wearlocation,
-                R.xml.devicesettings_weardirection,
-                R.xml.devicesettings_timeformat,
-                R.xml.devicesettings_world_clocks,
-                R.xml.devicesettings_upload_notifications_app_icon,
-                R.xml.devicesettings_samsung_fit3_menus,
-                R.xml.devicesettings_canned_reply_16,
-                R.xml.devicesettings_canned_dismisscall_16,
-                R.xml.devicesettings_sync_calendar,
-                R.xml.devicesettings_samsung_fit3_sos,
-                R.xml.devicesettings_sos_contact,
-                R.xml.devicesettings_samsung_fit3_cycle,
-        });
+        final DeviceSpecificSettings settings = new DeviceSpecificSettings();
+
+        final List<Integer> generic = settings.addRootScreen(DeviceSpecificSettingsScreen.GENERIC);
+        generic.add(R.xml.devicesettings_samsung_fit3_vibration);
+        generic.add(R.xml.devicesettings_key_vibration);
+        generic.add(R.xml.devicesettings_wearlocation);
+        generic.add(R.xml.devicesettings_weardirection);
+        generic.add(R.xml.devicesettings_samsung_fit3_double_press);
+
+        final List<Integer> dateTime = settings.addRootScreen(DeviceSpecificSettingsScreen.DATE_TIME);
+        dateTime.add(R.xml.devicesettings_timeformat);
+        dateTime.add(R.xml.devicesettings_world_clocks);
+
+        final List<Integer> display = settings.addRootScreen(DeviceSpecificSettingsScreen.DISPLAY);
+        display.add(R.xml.devicesettings_samsung_fit3_display);
+        display.add(R.xml.devicesettings_always_on_display);
+        display.add(R.xml.devicesettings_liftwrist_display_noshed);
+        display.add(R.xml.devicesettings_samsung_fit3_menus);
+
+        final List<Integer> health = settings.addRootScreen(DeviceSpecificSettingsScreen.HEALTH);
+        health.add(R.xml.devicesettings_samsung_fit3_cycle);
+        health.add(R.xml.devicesettings_samsung_fit3_sos);
+        health.add(R.xml.devicesettings_sos_contact);
+
+        final List<Integer> notifications = settings.addRootScreen(DeviceSpecificSettingsScreen.NOTIFICATIONS);
+        notifications.add(R.xml.devicesettings_samsung_fit3_status_indicator);
+        notifications.add(R.xml.devicesettings_upload_notifications_app_icon);
+        notifications.add(R.xml.devicesettings_canned_reply_16);
+        notifications.add(R.xml.devicesettings_canned_dismisscall_16);
+
+        settings.addRootScreen(DeviceSpecificSettingsScreen.CALENDAR,
+                R.xml.devicesettings_sync_calendar);
+        settings.addRootScreen(DeviceSpecificSettingsScreen.CONNECTION,
+                R.xml.devicesettings_samsung_fit3_disconnection_alert);
         settings.addRootScreen(DeviceSpecificSettingsScreen.DEVELOPER,
                 R.xml.devicesettings_samsung_fit3_developer);
         return settings;

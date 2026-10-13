@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.preference.PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+
+    <!-- Device-specific key: SamsungFit3SettingsCustomizer registers its
+         change handler. Values are the band's own list indices. -->
+
+    <ListPreference
+        android:defaultValue="1"
+        android:entries="@array/samsung_fit3_double_press"
+        android:entryValues="@array/samsung_fit3_double_press_values"
+        android:icon="@drawable/ic_touch_double"
+        android:key="samsung_fit3_double_press"
+        app:useSimpleSummaryProvider="true"
+        android:title="@string/pref_samsung_fit3_double_press_title" />
+
+</androidx.preference.PreferenceScreen>
