@@ -36,6 +36,7 @@ import android.webkit.WebView;
 import android.widget.LinearLayout;
 import android.widget.Toast;
 
+import androidx.activity.OnBackPressedCallback;
 import androidx.localbroadcastmanager.content.LocalBroadcastManager;
 
 import org.json.JSONArray;
@@ -90,6 +91,25 @@ public class AppsManagementActivity extends AbstractGBActivity {
             throw new IllegalArgumentException("Must provide a device when invoking this activity");
         }
         mCoordinator = mGBDevice.getDeviceCoordinator();
+
+        // Let the back gesture/button walk the app loader WebView history first
+        // (which closes in-app dialogs and navigates back within the SPA) and
+        // only leave the activity once there is no WebView history left.
+        // Without this the system back finishes the activity immediately,
+        // closing the whole app instead of the WebView's current view.
+        getOnBackPressedDispatcher().addCallback(this, new OnBackPressedCallback(true) {
+            @Override
+            public void handleOnBackPressed() {
+                if (webView != null && webView.canGoBack()) {
+                    webView.goBack();
+                    return;
+                }
+                // Nothing to go back to in the WebView - use the default
+                // behaviour (finish the activity).
+                setEnabled(false);
+                getOnBackPressedDispatcher().onBackPressed();
+            }
+        });
     }
 
     @Override
