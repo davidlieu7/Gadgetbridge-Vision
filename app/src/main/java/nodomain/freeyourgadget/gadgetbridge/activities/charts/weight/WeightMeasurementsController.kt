@@ -16,9 +16,9 @@ import nodomain.freeyourgadget.gadgetbridge.GBApplication
 import nodomain.freeyourgadget.gadgetbridge.R
 import nodomain.freeyourgadget.gadgetbridge.activities.charts.WeightEntryBottomSheet
 import nodomain.freeyourgadget.gadgetbridge.entities.DaoSession
-import nodomain.freeyourgadget.gadgetbridge.entities.GenericWeightSample
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice
 import nodomain.freeyourgadget.gadgetbridge.model.ActivityUser
+import nodomain.freeyourgadget.gadgetbridge.model.WeightSample
 import nodomain.freeyourgadget.gadgetbridge.model.WeightUnit
 import nodomain.freeyourgadget.gadgetbridge.util.UserWeight
 import org.slf4j.LoggerFactory
@@ -66,7 +66,7 @@ class WeightMeasurementsController(
     }
 
     fun delete(timestamp: Long) {
-        var deleted: GenericWeightSample? = null
+        var deleted: WeightSample? = null
         change({ session -> deleted = UserWeight.deleteRecord(session, device, timestamp) }) {
             val sample = deleted ?: return@change
             val parent = snackbarParent() ?: return@change
@@ -79,9 +79,11 @@ class WeightMeasurementsController(
     }
 
     /**
-     * Fills a row inflated from item_weight_measurement. Only [editable] rows can be edited and deleted.
+     * Fills a row inflated from item_weight_measurement. Manual weights can always be edited and deleted,
+     * readings of the device only when [deviceRecordsEditable].
      */
-    fun bind(view: View, row: WeightMeasurementRow, editable: Boolean) {
+    fun bind(view: View, row: WeightMeasurementRow, deviceRecordsEditable: Boolean) {
+        val editable = row.manual || deviceRecordsEditable
         val zone = ZoneId.systemDefault()
         val locale = Locale.getDefault()
         val date = WeightMeasurements.dateText(
@@ -140,9 +142,10 @@ class WeightMeasurementsController(
         val timestamp = result.getLong(WeightEntryBottomSheet.RESULT_TIMESTAMP)
         change({ session ->
             if (original != WeightEntryBottomSheet.NO_TIMESTAMP) {
-                UserWeight.deleteRecord(session, device, original)
+                UserWeight.replaceRecord(session, device, original, kg, timestamp)
+            } else {
+                UserWeight.addRecord(session, kg, timestamp)
             }
-            UserWeight.addRecord(session, device, kg, timestamp)
         })
     }
 

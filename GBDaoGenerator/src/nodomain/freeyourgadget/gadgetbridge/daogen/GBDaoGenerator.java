@@ -310,6 +310,7 @@ public class GBDaoGenerator {
         sampleProvidersToGenerate.add(addGenericTrainingLoadChronicSample(schema, user, device));
         sampleProvidersToGenerate.add(addGenericWeightSample(schema, user, device));
         sampleProvidersToGenerate.add(addGenericImpedanceSample(schema, user, device));
+        addManualWeightSample(schema, user);
         sampleProvidersToGenerate.add(addGlucoseSample(schema, user, device));
         addGenericMetricsSample(schema, user, device);
         sampleProvidersToGenerate.add(addGenericSleepScoreSample(schema, user, device));
@@ -2843,6 +2844,18 @@ public class GBDaoGenerator {
         sample.addFloatProperty(SAMPLE_WEIGHT_KG).notNull().codeBeforeGetter(OVERRIDE);
         // Raw bio-impedance in Ohms, for scales that report it (see MiScaleWeightSample).
         sample.addIntProperty(SAMPLE_IMPEDANCE_OHM).codeBeforeGetter(OVERRIDE);
+        return sample;
+    }
+
+    private static Entity addManualWeightSample(Schema schema, Entity user) {
+        // A weight the user typed in. It belongs to no device, so it survives removing one and is
+        // shown alongside the readings of every device that supports weight.
+        Entity sample = addEntity(schema, "ManualWeightSample");
+        sample.implementsInterface(MODEL_PACKAGE + ".WeightSample");
+        sample.addLongProperty("timestamp").notNull().primaryKey();
+        Property userId = sample.addLongProperty("userId").notNull().getProperty();
+        sample.addToOne(user, userId);
+        sample.addFloatProperty(SAMPLE_WEIGHT_KG).notNull();
         return sample;
     }
 

@@ -64,10 +64,10 @@ import nodomain.freeyourgadget.gadgetbridge.activities.charts.weight.WeightMeasu
 import nodomain.freeyourgadget.gadgetbridge.activities.workouts.StatTileData;
 import nodomain.freeyourgadget.gadgetbridge.activities.workouts.StatTileGridUtilKt;
 import nodomain.freeyourgadget.gadgetbridge.database.DBHandler;
-import nodomain.freeyourgadget.gadgetbridge.devices.DeviceCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.GenericImpedanceSampleProvider;
 import nodomain.freeyourgadget.gadgetbridge.devices.TimeSampleProvider;
 import nodomain.freeyourgadget.gadgetbridge.entities.GenericImpedanceSample;
+import nodomain.freeyourgadget.gadgetbridge.entities.ManualWeightSample;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
 import nodomain.freeyourgadget.gadgetbridge.model.ActivityUser;
 import nodomain.freeyourgadget.gadgetbridge.model.WeightSample;
@@ -136,8 +136,7 @@ public class WeightChartFragment extends AbstractChartFragment<WeightChartFragme
     protected WeightChartsData refreshInBackground(ChartsHost chartsHost, DBHandler db, GBDevice device) {
         long tsEnd = getTSEnd() * 1000L;
 
-        DeviceCoordinator coordinator = device.getDeviceCoordinator();
-        TimeSampleProvider<? extends WeightSample> provider = coordinator.getWeightSampleProvider(device, db.getDaoSession());
+        TimeSampleProvider<? extends WeightSample> provider = UserWeight.provider(device, db.getDaoSession());
         long tsStart = Instant.ofEpochMilli(tsEnd).atZone(ZoneId.systemDefault()).minusMonths(rangeMonths).toInstant().toEpochMilli();
         List<? extends WeightSample> samples = provider.getAllSamples(tsStart, tsEnd);
         WeightSample latestSample = provider.getLatestSample();
@@ -157,17 +156,21 @@ public class WeightChartFragment extends AbstractChartFragment<WeightChartFragme
         for (WeightSample sample : chartSamples) {
             compositions.add(BodyCompositionEstimates.composition(db.getDaoSession(), sample));
         }
-        boolean manualEntry = UserWeight.supportsManualEntry(device, db.getDaoSession());
+        boolean manualEntry = UserWeight.supportsManualEntry(device);
+        boolean deviceRecordsEditable = UserWeight.supportsDeviceRecordEdits(device, db.getDaoSession());
         List<? extends WeightSample> allSamples = provider.getAllSamples(0, System.currentTimeMillis());
         long[] timestamps = new long[allSamples.size()];
         double[] weights = new double[allSamples.size()];
+        boolean[] manual = new boolean[allSamples.size()];
         for (int i = 0; i < allSamples.size(); i++) {
             timestamps[i] = allSamples.get(i).getTimestamp();
             weights[i] = allSamples.get(i).getWeightKg();
+            manual[i] = allSamples.get(i) instanceof ManualWeightSample;
         }
-        List<WeightMeasurementRow> rows = WeightMeasurements.rows(timestamps, weights);
+        List<WeightMeasurementRow> rows = WeightMeasurements.rows(timestamps, weights, manual);
         return new WeightChartsData(samples, chartSamples, beforeRange != null, compositions,
-                impedances(db, device, samples, tsStart, tsEnd), latestSample, latestInRange, composition, bmi, manualEntry, tsStart / 1000, rows);
+                impedances(db, device, samples, tsStart, tsEnd), latestSample, latestInRange, composition, bmi, manualEntry,
+                deviceRecordsEditable, tsStart / 1000, rows);
     }
 
     /**
@@ -214,7 +217,7 @@ public class WeightChartFragment extends AbstractChartFragment<WeightChartFragme
         updateStats(chartsData.samples, chartsData.latestInRange, latestSample, chartsData.getComposition(), chartsData.getBmi());
         latestWeightKg = latestSample != null ? (double) latestSample.getWeightKg() : null;
         addButton.setVisibility(chartsData.supportsManualEntry() ? View.VISIBLE : View.GONE);
-        updateMeasurements(chartsData.measurements, chartsData.supportsManualEntry());
+        updateMeasurements(chartsData.measurements, chartsData.deviceRecordsEditable);
 
     }
 
@@ -604,12 +607,12 @@ public class WeightChartFragment extends AbstractChartFragment<WeightChartFragme
         }
     }
 
-    private void updateMeasurements(final List<WeightMeasurementRow> rows, final boolean editable) {
+    private void updateMeasurements(final List<WeightMeasurementRow> rows, final boolean deviceRecordsEditable) {
         measurementsContainer.removeAllViews();
         final LayoutInflater inflater = LayoutInflater.from(requireContext());
         for (final WeightMeasurementRow row : rows.subList(0, Math.min(PREVIEW_MEASUREMENTS, rows.size()))) {
             final View view = inflater.inflate(R.layout.item_weight_measurement, measurementsContainer, false);
-            measurements.bind(view, row, editable);
+            measurements.bind(view, row, deviceRecordsEditable);
             measurementsContainer.addView(view);
         }
         measurementsEmpty.setVisibility(rows.isEmpty() ? View.VISIBLE : View.GONE);
@@ -648,6 +651,7 @@ public class WeightChartFragment extends AbstractChartFragment<WeightChartFragme
         private final BodyCompositionCalculator.BodyComposition composition;
         private final Float bmi;
         private final boolean manualEntry;
+        private final boolean deviceRecordsEditable;
         private final long startTs;
         private final List<WeightMeasurementRow> measurements;
 
@@ -658,7 +662,8 @@ public class WeightChartFragment extends AbstractChartFragment<WeightChartFragme
                                 List<ImpedanceChartData.Reading> impedances,
                                 WeightSample latestSample, @Nullable WeightSample latestInRange,
                                 @Nullable BodyCompositionCalculator.BodyComposition composition, @Nullable Float bmi,
-                                boolean manualEntry, long startTs, List<WeightMeasurementRow> measurements) {
+                                boolean manualEntry, boolean deviceRecordsEditable, long startTs,
+                                List<WeightMeasurementRow> measurements) {
             this.samples = samples;
             this.chartSamples = chartSamples;
             this.carriedIn = carriedIn;
@@ -669,6 +674,7 @@ public class WeightChartFragment extends AbstractChartFragment<WeightChartFragme
             this.composition = composition;
             this.bmi = bmi;
             this.manualEntry = manualEntry;
+            this.deviceRecordsEditable = deviceRecordsEditable;
             this.startTs = startTs;
             this.measurements = measurements;
         }
@@ -695,6 +701,6 @@ public class WeightChartFragment extends AbstractChartFragment<WeightChartFragme
     @Nullable
     @Override
     public ChartDataRange getAvailableDataRange(final GBDevice device, final DBHandler db) {
-        return ChartDataRange.ofSamples(device.getDeviceCoordinator().getWeightSampleProvider(device, db.getDaoSession()));
+        return ChartDataRange.ofSamples(UserWeight.provider(device, db.getDaoSession()));
     }
 }

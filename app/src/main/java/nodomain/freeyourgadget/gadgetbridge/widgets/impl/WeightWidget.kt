@@ -26,6 +26,7 @@ import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice
 import nodomain.freeyourgadget.gadgetbridge.model.ActivityUser
 import nodomain.freeyourgadget.gadgetbridge.model.WeightSample
 import nodomain.freeyourgadget.gadgetbridge.model.WeightUnit
+import nodomain.freeyourgadget.gadgetbridge.util.UserWeight
 import nodomain.freeyourgadget.gadgetbridge.widgets.WidgetConfig
 import nodomain.freeyourgadget.gadgetbridge.widgets.WidgetDataScope
 import org.slf4j.LoggerFactory
@@ -74,7 +75,7 @@ object WeightWidget : GaugeWidget<WeightWidget.Data>() {
         scope.db { db ->
             var newest: WeightSample? = null
             for (dev in scope.devices) {
-                val sample = dev.deviceCoordinator.getWeightSampleProvider(dev, db.daoSession)
+                val sample = UserWeight.provider(dev, db.daoSession)
                     ?.getLatestSample(scope.query.timeTo * 1000L)
                 if (sample != null && (newest == null || sample.timestamp > newest.timestamp)) {
                     newest = sample

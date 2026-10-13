@@ -10,22 +10,23 @@ import kotlin.math.abs
 import kotlin.math.roundToInt
 
 /**
- * One weight measurement in a list, with the change from the measurement before it.
+ * One weight measurement in a list, with the change from the measurement before it. [manual] is true for a
+ * weight the user entered rather than a reading of the device.
  */
-data class WeightMeasurementRow(val timestamp: Long, val weightKg: Double, val deltaKg: Double?)
+data class WeightMeasurementRow(val timestamp: Long, val weightKg: Double, val deltaKg: Double?, val manual: Boolean = false)
 
 object WeightMeasurements {
     private const val MINUS = '−'
 
     /**
-     * [timestamps] and [weightsKg] as rows, newest first.
+     * [timestamps] and [weightsKg] as rows, newest first. [manual] marks the weights the user entered.
      */
     @JvmStatic
-    fun rows(timestamps: LongArray, weightsKg: DoubleArray): List<WeightMeasurementRow> {
+    fun rows(timestamps: LongArray, weightsKg: DoubleArray, manual: BooleanArray): List<WeightMeasurementRow> {
         val order = timestamps.indices.sortedByDescending { timestamps[it] }
         return order.mapIndexed { position, i ->
             val older = order.getOrNull(position + 1)
-            WeightMeasurementRow(timestamps[i], weightsKg[i], older?.let { weightsKg[i] - weightsKg[it] })
+            WeightMeasurementRow(timestamps[i], weightsKg[i], older?.let { weightsKg[i] - weightsKg[it] }, manual[i])
         }
     }
 

@@ -21,6 +21,7 @@ import nodomain.freeyourgadget.gadgetbridge.GBApplication
 import nodomain.freeyourgadget.gadgetbridge.R
 import nodomain.freeyourgadget.gadgetbridge.activities.AbstractGBActivity
 import nodomain.freeyourgadget.gadgetbridge.databinding.ActivityWeightMeasurementsBinding
+import nodomain.freeyourgadget.gadgetbridge.entities.ManualWeightSample
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice
 import nodomain.freeyourgadget.gadgetbridge.model.ActivityUser
 import nodomain.freeyourgadget.gadgetbridge.util.UserWeight
@@ -40,7 +41,7 @@ class WeightMeasurementsActivity : AbstractGBActivity() {
     private lateinit var controller: WeightMeasurementsController
     private val adapter = Adapter()
     private val mainHandler = Handler(Looper.getMainLooper())
-    private var editable = false
+    private var deviceRecordsEditable = false
     private var latestKg: Double? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -81,14 +82,16 @@ class WeightMeasurementsActivity : AbstractGBActivity() {
         EXECUTOR.execute {
             try {
                 GBApplication.acquireDB().use { db ->
-                    val canEdit = UserWeight.supportsManualEntry(device, db.daoSession)
-                    val samples = device.deviceCoordinator.getWeightSampleProvider(device, db.daoSession)
+                    val canAdd = UserWeight.supportsManualEntry(device)
+                    val deviceRecordsEditable = UserWeight.supportsDeviceRecordEdits(device, db.daoSession)
+                    val samples = UserWeight.provider(device, db.daoSession)
                         ?.getAllSamples(0, System.currentTimeMillis()).orEmpty()
                     val rows = WeightMeasurements.rows(
                         samples.map { it.timestamp }.toLongArray(),
                         samples.map { it.weightKg.toDouble() }.toDoubleArray(),
+                        samples.map { it is ManualWeightSample }.toBooleanArray(),
                     )
-                    mainHandler.post { show(rows, canEdit) }
+                    mainHandler.post { show(rows, canAdd, deviceRecordsEditable) }
                 }
             } catch (e: Exception) {
                 LOG.error("Failed to load weight measurements", e)
@@ -96,11 +99,11 @@ class WeightMeasurementsActivity : AbstractGBActivity() {
         }
     }
 
-    private fun show(rows: List<WeightMeasurementRow>, canEdit: Boolean) {
+    private fun show(rows: List<WeightMeasurementRow>, canAdd: Boolean, deviceRecordsEditable: Boolean) {
         if (isDestroyed) return
-        editable = canEdit
+        this.deviceRecordsEditable = deviceRecordsEditable
         latestKg = rows.firstOrNull()?.weightKg
-        binding.weightMeasurementsAdd.visibility = if (canEdit) View.VISIBLE else View.GONE
+        binding.weightMeasurementsAdd.visibility = if (canAdd) View.VISIBLE else View.GONE
         binding.weightMeasurementsListEmpty.visibility = if (rows.isEmpty()) View.VISIBLE else View.GONE
         val zone = ZoneId.systemDefault()
         val locale = Locale.getDefault()
@@ -148,7 +151,7 @@ class WeightMeasurementsActivity : AbstractGBActivity() {
                     text = item.label
                     setPaddingRelative(paddingStart, dp(if (item.first) 12f else 16f), paddingEnd, paddingBottom)
                 }
-                is Item.Measurement -> controller.bind(holder.itemView, item.row, editable)
+                is Item.Measurement -> controller.bind(holder.itemView, item.row, deviceRecordsEditable)
             }
         }
     }
@@ -165,7 +168,10 @@ class WeightMeasurementsActivity : AbstractGBActivity() {
         private var pastThreshold = false
 
         override fun getSwipeDirs(recyclerView: RecyclerView, viewHolder: RecyclerView.ViewHolder): Int =
-            if (editable && adapter.itemAt(viewHolder.bindingAdapterPosition) is Item.Measurement) super.getSwipeDirs(recyclerView, viewHolder) else 0
+            when (val item = adapter.itemAt(viewHolder.bindingAdapterPosition)) {
+                is Item.Measurement -> if (item.row.manual || deviceRecordsEditable) super.getSwipeDirs(recyclerView, viewHolder) else 0
+                else -> 0
+            }
 
         override fun getSwipeThreshold(viewHolder: RecyclerView.ViewHolder) = SWIPE_THRESHOLD
 

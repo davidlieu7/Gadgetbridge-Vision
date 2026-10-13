@@ -21,6 +21,7 @@ import nodomain.freeyourgadget.gadgetbridge.model.TemperatureUnit
 import nodomain.freeyourgadget.gadgetbridge.model.WeightUnit
 import nodomain.freeyourgadget.gadgetbridge.util.DateTimeUtils
 import nodomain.freeyourgadget.gadgetbridge.util.FormatUtils
+import nodomain.freeyourgadget.gadgetbridge.util.UserWeight
 import java.text.DecimalFormat
 import java.text.NumberFormat
 import java.time.Instant
@@ -397,7 +398,7 @@ open class DefaultChartsProvider : DeviceChartsProvider {
                 ?.let { context.getString(R.string.blood_pressure_avg_format, it.bpSystolic, it.bpDiastolic) }
 
             // Weight - latest value until the end of the time range
-            "weight" -> coordinator.getWeightSampleProvider(device, session)
+            "weight" -> UserWeight.provider(device, session)
                 ?.getLatestSample(end)
                 ?.weightKg
                 ?.takeIf { it > 0 }

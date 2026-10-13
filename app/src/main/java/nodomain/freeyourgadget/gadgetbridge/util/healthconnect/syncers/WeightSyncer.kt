@@ -21,8 +21,10 @@ import androidx.health.connect.client.records.metadata.Metadata
 import androidx.health.connect.client.units.Mass
 import nodomain.freeyourgadget.gadgetbridge.devices.TimeSampleProvider
 import nodomain.freeyourgadget.gadgetbridge.entities.DaoSession
+import nodomain.freeyourgadget.gadgetbridge.entities.ManualWeightSample
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice
 import nodomain.freeyourgadget.gadgetbridge.model.WeightSample
+import nodomain.freeyourgadget.gadgetbridge.util.UserWeight
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import java.time.Instant
@@ -37,7 +39,7 @@ internal object WeightSyncer : AbstractTimeSampleSyncer<WeightSample, WeightReco
         gbDevice: GBDevice,
         daoSession: DaoSession
     ): TimeSampleProvider<out WeightSample>? {
-        return gbDevice.deviceCoordinator.getWeightSampleProvider(gbDevice, daoSession)
+        return UserWeight.provider(gbDevice, daoSession)
     }
 
     override fun convertSample(
@@ -57,7 +59,13 @@ internal object WeightSyncer : AbstractTimeSampleSyncer<WeightSample, WeightReco
             time = Instant.ofEpochMilli(sample.timestamp),
             zoneOffset = offset,
             weight = Mass.kilograms(weightInKg),
-            metadata = metadata
+            // A manual weight is synced with every device that supports weight. Its fixed id makes
+            // Health Connect keep one record of it rather than one per device.
+            metadata = if (sample is ManualWeightSample) {
+                Metadata.manualEntry(clientRecordId = "gadgetbridge_manual_weight_${sample.timestamp}")
+            } else {
+                metadata
+            }
         )
     }
 }
