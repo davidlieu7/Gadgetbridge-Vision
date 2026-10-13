@@ -26,7 +26,7 @@ import java.util.regex.Pattern
 class SoundcoreR50iNCCoordinator : SoundcoreEarbudsCoordinator() {
     override fun isExperimental(): Boolean = true
 
-    override fun getModelName(): String = "A3949" // A3949G11 is the product identifier
+    override fun getModelName(): String = "A3959"
 
     override fun getSupportedDeviceName(): Pattern = Pattern.compile("^soundcore R50i( NC)?$")
 
