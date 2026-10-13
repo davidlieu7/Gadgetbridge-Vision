@@ -750,12 +750,12 @@ abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator(
                 }
             }
 
-            screen(
-                key = DeviceSpecificSettingsScreen.CONNECTION.key,
-                title = R.string.pref_header_connection,
-                icon = R.drawable.ic_mtu,
-            ) {
-                if (has(Capability.Multipoint)) {
+            if (has(Capability.Multipoint)) {
+                screen(
+                    key = DeviceSpecificSettingsScreen.CONNECTION.key,
+                    title = R.string.pref_header_connection,
+                    icon = R.drawable.ic_mtu,
+                ) {
                     multipointPairing()
                 }
             }
