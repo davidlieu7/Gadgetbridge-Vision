@@ -168,7 +168,7 @@ public class SoundcoreProtocolImplV1 extends AbstractSoundcoreProtocol {
                 return encodeByteCommand(CMD_SET_EQUALIZER_PRESET, Integer.parseInt(prefs.getString(config, "0")));
             case DeviceSettingsPreferenceConst.PREF_SOUNDCORE_FIT_TEST:
                 return encodeCommand(CMD_SET_FIT_TEST, new byte[]{0x0a});
-            case DeviceSettingsPreferenceConst.PREF_SOUNDCORE_LIGHTS_ENABLED:
+            case DeviceSettingsPreferenceConst.PREF_SOUNDCORE_LIGHT_ON:
                 return encodeBooleanCommand(CMD_SET_LIGHTS_ENABLED, prefs.getBoolean(config, false));
             default:
                 return super.encodeSendConfiguration(config);

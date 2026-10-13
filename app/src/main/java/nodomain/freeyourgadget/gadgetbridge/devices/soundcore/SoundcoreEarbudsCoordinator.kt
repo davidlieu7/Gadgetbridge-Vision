@@ -443,7 +443,7 @@ abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator(
                     icon = R.drawable.ic_lightbulb,
                 ) {
                     switchSetting(
-                        key = DeviceSettingsPreferenceConst.PREF_SOUNDCORE_LIGHTS_ENABLED,
+                        key = DeviceSettingsPreferenceConst.PREF_SOUNDCORE_LIGHT_ON,
                         title = R.string.soundcore_colorful_lights,
                         icon = R.drawable.ic_lightbulb,
                     )
@@ -458,21 +458,21 @@ abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator(
                             ListEntry.Res("3", R.string.soundcore_light_effect_music),
                         ),
                         defaultValue = "0",
-                        dependency = DeviceSettingsPreferenceConst.PREF_SOUNDCORE_LIGHTS_ENABLED,
+                        dependency = DeviceSettingsPreferenceConst.PREF_SOUNDCORE_LIGHT_ON,
                     )
                     seekbar(
-                        key = DeviceSettingsPreferenceConst.PREF_SOUNDCORE_LIGHT_INTENSITY,
+                        key = DeviceSettingsPreferenceConst.PREF_SOUNDCORE_LIGHT_BRIGHTNESS,
                         title = R.string.menuitem_brightness,
                         icon = R.drawable.ic_wb_sunny,
                         min = 1, max = 10, defaultValue = 5,
-                        dependency = DeviceSettingsPreferenceConst.PREF_SOUNDCORE_LIGHTS_ENABLED,
+                        dependency = DeviceSettingsPreferenceConst.PREF_SOUNDCORE_LIGHT_ON,
                     )
                     seekbar(
                         key = DeviceSettingsPreferenceConst.PREF_SOUNDCORE_LIGHT_AUTO_OFF,
                         title = R.string.sony_automatic_power_off,
                         icon = R.drawable.ic_timer,
                         min = 1, max = 120, defaultValue = 45,
-                        dependency = DeviceSettingsPreferenceConst.PREF_SOUNDCORE_LIGHTS_ENABLED,
+                        dependency = DeviceSettingsPreferenceConst.PREF_SOUNDCORE_LIGHT_ON,
                     )
                     val channels = listOf(
                         Triple(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_LIGHT_COLOR_RED, R.string.red, 23),
@@ -486,7 +486,7 @@ abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator(
                             min = 0,
                             max = 255,
                             defaultValue = initialValue,
-                            dependency = DeviceSettingsPreferenceConst.PREF_SOUNDCORE_LIGHTS_ENABLED,
+                            dependency = DeviceSettingsPreferenceConst.PREF_SOUNDCORE_LIGHT_ON,
                         )
                     }
                 }
