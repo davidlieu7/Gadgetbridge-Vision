@@ -104,10 +104,8 @@ public class SoundcoreV20iProtocol extends SoundcoreProtocolImplV1 {
         switch (config) {
             case DeviceSettingsPreferenceConst.PREF_SOUNDCORE_VOICE_PROMPTS:
                 return encodeBooleanCommand(CMD_SET_VOICE_PROMPTS, prefs.getBoolean(config, true));
-            case DeviceSettingsPreferenceConst.PREF_SOUNDCORE_AUDIO_BALANCE:
-                final int balance = prefs.getInt(config, 0);
-                return balance >= -6 && balance <= 6
-                        ? encodeByteCommand(CMD_SET_AUDIO_BALANCE, (byte) (100 + balance)) : null;
+            case DeviceSettingsPreferenceConst.PREF_SOUNDCORE_AUDIO_BALANCE: // -6 .. 6
+                return encodeByteCommand(CMD_SET_AUDIO_BALANCE, (byte) (100 + prefs.getInt(config, 0)));
             case DeviceSettingsPreferenceConst.PREF_SOUNDCORE_LIGHT_INTENSITY: // 1-10
                 return encodeByteCommand(CMD_SET_LIGHT_INTENSITY, prefs.getInt(config, 5));
             case DeviceSettingsPreferenceConst.PREF_SOUNDCORE_LIGHT_AUTO_OFF:  // 1-120
@@ -123,13 +121,8 @@ public class SoundcoreV20iProtocol extends SoundcoreProtocolImplV1 {
                 }
                 return encodeLedColor((red << 16) | (green << 8) | blue);
             case DeviceSettingsPreferenceConst.PREF_SOUNDCORE_LIGHT_MODE:
-                final int mode;
-                try {
-                    mode = Integer.parseInt(prefs.getString(config, "0"));
-                } catch (NumberFormatException e) {
-                    return null;
-                }
-                return mode >= 0 && mode <= 3 ? encodeByteCommand(CMD_SET_LIGHT_MODE, (byte) mode) : null;
+                final int mode = Integer.parseInt(prefs.getString(config, "0"));
+                return encodeByteCommand(CMD_SET_LIGHT_MODE, (byte) mode);
             default:
                 return super.encodeSendConfiguration(config);
         }
