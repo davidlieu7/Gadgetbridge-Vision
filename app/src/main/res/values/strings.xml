@@ -2552,6 +2552,7 @@
     <string name="devicetype_yawell_r05" translatable="false">Yawell R05</string>
     <string name="devicetype_yawell_r10" translatable="false">Yawell R10</string>
     <string name="devicetype_yawell_r11" translatable="false">Yawell R11</string>
+    <string name="devicetype_yawell_y27" translatable="false">Yawell Y27 AI Health WatchPad</string>
     <string name="devicetype_colmi_r02" translatable="false">Colmi R02</string>
     <string name="devicetype_colmi_r03" translatable="false">Colmi R03</string>
     <string name="devicetype_colmi_r06" translatable="false">Colmi R06</string>
