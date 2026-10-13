@@ -72,18 +72,6 @@ public class SoundcoreV20iProtocol extends SoundcoreProtocolImplV1 {
     }
 
     @Override
-    protected GBDeviceEvent[] decodePairedDevices(final byte[] payload) {
-        decodePairedDevicesPayload(payload);
-        return new GBDeviceEvent[0];
-    }
-
-    @Override
-    protected GBDeviceEvent[] decodeConnectionStatus(final byte[] payload) {
-        decodeConnectionStatusPayload(payload);
-        return new GBDeviceEvent[0];
-    }
-
-    @Override
     protected GBDeviceEvent[] decodeCommand(final short command, final byte[] payload) {
         // Setter replies acknowledge receipt, not the resulting device state.
         return new GBDeviceEvent[0];

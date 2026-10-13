@@ -99,18 +99,6 @@ public class SoundcoreSportX20Protocol extends SoundcoreProtocolImplV1 {
     }
 
     @Override
-    protected GBDeviceEvent[] decodePairedDevices(final byte[] payload) {
-        decodePairedDevicesPayload(payload);
-        return new GBDeviceEvent[0];
-    }
-
-    @Override
-    protected GBDeviceEvent[] decodeConnectionStatus(final byte[] payload) {
-        decodeConnectionStatusPayload(payload);
-        return new GBDeviceEvent[0];
-    }
-
-    @Override
     protected GBDeviceEvent[] decodeDeviceState(final byte[] payload) {
         LOG.debug("Device state notification, {} bytes", payload.length);
         return new GBDeviceEvent[0];

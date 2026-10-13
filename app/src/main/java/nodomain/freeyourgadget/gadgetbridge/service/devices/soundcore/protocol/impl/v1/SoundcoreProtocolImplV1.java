@@ -411,16 +411,6 @@ public class SoundcoreProtocolImplV1 extends AbstractSoundcoreProtocol {
         return events.toArray(new GBDeviceEvent[0]);
     }
 
-    /** Hook for the device-specific CMD_NOTIFY_PAIRED_DEVICES payload layout. */
-    protected GBDeviceEvent[] decodePairedDevices(final byte[] payload) {
-        return new GBDeviceEvent[0];
-    }
-
-    /** Hook for the device-specific CMD_NOTIFY_CONNECTION_STATUS payload layout. */
-    protected GBDeviceEvent[] decodeConnectionStatus(final byte[] payload) {
-        return new GBDeviceEvent[0];
-    }
-
     /**
      * Decodes the paired-device list sent by the device (CMD_NOTIFY_PAIRED_DEVICES) and broadcasts
      * it to {@link MultipointPairingActivity}.
@@ -435,9 +425,9 @@ public class SoundcoreProtocolImplV1 extends AbstractSoundcoreProtocol {
      *   [8..]    = device name, UTF-8, zero-padded, (entry length - 8) bytes
      * </pre>
      */
-    protected final void decodePairedDevicesPayload(final byte[] payload) {
+    protected GBDeviceEvent[] decodePairedDevices(final byte[] payload) {
         if (payload.length < 2) {
-            return;
+            return new GBDeviceEvent[0];
         }
         final List<MultipointDevice> devices = new ArrayList<>();
         int offset = 2; // skip the 2-byte header
@@ -462,15 +452,18 @@ public class SoundcoreProtocolImplV1 extends AbstractSoundcoreProtocol {
         pairedDevices.clear();
         pairedDevices.addAll(devices);
         broadcastPairedDevices(pairedDevices, activeSourceAddress);
+        return new GBDeviceEvent[0];
     }
 
-    protected final void decodeConnectionStatusPayload(final byte[] payload) {
+    /** Decodes the active source address from CMD_NOTIFY_CONNECTION_STATUS payload. */
+    protected GBDeviceEvent[] decodeConnectionStatus(final byte[] payload) {
         if (payload.length != 7 || (payload[0] != 0x00 && payload[0] != 0x01)) {
             LOG.warn("Invalid connection status payload");
-            return;
+            return new GBDeviceEvent[0];
         }
         activeSourceAddress = payload[0] == 0x01 ? formatMacAddress(payload, 1) : null;
         broadcastPairedDevices(pairedDevices, activeSourceAddress);
+        return new GBDeviceEvent[0];
     }
 
     /** Hook for the device-specific CMD_NOTIFY_DEVICE_STATE payload layout. */
