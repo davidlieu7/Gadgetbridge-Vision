@@ -20,6 +20,7 @@ import nodomain.freeyourgadget.gadgetbridge.model.ActivityPoint;
 import nodomain.freeyourgadget.gadgetbridge.model.ActivityTrack;
 import nodomain.freeyourgadget.gadgetbridge.model.ActivityTrackProvider;
 import nodomain.freeyourgadget.gadgetbridge.model.GpxActivityTrackProvider;
+import nodomain.freeyourgadget.gadgetbridge.util.elevation.ElevationTiles;
 
 public final class ActivitySummaryUtils {
     private static final Logger LOG = LoggerFactory.getLogger(ActivitySummaryUtils.class);
@@ -45,8 +46,8 @@ public final class ActivitySummaryUtils {
             return null;
         }
 
-        if (activityTrackProvider instanceof GpxActivityTrackProvider) {
-            // Avoid re-processing what already is a gpx file
+        if (activityTrackProvider instanceof GpxActivityTrackProvider && !ElevationTiles.isActive(GBApplication.getContext())) {
+            // Avoid re-processing what already is a gpx file, unless elevation tiles may correct it
             final String gpxTrack = summary.getGpxTrack();
             if (gpxTrack != null) {
                 return FileUtils.tryFixPath(new File(gpxTrack));
@@ -85,12 +86,19 @@ public final class ActivitySummaryUtils {
         final ActivityTrack deviceTrack = activityTrackProvider != null
                 ? activityTrackProvider.getActivityTrack(summary)
                 : null;
+        final ActivityTrack track;
         if (hasLocation(deviceTrack) || activityTrackProvider instanceof GpxActivityTrackProvider) {
-            return deviceTrack;
+            track = deviceTrack;
+        } else {
+            final ActivityTrack attachedTrack = new GpxActivityTrackProvider().getActivityTrack(summary);
+            track = hasLocation(attachedTrack) ? attachedTrack : deviceTrack;
         }
 
-        final ActivityTrack attachedTrack = new GpxActivityTrackProvider().getActivityTrack(summary);
-        return hasLocation(attachedTrack) ? attachedTrack : deviceTrack;
+        if (track != null) {
+            // Altitude from imported elevation tiles replaces what the device recorded
+            ElevationTiles.correct(GBApplication.getContext(), track);
+        }
+        return track;
     }
 
     /** Whether {@code track} holds at least one point with a position. */

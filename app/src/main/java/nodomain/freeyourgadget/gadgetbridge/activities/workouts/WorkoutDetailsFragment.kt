@@ -66,6 +66,7 @@ import nodomain.freeyourgadget.gadgetbridge.util.BarShade
 import nodomain.freeyourgadget.gadgetbridge.util.DateTimeUtils
 import nodomain.freeyourgadget.gadgetbridge.util.FileUtils
 import nodomain.freeyourgadget.gadgetbridge.util.GB
+import nodomain.freeyourgadget.gadgetbridge.util.elevation.ElevationTiles
 import nodomain.freeyourgadget.gadgetbridge.util.healthconnect.HealthConnectWorkoutDeletion
 import org.slf4j.LoggerFactory
 import java.io.File
@@ -194,6 +195,10 @@ class WorkoutDetailsFragment : Fragment(), MenuProvider {
                                 ?.getActivityTrack(parsedWorkout.summary)
                             val activityPoints = activityTrack?.allPoints
                             if (activityTrack != null && !activityPoints.isNullOrEmpty()) {
+                                // Altitude from imported elevation tiles replaces what the device recorded
+                                if (ElevationTiles.correct(requireContext(), activityPoints)) {
+                                    ElevationTiles.applyToSummary(parsedWorkout.data, activityPoints)
+                                }
                                 val intervals = IntervalChartUtils.deriveIntervals(
                                     activityTrack.segments, activityTrack.segmentInfos
                                 )

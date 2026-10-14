@@ -86,6 +86,7 @@ import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.messages.
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.messages.FitWorkoutStep;
 import nodomain.freeyourgadget.gadgetbridge.util.FileUtils;
 import nodomain.freeyourgadget.gadgetbridge.util.StringUtils;
+import nodomain.freeyourgadget.gadgetbridge.util.elevation.ElevationTiles;
 
 public class GarminWorkoutParser implements ActivitySummaryParser {
     private static final Logger LOG = LoggerFactory.getLogger(GarminWorkoutParser.class);
@@ -547,6 +548,11 @@ public class GarminWorkoutParser implements ActivitySummaryParser {
             }
             if (session.getAvgVam() != null) {
                 summaryData.add(AVERAGE_ASCENT_VELOCITY, session.getAvgVam() * 3600, UNIT_METERS_PER_HOUR);
+            }
+
+            // Altitude from imported elevation tiles replaces what the watch recorded
+            if (ElevationTiles.correct(context, activityPoints)) {
+                ElevationTiles.applyToSummary(summaryData, activityPoints);
             }
         }
         summaryData.add(SWIM_AVG_CADENCE, session.getAvgStrokesPerLength(), UNIT_STROKES_PER_LENGTH);

@@ -51,6 +51,7 @@ import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice
 import nodomain.freeyourgadget.gadgetbridge.model.ActivityKind
 import nodomain.freeyourgadget.gadgetbridge.util.GBPrefs
 import nodomain.freeyourgadget.gadgetbridge.util.Prefs
+import nodomain.freeyourgadget.gadgetbridge.util.elevation.ElevationTiles
 import nodomain.freeyourgadget.gadgetbridge.util.healthconnect.HealthConnectUtils
 import nodomain.freeyourgadget.gadgetbridge.util.healthconnect.HealthConnectWorkoutSync
 import org.slf4j.LoggerFactory
@@ -344,6 +345,15 @@ internal object RecordedWorkoutSyncer {
         if (points.isNullOrEmpty()) {
             LOG.debug("Track file for workout {} contains no activity points", workout.id)
             return null
+        }
+
+        // Altitude from imported elevation tiles replaces what the device recorded, and so does
+        // the elevation gained read from the summary below
+        if (ElevationTiles.correct(context, points)) {
+            parseSummaryData(workout.summaryData)?.let { summaryData ->
+                ElevationTiles.applyToSummary(summaryData, points)
+                workout.summaryData = summaryData.toString()
+            }
         }
         return points
     }
