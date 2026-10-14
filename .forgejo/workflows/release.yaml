@@ -1,0 +1,70 @@
+# Compila, firma y publica la app en el repo F-Droid https://codeberg.org/arnyminerz/fdroid
+#
+#  - Tag de version (X.Y[.Z]) -> build ESTABLE. Lo crea upstream-release.yaml cuando upstream saca un tag.
+#  - Release publicado en este repo -> build NIGHTLY de su tag. Usa un tag que NO sea numerico
+#    (p. ej. "nightly-2026-10-14"), si no tambien se lanzaria como estable.
+#  - Lanzamiento manual -> elige "stable" o "nightly" para la rama/tag seleccionado.
+#
+# Secretos del repo (Settings > Actions > Secrets): APK_KEYSTORE_B64, APK_KEYSTORE_PASSWORD, APK_KEY_ALIAS,
+# FDROID_KEYSTORE_B64, FDROID_KEYSTORE_PASSWORD, FDROID_KEY_ALIAS, FDROID_REPO_TOKEN.
+on:
+  push:
+    tags:
+      - '[0-9]*'
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      kind:
+        description: 'Tipo de build (stable o nightly)'
+        required: true
+        default: 'nightly'
+
+jobs:
+  publish:
+    # Etiqueta unica del runner de Arnau-FIXE (el del QNAP no tiene RAM para compilar Android)
+    runs-on: arnau-fixe
+    container:
+      image: codeberg.org/freeyourgadget/android-fdroid-tools:37.0.0-0
+
+    steps:
+      # We can't use actions/checkout since the image does not have node
+      - name: git clone and checkout
+        run: |
+          set -eu
+          git config --global user.name "CODEBERG CI"
+          git config --global user.email "noreply@nodomain.nodomain"
+          git clone -q "https://codeberg.org/${GITHUB_REPOSITORY}" .
+          git checkout -q "${GITHUB_REF_NAME}"
+
+      - name: Decide build kind
+        run: |
+          set -eu
+          case "${GITHUB_EVENT_NAME}" in
+            push)      kind=stable ;;
+            release)   kind=nightly ;;
+            *)         kind="${{ github.event.inputs.kind }}" ;;
+          esac
+          if [ "$kind" = stable ] && [ "${GITHUB_EVENT_NAME}" = push ] \
+              && ! printf '%s' "${GITHUB_REF_NAME}" | grep -Eq '^[0-9]+\.[0-9]+(\.[0-9]+)*$'; then
+            echo "Tag ${GITHUB_REF_NAME} no es una version, nada que publicar"
+            kind=skip
+          fi
+          case "$kind" in stable|nightly|skip) ;; *) echo "kind invalido: $kind" >&2; exit 1 ;; esac
+          echo "$kind" > .build_kind
+          git describe --tags --always > .build_version
+
+      - name: Build, sign and publish
+        env:
+          APK_KEYSTORE_B64: ${{ secrets.APK_KEYSTORE_B64 }}
+          APK_KEYSTORE_PASSWORD: ${{ secrets.APK_KEYSTORE_PASSWORD }}
+          APK_KEY_ALIAS: ${{ secrets.APK_KEY_ALIAS }}
+          FDROID_KEYSTORE_B64: ${{ secrets.FDROID_KEYSTORE_B64 }}
+          FDROID_KEYSTORE_PASSWORD: ${{ secrets.FDROID_KEYSTORE_PASSWORD }}
+          FDROID_KEY_ALIAS: ${{ secrets.FDROID_KEY_ALIAS }}
+          FDROID_REPO_TOKEN: ${{ secrets.FDROID_REPO_TOKEN }}
+        run: |
+          set -eu
+          kind=$(cat .build_kind)
+          if [ "$kind" = skip ]; then exit 0; fi
+          tools/ci-fdroid-publish.sh "$kind" "$(cat .build_version)"

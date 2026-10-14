@@ -1,0 +1,29 @@
+# Cada dia mira si upstream (Freeyourgadget/Gadgetbridge) ha creado un tag de version nuevo. Si es asi:
+# lo mergea en la rama por defecto (conservando las modificaciones de este fork), crea el mismo tag aqui
+# y lo sube. Ese tag lanza release.yaml (build estable + publicacion en F-Droid).
+# Necesita el secreto SYNC_TOKEN: token con escritura en este repo (permite crear tags).
+# Si el merge tiene conflictos el job falla y hay que actualizar el fork a mano.
+on:
+  schedule:
+    - cron: '17 3 * * *'
+  workflow_dispatch:
+
+jobs:
+  sync-release:
+    runs-on: codeberg-tiny-lazy
+    container:
+      image: docker.io/library/alpine:3.22
+
+    steps:
+      # We can't use actions/checkout since the image does not have node
+      - name: Merge new upstream tag
+        run: |
+          set -eu
+          apk add --no-cache git bash
+          git config --global user.name "CODEBERG CI"
+          git config --global user.email "noreply@nodomain.nodomain"
+
+          git clone -q -b "${GITHUB_REF_NAME}" \
+            "https://x-access-token:${{ secrets.SYNC_TOKEN }}@codeberg.org/${GITHUB_REPOSITORY}" repo
+          cd repo
+          ./tools/sync-upstream-release.sh

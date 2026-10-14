@@ -1,9 +1,9 @@
 # Keeps this fork's default branch up to date with upstream by merging, so local commits are kept.
 # Needs a repository secret SYNC_TOKEN: an access token with write access to this repository.
 # If the merge conflicts the job fails and the fork has to be updated by hand.
+# Ya no se ejecuta a diario: la sincronizacion automatica va por tags de version (upstream-release.yaml).
+# Este workflow queda solo para sincronizar a mano con upstream master (workflow_dispatch).
 on:
-  schedule:
-    - cron: '17 3 * * *'
   workflow_dispatch:
 
 jobs:
