@@ -38,8 +38,6 @@ class ColmiP10Coordinator : GloryFitCoordinator() {
     // Otherwise gets stuck in fetching data
     override fun supportsSpo2(device: GBDevice): Boolean = false
 
-    override fun usesCompactWeatherFormat(): Boolean = true
-
     override fun getReminderSettingsTrailingByte(): Byte = 0x00
 
     override fun getDeviceSettings(device: GBDevice): DeviceSettingsSpec = deviceSettings {

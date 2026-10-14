@@ -54,8 +54,6 @@ abstract class GloryFitCoordinator : AbstractBLEDeviceCoordinator() {
         return DeviceCoordinator.DeviceKind.WATCH
     }
 
-    open fun usesCompactWeatherFormat(): Boolean = false
-
     open fun getReminderSettingsTrailingByte(): Byte = 0x01
 
     override fun getDeviceSupportClass(device: GBDevice): Class<out DeviceSupport> {

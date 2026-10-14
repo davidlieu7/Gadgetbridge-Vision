@@ -897,17 +897,16 @@ class GloryFitSupport : AbstractBTLESingleDeviceSupport(LOG) {
 
     override fun onSendWeather() {
         val weather: WeatherSpec = Weather.getWeatherSpec() ?: return
-        val compact = (device.deviceCoordinator as GloryFitCoordinator).usesCompactWeatherFormat()
-        val characteristic = if (compact) UUID_CHARACTERISTIC_GLORYFIT_CMD_WRITE else UUID_CHARACTERISTIC_GLORYFIT_DATA_WRITE
+        val characteristic = UUID_CHARACTERISTIC_GLORYFIT_CMD_WRITE
         val builder = createTransactionBuilder("set weather")
-        builder.write(characteristic, *encodeCurrentWeather(weather, compact))
-        builder.write(characteristic, *encodeWeatherForecast(weather, 0, compact))
-        builder.write(characteristic, *encodeWeatherForecast(weather, 4, compact))
+        builder.write(characteristic, *encodeCurrentWeather(weather))
+        builder.write(characteristic, *encodeWeatherForecast(weather, 0))
+        builder.write(characteristic, *encodeWeatherForecast(weather, 4))
         builder.queue()
     }
 
-    internal fun encodeCurrentWeather(weather: WeatherSpec, compact: Boolean): ByteArray {
-        var packet = byteArrayOf(
+    internal fun encodeCurrentWeather(weather: WeatherSpec): ByteArray {
+        val packet = byteArrayOf(
             CMD_WEATHER,
             WEATHER_CURRENT,
             mapToGloryFitCondition(weather.currentConditionCode),
@@ -916,7 +915,7 @@ class GloryFitSupport : AbstractBTLESingleDeviceSupport(LOG) {
             encodeTemperature(weather.todayMaxTemp),
             encodeTemperature(weather.todayMinTemp),
             0x00,
-            if (compact) 0x03 else 0x01,
+            0x01,
             0x00,
             0x50,
             0x00,
@@ -927,17 +926,15 @@ class GloryFitSupport : AbstractBTLESingleDeviceSupport(LOG) {
             0x00,
             0x00,
             0x00,
-        )
-        if (!compact) { packet += byteArrayOf(
             weather.currentHumidity.toByte(),
             weather.uvIndex.roundToInt().toByte(),
-        )}
+        )
         return packet
     }
 
-    internal fun encodeWeatherForecast(weather: WeatherSpec, offset: Int, compact: Boolean): ByteArray {
+    internal fun encodeWeatherForecast(weather: WeatherSpec, offset: Int): ByteArray {
         val count = if (offset == 0) 4 else 2
-        val packet = ByteArray(if (compact) 2 + count * 4 else 18)
+        val packet = ByteArray(18)
         packet[0] = CMD_WEATHER
         packet[1] = if (offset == 0) WEATHER_FORECAST_1 else WEATHER_FORECAST_2
         var i = 2
