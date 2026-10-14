@@ -20,6 +20,7 @@ import androidx.preference.ListPreference
 import androidx.preference.Preference
 import kotlinx.parcelize.Parcelize
 import nodomain.freeyourgadget.gadgetbridge.R
+import nodomain.freeyourgadget.gadgetbridge.GBApplication
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsPreferenceConst
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsUtils
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSpecificSettingsCustomizer
@@ -42,6 +43,10 @@ class GloryFitSettingsCustomizer : DeviceSpecificSettingsCustomizer {
         genericDevicePrefs: Prefs,
         rootKey: String?
     ) {
+        if (rootKey == null) {
+            GBApplication.deviceService(handler.device).onReadConfiguration(null)
+        }
+
         DeviceSettingsUtils.populateWithRange(
             DeviceSettingsPreferenceConst.PREF_HEARTRATE_ALERT_HIGH_THRESHOLD,
             handler,

@@ -37,6 +37,7 @@ import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEventFindPhone
 import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEventMusicControl
 import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEventNotificationControl
 import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEventVersionInfo
+import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEventUpdatePreferences
 import nodomain.freeyourgadget.gadgetbridge.devices.gloryfit.GloryFitCoordinator
 import nodomain.freeyourgadget.gadgetbridge.devices.SampleProvider
 import nodomain.freeyourgadget.gadgetbridge.entities.AppSpecificNotificationSetting
@@ -193,6 +194,11 @@ class GloryFitSupport : AbstractBTLESingleDeviceSupport(LOG) {
                 val versionInfoEvent = GBDeviceEventVersionInfo()
                 versionInfoEvent.fwVersion = String(ArrayUtils.subarray(value, 1, value.size))
                 evaluateGBDeviceEvent(versionInfoEvent)
+            }
+
+            CMD_LANGUAGE -> {
+                val event = decodeLanguageReadback(value) ?: return
+                evaluateGBDeviceEvent(event)
             }
 
             CMD_BATTERY -> {
@@ -391,6 +397,22 @@ class GloryFitSupport : AbstractBTLESingleDeviceSupport(LOG) {
 
             else -> LOG.warn("Unhandled command on characteristic 34: {}", value.toHexString())
         }
+    }
+
+    override fun onReadConfiguration(config: String?) {
+        val builder = createTransactionBuilder("read configuration")
+        builder.write(UUID_CHARACTERISTIC_GLORYFIT_CMD_WRITE, *encodeLanguageReadRequest())
+        builder.queue()
+    }
+
+    internal fun encodeLanguageReadRequest(): ByteArray {
+        return byteArrayOf(CMD_LANGUAGE, LANGUAGE_READ)
+    }
+
+    internal fun decodeLanguageReadback(value: ByteArray): GBDeviceEventUpdatePreferences? {
+        if (value.size != 3 || value[0] != CMD_LANGUAGE || value[1] != LANGUAGE_READ) return null
+        val language = GloryFitLanguage.entries.find { it.code == value[2] } ?: return null
+        return GBDeviceEventUpdatePreferences(DeviceSettingsPreferenceConst.PREF_LANGUAGE, language.locale)
     }
 
     override fun onSendConfiguration(config: String) {
@@ -1576,7 +1598,7 @@ class GloryFitSupport : AbstractBTLESingleDeviceSupport(LOG) {
         const val GOAL_DISTANCE: Byte = 0x05.toByte()
         const val GOAL_STEPS: Byte = 0x04.toByte()
         const val CMD_LANGUAGE: Byte = 0xaf.toByte()
-        const val LANGUAGE_LIST: Byte = 0xaa.toByte()
+        const val LANGUAGE_READ: Byte = 0xaa.toByte()
         const val LANGUAGE_SET: Byte = 0xab.toByte()
         const val CMD_VIBRATE: Byte = 0xab.toByte()
         const val CMD_CALL_STATUS: Byte = 0xc1.toByte()
