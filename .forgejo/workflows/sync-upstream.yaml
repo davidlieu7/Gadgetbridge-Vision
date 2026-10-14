@@ -1,0 +1,27 @@
+# Keeps this fork's default branch up to date with upstream by merging, so local commits are kept.
+# Needs a repository secret SYNC_TOKEN: an access token with write access to this repository.
+# If the merge conflicts the job fails and the fork has to be updated by hand.
+on:
+  schedule:
+    - cron: '17 3 * * *'
+  workflow_dispatch:
+
+jobs:
+  sync:
+    runs-on: codeberg-tiny-lazy
+    container:
+      image: docker.io/library/alpine:3.22
+
+    steps:
+      # We can't use actions/checkout since the image does not have node
+      - name: Merge upstream
+        run: |
+          set -eu
+          apk add --no-cache git bash
+          git config --global user.name "CODEBERG CI"
+          git config --global user.email "noreply@nodomain.nodomain"
+
+          git clone -q -b "${{ env.GITHUB_REF_NAME }}" \
+            "https://x-access-token:${{ secrets.SYNC_TOKEN }}@codeberg.org/${{ env.GITHUB_REPOSITORY }}" repo
+          cd repo
+          ./tools/sync-upstream.sh
