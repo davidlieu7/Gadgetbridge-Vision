@@ -116,7 +116,16 @@ object SoundcoreSleepHistory {
             else if (session.end > canonical[mirror].end) canonical[mirror] = session
         }
         val intervals = canonical.flatMap { session ->
-            val points = sorted.filter { it.timestamp in session.start..session.end }
+            val boundedPoints = sorted.filter { it.timestamp in session.start..session.end }
+            // Summary and stage endpoints are independently measured. A terminal marker may
+            // follow the summary, but never skip another stage or borrow across a session.
+            val following = sorted.firstOrNull { it.timestamp > session.end }
+            val points = if (boundedPoints.isNotEmpty() && boundedPoints.last().stage != 4 &&
+                following?.stage == 4 && following.timestamp - session.start <= MAX_SESSION_SECONDS &&
+                canonical.none { other -> other != session &&
+                    other.start <= following.timestamp && other.end >= session.end }) {
+                boundedPoints + following
+            } else boundedPoints
             // The last sleep transition precedes the terminal stage-4 record. Its timestamp is
             // the sleep endpoint; the short tail leading to the terminal record is not sleep.
             val ambiguous = canonical.any { other -> other != session &&
