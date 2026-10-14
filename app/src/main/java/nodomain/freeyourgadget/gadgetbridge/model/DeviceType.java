@@ -275,6 +275,7 @@ import nodomain.freeyourgadget.gadgetbridge.devices.generic_headphones.GenericHe
 import nodomain.freeyourgadget.gadgetbridge.devices.generic_hr.GenericHeartRateCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.generic_scale.GenericWeightScaleCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.gloryfit.watches.BlackviewR3MaxCoordinator;
+import nodomain.freeyourgadget.gadgetbridge.devices.gloryfit.watches.ColmiP10Coordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.gloryfit.watches.D3Coordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.gloryfit.watches.DotnP66DCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.gloryfit.watches.GrvFc1Coordinator;
@@ -1207,6 +1208,7 @@ public enum DeviceType {
     H59(H59Coordinator.class),
     COLMI_I28_ULTRA(ColmiI28UltraCoordinator.class),
     COLMI_I31(ColmiI31Coordinator.class),
+    COLMI_P10(ColmiP10Coordinator.class),
     COLMI_P76(ColmiP76Coordinator.class),
     COLMI_P80(ColmiP80Coordinator.class),
     COLMI_P81(ColmiP81Coordinator.class),
