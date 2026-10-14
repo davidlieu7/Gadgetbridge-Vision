@@ -590,39 +590,46 @@ class GloryFitSupport : AbstractBTLESingleDeviceSupport(LOG) {
 
     override fun onSetAlarms(alarms: ArrayList<out Alarm>) {
         val builder = createTransactionBuilder("set alarms")
-
-        for ((i, alarm) in alarms.withIndex()) {
-            // Watch and Gb use a different bitmask
-            var repeatMask = 0
-            if ((alarm.repetition and Alarm.ALARM_MON.toInt()) != 0) repeatMask = repeatMask or ALARM_MON
-            if ((alarm.repetition and Alarm.ALARM_TUE.toInt()) != 0) repeatMask = repeatMask or ALARM_TUE
-            if ((alarm.repetition and Alarm.ALARM_WED.toInt()) != 0) repeatMask = repeatMask or ALARM_WED
-            if ((alarm.repetition and Alarm.ALARM_THU.toInt()) != 0) repeatMask = repeatMask or ALARM_THU
-            if ((alarm.repetition and Alarm.ALARM_FRI.toInt()) != 0) repeatMask = repeatMask or ALARM_FRI
-            if ((alarm.repetition and Alarm.ALARM_SAT.toInt()) != 0) repeatMask = repeatMask or ALARM_SAT
-            if ((alarm.repetition and Alarm.ALARM_SUN.toInt()) != 0) repeatMask = repeatMask or ALARM_SUN
-
-            val buf = ByteBuffer.allocate(9).order(ByteOrder.BIG_ENDIAN)
-            buf.put(CMD_VIBRATE)
-            buf.put(repeatMask.toByte())
-            buf.put(alarm.hour.toByte())
-            buf.put(alarm.minute.toByte())
-            if (alarm.enabled) {
-                buf.put(0x02) // ?
-                buf.put(0x0a) // ?
-                buf.put(0x02) // ?
-            } else {
-                buf.put(0x00) // ?
-                buf.put(0x00) // ?
-                buf.put(0x00) // ?
+        val slotCount = device.deviceCoordinator.getAlarmSlotCount(device)
+        for (alarm in alarms) {
+            if (alarm.position !in 0 until slotCount) {
+                LOG.warn("Ignoring alarm in unsupported slot {}", alarm.position)
+                continue
             }
-            buf.put(0x00) // ?
-            buf.put((i + 1).toByte()) // alarm index, starting at 1
-
-            builder.write(UUID_CHARACTERISTIC_GLORYFIT_CMD_WRITE, *buf.array().clone())
+            builder.write(UUID_CHARACTERISTIC_GLORYFIT_CMD_WRITE, *encodeAlarm(alarm))
         }
-
         builder.queue()
+    }
+
+    internal fun encodeAlarm(alarm: Alarm): ByteArray {
+        // Watch and Gb use a different bitmask
+        var repeatMask = 0
+        if ((alarm.repetition and Alarm.ALARM_MON.toInt()) != 0) repeatMask = repeatMask or ALARM_MON
+        if ((alarm.repetition and Alarm.ALARM_TUE.toInt()) != 0) repeatMask = repeatMask or ALARM_TUE
+        if ((alarm.repetition and Alarm.ALARM_WED.toInt()) != 0) repeatMask = repeatMask or ALARM_WED
+        if ((alarm.repetition and Alarm.ALARM_THU.toInt()) != 0) repeatMask = repeatMask or ALARM_THU
+        if ((alarm.repetition and Alarm.ALARM_FRI.toInt()) != 0) repeatMask = repeatMask or ALARM_FRI
+        if ((alarm.repetition and Alarm.ALARM_SAT.toInt()) != 0) repeatMask = repeatMask or ALARM_SAT
+        if ((alarm.repetition and Alarm.ALARM_SUN.toInt()) != 0) repeatMask = repeatMask or ALARM_SUN
+
+        val buf = ByteBuffer.allocate(9).order(ByteOrder.BIG_ENDIAN)
+        buf.put(CMD_VIBRATE)
+        buf.put(repeatMask.toByte())
+        buf.put(alarm.hour.toByte())
+        buf.put(alarm.minute.toByte())
+        if (alarm.enabled && !alarm.unused) {
+            buf.put(0x02) // ?
+            buf.put(0x0a) // ?
+            buf.put(0x02) // ?
+        } else {
+            buf.put(0x00) // ?
+            buf.put(0x00) // ?
+            buf.put(0x00) // ?
+        }
+        buf.put(0x00) // ?
+        buf.put((alarm.position + 1).toByte()) // alarm index, starting at 1
+
+        return buf.array()
     }
 
     override fun onNotification(notificationSpec: NotificationSpec) {
