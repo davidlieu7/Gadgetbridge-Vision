@@ -130,8 +130,7 @@ abstract class GloryFitCoordinator : AbstractBLEDeviceCoordinator() {
     }
 
     override fun supportsRealtimeData(device: GBDevice): Boolean {
-        // TODO it does
-        return false
+        return true
     }
 
     override fun supportsRemSleep(device: GBDevice): Boolean {
