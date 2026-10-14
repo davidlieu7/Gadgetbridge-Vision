@@ -26,6 +26,17 @@ printf '%s' "$APK_KEYSTORE_B64" | base64 -d > "$work/apk.jks"
 printf '%s' "$FDROID_KEYSTORE_B64" | base64 -d > "$work/fdroid.jks"
 
 # --- 1. Compilar y firmar ---------------------------------------------------
+# El wrapper de Gradle trae networkTimeout=10000 (10 s) y no reintenta: en el runner local la descarga de la
+# distribucion fallaba por timeout. Se sube el limite solo para este build (skip-worktree evita el flag "dirty").
+sed -i 's/^networkTimeout=.*/networkTimeout=300000/' gradle/wrapper/gradle-wrapper.properties
+git update-index --skip-worktree gradle/wrapper/gradle-wrapper.properties
+for attempt in 1 2 3; do
+    ./gradlew --version >/dev/null && break
+    [ "$attempt" = 3 ] && { echo "No se pudo descargar Gradle tras 3 intentos" >&2; exit 1; }
+    echo "Descarga de Gradle fallida (intento $attempt), reintentando..." >&2
+    sleep 30
+done
+
 case "$kind" in
 nightly)
     ./gradlew assembleMainlineNightly --stacktrace \
