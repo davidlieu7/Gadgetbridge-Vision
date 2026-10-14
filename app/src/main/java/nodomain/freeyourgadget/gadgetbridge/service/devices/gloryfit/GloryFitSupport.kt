@@ -897,71 +897,57 @@ class GloryFitSupport : AbstractBTLESingleDeviceSupport(LOG) {
 
     override fun onSendWeather() {
         val weather: WeatherSpec = Weather.getWeatherSpec() ?: return
-
+        val compact = (device.deviceCoordinator as GloryFitCoordinator).usesCompactWeatherFormat()
+        val characteristic = if (compact) UUID_CHARACTERISTIC_GLORYFIT_CMD_WRITE else UUID_CHARACTERISTIC_GLORYFIT_DATA_WRITE
         val builder = createTransactionBuilder("set weather")
-
-        //builder.write(
-        //    UUID_CHARACTERISTIC_GLORYFIT_DATA_WRITE,
-        //    *GB.hexStringToByteArray("CB01070013160E0001005000000000000000003607"),
-        //)
-        builder.write(
-            UUID_CHARACTERISTIC_GLORYFIT_DATA_WRITE,
-            *byteArrayOf(
-                CMD_WEATHER,
-                WEATHER_CURRENT,
-                mapToGloryFitCondition(weather.currentConditionCode),
-                0x00,
-                encodeTemperature(weather.currentTemp),
-                encodeTemperature(weather.todayMaxTemp),
-                encodeTemperature(weather.todayMinTemp),
-                0x00,
-                0x01,
-                0x00,
-                0x50,
-                0x00,
-                0x00,
-                0x00,
-                0x00,
-                0x00,
-                0x00,
-                0x00,
-                0x00,
-                weather.currentHumidity.toByte(),
-                weather.uvIndex.roundToInt().toByte(),
-            )
-        )
-
-        val forecasts1 = ByteArray(18)
-        forecasts1[0] = CMD_WEATHER
-        forecasts1[1] = WEATHER_FORECAST_1
-        var i = 2
-        weather.forecasts.take(4).forEach { forecast ->
-            forecasts1[i++] = mapToGloryFitCondition(forecast.conditionCode)
-            forecasts1[i++] = 0x00
-            forecasts1[i++] = encodeTemperature(forecast.maxTemp)
-            forecasts1[i++] = encodeTemperature(forecast.minTemp)
-        }
-        builder.write(
-            UUID_CHARACTERISTIC_GLORYFIT_DATA_WRITE,
-            *forecasts1,
-        )
-
-        val forecasts2 = ByteArray(18)
-        forecasts2[0] = CMD_WEATHER
-        forecasts2[1] = WEATHER_FORECAST_2
-        i = 2
-        weather.forecasts.drop(4).take(2).forEach { forecast ->
-            forecasts2[i++] = mapToGloryFitCondition(forecast.conditionCode)
-            forecasts2[i++] = 0x00
-            forecasts2[i++] = encodeTemperature(forecast.maxTemp)
-            forecasts2[i++] = encodeTemperature(forecast.minTemp)
-        }
-        builder.write(
-            UUID_CHARACTERISTIC_GLORYFIT_DATA_WRITE,
-            *forecasts2,
-        )
-
+        builder.write(characteristic, *encodeCurrentWeather(weather, compact))
+        builder.write(characteristic, *encodeWeatherForecast(weather, 0, compact))
+        builder.write(characteristic, *encodeWeatherForecast(weather, 4, compact))
         builder.queue()
+    }
+
+    internal fun encodeCurrentWeather(weather: WeatherSpec, compact: Boolean): ByteArray {
+        var packet = byteArrayOf(
+            CMD_WEATHER,
+            WEATHER_CURRENT,
+            mapToGloryFitCondition(weather.currentConditionCode),
+            0x00,
+            encodeTemperature(weather.currentTemp),
+            encodeTemperature(weather.todayMaxTemp),
+            encodeTemperature(weather.todayMinTemp),
+            0x00,
+            if (compact) 0x03 else 0x01,
+            0x00,
+            0x50,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+            0x00,
+        )
+        if (!compact) { packet += byteArrayOf(
+            weather.currentHumidity.toByte(),
+            weather.uvIndex.roundToInt().toByte(),
+        )}
+        return packet
+    }
+
+    internal fun encodeWeatherForecast(weather: WeatherSpec, offset: Int, compact: Boolean): ByteArray {
+        val count = if (offset == 0) 4 else 2
+        val packet = ByteArray(if (compact) 2 + count * 4 else 18)
+        packet[0] = CMD_WEATHER
+        packet[1] = if (offset == 0) WEATHER_FORECAST_1 else WEATHER_FORECAST_2
+        var i = 2
+        weather.forecasts.drop(offset).take(count).forEach { forecast ->
+            packet[i++] = mapToGloryFitCondition(forecast.conditionCode)
+            packet[i++] = 0x00
+            packet[i++] = encodeTemperature(forecast.maxTemp)
+            packet[i++] = encodeTemperature(forecast.minTemp)
+        }
+        return packet
     }
 
     fun mapToGloryFitCondition(openWeatherMapCondition: Int): Byte {
