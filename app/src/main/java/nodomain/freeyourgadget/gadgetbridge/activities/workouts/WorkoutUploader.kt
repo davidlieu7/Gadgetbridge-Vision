@@ -22,6 +22,8 @@ import nodomain.freeyourgadget.gadgetbridge.R
 import nodomain.freeyourgadget.gadgetbridge.activities.endurain.EndurainActivityLookup
 import nodomain.freeyourgadget.gadgetbridge.activities.endurain.EndurainApiClient
 import nodomain.freeyourgadget.gadgetbridge.activities.endurain.EndurainTokenManager
+import nodomain.freeyourgadget.gadgetbridge.activities.endurain.FitTrackeeApiClient
+import nodomain.freeyourgadget.gadgetbridge.activities.endurain.FitTrackeeTokenManager
 import nodomain.freeyourgadget.gadgetbridge.activities.endurain.WandererApiClient
 import nodomain.freeyourgadget.gadgetbridge.activities.endurain.WandererTokenManager
 import nodomain.freeyourgadget.gadgetbridge.entities.BaseActivitySummary
@@ -38,8 +40,8 @@ import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
 
 /**
- * Shared orchestration for exporting a single workout and uploading it to Endurain (FIT) or
- * Wanderer (GPX). Used by the workout detail screen, the multi-select upload from the workout
+ * Shared orchestration for exporting a single workout and uploading it to Endurain (FIT),
+ * Wanderer (GPX) or FitTrackee (FIT). Used by the workout detail screen, the multi-select upload from the workout
  * list, and the background auto-upload worker.
  *
  * All methods are blocking / callback-based and safe to call off the main thread; the upload
@@ -50,6 +52,7 @@ object WorkoutUploader {
 
     const val PREF_ENDURAIN_SERVER = "endurain_server"
     const val PREF_WANDERER_SERVER = "wanderer_server"
+    const val PREF_FITTRACKEE_SERVER = "fittrackee_server"
 
     /**
      * A workout's display name, falling back to the localized activity-kind label when the
@@ -215,6 +218,71 @@ object WorkoutUploader {
                 callback(UploadResult(false, null, message))
             }
         }
+    }
+
+    /**
+     * FitTrackee sport labels (as on a default instance) to try for [kind], in order of
+     * preference. Instances can rename or disable sports, so the first one the account actually
+     * has is used; with none, the sport is left to FitTrackee.
+     */
+    private fun fitTrackeeSportLabels(kind: ActivityKind): List<String> = when (kind) {
+        ActivityKind.RUNNING, ActivityKind.OUTDOOR_RUNNING, ActivityKind.INDOOR_RUNNING,
+        ActivityKind.INDOOR_TRACK_RUNNING, ActivityKind.STREET_RUNNING -> listOf("Running")
+        ActivityKind.TRAIL_RUN, ActivityKind.CROSS_COUNTRY_RUNNING -> listOf("Trail", "Running")
+        ActivityKind.WALKING, ActivityKind.OUTDOOR_WALKING, ActivityKind.INDOOR_WALKING,
+        ActivityKind.RACE_WALKING -> listOf("Walking")
+        ActivityKind.HIKING, ActivityKind.TRAIL_HIKE, ActivityKind.MOUNTAIN_HIKE,
+        ActivityKind.MOUNTAINEERING -> listOf("Hiking")
+        ActivityKind.CYCLING, ActivityKind.OUTDOOR_CYCLING, ActivityKind.INDOOR_CYCLING,
+        ActivityKind.E_BIKE, ActivityKind.HANDCYCLING -> listOf("Cycling (Sport)", "Cycling (Transport)")
+        ActivityKind.MOUNTAIN_BIKE, ActivityKind.E_MOUNTAIN_BIKE, ActivityKind.CYCLING_DOWNHILL ->
+            listOf("Mountain Biking", "Cycling (Sport)")
+        ActivityKind.ROWING, ActivityKind.ROWING_MACHINE -> listOf("Rowing")
+        ActivityKind.SKIING, ActivityKind.CROSS_COUNTRY_SKIING, ActivityKind.XC_CLASSIC_SKI,
+        ActivityKind.XC_SKATE_SKI, ActivityKind.BACKCOUNTRY_SKIING -> listOf("Skiing (Alpine)", "Skiing (Cross Country)")
+        else -> emptyList()
+    }
+
+    private fun fitTrackeeSportId(
+        apiClient: FitTrackeeApiClient,
+        summary: BaseActivitySummary
+    ): Int? {
+        val labels = fitTrackeeSportLabels(ActivityKind.fromCode(summary.activityKind))
+        if (labels.isEmpty()) return null
+        val sports = apiClient.fetchSports()
+        return labels.firstNotNullOfOrNull { sports[it] }
+    }
+
+    /**
+     * Uploads [file] (FIT or GPX) to FitTrackee, naming it after the workout and picking the
+     * matching sport. Blocking; call off the main thread.
+     */
+    fun uploadToFitTrackeeBlocking(
+        context: Context,
+        summary: BaseActivitySummary,
+        file: File
+    ): UploadResult {
+        val serverUrl = GBApplication.getPrefs().preferences.getString(PREF_FITTRACKEE_SERVER, null)
+            ?: return UploadResult(false, null, null)
+        val apiClient = FitTrackeeApiClient(serverUrl, FitTrackeeTokenManager(context))
+        val (id, reason) = apiClient.uploadWorkout(
+            file, fitTrackeeSportId(apiClient, summary), nameFor(context, summary)
+        )
+        return if (id != null) UploadResult(true, id, null) else UploadResult(false, null, reason)
+    }
+
+    /** Pushes the name and sport of [summary] onto the FitTrackee workout [workoutId]. */
+    fun updateFitTrackeeMetadataBlocking(
+        context: Context,
+        workoutId: String,
+        summary: BaseActivitySummary
+    ): Boolean {
+        val serverUrl = GBApplication.getPrefs().preferences.getString(PREF_FITTRACKEE_SERVER, null)
+            ?: return false
+        val apiClient = FitTrackeeApiClient(serverUrl, FitTrackeeTokenManager(context))
+        return apiClient.updateWorkout(
+            workoutId, fitTrackeeSportId(apiClient, summary), nameFor(context, summary)
+        )
     }
 
     /**

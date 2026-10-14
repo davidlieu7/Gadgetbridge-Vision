@@ -81,6 +81,12 @@
                 app:showAsAction="never" />
 
             <item
+                android:id="@+id/activity_action_upload_to_fittrackee"
+                android:icon="@drawable/ic_file_upload"
+                android:title="@string/activity_detail_upload_to_fittrackee"
+                app:showAsAction="never" />
+
+            <item
                 android:id="@+id/activity_action_upload_status"
                 android:icon="@drawable/ic_info"
                 android:title="@string/workout_upload_status_title"

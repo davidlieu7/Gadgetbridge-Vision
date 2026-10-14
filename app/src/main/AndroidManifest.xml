@@ -1224,6 +1224,23 @@
         </activity>
 
         <activity
+            android:name=".activities.endurain.FitTrackeeOAuthCallbackActivity"
+            android:exported="true"
+            android:launchMode="singleTop">
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+
+                <!-- FitTrackee only accepts http(s), app and myapp redirect schemes -->
+                <data
+                    android:scheme="app"
+                    android:host="gadgetbridge"
+                    android:path="/fittrackee/callback" />
+            </intent-filter>
+        </activity>
+
+        <activity
             android:name=".activities.endurain.EndurainOAuthCallbackActivity"
             android:exported="true"
             android:launchMode="singleTop">

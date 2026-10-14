@@ -106,6 +106,11 @@ class OnlineFitnessTrackersPreferencesActivity : AbstractSettingsActivityV2() {
                     .show(parentFragmentManager, "endurain_setup")
                 true
             }
+            findPreference<Preference>("pref_key_fittrackee_log_in")?.setOnPreferenceClickListener {
+                FitTrackeeSetupBottomSheet()
+                    .show(parentFragmentManager, "fittrackee_setup")
+                true
+            }
             findPreference<Preference>("pref_key_wanderer_log_in")?.setOnPreferenceClickListener {
                 WandererSetupBottomSheet()
                     .show(parentFragmentManager, "wanderer_setup")
@@ -128,6 +133,13 @@ class OnlineFitnessTrackersPreferencesActivity : AbstractSettingsActivityV2() {
                 }
                 true
             }
+            findPreference<Preference>("pref_key_fittrackee_log_out")?.setOnPreferenceClickListener {
+                FitTrackeeTokenManager(requireContext()).clearTokens()
+                GB.toast(getString(R.string.endurain_logged_out_successfully), Toast.LENGTH_SHORT, GB.INFO)
+                updateStatus()
+                updateLogoutPreferenceVisibility()
+                true
+            }
             findPreference<Preference>("pref_key_wanderer_log_out")?.setOnPreferenceClickListener {
                 WandererTokenManager(requireContext()).clearTokens()
                 activity?.runOnUiThread {
@@ -140,7 +152,23 @@ class OnlineFitnessTrackersPreferencesActivity : AbstractSettingsActivityV2() {
             }
         }
 
+        private fun updateFitTrackeeStatus() {
+            val tokenManager = FitTrackeeTokenManager(requireContext())
+            val loggedIn = tokenManager.isLoggedIn()
+            val server = GBApplication.getPrefs().preferences.getString("fittrackee_server", null)
+            val user = tokenManager.getUsername()
+            findPreference<Preference>("pref_key_fittrackee_status")?.summary = when {
+                !loggedIn || server == null -> getString(R.string.endurain_not_logged_in_integration_disabled)
+                user != null -> getString(R.string.fittrackee_logged_in, server, user)
+                else -> getString(R.string.fittrackee_logged_in_no_user, server)
+            }
+            findPreference<Preference>("pref_key_fittrackee_log_out")?.isVisible = loggedIn
+            findPreference<Preference>("pref_key_fittrackee_log_in")?.isVisible = !loggedIn
+            findPreference<Preference>("fittrackee_auto_upload_enabled")?.isEnabled = loggedIn
+        }
+
         private fun updateLogoutPreferenceVisibility() {
+            updateFitTrackeeStatus()
             val endurainLoggedIn = vm.endurainTokenManager.isLoggedIn()
             val wandererLoggedIn = WandererTokenManager(requireContext()).isLoggedIn()
 
@@ -155,6 +183,7 @@ class OnlineFitnessTrackersPreferencesActivity : AbstractSettingsActivityV2() {
         }
 
         private fun updateStatus() {
+            updateFitTrackeeStatus()
             val endurainStatusPref = findPreference<Preference>("pref_key_endurain_status")
             val endurainServer = GBApplication.getPrefs().preferences.getString("endurain_server", null)
             val endurainTokenExpiresAt = DateTimeUtils.parseTimeStamp(vm.endurainTokenManager.getRefreshTokenExpiresAt())
