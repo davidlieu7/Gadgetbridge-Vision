@@ -349,7 +349,7 @@ internal object RecordedWorkoutSyncer {
 
         // Altitude from imported elevation tiles replaces what the device recorded, and so does
         // the elevation gained read from the summary below
-        if (ElevationTiles.correct(context, points)) {
+        if (ElevationTiles.correct(context, device, ActivityKind.fromCode(workout.activityKind), points)) {
             parseSummaryData(workout.summaryData)?.let { summaryData ->
                 ElevationTiles.applyToSummary(summaryData, points)
                 workout.summaryData = summaryData.toString()

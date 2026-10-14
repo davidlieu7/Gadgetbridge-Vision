@@ -5318,7 +5318,8 @@
     <string name="elevation_correction">Elevation correction</string>
     <string name="elevation_correction_summary">Replace the altitude of workouts with values from SRTM elevation tiles stored on this phone. This fixes a drifting barometer or noisy GPS altitude, and the ascent is recomputed from the corrected profile.</string>
     <string name="pref_elevation_correction_enabled_title">Correct altitude from tiles</string>
-    <string name="pref_elevation_correction_enabled_summary">A workout that is not fully covered by your tiles keeps its own altitudes</string>
+    <string name="pref_elevation_correction_enabled_summary">Workouts of this device take their altitude and ascent from the elevation tiles. A workout the tiles do not fully cover, on terrain too steep for its GPS accuracy, or on water, in the air or on stairs keeps its own altitudes</string>
+    <string name="elevation_correction_per_device_summary">Switched on per device, under its settings › Workout. A device with a barometer usually records a better profile than the tiles</string>
     <string name="elevation_tiles_download_title">Where to get tiles</string>
     <string name="elevation_tiles_download_summary">SRTM .hgt tiles of 1 or 3 arc-seconds, one per one-degree cell, named like N45E007.hgt</string>
     <string name="elevation_tiles_import_title">Import elevation tile</string>

@@ -1,6 +1,8 @@
 package nodomain.freeyourgadget.gadgetbridge.devices.garmin
 
 import nodomain.freeyourgadget.gadgetbridge.GBApplication
+import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsPreferenceConst
+import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice
 import nodomain.freeyourgadget.gadgetbridge.entities.BaseActivitySummary
 import nodomain.freeyourgadget.gadgetbridge.export.FitExporter
 import nodomain.freeyourgadget.gadgetbridge.model.ActivityKind
@@ -36,12 +38,20 @@ class GarminWorkoutParserElevationTest : TestBase() {
     private val start = 1_777_747_544L
     private val points = 100
 
+    private lateinit var watch: GBDevice
+
     @Before
     fun clearTiles() {
         ElevationTiles.resetForTests()
         val library = ElevationTiles.library(getContext())
         library.scan().forEach { library.deleteTile(it.key) }
-        GBApplication.getPrefs().preferences.edit().putBoolean(ElevationTiles.PREF_ENABLED, true).commit()
+        watch = createDummyGDevice("00:00:00:00:53")
+        setEnabled(true)
+    }
+
+    private fun setEnabled(enabled: Boolean) {
+        GBApplication.getDeviceSpecificSharedPrefs(watch.address).edit()
+            .putBoolean(DeviceSettingsPreferenceConst.PREF_ELEVATION_CORRECTION, enabled).commit()
     }
 
     @After
@@ -75,7 +85,7 @@ class GarminWorkoutParserElevationTest : TestBase() {
         val file = tmp.newFile("hike.fit")
         FitExporter().performExport(track, summary, ActivitySummaryData(), file)
 
-        val parser = GarminWorkoutParser(getContext())
+        val parser = GarminWorkoutParser(getContext(), watch)
         FitFile.parseIncoming(file).records.forEach { parser.handleRecord(it) }
         return parser.updateSummary(BaseActivitySummary().apply {
             startTime = summary.startTime
@@ -103,4 +113,15 @@ class GarminWorkoutParserElevationTest : TestBase() {
         assertEquals(100.0, data.meters(ActivitySummaryEntries.ALTITUDE_MIN), 0.0)
         assertEquals(100.0, data.meters(ActivitySummaryEntries.ALTITUDE_MAX), 0.0)
     }
+
+    @Test
+    fun withTheDevicesSwitchOff_theWatchsAscentIsKept() {
+        importFlatTile(100)
+        setEnabled(false)
+
+        val data = parseHike()
+
+        assertEquals(49.0, data.meters(ActivitySummaryEntries.TOTAL_ASCENT), 2.0)
+    }
 }
+

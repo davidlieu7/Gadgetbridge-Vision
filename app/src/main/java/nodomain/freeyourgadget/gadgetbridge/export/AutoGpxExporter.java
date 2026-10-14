@@ -87,7 +87,7 @@ public class AutoGpxExporter {
         }
 
         // Altitude from imported elevation tiles replaces what the device recorded
-        ElevationTiles.correct(context, activityTrack);
+        ElevationTiles.correct(context, gbDevice, summary != null ? ActivityKind.fromCode(summary.getActivityKind()) : null, activityTrack);
 
         final List<ActivityPoint> points = activityTrack.getAllPoints();
         final Optional<ActivityPoint> firstValidPoint = points.stream().filter(p -> p.getLocation() != null).findFirst();

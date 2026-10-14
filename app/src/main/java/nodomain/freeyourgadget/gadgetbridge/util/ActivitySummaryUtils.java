@@ -15,6 +15,7 @@ import nodomain.freeyourgadget.gadgetbridge.GBApplication;
 import nodomain.freeyourgadget.gadgetbridge.entities.BaseActivitySummary;
 import nodomain.freeyourgadget.gadgetbridge.export.ActivityTrackExporter;
 import nodomain.freeyourgadget.gadgetbridge.export.GPXExporter;
+import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
 import nodomain.freeyourgadget.gadgetbridge.model.ActivityKind;
 import nodomain.freeyourgadget.gadgetbridge.model.ActivityPoint;
 import nodomain.freeyourgadget.gadgetbridge.model.ActivityTrack;
@@ -41,12 +42,14 @@ public final class ActivitySummaryUtils {
     }
 
     @Nullable
-    public static File getShareableGpxFile(final ActivityTrackProvider activityTrackProvider, final BaseActivitySummary summary) {
+    public static File getShareableGpxFile(final ActivityTrackProvider activityTrackProvider,
+                                           @Nullable final GBDevice device,
+                                           final BaseActivitySummary summary) {
         if (activityTrackProvider == null) {
             return null;
         }
 
-        if (activityTrackProvider instanceof GpxActivityTrackProvider && !ElevationTiles.isActive(GBApplication.getContext())) {
+        if (activityTrackProvider instanceof GpxActivityTrackProvider && !ElevationTiles.isActive(GBApplication.getContext(), device)) {
             // Avoid re-processing what already is a gpx file, unless elevation tiles may correct it
             final String gpxTrack = summary.getGpxTrack();
             if (gpxTrack != null) {
@@ -54,7 +57,7 @@ public final class ActivitySummaryUtils {
             }
         }
 
-        final ActivityTrack activityTrack = resolveExportableTrack(activityTrackProvider, summary);
+        final ActivityTrack activityTrack = resolveExportableTrack(activityTrackProvider, device, summary);
         if (activityTrack == null) {
             return null;
         }
@@ -82,6 +85,7 @@ public final class ActivitySummaryUtils {
      */
     @Nullable
     public static ActivityTrack resolveExportableTrack(@Nullable final ActivityTrackProvider activityTrackProvider,
+                                                       @Nullable final GBDevice device,
                                                        final BaseActivitySummary summary) {
         final ActivityTrack deviceTrack = activityTrackProvider != null
                 ? activityTrackProvider.getActivityTrack(summary)
@@ -96,7 +100,7 @@ public final class ActivitySummaryUtils {
 
         if (track != null) {
             // Altitude from imported elevation tiles replaces what the device recorded
-            ElevationTiles.correct(GBApplication.getContext(), track);
+            ElevationTiles.correct(GBApplication.getContext(), device, ActivityKind.fromCode(summary.getActivityKind()), track);
         }
         return track;
     }

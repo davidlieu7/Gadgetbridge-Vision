@@ -14,11 +14,12 @@
             android:summary="@string/elevation_correction_summary"
             app:iconSpaceReserved="false" />
 
-        <SwitchPreferenceCompat
-            android:defaultValue="true"
+        <Preference
             android:icon="@drawable/ic_altitude_24px"
-            android:key="elevation_correction_enabled"
-            android:summary="@string/pref_elevation_correction_enabled_summary"
+            android:key="elevation_correction_per_device"
+            android:persistent="false"
+            android:selectable="false"
+            android:summary="@string/elevation_correction_per_device_summary"
             android:title="@string/pref_elevation_correction_enabled_title" />
 
         <Preference

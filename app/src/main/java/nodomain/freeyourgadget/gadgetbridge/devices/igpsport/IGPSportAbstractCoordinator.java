@@ -56,7 +56,7 @@ public abstract class IGPSportAbstractCoordinator extends AbstractBLEDeviceCoord
     @Nullable
     @Override
     public ActivitySummaryParser getActivitySummaryParser(final GBDevice device, final Context context) {
-        return new GarminWorkoutParser(context);
+        return new GarminWorkoutParser(context, device);
     }
 
     @Override

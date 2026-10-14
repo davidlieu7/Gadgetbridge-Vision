@@ -1887,6 +1887,13 @@ public class DeviceSpecificSettingsFragment extends AbstractPreferenceFragment i
                 );
             }
 
+            if (coordinator.supportsRecordedActivities(device)) {
+                deviceSpecificSettings.addRootScreen(
+                        DeviceSpecificSettingsScreen.WORKOUT,
+                        R.xml.devicesettings_elevation_correction
+                );
+            }
+
             final List<Integer> deviceCardSubScreens = new ArrayList<>();
             deviceCardSubScreens.add(R.xml.devicesettings_device_card);
             if (!coordinator.getQuickControls(device).isEmpty()) {

@@ -21,6 +21,9 @@ import android.net.Uri
 import android.provider.OpenableColumns
 import androidx.annotation.VisibleForTesting
 import nodomain.freeyourgadget.gadgetbridge.GBApplication
+import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsPreferenceConst
+import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice
+import nodomain.freeyourgadget.gadgetbridge.model.ActivityKind
 import nodomain.freeyourgadget.gadgetbridge.model.ActivityPoint
 import nodomain.freeyourgadget.gadgetbridge.model.ActivitySummaryData
 import nodomain.freeyourgadget.gadgetbridge.model.ActivitySummaryEntries
@@ -32,11 +35,13 @@ import java.io.IOException
 /**
  * The user's imported SRTM tiles, and the correction of workout tracks from them.
  * Nothing is downloaded: the user imports tiles obtained elsewhere.
+ *
+ * The correction is switched on per device, since a watch with a barometer records
+ * a better profile than the model, while one without is at the mercy of GPS altitude.
  */
 object ElevationTiles {
     private val LOG = LoggerFactory.getLogger(ElevationTiles::class.java)
 
-    const val PREF_ENABLED = "elevation_correction_enabled"
     private const val DIRECTORY_NAME = "elevation_tiles"
 
     @Volatile
@@ -52,8 +57,10 @@ object ElevationTiles {
             library ?: HgtTileLibrary(File(context.applicationContext.filesDir, DIRECTORY_NAME)).also { library = it }
         }
 
+    /** The device's own switch, off unless the user turned it on for that device. */
     @JvmStatic
-    fun isEnabled(): Boolean = GBApplication.getPrefs().getBoolean(PREF_ENABLED, true)
+    fun isEnabledFor(device: GBDevice?): Boolean =
+        device != null && GBApplication.getDevicePrefs(device).getBoolean(DeviceSettingsPreferenceConst.PREF_ELEVATION_CORRECTION, false)
 
     @JvmStatic
     fun tiles(context: Context): List<ElevationTile> =
@@ -74,32 +81,37 @@ object ElevationTiles {
     fun deleteTile(context: Context, key: HgtTileKey): Boolean =
         library(context).deleteTile(key).also { tiles(context) }
 
-    /** Whether a track could be corrected at all: the toggle is on and a tile is imported. */
+    /** Whether a track of this device could be corrected at all: its switch is on and a tile is imported. */
     @JvmStatic
-    fun isActive(context: Context?): Boolean =
-        context != null && isEnabled() && (hasTiles ?: tiles(context).isNotEmpty())
+    fun isActive(context: Context?, device: GBDevice?): Boolean =
+        context != null && isEnabledFor(device) && (hasTiles ?: tiles(context).isNotEmpty())
 
     /**
-     * Replaces the track's altitudes with tile altitudes when correction is on and
-     * the tiles cover every positioned point. Off, no tiles or partial coverage all
-     * leave the track as recorded.
+     * Replaces the track's altitudes with tile altitudes when the device's switch is on, the
+     * activity follows the terrain and the tiles cover every positioned point on ground that is
+     * not too steep for the fixes. Anything else leaves the track as recorded.
      */
     @JvmStatic
-    fun correct(context: Context?, track: ActivityTrack): Boolean = correct(context, track.allPoints)
+    fun correct(context: Context?, device: GBDevice?, kind: ActivityKind?, track: ActivityTrack): Boolean =
+        correct(context, device, kind, track.allPoints)
 
     /** As [correct] for a track, for code that holds the points. */
     @JvmStatic
-    fun correct(context: Context?, points: List<ActivityPoint>): Boolean {
-        if (context == null || !isActive(context)) {
+    fun correct(context: Context?, device: GBDevice?, kind: ActivityKind?, points: List<ActivityPoint>): Boolean {
+        if (context == null || !isActive(context, device)) {
+            return false
+        }
+        if (kind != null && !ActivityKind.followsTerrain(kind)) {
+            LOG.debug("Not correcting the altitude of a {} workout, it does not follow the terrain", kind)
             return false
         }
         val library = library(context)
         return try {
-            ElevationCorrection.correct(points, library::elevationAt).also { corrected ->
-                if (!corrected) {
-                    LOG.debug("Elevation tiles do not cover every point of the track, keeping its altitudes")
-                }
+            val outcome = ElevationCorrection.correct(points, library::elevationAt)
+            if (outcome != ElevationCorrection.Outcome.CORRECTED) {
+                LOG.debug("Keeping the track's altitudes: {}", outcome)
             }
+            outcome == ElevationCorrection.Outcome.CORRECTED
         } catch (e: Exception) {
             // A tile that vanished under a mapping: keep what the device recorded
             LOG.warn("Failed to read elevation tiles, keeping the track's altitudes", e)

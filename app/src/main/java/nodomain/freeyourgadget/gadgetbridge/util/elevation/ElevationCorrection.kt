@@ -19,6 +19,9 @@ package nodomain.freeyourgadget.gadgetbridge.util.elevation
 import nodomain.freeyourgadget.gadgetbridge.model.ActivityPoint
 import nodomain.freeyourgadget.gadgetbridge.model.ActivityTrack
 import nodomain.freeyourgadget.gadgetbridge.model.GPSCoordinate
+import kotlin.math.abs
+import kotlin.math.cos
+import kotlin.math.max
 
 /** Elevation in meters at a position, or null when nothing covers it. */
 fun interface ElevationLookup {
@@ -33,25 +36,59 @@ fun interface ElevationLookup {
  * drifting barometer would be worse than either. A point without a position
  * cannot be looked up, so its altitude is dropped rather than mixing the
  * sensor the correction replaces into the corrected profile.
+ *
+ * On steep terrain the horizontal error of a GPS fix becomes a large altitude
+ * error: a few meters to the side of a slope is a different height. Each point
+ * is therefore also looked up at its own horizontal error to the north, south,
+ * east and west, and when the typical spread is too large the model is not
+ * trusted over the device.
  */
 object ElevationCorrection {
 
-    /** True when the track was corrected in place; false leaves it untouched. */
-    @JvmStatic
-    fun correct(track: ActivityTrack, lookup: ElevationLookup): Boolean = correct(track.allPoints, lookup)
+    /** Horizontal error assumed for a fix that reports none. */
+    const val DEFAULT_HORIZONTAL_ERROR_METERS = 10.0
 
-    /** True when the points were corrected in place; false leaves them untouched. */
+    /** Median altitude spread within the horizontal error above which the terrain is too steep. */
+    const val MAX_SLOPE_SPREAD_METERS = 15.0
+
+    private const val METERS_PER_DEGREE_LATITUDE = 111_320.0
+
+    enum class Outcome {
+        /** Every positioned point took the model's altitude. */
+        CORRECTED,
+
+        /** No point has a position, so there is nothing to look up. */
+        NO_POSITIONS,
+
+        /** At least one positioned point lies outside the imported tiles or on a void sample. */
+        NOT_COVERED,
+
+        /** The terrain changes too much within the horizontal error of the fixes. */
+        TOO_STEEP,
+    }
+
     @JvmStatic
-    fun correct(points: List<ActivityPoint>, lookup: ElevationLookup): Boolean {
+    fun correct(track: ActivityTrack, lookup: ElevationLookup): Outcome = correct(track.allPoints, lookup)
+
+    /** Corrects the points in place and says what happened; anything but [Outcome.CORRECTED] leaves them untouched. */
+    @JvmStatic
+    fun correct(points: List<ActivityPoint>, lookup: ElevationLookup): Outcome {
         val positioned = points.filter { it.hasPosition() }
         if (positioned.isEmpty()) {
-            return false
+            return Outcome.NO_POSITIONS
         }
 
         val altitudes = DoubleArray(positioned.size)
+        val spreads = DoubleArray(positioned.size)
         for ((index, point) in positioned.withIndex()) {
             val location = point.location!!
-            altitudes[index] = lookup.elevationAt(location.latitude, location.longitude) ?: return false
+            val altitude = lookup.elevationAt(location.latitude, location.longitude) ?: return Outcome.NOT_COVERED
+            altitudes[index] = altitude
+            spreads[index] = slopeSpread(location, altitude, lookup) ?: return Outcome.NOT_COVERED
+        }
+        spreads.sort()
+        if (spreads[spreads.size / 2] > MAX_SLOPE_SPREAD_METERS) {
+            return Outcome.TOO_STEEP
         }
 
         for ((index, point) in positioned.withIndex()) {
@@ -83,7 +120,29 @@ object ElevationCorrection {
                 }
             }
         }
-        return true
+        return Outcome.CORRECTED
+    }
+
+    /**
+     * How much the model's altitude changes within the fix's horizontal error around a point,
+     * or null when a shifted position is not covered.
+     */
+    private fun slopeSpread(location: GPSCoordinate, altitude: Double, lookup: ElevationLookup): Double? {
+        // Garmin stores gps_accuracy, in meters, as the hdop
+        val error = if (location.hasHdop() && location.hdop > 0) location.hdop else DEFAULT_HORIZONTAL_ERROR_METERS
+        val latitudeStep = error / METERS_PER_DEGREE_LATITUDE
+        val longitudeStep = error / (METERS_PER_DEGREE_LATITUDE * max(cos(Math.toRadians(location.latitude)), 0.01))
+        var spread = 0.0
+        for ((latitude, longitude) in listOf(
+            location.latitude + latitudeStep to location.longitude,
+            location.latitude - latitudeStep to location.longitude,
+            location.latitude to location.longitude + longitudeStep,
+            location.latitude to location.longitude - longitudeStep,
+        )) {
+            val shifted = lookup.elevationAt(latitude, longitude) ?: return null
+            spread = max(spread, abs(shifted - altitude))
+        }
+        return spread
     }
 
     /** Total ascent and descent of the track as it now stands. */
