@@ -308,21 +308,16 @@ class GloryFitSupport : AbstractBTLESingleDeviceSupport(LOG) {
                 fetcher.handleSleepInfo(value)
             }
 
+            CMD_STEPS,
             CMD_REALTIME_STEPS -> {
-                val record = fetcher.decodeStepsRecord(value) ?: return
-                if (fetcher.persistStepsRecord(record)) {
-                    LocalBroadcastManager.getInstance(context).sendBroadcast(Intent(ChartsHost.REFRESH))
-                }
+                fetcher.handleSteps(value)
+                if (value[0] != CMD_REALTIME_STEPS) return
                 val sample = decodeRealtimeSteps(value) ?: return
                 val intent = Intent(DeviceService.ACTION_REALTIME_SAMPLES)
                     .putExtra(GBDevice.EXTRA_DEVICE, device)
                     .putExtra(DeviceService.EXTRA_REALTIME_SAMPLE, sample)
                     .putExtra(DeviceService.EXTRA_TIMESTAMP, sample.getTimestamp())
                 LocalBroadcastManager.getInstance(context).sendBroadcast(intent)
-            }
-
-            CMD_STEPS -> {
-                fetcher.handleSteps(value)
             }
 
             CMD_HEART_RATE -> {
