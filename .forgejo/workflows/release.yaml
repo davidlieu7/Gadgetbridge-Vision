@@ -16,7 +16,11 @@ on:
   workflow_dispatch:
     inputs:
       kind:
-        description: 'Tipo de build (stable o nightly)'
+        description: 'Tipo de build'
+        type: choice
+        options:
+          - nightly
+          - stable
         required: true
         default: 'nightly'
 
