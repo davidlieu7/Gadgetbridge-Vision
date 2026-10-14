@@ -927,6 +927,20 @@ class GloryFitSupport : AbstractBTLESingleDeviceSupport(LOG) {
         builder.queue()
     }
 
+    override fun onReboot() {
+        sendPowerCommand(POWER_REBOOT)
+    }
+
+    override fun onPowerOff() {
+        sendPowerCommand(POWER_OFF)
+    }
+
+    private fun sendPowerCommand(action: Byte) {
+        val builder = createTransactionBuilder("power command")
+        builder.write(UUID_CHARACTERISTIC_GLORYFIT_CMD_WRITE, *byteArrayOf(CMD_POWER, action))
+        builder.queue()
+    }
+
     override fun onFactoryReset() {
         val builder = createTransactionBuilder("factory reset")
         builder.write(
@@ -1618,6 +1632,9 @@ class GloryFitSupport : AbstractBTLESingleDeviceSupport(LOG) {
         const val CONTACT_SOS_CLEAR: Byte = 0xae.toByte()
         const val CONTACT_SOS_SET: Byte = 0xac.toByte()
         const val CONTACT_SOS_END: Byte = 0xad.toByte()
+        const val CMD_POWER: Byte = 0xe8.toByte()
+        const val POWER_REBOOT: Byte = 0x12
+        const val POWER_OFF: Byte = 0x11
         const val CMD_FACTORY_RESET: Byte = 0xad.toByte()
         const val CMD_WEATHER: Byte = 0xcb.toByte()
         const val WEATHER_CURRENT: Byte = 0x01.toByte()
