@@ -415,7 +415,8 @@ class GloryFitSupport : AbstractBTLESingleDeviceSupport(LOG) {
 
         when (config) {
             DeviceSettingsPreferenceConst.PREF_VIBRATION_ENABLE,
-            DeviceSettingsPreferenceConst.PREF_NOTIFICATION_ENABLE -> {
+            DeviceSettingsPreferenceConst.PREF_NOTIFICATION_ENABLE,
+            DeviceSettingsPreferenceConst.PREF_DO_NOT_DISTURB_BOOL -> {
                 setReminderSettings(builder)
             }
 
@@ -1405,31 +1406,25 @@ class GloryFitSupport : AbstractBTLESingleDeviceSupport(LOG) {
         )
     }
 
-    private fun encodeReminderSettings(
+    internal fun encodeReminderSettings(
         vibration: Boolean,
         notifications: Boolean,
-    ): Byte {
+        doNotDisturb: Boolean = true,
+    ): ByteArray {
         var flags = 0x08
         if (!vibration) flags = flags or 0x02
         if (!notifications) flags = flags or 0x04
-        return flags.toByte()
+        return byteArrayOf(CMD_CALL_REJECT_WITH_BUTTON, flags.toByte(), 0x16, 0x00, 0x08, 0x00, if (doNotDisturb) 0x01 else 0x00)
     }
 
     private fun setReminderSettings(builder: TransactionBuilder) {
         LOG.debug("Setting reminder settings")
         builder.write(
             UUID_CHARACTERISTIC_GLORYFIT_CMD_WRITE,
-            *byteArrayOf(
-                CMD_CALL_REJECT_WITH_BUTTON,
-                encodeReminderSettings(
-                    devicePrefs.getBoolean(DeviceSettingsPreferenceConst.PREF_VIBRATION_ENABLE, true),
-                    devicePrefs.getBoolean(DeviceSettingsPreferenceConst.PREF_NOTIFICATION_ENABLE, true),
-                ),
-                0x16,
-                0x00,
-                0x08,
-                0x00,
-                (device.deviceCoordinator as GloryFitCoordinator).getReminderSettingsTrailingByte(),
+            *encodeReminderSettings(
+                devicePrefs.getBoolean(DeviceSettingsPreferenceConst.PREF_VIBRATION_ENABLE, true),
+                devicePrefs.getBoolean(DeviceSettingsPreferenceConst.PREF_NOTIFICATION_ENABLE, true),
+                devicePrefs.getBoolean(DeviceSettingsPreferenceConst.PREF_DO_NOT_DISTURB_BOOL, true),
             )
         )
     }

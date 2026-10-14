@@ -40,8 +40,6 @@ class ColmiP10Coordinator : GloryFitCoordinator() {
 
     override fun supportsRealtimeData(device: GBDevice): Boolean = true
 
-    override fun getReminderSettingsTrailingByte(): Byte = 0x00
-
     /* override fun getDeviceSettings(device: GBDevice): DeviceSettingsSpec = deviceSettings {
         screen(
             key = DeviceSpecificSettingsScreen.SOUND.key,
