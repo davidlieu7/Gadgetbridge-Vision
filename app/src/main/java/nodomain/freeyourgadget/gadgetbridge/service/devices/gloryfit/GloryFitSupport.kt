@@ -34,6 +34,7 @@ import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEventFindPhone
 import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEventMusicControl
 import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEventNotificationControl
 import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEventVersionInfo
+import nodomain.freeyourgadget.gadgetbridge.devices.gloryfit.GloryFitCoordinator
 import nodomain.freeyourgadget.gadgetbridge.entities.AppSpecificNotificationSetting
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice
 import nodomain.freeyourgadget.gadgetbridge.model.ActivityUser
@@ -130,7 +131,7 @@ class GloryFitSupport : AbstractBTLESingleDeviceSupport(LOG) {
         if (device.deviceCoordinator.supportsSpo2(device)) {
             setSpo2Measurement(builder)
         }
-        setEnableCallRejection(builder)
+        setReminderSettings(builder)
         setEnableSmsReply(builder)
         setSosContact(builder)
 
@@ -365,6 +366,11 @@ class GloryFitSupport : AbstractBTLESingleDeviceSupport(LOG) {
         val builder = createTransactionBuilder("set config $config")
 
         when (config) {
+            DeviceSettingsPreferenceConst.PREF_VIBRATION_ENABLE,
+            DeviceSettingsPreferenceConst.PREF_NOTIFICATION_ENABLE -> {
+                setReminderSettings(builder)
+            }
+
             ActivityUser.PREF_USER_HEIGHT_CM,
             ActivityUser.PREF_USER_WEIGHT_KG,
             ActivityUser.PREF_USER_DATE_OF_BIRTH,
@@ -1300,25 +1306,39 @@ class GloryFitSupport : AbstractBTLESingleDeviceSupport(LOG) {
         )
     }
 
-    private fun setEnableCallRejection(builder: TransactionBuilder) {
-        // In the official app, this is configurable
-        // but if we disable it, the watch shows the button anyway and freezes?
-        LOG.debug("Setting enable call reject button")
+    private fun encodeReminderSettings(
+        vibration: Boolean,
+        notifications: Boolean,
+    ): Byte {
+        var flags = 0x08
+        if (!vibration) flags = flags or 0x02
+        if (!notifications) flags = flags or 0x04
+        return flags.toByte()
+    }
+
+    private fun setReminderSettings(builder: TransactionBuilder) {
+        LOG.debug("Setting reminder settings")
         builder.write(
             UUID_CHARACTERISTIC_GLORYFIT_CMD_WRITE,
             *byteArrayOf(
                 CMD_CALL_REJECT_WITH_BUTTON,
-                0x08, // 0x00 for disabled
+                encodeReminderSettings(
+                    devicePrefs.getBoolean(DeviceSettingsPreferenceConst.PREF_VIBRATION_ENABLE, true),
+                    devicePrefs.getBoolean(DeviceSettingsPreferenceConst.PREF_NOTIFICATION_ENABLE, true),
+                ),
                 0x16,
                 0x00,
                 0x08,
                 0x00,
-                0x01,
+                (device.deviceCoordinator as GloryFitCoordinator).getReminderSettingsTrailingByte(),
             )
         )
     }
 
     private fun setEnableSmsReply(builder: TransactionBuilder) {
+        if (device.deviceCoordinator.getCannedRepliesSlotCount(device) <= 0) {
+            return
+        }
         val enabled = devicePrefs.getBoolean(DeviceSettingsPreferenceConst.PREF_ENABLE_SMS_QUICK_REPLY, true)
         LOG.debug("Setting enable sms reply = {}", enabled)
         builder.write(
@@ -1331,6 +1351,9 @@ class GloryFitSupport : AbstractBTLESingleDeviceSupport(LOG) {
     }
 
     private fun setSosContact(builder: TransactionBuilder) {
+        if (device.deviceCoordinator.getContactsSlotCount(device) <= 0) {
+            return
+        }
         if (!GBApplication.getPrefs().experimentalSettings()) {
             LOG.warn("Experimental settings disabled, ignoring SOS contact")
             return

@@ -54,6 +54,8 @@ abstract class GloryFitCoordinator : AbstractBLEDeviceCoordinator() {
         return DeviceCoordinator.DeviceKind.WATCH
     }
 
+    open fun getReminderSettingsTrailingByte(): Byte = 0x01
+
     override fun getDeviceSupportClass(device: GBDevice): Class<out DeviceSupport> {
         return GloryFitSupport::class.java
     }

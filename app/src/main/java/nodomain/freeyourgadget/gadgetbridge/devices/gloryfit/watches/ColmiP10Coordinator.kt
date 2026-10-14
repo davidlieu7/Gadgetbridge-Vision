@@ -37,4 +37,25 @@ class ColmiP10Coordinator : GloryFitCoordinator() {
 
     // Otherwise gets stuck in fetching data
     override fun supportsSpo2(device: GBDevice): Boolean = false
+
+    override fun getReminderSettingsTrailingByte(): Byte = 0x00
+
+    override fun getDeviceSettings(device: GBDevice): DeviceSettingsSpec = deviceSettings {
+        screen(
+            key = DeviceSpecificSettingsScreen.SOUND.key,
+            title = R.string.pref_header_sound_vibration,
+            icon = R.drawable.ic_notifications,
+        ) {
+            switchSetting(
+                key = DeviceSettingsPreferenceConst.PREF_VIBRATION_ENABLE,
+                title = R.string.prefs_vibration_enable,
+                defaultValue = true,
+            )
+            switchSetting(
+                key = DeviceSettingsPreferenceConst.PREF_NOTIFICATION_ENABLE,
+                title = R.string.prefs_notifications_enable,
+                defaultValue = true,
+            )
+        }
+    }
 }
