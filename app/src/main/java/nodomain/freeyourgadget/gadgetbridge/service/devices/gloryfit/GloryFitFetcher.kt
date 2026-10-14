@@ -230,41 +230,51 @@ class GloryFitFetcher(val mSupport: GloryFitSupport) {
             }
 
             value.size == 18 -> {
-                val buf = ByteBuffer.wrap(value).order(ByteOrder.BIG_ENDIAN)
-                buf.get() // discard first bytes
-                val timestamp = buf.getDate()
-                timestamp.set(Calendar.HOUR_OF_DAY, buf.get().toInt() and 0xff)
-
-                val sample = GloryFitStepsSample()
-                sample.timestamp = timestamp.timeInMillis
-                sample.totalSteps = buf.getShort().toInt()
-                sample.runningStart = buf.get().toInt()
-                sample.runningEnd = buf.get().toInt()
-                buf.get() // unk
-                sample.runningSteps = buf.getShort().toInt()
-                sample.walkingStart = buf.get().toInt()
-                sample.walkingEnd = buf.get().toInt()
-                buf.get() // unk
-                sample.walkingSteps = buf.getShort().toInt()
-
-                LOG.debug("Steps {}: {}", DateTimeUtils.formatIso8601(timestamp.time), sample.totalSteps)
-
-                try {
-                    GBApplication.acquireDB().use { handler ->
-                        val session = handler.getDaoSession()
-                        val sampleProvider = GloryFitStepsSampleProvider(mSupport.device, session)
-
-                        sampleProvider.persistSamples(
-                            Collections.singletonList(sample),
-                            mSupport.context
-                        )
-                    }
-                } catch (e: Exception) {
-                    GB.toast(mSupport.context, "Error saving steps samples", Toast.LENGTH_LONG, GB.ERROR, e)
-                }
+                decodeStepsRecord(value)?.let { persistStepsRecord(it) }
             }
 
             else -> LOG.warn("Unknown steps command {}", value.toHexString())
+        }
+    }
+
+    internal fun decodeStepsRecord(value: ByteArray): GloryFitStepsSample? {
+        if (value.size != 18 || (value[0] != GloryFitSupport.CMD_STEPS && value[0] != GloryFitSupport.CMD_REALTIME_STEPS)) {
+            return null
+        }
+        val buf = ByteBuffer.wrap(value).order(ByteOrder.BIG_ENDIAN)
+        buf.get()
+        val timestamp = buf.getDate()
+        timestamp.isLenient = false
+        timestamp.set(Calendar.HOUR_OF_DAY, buf.get().toInt() and 0xff)
+        val sample = GloryFitStepsSample()
+        try {
+            sample.timestamp = timestamp.timeInMillis
+        } catch (e: IllegalArgumentException) {
+            LOG.warn("Invalid steps record date")
+            return null
+        }
+        sample.totalSteps = buf.getShort().toInt()
+        sample.runningStart = buf.get().toInt()
+        sample.runningEnd = buf.get().toInt()
+        buf.get()
+        sample.runningSteps = buf.getShort().toInt()
+        sample.walkingStart = buf.get().toInt()
+        sample.walkingEnd = buf.get().toInt()
+        buf.get()
+        sample.walkingSteps = buf.getShort().toInt()
+        return sample
+    }
+
+    fun persistStepsRecord(sample: GloryFitStepsSample): Boolean {
+        LOG.debug("Steps {}: {}", DateTimeUtils.formatIso8601(java.util.Date(sample.timestamp)), sample.totalSteps)
+        try {
+            GBApplication.acquireDB().use { handler ->
+                val provider = GloryFitStepsSampleProvider(mSupport.device, handler.getDaoSession())
+                return provider.persistSamples(Collections.singletonList(sample), mSupport.context)
+            }
+        } catch (e: Exception) {
+            GB.toast(mSupport.context, "Error saving steps samples", Toast.LENGTH_LONG, GB.ERROR, e)
+            return false
         }
     }
 

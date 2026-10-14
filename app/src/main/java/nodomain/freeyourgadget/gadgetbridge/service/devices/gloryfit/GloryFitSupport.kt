@@ -20,11 +20,14 @@ import android.bluetooth.BluetoothAdapter
 import android.bluetooth.BluetoothGatt
 import android.bluetooth.BluetoothGattCharacteristic
 import android.content.Context
+import android.content.Intent
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import nodomain.freeyourgadget.gadgetbridge.GBApplication
 import nodomain.freeyourgadget.gadgetbridge.activities.SettingsActivity
+import nodomain.freeyourgadget.gadgetbridge.activities.charts.ChartsHost
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsPreferenceConst
 import nodomain.freeyourgadget.gadgetbridge.database.AppSpecificNotificationSettingsRepository
 import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEventBatteryInfo
@@ -35,14 +38,18 @@ import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEventMusicContr
 import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEventNotificationControl
 import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEventVersionInfo
 import nodomain.freeyourgadget.gadgetbridge.devices.gloryfit.GloryFitCoordinator
+import nodomain.freeyourgadget.gadgetbridge.devices.SampleProvider
 import nodomain.freeyourgadget.gadgetbridge.entities.AppSpecificNotificationSetting
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice
 import nodomain.freeyourgadget.gadgetbridge.model.ActivityUser
+import nodomain.freeyourgadget.gadgetbridge.model.ActivitySample
+import nodomain.freeyourgadget.gadgetbridge.model.ActivityKind
 import nodomain.freeyourgadget.gadgetbridge.model.Alarm
 import nodomain.freeyourgadget.gadgetbridge.model.BatteryState
 import nodomain.freeyourgadget.gadgetbridge.model.CallSpec
 import nodomain.freeyourgadget.gadgetbridge.model.CannedMessagesSpec
 import nodomain.freeyourgadget.gadgetbridge.model.Contact
+import nodomain.freeyourgadget.gadgetbridge.model.DeviceService
 import nodomain.freeyourgadget.gadgetbridge.model.DistanceUnit
 import nodomain.freeyourgadget.gadgetbridge.model.MusicSpec
 import nodomain.freeyourgadget.gadgetbridge.model.MusicStateSpec
@@ -51,6 +58,7 @@ import nodomain.freeyourgadget.gadgetbridge.model.TemperatureUnit
 import nodomain.freeyourgadget.gadgetbridge.model.WeatherSpec
 import nodomain.freeyourgadget.gadgetbridge.model.weather.OwmCondition
 import nodomain.freeyourgadget.gadgetbridge.model.weather.Weather
+import nodomain.freeyourgadget.gadgetbridge.service.btle.BLETypeConversions
 import nodomain.freeyourgadget.gadgetbridge.service.btle.AbstractBTLESingleDeviceSupport
 import nodomain.freeyourgadget.gadgetbridge.service.btle.TransactionBuilder
 import nodomain.freeyourgadget.gadgetbridge.service.devices.sony.wena3.protocol.packets.notification.defines.VibrationKind
@@ -66,6 +74,7 @@ import java.util.Calendar
 import java.util.GregorianCalendar
 import java.util.Locale
 import java.util.UUID
+import java.io.Serializable
 import kotlin.math.roundToInt
 
 class GloryFitSupport : AbstractBTLESingleDeviceSupport(LOG) {
@@ -78,6 +87,11 @@ class GloryFitSupport : AbstractBTLESingleDeviceSupport(LOG) {
     private var mAppNotificationSettingsRepository: AppSpecificNotificationSettingsRepository? = null
 
     private val fetcher: GloryFitFetcher = GloryFitFetcher(this)
+    private var realtimeStepsEnabled = false
+    private var lastRealtimeSteps: Int? = null
+    private var lastRealtimeStepsDate: ByteArray? = null
+    private var pendingRealtimeSteps = 0
+    private var lastRealtimeStepsTimestamp: Int? = null
 
     private var mHandler: Handler = Handler(Looper.getMainLooper())
     private val mBatteryStateRequestRunnable: Runnable = Runnable {
@@ -101,6 +115,8 @@ class GloryFitSupport : AbstractBTLESingleDeviceSupport(LOG) {
 
     override fun initializeDevice(builder: TransactionBuilder): TransactionBuilder {
         fetcher.reset()
+        lastRealtimeSteps = null
+        lastRealtimeStepsDate = null
 
         builder.setDeviceState(GBDevice.State.INITIALIZING)
 
@@ -144,6 +160,7 @@ class GloryFitSupport : AbstractBTLESingleDeviceSupport(LOG) {
     override fun dispose() {
         synchronized(ConnectionMonitor) {
             mHandler.removeCallbacksAndMessages(null)
+            onEnableRealtimeSteps(false)
             super.dispose()
         }
     }
@@ -170,6 +187,7 @@ class GloryFitSupport : AbstractBTLESingleDeviceSupport(LOG) {
     }
 
     private fun handleCommand(value: ByteArray) {
+        if (value.isEmpty()) return
         when (value[0]) {
             CMD_VERSION -> {
                 val versionInfoEvent = GBDeviceEventVersionInfo()
@@ -282,6 +300,19 @@ class GloryFitSupport : AbstractBTLESingleDeviceSupport(LOG) {
 
             CMD_SLEEP_INFO -> {
                 fetcher.handleSleepInfo(value)
+            }
+
+            CMD_REALTIME_STEPS -> {
+                val record = fetcher.decodeStepsRecord(value) ?: return
+                if (fetcher.persistStepsRecord(record)) {
+                    LocalBroadcastManager.getInstance(context).sendBroadcast(Intent(ChartsHost.REFRESH))
+                }
+                val sample = decodeRealtimeSteps(value) ?: return
+                val intent = Intent(DeviceService.ACTION_REALTIME_SAMPLES)
+                    .putExtra(GBDevice.EXTRA_DEVICE, device)
+                    .putExtra(DeviceService.EXTRA_REALTIME_SAMPLE, sample)
+                    .putExtra(DeviceService.EXTRA_TIMESTAMP, sample.getTimestamp())
+                LocalBroadcastManager.getInstance(context).sendBroadcast(intent)
             }
 
             CMD_STEPS -> {
@@ -893,7 +924,54 @@ class GloryFitSupport : AbstractBTLESingleDeviceSupport(LOG) {
     }
 
     override fun onEnableRealtimeSteps(enable: Boolean) {
-        // TODO onEnableRealtimeSteps
+        realtimeStepsEnabled = enable
+        lastRealtimeSteps = null
+        lastRealtimeStepsDate = null
+    }
+
+    internal fun decodeRealtimeSteps(
+        value: ByteArray,
+        timestamp: Int = (System.currentTimeMillis() / 1000).toInt(),
+    ): RealtimeStepsSample? {
+        if (value.size != 18 || value[0] != CMD_REALTIME_STEPS) return null
+        val steps = BLETypeConversions.toUint16(value[7], value[6])
+        val date = value.copyOfRange(1, 5)
+        val previousSteps = lastRealtimeSteps
+        val previousDate = lastRealtimeStepsDate
+        lastRealtimeSteps = steps
+        lastRealtimeStepsDate = date
+        if (previousSteps != null && previousDate != null && date.contentEquals(previousDate) && steps >= previousSteps) {
+            pendingRealtimeSteps += steps - previousSteps
+        }
+        val previousTimestamp = lastRealtimeStepsTimestamp
+        if (pendingRealtimeSteps == 0 || (previousTimestamp != null && timestamp <= previousTimestamp)) {
+            return null
+        }
+        val sample = RealtimeStepsSample(timestamp, pendingRealtimeSteps)
+        pendingRealtimeSteps = 0
+        lastRealtimeStepsTimestamp = timestamp
+        return sample
+    }
+
+    internal class RealtimeStepsSample(
+        private val sampleTimestamp: Int,
+        private val stepDelta: Int,
+    ) : ActivitySample, Serializable {
+        private var measuredHeartRate = ActivitySample.NOT_MEASURED
+
+        override fun getTimestamp(): Int = sampleTimestamp
+        override fun getSteps(): Int = stepDelta
+        override fun getProvider(): SampleProvider<*>? = null
+        override fun getRawKind(): Int = ActivityKind.UNKNOWN.code
+        override fun getKind(): ActivityKind = ActivityKind.UNKNOWN
+        override fun getRawIntensity(): Int = ActivitySample.NOT_MEASURED
+        override fun getIntensity(): Float = ActivitySample.NOT_MEASURED.toFloat()
+        override fun getDistanceCm(): Int = ActivitySample.NOT_MEASURED
+        override fun getActiveCalories(): Int = ActivitySample.NOT_MEASURED
+        override fun getHeartRate(): Int = measuredHeartRate
+        override fun setHeartRate(value: Int) {
+            measuredHeartRate = value
+        }
     }
 
     override fun onSetHeartRateMeasurementInterval(seconds: Int) {
@@ -1465,6 +1543,7 @@ class GloryFitSupport : AbstractBTLESingleDeviceSupport(LOG) {
         const val CMD_SMS_QUICK_REPLY: Byte = 0x52.toByte()
         const val SMS_QUICK_REPLY_SUCCESS: Byte = 0xfe.toByte()
         const val CMD_CALL_REJECT_WITH_BUTTON: Byte = 0xd7.toByte()
+        const val CMD_REALTIME_STEPS: Byte = 0xb1.toByte()
         const val CMD_STEPS: Byte = 0xb2.toByte()
         const val FETCH_START: Byte = 0xfa.toByte()
         const val FETCH_DATA: Byte = 0x07.toByte()
