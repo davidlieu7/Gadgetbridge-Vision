@@ -927,7 +927,9 @@ public class NotificationListener extends NotificationListenerService {
                     try (Cursor cursor = contentResolver.query(lastMessage.getDataUri(), null, null, null, null)) {
                         if (cursor != null && cursor.moveToFirst()) {
                             int dataIndex = cursor.getColumnIndex(MediaStore.Images.Media.DATA);
-                            notificationSpec.setPicturePath(cursor.getString(dataIndex));
+                            if (dataIndex >= 0) {
+                                notificationSpec.setPicturePath(cursor.getString(dataIndex));
+                            }
                         }
                     } catch (Exception e) {
                         LOG.error("Failed to get notification picture path", e);

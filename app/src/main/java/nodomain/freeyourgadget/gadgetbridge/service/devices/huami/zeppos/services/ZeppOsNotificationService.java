@@ -587,6 +587,7 @@ public class ZeppOsNotificationService extends AbstractZeppOsService {
                           final Consumer<Boolean> uploadFinishCallback) {
         if (getSupport().getMTU() < 247) {
             LOG.warn("Sending files requires high MTU, current MTU is {}", getSupport().getMTU());
+            uploadFinishCallback.accept(false);
             return;
         }
 
