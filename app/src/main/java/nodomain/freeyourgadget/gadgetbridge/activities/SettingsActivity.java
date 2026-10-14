@@ -68,6 +68,7 @@ import nodomain.freeyourgadget.gadgetbridge.R;
 import nodomain.freeyourgadget.gadgetbridge.activities.automations.AutomationsSettingsActivity;
 import nodomain.freeyourgadget.gadgetbridge.activities.charts.ChartsPreferencesActivity;
 import nodomain.freeyourgadget.gadgetbridge.activities.discovery.DiscoveryPairingPreferenceActivity;
+import nodomain.freeyourgadget.gadgetbridge.activities.elevation.ElevationSettingsActivity;
 import nodomain.freeyourgadget.gadgetbridge.activities.externalservices.OnlineFitnessTrackersPreferencesActivity;
 import nodomain.freeyourgadget.gadgetbridge.activities.maps.MapsSettingsActivity;
 import nodomain.freeyourgadget.gadgetbridge.activities.preferences.HealthConnectPreferencesActivity;
@@ -111,6 +112,8 @@ public class SettingsActivity extends AbstractSettingsActivityV2 implements Acti
             open(NotificationManagementActivity.class, result);
         } else if (result.getResourceFile() == R.xml.map_settings) {
             open(MapsSettingsActivity.class, result);
+        } else if (result.getResourceFile() == R.xml.elevation_settings) {
+            open(ElevationSettingsActivity.class, result);
         } else if (result.getResourceFile() == R.xml.automations_settings) {
             open(AutomationsSettingsActivity.class, result);
         } else if (result.getResourceFile() == R.xml.internethelper_preferences) {
@@ -186,6 +189,7 @@ public class SettingsActivity extends AbstractSettingsActivityV2 implements Acti
             index(R.xml.discovery_pairing_preferences, R.string.activity_prefs_discovery_pairing);
             index(R.xml.notifications_preferences, R.string.pref_header_notifications);
             index(R.xml.map_settings, R.string.maps_settings);
+            index(R.xml.elevation_settings, R.string.elevation_correction);
             index(R.xml.automations_settings, R.string.pref_header_automations);
             if (!GBApplication.hasDirectInternetAccess())
                 index(R.xml.internethelper_preferences, R.string.prefs_internet_helper_title);
@@ -455,6 +459,14 @@ public class SettingsActivity extends AbstractSettingsActivityV2 implements Acti
                 pref.setOnPreferenceClickListener(preference -> {
                     Intent enableIntent = new Intent(requireContext(), MapsSettingsActivity.class);
                     startActivity(enableIntent);
+                    return true;
+                });
+            }
+
+            pref = findPreference("pref_category_elevation_correction");
+            if (pref != null) {
+                pref.setOnPreferenceClickListener(preference -> {
+                    startActivity(new Intent(requireContext(), ElevationSettingsActivity.class));
                     return true;
                 });
             }

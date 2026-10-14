@@ -213,6 +213,10 @@
             android:label="@string/maps_settings"
             android:parentActivityName=".activities.SettingsActivity" />
         <activity
+            android:name=".activities.elevation.ElevationSettingsActivity"
+            android:label="@string/elevation_correction"
+            android:parentActivityName=".activities.SettingsActivity" />
+        <activity
             android:name=".activities.automations.AutomationsSettingsActivity"
             android:label="@string/pref_header_automations"
             android:parentActivityName=".activities.SettingsActivity" />

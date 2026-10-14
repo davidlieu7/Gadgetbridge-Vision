@@ -332,6 +332,12 @@
         app:iconSpaceReserved="false" />
 
     <Preference
+        android:icon="@drawable/ic_landscape"
+        android:key="pref_category_elevation_correction"
+        android:title="@string/elevation_correction"
+        app:iconSpaceReserved="false" />
+
+    <Preference
         android:icon="@drawable/ic_auto_awesome"
         android:key="pref_screen_automations"
         android:summary="@string/pref_description_automations"
