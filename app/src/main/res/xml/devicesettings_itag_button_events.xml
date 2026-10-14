@@ -2,10 +2,10 @@
 <androidx.preference.PreferenceScreen xmlns:app="http://schemas.android.com/apk/res-auto"
     xmlns:android="http://schemas.android.com/apk/res/android">
     <ListPreference
-        android:defaultValue="false"
+        android:defaultValue="@string/off"
         android:icon="@drawable/ic_auto_awesome"
         android:key="itag_button_event"
-        android:title="@string/pref_title_itag_button_events"
+        android:title="@string/prefs_wena3_button_action_item"
         app:summary="@string/pref_summary_itag_button_events"
         android:entries="@array/itag_button_event_names"
         android:entryValues="@array/itag_button_event_values"/>
