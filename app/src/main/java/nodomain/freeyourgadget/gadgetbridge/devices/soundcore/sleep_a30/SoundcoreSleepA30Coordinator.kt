@@ -20,6 +20,8 @@ import java.util.UUID
 import java.util.regex.Pattern
 import nodomain.freeyourgadget.gadgetbridge.GBApplication
 import nodomain.freeyourgadget.gadgetbridge.R
+import nodomain.freeyourgadget.gadgetbridge.activities.charts.DefaultChartsProvider
+import nodomain.freeyourgadget.gadgetbridge.activities.charts.DeviceChartsProvider
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsPreferenceConst
 import nodomain.freeyourgadget.gadgetbridge.devices.DeviceCardAction
 import nodomain.freeyourgadget.gadgetbridge.devices.deviceCardAction
@@ -38,6 +40,10 @@ class SoundcoreSleepA30Coordinator : SoundcoreEarbudsCoordinator() {
     override fun supportsSleepMeasurement(device: GBDevice): Boolean = true
     override fun supportsSleepScore(device: GBDevice): Boolean = true
     override fun supportsAwakeSleep(device: GBDevice): Boolean = true
+
+    override fun getChartsProvider(): DeviceChartsProvider = object : DefaultChartsProvider() {
+        override fun getSupportedCharts(device: GBDevice): List<String> = listOf("sleep")
+    }
 
     override fun getSampleProvider(device: GBDevice, session: nodomain.freeyourgadget.gadgetbridge.entities.DaoSession) =
         SoundcoreSleepSampleProvider(device, session)
