@@ -32,13 +32,18 @@ import org.slf4j.LoggerFactory
 class FitTrackeeOAuthCallbackActivity : AbstractGBActivity() {
     private val LOG = LoggerFactory.getLogger(FitTrackeeOAuthCallbackActivity::class.java)
 
-    override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
-
-        // Bring the settings screen back to the front, away from the browser
+    /**
+     * Bring the settings screen back to the front, away from the browser. This must happen after the
+     * tokens have been stored, so that the screen's onResume shows the up-to-date login state.
+     */
+    private fun showSettings() {
         startActivity(Intent(applicationContext, OnlineFitnessTrackersPreferencesActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP
         })
+    }
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
 
         val uri = intent.data
         val tokenManager = FitTrackeeTokenManager(applicationContext)
@@ -48,6 +53,7 @@ class FitTrackeeOAuthCallbackActivity : AbstractGBActivity() {
             LOG.error("Invalid FitTrackee authorization callback: {}", uri)
             tokenManager.clearPendingAuthorization()
             Toast.makeText(this, getString(R.string.fittrackee_login_failed, "invalid callback"), Toast.LENGTH_LONG).show()
+            showSettings()
             finish()
             return
         }
@@ -69,6 +75,7 @@ class FitTrackeeOAuthCallbackActivity : AbstractGBActivity() {
                 } else {
                     GB.toast(appContext.getString(R.string.fittrackee_login_failed, failure), Toast.LENGTH_LONG, GB.ERROR)
                 }
+                showSettings()
                 finish()
             }
         }.start()
