@@ -16,18 +16,25 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 package nodomain.freeyourgadget.gadgetbridge.util.healthconnect.syncers
 
+import androidx.health.connect.client.HealthConnectClient
+import androidx.health.connect.client.permission.HealthPermission
 import androidx.health.connect.client.records.WeightRecord
 import androidx.health.connect.client.records.metadata.Metadata
 import androidx.health.connect.client.units.Mass
+import nodomain.freeyourgadget.gadgetbridge.GBApplication
+import nodomain.freeyourgadget.gadgetbridge.devices.ManualWeightSampleProvider
 import nodomain.freeyourgadget.gadgetbridge.devices.TimeSampleProvider
 import nodomain.freeyourgadget.gadgetbridge.entities.DaoSession
 import nodomain.freeyourgadget.gadgetbridge.entities.ManualWeightSample
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice
 import nodomain.freeyourgadget.gadgetbridge.model.WeightSample
 import nodomain.freeyourgadget.gadgetbridge.util.UserWeight
+import nodomain.freeyourgadget.gadgetbridge.util.healthconnect.HealthConnectUtils
+import nodomain.freeyourgadget.gadgetbridge.util.healthconnect.SyncException
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import java.time.Instant
+import java.time.ZoneId
 import java.time.ZoneOffset
 import kotlin.reflect.KClass
 
@@ -40,6 +47,47 @@ internal object WeightSyncer : AbstractTimeSampleSyncer<WeightSample, WeightReco
         daoSession: DaoSession
     ): TimeSampleProvider<out WeightSample>? {
         return UserWeight.provider(gbDevice, daoSession)
+    }
+
+    /**
+     * Syncs the manual weights dated up to [syncedUntil] that were added or edited after it.
+     */
+    suspend fun syncEditedManualSamples(
+        healthConnectClient: HealthConnectClient,
+        gbDevice: GBDevice,
+        metadata: Metadata,
+        offset: ZoneId,
+        syncedUntil: Instant,
+        grantedPermissions: Set<String>
+    ): SyncerStatistics {
+        val recordTypeName = recordClass.simpleName ?: "Unknown"
+        if (HealthPermission.getWritePermission(recordClass) !in grantedPermissions) {
+            return SyncerStatistics(recordType = recordTypeName)
+        }
+        val samples = try {
+            GBApplication.acquireDbReadOnly().use { db ->
+                if (UserWeight.provider(gbDevice, db.daoSession) == null) {
+                    emptyList()
+                } else {
+                    ManualWeightSampleProvider(db.daoSession).getModifiedSince(syncedUntil.toEpochMilli(), syncedUntil.toEpochMilli())
+                }
+            }
+        } catch (e: Exception) {
+            throw SyncException("Error fetching edited manual weights for device '${gbDevice.aliasOrName}'.", e)
+        }
+        val records = samples.mapNotNull {
+            convertSample(it, offset.rules.getOffset(Instant.ofEpochMilli(it.timestamp)), metadata, gbDevice.aliasOrName)
+        }
+        if (records.isEmpty()) {
+            return SyncerStatistics(recordsSkipped = samples.size, recordType = recordTypeName)
+        }
+        logger.info("Inserting ${records.size} manual weight(s) edited since $syncedUntil for device '${gbDevice.aliasOrName}'.")
+        HealthConnectUtils.insertRecords(records, healthConnectClient)
+        return SyncerStatistics(
+            recordsSynced = records.size,
+            recordsSkipped = samples.size - records.size,
+            recordType = recordTypeName
+        )
     }
 
     override fun convertSample(
@@ -62,7 +110,10 @@ internal object WeightSyncer : AbstractTimeSampleSyncer<WeightSample, WeightReco
             // A manual weight is synced with every device that supports weight. Its fixed id makes
             // Health Connect keep one record of it rather than one per device.
             metadata = if (sample is ManualWeightSample) {
-                Metadata.manualEntry(clientRecordId = "gadgetbridge_manual_weight_${sample.timestamp}")
+                Metadata.manualEntry(
+                    clientRecordId = "gadgetbridge_manual_weight_${sample.createdTimestamp}",
+                    clientRecordVersion = sample.modifiedTimestamp
+                )
             } else {
                 metadata
             }

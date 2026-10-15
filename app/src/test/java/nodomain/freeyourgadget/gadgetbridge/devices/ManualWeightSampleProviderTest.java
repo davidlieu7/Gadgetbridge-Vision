@@ -120,6 +120,21 @@ public class ManualWeightSampleProviderTest extends TestBase {
     }
 
     @Test
+    public void editingKeepsTheCreationTimeAndMarksTheEntryModified() {
+        UserWeight.addRecord(daoSession, 71.5, 2000L, 100L);
+        final ManualWeightSampleProvider provider = new ManualWeightSampleProvider(daoSession);
+        final long modifiedBefore = provider.get(2000L).getModifiedTimestamp();
+
+        UserWeight.replaceRecord(daoSession, scale, 2000L, 71.0, 1500L);
+
+        final ManualWeightSample edited = provider.get(1500L);
+        assertEquals(100L, edited.getCreatedTimestamp());
+        assertTrue(edited.getModifiedTimestamp() >= modifiedBefore);
+        assertEquals(List.of("1500=71.0m"), describe(provider.getModifiedSince(modifiedBefore - 1, 1500L)));
+        assertEquals(List.of(), describe(provider.getModifiedSince(modifiedBefore - 1, 1000L)));
+    }
+
+    @Test
     public void deletingNothingReturnsNull() {
         assertNull(UserWeight.deleteRecord(daoSession, scale, 4242L));
     }

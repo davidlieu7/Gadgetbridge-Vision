@@ -321,6 +321,19 @@ class HealthConnectUtils {
                     continue@dataTypeLoop
                 }
 
+                if (dataType == HealthConnectPermissionManager.HealthConnectDataType.WEIGHT) {
+                    try {
+                        val stats = WeightSyncer.syncEditedManualSamples(
+                            healthConnectClient, gbDevice, Metadata.autoRecorded(device), zoneId,
+                            timestampRange.first, grantedPermissions
+                        )
+                        recordsSyncedByType[stats.recordType] = recordsSyncedByType.getOrDefault(stats.recordType, 0) + stats.recordsSynced
+                    } catch (e: SyncException) {
+                        LOG.warn("$HC_SYNC_TAG Failed to sync edited manual weights for {}: {}", gbDevice.aliasOrName, e.message)
+                        dataTypesWithErrors.add(dataType.name)
+                    }
+                }
+
                 var timestampToPersistForThisDataType = timestampRange.first
                 val currentDataTypeStartTsFromDb = timestampRange.first
                 val currentDataTypeEndTsFromDb = timestampRange.second

@@ -63,11 +63,15 @@ object UserWeight {
     }
 
     @JvmStatic
-    fun addRecord(session: DaoSession, kg: Double, timestampMillis: Long) {
+    @JvmOverloads
+    fun addRecord(session: DaoSession, kg: Double, timestampMillis: Long, createdMillis: Long? = null) {
+        val now = System.currentTimeMillis()
         val sample = ManualWeightSample().apply {
             timestamp = timestampMillis
             userId = DBHelper.getUser(session).id!!
             weightKg = kg.toFloat()
+            createdTimestamp = createdMillis ?: now
+            modifiedTimestamp = now
         }
         ManualWeightSampleProvider(session).addSample(sample)
     }
@@ -88,8 +92,9 @@ object UserWeight {
      */
     @JvmStatic
     fun replaceRecord(session: DaoSession, device: GBDevice, originalTimestampMillis: Long, kg: Double, timestampMillis: Long) {
-        when (deleteRecord(session, device, originalTimestampMillis)) {
+        when (val original = deleteRecord(session, device, originalTimestampMillis)) {
             is GenericWeightSample -> addDeviceRecord(session, device, kg, timestampMillis)
+            is ManualWeightSample -> addRecord(session, kg, timestampMillis, original.createdTimestamp)
             else -> addRecord(session, kg, timestampMillis)
         }
     }

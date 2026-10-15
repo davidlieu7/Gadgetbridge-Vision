@@ -141,6 +141,7 @@ class WeightEntryBottomSheet : BottomSheetDialogFragment() {
         if (childFragmentManager.findFragmentByTag(TIME_PICKER_TAG) != null) return
         val picker = MaterialTimePicker.Builder()
             .setTimeFormat(if (DateFormat.is24HourFormat(requireContext())) TimeFormat.CLOCK_24H else TimeFormat.CLOCK_12H)
+            .setInputMode(MaterialTimePicker.INPUT_MODE_CLOCK)
             .setHour(dateTime.hour)
             .setMinute(dateTime.minute)
             .build()

@@ -110,7 +110,7 @@ public class GBDaoGenerator {
             outputDir.mkdirs();
         }
 
-        final Schema schema = new Schema(155, MAIN_PACKAGE + ".entities");
+        final Schema schema = new Schema(156, MAIN_PACKAGE + ".entities");
 
         final List<Entity> sampleProvidersToGenerate = new LinkedList<>();
         final List<Entity> batterySampleProvidersToGenerate = new LinkedList<>();
@@ -2856,6 +2856,8 @@ public class GBDaoGenerator {
         Property userId = sample.addLongProperty("userId").notNull().getProperty();
         sample.addToOne(user, userId);
         sample.addFloatProperty(SAMPLE_WEIGHT_KG).notNull();
+        sample.addLongProperty("createdTimestamp").notNull();
+        sample.addLongProperty("modifiedTimestamp").notNull();
         return sample;
     }
 

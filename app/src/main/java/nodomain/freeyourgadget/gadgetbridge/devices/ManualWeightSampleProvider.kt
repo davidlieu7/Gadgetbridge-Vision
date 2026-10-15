@@ -33,6 +33,15 @@ class ManualWeightSampleProvider(private val session: DaoSession) {
             .list()
             .firstOrNull()
 
+    fun getModifiedSince(modifiedAfter: Long, timestampTo: Long): List<ManualWeightSample> =
+        dao.queryBuilder()
+            .where(
+                ManualWeightSampleDao.Properties.ModifiedTimestamp.gt(modifiedAfter),
+                ManualWeightSampleDao.Properties.Timestamp.le(timestampTo),
+            )
+            .orderAsc(ManualWeightSampleDao.Properties.Timestamp)
+            .list()
+
     fun get(timestamp: Long): ManualWeightSample? = dao.load(timestamp)
 
     fun addSample(sample: ManualWeightSample) {
