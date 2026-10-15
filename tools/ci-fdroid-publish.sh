@@ -44,12 +44,16 @@ nightly)
         -Dnightly_store_password="$APK_KEYSTORE_PASSWORD" \
         -Dnightly_key_alias="$APK_KEY_ALIAS" \
         -Dnightly_key_password="$APK_KEYSTORE_PASSWORD"
-    built=$(ls app/build/outputs/apk/mainline/nightly/*.apk | head -n1)
+    built=$(find app/build/outputs/apk -iname '*nightly*.apk' ! -name '*unsigned*' | head -n1)
+    find app/build/outputs/apk -name '*.apk' >&2
+    [ -n "$built" ] || { echo "No se encontro el APK nightly" >&2; exit 1; }
     cp "$built" "$work/signed.apk"
     ;;
 stable)
     ./gradlew assembleMainlineRelease --stacktrace
-    unsigned=$(ls app/build/outputs/apk/mainline/release/*.apk | head -n1)
+    find app/build/outputs/apk -name '*.apk' >&2
+    unsigned=$(find app/build/outputs/apk -path '*release*' -name '*.apk' | head -n1)
+    [ -n "$unsigned" ] || { echo "No se encontro el APK release" >&2; exit 1; }
     build_tools=$(ls -d "${ANDROID_HOME:-${ANDROID_SDK_ROOT:?ANDROID_HOME no definido}}"/build-tools/* | sort -V | tail -n1)
     "$build_tools/zipalign" -f -p 4 "$unsigned" "$work/aligned.apk"
     KS_PASS="$APK_KEYSTORE_PASSWORD" "$build_tools/apksigner" sign \
