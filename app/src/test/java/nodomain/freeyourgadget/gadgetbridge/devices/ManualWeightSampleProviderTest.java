@@ -20,7 +20,7 @@ import nodomain.freeyourgadget.gadgetbridge.util.UserWeight;
 
 /**
  * A weight entered by hand belongs to no device: every device that supports weight shows it next to
- * its own readings, and editing keeps a manual weight manual and a device reading with its device.
+ * its own readings, and only manual weights can be edited or deleted.
  * The values are synthetic, not readings from a person.
  */
 public class ManualWeightSampleProviderTest extends TestBase {
@@ -89,33 +89,28 @@ public class ManualWeightSampleProviderTest extends TestBase {
     }
 
     @Test
-    public void deletingRemovesOnlyTheRowThatWasShown() {
+    public void onlyManualWeightsCanBeDeleted() {
         addReading(scale, 1000L, 70.0f);
         UserWeight.addRecord(daoSession, 71.5, 2000L);
 
-        final WeightSample manual = UserWeight.deleteRecord(daoSession, scale, 2000L);
-        assertTrue(manual instanceof ManualWeightSample);
+        final ManualWeightSample manual = UserWeight.deleteRecord(daoSession, 2000L);
         assertEquals(List.of("1000=70.0d"), describe(merged(scale).getAllSamples(0, 10_000L)));
 
-        final WeightSample reading = UserWeight.deleteRecord(daoSession, scale, 1000L);
-        assertTrue(reading instanceof GenericWeightSample);
-        assertEquals(List.of(), describe(merged(scale).getAllSamples(0, 10_000L)));
+        assertNull(UserWeight.deleteRecord(daoSession, 1000L));
+        assertEquals(List.of("1000=70.0d"), describe(merged(scale).getAllSamples(0, 10_000L)));
 
         UserWeight.restoreRecord(daoSession, manual);
-        UserWeight.restoreRecord(daoSession, reading);
         assertEquals(List.of("1000=70.0d", "2000=71.5m"), describe(merged(scale).getAllSamples(0, 10_000L)));
     }
 
     @Test
-    public void editingKeepsTheKindOfTheRow() {
+    public void editingAManualWeightKeepsItManual() {
         addReading(scale, 1000L, 70.0f);
         UserWeight.addRecord(daoSession, 71.5, 2000L);
 
-        UserWeight.replaceRecord(daoSession, scale, 2000L, 71.0, 2500L);
-        UserWeight.replaceRecord(daoSession, scale, 1000L, 70.2, 1200L);
+        UserWeight.replaceRecord(daoSession, 2000L, 71.0, 2500L);
 
-        assertEquals(List.of("1200=70.2d", "2500=71.0m"), describe(merged(scale).getAllSamples(0, 10_000L)));
-        // the edited reading stays the scale's, so the watch does not gain it
+        assertEquals(List.of("1000=70.0d", "2500=71.0m"), describe(merged(scale).getAllSamples(0, 10_000L)));
         assertEquals(List.of("2500=71.0m"), describe(merged(watch).getAllSamples(0, 10_000L)));
     }
 
@@ -125,7 +120,7 @@ public class ManualWeightSampleProviderTest extends TestBase {
         final ManualWeightSampleProvider provider = new ManualWeightSampleProvider(daoSession);
         final long modifiedBefore = provider.get(2000L).getModifiedTimestamp();
 
-        UserWeight.replaceRecord(daoSession, scale, 2000L, 71.0, 1500L);
+        UserWeight.replaceRecord(daoSession, 2000L, 71.0, 1500L);
 
         final ManualWeightSample edited = provider.get(1500L);
         assertEquals(100L, edited.getCreatedTimestamp());
@@ -135,7 +130,20 @@ public class ManualWeightSampleProviderTest extends TestBase {
     }
 
     @Test
+    public void restoringMarksTheEntryModified() {
+        UserWeight.addRecord(daoSession, 71.5, 2000L, 100L);
+        final ManualWeightSample deleted = UserWeight.deleteRecord(daoSession, 2000L);
+        deleted.setModifiedTimestamp(200L);
+
+        UserWeight.restoreRecord(daoSession, deleted);
+
+        final ManualWeightSample restored = new ManualWeightSampleProvider(daoSession).get(2000L);
+        assertEquals(100L, restored.getCreatedTimestamp());
+        assertTrue(restored.getModifiedTimestamp() > 200L);
+    }
+
+    @Test
     public void deletingNothingReturnsNull() {
-        assertNull(UserWeight.deleteRecord(daoSession, scale, 4242L));
+        assertNull(UserWeight.deleteRecord(daoSession, 4242L));
     }
 }

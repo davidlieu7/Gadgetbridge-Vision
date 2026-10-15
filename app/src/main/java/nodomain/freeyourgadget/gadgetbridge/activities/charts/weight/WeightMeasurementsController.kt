@@ -16,11 +16,12 @@ import nodomain.freeyourgadget.gadgetbridge.GBApplication
 import nodomain.freeyourgadget.gadgetbridge.R
 import nodomain.freeyourgadget.gadgetbridge.activities.charts.WeightEntryBottomSheet
 import nodomain.freeyourgadget.gadgetbridge.entities.DaoSession
+import nodomain.freeyourgadget.gadgetbridge.entities.ManualWeightSample
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice
 import nodomain.freeyourgadget.gadgetbridge.model.ActivityUser
-import nodomain.freeyourgadget.gadgetbridge.model.WeightSample
 import nodomain.freeyourgadget.gadgetbridge.model.WeightUnit
 import nodomain.freeyourgadget.gadgetbridge.util.UserWeight
+import nodomain.freeyourgadget.gadgetbridge.util.healthconnect.HealthConnectWeightDeletion
 import org.slf4j.LoggerFactory
 import java.time.Instant
 import java.time.LocalDate
@@ -66,9 +67,10 @@ class WeightMeasurementsController(
     }
 
     fun delete(timestamp: Long) {
-        var deleted: WeightSample? = null
-        change({ session -> deleted = UserWeight.deleteRecord(session, device, timestamp) }) {
+        var deleted: ManualWeightSample? = null
+        change({ session -> deleted = UserWeight.deleteRecord(session, timestamp) }) {
             val sample = deleted ?: return@change
+            HealthConnectWeightDeletion.deleteManualSample(context, sample)
             val parent = snackbarParent() ?: return@change
             Snackbar.make(parent, R.string.weight_measurement_deleted, Snackbar.LENGTH_LONG)
                 .setDuration(UNDO_DURATION_MS)
@@ -79,11 +81,10 @@ class WeightMeasurementsController(
     }
 
     /**
-     * Fills a row inflated from item_weight_measurement. Manual weights can always be edited and deleted,
-     * readings of the device only when [deviceRecordsEditable].
+     * Fills a row inflated from item_weight_measurement. Only manual weights can be edited and deleted.
      */
-    fun bind(view: View, row: WeightMeasurementRow, deviceRecordsEditable: Boolean) {
-        val editable = row.manual || deviceRecordsEditable
+    fun bind(view: View, row: WeightMeasurementRow) {
+        val editable = row.manual
         val zone = ZoneId.systemDefault()
         val locale = Locale.getDefault()
         val date = WeightMeasurements.dateText(
@@ -142,7 +143,7 @@ class WeightMeasurementsController(
         val timestamp = result.getLong(WeightEntryBottomSheet.RESULT_TIMESTAMP)
         change({ session ->
             if (original != WeightEntryBottomSheet.NO_TIMESTAMP) {
-                UserWeight.replaceRecord(session, device, original, kg, timestamp)
+                UserWeight.replaceRecord(session, original, kg, timestamp)
             } else {
                 UserWeight.addRecord(session, kg, timestamp)
             }

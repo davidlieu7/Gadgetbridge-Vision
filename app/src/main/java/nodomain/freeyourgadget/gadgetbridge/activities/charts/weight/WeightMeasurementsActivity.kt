@@ -41,7 +41,6 @@ class WeightMeasurementsActivity : AbstractGBActivity() {
     private lateinit var controller: WeightMeasurementsController
     private val adapter = Adapter()
     private val mainHandler = Handler(Looper.getMainLooper())
-    private var deviceRecordsEditable = false
     private var latestKg: Double? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -83,7 +82,6 @@ class WeightMeasurementsActivity : AbstractGBActivity() {
             try {
                 GBApplication.acquireDB().use { db ->
                     val canAdd = UserWeight.supportsManualEntry(device)
-                    val deviceRecordsEditable = UserWeight.supportsDeviceRecordEdits(device, db.daoSession)
                     val samples = UserWeight.provider(device, db.daoSession)
                         ?.getAllSamples(0, System.currentTimeMillis()).orEmpty()
                     val rows = WeightMeasurements.rows(
@@ -91,7 +89,7 @@ class WeightMeasurementsActivity : AbstractGBActivity() {
                         samples.map { it.weightKg.toDouble() }.toDoubleArray(),
                         samples.map { it is ManualWeightSample }.toBooleanArray(),
                     )
-                    mainHandler.post { show(rows, canAdd, deviceRecordsEditable) }
+                    mainHandler.post { show(rows, canAdd) }
                 }
             } catch (e: Exception) {
                 LOG.error("Failed to load weight measurements", e)
@@ -99,9 +97,8 @@ class WeightMeasurementsActivity : AbstractGBActivity() {
         }
     }
 
-    private fun show(rows: List<WeightMeasurementRow>, canAdd: Boolean, deviceRecordsEditable: Boolean) {
+    private fun show(rows: List<WeightMeasurementRow>, canAdd: Boolean) {
         if (isDestroyed) return
-        this.deviceRecordsEditable = deviceRecordsEditable
         latestKg = rows.firstOrNull()?.weightKg
         binding.weightMeasurementsAdd.visibility = if (canAdd) View.VISIBLE else View.GONE
         binding.weightMeasurementsListEmpty.visibility = if (rows.isEmpty()) View.VISIBLE else View.GONE
@@ -151,7 +148,7 @@ class WeightMeasurementsActivity : AbstractGBActivity() {
                     text = item.label
                     setPaddingRelative(paddingStart, dp(if (item.first) 12f else 16f), paddingEnd, paddingBottom)
                 }
-                is Item.Measurement -> controller.bind(holder.itemView, item.row, deviceRecordsEditable)
+                is Item.Measurement -> controller.bind(holder.itemView, item.row)
             }
         }
     }
@@ -169,7 +166,7 @@ class WeightMeasurementsActivity : AbstractGBActivity() {
 
         override fun getSwipeDirs(recyclerView: RecyclerView, viewHolder: RecyclerView.ViewHolder): Int =
             when (val item = adapter.itemAt(viewHolder.bindingAdapterPosition)) {
-                is Item.Measurement -> if (item.row.manual || deviceRecordsEditable) super.getSwipeDirs(recyclerView, viewHolder) else 0
+                is Item.Measurement -> if (item.row.manual) super.getSwipeDirs(recyclerView, viewHolder) else 0
                 else -> 0
             }
 

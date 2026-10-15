@@ -7,8 +7,6 @@ import nodomain.freeyourgadget.gadgetbridge.devices.ManualWeightSampleProvider
 import nodomain.freeyourgadget.gadgetbridge.devices.TimeSampleProvider
 import nodomain.freeyourgadget.gadgetbridge.devices.WeightWithManualSampleProvider
 import nodomain.freeyourgadget.gadgetbridge.entities.DaoSession
-import nodomain.freeyourgadget.gadgetbridge.entities.GenericWeightSample
-import nodomain.freeyourgadget.gadgetbridge.entities.GenericWeightSampleDao
 import nodomain.freeyourgadget.gadgetbridge.entities.ManualWeightSample
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice
 import nodomain.freeyourgadget.gadgetbridge.model.ActivityUser
@@ -52,16 +50,6 @@ object UserWeight {
     @JvmStatic
     fun supportsManualEntry(device: GBDevice): Boolean = device.deviceCoordinator.supportsWeightMeasurement(device)
 
-    /**
-     * Whether the readings of [device] itself can be edited and deleted, i.e. it keeps generic weight records.
-     */
-    @JvmStatic
-    fun supportsDeviceRecordEdits(device: GBDevice, session: DaoSession): Boolean {
-        val coordinator = device.deviceCoordinator
-        return coordinator.supportsWeightMeasurement(device) &&
-            coordinator.getWeightSampleProvider(device, session) is GenericWeightSampleProvider
-    }
-
     @JvmStatic
     @JvmOverloads
     fun addRecord(session: DaoSession, kg: Double, timestampMillis: Long, createdMillis: Long? = null) {
@@ -76,62 +64,28 @@ object UserWeight {
         ManualWeightSampleProvider(session).addSample(sample)
     }
 
-    private fun addDeviceRecord(session: DaoSession, device: GBDevice, kg: Double, timestampMillis: Long) {
-        val sample = GenericWeightSample().apply {
-            timestamp = timestampMillis
-            deviceId = DBHelper.getDevice(device, session).id!!
-            userId = DBHelper.getUser(session).id!!
-            weightKg = kg.toFloat()
-        }
-        GenericWeightSampleProvider(device, session).addSample(sample)
+    /**
+     * Moves the manual weight at [originalTimestampMillis] to [kg] at [timestampMillis], keeping its creation time.
+     */
+    @JvmStatic
+    fun replaceRecord(session: DaoSession, originalTimestampMillis: Long, kg: Double, timestampMillis: Long) {
+        val original = deleteRecord(session, originalTimestampMillis)
+        addRecord(session, kg, timestampMillis, original?.createdTimestamp)
     }
 
     /**
-     * Replaces the record at [originalTimestampMillis] with [kg] at [timestampMillis]. A manual weight stays
-     * manual and a reading of [device] stays with [device].
+     * Deletes the manual weight at [timestampMillis] and returns it so it can be restored.
      */
     @JvmStatic
-    fun replaceRecord(session: DaoSession, device: GBDevice, originalTimestampMillis: Long, kg: Double, timestampMillis: Long) {
-        when (val original = deleteRecord(session, device, originalTimestampMillis)) {
-            is GenericWeightSample -> addDeviceRecord(session, device, kg, timestampMillis)
-            is ManualWeightSample -> addRecord(session, kg, timestampMillis, original.createdTimestamp)
-            else -> addRecord(session, kg, timestampMillis)
-        }
-    }
-
-    @JvmStatic
-    fun allRecords(session: DaoSession, device: GBDevice): List<GenericWeightSample> =
-        GenericWeightSampleProvider(device, session).getAllSamples(0, System.currentTimeMillis())
-
-    /**
-     * Deletes the manual weight at [timestampMillis], or else the record of [device] there, and returns it
-     * so it can be restored.
-     */
-    @JvmStatic
-    fun deleteRecord(session: DaoSession, device: GBDevice, timestampMillis: Long): WeightSample? {
+    fun deleteRecord(session: DaoSession, timestampMillis: Long): ManualWeightSample? {
         val manual = ManualWeightSampleProvider(session)
-        manual.get(timestampMillis)?.let {
-            manual.delete(timestampMillis)
-            return it
-        }
-        val sample = GenericWeightSampleProvider(device, session).getAllSamples(timestampMillis, timestampMillis).firstOrNull()
-            ?: return null
-        session.genericWeightSampleDao.queryBuilder()
-            .where(
-                GenericWeightSampleDao.Properties.DeviceId.eq(sample.deviceId),
-                GenericWeightSampleDao.Properties.Timestamp.eq(timestampMillis),
-            )
-            .buildDelete()
-            .executeDeleteWithoutDetachingEntities()
-        return sample
+        return manual.get(timestampMillis)?.also { manual.delete(timestampMillis) }
     }
 
     @JvmStatic
-    fun restoreRecord(session: DaoSession, sample: WeightSample) {
-        when (sample) {
-            is ManualWeightSample -> session.manualWeightSampleDao.insertOrReplace(sample)
-            is GenericWeightSample -> session.genericWeightSampleDao.insertOrReplace(sample)
-        }
+    fun restoreRecord(session: DaoSession, sample: ManualWeightSample) {
+        sample.modifiedTimestamp = System.currentTimeMillis()
+        session.manualWeightSampleDao.insertOrReplace(sample)
     }
 
     /**

@@ -49,6 +49,8 @@ internal object WeightSyncer : AbstractTimeSampleSyncer<WeightSample, WeightReco
         return UserWeight.provider(gbDevice, daoSession)
     }
 
+    fun manualClientRecordId(sample: ManualWeightSample) = "gadgetbridge_manual_weight_${sample.createdTimestamp}"
+
     /**
      * Syncs the manual weights dated up to [syncedUntil] that were added or edited after it.
      */
@@ -111,7 +113,7 @@ internal object WeightSyncer : AbstractTimeSampleSyncer<WeightSample, WeightReco
             // Health Connect keep one record of it rather than one per device.
             metadata = if (sample is ManualWeightSample) {
                 Metadata.manualEntry(
-                    clientRecordId = "gadgetbridge_manual_weight_${sample.createdTimestamp}",
+                    clientRecordId = manualClientRecordId(sample),
                     clientRecordVersion = sample.modifiedTimestamp
                 )
             } else {
