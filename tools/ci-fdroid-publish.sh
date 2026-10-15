@@ -9,6 +9,7 @@
 #   FDROID_KEYSTORE_B64 FDROID_KEYSTORE_PASSWORD FDROID_KEY_ALIAS FDROID_REPO_TOKEN
 # Opcional: FDROID_REPO (por defecto arnyminerz/fdroid), KEEP_VERSIONS (por defecto 3)
 set -euo pipefail
+trap 'echo "ERROR (linea $LINENO, codigo $?): $BASH_COMMAND" >&2' ERR
 
 kind="${1:?uso: $0 stable|nightly <version>}"
 version="${2:?falta la version}"
