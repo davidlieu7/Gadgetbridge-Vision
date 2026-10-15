@@ -771,6 +771,7 @@ public class GBDaoGenerator {
         addCommonTimeSampleProperties("AbstractTimeSample", sample, user, device);
         sample.addIntProperty("seq").notNull().primaryKey();
         sample.addIntProperty("rrMillis").notNull();
+        sample.addBooleanProperty("filterExcluded");
         return sample;
     }
 

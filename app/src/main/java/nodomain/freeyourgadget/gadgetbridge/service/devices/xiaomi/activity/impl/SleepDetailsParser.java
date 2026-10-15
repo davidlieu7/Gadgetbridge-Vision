@@ -46,6 +46,8 @@ import nodomain.freeyourgadget.gadgetbridge.entities.XiaomiSleepStageSample;
 import nodomain.freeyourgadget.gadgetbridge.entities.XiaomiSleepTimeSample;
 import nodomain.freeyourgadget.gadgetbridge.entities.HeartRrIntervalSample;
 import nodomain.freeyourgadget.gadgetbridge.entities.GenericHrvValueSample;
+import nodomain.freeyourgadget.gadgetbridge.entities.XiaomiActivitySample;
+import nodomain.freeyourgadget.gadgetbridge.entities.XiaomiActivitySampleDao;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.xiaomi.activity.XiaomiActivityFileId;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.xiaomi.activity.XiaomiActivityParser;
@@ -204,6 +206,9 @@ public class SleepDetailsParser extends XiaomiActivityParser {
         final List<GenericRespiratoryRateSample> respiratoryRateSamples = new ArrayList<>();
         final List<HeartRrIntervalSample> rrIntervalSamples = new ArrayList<>();
         final List<GenericHrvValueSample> hrvSamples = new ArrayList<>();
+        final Long spo2PhaseAnchorMs = findLatestSpo2TimestampMs(gbDevice);
+
+        LOG.debug("SpO2 phase anchor: {}", spo2PhaseAnchorMs);
         LOG.debug("Sleep stage packets from offset {}", Integer.toHexString(buf.position()));
 
         // Do not crash if we face a buffer underflow, as the next parsing is not 100% fool-proof,
@@ -259,6 +264,8 @@ public class SleepDetailsParser extends XiaomiActivityParser {
                     final long packetTimestamp = ts;
                     int seq = 0;
                     final List<Integer> packetRrMillis = new ArrayList<>();
+                    // load current packet database
+                    final List<HeartRrIntervalSample> packetRrSamples = new ArrayList<>();
                     // add heartbeats after intervals
                     while (dataBuf.position() < dataBuf.limit()) {
                         final int delta = dataBuf.get() & 0xff;  // delta is in 10msec units
@@ -275,15 +282,34 @@ public class SleepDetailsParser extends XiaomiActivityParser {
                         rrSample.setSeq(seq++);
                         rrSample.setRrMillis(rrMillis);
                         rrIntervalSamples.add(rrSample);
+                        packetRrSamples.add(rrSample);
                     }
+
+                    final boolean[] excluded = findExcludedRrIntervals(packetRrMillis);
+
+                    if (spo2PhaseAnchorMs != null) {
+                        addSpo2PhaseExclusions(
+                            packetRrMillis,
+                            packetTimestamp,
+                            spo2PhaseAnchorMs,
+                            excluded
+                        );
+                    }
+
+                    for (int i = 0; i < excluded.length; i++) {
+                        packetRrSamples.get(i).setFilterExcluded(excluded[i]);
+                    }
+
                     if (packetRrMillis.size() >= 2) {
-                        final double rmssd = calculateRmssd(packetRrMillis);
+                        final Double rmssd = calculateRmssd(packetRrMillis, excluded);
 
-                        final GenericHrvValueSample hrvSample = new GenericHrvValueSample();
-                        hrvSample.setTimestamp(packetTimestamp);
-                        hrvSample.setValue((int) Math.round(rmssd));
+                        if (rmssd != null) {
+                            final GenericHrvValueSample hrvSample = new GenericHrvValueSample();
+                            hrvSample.setTimestamp(packetTimestamp);
+                            hrvSample.setValue((int) Math.round(rmssd));
 
-                        hrvSamples.add(hrvSample);
+                            hrvSamples.add(hrvSample);
+                        }
                     }
                 } else if (type == 16) {
                     final int data_0 = dataBuf.get() & 0xFF;
@@ -512,17 +538,137 @@ public class SleepDetailsParser extends XiaomiActivityParser {
         return false;
     }
 
-    private static double calculateRmssd(final List<Integer> rrMillis) {
-        double sumSquaredDifferences = 0.0;
+    // Xiaomi SpO2 sensor cause spike in RR so this is to cut the overlapping RR out
+    private static Long findLatestSpo2TimestampMs(final GBDevice gbDevice) {
+        try (DBHandler handler = GBApplication.acquireDB()) {
+            final DaoSession session = handler.getDaoSession();
 
-        for (int i = 1; i < rrMillis.size(); i++) {
-            final double difference = rrMillis.get(i) - rrMillis.get(i - 1);
-            sumSquaredDifferences += difference * difference;
+            final long deviceId = DBHelper.getDevice(gbDevice, session).getId();
+            final long userId = DBHelper.getUser(session).getId();
+
+            final List<XiaomiActivitySample> samples =
+                session.getXiaomiActivitySampleDao()
+                    .queryBuilder()
+                    .where(
+                        XiaomiActivitySampleDao.Properties.DeviceId.eq(deviceId),
+                        XiaomiActivitySampleDao.Properties.UserId.eq(userId),
+                        XiaomiActivitySampleDao.Properties.Spo2.gt(0)
+                    )
+                    .orderDesc(XiaomiActivitySampleDao.Properties.Timestamp)
+                    .limit(1)
+                    .list();
+
+            if (samples.isEmpty()) {
+                return null;
+            }
+
+            return samples.get(0).getTimestamp() * 1000L;
+
+        } catch (final Exception e) {
+            LOG.warn("Unable to retrieve SpO2 phase anchor", e);
+            return null;
+        }
+    }
+
+    // This finds overlaps between SpO2 disturbance window and RR packet
+    private static void addSpo2PhaseExclusions(
+        final List<Integer> rrMillis,
+        final long packetTimestampMs,
+        final long spo2PhaseAnchorMs,
+        final boolean[] excluded) {
+
+        if (rrMillis.size() != excluded.length) {
+            throw new IllegalArgumentException("RR and exclusion mask lengths differ");
         }
 
-        return Math.sqrt(
-            sumSquaredDifferences / (rrMillis.size() - 1)
-        );
+        final long periodMs = 600_000L;
+        final long windowStartMs = 2_000L;
+        final long windowEndMs = 6_000L;
+
+        long elapsedMs = 0L;
+
+        for (int i = 0; i < rrMillis.size(); i++) {
+            final int durationMs = rrMillis.get(i);
+
+            if (durationMs > 0) {
+                final long rrStartMs = packetTimestampMs + elapsedMs;
+
+                final long phaseMs = Math.floorMod(
+                    rrStartMs - spo2PhaseAnchorMs,
+                    periodMs
+                );
+
+                final long rrEndPhaseMs = phaseMs + durationMs;
+
+                // Overlap with the window in the current 10-minute cycle
+                final boolean overlapsCurrentWindow =
+                    phaseMs < windowEndMs &&
+                        rrEndPhaseMs > windowStartMs;
+
+                // Overlap with the next window across the cycle boundary
+                final boolean overlapsNextWindow =
+                    rrEndPhaseMs > periodMs + windowStartMs;
+
+                if (overlapsCurrentWindow || overlapsNextWindow) {
+                    excluded[i] = true;
+                }
+            }
+
+            elapsedMs += durationMs;
+        }
+    }
+
+    private static boolean[] findExcludedRrIntervals(final List<Integer> rrMillis) {
+        final boolean[] excluded = new boolean[rrMillis.size()];
+
+        for (int i = 0; i < rrMillis.size(); i++) {
+            if (rrMillis.get(i) <= 0) {
+                excluded[i] = true;
+            }
+        }
+
+        for (int i = 1; i < rrMillis.size(); i++) {
+            final int previous = rrMillis.get(i - 1);
+            final int current = rrMillis.get(i);
+
+            // add SpO2 phase exclusion for RR quality
+            if (previous <= 0 || current <= 0
+                || (double) current / previous < 0.65
+                || (double) current / previous > (1 / 0.65) ) {
+                excluded[i - 1] = true;
+                excluded[i] = true;
+            }
+        }
+
+        return excluded;
+    }
+
+    private static Double calculateRmssd(
+        final List<Integer> rrMillis,
+        final boolean[] excluded) {
+
+        if (rrMillis.size() != excluded.length) {
+            throw new IllegalArgumentException("RR and exclusion mask lengths differ");
+        }
+
+        double sumSquaredDifferences = 0.0;
+        int validPairs = 0;
+
+        for (int i = 1; i < rrMillis.size(); i++) {
+            if (excluded[i - 1] || excluded[i]) {
+                continue;
+            }
+
+            final double difference = rrMillis.get(i) - rrMillis.get(i - 1);
+            sumSquaredDifferences += difference * difference;
+            validPairs++;
+        }
+
+        if (validPairs == 0) {
+            return null;
+        }
+
+        return Math.sqrt(sumSquaredDifferences / validPairs);
     }
 
     private static int decodeStage(int rawStage) {
