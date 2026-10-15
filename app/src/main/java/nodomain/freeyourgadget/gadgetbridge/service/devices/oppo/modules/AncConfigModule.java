@@ -129,6 +129,16 @@ public class AncConfigModule extends AbstractModule {
                 final Set<String> valuePrefIds = AncConfigValue.toPrefIds(values);
                 event.withPreference(OppoHeadphonesPreferences.ANC_TOUCH_CYCLE_MODES, valuePrefIds);
             }
+            case DYNAMIC_LEVEL -> {
+                final AncConfigValue.Level value = AncConfigValue.Level.fromCode(valueCode);
+                if (value == null) {
+                    LOG.warn("Unknown anc level value code 0x{}", OppoUtils.numberToHex(valueCode, 2));
+                    break;
+                }
+
+                LOG.debug("Got {} = {} (DYNAMIC)", type, value);
+                event.withPreference(OppoHeadphonesPreferences.ANC_LEVEL_DYNAMIC, value.getPrefId());
+            }
             default -> {
                 LOG.debug("Unknown anc type code {}", typeCode);
             }

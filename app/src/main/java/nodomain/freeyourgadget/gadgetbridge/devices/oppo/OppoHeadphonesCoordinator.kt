@@ -25,6 +25,7 @@ import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSpec
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSpecificSettingsScreen
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.DeviceSettingsScope
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.DeviceSettingsSpec
+import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.components.enumInfo
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.components.enumList
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.components.multiEnumList
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.components.multipointPairing
@@ -125,6 +126,22 @@ abstract class OppoHeadphonesCoordinator : AbstractBLClassicDeviceCoordinator() 
                             prefs.getString(OppoHeadphonesPreferences.ANC_SELECTOR, null)
                         val mode = AncConfigValue.fromPrefId(modePreference)
                         mode == AncConfigValue.ON
+                    }
+                )
+                enumInfo<AncConfigValue.Level>(
+                    key = OppoHeadphonesPreferences.ANC_LEVEL_DYNAMIC,
+                    title = R.string.prefs_active_noise_cancelling_effective_level,
+                    dependency = OppoHeadphonesPreferences.ANC_LEVEL_SELECTOR,
+                    visibleWhen = { prefs ->
+                        val modePreference =
+                            prefs.getString(OppoHeadphonesPreferences.ANC_SELECTOR, null)
+                        val mode = AncConfigValue.fromPrefId(modePreference)
+
+                        val modeLevelPreference =
+                            prefs.getString(OppoHeadphonesPreferences.ANC_LEVEL_SELECTOR, null)
+                        val modeLevel = AncConfigValue.Level.fromPrefId(modeLevelPreference)
+
+                        mode == AncConfigValue.ON && modeLevel == AncConfigValue.Level.DYNAMIC
                     }
                 )
             }

@@ -204,6 +204,9 @@ public class OppoHeadphonesSupport extends AbstractHeadphoneBTBRDeviceSupport {
             supports.add(AncConfigType.MODE);
             supports.add(AncConfigType.TOUCH_CYCLE_MODES);
         }
+        if (getCoordinator().supportsAncLevel(getDevice())) {
+            supports.add(AncConfigType.DYNAMIC_LEVEL);
+        }
         return supports;
     }
 
