@@ -182,37 +182,36 @@ object ZeppOsWeatherHandlerV6 {
     }
 
     private fun createHourlyWeather(weatherSpec: WeatherSpec): HourlyWeather {
-        // Round down to the hour, so that the entry covering the current hour is kept
+        // Anchor the current observations to the start of the hour.
         val cutoff = weatherSpec.timestamp - Math.floorMod(weatherSpec.timestamp, 3600)
 
-        val filteredHourly = weatherSpec.hourly.filter { it.timestamp != 0 && it.timestamp >= cutoff }
+        val filteredHourly = weatherSpec.hourly.filter { it.timestamp != 0 && it.timestamp > cutoff }
 
-        // Devices only display weather once a known hour starts (#6663)
-        val currentHourMissing = filteredHourly.firstOrNull()?.timestamp != cutoff
+        val currentHour = weatherSpec.hourly.firstOrNull { it.timestamp == cutoff }
 
+        // Use current observations even when an hourly forecast covers the current hour.
+        // Keep forecasts for future hours.
         val hours = buildList {
-            if (currentHourMissing) {
-                add(
-                    HourlyWeatherHour(
-                        forecastStart = toOffsetDateTime(Date(cutoff * 1000L)),
-                        conditionCode = ZeppOsWeatherHandler.mapToZeppOsWeatherCode(weatherSpec.currentConditionCode)
-                            .toString(),
-                        humidity = weatherSpec.currentHumidity / 100.0f,
-                        pressure = weatherSpec.pressure,
-                        temperature = weatherSpec.currentTemp - 273f,
-                        uvIndex = weatherSpec.uvIndex.roundToInt(),
-                        visibility = weatherSpec.visibility,
-                        windDirection = weatherSpec.windDirection,
-                        windSpeed = weatherSpec.windSpeed,
-                        windScale = weatherSpec.windSpeedAsBeaufort(),
-                        // New V6 fields
-                        temperatureApparent = weatherSpec.feelsLikeTemp.takeIf { it != 0 }?.let { it - 273f },
-                        temperatureDewPoint = weatherSpec.dewPoint.takeIf { it != 0 }?.let { it - 273f },
-                        precipitationChance = weatherSpec.precipProbability / 100.0f,
-                        daylight = isDaylight(weatherSpec, cutoff.toLong()),
-                    )
+            add(
+                HourlyWeatherHour(
+                    forecastStart = toOffsetDateTime(Date(cutoff * 1000L)),
+                    conditionCode = ZeppOsWeatherHandler.mapToZeppOsWeatherCode(weatherSpec.currentConditionCode)
+                        .toString(),
+                    humidity = weatherSpec.currentHumidity / 100.0f,
+                    pressure = weatherSpec.pressure,
+                    temperature = weatherSpec.currentTemp - 273f,
+                    uvIndex = weatherSpec.uvIndex.roundToInt(),
+                    visibility = weatherSpec.visibility,
+                    windDirection = weatherSpec.windDirection,
+                    windSpeed = weatherSpec.windSpeed,
+                    windScale = weatherSpec.windSpeedAsBeaufort(),
+                    // New V6 fields
+                    temperatureApparent = weatherSpec.feelsLikeTemp.takeIf { it != 0 }?.let { it - 273f },
+                    temperatureDewPoint = weatherSpec.dewPoint.takeIf { it != 0 }?.let { it - 273f },
+                    precipitationChance = (currentHour?.precipProbability ?: weatherSpec.precipProbability) / 100.0f,
+                    daylight = isDaylight(weatherSpec, cutoff.toLong()),
                 )
-            }
+            )
             filteredHourly.forEach {
                 add(
                     HourlyWeatherHour(
