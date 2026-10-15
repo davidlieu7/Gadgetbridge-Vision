@@ -22,7 +22,10 @@ class WeatherSpecTest : TestBase() {
             Triple(69.6, 19.0, "Europe/Oslo"),
             Triple(90.0, 0.0, "UTC"),
         )
-        val dates = listOf("2026-03-20", "2026-06-21", "2026-09-22", "2026-12-21", "2026-10-04")
+        val dates = listOf(
+            "2011-01-01", "2026-03-20", "2026-06-21", "2026-09-22",
+            "2026-12-21", "2026-10-04", "2109-12-31"
+        )
         for ((latitude, longitude, zone) in locations) {
             val location = Location("test").apply {
                 this.latitude = latitude

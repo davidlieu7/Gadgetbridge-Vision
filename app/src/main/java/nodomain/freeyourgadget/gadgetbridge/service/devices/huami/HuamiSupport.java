@@ -38,7 +38,6 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.localbroadcastmanager.content.LocalBroadcastManager;
 
-import net.e175.klaus.solarpositioning.DeltaT;
 import net.e175.klaus.solarpositioning.SolarEvents;
 
 import org.apache.commons.lang3.ArrayUtils;
@@ -3113,15 +3112,7 @@ public abstract class HuamiSupport extends AbstractBTLESingleDeviceSupport
             float longitude = longlat[0];
             float latitude = longlat[1];
             if (longitude != 0 && latitude != 0) {
-                final ZonedDateTime dateTimeToday = ZonedDateTime.now();
-
-                final SolarEvents.Day solarDay = SolarEvents.spa().forDate(
-                        dateTimeToday.toLocalDate(),
-                        dateTimeToday.getZone(),
-                        latitude,
-                        longitude,
-                        DeltaT.estimate(dateTimeToday.toLocalDate())
-                );
+                final SolarEvents.Day solarDay = WeatherSpec.solarDay(ZonedDateTime.now(), latitude, longitude);
 
                 if (!solarDay.rises().isEmpty() && !solarDay.sets().isEmpty()) {
                     final ZonedDateTime sunrise = solarDay.rises().get(0);
