@@ -99,7 +99,7 @@ printf 'config.yml\n*.jks\n' > .gitignore
 safe_version=$(printf '%s' "$version" | tr -c 'A-Za-z0-9._-' '_')
 cp "$work/signed.apk" "repo/gadgetbridge_${kind}_${safe_version}.apk"
 for k in stable nightly; do
-    ls -t repo/gadgetbridge_${k}_*.apk 2>/dev/null | tail -n +"$((KEEP_VERSIONS + 1))" | xargs -r rm -f --
+    { ls -t repo/gadgetbridge_${k}_*.apk 2>/dev/null || true; } | tail -n +"$((KEEP_VERSIONS + 1))" | xargs -r rm -f --
 done
 fdroid update --create-metadata --clean
 
