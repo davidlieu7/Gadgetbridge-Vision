@@ -54,6 +54,9 @@ class SoundcoreSleepSampleProvider(private val device: GBDevice, private val ses
                 }
             }
         }
+        // Daily charts prepend a range-start sample. Keep that unmeasured leading gap
+        // separate so sleep analysis cannot charge it to the first measured stage.
+        intervals.firstOrNull()?.let { addUnknown(it.timestamp / 1000L - 1L) }
         for ((index, record) in intervals.withIndex()) {
             val start = maxOf(record.timestamp / 1000L, timestampFrom.toLong())
             val end = record.endTimestamp / 1000L

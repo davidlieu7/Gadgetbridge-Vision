@@ -32,6 +32,9 @@ import nodomain.freeyourgadget.gadgetbridge.service.devices.soundcore.sleep_a30.
 
 class SoundcoreSleepA30Coordinator : SoundcoreEarbudsCoordinator() {
     override fun supportsDataFetching(device: GBDevice): Boolean = true
+    override fun supportsActivityTracking(device: GBDevice): Boolean = true
+    override fun supportsStepCounter(device: GBDevice): Boolean = false
+    override fun supportsSpeedzones(device: GBDevice): Boolean = false
     override fun supportsSleepMeasurement(device: GBDevice): Boolean = true
     override fun supportsSleepScore(device: GBDevice): Boolean = true
     override fun supportsAwakeSleep(device: GBDevice): Boolean = true
