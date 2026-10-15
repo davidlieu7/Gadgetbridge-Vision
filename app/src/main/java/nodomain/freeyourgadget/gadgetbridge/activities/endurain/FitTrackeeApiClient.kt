@@ -35,7 +35,8 @@ class FitTrackeeApiClient(
 ) {
     companion object {
         const val REDIRECT_URI = "app://gadgetbridge/fittrackee/callback"
-        const val SCOPES = "profile:read workouts:write"
+        // workouts:read is needed to list the sports, and FitTrackee refuses an upload without one
+        const val SCOPES = "profile:read workouts:read workouts:write"
 
         private val LOG = LoggerFactory.getLogger(FitTrackeeApiClient::class.java)
 
@@ -166,7 +167,11 @@ class FitTrackeeApiClient(
     fun fetchSports(): Map<String, Int> {
         val headers = authHeaders() ?: return emptyMap()
         val sports = InternetUtils.doJsonRequest(uri = "$base/api/sports".toUri(), requestHeaders = headers)
-            ?.optJSONObject("data")?.optJSONArray("sports") ?: return emptyMap()
+            ?.optJSONObject("data")?.optJSONArray("sports")
+        if (sports == null) {
+            LOG.warn("Could not list the FitTrackee sports, the token may lack the workouts:read scope")
+            return emptyMap()
+        }
         val result = mutableMapOf<String, Int>()
         for (i in 0 until sports.length()) {
             val sport = sports.optJSONObject(i) ?: continue
@@ -179,7 +184,8 @@ class FitTrackeeApiClient(
 
     /**
      * Uploads a workout [file]. Returns the new workout's short id, or null with a reason.
-     * [sportId] and [title] are optional; without them FitTrackee derives them from the file.
+     * FitTrackee rejects an upload without a [sportId] ("invalid payload"), so it is required in
+     * practice. [title] is optional; without it FitTrackee derives it from the file.
      */
     fun uploadWorkout(file: File, sportId: Int?, title: String?): Pair<String?, String?> {
         val headers = authHeaders()

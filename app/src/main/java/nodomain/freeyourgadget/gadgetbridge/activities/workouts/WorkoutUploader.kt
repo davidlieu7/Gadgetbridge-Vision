@@ -265,9 +265,9 @@ object WorkoutUploader {
         val serverUrl = GBApplication.getPrefs().preferences.getString(PREF_FITTRACKEE_SERVER, null)
             ?: return UploadResult(false, null, null)
         val apiClient = FitTrackeeApiClient(serverUrl, FitTrackeeTokenManager(context))
-        val (id, reason) = apiClient.uploadWorkout(
-            file, fitTrackeeSportId(apiClient, summary), nameFor(context, summary)
-        )
+        val sportId = fitTrackeeSportId(apiClient, summary)
+            ?: return UploadResult(false, null, context.getString(R.string.fittrackee_no_sport))
+        val (id, reason) = apiClient.uploadWorkout(file, sportId, nameFor(context, summary))
         return if (id != null) UploadResult(true, id, null) else UploadResult(false, null, reason)
     }
 
