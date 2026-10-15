@@ -146,7 +146,8 @@ internal object ChartDataBuilder {
         }
         val groupColors = group.map { (it.style as SeriesStyle.Column).color }
         return BarDataSet(entries, group.first().label).apply {
-            colors = if (isStacked) groupColors else groupColors.take(1)
+            // The renderer cycles colors over stackSize slots per entry, including padded sections.
+            colors = groupColors.take(stackSize)
             barCornerRadius = cornerRadiusDp
             highlightAlpha = 0
             isDrawValuesEnabled = false
