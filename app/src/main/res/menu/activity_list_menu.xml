@@ -17,6 +17,11 @@
         app:showAsAction="ifRoom" />
 
     <item
+        android:id="@+id/activity_action_upload_all"
+        android:title="@string/workout_upload_all"
+        app:showAsAction="never" />
+
+    <item
         android:id="@+id/activity_action_manage_timestamp"
         android:icon="@drawable/ic_history"
         android:title="@string/reset_index"

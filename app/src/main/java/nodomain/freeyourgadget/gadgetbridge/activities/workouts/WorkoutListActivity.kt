@@ -148,6 +148,16 @@ class WorkoutListActivity : AbstractListActivity<BaseActivitySummary>() {
                 true
             }
 
+            R.id.activity_action_upload_all -> {
+                MaterialAlertDialogBuilder(this)
+                    .setTitle(R.string.workout_upload_all)
+                    .setMessage(R.string.workout_upload_all_confirm)
+                    .setPositiveButton(R.string.ok) { _, _ -> forceUpload(null) }
+                    .setNegativeButton(R.string.cancel, null)
+                    .show()
+                true
+            }
+
             R.id.activity_action_manage_timestamp -> {
                 resetFetchTimestampToChosenDate()
                 true
@@ -293,6 +303,20 @@ class WorkoutListActivity : AbstractListActivity<BaseActivitySummary>() {
         refresh()
     }
 
+    /**
+     * Queues an upload of [summaryIds] (the whole history when null) to every set-up online
+     * service, ignoring the age of the workouts and the auto-upload setting.
+     */
+    private fun forceUpload(summaryIds: List<Long>?) {
+        val device = gbDevice ?: return
+        if (WorkoutUploadTargets.loggedIn(this).isEmpty()) {
+            GB.toast(getString(R.string.workout_upload_no_service), Toast.LENGTH_LONG, GB.WARN)
+            return
+        }
+        WorkoutUploadWorker.enqueueForced(this, device.address, summaryIds)
+        GB.toast(getString(R.string.workout_upload_queued), Toast.LENGTH_SHORT, GB.INFO)
+    }
+
     private fun stopActionMode() {
         actionMode?.finish()
         actionMode = null
@@ -356,6 +380,19 @@ class WorkoutListActivity : AbstractListActivity<BaseActivitySummary>() {
                             }
                         }
                         showExportDialog(toExport)
+                        return true
+                    }
+
+                    R.id.activity_action_upload -> {
+                        val ids = ArrayList<Long>()
+                        for (i in 0 until selectedItems!!.length()) {
+                            if (selectedItems!!.get(i)) {
+                                itemAdapter?.getItem(i)?.id?.let { ids.add(it) }
+                            }
+                        }
+                        forceUpload(ids)
+                        mode.finish()
+                        actionMode = null
                         return true
                     }
 

@@ -24,6 +24,13 @@
         app:showAsAction="ifRoom" />
 
     <item
+        android:id="@+id/activity_action_upload"
+        android:icon="@drawable/ic_file_upload"
+        android:title="@string/workout_upload_now"
+        app:iconTint="?attr/actionmenu_icon_color"
+        app:showAsAction="never" />
+
+    <item
         android:id="@+id/activity_action_delete"
         android:icon="@drawable/ic_delete_forever"
         android:title="@string/delete"

@@ -5841,6 +5841,11 @@
     <string name="auto_upload_failed_fittrackee">FitTrackee upload failed: %1$s</string>
     <string name="auto_upload_failed_wanderer">Wanderer upload failed: %1$s</string>
     <string name="auto_upload_endurain_remote_edited">The workout changed, but the activity on Endurain was edited there and was left untouched</string>
+    <string name="workout_upload_now">Upload to online services</string>
+    <string name="workout_upload_all">Upload all workouts to online services</string>
+    <string name="workout_upload_all_confirm">Every workout of this device that the connected online services do not hold yet will be uploaded, however old it is. This can take a while and use a lot of data.</string>
+    <string name="workout_upload_queued">Upload started, you will be notified of any failure</string>
+    <string name="workout_upload_no_service">No online service is set up</string>
     <string name="workout_upload_status_title">Upload status</string>
     <string name="workout_upload_status_uploaded">Uploaded</string>
     <string name="workout_upload_status_partial">Partly uploaded</string>

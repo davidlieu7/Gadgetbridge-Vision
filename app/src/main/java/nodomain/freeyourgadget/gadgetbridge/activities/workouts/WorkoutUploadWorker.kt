@@ -68,7 +68,13 @@ class WorkoutUploadWorker(
 
     override fun doWork(): Result {
         val context = applicationContext
-        val targets = WorkoutUploadTargets.active(context, GBApplication.getPrefs())
+        val forced = inputData.getBoolean(INPUT_FORCE, false)
+        // A forced run is the user asking for it, so it does not wait for auto-upload to be on.
+        val targets = if (forced) {
+            WorkoutUploadTargets.loggedIn(context)
+        } else {
+            WorkoutUploadTargets.active(context, GBApplication.getPrefs())
+        }
         if (targets.isEmpty()) {
             return Result.success()
         }
@@ -89,7 +95,12 @@ class WorkoutUploadWorker(
         val provider = gbDevice.deviceCoordinator.getActivityTrackProvider(gbDevice, context)
         val failures = mutableMapOf<WorkoutUploadTarget, String>()
 
-        for (summary in queryRecentSummaries(gbDevice)) {
+        val summaries = if (forced) {
+            queryForcedSummaries(gbDevice, inputData.getLongArray(INPUT_SUMMARY_IDS))
+        } else {
+            queryRecentSummaries(gbDevice)
+        }
+        for (summary in summaries) {
             val id = summary.id ?: continue
             val sourceHash = WorkoutUploadStore.sourceHashOf(summary)
             for (target in targets) {
@@ -98,6 +109,12 @@ class WorkoutUploadWorker(
                     failures[target] = it
                 }
             }
+        }
+
+        if (forced) {
+            // Only the upload pass was asked for. Re-syncing what is already out there is left to
+            // the regular runs, which know about the auto-upload setting.
+            return finish(context, failures, Result.success())
         }
 
         val rowIds = rowsByTarget.values.flatMap { it.keys }.toSet()
@@ -317,21 +334,30 @@ class WorkoutUploadWorker(
     }
 
     private fun queryRecentSummaries(gbDevice: GBDevice): List<BaseActivitySummary> {
+        val since = Date(System.currentTimeMillis() - RECENT_WINDOW_MS)
+        return querySummaries(gbDevice, since, null)
+    }
+
+    /** The workouts a forced run covers: [ids] when given, otherwise the device's whole history. */
+    private fun queryForcedSummaries(gbDevice: GBDevice, ids: LongArray?): List<BaseActivitySummary> {
+        return querySummaries(gbDevice, null, ids?.toList())
+    }
+
+    private fun querySummaries(gbDevice: GBDevice, since: Date?, ids: List<Long>?): List<BaseActivitySummary> {
         return try {
             GBApplication.acquireDbReadOnly().use { db ->
                 val device = DBHelper.findDevice(gbDevice, db.daoSession) ?: return emptyList()
-                val since = Date(System.currentTimeMillis() - RECENT_WINDOW_MS)
-                db.daoSession.baseActivitySummaryDao.queryBuilder()
-                    .where(
-                        BaseActivitySummaryDao.Properties.DeviceId.eq(device.id),
-                        BaseActivitySummaryDao.Properties.StartTime.ge(since)
-                    )
-                    .orderAsc(BaseActivitySummaryDao.Properties.StartTime)
-                    .build()
-                    .list()
+                val dao = db.daoSession.baseActivitySummaryDao
+                (ids?.chunked(SUMMARY_QUERY_CHUNK) ?: listOf(null)).flatMap { chunk ->
+                    val query = dao.queryBuilder()
+                        .where(BaseActivitySummaryDao.Properties.DeviceId.eq(device.id))
+                    since?.let { query.where(BaseActivitySummaryDao.Properties.StartTime.ge(it)) }
+                    chunk?.let { query.where(BaseActivitySummaryDao.Properties.Id.`in`(it)) }
+                    query.orderAsc(BaseActivitySummaryDao.Properties.StartTime).build().list()
+                }
             }
         } catch (e: Exception) {
-            LOG.error("Error querying summaries for auto-upload", e)
+            LOG.error("Error querying summaries for upload", e)
             emptyList()
         }
     }
@@ -377,6 +403,13 @@ class WorkoutUploadWorker(
 
     companion object {
         const val INPUT_DEVICE_ADDRESS = "device_address"
+
+        /** Marks a run the user asked for: no recent-window bound, and not gated on auto-upload. */
+        const val INPUT_FORCE = "force"
+
+        /** With [INPUT_FORCE], the summaries to upload; absent means the device's whole history. */
+        const val INPUT_SUMMARY_IDS = "summary_ids"
+        private const val FORCE_WORK_NAME_PREFIX = "WorkoutUploadWorkerForce_"
         private const val WORK_NAME_PREFIX = "WorkoutUploadWorker_"
         private const val RECENT_WINDOW_MS = 14L * 24 * 60 * 60 * 1000
 
@@ -404,6 +437,28 @@ class WorkoutUploadWorker(
             WorkManager.getInstance(context).enqueueUniqueWork(
                 WORK_NAME_PREFIX + deviceAddress,
                 ExistingWorkPolicy.REPLACE,
+                request
+            )
+        }
+
+        /**
+         * Enqueues a run that uploads [summaryIds] (or, when null, the device's whole history) to
+         * every service that is set up, whatever the age of the workouts and whether or not
+         * auto-upload is on. Workouts a service already holds are skipped. Kept apart from the
+         * regular per-device work so neither replaces the other.
+         */
+        @JvmStatic
+        fun enqueueForced(context: Context, deviceAddress: String, summaryIds: List<Long>?) {
+            val data = Data.Builder()
+                .putString(INPUT_DEVICE_ADDRESS, deviceAddress)
+                .putBoolean(INPUT_FORCE, true)
+            summaryIds?.let { data.putLongArray(INPUT_SUMMARY_IDS, it.toLongArray()) }
+            val request = OneTimeWorkRequest.Builder(WorkoutUploadWorker::class.java)
+                .setInputData(data.build())
+                .build()
+            WorkManager.getInstance(context).enqueueUniqueWork(
+                FORCE_WORK_NAME_PREFIX + deviceAddress,
+                ExistingWorkPolicy.APPEND_OR_REPLACE,
                 request
             )
         }

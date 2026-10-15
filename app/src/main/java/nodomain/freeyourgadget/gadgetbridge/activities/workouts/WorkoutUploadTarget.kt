@@ -129,6 +129,10 @@ interface WorkoutUploadTarget {
 object WorkoutUploadTargets {
     val ALL: List<WorkoutUploadTarget> = listOf(EndurainUploadTarget, WandererUploadTarget, FitTrackeeUploadTarget)
 
+    /** Targets the user has finished setting up, whether or not auto-upload is on for them. */
+    fun loggedIn(context: Context): List<WorkoutUploadTarget> =
+        ALL.filter { it.isLoggedIn(context) }
+
     /** Targets the user has both enabled and finished setting up. */
     fun active(context: Context, prefs: GBPrefs): List<WorkoutUploadTarget> =
         ALL.filter { it.isAutoUploadEnabled(prefs) && it.isLoggedIn(context) }
