@@ -30,6 +30,14 @@ public class EarFunPacket {
     public static final short VENDOR_ID_V1_V2 = (short) 0x000A;
     public static final short VENDOR_ID_V3 = (short) 0x001D;
     private static final List<Short> SUPPORTED_VENDOR_IDS = Arrays.asList(VENDOR_ID_V1_V2, VENDOR_ID_V3);
+    /**
+     * With these flags the length is carried on two bytes instead of one, which makes the header
+     * nine bytes long. It is meant for payloads that the one byte length cannot express, i.e. above
+     * 254 bytes — for instance a combined ten band equalizer payload on some models. Never observed
+     * on the wire for the Free Pro 3, so it is implemented for symmetry with {@link #encode()} only.
+     */
+    private static final byte FLAGS_EXTENDED_LENGTH = (byte) 0x02;
+    private static final int MAX_SHORT_PAYLOAD_LENGTH = 0xFE;
     static final int COMMAND_MASK = 0x7FFF;
     static final int ACK_MASK = 0x8000;
     public static final int COMMAND_INTENT_GET = 0x0080;
@@ -247,38 +255,82 @@ public class EarFunPacket {
         return payload;
     }
 
+    /**
+     * Decodes a single packet at the current buffer position.
+     * <p>
+     * On failure the position is advanced by exactly one byte, so that the caller can
+     * resynchronise on the next {@code 0xFF} instead of dropping everything that follows. A packet
+     * is never discarded without a log line explaining why.
+     */
     public static EarFunPacket decode(ByteBuffer buf) {
-        if (buf.remaining() < HEADER_LENGTH)
+        final int start = buf.position();
+
+        if (buf.remaining() < HEADER_LENGTH) {
+            // not even a header: there is no byte left to resynchronise on
+            buf.position(buf.limit());
             return null;
+        }
 
         if (buf.get() != START_OF_PACKET) {
-            LOG.error("Invalid start of packet: {}", hexdump(buf.array()));
+            LOG.debug("Unexpected byte {} at offset {}", hexdumpValue(buf.get(start)), start);
+            buf.position(start + 1);
             return null;
         }
 
-        byte version = buf.get();
+        final byte version = buf.get();
         if (!SUPPORTED_VERSIONS.contains(version)) {
-            LOG.error("Invalid version: {} in packet {}", hexdumpValue(version), hexdump(buf.array()));
+            LOG.error("Invalid version: {} in packet at offset {}", hexdumpValue(version), start);
+            buf.position(start + 1);
             return null;
         }
 
-        byte flags = buf.get();
-        if (flags != FLAGS_NO_CHECKSUM) {
-            LOG.error("Invalid flags: {} in packet {}", hexdumpValue(flags), hexdump(buf.array()));
+        final byte flags = buf.get();
+        final int length;
+        final int headerLength;
+        if (flags == FLAGS_EXTENDED_LENGTH) {
+            if (buf.remaining() < 2) {
+                buf.position(start + 1);
+                return null;
+            }
+            length = buf.getShort() & 0xFFFF;
+            headerLength = HEADER_LENGTH + 1;
+        } else if (flags == FLAGS_NO_CHECKSUM) {
+            length = buf.get() & 0xFF;
+            headerLength = HEADER_LENGTH;
+        } else {
+            LOG.error("Invalid flags: {} in packet at offset {}", hexdumpValue(flags), start);
+            buf.position(start + 1);
             return null;
         }
-        byte length = buf.get();
 
-        short vendorId = buf.getShort();
+        if (buf.remaining() < 4) {
+            buf.position(start + 1);
+            return null;
+        }
+
+        final short vendorId = buf.getShort();
         if (!SUPPORTED_VENDOR_IDS.contains(vendorId)) {
-            LOG.error("Invalid vendor ID: {} in packet {}", hexdumpValue(vendorId), hexdump(buf.array()));
+            LOG.error("Invalid vendor ID: {} in packet at offset {}", hexdumpValue(vendorId), start);
+            buf.position(start + 1);
             return null;
         }
 
-        short commandId = buf.getShort();
-        Command command = Command.getCommandById(commandId);
+        final short commandId = buf.getShort();
+        final Command command = Command.getCommandById(commandId);
         if (command == null) {
-            LOG.error("Received unknown command ID: {} in packet {}", hexdumpValue(commandId), hexdump(buf.array()));
+            LOG.error("Received unknown command ID: {} (vendor {}, length {}) in packet {}",
+                    hexdumpValue(commandId), hexdumpValue(vendorId), length,
+                    frameHexdump(buf, start, headerLength, length));
+            buf.position(start + 1);
+            return null;
+        }
+
+        if (buf.remaining() < length) {
+            // the announced length does not fit in what was received: bounding it here avoids a
+            // BufferUnderflowException which would lose every following packet as well
+            LOG.error("Truncated packet: {} payload bytes announced, {} available in packet {}",
+                    length, buf.remaining(), frameHexdump(buf, start, headerLength, length));
+            buf.position(start + 1);
             return null;
         }
 
@@ -288,12 +340,32 @@ public class EarFunPacket {
         return new EarFunPacket(command, payload);
     }
 
+    /**
+     * The raw bytes of the packet that starts at {@code start}, bounded by the end of the buffer.
+     * Used to keep an exploitable trace of the packets that get dropped.
+     */
+    private static String frameHexdump(ByteBuffer buf, int start, int headerLength, int length) {
+        final int from = buf.arrayOffset() + start;
+        final int to = Math.min(from + headerLength + length, buf.arrayOffset() + buf.limit());
+        if (from >= to) {
+            return "()";
+        }
+        return hexdump(Arrays.copyOfRange(buf.array(), from, to));
+    }
+
     public byte[] encode() {
-        ByteBuffer buf = ByteBuffer.allocate(HEADER_LENGTH + payload.length);
+        // payloads above 254 bytes need the length on two bytes, otherwise it would be truncated
+        final boolean extendedLength = payload.length > MAX_SHORT_PAYLOAD_LENGTH;
+        ByteBuffer buf = ByteBuffer.allocate(HEADER_LENGTH + (extendedLength ? 1 : 0) + payload.length);
         buf.put(START_OF_PACKET);
         buf.put(command.version);
-        buf.put(FLAGS_NO_CHECKSUM);
-        buf.put((byte) payload.length);
+        if (extendedLength) {
+            buf.put(FLAGS_EXTENDED_LENGTH);
+            buf.putShort((short) payload.length);
+        } else {
+            buf.put(FLAGS_NO_CHECKSUM);
+            buf.put((byte) payload.length);
+        }
         buf.putShort(command.vendorId);
         buf.putShort(command.commandId);
         buf.put(payload);

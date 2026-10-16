@@ -54,7 +54,7 @@ public class EarFunFreePro3Protocol extends EarFunProtocol {
 
     @Override
     public byte[] encodeSettingsReq() {
-        return EarFunPacketEncoder.encodeAirPro4SettingsReq();
+        return EarFunPacketEncoder.encodeFreePro3SettingsReq();
     }
 
     protected EarFunFreePro3Protocol(GBDevice device) {

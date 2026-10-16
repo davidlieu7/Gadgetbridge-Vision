@@ -62,6 +62,34 @@ public class EarFunPacketEncoder {
         return new EarFunPacket(EarFunPacket.Command.REQUEST_RESPONSE_FIRMWARE_VERSION).encode();
     }
 
+    /**
+     * Settings request for the Free Pro 3 (TW400, firmware v0.3.3).
+     * <p>
+     * It is the Air Pro 4 template minus the two commands which were measured to never answer on
+     * this model: 0x034A (in ear detection) and 0x034C (advanced audio mode / Google Fast Pair).
+     * Polling them only adds frames to every connection and leaves the corresponding settings
+     * empty in the UI.
+     * <p>
+     * The sound settings (ambient sound, ANC mode, transparency mode, game mode) are not polled
+     * here: they are covered by {@link #encodeSoundSettingsReq()}, which is written when the
+     * settings screen is opened.
+     */
+    public static byte[] encodeFreePro3SettingsReq() {
+        return joinPackets(
+                encodeCommonSettingsReq(),
+                // battery level of the case
+                new EarFunPacket(EarFunPacket.Command.REQUEST_RESPONSE_BATTERY_STATE_CASE).encode(),
+                // touch settings
+                new EarFunPacket(EarFunPacket.Command.REQUEST_RESPONSE_TOUCH_MODE).encode(),
+                // system settings
+                new EarFunPacket(EarFunPacket.Command.REQUEST_RESPONSE_CONNECT_TWO_DEVICES).encode(),
+                new EarFunPacket(EarFunPacket.Command.REQUEST_RESPONSE_MICROPHONE_MODE).encode(),
+                new EarFunPacket(EarFunPacket.Command.REQUEST_RESPONSE_FIND_DEVICE).encode(),
+                new EarFunPacket(EarFunPacket.Command.REQUEST_RESPONSE_VOICE_PROMPT_VOLUME).encode(),
+                new EarFunPacket(EarFunPacket.Command.REQUEST_RESPONSE_AUDIO_CODEC).encode()
+        );
+    }
+
     public static byte[] encodeSetGesture(Prefs prefs, String config, Interactions.InteractionType interactionType, Interactions.Position position) {
         byte action = (byte) (Integer.parseInt(prefs.getString(config, "0")) & 0xFF);
         byte[] payload;

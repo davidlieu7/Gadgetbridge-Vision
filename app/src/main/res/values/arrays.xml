@@ -3868,14 +3868,20 @@
         <item>2</item>
     </string-array>
 
+    <!-- Transparency levels of the ambient mode: they are the AmbientModeEnum bytes of the
+         protocol (0 = DEFAULT, 1 = TOTAL, 2 = NATRUAL). Measured on the Free Pro 3: setting
+         0x033C to 1 reads back 1 and setting it to 2 reads back 2, and the ambient state pushes
+         report level 1 (0x09) and level 2 (0x0A) accordingly. -->
     <string-array name="earfun_transparency_mode_names">
         <item>@string/pref_default</item>
+        <item>@string/earfun_transparency_mode_total</item>
         <item>@string/pref_title_equalizer_natural</item>
     </string-array>
 
     <string-array name="earfun_transparency_mode_values">
         <item>0</item>
         <item>1</item>
+        <item>2</item>
     </string-array>
 
     <string-array name="earfun_anc_mode_names">

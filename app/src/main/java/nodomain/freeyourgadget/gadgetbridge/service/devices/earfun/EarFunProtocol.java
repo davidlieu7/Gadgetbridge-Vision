@@ -29,7 +29,11 @@ public class EarFunProtocol extends GBDeviceProtocol {
         while (buf.hasRemaining()) {
             EarFunPacket packet = EarFunPacket.decode(buf);
 
-            if (packet == null) break;
+            if (packet == null) {
+                // decode() has already skipped the byte it failed on: keep going so that the packets
+                // following a malformed one are not lost as well
+                continue;
+            }
 
             EarFunPacket.Command command = packet.getCommand();
             byte[] payload = packet.getPayload();
@@ -90,11 +94,33 @@ public class EarFunProtocol extends GBDeviceProtocol {
                 case REQUEST_RESPONSE_AUDIO_CODEC:
                     events.add(handleAudioCodecInfo(payload));
                     break;
+                case AC_NOTIFICATION_STATE_CHANGE:
+                    // "noise processing active" flag; which mode is active is carried by 0x1081/0x1082
+                    addEvent(events, handleNoiseProcessingPush(payload));
+                    break;
+                case AC_NOTIFICATION_MODE_CHANGE:
+                case AC_NOTIFICATION_GAIN_CHANGE:
+                    // ambient state push: arrives on its own, without any subscription, on every
+                    // mode change — including when the user toggles it with a gesture on the earbud
+                    addEvent(events, handleAmbientStatePush(payload));
+                    break;
                 default:
-                    LOG.error("no handler for packet type {}", packet.getCommand().name());
+                    if (command.vendorId == EarFunPacket.VENDOR_ID_V3) {
+                        // the 0x001D configuration layer answers with a lot of state dumps which are
+                        // not interpreted yet; they arrive on every connection, so they are not errors
+                        LOG.info("no handler for configuration packet {}", packet.getCommand().name());
+                    } else {
+                        LOG.error("no handler for packet type {}", packet.getCommand().name());
+                    }
             }
         }
         return events.toArray(new GBDeviceEvent[0]);
+    }
+
+    private static void addEvent(final List<GBDeviceEvent> events, final GBDeviceEvent event) {
+        if (event != null) {
+            events.add(event);
+        }
     }
 
     @Override

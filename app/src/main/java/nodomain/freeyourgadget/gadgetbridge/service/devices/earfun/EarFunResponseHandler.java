@@ -29,12 +29,32 @@ import nodomain.freeyourgadget.gadgetbridge.model.BatteryState;
 
 public class EarFunResponseHandler {
 
+    /// The device reports 0x00 for "unknown" and 0xFF for "no value available".
+    /// Measured on the Free Pro 3 (TW400, firmware v0.3.3): the case answers `00 FF` while the
+    /// earbuds are out of it, i.e. nothing is being charged in the case.
+    private static final int BATTERY_UNAVAILABLE = 0xFF;
+
+    /// First byte of the ambient state pushes (0x1081 / 0x1082) is a bitfield.
+    /// Measured on the Free Pro 3 by switching modes: 0x01 = nothing active, 0x05 = noise
+    /// cancelling, 0x09 = transparency level TOTAL, 0x0A = transparency level NATRUAL.
+    private static final int AMBIENT_STATE_NOISE_CANCELLING = 0x04;
+    private static final int AMBIENT_STATE_TRANSPARENCY = 0x08;
+    private static final int AMBIENT_STATE_LEVEL_MASK = 0x03;
+
+    /// Values of `pref_earfun_ambient_sound_control` (see `earfun_ambient_sound_control_values`)
+    public static final String AMBIENT_CONTROL_OFF = "0";
+    public static final String AMBIENT_CONTROL_NOISE_CANCELLING = "1";
+    public static final String AMBIENT_CONTROL_TRANSPARENCY = "2";
+
     public static GBDeviceEvent handleBatteryInfo(int index, byte[] payload) {
-        int batteryLevel = payload[1];
+        // payload[1] is a signed byte: mask it, otherwise 0xFF reads as -1 and the "no value"
+        // case only works by accident
+        final int batteryLevel = payload[1] & 0xFF;
+        final boolean available = batteryLevel > 0 && batteryLevel != BATTERY_UNAVAILABLE;
         GBDeviceEventBatteryInfo batteryInfo = new GBDeviceEventBatteryInfo();
         batteryInfo.batteryIndex = index;
-        batteryInfo.level = (batteryLevel > 0) ? batteryLevel : GBDevice.BATTERY_UNKNOWN;
-        batteryInfo.state = (batteryLevel > 0) ? BatteryState.BATTERY_NORMAL : BatteryState.UNKNOWN;
+        batteryInfo.level = available ? batteryLevel : GBDevice.BATTERY_UNKNOWN;
+        batteryInfo.state = available ? BatteryState.BATTERY_NORMAL : BatteryState.UNKNOWN;
         return batteryInfo;
     }
 
@@ -126,5 +146,63 @@ public class EarFunResponseHandler {
             updateEvent.preferences.put(interactionType, Integer.toString(action));
         });
         return updateEvent;
+    }
+
+    /**
+     * Ambient state pushes (vendor 0x001D, commands 0x1081 / 0x1082).
+     * <p>
+     * These arrive on their own, without any subscription, every time the ambient mode changes —
+     * including when the user toggles it with a gesture on the earbud. The first payload byte is
+     * a bitfield, measured on the Free Pro 3 (firmware v0.3.3) by switching modes one at a time:
+     * <pre>
+     *   0x01  nothing active (mode Normal)
+     *   0x05  noise cancelling active
+     *   0x09  transparency active, level 1 (TOTAL)
+     *   0x0A  transparency active, level 2 (NATRUAL)
+     * </pre>
+     * bit 2 (0x04) = noise cancelling, bit 3 (0x08) = transparency, bits 0-1 = level, which is the
+     * `AmbientModeEnum` byte of the protocol (0 = default, 1 = TOTAL, 2 = NATRUAL).
+     * <p>
+     * The remaining bytes are not decoded: 0x1082 carries two extra opaque bytes, one per earbud.
+     * Returns {@code null} when the value is not one we understand, so that nothing is written to
+     * the preferences on a guess.
+     */
+    public static GBDeviceEvent handleAmbientStatePush(byte[] payload) {
+        if (payload.length == 0) {
+            return null;
+        }
+        final int state = payload[0] & 0xFF;
+        final int level = state & AMBIENT_STATE_LEVEL_MASK;
+        final GBDeviceEventUpdatePreferences updateEvent = new GBDeviceEventUpdatePreferences();
+        if ((state & AMBIENT_STATE_NOISE_CANCELLING) != 0) {
+            updateEvent.withPreference(PREF_EARFUN_AMBIENT_SOUND_CONTROL, AMBIENT_CONTROL_NOISE_CANCELLING);
+        } else if ((state & AMBIENT_STATE_TRANSPARENCY) != 0) {
+            updateEvent.withPreference(PREF_EARFUN_AMBIENT_SOUND_CONTROL, AMBIENT_CONTROL_TRANSPARENCY);
+            // both measured levels (1 = TOTAL, 2 = NATRUAL) are valid transparency modes; the
+            // higher bit combinations are not, so keep the current preference in that case
+            if (level >= 1 && level <= 2) {
+                updateEvent.withPreference(PREF_EARFUN_TRANSPARENCY_MODE, Integer.toString(level));
+            }
+        } else if ((state & ~AMBIENT_STATE_LEVEL_MASK) == 0 && level <= 1) {
+            // no bit 2 and no bit 3: nothing is processed, the device is in Normal mode (0x01 was
+            // measured in that state); a level above 1 is not a valid mode, so nothing is written
+            updateEvent.withPreference(PREF_EARFUN_AMBIENT_SOUND_CONTROL, AMBIENT_CONTROL_OFF);
+        } else {
+            return null;
+        }
+        return updateEvent;
+    }
+
+    /**
+     * Noise processing push (vendor 0x001D, command 0x1080): the second payload byte is 0x00 while
+     * the device is in Normal mode and 0x01 as soon as *some* mode is active (measured on the Free
+     * Pro 3). Which mode that is comes from 0x1081 / 0x1082, so only the "nothing active" case is
+     * turned into an event; see {@link #handleAmbientStatePush(byte[])}.
+     */
+    public static GBDeviceEvent handleNoiseProcessingPush(byte[] payload) {
+        if (payload.length < 2 || payload[1] != 0x00) {
+            return null;
+        }
+        return new GBDeviceEventUpdatePreferences(PREF_EARFUN_AMBIENT_SOUND_CONTROL, AMBIENT_CONTROL_OFF);
     }
 }

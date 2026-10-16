@@ -29,6 +29,6 @@
     <Preference
         android:key="pref_earfun_audio_codec_hint"
         android:selectable="false"
-        android:summary="@string/earfun_audio_codec_hint" />
+        android:summary="@string/earfun_free_pro_3_audio_codec_hint" />
 
 </androidx.preference.PreferenceScreen>
