@@ -66,7 +66,8 @@ object DreeveService : WorkoutUploadTarget {
     // old activity has to go before its replacement is imported.
     override val recreateOrder = RecreateOrder.DELETE_THEN_CREATE
 
-    override fun isLoggedIn(context: Context) = DreeveTokenManager(context).isLoggedIn()
+    override fun isLoggedIn(context: Context) =
+        serverUrl() != null && DreeveTokenManager(context).isLoggedIn()
 
     override fun showSetup(fragment: Fragment) {
         DreeveSetupBottomSheet().show(fragment.parentFragmentManager, "dreeve_setup")

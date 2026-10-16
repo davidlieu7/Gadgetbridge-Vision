@@ -85,7 +85,7 @@ object FitTrackeeService : WorkoutUploadTarget {
 
     override fun isLoggedIn(context: Context): Boolean {
         val tokenManager = FitTrackeeTokenManager(context)
-        return tokenManager.getClientId() != null && tokenManager.isLoggedIn()
+        return serverUrl() != null && tokenManager.getClientId() != null && tokenManager.isLoggedIn()
     }
 
     override fun showSetup(fragment: Fragment) {
