@@ -1,4 +1,4 @@
-/*  Copyright (C) 2026 Arjan Schrijver
+/*  Copyright (C) 2026 Arjan Schrijver, José Rebelo, Dany Mestas
 
     This file is part of Gadgetbridge.
 
@@ -17,173 +17,63 @@
 package nodomain.freeyourgadget.gadgetbridge.activities.externalservices
 
 import android.os.Bundle
-import android.widget.Toast
-import androidx.fragment.app.viewModels
 import androidx.preference.Preference
 import androidx.preference.PreferenceFragmentCompat
 import nodomain.freeyourgadget.gadgetbridge.GBApplication
 import nodomain.freeyourgadget.gadgetbridge.R
 import nodomain.freeyourgadget.gadgetbridge.activities.AbstractPreferenceFragment
 import nodomain.freeyourgadget.gadgetbridge.activities.AbstractSettingsActivityV2
-import nodomain.freeyourgadget.gadgetbridge.externalservices.endurain.EndurainSetupBottomSheet
-import nodomain.freeyourgadget.gadgetbridge.externalservices.endurain.EndurainSetupViewModel
-import nodomain.freeyourgadget.gadgetbridge.externalservices.endurain.EndurainTokenManager
-import nodomain.freeyourgadget.gadgetbridge.externalservices.wanderer.WandererSetupBottomSheet
-import nodomain.freeyourgadget.gadgetbridge.externalservices.wanderer.WandererTokenManager
-import nodomain.freeyourgadget.gadgetbridge.util.DateTimeUtils
-import nodomain.freeyourgadget.gadgetbridge.util.GB
+import nodomain.freeyourgadget.gadgetbridge.externalservices.ExternalService
+import nodomain.freeyourgadget.gadgetbridge.externalservices.ExternalServiceRegistry
+import java.text.Collator
 
+/**
+ * One row per registered [ExternalService], sorted by name, each opening that service's own
+ * screen. The rows come from [ExternalServiceRegistry], so a new service appears here without
+ * this screen being touched.
+ */
 class OnlineFitnessTrackersPreferencesActivity : AbstractSettingsActivityV2() {
     override fun newFragment(): PreferenceFragmentCompat =
         OnlineFitnessTrackersPreferencesFragment()
 
     class OnlineFitnessTrackersPreferencesFragment : AbstractPreferenceFragment() {
 
-        private val vm: EndurainSetupViewModel by viewModels()
-
         override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
             setPreferencesFromResource(R.xml.online_fitness_trackers_preferences, rootKey)
 
-            updateNetworkWarning()
-            wireLoginPreferences()
-            wireLogoutPreferences()
-            updateStatus()
-            updateLogoutPreferenceVisibility()
-            setupLoginResultListener()
+            findPreference<Preference>("pref_key_network_required")?.isVisible =
+                !GBApplication.hasInternetAccess()
 
-            // Refresh tokens
-            val vm: EndurainSetupViewModel by viewModels()
-            val server = GBApplication.getPrefs().preferences.getString("endurain_server", null)
-            if (server != null) {
-                if (vm.endurainTokenManager.isAccessTokenExpired()) {
-                    vm.endurainTokenManager.performTokenRefresh(server) {
-                        activity?.runOnUiThread {
-                            updateStatus()
-                            updateLogoutPreferenceVisibility()
-                        }
+            val collator = Collator.getInstance()
+            val services = ExternalServiceRegistry.services
+                .sortedWith(compareBy(collator) { getString(it.nameRes) })
+            for (service in services) {
+                preferenceScreen.addPreference(
+                    Preference(preferenceScreen.context).apply {
+                        key = rowKey(service)
+                        title = getString(service.nameRes)
+                        isPersistent = false
+                        isIconSpaceReserved = false
+                        fragment = ExternalServiceSettingsFragment::class.java.name
+                        extras.putString(ExternalServiceSettingsFragment.ARG_SERVICE_ID, service.id)
                     }
-                }
-                vm.fetchServerVersion(server) {
-                    activity?.runOnUiThread {
-                        updateStatus()
-                    }
-                }
+                )
             }
-        }
-
-        private fun setupLoginResultListener() {
-            parentFragmentManager.setFragmentResultListener(
-                "endurain_login_result",
-                this
-            ) { _, bundle ->
-                val success = bundle.getBoolean("success", false)
-                if (success) {
-                    updateStatus()
-                    updateLogoutPreferenceVisibility()
-                }
-            }
-            parentFragmentManager.setFragmentResultListener(
-                "wanderer_login_result",
-                this
-            ) { _, bundle ->
-                val success = bundle.getBoolean("success", false)
-                if (success) {
-                    updateStatus()
-                    updateLogoutPreferenceVisibility()
-                }
-            }
+            refreshSummaries()
         }
 
         override fun onResume() {
             super.onResume()
-            updateStatus()
-            updateLogoutPreferenceVisibility()
+            refreshSummaries()
         }
 
-        private fun updateNetworkWarning() {
-            findPreference<Preference>("pref_key_network_required")?.isVisible =
-                !GBApplication.hasInternetAccess()
-        }
-
-        private fun wireLoginPreferences() {
-            findPreference<Preference>("pref_key_endurain_log_in")?.setOnPreferenceClickListener {
-                EndurainSetupBottomSheet()
-                    .show(parentFragmentManager, "endurain_setup")
-                true
-            }
-            findPreference<Preference>("pref_key_wanderer_log_in")?.setOnPreferenceClickListener {
-                WandererSetupBottomSheet()
-                    .show(parentFragmentManager, "wanderer_setup")
-                true
+        private fun refreshSummaries() {
+            val context = requireContext()
+            for (service in ExternalServiceRegistry.services) {
+                findPreference<Preference>(rowKey(service))?.summary = service.statusSummary(context)
             }
         }
 
-        private fun wireLogoutPreferences() {
-            findPreference<Preference>("pref_key_endurain_log_out")?.setOnPreferenceClickListener {
-                vm.logout { success ->
-                    activity?.runOnUiThread {
-                        if (success) {
-                            GB.toast(getString(R.string.endurain_logged_out_successfully), Toast.LENGTH_SHORT, GB.INFO)
-                            updateStatus()
-                            updateLogoutPreferenceVisibility()
-                        } else {
-                            GB.toast(getString(R.string.endurain_logout_failed), Toast.LENGTH_SHORT, GB.WARN)
-                        }
-                    }
-                }
-                true
-            }
-            findPreference<Preference>("pref_key_wanderer_log_out")?.setOnPreferenceClickListener {
-                WandererTokenManager(requireContext()).clearTokens()
-                activity?.runOnUiThread {
-                    GB.toast(getString(R.string.endurain_logged_out_successfully), Toast.LENGTH_SHORT, GB.INFO)
-                    updateStatus()
-                    updateLogoutPreferenceVisibility()
-                }
-
-                true
-            }
-        }
-
-        private fun updateLogoutPreferenceVisibility() {
-            val endurainLoggedIn = vm.endurainTokenManager.isLoggedIn()
-            val wandererLoggedIn = WandererTokenManager(requireContext()).isLoggedIn()
-
-            findPreference<Preference>("pref_key_endurain_log_out")?.isVisible = endurainLoggedIn
-            findPreference<Preference>("pref_key_endurain_log_in")?.isVisible = !endurainLoggedIn
-            findPreference<Preference>("pref_key_wanderer_log_out")?.isVisible = wandererLoggedIn
-            findPreference<Preference>("pref_key_wanderer_log_in")?.isVisible = !wandererLoggedIn
-
-            // Auto-upload only makes sense once the integration is logged in.
-            findPreference<Preference>("endurain_auto_upload_enabled")?.isEnabled = endurainLoggedIn
-            findPreference<Preference>("wanderer_auto_upload_enabled")?.isEnabled = wandererLoggedIn
-        }
-
-        private fun updateStatus() {
-            val endurainStatusPref = findPreference<Preference>("pref_key_endurain_status")
-            val endurainServer = GBApplication.getPrefs().preferences.getString("endurain_server", null)
-            val endurainTokenExpiresAt = DateTimeUtils.parseTimeStamp(vm.endurainTokenManager.getRefreshTokenExpiresAt())
-            val wandererStatusPref = findPreference<Preference>("pref_key_wanderer_status")
-            val wandererServer = GBApplication.getPrefs().preferences.getString("wanderer_server", null)
-            val wandererAPITokenAvailable = WandererTokenManager(requireContext()).isLoggedIn()
-
-            // Update Endurain preferences
-            var summaryText = getString(R.string.endurain_not_logged_in_integration_disabled)
-            if (vm.endurainTokenManager.isLoggedIn() && endurainServer != null) {
-                summaryText =
-                    getString(R.string.endurain_logged_in_refresh_token, endurainServer, endurainTokenExpiresAt)
-            }
-            if (vm.endurainServerVersion != null) {
-                summaryText += getString(R.string.endurain_server_version, vm.endurainServerVersion)
-            }
-            endurainStatusPref?.summary = summaryText
-
-            // Update Wanderer preferences
-            summaryText = getString(R.string.endurain_not_logged_in_integration_disabled)
-            if (wandererAPITokenAvailable && wandererServer != null) {
-                summaryText = getString(R.string.wanderer_logged_in, wandererServer)
-            }
-            wandererStatusPref?.summary = summaryText
-        }
+        private fun rowKey(service: ExternalService) = "pref_key_external_service_${service.id}"
     }
 }

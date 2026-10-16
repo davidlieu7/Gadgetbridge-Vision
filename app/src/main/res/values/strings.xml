@@ -5785,6 +5785,15 @@
     <string name="prefs_online_fitness_trackers_summary">Configure how to reach and use online fitness trackers</string>
     <string name="warning_network_required_title">Network required</string>
     <string name="warning_network_required_summary">These integrations requires network connectivity. Please install and enable the internet helper add-on app.</string>
+    <!-- %1$s in the pref_service_* strings is the name of an online fitness tracker -->
+    <string name="pref_service_status_title">%1$s status</string>
+    <string name="pref_service_log_in_title">Log in to %1$s</string>
+    <string name="pref_service_log_in_summary">Tap here to enter the %1$s server and log in</string>
+    <string name="pref_service_api_token_title">Enter %1$s API token</string>
+    <string name="pref_service_api_token_summary">Tap here to enter the %1$s server and API token</string>
+    <string name="pref_service_log_out_title">Log out of %1$s</string>
+    <string name="pref_service_auto_upload_title">Auto-upload to %1$s</string>
+    <string name="pref_service_auto_upload_summary">Automatically upload newly synced workouts to %1$s</string>
     <string name="pref_info_endurain_status_title">Endurain status</string>
     <string name="pref_endurain_log_in_title">Log in to Endurain</string>
     <string name="pref_endurain_log_in_summary">Tap here to enter the Endurain server and log in</string>

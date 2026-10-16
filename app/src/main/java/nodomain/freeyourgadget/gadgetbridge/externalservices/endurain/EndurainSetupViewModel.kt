@@ -48,26 +48,6 @@ class EndurainSetupViewModel(application: Application) : AndroidViewModel(applic
     var ssoEnabled = false
     var pendingMfaUsername: String? = null
     var availableProviders: List<EndurainIdentityProvider> = emptyList()
-    var endurainServerVersion: String? = null
-
-    /**
-     * Fetch server version
-     */
-    fun fetchServerVersion(
-        serverUrl: String,
-        callback: (Boolean) -> Unit
-    ) {
-        Thread {
-            try {
-                apiClient = EndurainApiClient(serverUrl, endurainTokenManager)
-                endurainServerVersion = apiClient.fetchVersion()
-                callback(true)
-            } catch (e: Exception) {
-                LOG.error("Fetching server version error", e)
-                callback(false)
-            }
-        }.start()
-    }
 
     /**
      * Fetch server capabilities to determine available login methods
@@ -292,26 +272,6 @@ class EndurainSetupViewModel(application: Application) : AndroidViewModel(applic
             } catch (e: Exception) {
                 LOG.error("MFA verification error", e)
                 callback(false)
-            }
-        }.start()
-    }
-
-    /**
-     * Logout and clear tokens
-     */
-    fun logout(callback: (Boolean) -> Unit) {
-        Thread {
-            try {
-                if (::apiClient.isInitialized) {
-                    apiClient.logout()
-                } else {
-                    endurainTokenManager.clearTokens()
-                }
-                callback(true)
-            } catch (e: Exception) {
-                LOG.error("Logout error", e)
-                endurainTokenManager.clearTokens() // Clear tokens anyway
-                callback(true)
             }
         }.start()
     }

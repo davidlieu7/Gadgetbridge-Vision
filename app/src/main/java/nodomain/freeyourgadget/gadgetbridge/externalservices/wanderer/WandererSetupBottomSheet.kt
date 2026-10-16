@@ -27,6 +27,7 @@ import androidx.core.content.edit
 import com.google.android.material.bottomsheet.BottomSheetDialogFragment
 import nodomain.freeyourgadget.gadgetbridge.GBApplication
 import nodomain.freeyourgadget.gadgetbridge.R
+import nodomain.freeyourgadget.gadgetbridge.externalservices.externalServiceLoginResultKey
 import nodomain.freeyourgadget.gadgetbridge.util.GB
 import nodomain.freeyourgadget.gadgetbridge.util.InternetUtils
 import org.slf4j.LoggerFactory
@@ -95,7 +96,7 @@ class WandererSetupBottomSheet : BottomSheetDialogFragment() {
                         tokenManager.saveToken(apiToken)
                         handle?.let { tokenManager.saveHandle(it) }
                         parentFragmentManager.setFragmentResult(
-                            "wanderer_login_result",
+                            externalServiceLoginResultKey(WandererService.id),
                             Bundle().apply { putBoolean("success", true) }
                         )
                         dismiss()
