@@ -79,7 +79,7 @@ public class SoundcoreA30iProtocol extends SoundcoreProtocolImplV1 {
                         prefs.getString(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_AMBIENT_SOUND_CONTROL, AmbientSoundMode.OFF.toString()));
                 final AncMode ancMode = AncMode.fromPreference(
                         prefs.getString(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_ANC_MODE, AncMode.TRANSPORT.toString()));
-                final int noiseCancellingLevel = prefs.getInt(DeviceSettingsPreferenceConst.PREF_SONY_AMBIENT_SOUND_LEVEL, 0);
+                final int noiseCancellingLevel = prefs.getInt(DeviceSettingsPreferenceConst.PREF_SONY_AMBIENT_SOUND_LEVEL, 1);
                 final boolean windNoiseReduction = prefs.getBoolean(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_WIND_NOISE_REDUCTION, false);
 
                 final byte[] command = encodeAudioMode(ambientSoundControl, ancMode, noiseCancellingLevel, windNoiseReduction);

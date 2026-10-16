@@ -643,7 +643,7 @@ public class SoundcoreProtocolImplV1 extends AbstractSoundcoreProtocol {
 
         final Byte ancStrength = encodeNoiseCancellationLevel(prefs.getInt(
                 DeviceSettingsPreferenceConst.PREF_SONY_AMBIENT_SOUND_LEVEL,
-                0
+                1
         ));
 
         if (ancStrength == null) {
@@ -714,7 +714,7 @@ public class SoundcoreProtocolImplV1 extends AbstractSoundcoreProtocol {
     protected Byte encodeNoiseCancellationLevel(final int strength) {
         final byte[] levels = ((SoundcoreEarbudsCoordinator) getDevice().getDeviceCoordinator())
                 .getNoiseCancellationLevelRange();
-        if (strength < 0 || strength >= levels.length) {
+        if (strength < 1 || strength >= levels.length) {
             return null;
         }
         return levels[strength];
@@ -723,11 +723,11 @@ public class SoundcoreProtocolImplV1 extends AbstractSoundcoreProtocol {
     protected int decodeNoiseCancellationLevel(final byte strength) {
         final byte[] levels = ((SoundcoreEarbudsCoordinator) getDevice().getDeviceCoordinator())
                 .getNoiseCancellationLevelRange();
-        for (int i = 0; i < levels.length; i++) {
+        for (int i = 1; i < levels.length; i++) {
             if ((levels[i] & 0xF0) == (strength & 0xF0)) {
                 return i;
             }
         }
-        return 0;
+        return 1;
     }
 }

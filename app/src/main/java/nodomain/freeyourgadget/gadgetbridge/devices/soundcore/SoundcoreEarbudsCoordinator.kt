@@ -281,7 +281,7 @@ abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator(
     fun supports(device: GBDevice, capability: Capability): Boolean =
         getCapabilities(device).contains(capability)
 
-    open fun getNoiseCancellationLevelRange(): ByteArray = byteArrayOf(0x10, 0x20, 0x30)
+    open fun getNoiseCancellationLevelRange(): ByteArray = byteArrayOf(0x00, 0x10, 0x20, 0x30)
 
     open fun getAutoPowerOffMinutes(): Array<Int> = arrayOf(10, 20, 30, 60)
 
@@ -649,9 +649,9 @@ abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator(
                             key = DeviceSettingsPreferenceConst.PREF_SONY_AMBIENT_SOUND_LEVEL,
                             title = R.string.prefs_active_noise_cancelling_level,
                             icon = R.drawable.ic_hearing,
-                            min = levelRange.first,
+                            min = 1,
                             max = levelRange.last,
-                            defaultValue = levelRange.first,
+                            defaultValue = 1,
                             dependency = if (separateAdaptiveToggle) DeviceSettingsPreferenceConst.PREF_SOUNDCORE_ADAPTIVE_NOISE_CANCELLING else null,
                         )
                     }
