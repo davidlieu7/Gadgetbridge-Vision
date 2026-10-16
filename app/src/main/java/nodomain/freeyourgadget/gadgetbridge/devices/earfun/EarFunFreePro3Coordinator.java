@@ -41,6 +41,13 @@ public class EarFunFreePro3Coordinator extends AbstractEarFunCoordinator {
     }
 
     @Override
+    public int getDefaultIconResource() {
+        // The buds have a rounded body: the generic earfun silhouette (Nothing Ear)
+        // has a long stem, which does not match this model.
+        return R.drawable.ic_device_earfun_free_pro_3;
+    }
+
+    @Override
     public boolean supports(GBDeviceCandidate candidate) {
         if (candidate.getName().startsWith("EarFun Free Pro 3")) {
             return true;
@@ -62,9 +69,9 @@ public class EarFunFreePro3Coordinator extends AbstractEarFunCoordinator {
 
     @Override
     public BatteryConfig[] getBatteryConfig(final GBDevice device) {
-        BatteryConfig battery1 = new BatteryConfig(2, R.drawable.ic_buds_pro_case, R.string.battery_case);
-        BatteryConfig battery2 = new BatteryConfig(0, R.drawable.ic_nothing_ear_l, R.string.left_earbud);
-        BatteryConfig battery3 = new BatteryConfig(1, R.drawable.ic_nothing_ear_r, R.string.right_earbud);
+        BatteryConfig battery1 = new BatteryConfig(2, R.drawable.ic_earfun_free_pro_3_case, R.string.battery_case);
+        BatteryConfig battery2 = new BatteryConfig(0, R.drawable.ic_earfun_free_pro_3_l, R.string.left_earbud);
+        BatteryConfig battery3 = new BatteryConfig(1, R.drawable.ic_earfun_free_pro_3_r, R.string.right_earbud);
         return new BatteryConfig[]{battery1, battery2, battery3};
     }
 
