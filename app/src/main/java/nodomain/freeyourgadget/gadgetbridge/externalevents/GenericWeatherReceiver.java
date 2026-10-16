@@ -217,6 +217,7 @@ public class GenericWeatherReceiver extends BroadcastReceiver {
     private WeatherSpec.AirQuality toAirQuality(final JSONObject jsonObject) {
         final WeatherSpec.AirQuality airQuality = new WeatherSpec.AirQuality();
         airQuality.setAqi(safelyGet(jsonObject, Integer.class, "aqi", -1));
+        airQuality.setAqiUsEpa(getInt(jsonObject, "aqiUsEpa", -1));
         airQuality.setCo(getFloat(jsonObject, "co", -1.0f));
         airQuality.setNo2(getFloat(jsonObject, "no2", -1.0f));
         airQuality.setO3(getFloat(jsonObject, "o3", -1.0f));

@@ -380,6 +380,8 @@ class WeatherSpec() : Parcelable {
     class AirQuality : Parcelable {
         var aqi: Int =
             -1 // Air Quality Index - usually the max across all AQI values for pollutants
+        /** US EPA index, kept separate from the existing Plume index. -1 means unavailable. */
+        var aqiUsEpa: Int = -1
         var co: Float = -1f // Carbon Monoxide, mg/m^3
         var no2: Float = -1f // Nitrogen Dioxide, ug/m^3
         var o3: Float = -1f // Ozone, ug/m^3
@@ -405,7 +407,7 @@ class WeatherSpec() : Parcelable {
         constructor()
 
         internal constructor(parcel: Parcel) {
-            parcel.readInt() // version
+            val version = parcel.readInt()
             aqi = parcel.readInt()
             co = parcel.readFloat()
             no2 = parcel.readFloat()
@@ -419,6 +421,9 @@ class WeatherSpec() : Parcelable {
             pm10Aqi = parcel.readInt()
             pm25Aqi = parcel.readInt()
             so2Aqi = parcel.readInt()
+            if (version >= 2) {
+                aqiUsEpa = parcel.readInt()
+            }
         }
 
         override fun describeContents(): Int = 0
@@ -438,6 +443,7 @@ class WeatherSpec() : Parcelable {
             dest.writeInt(pm10Aqi)
             dest.writeInt(pm25Aqi)
             dest.writeInt(so2Aqi)
+            dest.writeInt(aqiUsEpa)
         }
 
         override fun equals(other: Any?): Boolean {
@@ -447,6 +453,7 @@ class WeatherSpec() : Parcelable {
             other as AirQuality
 
             if (aqi != other.aqi) return false
+            if (aqiUsEpa != other.aqiUsEpa) return false
             if (co != other.co) return false
             if (no2 != other.no2) return false
             if (o3 != other.o3) return false
@@ -465,6 +472,7 @@ class WeatherSpec() : Parcelable {
 
         override fun hashCode(): Int {
             var result = aqi
+            result = 31 * result + aqiUsEpa
             result = 31 * result + co.hashCode()
             result = 31 * result + no2.hashCode()
             result = 31 * result + o3.hashCode()
@@ -481,7 +489,7 @@ class WeatherSpec() : Parcelable {
         }
 
         companion object {
-            const val VERSION = 1
+            const val VERSION = 2
 
             @JvmField
             val CREATOR: Parcelable.Creator<AirQuality> = object : Parcelable.Creator<AirQuality> {

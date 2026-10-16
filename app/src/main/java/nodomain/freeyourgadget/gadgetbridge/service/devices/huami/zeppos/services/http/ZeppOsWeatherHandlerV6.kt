@@ -71,6 +71,24 @@ object ZeppOsWeatherHandlerV6 {
         globalMin = 0,
     )
 
+    private val AQI_STANDARD_US_EPA = AirQualityStandard(
+        code = "q_us-epa",
+        displayName = "AQI (US EPA)",
+        hasNumericAqi = true,
+        isContinuous = true,
+        standardType = 1,
+        categories = listOf(
+            AirQualityCategory(0, "Good", 0, 50, 10, 0x00e400),
+            AirQualityCategory(1, "Moderate", 51, 100, 10, 0xffff00),
+            AirQualityCategory(2, "Unhealthy for Sensitive Groups", 101, 150, 10, 0xff7e00),
+            AirQualityCategory(3, "Unhealthy", 151, 200, 10, 0xff0000),
+            AirQualityCategory(4, "Very Unhealthy", 201, 300, 20, 0x8f3f97),
+            AirQualityCategory(5, "Hazardous", 301, 500, 40, 0x7e0023),
+        ),
+        totalWidth = 501,
+        globalMin = 0,
+    )
+
     @JvmStatic
     fun handleHttpRequest(path: String, query: Map<String, String>): ByteArray? {
         val weatherSpec = getWeatherSpec()
@@ -248,15 +266,15 @@ object ZeppOsWeatherHandlerV6 {
     }
 
     private fun createHourlyAirQuality(weatherSpec: WeatherSpec): HourlyAirQuality? {
-        val aqi = weatherSpec.airQuality?.aqi?.takeIf { it >= 0 } ?: return null
-
+        val standard = airQualityStandard(weatherSpec)
+        val aqi = airQualityIndex(weatherSpec.airQuality, standard) ?: return null
         val hourStart = weatherSpec.timestamp - Math.floorMod(weatherSpec.timestamp, 3600)
 
         return HourlyAirQuality(
             metadata = ZeppOsWeatherHandlerV5.createMetadata(weatherSpec).copy(version = 2),
-            code = AQI_STANDARD_PLUME.code,
-            standard = AQI_STANDARD_PLUME,
-            hours = listOf(createHourlyAirQualityHour(AQI_STANDARD_PLUME, Date(hourStart * 1000L), aqi)),
+            code = standard.code,
+            standard = standard,
+            hours = listOf(createHourlyAirQualityHour(standard, Date(hourStart * 1000L), aqi)),
         )
     }
 
@@ -279,9 +297,16 @@ object ZeppOsWeatherHandlerV6 {
         )
     }
 
+    private fun airQualityStandard(weatherSpec: WeatherSpec): AirQualityStandard =
+        if (weatherSpec.airQuality?.aqiUsEpa?.let { it >= 0 } == true) AQI_STANDARD_US_EPA else AQI_STANDARD_PLUME
+
+    private fun airQualityIndex(airQuality: WeatherSpec.AirQuality?, standard: AirQualityStandard): Int? =
+        (if (standard == AQI_STANDARD_US_EPA) airQuality?.aqiUsEpa else airQuality?.aqi)?.takeIf { it >= 0 }
+
     private fun createDailyAirQuality(weatherSpec: WeatherSpec): DailyAirQuality? {
+        val standard = airQualityStandard(weatherSpec)
         val days = (listOf(weatherSpec.todayAsDaily()) + weatherSpec.forecasts).mapIndexedNotNull { i, day ->
-            val aqi = day.airQuality?.aqi?.takeIf { it >= 0 } ?: return@mapIndexedNotNull null
+            val aqi = airQualityIndex(day.airQuality, standard) ?: return@mapIndexedNotNull null
             val dayTimestamp = weatherSpec.timestamp * 1000L + i * 86400_000L
             DailyAirQualityDay(
                 forecastStart = toOffsetDateTime(DateTimeUtils.dayStart(Date(dayTimestamp))),
