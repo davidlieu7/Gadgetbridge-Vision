@@ -41,6 +41,7 @@ import nodomain.freeyourgadget.gadgetbridge.devices.binary_sensor.coordinator.Bi
 import nodomain.freeyourgadget.gadgetbridge.devices.bm2.Bm2Coordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.bm6.Bm6Coordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.braun.BraunBPW4500DeviceCoordinator;
+import nodomain.freeyourgadget.gadgetbridge.devices.canon.CanonCameraCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.cardo.Ls24xDeviceCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.casio.ecbs100.CasioECBS100DeviceCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.casio.gb6900.CasioGB6900DeviceCoordinator;
@@ -1325,6 +1326,7 @@ public enum DeviceType {
     F8SCALE(F8ScaleCoordinator.class),
     EIGHTBITDO_MICRO(EightBitDoMicroCoordinator.class),
     INNOVO_IP900BP_B(InnovoPulseOximeterCoordinator.class),
+    CANON_CAMERA(CanonCameraCoordinator.class),
     TEST(TestDeviceCoordinator.class);
 
     private DeviceCoordinator coordinator;
