@@ -15,7 +15,7 @@
         android:icon="@drawable/ic_bluetooth_searching"
         android:key="pref_earfun_connect_two_devices"
         android:layout="@layout/preference_checkbox"
-        android:summary="@string/earfun_connect_two_devices_hint"
+        android:summary="@string/earfun_free_pro_3_two_devices_hint"
         android:title="@string/earfun_connect_two_devices" />
 
     <ListPreference

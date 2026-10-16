@@ -3900,6 +3900,22 @@
         <item>1</item>
     </string-array>
 
+    <string-array name="earfun_free_pro_3_anc_mode_names">
+        <item>@string/earfun_anc_mode_default</item>
+        <item>@string/earfun_anc_mode_ears_1</item>
+        <item>@string/earfun_anc_mode_ears_2</item>
+        <item>@string/earfun_anc_mode_ears_3</item>
+        <item>@string/earfun_anc_mode_wind_noise_cancelling</item>
+    </string-array>
+
+    <string-array name="earfun_free_pro_3_anc_mode_values">
+        <item>0</item>
+        <item>2</item>
+        <item>3</item>
+        <item>4</item>
+        <item>1</item>
+    </string-array>
+
     <string-array name="earfun_microphone_mode_names">
         <item>@string/earfun_earbud_mode_automatic</item>
         <item>@string/earfun_earbud_mode_left</item>

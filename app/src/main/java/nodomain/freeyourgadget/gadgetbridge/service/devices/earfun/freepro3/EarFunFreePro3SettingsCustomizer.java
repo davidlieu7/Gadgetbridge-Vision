@@ -68,24 +68,32 @@ public class EarFunFreePro3SettingsCustomizer extends EarFunSettingsCustomizer {
     private void onPreferenceChangeAmbientSoundControl(DeviceSpecificSettingsHandler handler) {
         ListPreference listPreferenceAmbientSound = handler.findPreference(PREF_EARFUN_AMBIENT_SOUND_CONTROL);
         ListPreference listPreferenceTransparencyMode = handler.findPreference(PREF_EARFUN_TRANSPARENCY_MODE);
+        // The ANC mode only makes sense while noise cancelling is the active ambient mode; the
+        // entry is read defensively so that a screen without it keeps working.
         ListPreference listPreferenceAncMode = handler.findPreference(PREF_EARFUN_ANC_MODE);
 
-        if (listPreferenceAmbientSound == null || listPreferenceTransparencyMode == null || listPreferenceAncMode == null) {
+        if (listPreferenceAmbientSound == null || listPreferenceTransparencyMode == null) {
             return;
         }
 
         switch (listPreferenceAmbientSound.getValue()) {
             case "1": // noise cancelling
                 listPreferenceTransparencyMode.setVisible(false);
-                listPreferenceAncMode.setVisible(true);
+                if (listPreferenceAncMode != null) {
+                    listPreferenceAncMode.setVisible(true);
+                }
                 break;
             case "2": // transparency
                 listPreferenceTransparencyMode.setVisible(true);
-                listPreferenceAncMode.setVisible(false);
+                if (listPreferenceAncMode != null) {
+                    listPreferenceAncMode.setVisible(false);
+                }
                 break;
             default:
                 listPreferenceTransparencyMode.setVisible(false);
-                listPreferenceAncMode.setVisible(false);
+                if (listPreferenceAncMode != null) {
+                    listPreferenceAncMode.setVisible(false);
+                }
         }
     }
 

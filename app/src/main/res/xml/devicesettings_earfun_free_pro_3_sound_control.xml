@@ -22,8 +22,8 @@
 
     <ListPreference
         android:defaultValue="0"
-        android:entries="@array/earfun_anc_mode_names"
-        android:entryValues="@array/earfun_anc_mode_values"
+        android:entries="@array/earfun_free_pro_3_anc_mode_names"
+        android:entryValues="@array/earfun_free_pro_3_anc_mode_values"
         android:icon="@drawable/ic_hearing"
         android:key="pref_earfun_anc_mode"
         app:useSimpleSummaryProvider="true"
