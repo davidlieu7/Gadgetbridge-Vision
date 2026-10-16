@@ -5884,6 +5884,7 @@
     <string name="service_server_version">\nServer version: %1$s</string>
     <string name="service_logout_failed">Logout failed</string>
     <string name="service_logged_out">Logged out successfully</string>
+    <string name="service_logged_out_unconfirmed">Logged out on this phone, but %1$s did not confirm the end of the session</string>
     <string name="prefs_online_fitness_trackers_title">Online fitness trackers</string>
     <string name="prefs_online_fitness_trackers_summary">Configure how to reach and use online fitness trackers</string>
     <string name="warning_network_required_title">Network required</string>

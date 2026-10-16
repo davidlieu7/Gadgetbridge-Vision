@@ -92,20 +92,10 @@ object EndurainService : WorkoutUploadTarget {
     }
 
     override fun logout(context: Context): Boolean {
-        val server = serverUrl()
         val tokenManager = EndurainTokenManager(context)
-        if (server == null) {
-            tokenManager.clearTokens()
-            return true
-        }
-        return try {
-            EndurainApiClient(server, tokenManager).logout()
-        } catch (e: Exception) {
-            // The session may well be gone on the server already, and a user who cannot reach it
-            // still has to be able to disconnect, so the credentials go either way.
-            tokenManager.clearTokens()
-            true
-        }
+        val confirmed = serverUrl()?.let { EndurainApiClient(it, tokenManager).logout() } ?: true
+        tokenManager.clearTokens()
+        return confirmed
     }
 
     /** The refresh token expires, so it is renewed on a schedule rather than at the next upload. */
