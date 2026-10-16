@@ -812,7 +812,8 @@ class WorkoutDetailsFragment : Fragment(), MenuProvider {
                 val provider = gbDevice.deviceCoordinator.getActivityTrackProvider(gbDevice, context)
                 for (target in targets) {
                     WorkoutUploader.syncWorkout(
-                        context, gbDevice, provider, target, workout.summary, workout.data
+                        context, gbDevice, provider, target, workout.summary, workout.data,
+                        verifyRemote = true
                     )
                 }
             }

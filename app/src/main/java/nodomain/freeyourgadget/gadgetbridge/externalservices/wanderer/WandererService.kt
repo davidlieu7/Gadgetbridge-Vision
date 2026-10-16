@@ -19,6 +19,7 @@ package nodomain.freeyourgadget.gadgetbridge.externalservices.wanderer
 import android.content.Context
 import androidx.fragment.app.Fragment
 import nodomain.freeyourgadget.gadgetbridge.R
+import nodomain.freeyourgadget.gadgetbridge.activities.workouts.RemoteLookup
 import nodomain.freeyourgadget.gadgetbridge.activities.workouts.RemoteOp
 import nodomain.freeyourgadget.gadgetbridge.activities.workouts.TrackUpdateResult
 import nodomain.freeyourgadget.gadgetbridge.activities.workouts.UploadCapabilities
@@ -47,7 +48,7 @@ object WandererService : WorkoutUploadTarget {
         formats = listOf(WorkoutPayloadFormat.GPX),
         // trail/form/{id} writes the new track onto the existing trail, so its id and whatever the
         // user did to it survive.
-        activity = setOf(RemoteOp.CREATE, RemoteOp.UPDATE),
+        activity = setOf(RemoteOp.CREATE, RemoteOp.UPDATE, RemoteOp.READ),
         // It infers a trail's name and type from the uploaded file.
         metadata = emptySet(),
         media = emptySet()
@@ -114,6 +115,15 @@ object WandererService : WorkoutUploadTarget {
                 }
         }
         return if (updated == true) TrackUpdateResult.Updated else TrackUpdateResult.Failed
+    }
+
+    override fun lookupRemote(context: Context, remoteActivityId: String): RemoteLookup {
+        val server = serverUrl() ?: return RemoteLookup.FAILED
+        return when (WandererApiClient(server, WandererTokenManager(context)).trailExists(remoteActivityId)) {
+            true -> RemoteLookup.PRESENT
+            false -> RemoteLookup.GONE
+            null -> RemoteLookup.FAILED
+        }
     }
 
     /**

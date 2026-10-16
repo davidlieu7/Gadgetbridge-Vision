@@ -148,9 +148,10 @@ object WorkoutUploader {
      * since when it does. A service that already holds it as it stands is left alone, so asking
      * for an upload twice does not leave a second activity behind.
      *
-     * With [verifyRemote], the service is first asked whether it still holds the activity the row
-     * names, and one deleted there is uploaded afresh. That costs a request, so it is meant for an
-     * upload the user asked for, not for every background run.
+     * With [verifyRemote], a service that can tell ([UploadCapabilities.canLookUp]) is first asked
+     * whether it still holds the activity the row names, and one deleted there is uploaded afresh.
+     * That costs a request, so it is meant for an upload the user asked for, not for every
+     * background run.
      *
      * [summaryData] supplies the exported session fields; see [buildFitFile].
      *
@@ -168,7 +169,26 @@ object WorkoutUploader {
         val id = summary.id ?: return SyncOutcome.NotApplicable
         val sourceHash = WorkoutUploadStore.sourceHashOf(summary)
         val row = WorkoutUploadStore.rowsForSummaries(listOf(id))[id]?.get(target.service)
-        return when (syncActionFor(row, sourceHash)) {
+        val action = syncActionFor(row, sourceHash)
+        val remoteId = row?.remoteActivityId
+        if (verifyRemote && action != SyncAction.UPLOAD && remoteId != null && target.capabilities.canLookUp) {
+            renewExpiredCredentials(context, target)
+            when (target.lookupRemote(context, remoteId)) {
+                RemoteLookup.GONE -> {
+                    LOG.info("Service {} no longer holds activity {} of summary {}, uploading it again",
+                        target.service, remoteId, id)
+                    // Dropped first so that a failed upload leaves a failed first attempt, which the
+                    // background worker picks up again, rather than a row naming an activity that
+                    // no longer exists.
+                    WorkoutUploadStore.delete(id, target.service)
+                    return uploadNew(context, gbDevice, provider, target, summary, sourceHash, summaryData)
+                }
+
+                RemoteLookup.FAILED -> return SyncOutcome.Failed(null)
+                RemoteLookup.PRESENT -> Unit
+            }
+        }
+        return when (action) {
             SyncAction.UPLOAD ->
                 uploadNew(context, gbDevice, provider, target, summary, sourceHash, summaryData)
 

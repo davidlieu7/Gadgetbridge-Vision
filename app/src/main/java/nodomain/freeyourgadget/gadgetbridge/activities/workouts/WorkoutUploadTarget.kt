@@ -43,8 +43,14 @@ enum class RemoteOp {
     REPLACE,
 
     /** Take it away and leave nothing behind. */
-    DELETE
+    DELETE,
+
+    /** Tell whether it is still there; see [WorkoutUploadTarget.lookupRemote]. */
+    READ
 }
+
+/** Whether a service still holds an activity it was given. [FAILED] means it could not be asked. */
+enum class RemoteLookup { PRESENT, GONE, FAILED }
 
 /** Whether these operations amount to a way of making something match the local workout. */
 fun Set<RemoteOp>.canChange(): Boolean = RemoteOp.UPDATE in this || RemoteOp.REPLACE in this
@@ -82,6 +88,9 @@ data class UploadCapabilities(
 
     /** Whether the name and activity kind can be pushed onto an activity that already exists. */
     val editableMetadata: Boolean get() = RemoteOp.UPDATE in metadata
+
+    /** Whether the service can be asked if it still holds an activity, once deleted there. */
+    val canLookUp: Boolean get() = RemoteOp.READ in activity
 
     /**
      * Whether the service can bring its copy of the header photo in line, which depends on which
@@ -165,6 +174,12 @@ interface WorkoutUploadTarget : ExternalService {
         summary: BaseActivitySummary,
         payload: File
     ): WorkoutUploader.UploadResult
+
+    /**
+     * Asks the service whether it still holds [remoteActivityId], which it no longer does once the
+     * user deleted it there. Called only when [UploadCapabilities.canLookUp]. Blocking.
+     */
+    fun lookupRemote(context: Context, remoteActivityId: String): RemoteLookup = RemoteLookup.FAILED
 
     /**
      * Pushes the name and activity kind onto an activity that already exists remotely. Called only
