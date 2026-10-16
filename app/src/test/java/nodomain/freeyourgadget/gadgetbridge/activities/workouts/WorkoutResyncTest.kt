@@ -105,9 +105,13 @@ class WorkoutResyncTest : TestBase() {
         hadTrack = false
     }
 
-    private fun resync(target: FakeTarget, summary: BaseActivitySummary) = WorkoutUploader.resyncWorkout(
+    private fun resync(
+        target: FakeTarget,
+        summary: BaseActivitySummary,
+        row: WorkoutUpload = uploadedRow(target)
+    ) = WorkoutUploader.resyncWorkout(
         GBApplication.getContext(), createDummyGDevice("00:00:00:00:00:07"), null, target,
-        summary, uploadedRow(target), "new"
+        summary, row, "new"
     )
 
     private fun storedRow(target: FakeTarget) =
@@ -195,5 +199,19 @@ class WorkoutResyncTest : TestBase() {
             }.absolutePath
         }
         assertEquals(WorkoutUploader.SyncOutcome.Failed("Invalid API key"), resync(track, withTrack))
+    }
+
+    @Test
+    fun aRowWithoutATrackFingerprintTakesTheCurrentOneWithoutSendingTheTrack() {
+        val target = FakeTarget(trackResult = TrackUpdateResult.Failed("must not be sent"))
+        val withTrack = summary(false).apply {
+            gpxTrack = File.createTempFile("track", ".gpx").apply {
+                writeText("<gpx/>")
+                deleteOnExit()
+            }.absolutePath
+        }
+        val row = uploadedRow(target).apply { payloadHash = null }
+        assertEquals(WorkoutUploader.SyncOutcome.Resynced(null), resync(target, withTrack, row))
+        assertEquals(WorkoutUploader.payloadHashFor(target, withTrack), storedRow(target).payloadHash)
     }
 }

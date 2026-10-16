@@ -425,7 +425,10 @@ object WorkoutUploader {
         renewExpiredCredentials(context, target)
         var photoHash = row.photoHash
         var photoMediaRef = row.photoMediaRef
-        var payloadHash = row.payloadHash
+        // A row with no track fingerprint is taken to hold the current track: the activity was
+        // uploaded from this workout, and nothing says the recording changed since.
+        val newTrackHash = payloadHashFor(target, summary)
+        var payloadHash = row.payloadHash ?: newTrackHash
         var hadTrack = row.hadTrack
         var refusal: String? = null
         // Set when something the service could have taken did not get through, so the fingerprint
@@ -436,13 +439,12 @@ object WorkoutUploader {
         // gives back a new activity id, and the photo and metadata belong on the replacement.
         var recreated = false
         var awaitingId = false
-        // A service that takes the name out of the file has to be sent the file again to hear
-        // about a rename, unless sending it would cost the activity its address.
-        val newTrackHash = payloadHashFor(target, summary)
         // A service with no way to change a track is not asked to build a payload it cannot use,
-        // and neither is a workout whose track is the one the service already holds.
+        // and neither is a workout whose track is the one the service already holds. A service
+        // that takes the name out of the file has to be sent the file again to hear about a
+        // rename, unless sending it would cost the activity its address; see [payloadHashFor].
         val trackChanged =
-            target.capabilities.activity.canChange() && newTrackHash != row.payloadHash
+            target.capabilities.activity.canChange() && newTrackHash != payloadHash
         val mayPushTrack = trackChanged && mayPushTrackUpdate(target, summary, row)
         val payload = if (mayPushTrack) {
             buildPayload(context, gbDevice, provider, target, summary, summaryData)

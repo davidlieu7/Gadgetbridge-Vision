@@ -16,7 +16,6 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 package nodomain.freeyourgadget.gadgetbridge.activities.workouts
 
-import nodomain.freeyourgadget.gadgetbridge.BuildConfig
 import nodomain.freeyourgadget.gadgetbridge.GBApplication
 import nodomain.freeyourgadget.gadgetbridge.entities.BaseActivitySummary
 import nodomain.freeyourgadget.gadgetbridge.entities.BaseActivitySummaryDao
@@ -233,12 +232,6 @@ object WorkoutUploadStore {
      * A device reprocess is caught because every reprocess path rewrites at least one of these:
      * Garmin repoints rawDetailsPath, Xiaomi and Huawei rewrite summaryData.
      *
-     * [BuildConfig.VERSION_CODE] is part of the fingerprint so that an improved exporter or track
-     * parser is picked up too. Those change the exported file without touching the database, and
-     * no fingerprint over stored fields could ever see them. Folding the version in invalidates
-     * every row once per app update, after which the payload hash decides whether the change is
-     * real; the cost is bounded by the caller's export budget.
-     *
      * The summary data folded in is the stored one, not whatever [summary] carries; see
      * [storedSummaryDataOf]. A caller fingerprinting a list passes it in [storedSummaryData] to
      * save a read per workout.
@@ -246,7 +239,6 @@ object WorkoutUploadStore {
     @JvmOverloads
     fun sourceHashOf(summary: BaseActivitySummary, storedSummaryData: String? = null): String {
         val parts = listOf(
-            BuildConfig.VERSION_CODE.toString(),
             fileStamp(summary.gpxTrack),
             fileStamp(summary.rawDetailsPath),
             fileStamp(summary.headerPhoto),
@@ -264,6 +256,10 @@ object WorkoutUploadStore {
      * not read as a new track and cost the activity its address on a service that can only replace
      * one. [withMetadata] puts them back in, for a service that reads them out of the file and
      * offers no other way to change them; see [UploadCapabilities.metadataComesFromFile].
+     *
+     * The app version stays out of it: a workout whose recording did not change keeps its track
+     * across updates, since sending every track again would re-create every activity on a service
+     * that can only replace one.
      */
     @JvmOverloads
     fun trackHashOf(
@@ -272,7 +268,6 @@ object WorkoutUploadStore {
         storedSummaryData: String? = null
     ): String {
         val parts = listOf(
-            BuildConfig.VERSION_CODE.toString(),
             fileStamp(summary.gpxTrack),
             fileStamp(summary.rawDetailsPath),
             storedSummaryData ?: storedSummaryDataOf(summary),
