@@ -76,23 +76,18 @@ interface ExternalService {
     fun serverUrl(): String? =
         serverPrefKey?.let { GBApplication.getPrefs().preferences.getString(it, null) }
 
-    /** Whether credentials for this service are held and still usable. */
-    fun isLoggedIn(context: Context): Boolean
-
     /**
-     * Whether the service can be reached at all, which for a self-hosted one also means the user
-     * gave an address. Kept apart from [isLoggedIn] because credentials can outlive the address
-     * they were obtained from, and a service with no address to give answers on login alone.
+     * Whether the user has finished setting this service up: an address, for a self-hosted one,
+     * and credentials that are held and still usable.
      */
-    fun isConfigured(context: Context): Boolean =
-        (serverPrefKey == null || serverUrl() != null) && isLoggedIn(context)
+    fun isLoggedIn(context: Context): Boolean
 
     /**
      * One line saying where the user stands with this service, for its settings rows. Names the
      * instance for a self-hosted service, since the user may have more than one in mind.
      */
     fun statusSummary(context: Context): CharSequence = when {
-        !isConfigured(context) -> context.getString(R.string.service_not_logged_in)
+        !isLoggedIn(context) -> context.getString(R.string.service_not_logged_in)
         serverUrl() != null -> context.getString(R.string.service_logged_in_to, serverUrl())
         else -> context.getString(R.string.service_logged_in)
     }

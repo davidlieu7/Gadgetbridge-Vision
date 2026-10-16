@@ -54,7 +54,8 @@ object WandererService : WorkoutUploadTarget {
         media = emptySet()
     )
 
-    override fun isLoggedIn(context: Context) = WandererTokenManager(context).isLoggedIn()
+    override fun isLoggedIn(context: Context) =
+        serverUrl() != null && WandererTokenManager(context).isLoggedIn()
 
     override fun showSetup(fragment: Fragment) {
         WandererSetupBottomSheet().show(fragment.parentFragmentManager, "wanderer_setup")

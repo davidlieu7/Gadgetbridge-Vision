@@ -116,7 +116,7 @@ class ExternalServiceSettingsFragment : AbstractPreferenceFragment() {
 
     private fun refresh() {
         val context = requireContext()
-        val configured = service.isConfigured(context)
+        val configured = service.isLoggedIn(context)
         findPreference<Preference>(KEY_STATUS)?.summary = service.statusSummary(context)
         findPreference<Preference>(KEY_LOG_IN)?.isVisible = !configured
         findPreference<Preference>(KEY_LOG_OUT)?.isVisible = configured

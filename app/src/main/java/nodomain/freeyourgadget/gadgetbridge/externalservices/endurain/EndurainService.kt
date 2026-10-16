@@ -69,7 +69,8 @@ object EndurainService : WorkoutUploadTarget {
     @Volatile
     var serverVersion: String? = null
 
-    override fun isLoggedIn(context: Context) = EndurainTokenManager(context).isLoggedIn()
+    override fun isLoggedIn(context: Context) =
+        serverUrl() != null && EndurainTokenManager(context).isLoggedIn()
 
     override fun statusSummary(context: Context): CharSequence {
         val server = serverUrl()

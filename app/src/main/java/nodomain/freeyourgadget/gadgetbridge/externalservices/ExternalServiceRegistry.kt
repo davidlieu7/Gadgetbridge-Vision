@@ -33,7 +33,7 @@ object ExternalServiceRegistry {
     fun byId(id: String): ExternalService? = services.firstOrNull { it.id == id }
 
     /** Services the user has finished setting up. */
-    fun configured(context: Context): List<ExternalService> = services.filter { it.isConfigured(context) }
+    fun configured(context: Context): List<ExternalService> = services.filter { it.isLoggedIn(context) }
 
     /** Lets every service arrange its own background upkeep. Called once at startup. */
     @JvmStatic

@@ -235,7 +235,7 @@ object WorkoutUploadTargets {
      */
     @JvmStatic
     fun configured(context: Context): List<WorkoutUploadTarget> =
-        ALL.filter { it.isConfigured(context) }
+        ALL.filter { it.isLoggedIn(context) }
 
     /**
      * Targets set up and asked to take every synced workout without being told to, which is the
