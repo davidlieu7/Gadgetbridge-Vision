@@ -33,6 +33,8 @@ import nodomain.freeyourgadget.gadgetbridge.service.devices.soundcore.protocol.i
 open class SoundcoreSleepA30Protocol(device: GBDevice?) : SoundcoreProtocolImplV1(device) {
     private var stagePages: SoundcoreSleepHistory.Pages? = null
     private var sessionPages: SoundcoreSleepHistory.Pages? = null
+    private var snorePages: SoundcoreSleepHistory.Pages? = null
+    private var pendingSleepReport: SoundcoreSleepHistory.Report? = null
     private var sessionAcknowledgementTimestamp: Long? = null
     private var stageAcknowledgementTimestamp: Long? = null
     private var historyReadyForAcknowledgement = false
@@ -64,7 +66,8 @@ open class SoundcoreSleepA30Protocol(device: GBDevice?) : SoundcoreProtocolImplV
     override fun decodeResponse(responseData: ByteArray?): Array<GBDeviceEvent>? {
         if (responseData != null && responseData.size >= 7) {
             val command = BLETypeConversions.toUint16(responseData, 5).toShort()
-            if (command == CMD_GET_SLEEP_STAGES || command == CMD_GET_SLEEP_SESSIONS) {
+            if (command == CMD_GET_SLEEP_STAGES || command == CMD_GET_SLEEP_SESSIONS ||
+                command == SoundcoreSleepHistory.CMD_SNORES) {
                 if (responseData.size < 10) return null
                 val length = BLETypeConversions.toUint16(responseData, 7)
                 var checksum = 0
@@ -152,7 +155,8 @@ open class SoundcoreSleepA30Protocol(device: GBDevice?) : SoundcoreProtocolImplV
         var result: Array<GBDeviceEvent> = emptyArray()
         when (command) {
             CMD_GET_SLEEP_STAGES,
-            CMD_GET_SLEEP_SESSIONS -> {
+            CMD_GET_SLEEP_SESSIONS,
+            SoundcoreSleepHistory.CMD_SNORES -> {
                 return decodeSleepHistory(command, payload)
             }
             CMD_GET_ALARMS -> result = decodeAlarms(payload)
@@ -202,6 +206,8 @@ open class SoundcoreSleepA30Protocol(device: GBDevice?) : SoundcoreProtocolImplV
     fun cancelSleepHistory() {
         stagePages = null
         sessionPages = null
+        snorePages = null
+        pendingSleepReport = null
         sessionAcknowledgementTimestamp = null
         stageAcknowledgementTimestamp = null
         historyReadyForAcknowledgement = false
@@ -230,13 +236,23 @@ open class SoundcoreSleepA30Protocol(device: GBDevice?) : SoundcoreProtocolImplV
         val stages = stagePages ?: return emptyArray()
         // Once stages are complete, additional stage streams must not replace that snapshot.
         if (command == CMD_GET_SLEEP_STAGES && sessionPages != null) return emptyArray()
-        val pages = if (command == CMD_GET_SLEEP_STAGES) stages else sessionPages
-            ?: return emptyArray()
+        if (command == CMD_GET_SLEEP_SESSIONS && snorePages != null) return emptyArray()
+        val pages = when (command) {
+            CMD_GET_SLEEP_STAGES -> stages
+            CMD_GET_SLEEP_SESSIONS -> sessionPages
+            SoundcoreSleepHistory.CMD_SNORES -> snorePages
+            else -> null
+        } ?: return emptyArray()
         if (!pages.accept(payload)) {
             cancelSleepHistory()
             return arrayOf(SoundcoreSleepHistoryEvent(null))
         }
-        val page = SoundcoreSleepHistory.decodePage(payload, if (command == CMD_GET_SLEEP_STAGES) 7 else 14)!!
+        val recordSize = when (command) {
+            CMD_GET_SLEEP_STAGES -> 7
+            SoundcoreSleepHistory.CMD_SNORES -> 9
+            else -> 14
+        }
+        val page = SoundcoreSleepHistory.decodePage(payload, recordSize)!!
         val timestamp = page.records.maxOfOrNull {
             BLETypeConversions.toUint32(it, 0).toLong() and 0xffffffffL
         }
@@ -254,9 +270,22 @@ open class SoundcoreSleepA30Protocol(device: GBDevice?) : SoundcoreProtocolImplV
             sessionPages = SoundcoreSleepHistory.Pages(14, setOf(0, 1))
             return arrayOf(GBDeviceEventSendBytes(encodeRequest(CMD_GET_SLEEP_SESSIONS)))
         }
-        val report = SoundcoreSleepHistory.buildReport(stages.records(), pages.records())
+        if (command == CMD_GET_SLEEP_SESSIONS) {
+            val report = SoundcoreSleepHistory.buildReport(stages.records(), pages.records())
+            if (report == null) {
+                cancelSleepHistory()
+                return arrayOf(SoundcoreSleepHistoryEvent(null))
+            }
+            pendingSleepReport = report
+            snorePages = SoundcoreSleepHistory.Pages(9, setOf(0, 1))
+            return arrayOf(GBDeviceEventSendBytes(encodeRequest(SoundcoreSleepHistory.CMD_SNORES)))
+        }
+        val snores = SoundcoreSleepHistory.decodeSnores(pages)
+        val report = if (snores != null) pendingSleepReport?.copy(snores = snores) else null
         stagePages = null
         sessionPages = null
+        snorePages = null
+        pendingSleepReport = null
         historyReadyForAcknowledgement = report != null
         if (report == null) cancelSleepHistory()
         return arrayOf(SoundcoreSleepHistoryEvent(report))

@@ -21,6 +21,7 @@ import nodomain.freeyourgadget.gadgetbridge.service.btle.BLETypeConversions
 
 /** A complete history snapshot. Transport paging is independent of the record chronology. */
 object SoundcoreSleepHistory {
+    const val CMD_SNORES: Short = 0x0615
     const val CMD_STAGES: Short = 0x0415
     const val CMD_SESSIONS: Short = 0x8815.toShort()
     private const val MAX_PAGES = 32
@@ -34,7 +35,9 @@ object SoundcoreSleepHistory {
     data class Session(val start: Long, val end: Long, val type: Int, val score: Int,
                        val unknownCount: Int, val durationMinutes: Int, val unknown: Int)
     data class Interval(val start: Long, val end: Long, val stage: Int, val position: Int)
-    data class Report(val records: List<Record>, val sessions: List<Session>, val intervals: List<Interval>)
+    data class Snore(val selector: Int, val start: Long, val end: Long, val averageDecibels: Int)
+    data class Report(val records: List<Record>, val sessions: List<Session>, val intervals: List<Interval>,
+                      val snores: List<Snore> = emptyList())
 
     class Pages(private val recordSize: Int, private val requiredSelectors: Set<Int> = emptySet()) {
         private class Stream(val total: Int) {
@@ -64,13 +67,17 @@ object SoundcoreSleepHistory {
             return true
         }
 
+        fun records(selector: Int): List<ByteArray> = streams[selector]?.pages?.values?.flatMap {
+            decodePage(it, recordSize)!!.records
+        } ?: emptyList()
+
         fun records(): List<ByteArray> = streams.values.flatMap { stream ->
             stream.pages.values.flatMap { decodePage(it, recordSize)!!.records }
         }
     }
 
     @JvmStatic fun decodePage(payload: ByteArray, recordSize: Int): Page? {
-        if (recordSize !in setOf(7, 14) || payload.size < 4) return null
+        if (recordSize !in setOf(7, 9, 14) || payload.size < 4) return null
         val selector = payload[0].toInt() and 255
         val index = payload[1].toInt() and 255
         val total = payload[2].toInt() and 255
@@ -84,6 +91,23 @@ object SoundcoreSleepHistory {
 
     private fun timestamp(bytes: ByteArray, offset: Int): Long =
         BLETypeConversions.toUint32(bytes, offset).toLong() and 0xffffffffL
+
+    @JvmStatic fun decodeSnores(pages: Pages): List<Snore>? {
+        if (!pages.complete) return null
+        val snores = mutableListOf<Snore>()
+        for (selector in 0..1) {
+            for (raw in pages.records(selector)) {
+                if (raw.size != 9) return null
+                val start = timestamp(raw, 0)
+                val end = timestamp(raw, 4)
+                if (start !in 1..Int.MAX_VALUE.toLong() || end <= start || end > Int.MAX_VALUE) return null
+                snores.add(Snore(selector, start, end, raw[8].toInt() and 255))
+            }
+        }
+        // Preserve raw intervals without grouping or filtering. Sleep-report presentation is
+        // deferred until the grouping and volume aggregation semantics are established.
+        return snores
+    }
 
     @JvmStatic fun buildReport(rawRecords: List<ByteArray>, rawSessions: List<ByteArray>): Report? {
         if (rawRecords.any { it.size != 7 } || rawSessions.any { it.size != 14 }) return null

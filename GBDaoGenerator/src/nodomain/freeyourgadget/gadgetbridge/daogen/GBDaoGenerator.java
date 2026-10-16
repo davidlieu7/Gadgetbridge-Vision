@@ -2914,6 +2914,11 @@ public class GBDaoGenerator {
     }
 
     private static void addSoundcoreSleepSamples(Schema schema, Entity user, Entity device) {
+        Entity snore = addEntity(schema, "SoundcoreSnoreSample");
+        addCommonTimeSampleProperties("AbstractTimeSample", snore, user, device);
+        snore.addIntProperty("selector").notNull().primaryKey();
+        snore.addLongProperty("endTimestamp").notNull().primaryKey();
+        snore.addIntProperty("averageDecibels").notNull().primaryKey();
         Entity stage = addEntity(schema, "SoundcoreSleepStageSample");
         addCommonTimeSampleProperties("AbstractTimeSample", stage, user, device);
         stage.addLongProperty("endTimestamp").notNull();

@@ -56,6 +56,8 @@ class SoundcoreSleepA30Coordinator : SoundcoreEarbudsCoordinator() {
         super.getAllDeviceDao(session).toMutableMap().apply {
             put(session.genericSleepScoreSampleDao,
                 nodomain.freeyourgadget.gadgetbridge.entities.GenericSleepScoreSampleDao.Properties.DeviceId)
+            put(session.soundcoreSnoreSampleDao,
+                nodomain.freeyourgadget.gadgetbridge.entities.SoundcoreSnoreSampleDao.Properties.DeviceId)
             put(session.soundcoreSleepStageSampleDao,
                 nodomain.freeyourgadget.gadgetbridge.entities.SoundcoreSleepStageSampleDao.Properties.DeviceId)
             put(session.soundcoreSleepSessionSampleDao,

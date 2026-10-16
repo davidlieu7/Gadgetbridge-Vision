@@ -20,6 +20,7 @@ import nodomain.freeyourgadget.gadgetbridge.GBApplication
 import nodomain.freeyourgadget.gadgetbridge.database.DBHelper
 import nodomain.freeyourgadget.gadgetbridge.entities.GenericSleepScoreSample
 import nodomain.freeyourgadget.gadgetbridge.entities.GenericSleepScoreSampleDao
+import nodomain.freeyourgadget.gadgetbridge.entities.SoundcoreSnoreSample
 import nodomain.freeyourgadget.gadgetbridge.entities.SoundcoreSleepSessionSample
 import nodomain.freeyourgadget.gadgetbridge.entities.SoundcoreSleepSessionSampleDao
 import nodomain.freeyourgadget.gadgetbridge.entities.SoundcoreSleepStageSample
@@ -73,6 +74,10 @@ object SoundcoreSleepHistoryStorage {
                         end, record.packed, record.rollovers, record.flags)
                 }
                 session.soundcoreSleepStageSampleDao.insertOrReplaceInTx(samples)
+                session.soundcoreSnoreSampleDao.insertOrReplaceInTx(report.snores.map {
+                    SoundcoreSnoreSample(it.start * 1000L, deviceId, userId,
+                        it.selector, it.end * 1000L, it.averageDecibels)
+                })
             }
         }
     }
