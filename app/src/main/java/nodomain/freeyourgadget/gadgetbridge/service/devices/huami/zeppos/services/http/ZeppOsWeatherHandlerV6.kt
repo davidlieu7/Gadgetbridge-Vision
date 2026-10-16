@@ -227,7 +227,8 @@ object ZeppOsWeatherHandlerV6 {
                         windSpeed = it.windSpeed,
                         windScale = it.windSpeedAsBeaufort(),
                         // New V6 fields
-                        temperatureApparent = null, // TODO WeatherSpec does not support hourly feelsLikeTemp
+                        temperatureApparent = it.feelsLikeTemp.takeIf { temp -> temp != 0 }
+                            ?.let { temp -> temp - 273f },
                         temperatureDewPoint = it.dewPoint.takeIf { dewPoint -> dewPoint != 0 }
                             ?.let { dewPoint -> dewPoint - 273f },
                         precipitationChance = it.precipProbability / 100.0f,

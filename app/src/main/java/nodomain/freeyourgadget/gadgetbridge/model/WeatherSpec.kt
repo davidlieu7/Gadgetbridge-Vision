@@ -680,6 +680,9 @@ class WeatherSpec() : Parcelable {
         /** dew point in Kelvin */
         var dewPoint: Int = 0
 
+        /** apparent (feels-like) temperature in Kelvin, or 0 when unavailable */
+        var feelsLikeTemp: Int = 0
+
         /** atmospheric air pressure in millibar */
         var pressure: Float = 0f
 
@@ -702,6 +705,9 @@ class WeatherSpec() : Parcelable {
                 pressure = parcel.readFloat()
                 cloudCover = parcel.readInt()
             }
+            if (version >= 3) {
+                feelsLikeTemp = parcel.readInt()
+            }
         }
 
         override fun describeContents(): Int = 0
@@ -719,6 +725,7 @@ class WeatherSpec() : Parcelable {
             dest.writeInt(dewPoint)
             dest.writeFloat(pressure)
             dest.writeInt(cloudCover)
+            dest.writeInt(feelsLikeTemp)
         }
 
         fun windSpeedAsBeaufort(): Int {
@@ -740,6 +747,7 @@ class WeatherSpec() : Parcelable {
             if (uvIndex != other.uvIndex) return false
             if (precipProbability != other.precipProbability) return false
             if (dewPoint != other.dewPoint) return false
+            if (feelsLikeTemp != other.feelsLikeTemp) return false
             if (pressure != other.pressure) return false
             if (cloudCover != other.cloudCover) return false
 
@@ -756,13 +764,14 @@ class WeatherSpec() : Parcelable {
             result = 31 * result + uvIndex.hashCode()
             result = 31 * result + precipProbability
             result = 31 * result + dewPoint
+            result = 31 * result + feelsLikeTemp
             result = 31 * result + cloudCover
             result = 31 * result + pressure.hashCode()
             return result
         }
 
         companion object {
-            const val VERSION = 2
+            const val VERSION = 3
 
             @JvmField
             val CREATOR: Parcelable.Creator<Hourly> = object : Parcelable.Creator<Hourly> {

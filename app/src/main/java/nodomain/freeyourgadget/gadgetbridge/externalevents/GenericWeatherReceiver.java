@@ -204,6 +204,7 @@ public class GenericWeatherReceiver extends BroadcastReceiver {
                 forecast.setUvIndex(getFloat(forecastJson, "uvIndex", 0.0f));
                 forecast.setPrecipProbability(getInt(forecastJson, "precipProbability", 0));
                 forecast.setDewPoint(getInt(forecastJson, "dewPoint", 0));
+                forecast.setFeelsLikeTemp(getInt(forecastJson, "feelsLikeTemp", 0));
                 forecast.setPressure(getFloat(forecastJson, "pressure", 0.0f));
                 forecast.setCloudCover(getInt(forecastJson, "cloudCover", 0));
 
