@@ -2594,6 +2594,7 @@
     <string name="devicetype_colmi_r12" translatable="false">Colmi R12</string>
     <string name="devicetype_h59" translatable="false">H59</string>
     <string name="devicetype_c60" translatable="false">C60</string>
+    <string name="devicetype_oura_ring_4" translatable="false">Oura Ring 4</string>
     <string name="devicetype_colmi_i28_ultra" translatable="false">Colmi i28 Ultra</string>
     <string name="devicetype_colmi_i31" translatable="false">Colmi i31</string>
     <string name="devicetype_colmi_v72" translatable="false">Colmi V72</string>

@@ -898,6 +898,10 @@
             android:label="@string/devicetype_gree_ac"
             android:parentActivityName=".activities.discovery.DiscoveryActivityV2" />
         <activity
+            android:name=".devices.oura.OuraPairingActivity"
+            android:label="@string/devicetype_oura_ring_4"
+            android:parentActivityName=".activities.discovery.DiscoveryActivityV2" />
+        <activity
             android:name=".devices.lenovo.watch9.Watch9PairingActivity"
             android:label="@string/title_activity_watch9_pairing" />
         <activity

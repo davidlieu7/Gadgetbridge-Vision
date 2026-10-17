@@ -110,7 +110,7 @@ public class GBDaoGenerator {
             outputDir.mkdirs();
         }
 
-        final Schema schema = new Schema(157, MAIN_PACKAGE + ".entities");
+        final Schema schema = new Schema(158, MAIN_PACKAGE + ".entities");
 
         final List<Entity> sampleProvidersToGenerate = new LinkedList<>();
         final List<Entity> batterySampleProvidersToGenerate = new LinkedList<>();
@@ -232,6 +232,7 @@ public class GBDaoGenerator {
         sampleProvidersToGenerate.add(addColmiHrvValueSample(schema, user, device));
         addColmiHrvSummarySample(schema, user, device);
         sampleProvidersToGenerate.add(addColmiTemperatureSample(schema, user, device));
+        addOuraActivitySample(schema, user, device);
         addMoyoungActivitySample(schema, user, device);
         sampleProvidersToGenerate.add(addMoyoungHeartRateSample(schema, user, device));
         sampleProvidersToGenerate.add(addMoyoungSpo2Sample(schema, user, device));
@@ -947,6 +948,19 @@ public class GBDaoGenerator {
         sample.addIntProperty("temperatureType").notNull().codeBeforeGetter(OVERRIDE);
         sample.addIntProperty("temperatureLocation").notNull().codeBeforeGetter(OVERRIDE);
         return sample;
+    }
+
+    private static Entity addOuraActivitySample(Schema schema, Entity user, Entity device) {
+        Entity activitySample = addEntity(schema, "OuraActivitySample");
+        addCommonActivitySampleProperties("AbstractActivitySample", activitySample, user, device);
+        activitySample.implementsSerializable();
+        activitySample.addIntProperty(SAMPLE_RAW_INTENSITY).notNull().codeBeforeGetterAndSetter(OVERRIDE);
+        activitySample.addIntProperty(SAMPLE_STEPS).notNull().codeBeforeGetterAndSetter(OVERRIDE);
+        activitySample.addIntProperty(SAMPLE_RAW_KIND).notNull().codeBeforeGetterAndSetter(OVERRIDE);
+        addHeartRateProperties(activitySample);
+        activitySample.addFloatProperty("restMovement")
+                .javaDocGetterAndSetter("Sleep estimator movement of the ring's rest records in this minute, null outside rest.");
+        return activitySample;
     }
 
     private static void addHeartRateProperties(Entity activitySample) {

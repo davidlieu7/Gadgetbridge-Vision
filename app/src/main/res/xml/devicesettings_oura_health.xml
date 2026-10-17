@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.preference.PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <SwitchPreferenceCompat
+        android:defaultValue="true"
+        android:icon="@drawable/ic_heart"
+        android:key="heartrate_automatic_enable"
+        android:layout="@layout/preference_checkbox"
+        android:title="@string/prefs_title_all_day_heart_rate" />
+
+    <SwitchPreferenceCompat
+        android:defaultValue="true"
+        android:icon="@drawable/ic_heart"
+        android:key="heartrate_activity_monitoring"
+        android:layout="@layout/preference_checkbox"
+        android:title="@string/prefs_activity_monitoring_title" />
+
+    <SwitchPreferenceCompat
+        android:defaultValue="true"
+        android:icon="@drawable/ic_steps"
+        android:key="oura_steps"
+        android:layout="@layout/preference_checkbox"
+        android:title="@string/steps" />
+
+</androidx.preference.PreferenceScreen>

@@ -6,7 +6,8 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * A single, complete sleep session: an ordered, contiguous list of {@link SleepStage}s.
+ * A single, complete sleep session: an ordered list of {@link SleepStage}s. A span the device did
+ * not measure, such as the device taken off for a while, may lie between two stages.
  */
 public class SleepSession {
     private final List<SleepStage> stages;
