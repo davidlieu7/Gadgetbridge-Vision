@@ -338,7 +338,7 @@ public class DeviceCommunicationService extends Service implements SharedPrefere
                     return;
                 }
 
-                connectToDevice(target, false);
+                connectToDevice(target, false, result);
             }
         }
     };
@@ -488,7 +488,7 @@ public class DeviceCommunicationService extends Service implements SharedPrefere
                 continue;
             }
             LOG.info("Reconnecting to {} after restart", device);
-            connectToDevice(device, false);
+            connectToDevice(device, false, null);
         }
     }
 
@@ -518,7 +518,7 @@ public class DeviceCommunicationService extends Service implements SharedPrefere
         return registeredStruct;
     }
 
-    private void connectToDevice(@Nullable final GBDevice device, final boolean firstTime) {
+    private void connectToDevice(@Nullable final GBDevice device, final boolean firstTime, @Nullable final ScanResult scanResult) {
         final List<GBDevice> gbDevs = new ArrayList<>(2);
         final boolean fromExtra;
 
@@ -649,7 +649,9 @@ public class DeviceCommunicationService extends Service implements SharedPrefere
                         } else {
                             deviceSupport.setAutoReconnect(autoReconnect);
                             deviceSupport.setScanReconnect(reconnectViaScan);
-                            if (BuildConfig.DEBUG) {
+                            if (scanResult != null) {
+                                connected = deviceSupport.connectFromScan(scanResult);
+                            } else if (BuildConfig.DEBUG) {
                                 connected = stressTestConnect(deviceSupport);
                             } else {
                                 connected = deviceSupport.connect();
@@ -709,7 +711,7 @@ public class DeviceCommunicationService extends Service implements SharedPrefere
         switch (action) {
             case ACTION_CONNECT:
                 boolean firstTime = intent.getBooleanExtra(EXTRA_CONNECT_FIRST_TIME, false);
-                connectToDevice(targetDevice, firstTime);
+                connectToDevice(targetDevice, firstTime, null);
                 break;
             default:
                 ArrayList<GBDevice> targetedDevices = new ArrayList<>();
@@ -981,7 +983,7 @@ public class DeviceCommunicationService extends Service implements SharedPrefere
         if (!pendingSleepAsAndroidAction.store(intent, device.getAddress())) {
             if (!connectInFlight && pendingSleepAsAndroidAction.wakes(saaAction)) {
                 LOG.info("Connecting to {}, Sleep as Android is looking for it", device.getAliasOrName());
-                connectToDevice(device, false);
+                connectToDevice(device, false, null);
                 return;
             }
             LOG.debug("Dropping Sleep as Android action {}, {} is not connected", saaAction, device.getAliasOrName());
@@ -994,7 +996,7 @@ public class DeviceCommunicationService extends Service implements SharedPrefere
         }
 
         LOG.info("Connecting to {} to replay Sleep as Android action {}", device.getAliasOrName(), saaAction);
-        connectToDevice(device, false);
+        connectToDevice(device, false, null);
     }
 
     private void sendPendingSleepAsAndroidAction(final GBDevice device) {

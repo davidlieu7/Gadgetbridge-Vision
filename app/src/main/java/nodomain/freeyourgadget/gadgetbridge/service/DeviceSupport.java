@@ -17,6 +17,7 @@
 package nodomain.freeyourgadget.gadgetbridge.service;
 
 import android.bluetooth.BluetoothAdapter;
+import android.bluetooth.le.ScanResult;
 import android.content.Context;
 import android.hardware.usb.UsbAccessory;
 
@@ -109,9 +110,31 @@ public interface DeviceSupport extends EventHandler {
      * #getDevice device as a device change Intent.
      *
      * @see #connectFirstTime()
+     * @see #connectFromScan(ScanResult)
      * @see GBDevice#ACTION_DEVICE_CHANGED
      */
     boolean connect();
+
+    /**
+     * Attempts to establish a connection to the device, after the device was found
+     * by a scan. Some implementations may use the scan result to decide whether to establish the
+     * connection or to extract useful information.
+     * <p/>
+     * Implementations may perform the connection in a synchronous or asynchronous way.
+     * Returns true if a connection attempt was made. If the implementation is synchronous
+     * it may also return true if the connection was successfully established, however
+     * callers shall not rely on that.
+     * <p/>
+     * The actual connection state change (successful or not) will be reported via the
+     * #getDevice device as a device change Intent.
+     *
+     * Note: the default implementation {@link AbstractDeviceSupport#connectFromScan(ScanResult)}
+     * just calls {@link #connect()}
+     *
+     * @see #connect()
+     * @see GBDevice#ACTION_DEVICE_CHANGED
+     */
+    boolean connectFromScan(@NonNull ScanResult scanResult);
 
     /**
      * Disposes of this instance, closing all connections and freeing all resources.
