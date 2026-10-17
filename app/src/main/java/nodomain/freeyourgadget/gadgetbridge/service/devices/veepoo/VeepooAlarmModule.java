@@ -16,7 +16,10 @@
     along with this program.  If not, see <http://www.gnu.org/licenses/>. */
 package nodomain.freeyourgadget.gadgetbridge.service.devices.veepoo;
 
+import android.content.Intent;
 import android.content.SharedPreferences;
+
+import androidx.localbroadcastmanager.content.LocalBroadcastManager;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -25,11 +28,19 @@ import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Calendar;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 import nodomain.freeyourgadget.gadgetbridge.GBApplication;
+import nodomain.freeyourgadget.gadgetbridge.database.DBHandler;
+import nodomain.freeyourgadget.gadgetbridge.database.DBHelper;
 import nodomain.freeyourgadget.gadgetbridge.devices.veepoo.VeepooConstants;
+import nodomain.freeyourgadget.gadgetbridge.entities.DaoSession;
+import nodomain.freeyourgadget.gadgetbridge.entities.Device;
+import nodomain.freeyourgadget.gadgetbridge.entities.User;
 import nodomain.freeyourgadget.gadgetbridge.model.Alarm;
+import nodomain.freeyourgadget.gadgetbridge.model.DeviceService;
 import nodomain.freeyourgadget.gadgetbridge.service.btle.TransactionBuilder;
 
 // ------------------------------------------------------------------------
@@ -66,7 +77,7 @@ class VeepooAlarmModule {
     };
 
     /** One text alarm as stored on the band (vendor TextAlarm2Setting). */
-    private static final class VeepooAlarm {
+    static final class VeepooAlarm {
         int id;
         int hour;
         int minute;
@@ -178,7 +189,7 @@ class VeepooAlarmModule {
     }
 
     /** Maps Gadgetbridge's MON=1..SUN=64 mask onto the band's weekday value (bit6=Sunday .. bit0=Saturday). */
-    private static int gbRepeatToVendorRepeat(int gbRepetition) {
+    static int gbRepeatToVendorRepeat(int gbRepetition) {
         int vendor = 0;
         if ((gbRepetition & Alarm.ALARM_SUN) != 0) vendor |= 0x40;
         if ((gbRepetition & Alarm.ALARM_MON) != 0) vendor |= 0x20;
@@ -406,12 +417,19 @@ class VeepooAlarmModule {
                 break;
             case VeepooConstants.ALARM_OP_DEVICE_DELETE:
                 if (data.length >= 5) {
-                    removeAlarmById(data[4] & 0xFF);
+                    VeepooAlarm deleted = removeAlarmById(data[4] & 0xFF);
+                    if (deleted != null) {
+                        markDbAlarmUnused(deleted);
+                    }
                 }
                 break;
             case VeepooConstants.ALARM_OP_DEVICE_TOGGLE:
                 if (data.length >= 6) {
-                    setAlarmOpen(data[4] & 0xFF, data[5] == 1);
+                    boolean open = data[5] == 1;
+                    VeepooAlarm toggled = setAlarmOpen(data[4] & 0xFF, open);
+                    if (toggled != null) {
+                        updateDbAlarmEnabled(toggled, open);
+                    }
                 }
                 break;
             default:
@@ -490,6 +508,7 @@ class VeepooAlarmModule {
             alarmCrc = computeAlarmCrc(alarmList);
         }
         LOG.info("Read {} alarm(s) from watch: {}", list.size(), describeAlarms(list));
+        adoptBandAlarms(list);
     }
 
     /** Parses one alarm record starting at the 0xB1 marker byte. */
@@ -515,22 +534,182 @@ class VeepooAlarmModule {
         return alarm;
     }
 
-    private void removeAlarmById(int id) {
+    private VeepooAlarm removeAlarmById(int id) {
+        VeepooAlarm removed = null;
         synchronized (alarmLock) {
+            for (VeepooAlarm alarm : alarmList) {
+                if (alarm.id == id) {
+                    removed = alarm;
+                    break;
+                }
+            }
             alarmList.removeIf(alarm -> alarm.id == id);
         }
-        LOG.info("Band deleted alarm {} from its own UI", id);
+        if (removed != null) {
+            LOG.info("Band deleted alarm {} from its own UI", id);
+        }
+        return removed;
     }
 
-    private void setAlarmOpen(int id, boolean open) {
+    private VeepooAlarm setAlarmOpen(int id, boolean open) {
+        VeepooAlarm matched = null;
         synchronized (alarmLock) {
             for (VeepooAlarm alarm : alarmList) {
                 if (alarm.id == id) {
                     alarm.open = open;
+                    matched = alarm;
+                    break;
                 }
             }
         }
-        LOG.info("Band {} alarm {} from its own UI", open ? "enabled" : "disabled", id);
+        if (matched != null) {
+            LOG.info("Band {} alarm {} from its own UI", open ? "enabled" : "disabled", id);
+        }
+        return matched;
+    }
+
+    // ------------------------------------------------------------------------
+    // Two-way sync: devices with a screen can create, delete and toggle alarms
+    // from their own UI. The tracked list above only keeps the CRC state; this
+    // section mirrors band-initiated changes into the alarm database so they show
+    // up in the UI and are not wiped by the next phone-side push.
+    // ------------------------------------------------------------------------
+
+    /** True when the band alarm matches the GB alarm's time, repetition and one-shot-ness. */
+    static boolean matchesGbAlarm(VeepooAlarm band, Alarm gb) {
+        if (band.hour != gb.getHour() || band.minute != gb.getMinute()) {
+            return false;
+        }
+        if (band.repeatInt == 0) {
+            return !gb.isRepetitive();
+        }
+        return gb.isRepetitive() && gbRepeatToVendorRepeat(gb.getRepetition()) == band.repeatInt;
+    }
+
+    /** Lowest free slot position, or -1 when the device has no free slots left. */
+    static int nextFreeAlarmPosition(int maxAlarms, Set<Integer> usedPositions) {
+        for (int position = 0; position < maxAlarms; position++) {
+            if (!usedPositions.contains(position)) {
+                return position;
+            }
+        }
+        return -1;
+    }
+
+    /** Maps the band's weekday value (bit6=Sunday .. bit0=Saturday) onto Gadgetbridge's MON=1..SUN=64 mask. */
+    static int vendorRepeatToGbRepeat(int vendorRepeat) {
+        int gb = 0;
+        if ((vendorRepeat & 0x40) != 0) gb |= Alarm.ALARM_SUN;
+        if ((vendorRepeat & 0x20) != 0) gb |= Alarm.ALARM_MON;
+        if ((vendorRepeat & 0x10) != 0) gb |= Alarm.ALARM_TUE;
+        if ((vendorRepeat & 0x08) != 0) gb |= Alarm.ALARM_WED;
+        if ((vendorRepeat & 0x04) != 0) gb |= Alarm.ALARM_THU;
+        if ((vendorRepeat & 0x02) != 0) gb |= Alarm.ALARM_FRI;
+        if ((vendorRepeat & 0x01) != 0) gb |= Alarm.ALARM_SAT;
+        return gb;
+    }
+
+    /**
+     * Adds alarms that exist on the band but not in the database (created from the band's own UI)
+     * so the alarm screen shows them and a later push does not delete them.
+     */
+    private void adoptBandAlarms(List<VeepooAlarm> fromBand) {
+        if (fromBand.isEmpty()) {
+            return;
+        }
+        List<nodomain.freeyourgadget.gadgetbridge.entities.Alarm> dbAlarms = DBHelper.getAlarms(support.getDevice());
+        Set<Integer> usedPositions = new HashSet<>();
+        for (nodomain.freeyourgadget.gadgetbridge.entities.Alarm dbAlarm : dbAlarms) {
+            usedPositions.add(dbAlarm.getPosition());
+        }
+        boolean changed = false;
+        try (DBHandler db = GBApplication.acquireDB()) {
+            DaoSession daoSession = db.getDaoSession();
+            Device device = DBHelper.getDevice(support.getDevice(), daoSession);
+            User user = DBHelper.getUser(daoSession);
+            for (VeepooAlarm bandAlarm : fromBand) {
+                if (findMatchingDbAlarm(bandAlarm, dbAlarms) != null) {
+                    continue;
+                }
+                int position = nextFreeAlarmPosition(VeepooConstants.ALARM_MAX_ALARMS, usedPositions);
+                if (position < 0) {
+                    LOG.warn("No free alarm slot for a band-created alarm at {}; leaving it watch-only",
+                            String.format("%02d:%02d", bandAlarm.hour, bandAlarm.minute));
+                    continue;
+                }
+                int repetition = bandAlarm.repeatInt == 0 ? Alarm.ALARM_ONCE : vendorRepeatToGbRepeat(bandAlarm.repeatInt);
+                nodomain.freeyourgadget.gadgetbridge.entities.Alarm adopted =
+                        new nodomain.freeyourgadget.gadgetbridge.entities.Alarm(
+                                device.getId(), user.getId(), position, bandAlarm.open, false, null, false,
+                                repetition, bandAlarm.hour, bandAlarm.minute, false,
+                                bandAlarm.label.isEmpty() ? null : bandAlarm.label, null, 0, true);
+                daoSession.insertOrReplace(adopted);
+                dbAlarms.add(adopted);
+                usedPositions.add(position);
+                changed = true;
+                LOG.info("Adopted band alarm {} {} into slot {}",
+                        String.format("%02d:%02d", bandAlarm.hour, bandAlarm.minute),
+                        bandAlarm.repeatInt == 0 ? "(once)" : "(weekly)", position);
+            }
+        } catch (Exception e) {
+            LOG.error("Error adopting band alarms into the database", e);
+        }
+        if (changed) {
+            notifyAlarmsChanged();
+        }
+    }
+
+    /** Marks the in-use DB alarm matching a band-side deletion as unused, mirroring the UI delete. */
+    private void markDbAlarmUnused(VeepooAlarm band) {
+        nodomain.freeyourgadget.gadgetbridge.entities.Alarm dbAlarm =
+                findMatchingDbAlarm(band, DBHelper.getAlarms(support.getDevice()));
+        if (dbAlarm == null || dbAlarm.getUnused()) {
+            return;
+        }
+        dbAlarm.setUnused(true);
+        dbAlarm.setEnabled(false);
+        DBHelper.store(dbAlarm);
+        LOG.info("Band deleted alarm {}; marked slot {} unused in the database",
+                String.format("%02d:%02d", band.hour, band.minute), dbAlarm.getPosition());
+        notifyAlarmsChanged();
+    }
+
+    /** Mirrors a band-side enable/disable into the matching DB alarm. */
+    private void updateDbAlarmEnabled(VeepooAlarm band, boolean open) {
+        nodomain.freeyourgadget.gadgetbridge.entities.Alarm dbAlarm =
+                findMatchingDbAlarm(band, DBHelper.getAlarms(support.getDevice()));
+        if (dbAlarm == null) {
+            return;
+        }
+        if (open) {
+            dbAlarm.setUnused(false);
+            dbAlarm.setEnabled(true);
+        } else if (dbAlarm.getUnused()) {
+            return;
+        } else {
+            dbAlarm.setEnabled(false);
+        }
+        DBHelper.store(dbAlarm);
+        LOG.info("Band {} alarm {}; updated slot {} in the database",
+                open ? "enabled" : "disabled", String.format("%02d:%02d", band.hour, band.minute),
+                dbAlarm.getPosition());
+        notifyAlarmsChanged();
+    }
+
+    private static nodomain.freeyourgadget.gadgetbridge.entities.Alarm findMatchingDbAlarm(
+            VeepooAlarm band, List<nodomain.freeyourgadget.gadgetbridge.entities.Alarm> dbAlarms) {
+        for (nodomain.freeyourgadget.gadgetbridge.entities.Alarm dbAlarm : dbAlarms) {
+            if (matchesGbAlarm(band, dbAlarm)) {
+                return dbAlarm;
+            }
+        }
+        return null;
+    }
+
+    /** Lets an open alarm screen refresh after a band-initiated change. */
+    private void notifyAlarmsChanged() {
+        support.mainHandler.post(() -> LocalBroadcastManager.getInstance(GBApplication.getContext())
+                .sendBroadcast(new Intent(DeviceService.ACTION_SAVE_ALARMS)));
     }
 
     /** Writes an alarm frame (up to MTU-3 bytes, unlike the fixed 20-byte writeFrame). */
