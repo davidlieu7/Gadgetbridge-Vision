@@ -6115,6 +6115,10 @@
     <string name="ugreen_high_quality_summary">Enable high-resolution audio decoding (LDAC)</string>
 
     <string name="devicetype_canon_camera" translatable="false">Canon Camera</string>
+    <string name="pref_title_canon_camera_gps_update_interval">GPS data update interval</string>
+    <string name="pref_summary_canon_camera_gps_update_interval">The interval for how often the GPS position is being sent to the camera, in seconds</string>
+    <string name="pref_title_canon_camera_gps_network">Use network to determine location</string>
+    <string name="pref_summary_canon_camera_gps_network">Use the network provider to determine the location. This reduces the power consumption at the cost of accuracy.</string>
 
     <string name="pref_workout_templates_title">Workout templates</string>
     <string name="pref_workout_templates_summary">Create and manage structured workouts</string>

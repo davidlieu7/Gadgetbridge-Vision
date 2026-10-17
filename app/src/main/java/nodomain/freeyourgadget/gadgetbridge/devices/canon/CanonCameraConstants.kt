@@ -45,6 +45,25 @@ object CanonCameraConstants {
     const val MAIN_IDENTITY_CMD_PHONE_UUID: Byte = 0x03
     const val MAIN_IDENTITY_CMD_PHONE_NAME: Byte = 0x04
 
+    // Service 40000 - GPS
+    val UUID_SERVICE_GPS: UUID = uuid(0x40000)
+    val UUID_CHARACTERISTIC_GPS_WRITE: UUID = uuid(0x40002)
+    val UUID_CHARACTERISTIC_GPS_NOTIFY: UUID = uuid(0x40003)
+
+    // GPS Write characteristic (0x40002)
+    const val GPS_CMD_SUPPORTED: Byte = 0x01
+    const val GPS_CMD_UNSUPPORTED: Byte = 0x02
+    const val GPS_CMD_DATA: Byte = 0x04
+
+    // GPS Notify characteristic (00040003)
+    const val GPS_EVENT_DISABLE: Byte = 0x01
+    const val GPS_EVENT_ENABLE: Byte = 0x02
+    const val GPS_EVENT_REQUEST: Byte = 0x03
+
     // Device preferences
     const val PREF_PHONE_UUID = "phone_uuid"
+    const val PREF_GPS_UPDATE_INTERVAL = "gps_update_interval"
+    const val PREF_GPS_UPDATE_INTERVAL_DEFAULT = 10
+    const val PREF_GPS_USE_NETWORK = "gps_use_network"
+    const val PREF_GPS_USE_NETWORK_DEFAULT = false
 }

@@ -18,7 +18,11 @@ package nodomain.freeyourgadget.gadgetbridge.devices.canon
 
 import android.bluetooth.le.ScanFilter
 import android.os.ParcelUuid
+import android.text.InputType
 import nodomain.freeyourgadget.gadgetbridge.R
+import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSpecificSettingsScreen
+import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.DeviceSettingsSpec
+import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.deviceSettings
 import nodomain.freeyourgadget.gadgetbridge.devices.AbstractBLEDeviceCoordinator
 import nodomain.freeyourgadget.gadgetbridge.devices.DeviceCoordinator
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice
@@ -45,6 +49,31 @@ class CanonCameraCoordinator : AbstractBLEDeviceCoordinator() {
 
     override fun getDeviceSupportClass(device: GBDevice): Class<out DeviceSupport> {
         return CanonCameraSupport::class.java
+    }
+
+    override fun getDeviceSettings(device: GBDevice): DeviceSettingsSpec {
+        return deviceSettings {
+            DeviceSpecificSettingsScreen.LOCATION.screen {
+                text(
+                    key = CanonCameraConstants.PREF_GPS_UPDATE_INTERVAL,
+                    title = R.string.pref_title_canon_camera_gps_update_interval,
+                    summary = R.string.pref_summary_canon_camera_gps_update_interval,
+                    icon = R.drawable.ic_access_time,
+                    defaultValue = CanonCameraConstants.PREF_GPS_UPDATE_INTERVAL_DEFAULT.toString(),
+                    inputType = InputType.TYPE_CLASS_NUMBER,
+                    connectedOnly = false,
+                )
+
+                switchSetting(
+                    key = CanonCameraConstants.PREF_GPS_USE_NETWORK,
+                    title = R.string.pref_title_canon_camera_gps_network,
+                    summary = R.string.pref_summary_canon_camera_gps_network,
+                    icon = R.drawable.ic_gps_location,
+                    defaultValue = CanonCameraConstants.PREF_GPS_USE_NETWORK_DEFAULT,
+                    connectedOnly = false,
+                )
+            }
+        }
     }
 
     override fun getBondingStyle(): Int {
