@@ -14,7 +14,7 @@
 
     You should have received a copy of the GNU Affero General Public License
     along with this program.  If not, see <https://www.gnu.org/licenses/>. */
-package nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit
+package nodomain.freeyourgadget.gadgetbridge.util.sleep
 
 import android.content.Context
 import nodomain.freeyourgadget.gadgetbridge.database.DBHelper
@@ -27,11 +27,9 @@ import nodomain.freeyourgadget.gadgetbridge.entities.GarminEventSample
 import nodomain.freeyourgadget.gadgetbridge.entities.GarminEventSampleDao
 import nodomain.freeyourgadget.gadgetbridge.entities.GarminRawSleepSample
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice
+import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.RawSleepStream
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.enums.Event
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.enums.EventType
-import nodomain.freeyourgadget.gadgetbridge.util.sleep.SleepMinute
-import nodomain.freeyourgadget.gadgetbridge.util.sleep.SleepMinuteKind
-import nodomain.freeyourgadget.gadgetbridge.util.sleep.SleepStageEstimator
 import org.slf4j.LoggerFactory
 import java.time.Instant
 

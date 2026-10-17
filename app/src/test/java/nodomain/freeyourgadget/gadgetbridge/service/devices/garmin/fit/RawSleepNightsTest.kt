@@ -12,6 +12,7 @@ import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.enums.Eve
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.enums.SleepLevel
 import nodomain.freeyourgadget.gadgetbridge.test.TestBase
 import nodomain.freeyourgadget.gadgetbridge.util.sleep.EstimatedSleepSession
+import nodomain.freeyourgadget.gadgetbridge.util.sleep.RawSleepNights
 import nodomain.freeyourgadget.gadgetbridge.util.sleep.SleepMinute
 import nodomain.freeyourgadget.gadgetbridge.util.sleep.SleepMinuteKind
 import nodomain.freeyourgadget.gadgetbridge.util.sleep.SleepStageEstimator
