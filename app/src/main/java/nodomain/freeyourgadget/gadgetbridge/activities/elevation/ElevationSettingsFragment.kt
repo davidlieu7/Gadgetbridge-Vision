@@ -69,14 +69,16 @@ class ElevationSettingsFragment : AbstractPreferenceFragment() {
         lifecycleScope.launch {
             for (uri in uris) {
                 val result = withContext(Dispatchers.IO) {
-                    runCatching { ElevationTiles.importTile(context, uri) }
+                    runCatching { ElevationTiles.importTiles(context, uri) }
                 }
-                result.onSuccess { tile ->
-                    GB.toast(
-                        context.getString(R.string.elevation_tile_imported, tile.displayName, context.getString(resolutionLabel(tile.resolution))),
-                        Toast.LENGTH_SHORT,
-                        GB.INFO
-                    )
+                result.onSuccess { tiles ->
+                    val tile = tiles.singleOrNull()
+                    val message = if (tile != null) {
+                        context.getString(R.string.elevation_tile_imported, tile.displayName, context.getString(resolutionLabel(tile.resolution)))
+                    } else {
+                        context.resources.getQuantityString(R.plurals.elevation_tiles_imported, tiles.size, tiles.size)
+                    }
+                    GB.toast(message, Toast.LENGTH_SHORT, GB.INFO)
                 }.onFailure { e ->
                     LOG.warn("Failed to import elevation tile {}", uri, e)
                     GB.toast(

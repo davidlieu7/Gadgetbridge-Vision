@@ -53,7 +53,7 @@ class ElevationTilesTest : TestBase() {
         val resolution = HgtResolution.THREE_ARC_SECOND
         val buffer = ByteBuffer.allocate(resolution.byteSize.toInt()).order(ByteOrder.BIG_ENDIAN)
         repeat(resolution.samplesPerSide * resolution.samplesPerSide) { buffer.putShort(value.toShort()) }
-        ElevationTiles.library(getContext()).importTile("N45E007.hgt", ByteArrayInputStream(buffer.array()))
+        ElevationTiles.library(getContext()).importTiles("N45E007.hgt", ByteArrayInputStream(buffer.array()))
         // As the settings screen does after an import
         ElevationTiles.tiles(getContext())
     }

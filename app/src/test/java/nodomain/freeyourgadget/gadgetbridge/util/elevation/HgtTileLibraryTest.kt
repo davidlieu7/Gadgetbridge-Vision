@@ -33,7 +33,7 @@ class HgtTileLibraryTest {
     }
 
     @Test fun aRawTileIsStoredUnderItsCanonicalName() {
-        val tile = library.importTile("n45e007.hgt", flatTile(100).stream())
+        val tile = library.importTiles("n45e007.hgt", flatTile(100).stream()).single()
 
         assertEquals(key, tile.key)
         assertEquals(HgtResolution.THREE_ARC_SECOND, tile.resolution)
@@ -45,7 +45,7 @@ class HgtTileLibraryTest {
 
     @Test fun aWrongSizeIsRefusedAndLeavesNothingBehind() {
         val failure = runCatching {
-            library.importTile("N45E007.hgt", ByteArray(1000).stream())
+            library.importTiles("N45E007.hgt", ByteArray(1000).stream())
         }.exceptionOrNull()
 
         assertTrue(failure is IllegalArgumentException)
@@ -57,7 +57,7 @@ class HgtTileLibraryTest {
         // Twice the largest tile: the size check after a full copy would refuse it too, but only once it is on disk
         val oversized = CountingZeros(2 * limit)
 
-        val failure = runCatching { library.importTile("N45E007.hgt", oversized) }.exceptionOrNull()
+        val failure = runCatching { library.importTiles("N45E007.hgt", oversized) }.exceptionOrNull()
 
         assertTrue(failure is IllegalArgumentException)
         assertTrue("read ${oversized.served} bytes", oversized.served < limit + 1024 * 1024)
@@ -66,7 +66,7 @@ class HgtTileLibraryTest {
 
     @Test fun aBadNameIsRefusedBeforeAnythingIsCopied() {
         val failure = runCatching {
-            library.importTile("srtm_38_03.hgt", flatTile(100).stream())
+            library.importTiles("srtm_38_03.hgt", flatTile(100).stream())
         }.exceptionOrNull()
 
         assertTrue(failure is IllegalArgumentException)
@@ -76,7 +76,7 @@ class HgtTileLibraryTest {
     @Test fun aZipWithOneTileIsStoredAsTheRawTile() {
         val zip = zip("folder/N45E007.hgt" to flatTile(200))
 
-        val tile = library.importTile("N45E007.SRTMGL1.hgt.zip", zip.stream())
+        val tile = library.importTiles("N45E007.SRTMGL1.hgt.zip", zip.stream()).single()
 
         assertEquals(key, tile.key)
         assertEquals(HgtResolution.THREE_ARC_SECOND.byteSize, File(directory, "N45E007.hgt").length())
@@ -86,33 +86,64 @@ class HgtTileLibraryTest {
     @Test fun aZipNamedByRegionTakesItsKeyFromTheEntry() {
         val zip = zip("readme.txt" to "hello".toByteArray(), "N45E007.hgt" to flatTile(5))
 
-        val tile = library.importTile("alps.zip", zip.stream())
+        val tile = library.importTiles("alps.zip", zip.stream()).single()
 
         assertEquals(key, tile.key)
     }
 
-    @Test fun aZipWithTwoTilesOrNoneIsRefused() {
-        val two = zip("N45E007.hgt" to flatTile(1), "N45E008.hgt" to flatTile(2))
+    @Test fun aRegionZipStoresEveryTileItHolds() {
+        // Laid out like the regional archives of viewfinderpanoramas.org
+        val zip = zip("L32/N45E007.hgt" to flatTile(1), "L32/N45E008.hgt" to flatTile(2), "L32/N46E007.hgt" to flatTile(3))
+
+        val tiles = library.importTiles("L32.zip", zip.stream())
+
+        assertEquals(listOf(key, HgtTileKey(45, 8), HgtTileKey(46, 7)), tiles.map { it.key })
+        assertEquals(3, library.scan().size)
+        assertEquals(1.0, library.elevationAt(45.5, 7.5)!!, 1e-6)
+        assertEquals(2.0, library.elevationAt(45.5, 8.5)!!, 1e-6)
+        assertEquals(3.0, library.elevationAt(46.5, 7.5)!!, 1e-6)
+    }
+
+    @Test fun aZipWithNoTileIsRefused() {
         val none = zip("readme.txt" to "hello".toByteArray())
 
-        assertTrue(runCatching { library.importTile("two.zip", two.stream()) }.isFailure)
-        assertTrue(runCatching { library.importTile("none.zip", none.stream()) }.isFailure)
+        assertTrue(runCatching { library.importTiles("none.zip", none.stream()) }.isFailure)
+        assertEquals(emptyList<File>(), directory.listFiles().orEmpty().toList())
+    }
+
+    @Test fun aBadTileLateInAZipImportsNoneAndKeepsTheStoredOnes() {
+        library.importTiles("N45E007.hgt", flatTile(100).stream())
+        val zip = zip("N45E007.hgt" to flatTile(200), "N45E008.hgt" to ByteArray(1000))
+
+        val failure = runCatching { library.importTiles("L32.zip", zip.stream()) }.exceptionOrNull()
+
+        assertTrue(failure is IllegalArgumentException)
+        assertEquals(listOf("N45E007.hgt"), directory.listFiles().orEmpty().map { it.name })
+        assertEquals(100.0, library.elevationAt(45.5, 7.5)!!, 1e-6)
+    }
+
+    @Test fun aZipHoldingACellTwiceIsRefused() {
+        val zip = zip("a/N45E007.hgt" to flatTile(1), "b/N45E007.hgt" to flatTile(2))
+
+        val failure = runCatching { library.importTiles("L32.zip", zip.stream()) }.exceptionOrNull()
+
+        assertTrue(failure is IllegalArgumentException)
         assertEquals(emptyList<File>(), directory.listFiles().orEmpty().toList())
     }
 
     @Test fun aZipWhoseNameDisagreesWithItsEntryIsRefused() {
         val zip = zip("N45E008.hgt" to flatTile(1))
 
-        val failure = runCatching { library.importTile("N45E007.hgt.zip", zip.stream()) }.exceptionOrNull()
+        val failure = runCatching { library.importTiles("N45E007.hgt.zip", zip.stream()) }.exceptionOrNull()
 
         assertTrue(failure is IllegalArgumentException)
     }
 
     @Test fun reImportingACellReplacesTheFileAndTheCachedMapping() {
-        library.importTile("N45E007.hgt", flatTile(100).stream())
+        library.importTiles("N45E007.hgt", flatTile(100).stream())
         assertEquals(100.0, library.elevationAt(45.5, 7.5)!!, 1e-6)
 
-        library.importTile("N45E007.hgt", flatTile(300).stream())
+        library.importTiles("N45E007.hgt", flatTile(300).stream())
 
         assertEquals(300.0, library.elevationAt(45.5, 7.5)!!, 1e-6)
         assertEquals(1, library.scan().size)
@@ -128,7 +159,7 @@ class HgtTileLibraryTest {
     }
 
     @Test fun deleteRemovesTheFileAndForgetsTheMapping() {
-        library.importTile("N45E007.hgt", flatTile(100).stream())
+        library.importTiles("N45E007.hgt", flatTile(100).stream())
         // Read once, so the tile is mapped and cached
         assertEquals(100.0, library.elevationAt(45.5, 7.5)!!, 1e-6)
 
@@ -140,15 +171,15 @@ class HgtTileLibraryTest {
     }
 
     @Test fun positionsWithoutATileAreNull() {
-        library.importTile("N45E007.hgt", flatTile(100).stream())
+        library.importTiles("N45E007.hgt", flatTile(100).stream())
 
         assertNull(library.elevationAt(46.5, 7.5))
     }
 
     @Test fun aOneTileCacheStillServesTwoTilesCorrectly() {
         val small = HgtTileLibrary(directory, maxOpenTiles = 1)
-        small.importTile("N45E007.hgt", flatTile(100).stream())
-        small.importTile("N45E008.hgt", flatTile(200).stream())
+        small.importTiles("N45E007.hgt", flatTile(100).stream())
+        small.importTiles("N45E008.hgt", flatTile(200).stream())
 
         assertEquals(100.0, small.elevationAt(45.5, 7.5)!!, 1e-6)
         assertEquals(200.0, small.elevationAt(45.5, 8.5)!!, 1e-6)

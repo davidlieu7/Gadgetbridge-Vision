@@ -94,37 +94,60 @@ class HgtTileLibrary @JvmOverloads constructor(
     }
 
     /**
-     * Copies one tile into the directory: a raw `.hgt`, or a zip holding
-     * exactly one. The key comes from [displayName], else from the zip entry.
-     * Replaces an existing tile of the same key.
+     * Copies the tiles of one file into the directory: a raw `.hgt`, or a zip
+     * holding any number of them, like the regional archives of
+     * viewfinderpanoramas. A raw tile's key comes from [displayName], a zipped
+     * one's from its entry. Replaces existing tiles of the same keys. A file
+     * with one bad tile imports none of them.
      */
     @Throws(IOException::class)
-    fun importTile(displayName: String, input: InputStream): ElevationTile {
+    fun importTiles(displayName: String, input: InputStream): List<ElevationTile> {
         directory.mkdirs()
         val stream = BufferedInputStream(input, PEEK_BYTES)
         val nameKey = HgtTileKey.parse(displayName)
         val isZip = displayName.endsWith(".zip", ignoreCase = true) || stream.looksLikeZip()
 
-        val key: HgtTileKey
-        val source: InputStream
-        var zip: ZipInputStream? = null
-        if (isZip) {
-            zip = ZipInputStream(stream)
-            val entry = zip.firstHgtEntry()
-            val entryKey = HgtTileKey.parse(File(entry).name)
-            require(entryKey != null) { "The zip entry $entry is not named like an SRTM tile (N45E007.hgt)." }
-            require(nameKey == null || nameKey == entryKey) {
-                "The zip is named $displayName but holds $entry."
+        // A zip is sequential, so every tile is staged before any replaces a stored one.
+        val staged = LinkedHashMap<HgtTileKey, File>()
+        try {
+            if (isZip) {
+                val zip = ZipInputStream(stream)
+                while (true) {
+                    val entry = zip.nextHgtEntryName() ?: break
+                    val entryKey = HgtTileKey.parse(File(entry).name)
+                    require(entryKey != null) { "The zip entry $entry is not named like an SRTM tile (N45E007.hgt)." }
+                    require(nameKey == null || nameKey == entryKey) {
+                        "The zip is named $displayName but holds $entry."
+                    }
+                    require(entryKey !in staged) { "The zip holds ${entryKey.fileName} twice." }
+                    staged[entryKey] = stage(entryKey, zip)
+                }
+                require(staged.isNotEmpty()) { "The zip holds no .hgt tile." }
+            } else {
+                require(nameKey != null) { "$displayName is not named like an SRTM tile (N45E007.hgt)." }
+                staged[nameKey] = stage(nameKey, stream)
             }
-            key = entryKey
-            source = zip
-        } else {
-            require(nameKey != null) { "$displayName is not named like an SRTM tile (N45E007.hgt)." }
-            key = nameKey
-            source = stream
-        }
 
-        val finalFile = fileFor(key)
+            for ((key, tempFile) in staged) {
+                val finalFile = fileFor(key)
+                evict(key)
+                if (!tempFile.renameTo(finalFile)) {
+                    tempFile.copyTo(finalFile, overwrite = true)
+                    tempFile.delete()
+                }
+            }
+        } catch (error: Throwable) {
+            staged.values.forEach { it.delete() }
+            throw error
+        }
+        return staged.keys.map { key ->
+            fileFor(key).toElevationTile()
+                ?: throw IOException("${key.fileName} could not be read back after import.")
+        }
+    }
+
+    /** Copies one tile to a `.tmp` beside its final file, which a scan does not list. */
+    private fun stage(key: HgtTileKey, source: InputStream): File {
         val tempFile = File(directory, "${key.fileName}.tmp")
         try {
             tempFile.delete()
@@ -132,21 +155,11 @@ class HgtTileLibrary @JvmOverloads constructor(
             require(HgtResolution.forByteSize(copied) != null) {
                 "This is not a 1 or 3 arc-second SRTM .hgt tile."
             }
-            // A zip is sequential: only after the copy can the rest be walked.
-            require(zip == null || !zip.hasAnotherHgtEntry()) {
-                "The zip holds more than one .hgt tile; import them one at a time."
-            }
-            evict(key)
-            if (!tempFile.renameTo(finalFile)) {
-                tempFile.copyTo(finalFile, overwrite = true)
-                tempFile.delete()
-            }
         } catch (error: Throwable) {
             tempFile.delete()
             throw error
         }
-        return finalFile.toElevationTile()
-            ?: throw IOException("${key.fileName} could not be read back after import.")
+        return tempFile
     }
 
     fun deleteTile(key: HgtTileKey): Boolean {
@@ -168,14 +181,7 @@ class HgtTileLibrary @JvmOverloads constructor(
         )
     }
 
-    /** Positions the stream on the first `.hgt` entry and returns its name, or fails. */
-    private fun ZipInputStream.firstHgtEntry(): String =
-        nextHgtEntryName() ?: throw IllegalArgumentException("The zip holds no .hgt tile.")
-
-    private fun ZipInputStream.hasAnotherHgtEntry(): Boolean =
-        nextHgtEntryName() != null
-
-    /** Skips directories and other files. Null at the end of the archive. */
+    /** Positions the stream on the next `.hgt` entry, skipping directories and other files. Null at the end of the archive. */
     private fun ZipInputStream.nextHgtEntryName(): String? {
         while (true) {
             val entry = nextEntry ?: return null

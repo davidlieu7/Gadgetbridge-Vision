@@ -68,13 +68,13 @@ object ElevationTiles {
 
     @JvmStatic
     @Throws(IOException::class)
-    fun importTile(context: Context, uri: Uri): ElevationTile {
+    fun importTiles(context: Context, uri: Uri): List<ElevationTile> {
         val displayName = displayNameOf(context, uri)?.takeIf { it.isNotBlank() } ?: uri.lastPathSegment.orEmpty()
         val input = context.contentResolver.openInputStream(uri)
             ?: throw IOException("Unable to open the selected elevation tile.")
-        val tile = input.use { library(context).importTile(displayName, it) }
+        val tiles = input.use { library(context).importTiles(displayName, it) }
         hasTiles = true
-        return tile
+        return tiles
     }
 
     @JvmStatic
