@@ -591,6 +591,7 @@ import nodomain.freeyourgadget.gadgetbridge.devices.ultrahuman.UltrahumanDeviceC
 import nodomain.freeyourgadget.gadgetbridge.devices.ugreen.hitunemax5c.UgreenHituneMax5cCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.um25.Coordinator.UM25Coordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.una.UnaDeviceCoordinator;
+import nodomain.freeyourgadget.gadgetbridge.devices.veepoo.VeepooKR96ProCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.vesc.VescCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.viatom.F8ScaleCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.vibratissimo.VibratissimoCoordinator;
@@ -1285,6 +1286,7 @@ public enum DeviceType {
     ZEBLAZE_STRATOS_4_PRO(Stratos4ProCoordinator.class),
     QN_SCALE(QnScaleCoordinator.class),
     CARDO_LS24X(Ls24xDeviceCoordinator.class),
+    VEEPOO_KR96_PRO(VeepooKR96ProCoordinator.class),
     F8SCALE(F8ScaleCoordinator.class),
     EIGHTBITDO_MICRO(EightBitDoMicroCoordinator.class),
     TEST(TestDeviceCoordinator.class);

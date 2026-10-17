@@ -1,0 +1,2989 @@
+/*  Copyright (C) 2025 Gadgetbridge contributors
+
+    This file is part of Gadgetbridge.
+
+    Gadgetbridge is free software: you can redistribute it and/or modify
+    it under the terms of the GNU Affero General Public License as published
+    by the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    Gadgetbridge is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU Affero General Public License for more details.
+
+    You should have received a copy of the GNU Affero General Public License
+    along with this program.  If not, see <http://www.gnu.org/licenses/>. */
+package nodomain.freeyourgadget.gadgetbridge.service.devices.veepoo;
+
+import android.bluetooth.BluetoothGatt;
+import android.bluetooth.BluetoothGattCharacteristic;
+import android.content.Intent;
+import android.content.SharedPreferences;
+import android.location.Location;
+import android.os.Handler;
+import android.os.Looper;
+import android.widget.Toast;
+
+import androidx.localbroadcastmanager.content.LocalBroadcastManager;
+
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
+import java.io.ByteArrayOutputStream;
+import java.io.File;
+import java.io.IOException;
+import java.io.Serializable;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.Calendar;
+import java.util.Date;
+import java.util.List;
+import java.util.TimeZone;
+
+import nodomain.freeyourgadget.gadgetbridge.GBApplication;
+import nodomain.freeyourgadget.gadgetbridge.R;
+import nodomain.freeyourgadget.gadgetbridge.database.DBHandler;
+import nodomain.freeyourgadget.gadgetbridge.database.DBHelper;
+import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEventBatteryInfo;
+import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEventVersionInfo;
+import nodomain.freeyourgadget.gadgetbridge.devices.DeviceCoordinator;
+import nodomain.freeyourgadget.gadgetbridge.devices.GenericBodyCompositionSampleProvider;
+import nodomain.freeyourgadget.gadgetbridge.devices.GenericBloodLipidSampleProvider;
+import nodomain.freeyourgadget.gadgetbridge.devices.GenericBloodPressureSampleProvider;
+import nodomain.freeyourgadget.gadgetbridge.devices.GenericSpo2SampleProvider;
+import nodomain.freeyourgadget.gadgetbridge.devices.GenericStressSampleProvider;
+import nodomain.freeyourgadget.gadgetbridge.devices.GenericTemperatureSampleProvider;
+import nodomain.freeyourgadget.gadgetbridge.devices.veepoo.AbstractVeepooCoordinator;
+import nodomain.freeyourgadget.gadgetbridge.devices.veepoo.VeepooConstants;
+import nodomain.freeyourgadget.gadgetbridge.entities.BaseActivitySummary;
+import nodomain.freeyourgadget.gadgetbridge.entities.BaseActivitySummaryDao;
+import nodomain.freeyourgadget.gadgetbridge.entities.DaoSession;
+import nodomain.freeyourgadget.gadgetbridge.entities.Device;
+import nodomain.freeyourgadget.gadgetbridge.entities.GenericBodyCompositionSample;
+import nodomain.freeyourgadget.gadgetbridge.entities.GenericBloodLipidSample;
+import nodomain.freeyourgadget.gadgetbridge.entities.GenericBloodLipidSampleDao;
+import nodomain.freeyourgadget.gadgetbridge.entities.GenericBloodPressureSample;
+import nodomain.freeyourgadget.gadgetbridge.entities.GenericBloodPressureSampleDao;
+import nodomain.freeyourgadget.gadgetbridge.entities.GenericHeartRateSample;
+import nodomain.freeyourgadget.gadgetbridge.entities.GenericHrvValueSample;
+import nodomain.freeyourgadget.gadgetbridge.entities.GenericHrvValueSampleDao;
+import nodomain.freeyourgadget.gadgetbridge.entities.GenericRespiratoryRateSample;
+import nodomain.freeyourgadget.gadgetbridge.entities.GenericRespiratoryRateSampleDao;
+import nodomain.freeyourgadget.gadgetbridge.entities.GenericSpo2Sample;
+import nodomain.freeyourgadget.gadgetbridge.entities.GenericSpo2SampleDao;
+import nodomain.freeyourgadget.gadgetbridge.entities.GenericStressSample;
+import nodomain.freeyourgadget.gadgetbridge.entities.GenericStressSampleDao;
+import nodomain.freeyourgadget.gadgetbridge.entities.GenericTemperatureSample;
+import nodomain.freeyourgadget.gadgetbridge.entities.GenericTemperatureSampleDao;
+import nodomain.freeyourgadget.gadgetbridge.entities.GlucoseSample;
+import nodomain.freeyourgadget.gadgetbridge.entities.GlucoseSampleDao;
+import nodomain.freeyourgadget.gadgetbridge.entities.User;
+import nodomain.freeyourgadget.gadgetbridge.model.TemperatureSample;
+import nodomain.freeyourgadget.gadgetbridge.entities.VeepooActivitySample;
+import nodomain.freeyourgadget.gadgetbridge.entities.VeepooSleepSummarySample;
+import nodomain.freeyourgadget.gadgetbridge.entities.VeepooSleepSummarySampleDao;
+import nodomain.freeyourgadget.gadgetbridge.entities.VeepooWeightSample;
+import nodomain.freeyourgadget.gadgetbridge.export.GPXExporter;
+import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
+import nodomain.freeyourgadget.gadgetbridge.model.ActivityKind;
+import nodomain.freeyourgadget.gadgetbridge.model.ActivityPoint;
+import nodomain.freeyourgadget.gadgetbridge.model.ActivitySample;
+import nodomain.freeyourgadget.gadgetbridge.model.ActivitySummaryData;
+import nodomain.freeyourgadget.gadgetbridge.model.ActivitySummaryEntries;
+import nodomain.freeyourgadget.gadgetbridge.model.ActivityTrack;
+import nodomain.freeyourgadget.gadgetbridge.model.ActivityUser;
+import nodomain.freeyourgadget.gadgetbridge.model.Alarm;
+import nodomain.freeyourgadget.gadgetbridge.model.BatteryState;
+import nodomain.freeyourgadget.gadgetbridge.model.DeviceService;
+import nodomain.freeyourgadget.gadgetbridge.model.GPSCoordinate;
+import nodomain.freeyourgadget.gadgetbridge.model.NotificationSpec;
+import nodomain.freeyourgadget.gadgetbridge.model.NotificationType;
+import nodomain.freeyourgadget.gadgetbridge.model.RecordedDataTypes;
+import nodomain.freeyourgadget.gadgetbridge.service.btle.AbstractBTLESingleDeviceSupport;
+import nodomain.freeyourgadget.gadgetbridge.service.btle.TransactionBuilder;
+import nodomain.freeyourgadget.gadgetbridge.util.GB;
+
+/**
+ * Device support for the VeePoo G Band (KR96 Pro, {@code com.vpgband.app}).
+ *
+ * <p>All traffic uses the F008 GATT service: one fixed 20-byte write per command on
+ * {@code F0080003}, responses arrive as 20-byte notifications on {@code F0080002} carrying the
+ * same opcode in byte 0.
+ */
+public class VeepooDeviceSupport extends AbstractBTLESingleDeviceSupport {
+    private static final Logger LOG = LoggerFactory.getLogger(VeepooDeviceSupport.class);
+
+    private final VeepooAlarmModule alarmModule = new VeepooAlarmModule(this);
+    private final VeepooAutoMeasureModule autoMeasureModule = new VeepooAutoMeasureModule(this);
+    private final VeepooEcgModule ecgModule = new VeepooEcgModule(this);
+    private final VeepooLiveWorkoutModule liveWorkoutModule = new VeepooLiveWorkoutModule(this);
+    private final VeepooManualDetectModule manualDetectModule = new VeepooManualDetectModule(this);
+    private final VeepooVitalDetectModule vitalDetectModule = new VeepooVitalDetectModule(this);
+
+    static final int DATA_SOURCE_ACTIVITY_SUMMARY = 2; // daily summary records (D1)
+    static final int DATA_SOURCE_SLEEP_SUMMARY = 4;    // sleep function records (E0)
+    static final long MILLIS_PER_DAY = 86400_000L;
+
+    /** Phases of the data-fetch state machine. Sleep is fetched first, then activity, then workouts. */
+    private enum FetchPhase {IDLE, SLEEP, ORIGIN, SPORT}
+
+    private final Object syncLock = new Object();
+    private FetchPhase fetchPhase = FetchPhase.IDLE;
+    private int sleepDayIndex = 0;
+    private int originDayIndex = 0;
+    private int sportDayIndex = 0;
+    /** Highest day index requested in the current pass; -1 = full history (first sync). */
+    private int fetchEndDay = -1;
+    /** Local midnight when the current pass started; every date anchor derives from it. */
+    private long fetchAnchorTodayMs = 0L;
+    private final ByteArrayOutputStream sleepDayPayload = new ByteArrayOutputStream();
+    private long sleepLastChunkAt = 0;
+    private final List<byte[]> dfDayFrames = new ArrayList<>();
+    private long dfLastFrameAt = 0;
+    private final List<byte[]> sportDayFrames = new ArrayList<>();
+    private long sportLastFrameAt = 0;
+    final Handler mainHandler = new Handler(Looper.getMainLooper());
+    private final Runnable sleepWatchdog = () -> runSleepWatchdog();
+    private final Runnable dfWatchdog = () -> runDfWatchdog();
+    private final Runnable sportWatchdog = () -> runSportWatchdog();
+
+    /** True while any data-fetch phase is active; on-demand detectors refuse to start in that case. */
+    boolean isFetchInProgress() {
+        synchronized (syncLock) {
+            return fetchPhase != FetchPhase.IDLE;
+        }
+    }
+    private final List<VeepooActivitySample> pendingOriginSamples = new ArrayList<>();
+    private final List<VeepooActivitySample> pendingSleepSamples = new ArrayList<>();
+    private final List<VeepooSleepSummarySample> pendingSleepSummaries = new ArrayList<>();
+    private final List<GenericHrvValueSample> pendingHrvSamples = new ArrayList<>();
+    // Per-record all-day stress ("pressure") from the Origin3 0xC1 tag.
+    private final List<GenericStressSample> pendingStressSamples = new ArrayList<>();
+    // Per-record all-day vitals from Origin3 (0xDF) tags, persisted when the day completes.
+    private final List<GenericSpo2Sample> pendingOriginSpo2Samples = new ArrayList<>();
+    private final List<GenericBloodPressureSample> pendingOriginBpSamples = new ArrayList<>();
+    private final List<GenericTemperatureSample> pendingOriginTemperatureSamples = new ArrayList<>();
+    private final List<GlucoseSample> pendingOriginGlucoseSamples = new ArrayList<>();
+    private final List<GenericRespiratoryRateSample> pendingOriginBreathSamples = new ArrayList<>();
+    private final List<GenericBloodLipidSample> pendingOriginLipidSamples = new ArrayList<>();
+
+    // Adapter handed to the pure day parsers (VeepooSleepParser / VeepooOrigin3Parser) so they
+    // can append to the pending lists without knowing about them.
+    private final VeepooSampleCollector pendingListCollector = new VeepooSampleCollector() {
+        @Override
+        public void addSleepSample(VeepooActivitySample sample) {
+            pendingSleepSamples.add(sample);
+        }
+
+        @Override
+        public void addSleepSummary(VeepooSleepSummarySample summary) {
+            pendingSleepSummaries.add(summary);
+        }
+
+        @Override
+        public void addOriginSample(VeepooActivitySample sample) {
+            pendingOriginSamples.add(sample);
+        }
+
+        @Override
+        public void addHrvSample(GenericHrvValueSample sample) {
+            pendingHrvSamples.add(sample);
+        }
+
+        @Override
+        public void addStressSample(GenericStressSample sample) {
+            pendingStressSamples.add(sample);
+        }
+
+        @Override
+        public void addBreathSample(GenericRespiratoryRateSample sample) {
+            pendingOriginBreathSamples.add(sample);
+        }
+
+        @Override
+        public void addBpSample(GenericBloodPressureSample sample) {
+            pendingOriginBpSamples.add(sample);
+        }
+
+        @Override
+        public void addSpo2Sample(GenericSpo2Sample sample) {
+            pendingOriginSpo2Samples.add(sample);
+        }
+
+        @Override
+        public void addGlucoseSample(GlucoseSample sample) {
+            pendingOriginGlucoseSamples.add(sample);
+        }
+
+        @Override
+        public void addLipidSample(GenericBloodLipidSample sample) {
+            pendingOriginLipidSamples.add(sample);
+        }
+
+        @Override
+        public void addTemperatureSample(GenericTemperatureSample sample) {
+            pendingOriginTemperatureSamples.add(sample);
+        }
+    };
+
+    // On-demand vital detection state is tracked by VeepooVitalDetectModule (HR 0xD0, SpO2 0x80,
+    // temperature 0x87, stress 0x89, BP 0x90, body composition 0x93, lipids 0x8A).
+
+    // Capabilities from the device-pushed 0xA7 report (package 2)
+    private int watchDataDay = VeepooConstants.WATCH_DAY_DEFAULT;
+    private int originProtocolVersion = 1; // 3/5 => Origin3 (0xDF), anything else => v1 (0xD1)
+    private boolean preciseSleepCapable = false;
+    private int sportModelDay = 0;      // days of workout history kept (0 = unsupported)
+    private int multSportModeType = 0;  // 4/5/6 => GPS variant of the 0xD4 layout
+
+    // Capabilities from the device-pushed 0xA7 report (packages 1 and 3)
+    private int spo2hType = -1;     // pkg1: supported when in {1..9, 0xFD, 0xFE, 0xE0}
+    /** pkg1: max 0xC2 packets per pushed notification; vendor default when the report says 0. */
+    private int socialMsgMaxPackets = 4;
+    private int tempType = -1;      // pkg3: 0 => no app-triggered temperature measurement
+    private int metType = -1;       // pkg3: 2/3 => MET supported
+    private int stressType = -1;    // pkg3: 2/3 => app-triggered stress detection supported
+
+    // All-day vitals capability bytes from the A7 report. Captured for logging only: Origin3 tag
+    // parsing is unconditional, so an unknown device build must not hide data the band kept.
+    private int bpTag = -1;             // pkg1: non-zero => continuous blood pressure (tag 0xB8)
+    private int breathFunction = -1;    // pkg2: non-zero => breath rate (tag 0xB6); vendor: beathFunction
+    private int hrvType = -1;           // pkg2: 3/4/6/7/8 => all-day HRV (tag 0xB7)
+    private int bloodGlucoseTag = -1;   // pkg3: non-zero => glucose (tag 0xBE); 5 => packed risk+value encoding
+    private int bloodComponentTag = -1; // pkg4: non-zero => lipids (tag 0xC2)
+
+    // Capability from the device-pushed 0xA7 report (package 1): text alarms (0xB9). The alarm
+    // state itself is tracked by VeepooAlarmModule, which re-reads the list whenever needed.
+    volatile boolean textAlarmsSupported = false;
+
+    // Capability from the device-pushed 0xA7 report (package 4): configurable periodic vitals.
+    boolean autoMeasureSupported = false;
+
+    // 0xB8 CustomSetting: last known basic ([19]==0) and extended ([19]==1) frames, pushed by
+    // the band after every connect and answered after an explicit read request. Toggles are
+    // applied by re-sending the stored frame with the target byte flipped.
+    private final Object customSettingLock = new Object();
+    private byte[] customSettingFrame1;
+    private byte[] customSettingFrame2;
+    private String customSettingPendingKey = null;
+    private boolean customSettingPendingOn = false;
+    private boolean customSettingEchoDone = false;
+
+    // 0xB3 AllSet (legacy dialect): night SpO2 auto-detect with a time window. Used on firmware
+    // that does not report the newer 0xB3 TLV auto-measure capability (see A7 package 4).
+    private final Object allSetLock = new Object();
+    private boolean allSetReadOutstanding = false;
+    private boolean allSetPending = false;
+    private boolean allSetPendingOn = false;
+    private boolean allSetEchoDone = false;
+    private int allSetOpen = -1;   // last known open state (-1 unknown), 0 closed, 1 open
+    private int allSetStartHour;
+    private int allSetStartMinute;
+    private int allSetEndHour;
+    private int allSetEndMinute;
+    private final Runnable allSetReadTimeout = () -> {
+        synchronized (allSetLock) {
+            if (!allSetReadOutstanding) {
+                return;
+            }
+            allSetReadOutstanding = false;
+            allSetPending = false;
+        }
+        LOG.warn("SpO2 auto-detect settings read timed out");
+    };
+
+    // 0xD8 status poll: today's cumulative steps/distance/calories. Runs only while the live
+    // activity screen requests realtime step tracking (onEnableRealtimeSteps), so no
+    // background BLE traffic is generated; the vendor app polls at the same ~5 s cadence.
+    private boolean realtimeStepsRequested = false;
+    private long lastStatusSteps = -1;
+    private int lastStatusDay = -1;
+    private final Runnable statusPollTask = () -> {
+        if (!realtimeStepsRequested) {
+            return;
+        }
+        try {
+            TransactionBuilder builder = performInitialized("status poll");
+            // The vendor app sends exactly {D8, 00} (2 bytes); zero-padded 20-byte frames get no reply.
+            builder.write(getCharacteristic(VeepooConstants.UUID_CHARACTERISTIC_F008_CMD),
+                    new byte[]{VeepooConstants.OP_STATUS_POLL, 0x00});
+            builder.queue();
+            LOG.debug("Status poll sent (0xD8)");
+        } catch (Exception e) {
+            LOG.debug("Status poll skipped: {}", e.getMessage());
+        }
+        scheduleStatusPoll(5_000L);
+    };
+
+    private void scheduleStatusPoll(long delayMillis) {
+        mainHandler.removeCallbacks(statusPollTask);
+        mainHandler.postDelayed(statusPollTask, delayMillis);
+    }
+
+    public VeepooDeviceSupport() {
+        super(LOG);
+        addSupportedService(VeepooConstants.UUID_SERVICE_F008);
+        addSupportedService(VeepooConstants.UUID_SERVICE_F002);
+        addSupportedService(VeepooConstants.UUID_SERVICE_F003);
+        addSupportedService(VeepooConstants.UUID_SERVICE_AE00);
+    }
+
+    @Override
+    public boolean useAutoConnect() {
+        return true;
+    }
+
+    @Override
+    protected TransactionBuilder initializeDevice(TransactionBuilder builder) {
+        builder.requestMtu(VeepooConstants.MTU);
+        builder.setDeviceState(GBDevice.State.INITIALIZING);
+        builder.notify(VeepooConstants.UUID_CHARACTERISTIC_F008_DATA, true);
+        // Light-origin channel: carries live PPG/ECG waveform frames; only active during
+        // measurements, but must be subscribed before an ECG detection can start.
+        builder.notify(VeepooConstants.UUID_CHARACTERISTIC_F002_DATA, true);
+        // Auxiliary channel: unknown purpose, suspected carrier of auto-measure pushes.
+        builder.notify(VeepooConstants.UUID_CHARACTERISTIC_F003_DATA, true);
+        // "Sinilink-APP" handshake channel: vendor app does a C0BADCFE challenge/response here;
+        // subscribe to observe whether autonomous pushes travel on it.
+        builder.notify(VeepooConstants.UUID_CHARACTERISTIC_AE02_DATA, true);
+        // Password confirmation carries the phone time; followed by an explicit time sync.
+        writeFrame(builder, buildPwdConfirmTimeFrame());
+        writeFrame(builder, buildSyncTimeFrame());
+        // Vendor flow: personal info + goals right after the time sync. The height calibrates
+        // the band's stride, which drives its step-based distance for non-GPS workouts.
+        writeFrame(builder, buildPersonInfoFrame());
+        writeFrame(builder, new byte[]{VeepooConstants.OP_READ_BATTERY, 0x00});
+        writeFrame(builder, new byte[]{VeepooConstants.OP_PRODUCTION_INFO, 0x00});
+        // Defer the auto-measure settings read to steady state: issued inside this connect
+        // burst the band refuses it with a set-command NAK (see VeepooAutoMeasureModule). Skip
+        // it entirely when a previous connection already learned the firmware lacks the feature.
+        SharedPreferences capabilities = GBApplication.getDeviceSpecificSharedPrefs(getDevice().getAddress());
+        if (!capabilities.contains(VeepooConstants.CONFIG_AUTO_MEASURE_SUPPORTED)
+                || capabilities.getBoolean(VeepooConstants.CONFIG_AUTO_MEASURE_SUPPORTED, false)) {
+            autoMeasureModule.scheduleSteadyStateRead();
+        }
+        // Same steady-state deferral for the legacy SpO2 auto-detect read; the A7 package 1
+        // report (which sets the capability) has arrived by then on supported firmware.
+        mainHandler.postDelayed(() -> {
+            SharedPreferences spo2Capabilities = GBApplication.getDeviceSpecificSharedPrefs(getDevice().getAddress());
+            if (!spo2Capabilities.getBoolean(VeepooConstants.CONFIG_AUTO_MEASURE_SPO2_SUPPORTED, true)) {
+                return;
+            }
+            synchronized (allSetLock) {
+                if (allSetReadOutstanding || allSetOpen >= 0) {
+                    return;
+                }
+            }
+            sendAllSetRead();
+        }, 5000L);
+        // Read the watch's alarm list once the A7 capability report has had time to arrive; the
+        // band verifies a whole-list CRC on every 0xB9 op, so we must know its current state.
+        alarmModule.scheduleConnectReadBack();
+        // Vendor parity: Jieli "Sinilink-APP" challenge/response on AE01. The vendor's BLE stack
+        // runs this exchange on every connect and the band answers with a device info
+        // notification on AE02 (fe dc ba 00 ...).
+        sendSinilinkHandshake();
+        // The device pushes its 0xA7 capability report after pairing; it is handled in
+        // onCharacteristicChanged() and may arrive before the INITIALIZED state is reached.
+        // If the live activity screen is still open across a reconnect, resume the status poll.
+        if (realtimeStepsRequested) {
+            scheduleStatusPoll(5_000L);
+        }
+        builder.setDeviceState(GBDevice.State.INITIALIZED);
+        return builder;
+    }
+
+    /** Writes a command frame to the F008 write characteristic, zero-padded to 20 bytes. */
+    void writeFrame(TransactionBuilder builder, byte[] frame) {
+        if (frame.length > VeepooConstants.PACKET_SIZE) {
+            throw new IllegalArgumentException("VeePoo frames must be at most " + VeepooConstants.PACKET_SIZE + " bytes");
+        }
+        if (frame.length == VeepooConstants.PACKET_SIZE) {
+            builder.write(getCharacteristic(VeepooConstants.UUID_CHARACTERISTIC_F008_CMD), frame);
+            return;
+        }
+        byte[] padded = new byte[VeepooConstants.PACKET_SIZE];
+        System.arraycopy(frame, 0, padded, 0, frame.length);
+        builder.write(getCharacteristic(VeepooConstants.UUID_CHARACTERISTIC_F008_CMD), padded);
+    }
+
+    /**
+     * Jieli "Sinilink-APP" handshake on the AE01 write characteristic (AE00 service), replayed
+     * from vendor app captures: challenge, nonce, password token ("pass"), second nonce (twice),
+     * final frame. The vendor's BLE stack runs it automatically on every connect; the band
+     * answers the nonce steps with notifications on AE02.
+     */
+    private void sendSinilinkHandshake() {
+        BluetoothGattCharacteristic c = getCharacteristic(VeepooConstants.UUID_CHARACTERISTIC_AE01_WRITE);
+        if (c == null) {
+            LOG.warn("AE01 characteristic missing; skipping Sinilink handshake");
+            return;
+        }
+        java.util.Random rnd = new java.util.Random();
+        byte[] nonce1 = new byte[16];
+        byte[] nonce2 = new byte[16];
+        rnd.nextBytes(nonce1);
+        rnd.nextBytes(nonce2);
+        byte xx = (byte) rnd.nextInt(256);
+
+        byte[] challenge = {(byte) 0xFE, (byte) 0xDC, (byte) 0xBA, (byte) 0xC0, 0x06, 0x00, 0x02, 0x00, 0x01, (byte) 0xEF};
+        byte[] token = {0x02, 'p', 'a', 's', 's'};
+        byte[] n1 = new byte[1 + nonce1.length];
+        n1[0] = 0x00;
+        System.arraycopy(nonce1, 0, n1, 1, nonce1.length);
+        byte[] n2 = new byte[1 + nonce2.length];
+        n2[0] = 0x01;
+        System.arraycopy(nonce2, 0, n2, 1, nonce2.length);
+        byte[] finalFrame = {(byte) 0xFE, (byte) 0xDC, (byte) 0xBA, (byte) 0xC0, 0x03, 0x00, 0x06, xx,
+                (byte) 0xFF, (byte) 0xFF, (byte) 0xFF, (byte) 0xFF, 0x00, (byte) 0xEF};
+
+        ae01WriteAt(3_000L, challenge, "challenge");
+        ae01WriteAt(3_500L, n1, "nonce1");
+        ae01WriteAt(4_200L, token, "token");
+        ae01WriteAt(4_300L, n2, "nonce2a");
+        ae01WriteAt(4_400L, n2, "nonce2b");
+        ae01WriteAt(4_600L, finalFrame, "final");
+    }
+
+    private void ae01WriteAt(long delay, byte[] frame, String name) {
+        mainHandler.postDelayed(() -> {
+            try {
+                TransactionBuilder b = performInitialized("ae01 " + name);
+                b.write(getCharacteristic(VeepooConstants.UUID_CHARACTERISTIC_AE01_WRITE), frame);
+                b.queue();
+                LOG.info("Sinilink {} sent: {}", name, GB.hexdump(frame));
+            } catch (Exception e) {
+                LOG.warn("Sinilink {} failed: {}", name, e.getMessage());
+            }
+        }, delay);
+    }
+
+    /**
+     * Opcode 0xA1: device password confirmation plus phone time.
+     * Layout: [0]=A1, [1..2]=password LE16, [3]=mode 0 (confirm+time), [4..5]=year BE16 hex,
+     * [6]=month, [7]=day, [8]=hour, [9]=minute, [10]=second, [11]=12/24h flag, [12]=const 1,
+     * [13]=timezone in 15-minute steps, [14]=confirm flag (vendor default true).
+     */
+    byte[] buildPwdConfirmTimeFrame() {
+        Calendar now = Calendar.getInstance();
+        int year = now.get(Calendar.YEAR);
+        byte[] frame = new byte[VeepooConstants.PACKET_SIZE];
+        frame[0] = VeepooConstants.OP_PWD_CONFIRM;
+        frame[1] = (byte) (VeepooConstants.DEFAULT_PASSWORD & 0xFF);
+        frame[2] = (byte) ((VeepooConstants.DEFAULT_PASSWORD >> 8) & 0xFF);
+        frame[3] = 0x00;
+        frame[4] = (byte) ((year >> 8) & 0xFF);
+        frame[5] = (byte) (year & 0xFF);
+        frame[6] = (byte) (now.get(Calendar.MONTH) + 1);
+        frame[7] = (byte) now.get(Calendar.DAY_OF_MONTH);
+        frame[8] = (byte) now.get(Calendar.HOUR_OF_DAY);
+        frame[9] = (byte) now.get(Calendar.MINUTE);
+        frame[10] = (byte) now.get(Calendar.SECOND);
+        frame[11] = 0x01; // 24-hour mode
+        frame[12] = 0x01;
+        int tzMinutes = TimeZone.getDefault().getOffset(System.currentTimeMillis()) / 1000 / 60;
+        frame[13] = (byte) (tzMinutes / 15);
+        frame[14] = 0x01;
+        return frame;
+    }
+
+    /** Opcode 0xA5: time sync (vendor settingTime): [1..2]=year BE16, [3..7]=month/day/hour/minute/second, [8]=time mode (2=24h). */
+    byte[] buildSyncTimeFrame() {
+        Calendar now = Calendar.getInstance();
+        int year = now.get(Calendar.YEAR);
+        byte[] frame = new byte[VeepooConstants.PACKET_SIZE];
+        frame[0] = VeepooConstants.OP_SYNC_TIME;
+        frame[1] = (byte) ((year >> 8) & 0xFF);
+        frame[2] = (byte) (year & 0xFF);
+        frame[3] = (byte) (now.get(Calendar.MONTH) + 1);
+        frame[4] = (byte) now.get(Calendar.DAY_OF_MONTH);
+        frame[5] = (byte) now.get(Calendar.HOUR_OF_DAY);
+        frame[6] = (byte) now.get(Calendar.MINUTE);
+        frame[7] = (byte) now.get(Calendar.SECOND);
+        frame[8] = 0x02; // MODE_24
+        return frame;
+    }
+
+    /**
+     * Opcode 0xA3: personal info + goals (vendor p000if/s1.java): [1]=height cm, [2]=weight kg,
+     * [3]=age, [4]=sex (1=male, 2=female), [5..6]=step goal BE u16, [7..8]=sleep goal hours BE
+     * u16. The vendor app pushes this on every connect right after the time sync; the band uses
+     * the height for its stride/distance estimates, so skipping it leaves workout distance on an
+     * uncalibrated default stride.
+     */
+    byte[] buildPersonInfoFrame() {
+        ActivityUser user = new ActivityUser();
+        return personInfoFrame(user.getHeightCm(), user.getWeightKg(), user.getAge(),
+                user.getGender() == ActivityUser.GENDER_MALE, user.getStepsGoal(),
+                user.getSleepDurationGoal() / 60);
+    }
+
+    static byte[] personInfoFrame(int heightCm, int weightKg, int age, boolean male,
+                                  int stepsGoal, int sleepHours) {
+        byte[] frame = new byte[VeepooConstants.PACKET_SIZE];
+        frame[0] = VeepooConstants.OP_PERSON_INFO;
+        frame[1] = (byte) heightCm;
+        frame[2] = (byte) weightKg;
+        frame[3] = (byte) age;
+        frame[4] = (byte) (male ? 1 : 2);
+        frame[5] = (byte) ((stepsGoal >> 8) & 0xFF);
+        frame[6] = (byte) (stepsGoal & 0xFF);
+        frame[7] = (byte) ((sleepHours >> 8) & 0xFF);
+        frame[8] = (byte) (sleepHours & 0xFF);
+        return frame;
+    }
+
+    @Override
+    public boolean onCharacteristicChanged(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic, byte[] value) {
+        if (value != null && characteristic.getUuid().equals(VeepooConstants.UUID_CHARACTERISTIC_F008_DATA)) {
+            handlePacket(value);
+            return true;
+        }
+        if (value != null && characteristic.getUuid().equals(VeepooConstants.UUID_CHARACTERISTIC_F002_DATA)) {
+            ecgModule.handleLightFrame(value);
+            return true;
+        }
+        if (value != null && characteristic.getUuid().equals(VeepooConstants.UUID_CHARACTERISTIC_F003_DATA)) {
+            // Diagnostic: newly subscribed channel of unknown purpose; log raw frames first.
+            LOG.debug("F003 notification ({} bytes): {}", value.length, GB.hexdump(value));
+            return true;
+        }
+        if (value != null && characteristic.getUuid().equals(VeepooConstants.UUID_CHARACTERISTIC_AE02_DATA)) {
+            // Diagnostic: "Sinilink-APP" channel of unknown purpose; log raw frames first.
+            LOG.debug("AE02 notification ({} bytes): {}", value.length, GB.hexdump(value));
+            return true;
+        }
+        return super.onCharacteristicChanged(gatt, characteristic, value);
+    }
+
+    private void handlePacket(byte[] data) {
+        if (data == null || data.length == 0) {
+            return;
+        }
+        int opcode = data[0] & 0xFF;
+        switch (opcode) {
+            case 0xA1:
+                handlePwdConfirmResponse(data);
+                break;
+            case 0xA5:
+                if (data.length >= 2) {
+                    LOG.info("Time sync status: {}", data[1] & 0xFF);
+                }
+                break;
+            case 0xA3:
+                if (data.length >= 2) {
+                    LOG.info("Personal info push: {}", (data[1] & 0xFF) == 1 ? "success" : "rejected");
+                }
+                break;
+            case 0xA0:
+                handleBatteryResponse(data);
+                break;
+            case 0xFC:
+                handleProductionInfoResponse(data);
+                break;
+            case 0xA7:
+                handleDeviceFunctionReport(data);
+                break;
+            case 0xE0:
+                handleSleepChunk(data);
+                break;
+            case 0xD1:
+                handleOriginRecord(data);
+                break;
+            case 0xDF:
+                handleOrigin3Frame(data);
+                break;
+            case 0xD4:
+                handleSportFrame(data);
+                break;
+            case 0xD3:
+                handleSportCrcFrame(data);
+                break;
+            case 0xDA:
+                liveWorkoutModule.handleFrame(data);
+                break;
+            case 0xD0:
+                vitalDetectModule.handleHrFrame(data);
+                break;
+            case 0x80:
+                vitalDetectModule.handleSpo2Frame(data);
+                break;
+            case 0x87:
+                vitalDetectModule.handleTemperatureFrame(data);
+                break;
+            case 0x89:
+                vitalDetectModule.handleStressFrame(data);
+                break;
+            case 0x90:
+                vitalDetectModule.handleBpFrame(data);
+                break;
+            case 0x93:
+                // Shared opcode: [1]==4 body composition, [1]==1 ECG; each handler self-guards.
+                vitalDetectModule.handleBodyCompositionFrame(data);
+                ecgModule.handleFrame(data);
+                break;
+            case 0x8A:
+                vitalDetectModule.handleLipidFrame(data);
+                break;
+            case 0xB3:
+                // Two dialects share this opcode; the A7 package 4 capability selects which one
+                // the firmware speaks (newer TLV auto-measure vs legacy AllSet SpO2).
+                if (autoMeasureSupported) {
+                    autoMeasureModule.handleFrame(data);
+                } else {
+                    handleAllSetFrame(data);
+                }
+                break;
+            case 0xB8:
+                handleCustomSettingFrame(data);
+                break;
+            case 0xB9:
+                alarmModule.handleFrame(data);
+                break;
+            case 0xB5:
+                handleFindDeviceAck(data);
+                break;
+            case 0xDE:
+                manualDetectModule.handleFrame(data);
+                break;
+            case 0xD8:
+                handleStatusFrame(data);
+                break;
+            default:
+                LOG.debug("Unhandled VeePoo opcode: {}", String.format("%02X", (int) opcode));
+        }
+    }
+
+    /**
+     * Opcode 0xD8 status reply: [2..5]=today's steps u32 LE, [6..9]=distance meters u32 LE,
+     * [10..13]=calories x10 u32 LE. The band keeps the daily total itself and resets it at
+     * midnight; we turn consecutive polls into per-poll deltas for the live activity view.
+     */
+     private void handleStatusFrame(byte[] data) {
+        LOG.debug("D8 status frame received: len={} hex={}", data.length, GB.hexdump(data));
+        if (data.length < 14) {
+            LOG.warn("D8 status frame too short ({}), ignoring", data.length);
+            return;
+        }
+        long steps = ((long) (data[2] & 0xFF)) | ((long) (data[3] & 0xFF) << 8)
+                | ((long) (data[4] & 0xFF) << 16) | ((long) (data[5] & 0xFF) << 24);
+        int day = (int) (System.currentTimeMillis() / 86_400_000L);
+        if (day != lastStatusDay || lastStatusSteps < 0) {
+            // First poll after screen open, reconnect, or midnight rollover: baseline only.
+            LOG.debug("D8 status: steps={} (baseline)", steps);
+            lastStatusDay = day;
+            lastStatusSteps = steps;
+            return;
+        }
+        long delta = steps - lastStatusSteps;
+        lastStatusSteps = steps;
+        if (delta <= 0 || delta > 1000) {
+            // Counter moved backwards (band reset, manual clear) or an implausible jump.
+            LOG.debug("D8 status: steps={} delta={} (dropped)", steps, delta);
+            return;
+        }
+        LOG.debug("D8 status: steps={} delta={}", steps, delta);
+        VeepooActivitySample sample = new VeepooActivitySample();
+        sample.setTimestamp((int) (System.currentTimeMillis() / 1000L));
+        sample.setSteps((int) delta);
+        notifyVitalSample(sample);
+    }
+
+    @Override
+    public void onEnableRealtimeSteps(boolean enable) {
+        LOG.info("Live step tracking {}", enable ? "enabled" : "disabled");
+        realtimeStepsRequested = enable;
+        if (enable) {
+            mainHandler.removeCallbacks(statusPollTask);
+            mainHandler.post(statusPollTask);
+        } else {
+            mainHandler.removeCallbacks(statusPollTask);
+        }
+    }
+
+    /**
+     * Opcode 0xA1 response: [3]=status (6 = check + time success), [4..5]=deviceNumber BE,
+     * [6..9]=firmware/test version digits, [18]=find-device capability (0 none, 1/2 supported),
+     * [19]=wear-check capability (0 none, 1/2 supported).
+     */
+    private void handlePwdConfirmResponse(byte[] data) {
+        if (data.length < 20) {
+            LOG.warn("Short 0xA1 response: {} bytes", data.length);
+            return;
+        }
+        int status = data[3] & 0xFF;
+        int deviceNumber = ((data[4] & 0xFF) << 8) | (data[5] & 0xFF);
+        String firmwareVersion = hexByte(data[6]) + "." + hexByte(data[7]) + "." + hexByte(data[8]) + "." + hexByte(data[9]);
+        int findPhoneFunction = data[18] & 0xFF;
+        int wearDetectFunction = data[19] & 0xFF;
+        LOG.info("Password confirm status: {} (device number {}, firmware {}, findPhone: {}, wearDetect: {})",
+                status, deviceNumber, firmwareVersion, findPhoneFunction, wearDetectFunction);
+        if (status != 1 && status != 3 && status != 5 && status != 6) {
+            LOG.warn("Password confirm did not report success (status {}); the band may be paired to another phone", status);
+        }
+        GBDeviceEventVersionInfo versionInfo = new GBDeviceEventVersionInfo();
+        versionInfo.fwVersion = firmwareVersion;
+        versionInfo.fwVersion2 = String.valueOf(deviceNumber);
+        evaluateGBDeviceEvent(versionInfo);
+    }
+
+    /**
+     * Opcode 0xA0 response: [1]=power model (1 = charging), [4]=discrete level 0-4,
+     * [5]==1 makes [6] a battery percent, [7]==2 flags low battery.
+     */
+    private void handleBatteryResponse(byte[] data) {
+        if (data.length < 7) {
+            LOG.warn("Short 0xA0 battery response: {} bytes", data.length);
+            return;
+        }
+        boolean charging = (data[1] & 0xFF) == 1;
+        int level;
+        if ((data[5] & 0xFF) == 1) {
+            level = data[6] & 0xFF;
+        } else {
+            // Discrete 0-4 level report: map to a representative percentage.
+            int discrete = data[4] & 0xFF;
+            if (discrete > 4) {
+                discrete = 4;
+            }
+            level = new int[]{5, 30, 55, 80, 100}[discrete];
+        }
+        boolean low = data.length >= 8 && (data[7] & 0xFF) == 2;
+        LOG.info("Battery: {}% (charging: {}, low: {})", level, charging, low);
+        GBDeviceEventBatteryInfo batteryInfo = new GBDeviceEventBatteryInfo();
+        batteryInfo.level = level;
+        batteryInfo.state = charging ? BatteryState.BATTERY_CHARGING : BatteryState.BATTERY_NORMAL;
+        evaluateGBDeviceEvent(batteryInfo);
+    }
+
+    /** Opcode 0xFC response: accepted only if length == 20 && [18] == 2; TP version = bytes [9..14]. */
+    private void handleProductionInfoResponse(byte[] data) {
+        if (data.length != 20 || (data[18] & 0xFF) != 2) {
+            LOG.debug("Ignoring production info response (len {}, [18]={})", data.length, data.length > 18 ? (int) (data[18] & 0xFF) : -1);
+            return;
+        }
+        StringBuilder tpVersion = new StringBuilder();
+        for (int i = 9; i <= 14; i++) {
+            if (i > 9) {
+                tpVersion.append('.');
+            }
+            tpVersion.append(hexByte(data[i]));
+        }
+        LOG.info("Production (TP) version: {}", tpVersion);
+    }
+
+    /**
+     * Opcode 0xA7 capability report (device push, package id in byte [19]). Package 2 carries the
+     * fields we need: watch data days [2], workout history days [5], origin protocol version [10],
+     * precision sleep tag [13], ECG capability/type [15], multi-sport mode type [16].
+     */
+    private void handleDeviceFunctionReport(byte[] data) {
+        if (data.length < 20) {
+            return;
+        }
+        int packageId = data[19] & 0xFF;
+        LOG.info("Device capability report, package {}: {}", packageId, hexBytes(data));
+        if (packageId == 1) {
+            bpTag = data[VeepooConstants.CAP_PKG1_BP_TAG] & 0xFF;
+            spo2hType = data[VeepooConstants.CAP_PKG1_SPO2H_TYPE] & 0xFF;
+            boolean spo2Supported = isSpo2hTypeSupported(spo2hType) && spo2hType != 8;
+            int allMsgLength = data[VeepooConstants.CAP_PKG1_ALL_MSG_LENGTH] & 0xFF;
+            if (allMsgLength >= 1 && allMsgLength <= 64) {
+                socialMsgMaxPackets = allMsgLength;
+            }
+            int alarmTag = data[VeepooConstants.CAP_PKG1_ALARM_TAG] & 0xFF;
+            textAlarmsSupported = alarmTag == 5 || alarmTag == 6 || alarmTag == 7;
+            LOG.info("Capabilities: spo2hType={} ({}) maxMessagePackets={} alarmTag={} ({})",
+                    spo2hType, spo2Supported ? "supported" : "not supported", socialMsgMaxPackets,
+                    alarmTag, textAlarmsSupported ? "text alarms supported" : "no text alarms");
+            LOG.info("All-day vitals capability (pkg1): bpTag={} spo2hType={}", bpTag, spo2hType);
+            GBApplication.getDeviceSpecificSharedPrefs(getDevice().getAddress())
+                    .edit()
+                    .putBoolean(VeepooConstants.CONFIG_AUTO_MEASURE_SPO2_SUPPORTED, spo2Supported)
+                    .putBoolean(VeepooConstants.CONFIG_ALARMS_SUPPORTED, textAlarmsSupported)
+                    .apply();
+        } else if (packageId == 2) {
+            int watchDay = data[2] & 0xFF;
+            if (watchDay >= 1 && watchDay <= 7) {
+                watchDataDay = watchDay;
+            }
+            originProtocolVersion = data[10] & 0xFF;
+            preciseSleepCapable = (data[13] & 0xFF) != 0;
+            sportModelDay = data[VeepooConstants.CAP_PKG2_SPORT_MODEL_DAY] & 0xFF;
+            multSportModeType = data[VeepooConstants.CAP_PKG2_MULTISPORT_MODE_TYPE] & 0xFF;
+            int ecgType = data[VeepooConstants.CAP_PKG2_ECG_TYPE] & 0xFF;
+            boolean ecgSupported = ecgType != 0;
+            breathFunction = data[VeepooConstants.CAP_PKG2_BREATH_FUNCTION] & 0xFF;
+            hrvType = data[VeepooConstants.CAP_PKG2_HRV_TYPE] & 0xFF;
+            LOG.info("Capabilities: watchDataDay={}, originProtocolVersion={} ({}), preciseSleep={}, workoutDays={}, multisport={}, ecg={} (ecgType={})",
+                    watchDataDay, originProtocolVersion,
+                    (originProtocolVersion == 3 || originProtocolVersion == 5) ? "Origin3/DF" : "v1",
+                    preciseSleepCapable, sportModelDay, multSportModeType,
+                    ecgSupported ? "supported" : "not supported", ecgType);
+            LOG.info("All-day vitals capability (pkg2): breathFunction={} hrvType={}", breathFunction, hrvType);
+            GBApplication.getDeviceSpecificSharedPrefs(getDevice().getAddress())
+                    .edit()
+                    .putBoolean(VeepooConstants.CONFIG_ECG_SUPPORTED, ecgSupported)
+                    .putInt(VeepooConstants.CONFIG_ECG_TYPE, ecgType)
+                    .apply();
+        } else if (packageId == 3) {
+            tempType = data[VeepooConstants.CAP_PKG3_TEMP_TYPE] & 0xFF;
+            metType = data[VeepooConstants.CAP_PKG3_MET_TYPE] & 0xFF;
+            stressType = data[VeepooConstants.CAP_PKG3_STRESS_TYPE] & 0xFF;
+            int findDeviceByPhone = data[VeepooConstants.CAP_PKG3_FIND_DEVICE_BY_PHONE] & 0xFF;
+            bloodGlucoseTag = data[VeepooConstants.CAP_PKG3_BLOOD_GLUCOSE_TAG] & 0xFF;
+            LOG.info("Capabilities: tempType={} ({}), metType={}, stressType={} ({}), findDeviceByPhone={}",
+                    tempType, tempType != 0 ? "supported" : "not supported", metType, stressType,
+                    (stressType == 2 || stressType == 3) ? "supported" : "not supported", findDeviceByPhone);
+            LOG.info("All-day vitals capability (pkg3): bloodGlucoseTag={} metType={} stressType={}",
+                    bloodGlucoseTag, metType, stressType);
+        } else if (packageId == 4) {
+            autoMeasureSupported = (data[12] & 0xFF) == 1;
+            bloodComponentTag = data[VeepooConstants.CAP_PKG4_BLOOD_COMPONENT_TAG] & 0xFF;
+            LOG.info("Capabilities: autoMeasure={} ({})", data[12] & 0xFF,
+                    autoMeasureSupported ? "supported" : "not supported");
+            LOG.info("All-day vitals capability (pkg4): bloodComponentTag={}", bloodComponentTag);
+            GBApplication.getDeviceSpecificSharedPrefs(getDevice().getAddress())
+                    .edit()
+                    .putBoolean(VeepooConstants.CONFIG_AUTO_MEASURE_SUPPORTED, autoMeasureSupported)
+                    .apply();
+        }
+    }
+
+    /**
+     * Opcode 0xB8 CustomSetting frame: two 20-byte blocks ([19] selects basic/extended) that the
+     * band pushes after connect and answers a read request with. Each carries the live state of
+     * many feature toggles; we persist the monitor ones and use the stored frames as the write
+     * baseline so a toggle flips exactly one byte.
+     */
+    private void handleCustomSettingFrame(byte[] data) {
+        if (data == null || data.length < 20) {
+            LOG.warn("Short 0xB8 custom setting frame: {} bytes", data == null ? 0 : data.length);
+            return;
+        }
+        int index = data[19] & 0xFF;
+        if (index != 0 && index != 1) {
+            LOG.debug("Unknown 0xB8 custom setting index: {}", index);
+            return;
+        }
+        LOG.debug("Custom setting frame {}: {}", index, hexBytes(data));
+        boolean baselineComplete;
+        synchronized (customSettingLock) {
+            if (index == 0) {
+                customSettingFrame1 = data.clone();
+            } else {
+                customSettingFrame2 = data.clone();
+            }
+            baselineComplete = customSettingFrame1 != null && customSettingFrame2 != null;
+        }
+        if (baselineComplete && !customSettingEchoDone) {
+            customSettingEchoDone = true;
+            // Vendor parity: the reference app re-sends these frames on every connect; treat
+            // that as a possible "app armed" handshake for autonomous measurement pushes.
+            mainHandler.postDelayed(this::echoCustomSettings, 2000L);
+        }
+        int hr = stateOf(0, VeepooConstants.CUSTOM_SETTING_F1_AUTO_HEART);
+        int bp = stateOf(0, VeepooConstants.CUSTOM_SETTING_F1_AUTO_BP);
+        int hrv = stateOf(0, VeepooConstants.CUSTOM_SETTING_F1_AUTO_HRV);
+        int temp = stateOf(1, VeepooConstants.CUSTOM_SETTING_F2_AUTO_TEMP);
+        int stress = stateOf(1, VeepooConstants.CUSTOM_SETTING_F2_STRESS);
+        int bloodComponents = stateOf(1, VeepooConstants.CUSTOM_SETTING_F2_BLOOD_COMPONENTS);
+        LOG.info("Custom setting monitors: heart={} bp={} hrv={} temp={} stress={} bloodComponents={}",
+                hr, bp, hrv, temp, stress, bloodComponents);
+        SharedPreferences.Editor editor = GBApplication.getDeviceSpecificSharedPrefs(getDevice().getAddress()).edit();
+        persistMonitor(editor, VeepooConstants.CONFIG_AUTO_MEASURE_HR, VeepooConstants.CONFIG_AUTO_MEASURE_HR_SUPPORTED, hr);
+        persistMonitor(editor, VeepooConstants.CONFIG_AUTO_MEASURE_BLOOD_PRESSURE, VeepooConstants.CONFIG_AUTO_MEASURE_BLOOD_PRESSURE_SUPPORTED, bp);
+        persistMonitor(editor, VeepooConstants.CONFIG_AUTO_MEASURE_HRV, VeepooConstants.CONFIG_AUTO_MEASURE_HRV_SUPPORTED, hrv);
+        persistMonitor(editor, VeepooConstants.CONFIG_AUTO_MEASURE_TEMPERATURE, VeepooConstants.CONFIG_AUTO_MEASURE_TEMPERATURE_SUPPORTED, temp);
+        persistMonitor(editor, VeepooConstants.CONFIG_AUTO_MEASURE_STRESS, VeepooConstants.CONFIG_AUTO_MEASURE_STRESS_SUPPORTED, stress);
+        persistMonitor(editor, VeepooConstants.CONFIG_AUTO_MEASURE_BLOOD_COMPONENTS, VeepooConstants.CONFIG_AUTO_MEASURE_BLOOD_COMPONENTS_SUPPORTED, bloodComponents);
+        editor.apply();
+        if (baselineComplete && customSettingPendingKey != null) {
+            applyCustomSettingToggle(customSettingPendingKey, customSettingPendingOn);
+        }
+    }
+
+    /** Stores the live state of one monitor; -1 means the frame carrying it has not arrived. */
+    private void persistMonitor(SharedPreferences.Editor editor, String stateKey, String supportKey, int value) {
+        if (value < 0) {
+            return;
+        }
+        editor.putBoolean(stateKey, value == VeepooConstants.CUSTOM_SETTING_VALUE_OPEN);
+        editor.putBoolean(supportKey, value != 0);
+    }
+
+    private int stateOf(int frameIndex, int offset) {
+        synchronized (customSettingLock) {
+            byte[] frame = frameIndex == 0 ? customSettingFrame1 : customSettingFrame2;
+            return frame == null ? -1 : frame[offset] & 0xFF;
+        }
+    }
+
+    /** Maps a monitor setting key to its {frame index, byte offset}; null for non-0xB8 keys. */
+    private static int[] customSettingField(final String config) {
+        if (VeepooConstants.CONFIG_AUTO_MEASURE_HR.equals(config)) {
+            return new int[]{0, VeepooConstants.CUSTOM_SETTING_F1_AUTO_HEART};
+        } else if (VeepooConstants.CONFIG_AUTO_MEASURE_BLOOD_PRESSURE.equals(config)) {
+            return new int[]{0, VeepooConstants.CUSTOM_SETTING_F1_AUTO_BP};
+        } else if (VeepooConstants.CONFIG_AUTO_MEASURE_HRV.equals(config)) {
+            return new int[]{0, VeepooConstants.CUSTOM_SETTING_F1_AUTO_HRV};
+        } else if (VeepooConstants.CONFIG_AUTO_MEASURE_TEMPERATURE.equals(config)) {
+            return new int[]{1, VeepooConstants.CUSTOM_SETTING_F2_AUTO_TEMP};
+        } else if (VeepooConstants.CONFIG_AUTO_MEASURE_STRESS.equals(config)) {
+            return new int[]{1, VeepooConstants.CUSTOM_SETTING_F2_STRESS};
+        } else if (VeepooConstants.CONFIG_AUTO_MEASURE_BLOOD_COMPONENTS.equals(config)) {
+            return new int[]{1, VeepooConstants.CUSTOM_SETTING_F2_BLOOD_COMPONENTS};
+        }
+        return null;
+    }
+
+    /**
+     * Monitor toggle from the device settings screen. If the band already pushed (or answered)
+     * both custom-setting frames, write immediately with only the target byte changed; otherwise
+     * queue the toggle and request a read so the baseline arrives first.
+     */
+    private void handleCustomSettingToggle(final String config) {
+        int[] field = customSettingField(config);
+        if (field == null) {
+            return;
+        }
+        boolean on = GBApplication.getDeviceSpecificSharedPrefs(getDevice().getAddress())
+                .getBoolean(config, false);
+        boolean baselineComplete;
+        synchronized (customSettingLock) {
+            customSettingPendingKey = config;
+            customSettingPendingOn = on;
+            baselineComplete = customSettingFrame1 != null && customSettingFrame2 != null;
+        }
+        if (baselineComplete) {
+            applyCustomSettingToggle(config, on);
+        } else {
+            LOG.info("Custom setting baseline not received yet; requesting a read for toggle {}", config);
+            sendCustomSettingRead();
+        }
+    }
+
+    private void sendCustomSettingRead() {
+        try {
+            TransactionBuilder builder = performInitialized("read custom settings");
+            writeFrame(builder, new byte[]{VeepooConstants.OP_CUSTOM_SETTING,
+                    (byte) VeepooConstants.CUSTOM_SETTING_CMD_READ});
+            builder.queue();
+        } catch (IOException e) {
+            LOG.error("Error requesting custom settings", e);
+        }
+    }
+
+    private void applyCustomSettingToggle(final String config, final boolean on) {
+        int[] field = customSettingField(config);
+        if (field == null) {
+            return;
+        }
+        int frameIndex = field[0];
+        int offset = field[1];
+        byte[] frame1;
+        byte[] frame2;
+        synchronized (customSettingLock) {
+            customSettingPendingKey = null;
+            customSettingPendingOn = false;
+            // An extended block that never arrived is all-unsupported; synthesize it so the
+            // toggles living in it can still be written.
+            frame1 = customSettingFrame1 != null ? customSettingFrame1.clone() : new byte[20];
+            frame2 = customSettingFrame2 != null ? customSettingFrame2.clone() : new byte[20];
+        }
+        frame1[0] = VeepooConstants.OP_CUSTOM_SETTING;
+        frame1[1] = (byte) VeepooConstants.CUSTOM_SETTING_CMD_SET;
+        frame2[0] = VeepooConstants.OP_CUSTOM_SETTING;
+        frame2[1] = (byte) VeepooConstants.CUSTOM_SETTING_CMD_SET;
+        if (frameIndex == 0) {
+            frame1[offset] = (byte) (on ? VeepooConstants.CUSTOM_SETTING_VALUE_OPEN : VeepooConstants.CUSTOM_SETTING_VALUE_CLOSE);
+        } else {
+            frame2[offset] = (byte) (on ? VeepooConstants.CUSTOM_SETTING_VALUE_OPEN : VeepooConstants.CUSTOM_SETTING_VALUE_CLOSE);
+        }
+        // The vendor re-sends the extended block whenever any of its fields is set; follow suit.
+        boolean sendExtended = frame2[16] != 0;
+        if (!sendExtended) {
+            for (int i = 2; i <= 14; i++) {
+                if (frame2[i] != 0) {
+                    sendExtended = true;
+                    break;
+                }
+            }
+        }
+        LOG.info("Writing custom setting toggle {} -> {}", config, on ? "on" : "off");
+        try {
+            TransactionBuilder builder = performInitialized("write custom settings");
+            writeFrame(builder, frame1);
+            if (sendExtended) {
+                writeFrame(builder, frame2);
+            }
+            builder.queue();
+        } catch (IOException e) {
+            LOG.error("Error writing custom setting toggle {}", config, e);
+        }
+    }
+
+    /**
+     * Vendor parity: the reference app re-sends the custom-setting frames on every connect, and
+     * the band may treat that write as an "app armed" handshake for autonomous measurement
+     * pushes. Echo back exactly what was just read at connect, so no setting changes state.
+     */
+    private void echoCustomSettings() {
+        byte[] frame1;
+        byte[] frame2;
+        synchronized (customSettingLock) {
+            if (customSettingFrame1 == null || customSettingFrame2 == null) {
+                return;
+            }
+            frame1 = customSettingFrame1.clone();
+            frame2 = customSettingFrame2.clone();
+        }
+        LOG.info("Echoing custom settings at connect (no state change): {}", hexBytes(frame1));
+        try {
+            TransactionBuilder builder = performInitialized("echo custom settings at connect");
+            writeFrame(builder, frame1);
+            writeFrame(builder, frame2);
+            builder.queue();
+        } catch (IOException e) {
+            LOG.error("Error echoing custom settings at connect", e);
+        }
+    }
+
+    /**
+     * Opcode 0xB3 AllSet frame (legacy dialect, only SpO2 night auto-detect on this generation):
+     * response [1]==1, [3]=oprate (0 set ack / 1 read data), [4..7]=window start h/m + end h/m,
+     * [8]=open state.
+     */
+    private void handleAllSetFrame(byte[] data) {
+        if (data == null || data.length < 9 || (data[1] & 0xFF) != VeepooConstants.AUTO_MEASURE_CMD_SET) {
+            LOG.debug("Ignoring unexpected AllSet frame: {}", data == null ? "null" : hexBytes(data));
+            return;
+        }
+        int oprate = data[VeepooConstants.ALLSET_RESP_OPRATE] & 0xFF;
+        if (oprate != VeepooConstants.ALLSET_OPRATE_SET && oprate != VeepooConstants.ALLSET_OPRATE_READ) {
+            LOG.debug("Unknown AllSet oprate: {}", oprate);
+            return;
+        }
+        boolean applyPending = false;
+        int open;
+        synchronized (allSetLock) {
+            allSetReadOutstanding = false;
+            if (oprate == VeepooConstants.ALLSET_OPRATE_READ) {
+                allSetOpen = data[VeepooConstants.ALLSET_RESP_OPEN] & 0xFF;
+                allSetStartHour = data[VeepooConstants.ALLSET_RESP_START_HOUR] & 0xFF;
+                allSetStartMinute = data[VeepooConstants.ALLSET_RESP_START_MINUTE] & 0xFF;
+                allSetEndHour = data[VeepooConstants.ALLSET_RESP_END_HOUR] & 0xFF;
+                allSetEndMinute = data[VeepooConstants.ALLSET_RESP_END_MINUTE] & 0xFF;
+                applyPending = allSetPending;
+            }
+            open = allSetOpen;
+        }
+        if (oprate == VeepooConstants.ALLSET_OPRATE_READ) {
+            LOG.info("SpO2 auto-detect: open={} window {}:{}-{}:{}", open,
+                    allSetStartHour, allSetStartMinute, allSetEndHour, allSetEndMinute);
+            GBApplication.getDeviceSpecificSharedPrefs(getDevice().getAddress())
+                    .edit()
+                    .putBoolean(VeepooConstants.CONFIG_AUTO_MEASURE_SPO2, open == 1)
+                    .apply();
+            // Vendor parity: the reference app re-writes the SpO2 auto-detect settings on every
+            // connect; echo back exactly what was just read so no setting changes state.
+            synchronized (allSetLock) {
+                if (!allSetEchoDone && !allSetPending) {
+                    allSetEchoDone = true;
+                    LOG.info("Echoing SpO2 auto-detect at connect (no state change): open={}", open);
+                    writeAllSet(open == 1);
+                }
+            }
+        } else {
+            LOG.info("SpO2 auto-detect set acknowledged (open={})", open);
+        }
+        if (applyPending) {
+            boolean pendingOn;
+            synchronized (allSetLock) {
+                pendingOn = allSetPendingOn;
+            }
+            writeAllSet(pendingOn);
+        }
+    }
+
+    private void sendAllSetRead() {
+        synchronized (allSetLock) {
+            allSetReadOutstanding = true;
+        }
+        try {
+            TransactionBuilder builder = performInitialized("read SpO2 auto-detect settings");
+            writeFrame(builder, new byte[]{VeepooConstants.OP_AUTO_MEASURE, 0x00,
+                    (byte) VeepooConstants.ALLSET_OPRATE_READ});
+            builder.queue();
+            mainHandler.removeCallbacks(allSetReadTimeout);
+            mainHandler.postDelayed(allSetReadTimeout, 15000L);
+        } catch (IOException e) {
+            synchronized (allSetLock) {
+                allSetReadOutstanding = false;
+            }
+            LOG.error("Error requesting SpO2 auto-detect settings", e);
+        }
+    }
+
+    /** SpO2 auto-detect toggle from the device settings screen. */
+    private void handleSpo2Configuration(final String config) {
+        boolean on = GBApplication.getDeviceSpecificSharedPrefs(getDevice().getAddress())
+                .getBoolean(VeepooConstants.CONFIG_AUTO_MEASURE_SPO2, false);
+        boolean known;
+        synchronized (allSetLock) {
+            allSetPending = true;
+            allSetPendingOn = on;
+            known = allSetOpen >= 0;
+        }
+        if (known) {
+            writeAllSet(on);
+        } else {
+            LOG.info("SpO2 auto-detect state unknown; requesting a read before writing");
+            sendAllSetRead();
+        }
+    }
+
+    private void writeAllSet(final boolean on) {
+        int open, startHour, startMinute, endHour, endMinute;
+        synchronized (allSetLock) {
+            allSetPending = false;
+            open = on ? 1 : 0;
+            startHour = allSetStartHour;
+            startMinute = allSetStartMinute;
+            endHour = allSetEndHour;
+            endMinute = allSetEndMinute;
+        }
+        LOG.info("Writing SpO2 auto-detect: open={} window {}:{}-{}:{}", open,
+                startHour, startMinute, endHour, endMinute);
+        try {
+            TransactionBuilder builder = performInitialized("write SpO2 auto-detect");
+            writeFrame(builder, new byte[]{VeepooConstants.OP_AUTO_MEASURE, 0x00,
+                    (byte) VeepooConstants.ALLSET_OPRATE_SET,
+                    (byte) startHour, (byte) startMinute, (byte) endHour, (byte) endMinute, (byte) open});
+            builder.queue();
+        } catch (IOException e) {
+            LOG.error("Error writing SpO2 auto-detect settings", e);
+        }
+    }
+
+    /**
+     * Captures the date anchor and day cap for a new pass. Day indices are relative to this
+     * phone date, so everything recorded since the last fully-synced date lives in days
+     * 0..(days elapsed); a missing last-sync date falls back to a full-history pass.
+     */
+    private void prepareFetchWindow() {
+        fetchAnchorTodayMs = midnightOf(System.currentTimeMillis());
+        long lastSyncMidnightMs = GBApplication.getDeviceSpecificSharedPrefs(getDevice().getAddress())
+                .getLong(VeepooConstants.PREF_LAST_SYNC_DATE, 0L);
+        fetchEndDay = computeFetchEndDay(lastSyncMidnightMs, fetchAnchorTodayMs);
+        LOG.info("Fetch window: days 0..{} (last sync {})",
+                fetchEndDay < 0 ? "full" : String.valueOf(fetchEndDay),
+                lastSyncMidnightMs > 0L ? new Date(lastSyncMidnightMs) : "never");
+    }
+
+    /** Normalizes an instant to the local midnight of its day. */
+    static long midnightOf(long ms) {
+        Calendar calendar = Calendar.getInstance();
+        calendar.setTimeInMillis(ms);
+        calendar.set(Calendar.HOUR_OF_DAY, 0);
+        calendar.set(Calendar.MINUTE, 0);
+        calendar.set(Calendar.SECOND, 0);
+        calendar.set(Calendar.MILLISECOND, 0);
+        return calendar.getTimeInMillis();
+    }
+
+    /** Days elapsed between two midnights; -1 requests a full-history pass. */
+    static int computeFetchEndDay(long lastSyncMidnightMs, long todayMidnightMs) {
+        if (lastSyncMidnightMs <= 0L) {
+            return -1;
+        }
+        long days = Math.round((todayMidnightMs - lastSyncMidnightMs) / (double) MILLIS_PER_DAY);
+        return days < 0 ? -1 : (int) Math.min(days, Integer.MAX_VALUE);
+    }
+
+    @Override
+    public void onFetchRecordedData(int dataTypes) {
+        if ((dataTypes & RecordedDataTypes.TYPE_ACTIVITY) == 0) {
+            return;
+        }
+        synchronized (syncLock) {
+            if (fetchPhase != FetchPhase.IDLE) {
+                LOG.warn("Data fetch already in progress (phase {}); ignoring new request", fetchPhase);
+                return;
+            }
+            fetchPhase = FetchPhase.SLEEP;
+            sleepDayIndex = 0;
+            originDayIndex = 0;
+            sportDayIndex = 0;
+            sportDayFrames.clear();
+        }
+        getDevice().setBusyTask(R.string.busy_task_fetch_activity_data, getContext());
+        getDevice().sendDeviceUpdateIntent(getContext());
+        prepareFetchWindow();
+        requestSleepDay(0);
+    }
+
+    private void requestSleepDay(int dayIndex) {
+        scheduleSleepWatchdog();
+        continueFetch("fetch sleep day " + dayIndex, builder ->
+                writeFrame(builder, new byte[]{VeepooConstants.OP_SLEEP_READ, (byte) dayIndex}));
+    }
+
+    private void requestOriginDay(int dayIndex) {
+        continueFetch("fetch activity day " + dayIndex, builder ->
+                writeFrame(builder, new byte[]{VeepooConstants.OP_ORIGIN_V1, 0x01, 0x00, (byte) dayIndex}));
+    }
+
+    /** Queues a follow-up write after the current transaction completed. */
+    private void continueFetch(String taskName, java.util.function.Consumer<TransactionBuilder> action) {
+        try {
+            TransactionBuilder builder = performInitialized(taskName);
+            action.accept(builder);
+            builder.queue();
+        } catch (IOException e) {
+            LOG.error("Error continuing VeePoo data fetch ({})", taskName, e);
+            abortFetch();
+        }
+    }
+
+    /**
+     * Opcode 0xE0 chunk: [1]=remaining chunks of the day (0 = last), [3]=day index echo,
+     * payload in bytes [4..19]. Payloads are concatenated and split into 96-byte day records.
+     * A zero-payload chunk with [2]==0x00 is the device's "this day has no data" answer
+     * (seen for days beyond the stored window); it never completes via remaining==0.
+     */
+    private void handleSleepChunk(byte[] data) {
+        if (data.length < VeepooConstants.PACKET_SIZE) {
+            LOG.debug("Dropping short 0xE0 chunk: {} bytes", data.length);
+            return;
+        }
+        synchronized (syncLock) {
+            if (fetchPhase != FetchPhase.SLEEP) {
+                LOG.warn("Unexpected 0xE0 chunk outside the sleep phase ({})", fetchPhase);
+                return;
+            }
+        }
+        int remaining = data[1] & 0xFF;
+        int dayIndex = data[3] & 0xFF;
+        if (dayIndex != sleepDayIndex) {
+            LOG.warn("Sleep chunk day index {} does not match requested day {}", dayIndex, sleepDayIndex);
+        }
+        if ((data[2] & 0xFF) == 0x00 && isZeroPayload(data)) {
+            LOG.info("Sleep day {} reported empty by the device", dayIndex);
+            advanceSleepDay(dayIndex, false);
+            return;
+        }
+        if (dayIndex == sleepDayIndex) {
+            sleepLastChunkAt = System.currentTimeMillis();
+            sleepDayPayload.write(data, 4, VeepooConstants.PACKET_SIZE - 4);
+        }
+        if (remaining != 0) {
+            return;
+        }
+
+        byte[] stream = sleepDayPayload.toByteArray();
+        sleepDayPayload.reset();
+        LOG.info("Sleep day {} complete: {} payload bytes", dayIndex, stream.length);
+        if (preciseSleepCapable) {
+            VeepooSleepParser.parsePrecisionStream(stream, dayIndex, fetchAnchorTodayMs, pendingListCollector);
+        } else {
+            for (int offset = 0; offset + VeepooConstants.SLEEP_RECORD_SIZE <= stream.length; offset += VeepooConstants.SLEEP_RECORD_SIZE) {
+                VeepooSleepParser.parseNormalRecord(stream, offset, dayIndex, fetchAnchorTodayMs, pendingListCollector);
+            }
+        }
+        advanceSleepDay(dayIndex, stream.length > 0);
+    }
+
+    private boolean isZeroPayload(byte[] data) {
+        for (int i = 4; i < VeepooConstants.PACKET_SIZE; i++) {
+            if (data[i] != 0) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * Advances the fetch after one sleep day. Inside the advertised watchDataDay window every
+     * day is requested; beyond it, days are probed until an empty day or SLEEP_FETCH_MAX_DAYS.
+     */
+    private void advanceSleepDay(int dayIndex, boolean hadData) {
+        int nextDay = dayIndex + 1;
+        if (fetchEndDay < 0 && nextDay >= watchDataDay && !hadData) {
+            if (dayIndex >= watchDataDay) {
+                LOG.info("Sleep probe: day {} empty, history ends at day {}", dayIndex, dayIndex);
+            }
+            enterOriginPhase();
+            return;
+        }
+        if (nextDay < sleepEndExclusive()) {
+            if (fetchEndDay < 0 && nextDay == watchDataDay) {
+                LOG.info("Sleep window full at {} day(s); probing up to day {}", watchDataDay, sleepEndExclusive() - 1);
+            }
+            synchronized (syncLock) {
+                sleepDayIndex = nextDay;
+            }
+            requestSleepDay(nextDay);
+        } else {
+            enterOriginPhase();
+        }
+    }
+
+    private int sleepFetchLimit() {
+        return watchDataDay > 0 ? Math.max(watchDataDay, VeepooConstants.SLEEP_FETCH_MAX_DAYS) : 0;
+    }
+
+    private void enterOriginPhase() {
+        synchronized (syncLock) {
+            fetchPhase = FetchPhase.ORIGIN;
+        }
+        if (originProtocolVersion == 3 || originProtocolVersion == 5) {
+            requestOrigin3Day(0);
+        } else {
+            requestOriginDay(0);
+        }
+    }
+
+    /** 90 s for advertised days (mirrors the vendor app), 10 s for days beyond the window. */
+    private long sleepWatchdogTimeout() {
+        return isSleepProbeDay(sleepDayIndex) ? 10_000L : 90_000L;
+    }
+
+    /** Exclusive day cap for this pass: the full limit, or the incremental end, whichever is smaller. */
+    private int sleepEndExclusive() {
+        int full = sleepFetchLimit();
+        return fetchEndDay < 0 ? full : Math.min(full, fetchEndDay + 1);
+    }
+
+    /** Probe days exist only on a full pass; an incremental pass simply stops at its cap. */
+    private boolean isSleepProbeDay(int dayIndex) {
+        return fetchEndDay < 0 && dayIndex >= watchDataDay;
+    }
+
+    private void scheduleSleepWatchdog() {
+        mainHandler.removeCallbacks(sleepWatchdog);
+        sleepLastChunkAt = System.currentTimeMillis();
+        mainHandler.postDelayed(sleepWatchdog, sleepWatchdogTimeout());
+    }
+
+    private void runSleepWatchdog() {
+        synchronized (syncLock) {
+            if (fetchPhase != FetchPhase.SLEEP) {
+                return;
+            }
+        }
+        long idle = System.currentTimeMillis() - sleepLastChunkAt;
+        if (idle < sleepWatchdogTimeout()) {
+            scheduleSleepWatchdog();
+            return;
+        }
+        mainHandler.removeCallbacks(sleepWatchdog);
+        int dayIndex = sleepDayIndex;
+        byte[] stream = sleepDayPayload.toByteArray();
+        sleepDayPayload.reset();
+        if (isSleepProbeDay(dayIndex)) {
+            LOG.info("Sleep probe: no response for day {}, history ends at day {}", dayIndex, dayIndex - 1);
+            enterOriginPhase();
+            return;
+        }
+        LOG.warn("Sleep read stalled for {} ms; finishing the day with partial data", idle);
+        if (preciseSleepCapable) {
+            VeepooSleepParser.parsePrecisionStream(stream, dayIndex, fetchAnchorTodayMs, pendingListCollector);
+        } else {
+            for (int offset = 0; offset + VeepooConstants.SLEEP_RECORD_SIZE <= stream.length; offset += VeepooConstants.SLEEP_RECORD_SIZE) {
+                VeepooSleepParser.parseNormalRecord(stream, offset, dayIndex, fetchAnchorTodayMs, pendingListCollector);
+            }
+        }
+        advanceSleepDay(dayIndex, stream.length > 0);
+    }
+
+    /**
+     * Opcode 0xD1 response: one activity record per notification.
+     * [1..2]=packageNumber BE, [3..4]=allPackage BE, [5]=day offset, [7]=date day, [8]=hour,
+     * [9]=minute, [10..11]=steps BE, [14]=heart rate (valid 30..200).
+     */
+    private void handleOriginRecord(byte[] data) {
+        if (data.length < VeepooConstants.PACKET_SIZE) {
+            return;
+        }
+        synchronized (syncLock) {
+            if (fetchPhase != FetchPhase.ORIGIN) {
+                LOG.warn("Unexpected 0xD1 record outside the activity phase ({})", fetchPhase);
+                return;
+            }
+        }
+        int packageNumber = ((data[1] & 0xFF) << 8) | (data[2] & 0xFF);
+        int allPackage = ((data[3] & 0xFF) << 8) | (data[4] & 0xFF);
+
+        int dayOffset = data[5] & 0xFF;
+        if (dayOffset > 7) {
+            dayOffset = originDayIndex; // implausible echo; fall back to the requested day
+        }
+        int hour = data[8] & 0xFF;
+        int minute = data[9] & 0xFF;
+        int steps = ((data[10] & 0xFF) << 8) | (data[11] & 0xFF);
+        int heartRate = data[14] & 0xFF;
+        if (heartRate < 30 || heartRate > 200) {
+            heartRate = ActivitySample.NOT_MEASURED;
+        }
+
+        Calendar calendar = Calendar.getInstance();
+        calendar.setTimeInMillis(fetchAnchorTodayMs);
+        calendar.add(Calendar.DAY_OF_MONTH, -dayOffset);
+        calendar.set(Calendar.HOUR_OF_DAY, hour);
+        calendar.set(Calendar.MINUTE, minute);
+        calendar.set(Calendar.SECOND, 0);
+        calendar.set(Calendar.MILLISECOND, 0);
+
+        VeepooActivitySample sample = new VeepooActivitySample();
+        sample.setTimestamp((int) (calendar.getTimeInMillis() / 1000L));
+        sample.setRawKind(VeepooConstants.RAW_KIND_ACTIVITY);
+        sample.setSteps(steps);
+        sample.setHeartRate(heartRate);
+        sample.setCaloriesBurnt(0);
+        sample.setDistanceMeters(0);
+        sample.setDataSource(DATA_SOURCE_ACTIVITY_SUMMARY);
+        pendingOriginSamples.add(sample);
+
+        boolean dayComplete = (data[1] & 0xFF) == (data[3] & 0xFF) && (data[2] & 0xFF) == (data[4] & 0xFF);
+        if (!dayComplete) {
+            return;
+        }
+        LOG.info("Activity day {} complete ({} packages, {} records total)", originDayIndex, allPackage, packageNumber);
+        boolean hadData = !pendingOriginSamples.isEmpty();
+        persistPendingOriginDay();
+        afterOriginDayComplete(originDayIndex, hadData);
+    }
+
+    /** Requests the Origin3 (0xDF) 5-minute activity stream for dayIndex. */
+    private void requestOrigin3Day(int dayIndex) {
+        dfDayFrames.clear();
+        scheduleDfWatchdog();
+        continueFetch("fetch Origin3 activity day " + dayIndex, builder ->
+                writeFrame(builder, new byte[]{VeepooConstants.OP_ORIGIN_DF, 0x01, 0x00, (byte) dayIndex}));
+    }
+
+    /**
+     * Opcode 0xDF frame (Origin3, protocol versions 3/5). Each day read is a series of blocks:
+     * a header frame ([3]=0, no payload) followed by payload frames carrying bytes [4..4+(j-4))
+     * where j = header[13] on v5 and 20 on v3. The day ends when [1]==[2]==0xFF. The joined block
+     * payloads are TLV streams: [tag][len][payload], tag 0xB1 = record time (5-minute boundary),
+     * 0xB2 = steps/distance/kcal, 0xB4/0xB5 = heart rate, 0xC0 = end of stream.
+     */
+    private void handleOrigin3Frame(byte[] data) {
+        if (data.length < VeepooConstants.PACKET_SIZE) {
+            LOG.debug("Dropping short 0xDF frame: {} bytes", data.length);
+            return;
+        }
+        synchronized (syncLock) {
+            if (fetchPhase != FetchPhase.ORIGIN) {
+                LOG.warn("Unexpected 0xDF frame outside the activity phase ({})", fetchPhase);
+                return;
+            }
+        }
+        dfLastFrameAt = System.currentTimeMillis();
+
+        if ((data[1] & 0xFF) == 0xFF && (data[2] & 0xFF) == 0xFF) {
+            mainHandler.removeCallbacks(dfWatchdog);
+            List<byte[]> frames = new ArrayList<>(dfDayFrames);
+            dfDayFrames.clear();
+            int dayIndex = originDayIndex;
+            LOG.info("Origin3 day {} complete ({} frames)", dayIndex, frames.size());
+            boolean hadData = VeepooOrigin3Parser.parseDay(frames, dayIndex, originProtocolVersion, bloodGlucoseTag, fetchAnchorTodayMs, pendingListCollector);
+            VeepooOrigin3Parser.mergeHeartRateIntoSleep(pendingOriginSamples, pendingSleepSamples);
+            persistPendingOriginDay();
+            afterOriginDayComplete(dayIndex, hadData);
+            return;
+        }
+        dfDayFrames.add(data);
+    }
+
+    /** 90 s for advertised days (mirrors the vendor app), 10 s for days beyond the window. */
+    private long dfWatchdogTimeout() {
+        return isOriginProbeDay(originDayIndex) ? 10_000L : 90_000L;
+    }
+
+    /** Exclusive day cap for this pass: the full limit, or the incremental end, whichever is smaller. */
+    private int originEndExclusive() {
+        boolean origin3 = originProtocolVersion == 3 || originProtocolVersion == 5;
+        int full = origin3 ? Math.max(watchDataDay, VeepooConstants.ORIGIN_FETCH_MAX_DAYS) : watchDataDay;
+        return fetchEndDay < 0 ? full : Math.min(full, fetchEndDay + 1);
+    }
+
+    /** Probe days exist only on a full Origin3 pass; an incremental pass simply stops at its cap. */
+    private boolean isOriginProbeDay(int dayIndex) {
+        return fetchEndDay < 0 && (originProtocolVersion == 3 || originProtocolVersion == 5) && dayIndex >= watchDataDay;
+    }
+
+    private void scheduleDfWatchdog() {
+        mainHandler.removeCallbacks(dfWatchdog);
+        dfLastFrameAt = System.currentTimeMillis();
+        mainHandler.postDelayed(dfWatchdog, dfWatchdogTimeout());
+    }
+
+    private void runDfWatchdog() {
+        synchronized (syncLock) {
+            if (fetchPhase != FetchPhase.ORIGIN) {
+                return;
+            }
+        }
+        long idle = System.currentTimeMillis() - dfLastFrameAt;
+        if (idle < dfWatchdogTimeout()) {
+            scheduleDfWatchdog();
+            return;
+        }
+        mainHandler.removeCallbacks(dfWatchdog);
+        List<byte[]> frames = new ArrayList<>(dfDayFrames);
+        dfDayFrames.clear();
+        int dayIndex = originDayIndex;
+        boolean hadData;
+        if (isOriginProbeDay(dayIndex)) {
+            LOG.info("Activity probe: no response for day {}, history ends at day {}", dayIndex, dayIndex - 1);
+            hadData = false;
+        } else {
+            LOG.warn("Origin3 read stalled for {} ms; finishing the day with partial data", idle);
+            hadData = VeepooOrigin3Parser.parseDay(frames, dayIndex, originProtocolVersion, bloodGlucoseTag, fetchAnchorTodayMs, pendingListCollector);
+        }
+        VeepooOrigin3Parser.mergeHeartRateIntoSleep(pendingOriginSamples, pendingSleepSamples);
+        persistPendingOriginDay();
+        afterOriginDayComplete(dayIndex, hadData);
+    }
+
+    /**
+     * Advances the fetch after an activity day. Inside the advertised watchDataDay window every
+     * day is requested; beyond it (Origin3 only, full passes), days are probed until an empty
+     * day or ORIGIN_FETCH_MAX_DAYS. Incremental passes (fetchEndDay >= 0) stop at the cap and
+     * never probe. Then the workout history days follow if the device keeps them.
+     */
+    private void afterOriginDayComplete(int dayIndex, boolean hadData) {
+        int nextDay = dayIndex + 1;
+        boolean origin3 = originProtocolVersion == 3 || originProtocolVersion == 5;
+        boolean probeRequest = fetchEndDay < 0 && origin3 && nextDay >= watchDataDay;
+        if (!probeRequest || hadData) {
+            if (nextDay < originEndExclusive()) {
+                if (probeRequest && nextDay == watchDataDay) {
+                    LOG.info("Activity window full at {} day(s); probing up to day {}", watchDataDay, originEndExclusive() - 1);
+                }
+                synchronized (syncLock) {
+                    originDayIndex = nextDay;
+                }
+                if (origin3) {
+                    requestOrigin3Day(nextDay);
+                } else {
+                    requestOriginDay(nextDay);
+                }
+                return;
+            }
+        }
+        if (probeRequest && !hadData) {
+            LOG.info("Activity probe: day {} empty, history ends at day {}", dayIndex, dayIndex);
+        }
+        if (sportModelDay > 0) {
+            synchronized (syncLock) {
+                fetchPhase = FetchPhase.SPORT;
+                sportDayIndex = 0;
+            }
+            LOG.info("Activity days complete; reading up to {} day(s) of workout history", sportFetchLimit());
+            requestSportDay(0);
+        } else {
+            synchronized (syncLock) {
+                fetchPhase = FetchPhase.IDLE;
+            }
+            finishFetch();
+        }
+    }
+
+    /** Requests the workout history (0xD4) stream for dayIndex. */
+    private void requestSportDay(int dayIndex) {
+        sportDayFrames.clear();
+        scheduleSportWatchdog();
+        continueFetch("fetch workout history day " + dayIndex, builder ->
+                writeFrame(builder, new byte[]{VeepooConstants.OP_SPORT_ORIGIN, (byte) dayIndex}));
+    }
+
+    /**
+     * Opcode 0xD4 frame (workout history): one workout session per requested day. All frames
+     * accumulate; the day ends when [1]==[3] && [2]==[4]. Multi-sport types 4/5/6 use the GPS
+     * layout, everything else the plain layout.
+     */
+    private void handleSportFrame(byte[] data) {
+        if (data.length < VeepooConstants.PACKET_SIZE) {
+            LOG.debug("Dropping short 0xD4 frame: {} bytes", data.length);
+            return;
+        }
+        synchronized (syncLock) {
+            if (fetchPhase != FetchPhase.SPORT) {
+                LOG.warn("Unexpected 0xD4 frame outside the workout phase ({})", fetchPhase);
+                return;
+            }
+        }
+        sportLastFrameAt = System.currentTimeMillis();
+        sportDayFrames.add(data);
+
+        boolean dayComplete = (data[1] & 0xFF) == (data[3] & 0xFF) && (data[2] & 0xFF) == (data[4] & 0xFF);
+        if (!dayComplete) {
+            return;
+        }
+        mainHandler.removeCallbacks(sportWatchdog);
+        List<byte[]> frames = new ArrayList<>(sportDayFrames);
+        sportDayFrames.clear();
+        int dayIndex = sportDayIndex;
+        LOG.info("Workout day {} complete ({} frames)", dayIndex, frames.size());
+        boolean hadSession = parseSportDay(frames, dayIndex);
+        advanceSportDay(dayIndex, hadSession);
+    }
+
+    /**
+     * Advances the fetch after one workout day. Inside the advertised sportModelDay window every
+     * day is requested; beyond it, days are probed (the firmware keeps a compacted ring of
+     * sessions that can extend past the window) until an empty day or SPORT_FETCH_MAX_DAYS.
+     */
+    private void advanceSportDay(int dayIndex, boolean hadSession) {
+        int nextDay = dayIndex + 1;
+        if (fetchEndDay < 0 && nextDay >= sportModelDay && !hadSession) {
+            if (dayIndex >= sportModelDay) {
+                LOG.info("Workout probe: day {} empty, history ends at day {}", dayIndex, dayIndex);
+            }
+            synchronized (syncLock) {
+                fetchPhase = FetchPhase.IDLE;
+            }
+            finishFetch();
+            return;
+        }
+        if (nextDay < sportEndExclusive()) {
+            if (fetchEndDay < 0 && nextDay == sportModelDay) {
+                LOG.info("Workout window full at {} day(s); probing up to day {}", sportModelDay, sportEndExclusive() - 1);
+            }
+            synchronized (syncLock) {
+                sportDayIndex = nextDay;
+            }
+            requestSportDay(nextDay);
+        } else {
+            synchronized (syncLock) {
+                fetchPhase = FetchPhase.IDLE;
+            }
+            finishFetch();
+        }
+    }
+
+    /** Total 0xD4 days to request: the advertised window, extended by the probe. */
+    private int sportFetchLimit() {
+        return sportModelDay > 0 ? Math.max(sportModelDay, VeepooConstants.SPORT_FETCH_MAX_DAYS) : 0;
+    }
+
+    /** Mirrors the app's 90-second per-day timeout; probe days time out much faster. */
+    private void scheduleSportWatchdog() {
+        mainHandler.removeCallbacks(sportWatchdog);
+        sportLastFrameAt = System.currentTimeMillis();
+        mainHandler.postDelayed(sportWatchdog, sportWatchdogTimeout());
+    }
+
+    /** 90 s for advertised days (mirrors the vendor app), 10 s for days beyond the window. */
+    private long sportWatchdogTimeout() {
+        return isSportProbeDay(sportDayIndex) ? 10_000L : 90_000L;
+    }
+
+    /** Exclusive day cap for this pass: the full limit, or the incremental end, whichever is smaller. */
+    private int sportEndExclusive() {
+        int full = sportFetchLimit();
+        return fetchEndDay < 0 ? full : Math.min(full, fetchEndDay + 1);
+    }
+
+    /** Probe days exist only on a full pass; an incremental pass simply stops at its cap. */
+    private boolean isSportProbeDay(int dayIndex) {
+        return fetchEndDay < 0 && dayIndex >= sportModelDay;
+    }
+
+    private void runSportWatchdog() {
+        synchronized (syncLock) {
+            if (fetchPhase != FetchPhase.SPORT) {
+                return;
+            }
+        }
+        long idle = System.currentTimeMillis() - sportLastFrameAt;
+        if (idle < sportWatchdogTimeout()) {
+            scheduleSportWatchdog();
+            return;
+        }
+        mainHandler.removeCallbacks(sportWatchdog);
+        if (isSportProbeDay(sportDayIndex)) {
+            LOG.info("Workout probe: no response for day {}, stopping the history fetch", sportDayIndex);
+            sportDayFrames.clear();
+            synchronized (syncLock) {
+                fetchPhase = FetchPhase.IDLE;
+            }
+            finishFetch();
+            return;
+        }
+        LOG.warn("Workout read stalled for {} ms; finishing the day with partial data", idle);
+        List<byte[]> frames = new ArrayList<>(sportDayFrames);
+        sportDayFrames.clear();
+        int dayIndex = sportDayIndex;
+        boolean hadSession = parseSportDay(frames, dayIndex);
+        advanceSportDay(dayIndex, hadSession);
+    }
+
+    /** Parses one 0xD4 day: GPS layout for multi-sport types 4/5/6, plain layout otherwise. */
+    private boolean parseSportDay(List<byte[]> frames, int dayIndex) {
+        try {
+            VeepooSportDayParser.SportDay day;
+            if (multSportModeType == 4 || multSportModeType == 5 || multSportModeType == 6) {
+                day = VeepooSportDayParser.parseGpsDay(frames, dayIndex);
+            } else {
+                day = VeepooSportDayParser.parsePlainDay(frames, dayIndex);
+            }
+            if (day == null) {
+                return false;
+            }
+            saveSportSession(day.startTime, day.stopTime, day.sportType, day.summary, day.gpsPoints, dayIndex);
+            return true;
+        } catch (Exception e) {
+            LOG.error("Error parsing workout day {}", dayIndex, e);
+            return false;
+        }
+    }
+
+    /**
+     * The band clock is re-synced before a phone-initiated workout starts, so a matching pending
+     * phone GPS track started within this window belongs to the session.
+     */
+    private static final long PHONE_GPS_MATCH_TOLERANCE_MS = 5 * 60 * 1000L;
+
+    /** Persists one parsed workout as a BaseActivitySummary; identical sessions are skipped. */
+    private void saveSportSession(Date startTime, Date stopTime, int sportType, ActivitySummaryData summary,
+                                  List<VeepooSportDayParser.GpxPoint> gpsPoints, int dayIndex) {
+        // Consume the pending phone GPS track even when the session is already stored, so a stale
+        // track can never attach to a later session.
+        final VeepooLiveWorkoutModule.PhoneGpsTrack phoneTrack = liveWorkoutModule.consumePendingPhoneGpsTrack();
+        try (DBHandler dbHandler = GBApplication.acquireDB()) {
+            DaoSession session = dbHandler.getDaoSession();
+            User user = DBHelper.getUser(session);
+            Device device = DBHelper.getDevice(getDevice(), session);
+
+            BaseActivitySummaryDao dao = session.getBaseActivitySummaryDao();
+            List<BaseActivitySummary> existing = dao.queryBuilder()
+                    .where(BaseActivitySummaryDao.Properties.DeviceId.eq(device.getId()),
+                            BaseActivitySummaryDao.Properties.StartTime.eq(startTime))
+                    .list();
+            if (!existing.isEmpty()) {
+                LOG.debug("Workout day {}: session starting at {} already stored; skipping", dayIndex, startTime);
+                return;
+            }
+
+            ActivityKind kind = sportTypeToKind(sportType);
+            BaseActivitySummary workout = new BaseActivitySummary();
+            workout.setName(kind.getLabel(getContext()));
+            workout.setActivityKind(kind.getCode());
+            workout.setStartTime(startTime);
+            workout.setEndTime(stopTime);
+            workout.setDevice(device);
+            workout.setUser(user);
+
+            List<ActivityPoint> trackPoints = toActivityPoints(gpsPoints);
+            boolean usingPhoneTrack = false;
+            if (trackPoints.size() < 2 && phoneTrack != null) {
+                // No band GPS: attach the route recorded with the phone, when it matches this session.
+                final List<ActivityPoint> trimmedPhoneTrack = trimPhoneGpsTrackToSession(phoneTrack.points, startTime, stopTime);
+                if (trimmedPhoneTrack.size() >= 2
+                        && Math.abs(phoneTrack.startMs - startTime.getTime()) <= PHONE_GPS_MATCH_TOLERANCE_MS) {
+                    LOG.info("Workout day {}: attaching the phone GPS track ({} points)", dayIndex, trimmedPhoneTrack.size());
+                    trackPoints = trimmedPhoneTrack;
+                    usingPhoneTrack = true;
+                } else {
+                    LOG.info("Workout day {}: discarding a pending phone GPS track that does not match the session", dayIndex);
+                }
+            }
+            if (trackPoints.size() >= 2) {
+                try {
+                    summary.setHasGps(true);
+                    workout.setGpxTrack(writeSportGpx(startTime, workout.getName(), device, user, trackPoints));
+                    if (usingPhoneTrack) {
+                        // Without GNSS the band's distance is a step estimate; the recorded route
+                        // provides a real one for the summary and the Health Connect sync.
+                        applyPhoneTrackMetrics(summary, trackPoints, startTime, stopTime);
+                    }
+                } catch (Exception e) {
+                    LOG.warn("Workout day {}: GPX export failed, saving without track", dayIndex, e);
+                }
+            }
+            workout.setSummaryData(summary.toString());
+            dao.insertOrReplace(workout);
+            LOG.info("Workout day {}: saved {} session {} to {}", dayIndex, kind.name(), startTime, stopTime);
+        } catch (Exception e) {
+            LOG.error("Error saving VeePoo workout session (day {})", dayIndex, e);
+        }
+        getDevice().sendDeviceUpdateIntent(getContext());
+    }
+
+    /**
+     * Trims the phone GPS fixes to the session window (with a little margin on each side) so that
+     * stationary time before the start or after the stop - for example left over from a failed
+     * stop command that kept the phone recording - never ends up in the exported track or the
+     * computed distance. Falls back to the untrimmed track when nothing survives the window.
+     */
+    static List<ActivityPoint> trimPhoneGpsTrackToSession(List<ActivityPoint> points, Date startTime, Date stopTime) {
+        if (points == null || points.isEmpty() || startTime == null || stopTime == null) {
+            return points;
+        }
+        final long fromMs = startTime.getTime() - 60_000L;
+        final long toMs = stopTime.getTime() + 120_000L;
+        final List<ActivityPoint> trimmed = new ArrayList<>();
+        for (ActivityPoint point : points) {
+            if (point.getTime() == null) {
+                continue;
+            }
+            final long timeMs = point.getTime().getTime();
+            if (timeMs >= fromMs && timeMs <= toMs) {
+                trimmed.add(point);
+            }
+        }
+        return trimmed.isEmpty() ? points : trimmed;
+    }
+
+    /** Writes the collected GPS track points as a .gpx file in the export directory. */
+    private String writeSportGpx(Date startTime, String name, Device device, User user, List<ActivityPoint> trackPoints) throws Exception {
+        File dir = getDevice().getDeviceCoordinator().getWritableExportDirectory(getDevice(), true);
+        File gpxFile = new File(dir, "veepoo_sport_" + (startTime.getTime() / 1000L) + ".gpx");
+        ActivityTrack track = new ActivityTrack();
+        track.setBaseTime(startTime);
+        track.setName(name);
+        track.setDevice(device);
+        track.setUser(user);
+        for (ActivityPoint activityPoint : trackPoints) {
+            track.addTrackPoint(activityPoint);
+        }
+        new GPXExporter().performExport(track, gpxFile, null);
+        return gpxFile.getAbsolutePath();
+    }
+
+    /** Converts the band-reported GPS layout points into track points. */
+    private static List<ActivityPoint> toActivityPoints(List<VeepooSportDayParser.GpxPoint> gpsPoints) {
+        final List<ActivityPoint> points = new ArrayList<>(gpsPoints.size());
+        for (VeepooSportDayParser.GpxPoint point : gpsPoints) {
+            ActivityPoint activityPoint = new ActivityPoint(new Date(point.timeMs));
+            if (point.altitude > 0) {
+                activityPoint.setLocation(new GPSCoordinate(point.longitude / 1e6, point.latitude / 1e6, point.altitude));
+            } else {
+                activityPoint.setLocation(new GPSCoordinate(point.longitude / 1e6, point.latitude / 1e6));
+            }
+            points.add(activityPoint);
+        }
+        return points;
+    }
+
+    /** Sums the great-circle distance between consecutive track points, skipping implausible jumps. */
+    static double trackDistance(List<ActivityPoint> points) {
+        double meters = 0;
+        ActivityPoint last = null;
+        for (ActivityPoint point : points) {
+            final GPSCoordinate location = point.getLocation();
+            if (location == null || point.getTime() == null) {
+                continue;
+            }
+            if (last != null) {
+                final double seconds = (point.getTime().getTime() - last.getTime().getTime()) / 1000.0;
+                final double distance = GPSCoordinate.distanceHaversine(last.getLocation(), location);
+                if (seconds > 0 && distance / seconds <= VeepooLiveWorkoutModule.MAX_GPS_SPEED_MPS) {
+                    meters += distance;
+                }
+            }
+            last = point;
+        }
+        return meters;
+    }
+
+    /** Segments below walking pace (~1 m/s) are a standstill between fixes, not movement. */
+    private static final float MIN_MOVING_SPEED_MPS = 1f;
+
+    /**
+     * Replaces the band's distance-derived metrics with values computed from the recorded phone
+     * route: without GNSS the band estimates the distance from its steps, so its pace and speeds
+     * do not match the real distance and would be displayed next to it. Entries that cannot be
+     * recomputed are dropped rather than kept stale.
+     */
+    static void applyPhoneTrackMetrics(final ActivitySummaryData summary, final List<ActivityPoint> trackPoints,
+                                       final Date startTime, final Date stopTime) {
+        final double gpsDistanceMeters = trackDistance(trackPoints);
+        if (gpsDistanceMeters <= 0) {
+            return;
+        }
+        summary.add(ActivitySummaryEntries.DISTANCE_METERS, Math.round(gpsDistanceMeters), ActivitySummaryEntries.UNIT_METERS);
+
+        long activeSeconds = summary.getNumber(ActivitySummaryEntries.ACTIVE_SECONDS, 0L).longValue();
+        if (activeSeconds <= 0) {
+            activeSeconds = Math.max(0L, (stopTime.getTime() - startTime.getTime()) / 1000L);
+        }
+        if (activeSeconds > 0) {
+            final double kilometers = gpsDistanceMeters / 1000d;
+            summary.add(ActivitySummaryEntries.PACE_AVG_SECONDS_KM, Math.round(activeSeconds / kilometers),
+                    ActivitySummaryEntries.UNIT_SECONDS_PER_KM);
+            summary.add(ActivitySummaryEntries.SPEED_AVG, (kilometers * 3600d) / activeSeconds,
+                    ActivitySummaryEntries.UNIT_KMPH);
+        } else {
+            summary.remove(ActivitySummaryEntries.PACE_AVG_SECONDS_KM);
+            summary.remove(ActivitySummaryEntries.SPEED_AVG);
+        }
+
+        final double[] speedRangeKmH = trackSpeedRangeKmH(trackPoints);
+        if (speedRangeKmH != null) {
+            summary.add(ActivitySummaryEntries.SPEED_MAX, speedRangeKmH[0], ActivitySummaryEntries.UNIT_KMPH);
+            summary.add(ActivitySummaryEntries.SPEED_MIN, speedRangeKmH[1], ActivitySummaryEntries.UNIT_KMPH);
+        } else {
+            summary.remove(ActivitySummaryEntries.SPEED_MAX);
+            summary.remove(ActivitySummaryEntries.SPEED_MIN);
+        }
+    }
+
+    /**
+     * The maximum and minimum segment speeds of a track in km/h, using the same plausibility
+     * filter as {@link #trackDistance}; standstills are excluded from the minimum.
+     *
+     * @return {max, min}, or null when the track has no usable segment
+     */
+    static double[] trackSpeedRangeKmH(List<ActivityPoint> points) {
+        double maxMps = 0;
+        Double minMps = null;
+        ActivityPoint last = null;
+        for (ActivityPoint point : points) {
+            final GPSCoordinate location = point.getLocation();
+            if (location == null || point.getTime() == null) {
+                continue;
+            }
+            if (last != null) {
+                final double seconds = (point.getTime().getTime() - last.getTime().getTime()) / 1000.0;
+                final double distance = GPSCoordinate.distanceHaversine(last.getLocation(), location);
+                if (seconds > 0) {
+                    final double mps = distance / seconds;
+                    if (mps <= VeepooLiveWorkoutModule.MAX_GPS_SPEED_MPS) {
+                        maxMps = Math.max(maxMps, mps);
+                        if (mps >= MIN_MOVING_SPEED_MPS) {
+                            minMps = minMps == null ? mps : Math.min(minMps, mps);
+                        }
+                    }
+                }
+            }
+            last = point;
+        }
+        if (maxMps <= 0 || minMps == null) {
+            return null;
+        }
+        return new double[]{maxMps * 3.6, minMps * 3.6};
+    }
+
+    /** Maps the VeePoo ESportType value to the closest Gadgetbridge activity kind. */
+    private static ActivityKind sportTypeToKind(int type) {
+        switch (type) {
+            case 1: return ActivityKind.RUNNING;
+            case 2: return ActivityKind.WALKING;
+            case 3: return ActivityKind.INDOOR_TRACK_RUNNING;
+            case 4: return ActivityKind.INDOOR_WALKING;
+            case 5: return ActivityKind.HIKING;
+            case 6: return ActivityKind.TREADMILL;
+            case 7: return ActivityKind.CYCLING;
+            case 8: return ActivityKind.INDOOR_CYCLING;
+            case 9: return ActivityKind.ELLIPTICAL_TRAINER;
+            case 10: return ActivityKind.ROWING_MACHINE;
+            case 11: return ActivityKind.MOUNTAINEERING;
+            case 12: return ActivityKind.POOL_SWIM;
+            case 13: return ActivityKind.SIT_UPS;
+            case 14: return ActivityKind.SKIING;
+            case 15: return ActivityKind.JUMP_ROPING;
+            case 16: return ActivityKind.YOGA;
+            case 17: return ActivityKind.TABLE_TENNIS;
+            case 18: return ActivityKind.BASKETBALL;
+            case 19: return ActivityKind.VOLLEYBALL;
+            case 20: return ActivityKind.SOCCER;
+            case 21: return ActivityKind.BADMINTON;
+            case 22: return ActivityKind.TENNIS;
+            case 23: return ActivityKind.STAIR_STEPPER; // climb stairs
+            case 24: return ActivityKind.CARDIO;
+            case 25: return ActivityKind.STRENGTH_TRAINING;
+            case 26: return ActivityKind.DIVING;
+            case 27: return ActivityKind.BOXING;
+            case 30: return ActivityKind.MULTISPORT;
+            case 31: return ActivityKind.DANCE;
+            case 32: return ActivityKind.HIIT;
+            case 33: return ActivityKind.ROCK_CLIMBING;
+            case 45: return ActivityKind.RUNNING; // marathon
+            case 53: return ActivityKind.GOLF;
+            case 56: return ActivityKind.ROWING;
+            case 57: return ActivityKind.BOATING;
+            case 58: return ActivityKind.INLINE_SKATING;
+            case 62: return ActivityKind.WALKING; // strong walk
+            case 63: return ActivityKind.TREADMILL;
+            case 64: return ActivityKind.TRAIL_RUN;
+            case 65: return ActivityKind.WALKING; // race walking
+            case 66: return ActivityKind.MOUNTAIN_BIKE;
+            case 68: return ActivityKind.HIKING; // orienteering
+            case 69: return ActivityKind.FISHING;
+            case 70: return ActivityKind.HUNTING;
+            case 84: return ActivityKind.STRENGTH_TRAINING;
+            case 89: return ActivityKind.PILATES;
+            case 108: return ActivityKind.MARTIAL_ARTS;
+            case 109: return ActivityKind.TAI_CHI;
+            case 142: return ActivityKind.SNOWBOARDING;
+            case 143: return ActivityKind.SNOWBOARDING;
+            case 144: return ActivityKind.SKIING; // alpine skiing
+            case 177: return ActivityKind.RUNNING; // long distance running
+            case 178: return ActivityKind.RUNNING; // full speed run
+            case 179: return ActivityKind.RUNNING; // variable speed run
+            default: return ActivityKind.EXERCISE;
+        }
+    }
+
+    static Date dateFromParts(int year, int month, int day, int hour, int minute, int second) {
+        if (year < 2000 || year > 2100 || !isValidDatePart(month, day, hour, minute) || second > 60) {
+            return null;
+        }
+        Calendar calendar = Calendar.getInstance();
+        calendar.clear();
+        calendar.set(year, month - 1, day, hour, minute, second);
+        return calendar.getTime();
+    }
+
+    static int le16(byte[] buf, int offset) {
+        return (buf[offset] & 0xFF) | ((buf[offset + 1] & 0xFF) << 8);
+    }
+
+    static int be16(byte[] buf, int offset) {
+        return ((buf[offset] & 0xFF) << 8) | (buf[offset + 1] & 0xFF);
+    }
+
+    static long le32(byte[] buf, int offset) {
+        return (buf[offset] & 0xFFL)
+                | ((buf[offset + 1] & 0xFFL) << 8)
+                | ((buf[offset + 2] & 0xFFL) << 16)
+                | ((buf[offset + 3] & 0xFFL) << 24);
+    }
+
+    static boolean isValidDatePart(int month, int day, int hour, int minute) {
+        return month >= 1 && month <= 12
+                && day >= 1 && day <= 31
+                && hour >= 0 && hour <= 23
+                && minute >= 0 && minute <= 59;
+    }
+
+    static String hexByte(int value) {
+        return String.format("%02x", value & 0xFF);
+    }
+
+    @Override
+    public void onSendConfiguration(final String config) {
+        if (config == null) {
+            return;
+        }
+        if (config.startsWith(VeepooConstants.CONFIG_WORKOUT_START_PREFIX)) {
+            int sportType;
+            try {
+                sportType = Integer.parseInt(config.substring(VeepooConstants.CONFIG_WORKOUT_START_PREFIX.length()));
+            } catch (NumberFormatException e) {
+                LOG.warn("Invalid workout config key: {}", config);
+                return;
+            }
+            liveWorkoutModule.startWorkout(sportType);
+        } else if (VeepooConstants.CONFIG_WORKOUT_STOP.equals(config)) {
+            liveWorkoutModule.stopWorkout();
+        } else if (VeepooConstants.CONFIG_MEASURE_SPO2.equals(config)) {
+            vitalDetectModule.startSpo2Detect();
+        } else if (VeepooConstants.CONFIG_MEASURE_TEMPERATURE.equals(config)) {
+            vitalDetectModule.startTemperatureDetect();
+        } else if (VeepooConstants.CONFIG_MEASURE_STRESS.equals(config)) {
+            vitalDetectModule.startStressDetect();
+        } else if (VeepooConstants.CONFIG_MEASURE_BLOOD_PRESSURE.equals(config)) {
+            vitalDetectModule.startBpDetect();
+        } else if (VeepooConstants.CONFIG_MEASURE_BODY_COMPOSITION.equals(config)) {
+            vitalDetectModule.startBcDetect();
+        } else if (VeepooConstants.CONFIG_MEASURE_BLOOD_LIPIDS.equals(config)) {
+            vitalDetectModule.startLipidDetect();
+        } else if (VeepooConstants.CONFIG_MEASURE_ECG.equals(config)) {
+            ecgModule.startEcgDetect();
+        } else {
+            if (autoMeasureSupported) {
+                autoMeasureModule.handleConfiguration(config);
+            } else if (VeepooConstants.CONFIG_AUTO_MEASURE_SPO2.equals(config)) {
+                handleSpo2Configuration(config);
+            } else {
+                handleCustomSettingToggle(config);
+            }
+            super.onSendConfiguration(config);
+        }
+    }
+
+    /**
+     * Pushes a notification to the watch (vendor "device_msg_oprate"): fixed 20-byte 0xC2 frames,
+     * [1]=message type, [2]=payload length, [3]=total packet count, [4]=1-based index,
+     * [5]=section (1=contact name, 2=message text, 0=no contact), [6..19]=UTF-8 payload
+     * (max 14 bytes). The watch performs its own vibration and light on receipt.
+     */
+    @Override
+    public void onNotification(NotificationSpec spec) {
+        if (spec == null) {
+            return;
+        }
+        NotificationType type = spec.getType();
+        String title = firstNonEmpty(spec.getTitle(), spec.getSubject());
+        String sender = spec.getSender();
+        boolean hasSenderName = sender != null && !sender.trim().isEmpty();
+        // Google Messages (and other SMS apps) report the caller as a phone number rather than a
+        // GENERIC_SMS type; route anything carrying a phone number through the SMS layout so the
+        // watch plays its SMS pattern and shows a proper contact entry.
+        boolean smsLayout = type == NotificationType.GENERIC_SMS
+                || firstNonEmpty(spec.getPhoneNumber()).length() > 0;
+        List<byte[]> frames = new ArrayList<>();
+        if (type == NotificationType.GENERIC_PHONE) {
+            byte[] nameBytes = VeepooAlarmModule.truncateUtf8(firstNonEmpty(sender, spec.getPhoneNumber()), 12)
+                    .getBytes(StandardCharsets.UTF_8);
+            frames.add(socialMsgFrame(VeepooConstants.SOCIAL_MSG_TYPE_PHONE, 1, 1,
+                    hasSenderName ? 1 : 0, nameBytes));
+        } else if (smsLayout) {
+            String body = firstNonEmpty(spec.getBody(), spec.getTitle());
+            byte[] nameBytes = VeepooAlarmModule.truncateUtf8(firstNonEmpty(sender, spec.getPhoneNumber(), " "), 12)
+                    .getBytes(StandardCharsets.UTF_8);
+            byte[] bodyBytes = body.getBytes(StandardCharsets.UTF_8);
+            int total = Math.min(1 + (bodyBytes.length + 13) / 14, socialMsgMaxPackets);
+            frames.add(socialMsgFrame(VeepooConstants.SOCIAL_MSG_TYPE_SMS, total, 1,
+                    hasSenderName ? 1 : 0, nameBytes));
+            int offset = 0;
+            for (int index = 2; index <= total; index++) {
+                byte[] chunk = new byte[Math.min(14, bodyBytes.length - offset)];
+                System.arraycopy(bodyBytes, offset, chunk, 0, chunk.length);
+                frames.add(socialMsgFrame(VeepooConstants.SOCIAL_MSG_TYPE_SMS, total, index, 2, chunk));
+                offset += chunk.length;
+            }
+        } else {
+            String text;
+            if (title.isEmpty()) {
+                text = firstNonEmpty(spec.getBody());
+            } else if (firstNonEmpty(spec.getBody()).isEmpty()) {
+                text = title;
+            } else {
+                text = VeepooAlarmModule.truncateUtf8(title, 12) + ":" + spec.getBody();
+            }
+            byte[] bytes = text.getBytes(StandardCharsets.UTF_8);
+            if (bytes.length > 0) {
+                int msgType = mapSocialMsgType(type);
+                int total = Math.min((bytes.length + 13) / 14, socialMsgMaxPackets);
+                int offset = 0;
+                for (int index = 1; index <= total; index++) {
+                    byte[] chunk = new byte[Math.min(14, bytes.length - offset)];
+                    System.arraycopy(bytes, offset, chunk, 0, chunk.length);
+                    frames.add(socialMsgFrame(msgType, total, index, 2, chunk));
+                    offset += chunk.length;
+                }
+            }
+        }
+        if (frames.isEmpty()) {
+            return;
+        }
+        LOG.info("Pushing notification to watch: type={} frames={}", spec.getType(), frames.size());
+        try {
+            TransactionBuilder builder = performInitialized("send notification");
+            for (byte[] frame : frames) {
+                writeFrame(builder, frame);
+            }
+            builder.queue();
+        } catch (IOException e) {
+            LOG.error("Error pushing notification to watch", e);
+        }
+    }
+
+    /** Maps a Gadgetbridge notification type onto the vendor ESocailMsg value at frame [1]. */
+    private static int mapSocialMsgType(NotificationType type) {
+        switch (type) {
+            case WECHAT:
+                return VeepooConstants.SOCIAL_MSG_TYPE_WECHAT;
+            case QQ:
+                return VeepooConstants.SOCIAL_MSG_TYPE_QQ;
+            case TWITTER:
+                return VeepooConstants.SOCIAL_MSG_TYPE_TWITTER;
+            case LINKEDIN:
+                return VeepooConstants.SOCIAL_MSG_TYPE_LINKEDIN;
+            case WHATSAPP:
+                return VeepooConstants.SOCIAL_MSG_TYPE_WHATSAPP;
+            case LINE:
+                return VeepooConstants.SOCIAL_MSG_TYPE_LINE;
+            case INSTAGRAM:
+                return VeepooConstants.SOCIAL_MSG_TYPE_INSTAGRAM;
+            case SNAPCHAT:
+                return VeepooConstants.SOCIAL_MSG_TYPE_SNAPCHAT;
+            case SKYPE:
+                return VeepooConstants.SOCIAL_MSG_TYPE_SKYPE;
+            case GMAIL:
+                return VeepooConstants.SOCIAL_MSG_TYPE_GMAIL;
+            case TELEGRAM:
+                return VeepooConstants.SOCIAL_MSG_TYPE_TELEGRAM;
+            case KAKAO_TALK:
+                return VeepooConstants.SOCIAL_MSG_TYPE_KAKAOTALK;
+            case VIBER:
+                return VeepooConstants.SOCIAL_MSG_TYPE_VIBER;
+            default:
+                return VeepooConstants.SOCIAL_MSG_TYPE_OTHER;
+        }
+    }
+
+    /** Builds one 20-byte 0xC2 frame; the payload must be at most 14 UTF-8 bytes. */
+    private static byte[] socialMsgFrame(int msgType, int total, int index, int section, byte[] payload) {
+        if (payload.length > 14) {
+            throw new IllegalArgumentException("0xC2 payloads must be at most 14 bytes");
+        }
+        byte[] frame = new byte[VeepooConstants.PACKET_SIZE];
+        frame[0] = VeepooConstants.OP_SOCIAL_MESSAGE;
+        frame[1] = (byte) msgType;
+        frame[2] = (byte) payload.length;
+        frame[3] = (byte) total;
+        frame[4] = (byte) index;
+        frame[5] = (byte) section;
+        System.arraycopy(payload, 0, frame, 6, payload.length);
+        return frame;
+    }
+
+    @Override
+    public void onFindDevice(boolean start) {
+        try {
+            byte[] frame = new byte[VeepooConstants.PACKET_SIZE];
+            frame[0] = VeepooConstants.OP_FIND_DEVICE;
+            frame[1] = (byte) (start ? VeepooConstants.FIND_DEVICE_START : VeepooConstants.FIND_DEVICE_STOP);
+            TransactionBuilder builder = performInitialized("find device");
+            writeFrame(builder, frame);
+            builder.queue();
+            LOG.info("Find device: {}", start ? "start" : "stop");
+        } catch (IOException e) {
+            LOG.error("Error sending find-device command", e);
+        }
+    }
+
+    /** Status frame for 0xB5 find-device: [1] echoes the op (0x0A start / 0x0B stop) and [2] is
+     * the state (0 unsupported, 1 finding, 2 found, 3 stopped). [1]=0/2 are band-initiated
+     * find-phone events. */
+    private void handleFindDeviceAck(byte[] data) {
+        if (data.length < 2) {
+            return;
+        }
+        int operation = data[1] & 0xFF;
+        if (operation == VeepooConstants.FIND_DEVICE_START || operation == VeepooConstants.FIND_DEVICE_STOP) {
+            if (data.length >= 3) {
+                int state = data[2] & 0xFF;
+                if (state == 1) {
+                    LOG.info("Find device: finding");
+                } else if (state == 2) {
+                    LOG.info("Find device: found");
+                } else if (state == 3) {
+                    LOG.info("Find device: stopped");
+                } else if (state == 0) {
+                    LOG.warn("Find device: band reports not supported");
+                } else {
+                    LOG.debug("Find device status: op={} state={}", operation, state);
+                }
+            }
+        } else if (operation == 0 || operation == 2) {
+            LOG.info("Band-initiated find event from watch (op={})", operation);
+        } else {
+            LOG.debug("Find-device frame: op={}", operation);
+        }
+    }
+
+    @Override
+    public void onSetAlarms(ArrayList<? extends Alarm> alarms) {
+        alarmModule.onSetAlarms(alarms);
+    }
+
+    private static String firstNonEmpty(String... values) {
+        for (String value : values) {
+            if (value != null && !value.trim().isEmpty()) {
+                return value;
+            }
+        }
+        return "";
+    }
+
+    /** Mirrors the live workout state (confirmed by the device) onto the card's start/stop action. */
+    void onLiveWorkoutStateChanged(final boolean running) {
+        final DeviceCoordinator coordinator = getDevice().getDeviceCoordinator();
+        if (coordinator instanceof AbstractVeepooCoordinator) {
+            ((AbstractVeepooCoordinator) coordinator).setWorkoutRunning(running);
+        }
+    }
+
+    /**
+     * Opcode 0xD3 frame (workout history CRC, vendor "sport_model_crc_oprate"): [1]==2 means the
+     * band just finalized a workout session on its own, and any other non-zero state carries the
+     * per-day CRCs (little-endian u16 at [3+2i..4+2i]) that the vendor app compares to skip
+     * already-synced days. We never request this opcode, so every frame is a push from the band:
+     * it announces that a finished session has landed in the history, which can happen earlier
+     * than the run-state poll notices it.
+     */
+    private void handleSportCrcFrame(byte[] data) {
+        if (data.length < 3) {
+            LOG.debug("Dropping short 0xD3 frame: {} bytes ({})", data.length, hexBytes(data));
+            return;
+        }
+        int state = data[1] & 0xFF;
+        if (state == 0) {
+            LOG.debug("Workout history CRC report: the band could not read its history");
+            return;
+        }
+        final int[] crcs = new int[(data.length - 3) / 2];
+        for (int i = 0; i < crcs.length; i++) {
+            crcs[i] = le16(data, 3 + 2 * i);
+        }
+        liveWorkoutModule.onSportHistoryCrcReport(state, crcs);
+    }
+
+    /** Fetches day 0 of the workout history (called by VeepooLiveWorkoutModule's post-stop task). */
+    void startPostWorkoutFetch() {
+        synchronized (syncLock) {
+            if (fetchPhase != FetchPhase.IDLE) {
+                LOG.info("A data fetch is already running; it will pick up the finished workout");
+                return;
+            }
+            fetchPhase = FetchPhase.SPORT;
+            sportDayIndex = 0;
+        }
+        prepareFetchWindow();
+        getDevice().setBusyTask(R.string.busy_task_fetch_activity_data, getContext());
+        // The firmware only writes a stopped session into the day-0 history slot when a new
+        // phone session is established (an A1 password-confirm frame), so re-send A1+A5 in
+        // the same transaction as the day-0 read.
+        sportDayFrames.clear();
+        scheduleSportWatchdog();
+        continueFetch("fetch workout history day 0", builder -> {
+            writeFrame(builder, buildPwdConfirmTimeFrame());
+            writeFrame(builder, buildSyncTimeFrame());
+            writeFrame(builder, new byte[]{VeepooConstants.OP_SPORT_ORIGIN, (byte) 0});
+        });
+    }
+
+    static String hexBytes(byte[] bytes) {
+        StringBuilder sb = new StringBuilder();
+        for (byte b : bytes) {
+            sb.append(String.format("%02X", b));
+        }
+        return sb.toString();
+    }
+
+    /** Stores a single heart rate sample in the DB; returns it so callers can announce it. */
+    GenericHeartRateSample saveHeartRateSample(int bpm) {
+        try (DBHandler dbHandler = GBApplication.acquireDB()) {
+            DaoSession session = dbHandler.getDaoSession();
+            Long userId = DBHelper.getUser(session).getId();
+            Long deviceId = DBHelper.getDevice(getDevice(), session).getId();
+
+            GenericHeartRateSample sample = new GenericHeartRateSample();
+            sample.setTimestamp(System.currentTimeMillis());
+            sample.setHeartRate(bpm);
+            sample.setUserId(userId);
+            sample.setDeviceId(deviceId);
+            new nodomain.freeyourgadget.gadgetbridge.devices.GenericHeartRateSampleProvider(getDevice(), session).addSample(sample);
+            return sample;
+        } catch (Exception e) {
+            LOG.error("Error saving heart rate sample", e);
+            return null;
+        }
+    }
+
+    /**
+     * Announces the measured sample to listeners such as HeartRateDialog, which hides its
+     * spinner and shows the value; the user dismisses the dialog from there.
+     */
+    void notifyVitalSample(Serializable sample) {
+        Intent intent = new Intent(DeviceService.ACTION_REALTIME_SAMPLES)
+                .putExtra(GBDevice.EXTRA_DEVICE, getDevice())
+                .putExtra(DeviceService.EXTRA_REALTIME_SAMPLE, sample);
+        LocalBroadcastManager.getInstance(getContext()).sendBroadcast(intent);
+    }
+
+    @Override
+    public void onHeartRateTest() {
+        vitalDetectModule.startHeartRateDetect();
+    }
+
+    /** A7 package 1 SpO2H type values the vendor app treats as supported. */
+    private static boolean isSpo2hTypeSupported(int type) {
+        return (type >= 1 && type <= 9) || type == 0xFD || type == 0xFE || type == 0xE0;
+    }
+
+    /** Stores a SpO2 sample; returns the saved sample, or null on failure. */
+    GenericSpo2Sample saveSpo2Sample(int spo2) {
+        try (DBHandler dbHandler = GBApplication.acquireDB()) {
+            DaoSession session = dbHandler.getDaoSession();
+            Long userId = DBHelper.getUser(session).getId();
+            Long deviceId = DBHelper.getDevice(getDevice(), session).getId();
+
+            GenericSpo2Sample sample = new GenericSpo2Sample();
+            sample.setTimestamp(System.currentTimeMillis());
+            sample.setSpo2(spo2);
+            sample.setUserId(userId);
+            sample.setDeviceId(deviceId);
+            new GenericSpo2SampleProvider(getDevice(), session).addSample(sample);
+            return sample;
+        } catch (Exception e) {
+            LOG.error("Error saving SpO2 sample", e);
+            return null;
+        }
+    }
+
+    /** Result of an on-demand temperature measurement: the estimated body and the raw skin (base) readings. */
+    public static final class VeepooTemperatureMeasurementResult implements Serializable {
+        private static final long serialVersionUID = 1L;
+        public final float bodyCelsius;
+        public final Float skinCelsius;
+
+        public VeepooTemperatureMeasurementResult(float bodyCelsius, Float skinCelsius) {
+            this.bodyCelsius = bodyCelsius;
+            this.skinCelsius = skinCelsius;
+        }
+    }
+
+    /** Stores a temperature sample of the given type (TYPE_BODY or TYPE_SKIN); returns it, or null on failure. */
+    GenericTemperatureSample saveTemperatureSample(float celsius, int temperatureType) {
+        try (DBHandler dbHandler = GBApplication.acquireDB()) {
+            DaoSession session = dbHandler.getDaoSession();
+            Long userId = DBHelper.getUser(session).getId();
+            Long deviceId = DBHelper.getDevice(getDevice(), session).getId();
+
+            GenericTemperatureSample sample = new GenericTemperatureSample();
+            sample.setTimestamp(System.currentTimeMillis());
+            sample.setTemperature(celsius);
+            sample.setTemperatureType(temperatureType);
+            sample.setTemperatureLocation(TemperatureSample.LOCATION_WRIST);
+            sample.setUserId(userId);
+            sample.setDeviceId(deviceId);
+            new GenericTemperatureSampleProvider(getDevice(), session).addSample(sample);
+            return sample;
+        } catch (Exception e) {
+            LOG.error("Error saving temperature sample", e);
+            return null;
+        }
+    }
+
+    /** Stores a stress sample; returns the saved sample, or null on failure. */
+    GenericStressSample saveStressSample(int value) {
+        try (DBHandler dbHandler = GBApplication.acquireDB()) {
+            DaoSession session = dbHandler.getDaoSession();
+            Long userId = DBHelper.getUser(session).getId();
+            Long deviceId = DBHelper.getDevice(getDevice(), session).getId();
+
+            GenericStressSample sample = new GenericStressSample();
+            sample.setTimestamp(System.currentTimeMillis());
+            sample.setStress(value);
+            sample.setUserId(userId);
+            sample.setDeviceId(deviceId);
+            new GenericStressSampleProvider(getDevice(), session).addSample(sample);
+            return sample;
+        } catch (Exception e) {
+            LOG.error("Error saving stress sample", e);
+            return null;
+        }
+    }
+
+    /** Stores a blood pressure sample; returns the saved sample, or null on failure. */
+    GenericBloodPressureSample saveBpSample(int systolic, int diastolic) {
+        try (DBHandler dbHandler = GBApplication.acquireDB()) {
+            DaoSession session = dbHandler.getDaoSession();
+            Long userId = DBHelper.getUser(session).getId();
+            Long deviceId = DBHelper.getDevice(getDevice(), session).getId();
+
+            GenericBloodPressureSample sample = new GenericBloodPressureSample();
+            sample.setTimestamp(System.currentTimeMillis());
+            sample.setBpSystolic(systolic);
+            sample.setBpDiastolic(diastolic);
+            sample.setMeanArterialPressure((systolic + 2 * diastolic) / 3);
+            sample.setUserId(userId);
+            sample.setDeviceId(deviceId);
+            new GenericBloodPressureSampleProvider(getDevice(), session).addSample(sample);
+            return sample;
+        } catch (Exception e) {
+            LOG.error("Error saving blood pressure sample", e);
+            return null;
+        }
+    }
+
+    /** Stores a body composition sample; returns the saved sample, or null on failure. */
+    GenericBodyCompositionSample saveBcSample(float[] v) {
+        try (DBHandler dbHandler = GBApplication.acquireDB()) {
+            DaoSession session = dbHandler.getDaoSession();
+            Long userId = DBHelper.getUser(session).getId();
+            Long deviceId = DBHelper.getDevice(getDevice(), session).getId();
+            long timestamp = System.currentTimeMillis();
+            GenericBodyCompositionSample sample = new GenericBodyCompositionSample();
+            sample.setTimestamp(timestamp);
+            sample.setBmi(v[0]);
+            sample.setBodyFatRate(v[1]);
+            sample.setFatWeight(v[2]);
+            sample.setFfm(v[3]);
+            sample.setMuscleRate(v[4]);
+            sample.setMuscleMass(v[5]);
+            sample.setSubcutaneousFat(v[6]);
+            sample.setBodyWaterRate(v[7]);
+            sample.setWaterContent(v[8]);
+            sample.setSkeletalMuscleRate(v[9]);
+            sample.setBoneMass(v[10]);
+            sample.setProteinProportion(v[11]);
+            sample.setProteinMass(v[12]);
+            sample.setBasalMetabolicRate(v[13]);
+            sample.setUserId(userId);
+            sample.setDeviceId(deviceId);
+            new GenericBodyCompositionSampleProvider(getDevice(), session).addSample(sample);
+            saveBcWeightSample(session, userId, deviceId, timestamp, v);
+            return sample;
+        } catch (Exception e) {
+            LOG.error("Error saving body composition sample", e);
+            return null;
+        }
+    }
+
+    /**
+     * Also stores the measurement as a weight sample so the generic widgets and charts show it.
+     * The band sends finished vendor values instead of a raw impedance, so the weight is derived
+     * from the vendor's water or fat share and the composition fields carry the reported values.
+     */
+    private void saveBcWeightSample(final DaoSession session, final Long userId, final Long deviceId,
+                                    final long timestamp, final float[] v) {
+        final Float weightKg = deriveWeightKg(v);
+        if (weightKg == null) {
+            LOG.warn("body composition sample carries no usable weight, skipping the weight sample");
+            return;
+        }
+        VeepooWeightSample sample = new VeepooWeightSample();
+        sample.setTimestamp(timestamp);
+        sample.setWeightKg(weightKg);
+        sample.setBodyFatPercent(v[1]);
+        sample.setBodyWaterPercent(v[7]);
+        sample.setMuscleMassKg(v[5]);
+        sample.setBoneMassKg(v[10]);
+        sample.setBasalMetabolicRate((int) v[13]);
+        sample.setUserId(userId);
+        sample.setDeviceId(deviceId);
+        session.getVeepooWeightSampleDao().insert(sample);
+    }
+
+    /**
+     * Derives the body weight in kg from the vendor's water or fat share (e.g. 38.1 kg of water at
+     * 63.6 % is about 59.9 kg), or null when neither share yields a plausible weight.
+     */
+    static Float deriveWeightKg(final float[] v) {
+        final Float fromWater = plausibleWeight(v[8] / (v[7] / 100f), v[7] >= 30f && v[7] <= 80f && v[8] > 0);
+        if (fromWater != null) {
+            return fromWater;
+        }
+        return plausibleWeight(v[2] / (v[1] / 100f), v[1] >= 3f && v[1] <= 70f && v[2] > 0);
+    }
+
+    private static Float plausibleWeight(final float weightKg, final boolean sharePlausible) {
+        return sharePlausible && weightKg >= 20f && weightKg <= 300f ? weightKg : null;
+    }
+
+    /**
+     * Result announced to HeartRateDialog during and after an ECG measurement. {@code sampleCount}
+     * is the number of decoded waveform samples captured so far; {@code savedId} is the id of the
+     * persisted {@link nodomain.freeyourgadget.gadgetbridge.entities.VeepooEcgSample} (0 while the
+     * measurement is still running).
+     */
+    public static final class VeepooEcgMeasurementResult implements Serializable {
+        private static final long serialVersionUID = 1L;
+        public int frameCount;
+        public int sampleCount;
+        public int latestHr;
+        public int progress;
+        public int drawFrequency;
+        public long savedId;
+        /** 0 = success, otherwise a string resource id describing the failure. */
+        public int failCode;
+
+        public VeepooEcgMeasurementResult(int frameCount, int sampleCount, int latestHr,
+                                          int progress, int drawFrequency, long savedId,
+                                          int failCode) {
+            this.frameCount = frameCount;
+            this.sampleCount = sampleCount;
+            this.latestHr = latestHr;
+            this.progress = progress;
+            this.drawFrequency = drawFrequency;
+            this.savedId = savedId;
+            this.failCode = failCode;
+        }
+    }
+
+    /** Stores a blood lipid sample; returns the saved sample, or null on failure. */
+    GenericBloodLipidSample saveLipidSample(float[] v) {
+        try (DBHandler dbHandler = GBApplication.acquireDB()) {
+            DaoSession session = dbHandler.getDaoSession();
+            Long userId = DBHelper.getUser(session).getId();
+            Long deviceId = DBHelper.getDevice(getDevice(), session).getId();
+            GenericBloodLipidSample sample = new GenericBloodLipidSample();
+            sample.setTimestamp(System.currentTimeMillis());
+            sample.setUricAcid(v[0]);
+            sample.setTotalCholesterol(v[1]);
+            sample.setTriglyceride(v[2]);
+            sample.setHdl(v[3]);
+            sample.setLdl(v[4]);
+            sample.setUserId(userId);
+            sample.setDeviceId(deviceId);
+            new GenericBloodLipidSampleProvider(getDevice(), session).addSample(sample);
+            return sample;
+        } catch (Exception e) {
+            LOG.error("Error saving blood lipid sample", e);
+            return null;
+        }
+    }
+
+    /**
+     * Persist the collected origin (activity) samples. Sleep samples are persisted last so they
+     * win over overlapping activity rows within the sleep window.
+     */
+    private void persistPendingOriginDay() {
+        if (pendingOriginSamples.isEmpty() && pendingHrvSamples.isEmpty()
+                && pendingStressSamples.isEmpty()
+                && pendingOriginSpo2Samples.isEmpty() && pendingOriginBpSamples.isEmpty()
+                && pendingOriginTemperatureSamples.isEmpty() && pendingOriginGlucoseSamples.isEmpty()
+                && pendingOriginBreathSamples.isEmpty() && pendingOriginLipidSamples.isEmpty()) {
+            return;
+        }
+        List<VeepooActivitySample> batch = new ArrayList<>(pendingOriginSamples);
+        pendingOriginSamples.clear();
+        if (!batch.isEmpty()) {
+            persistSamples(batch, false);
+        }
+        persistPendingHrvSamples();
+        persistPendingStressSamples();
+        persistPendingOriginVitalsSamples();
+    }
+
+    private void persistPendingStressSamples() {
+        if (pendingStressSamples.isEmpty()) {
+            return;
+        }
+        List<GenericStressSample> batch = new ArrayList<>(pendingStressSamples);
+        pendingStressSamples.clear();
+        try (DBHandler dbHandler = GBApplication.acquireDB()) {
+            DaoSession session = dbHandler.getDaoSession();
+            long userId = DBHelper.getUser(session).getId();
+            long deviceId = DBHelper.getDevice(getDevice(), session).getId();
+            GenericStressSampleDao dao = session.getGenericStressSampleDao();
+            long from = Long.MAX_VALUE;
+            long to = Long.MIN_VALUE;
+            for (GenericStressSample sample : batch) {
+                sample.setUserId(userId);
+                sample.setDeviceId(deviceId);
+                from = Math.min(from, sample.getTimestamp());
+                to = Math.max(to, sample.getTimestamp());
+            }
+            dao.queryBuilder()
+                    .where(GenericStressSampleDao.Properties.DeviceId.eq(deviceId),
+                            GenericStressSampleDao.Properties.Timestamp.ge(from - 60_000L),
+                            GenericStressSampleDao.Properties.Timestamp.le(to + 60_000L))
+                    .buildDelete()
+                    .executeDeleteWithoutDetachingEntities();
+            dao.insertInTx(batch);
+        } catch (Exception e) {
+            LOG.error("Error saving stress samples", e);
+        }
+    }
+
+    private void persistPendingHrvSamples() {
+        if (pendingHrvSamples.isEmpty()) {
+            return;
+        }
+        List<GenericHrvValueSample> batch = new ArrayList<>(pendingHrvSamples);
+        pendingHrvSamples.clear();
+        try (DBHandler dbHandler = GBApplication.acquireDB()) {
+            DaoSession session = dbHandler.getDaoSession();
+            long userId = DBHelper.getUser(session).getId();
+            long deviceId = DBHelper.getDevice(getDevice(), session).getId();
+            GenericHrvValueSampleDao dao = session.getGenericHrvValueSampleDao();
+            long from = Long.MAX_VALUE;
+            long to = Long.MIN_VALUE;
+            for (GenericHrvValueSample sample : batch) {
+                sample.setUserId(userId);
+                sample.setDeviceId(deviceId);
+                from = Math.min(from, sample.getTimestamp());
+                to = Math.max(to, sample.getTimestamp());
+            }
+            dao.queryBuilder()
+                    .where(GenericHrvValueSampleDao.Properties.DeviceId.eq(deviceId),
+                            GenericHrvValueSampleDao.Properties.Timestamp.ge(from - 60_000L),
+                            GenericHrvValueSampleDao.Properties.Timestamp.le(to + 60_000L))
+                    .buildDelete()
+                    .executeDeleteWithoutDetachingEntities();
+            dao.insertInTx(batch);
+        } catch (Exception e) {
+            LOG.error("Error saving HRV samples", e);
+        }
+    }
+
+    /**
+     * Persist the per-record all-day vitals (SpO2, blood pressure, temperature, glucose, breath
+     * rate, lipids) collected while parsing Origin3 days. Like the HRV batch, rows inside each
+     * batch's time window are deleted first so re-syncing a day replaces instead of duplicates.
+     */
+    private void persistPendingOriginVitalsSamples() {
+        if (pendingOriginSpo2Samples.isEmpty() && pendingOriginBpSamples.isEmpty()
+                && pendingOriginTemperatureSamples.isEmpty() && pendingOriginGlucoseSamples.isEmpty()
+                && pendingOriginBreathSamples.isEmpty() && pendingOriginLipidSamples.isEmpty()) {
+            return;
+        }
+        List<GenericSpo2Sample> spo2Batch = new ArrayList<>(pendingOriginSpo2Samples);
+        List<GenericBloodPressureSample> bpBatch = new ArrayList<>(pendingOriginBpSamples);
+        List<GenericTemperatureSample> temperatureBatch = new ArrayList<>(pendingOriginTemperatureSamples);
+        List<GlucoseSample> glucoseBatch = new ArrayList<>(pendingOriginGlucoseSamples);
+        List<GenericRespiratoryRateSample> breathBatch = new ArrayList<>(pendingOriginBreathSamples);
+        List<GenericBloodLipidSample> lipidBatch = new ArrayList<>(pendingOriginLipidSamples);
+        pendingOriginSpo2Samples.clear();
+        pendingOriginBpSamples.clear();
+        pendingOriginTemperatureSamples.clear();
+        pendingOriginGlucoseSamples.clear();
+        pendingOriginBreathSamples.clear();
+        pendingOriginLipidSamples.clear();
+        try (DBHandler dbHandler = GBApplication.acquireDB()) {
+            DaoSession session = dbHandler.getDaoSession();
+            long userId = DBHelper.getUser(session).getId();
+            long deviceId = DBHelper.getDevice(getDevice(), session).getId();
+
+            if (!spo2Batch.isEmpty()) {
+                GenericSpo2SampleDao dao = session.getGenericSpo2SampleDao();
+                long from = Long.MAX_VALUE;
+                long to = Long.MIN_VALUE;
+                for (GenericSpo2Sample sample : spo2Batch) {
+                    sample.setUserId(userId);
+                    sample.setDeviceId(deviceId);
+                    from = Math.min(from, sample.getTimestamp());
+                    to = Math.max(to, sample.getTimestamp());
+                }
+                dao.queryBuilder()
+                        .where(GenericSpo2SampleDao.Properties.DeviceId.eq(deviceId),
+                                GenericSpo2SampleDao.Properties.Timestamp.ge(from - 60_000L),
+                                GenericSpo2SampleDao.Properties.Timestamp.le(to + 60_000L))
+                        .buildDelete()
+                        .executeDeleteWithoutDetachingEntities();
+                dao.insertInTx(spo2Batch);
+            }
+
+            if (!bpBatch.isEmpty()) {
+                GenericBloodPressureSampleDao dao = session.getGenericBloodPressureSampleDao();
+                long from = Long.MAX_VALUE;
+                long to = Long.MIN_VALUE;
+                for (GenericBloodPressureSample sample : bpBatch) {
+                    sample.setUserId(userId);
+                    sample.setDeviceId(deviceId);
+                    from = Math.min(from, sample.getTimestamp());
+                    to = Math.max(to, sample.getTimestamp());
+                }
+                dao.queryBuilder()
+                        .where(GenericBloodPressureSampleDao.Properties.DeviceId.eq(deviceId),
+                                GenericBloodPressureSampleDao.Properties.Timestamp.ge(from - 60_000L),
+                                GenericBloodPressureSampleDao.Properties.Timestamp.le(to + 60_000L))
+                        .buildDelete()
+                        .executeDeleteWithoutDetachingEntities();
+                dao.insertInTx(bpBatch);
+            }
+
+            if (!temperatureBatch.isEmpty()) {
+                GenericTemperatureSampleDao dao = session.getGenericTemperatureSampleDao();
+                long from = Long.MAX_VALUE;
+                long to = Long.MIN_VALUE;
+                for (GenericTemperatureSample sample : temperatureBatch) {
+                    sample.setUserId(userId);
+                    sample.setDeviceId(deviceId);
+                    from = Math.min(from, sample.getTimestamp());
+                    to = Math.max(to, sample.getTimestamp());
+                }
+                dao.queryBuilder()
+                        .where(GenericTemperatureSampleDao.Properties.DeviceId.eq(deviceId),
+                                GenericTemperatureSampleDao.Properties.Timestamp.ge(from - 60_000L),
+                                GenericTemperatureSampleDao.Properties.Timestamp.le(to + 60_000L))
+                        .buildDelete()
+                        .executeDeleteWithoutDetachingEntities();
+                dao.insertInTx(temperatureBatch);
+            }
+
+            if (!glucoseBatch.isEmpty()) {
+                GlucoseSampleDao dao = session.getGlucoseSampleDao();
+                long from = Long.MAX_VALUE;
+                long to = Long.MIN_VALUE;
+                for (GlucoseSample sample : glucoseBatch) {
+                    sample.setUserId(userId);
+                    sample.setDeviceId(deviceId);
+                    from = Math.min(from, sample.getTimestamp());
+                    to = Math.max(to, sample.getTimestamp());
+                }
+                dao.queryBuilder()
+                        .where(GlucoseSampleDao.Properties.DeviceId.eq(deviceId),
+                                GlucoseSampleDao.Properties.Timestamp.ge(from - 60_000L),
+                                GlucoseSampleDao.Properties.Timestamp.le(to + 60_000L))
+                        .buildDelete()
+                        .executeDeleteWithoutDetachingEntities();
+                dao.insertInTx(glucoseBatch);
+            }
+
+            if (!breathBatch.isEmpty()) {
+                GenericRespiratoryRateSampleDao dao = session.getGenericRespiratoryRateSampleDao();
+                long from = Long.MAX_VALUE;
+                long to = Long.MIN_VALUE;
+                for (GenericRespiratoryRateSample sample : breathBatch) {
+                    sample.setUserId(userId);
+                    sample.setDeviceId(deviceId);
+                    from = Math.min(from, sample.getTimestamp());
+                    to = Math.max(to, sample.getTimestamp());
+                }
+                dao.queryBuilder()
+                        .where(GenericRespiratoryRateSampleDao.Properties.DeviceId.eq(deviceId),
+                                GenericRespiratoryRateSampleDao.Properties.Timestamp.ge(from - 60_000L),
+                                GenericRespiratoryRateSampleDao.Properties.Timestamp.le(to + 60_000L))
+                        .buildDelete()
+                        .executeDeleteWithoutDetachingEntities();
+                dao.insertInTx(breathBatch);
+            }
+
+            if (!lipidBatch.isEmpty()) {
+                GenericBloodLipidSampleDao dao = session.getGenericBloodLipidSampleDao();
+                long from = Long.MAX_VALUE;
+                long to = Long.MIN_VALUE;
+                for (GenericBloodLipidSample sample : lipidBatch) {
+                    sample.setUserId(userId);
+                    sample.setDeviceId(deviceId);
+                    from = Math.min(from, sample.getTimestamp());
+                    to = Math.max(to, sample.getTimestamp());
+                }
+                dao.queryBuilder()
+                        .where(GenericBloodLipidSampleDao.Properties.DeviceId.eq(deviceId),
+                                GenericBloodLipidSampleDao.Properties.Timestamp.ge(from - 60_000L),
+                                GenericBloodLipidSampleDao.Properties.Timestamp.le(to + 60_000L))
+                        .buildDelete()
+                        .executeDeleteWithoutDetachingEntities();
+                dao.insertInTx(lipidBatch);
+            }
+        } catch (Exception e) {
+            LOG.error("Error saving Origin3 vital samples", e);
+        }
+    }
+
+    private void finishFetch() {
+        persistPendingOriginDay();
+        if (!pendingSleepSamples.isEmpty()) {
+            List<VeepooActivitySample> sleepBatch = new ArrayList<>(pendingSleepSamples);
+            pendingSleepSamples.clear();
+            persistSamples(sleepBatch, true);
+        }
+        persistPendingSleepSummaries();
+        if (fetchAnchorTodayMs > 0L) {
+            GBApplication.getDeviceSpecificSharedPrefs(getDevice().getAddress()).edit()
+                    .putLong(VeepooConstants.PREF_LAST_SYNC_DATE, fetchAnchorTodayMs)
+                    .apply();
+        }
+        getDevice().unsetBusyTask();
+        getDevice().sendDeviceUpdateIntent(getContext());
+        GB.signalActivityDataFinish(getDevice());
+        LOG.info("VeePoo data fetch complete");
+    }
+
+    private void abortFetch() {
+        mainHandler.removeCallbacks(sleepWatchdog);
+        mainHandler.removeCallbacks(dfWatchdog);
+        mainHandler.removeCallbacks(sportWatchdog);
+        synchronized (syncLock) {
+            fetchPhase = FetchPhase.IDLE;
+        }
+        pendingOriginSamples.clear();
+        pendingSleepSamples.clear();
+        pendingSleepSummaries.clear();
+        pendingStressSamples.clear();
+        pendingOriginSpo2Samples.clear();
+        pendingOriginBpSamples.clear();
+        pendingOriginTemperatureSamples.clear();
+        pendingOriginGlucoseSamples.clear();
+        pendingOriginBreathSamples.clear();
+        pendingOriginLipidSamples.clear();
+        sleepDayPayload.reset();
+        dfDayFrames.clear();
+        sportDayFrames.clear();
+        getDevice().unsetBusyTask();
+        getDevice().sendDeviceUpdateIntent(getContext());
+    }
+
+    private void persistSamples(List<VeepooActivitySample> samples, boolean isSleep) {
+        try (DBHandler dbHandler = GBApplication.acquireDB()) {
+            DaoSession session = dbHandler.getDaoSession();
+            User user = DBHelper.getUser(session);
+            Device device = DBHelper.getDevice(getDevice(), session);
+            nodomain.freeyourgadget.gadgetbridge.devices.veepoo.samples.VeepooActivitySampleProvider provider =
+                    new nodomain.freeyourgadget.gadgetbridge.devices.veepoo.samples.VeepooActivitySampleProvider(getDevice(), session);
+            for (VeepooActivitySample sample : samples) {
+                sample.setDevice(device);
+                sample.setUser(user);
+            }
+            provider.addGBActivitySamples(samples);
+        } catch (Exception e) {
+            LOG.error("Error saving VeePoo {} samples", isSleep ? "sleep" : "activity", e);
+        }
+        getDevice().sendDeviceUpdateIntent(getContext());
+    }
+
+    /**
+     * Persist the per-night sleep summaries collected while parsing sleep records. Rows inside
+     * each batch's time window are deleted first so re-syncing a night replaces instead of
+     * duplicates; the window is padded by two days to absorb clock/anchoring drift.
+     */
+    private void persistPendingSleepSummaries() {
+        if (pendingSleepSummaries.isEmpty()) {
+            return;
+        }
+        List<VeepooSleepSummarySample> batch = new ArrayList<>(pendingSleepSummaries);
+        pendingSleepSummaries.clear();
+        try (DBHandler dbHandler = GBApplication.acquireDB()) {
+            DaoSession session = dbHandler.getDaoSession();
+            long userId = DBHelper.getUser(session).getId();
+            long deviceId = DBHelper.getDevice(getDevice(), session).getId();
+            VeepooSleepSummarySampleDao dao = session.getVeepooSleepSummarySampleDao();
+            long from = Long.MAX_VALUE;
+            long to = Long.MIN_VALUE;
+            for (VeepooSleepSummarySample summary : batch) {
+                summary.setUserId(userId);
+                summary.setDeviceId(deviceId);
+                from = Math.min(from, summary.getTimestamp());
+                to = Math.max(to, summary.getTimestamp());
+            }
+            dao.queryBuilder()
+                    .where(VeepooSleepSummarySampleDao.Properties.DeviceId.eq(deviceId),
+                            VeepooSleepSummarySampleDao.Properties.Timestamp.ge(from - 2 * MILLIS_PER_DAY),
+                            VeepooSleepSummarySampleDao.Properties.Timestamp.le(to + 2 * MILLIS_PER_DAY))
+                    .buildDelete()
+                    .executeDeleteWithoutDetachingEntities();
+            dao.insertInTx(batch);
+        } catch (Exception e) {
+            LOG.error("Error saving VeePoo sleep summaries", e);
+        }
+    }
+
+    @Override
+    public void onSetTime() {
+        try {
+            TransactionBuilder builder = performInitialized("onSetTime");
+            writeFrame(builder, buildSyncTimeFrame());
+            builder.queue();
+        } catch (IOException e) {
+            LOG.error("Error setting time", e);
+        }
+    }
+
+    /** Receives the phone GPS fixes while a phone-initiated workout records its route. */
+    @Override
+    public void onSetGpsLocation(Location location) {
+        liveWorkoutModule.addPhoneGpsPoint(location);
+    }
+
+    @Override
+    public void dispose() {
+        liveWorkoutModule.dispose();
+        ecgModule.dispose();
+        manualDetectModule.dispose();
+        vitalDetectModule.dispose();
+        mainHandler.removeCallbacks(statusPollTask);
+        alarmModule.dispose();
+        autoMeasureModule.dispose();
+        realtimeStepsRequested = false;
+        synchronized (syncLock) {
+            fetchPhase = FetchPhase.IDLE;
+        }
+        super.dispose();
+    }
+}

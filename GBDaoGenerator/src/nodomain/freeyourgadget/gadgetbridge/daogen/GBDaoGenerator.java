@@ -243,6 +243,9 @@ public class GBDaoGenerator {
         addKeephealthActivitySample(schema, user, device);
         addKeephealthBloodPressureSample(schema, user, device);
         addKeephealthTemperatureSample(schema, user, device);
+        addVeepooActivitySample(schema, user, device);
+        addVeepooEcgSample(schema, user, device);
+        addVeepooSleepSummarySample(schema, user, device);
 
         addHuaweiActivitySample(schema, user, device);
         sampleProvidersToGenerate.add(addHuaweiStressSample(schema, user, device));
@@ -311,6 +314,7 @@ public class GBDaoGenerator {
         sampleProvidersToGenerate.add(addGenericTrainingLoadAcuteSample(schema, user, device));
         sampleProvidersToGenerate.add(addGenericTrainingLoadChronicSample(schema, user, device));
         sampleProvidersToGenerate.add(addGenericWeightSample(schema, user, device));
+        sampleProvidersToGenerate.add(addVeepooWeightSample(schema, user, device));
         sampleProvidersToGenerate.add(addGenericImpedanceSample(schema, user, device));
         sampleProvidersToGenerate.add(addGlucoseSample(schema, user, device));
         addGenericMetricsSample(schema, user, device);
@@ -1529,6 +1533,72 @@ public class GBDaoGenerator {
         addCommonTimeSampleProperties("AbstractStressSample", stressSample, user, device);
         stressSample.addIntProperty(SAMPLE_STRESS).notNull().codeBeforeGetter(OVERRIDE);
         return stressSample;
+    }
+
+    private static Entity addVeepooActivitySample(Schema schema, Entity user, Entity device) {
+        Entity activitySample = addEntity(schema, "VeepooActivitySample");
+        activitySample.implementsSerializable();
+        addCommonActivitySampleProperties("AbstractActivitySample", activitySample, user, device);
+        activitySample.addIntProperty(SAMPLE_STEPS).notNull().codeBeforeGetterAndSetter(OVERRIDE);
+        activitySample.addIntProperty(SAMPLE_RAW_KIND).notNull().codeBeforeGetterAndSetter(OVERRIDE);
+        activitySample.addIntProperty("dataSource").notNull();
+        activitySample.addIntProperty("caloriesBurnt").notNull().codeBeforeGetter(
+                """
+                        @Override
+                            public int getActiveCalories() {
+                                return caloriesBurnt;
+                            }
+                        """
+        );
+        activitySample.addIntProperty("distanceMeters").notNull();
+        addHeartRateProperties(activitySample);
+        // Aggregated from the apnea/hypoxia/cardiac-load groups of the 0xB9 Origin3 tag
+        // (five 1-byte values per group, one per minute of a five-minute record).
+        activitySample.addIntProperty("apneaCount");
+        activitySample.addIntProperty("hypoxiaMinutes");
+        activitySample.addIntProperty("hypoxiaTimeSum");
+        activitySample.addIntProperty("cardiacLoadMinutes");
+        return activitySample;
+    }
+
+    private static Entity addVeepooEcgSample(Schema schema, Entity user, Entity device) {
+        Entity ecg = addEntity(schema, "VeepooEcgSample");
+        ecg.setJavaDoc("A single Veepoo KR96 Pro single-lead ECG measurement. Holds the summary fields of a\n" +
+                "measurement plus the raw waveform as a blob of big-endian signed 24-bit samples (3 bytes each).");
+        ecg.addIdProperty();
+        Property userId = ecg.addLongProperty("userId").notNull().getProperty();
+        ecg.addToOne(user, userId);
+        Property deviceId = ecg.addLongProperty("deviceId").notNull().getProperty();
+        ecg.addToOne(device, deviceId);
+        ecg.addLongProperty("timestamp").notNull().index();
+        ecg.addIntProperty("heartRate");
+        ecg.addIntProperty("sampleRate");
+        ecg.addIntProperty("durationMs");
+        ecg.addIntProperty("sampleCount");
+        ecg.addByteArrayProperty("resultBlob");
+        ecg.addByteArrayProperty("waveform");
+        return ecg;
+    }
+
+    private static Entity addVeepooSleepSummarySample(Schema schema, Entity user, Entity device) {
+        Entity sleepSummary = addEntity(schema, "VeepooSleepSummarySample");
+        sleepSummary.setJavaDoc("A per-night Veepoo sleep summary: overall quality, wake count and (for the\n" +
+                "precision firmware dialect) the individual quality scores. One row per synced night.");
+        sleepSummary.addIdProperty();
+        Property userId = sleepSummary.addLongProperty("userId").notNull().getProperty();
+        sleepSummary.addToOne(user, userId);
+        Property deviceId = sleepSummary.addLongProperty("deviceId").notNull().getProperty();
+        sleepSummary.addToOne(device, deviceId);
+        sleepSummary.addLongProperty("timestamp").notNull().index();
+        sleepSummary.addIntProperty("durationMin").notNull();
+        sleepSummary.addIntProperty("quality");
+        sleepSummary.addIntProperty("wakeCount");
+        sleepSummary.addIntProperty("scoreGetUp");
+        sleepSummary.addIntProperty("scoreDeep");
+        sleepSummary.addIntProperty("scoreEfficiency");
+        sleepSummary.addIntProperty("scoreFallAsleep");
+        sleepSummary.addIntProperty("scoreTime");
+        return sleepSummary;
     }
 
     private static Entity addGloryFitStepsSample(Schema schema, Entity user, Entity device) {
@@ -2849,6 +2919,20 @@ public class GBDaoGenerator {
         sample.addFloatProperty(SAMPLE_WEIGHT_KG).notNull().codeBeforeGetter(OVERRIDE);
         // Raw bio-impedance in Ohms, for scales that report it (see MiScaleWeightSample).
         sample.addIntProperty(SAMPLE_IMPEDANCE_OHM).codeBeforeGetter(OVERRIDE);
+        return sample;
+    }
+
+    private static Entity addVeepooWeightSample(Schema schema, Entity user, Entity device) {
+        // Weight with the finished body-composition values reported by the Veepoo band, which
+        // sends vendor metrics instead of a raw impedance (see VeepooVitalDetectModule).
+        Entity sample = addEntity(schema, "VeepooWeightSample");
+        addCommonTimeSampleProperties("AbstractVeepooWeightSample", sample, user, device);
+        sample.addFloatProperty(SAMPLE_WEIGHT_KG).notNull().codeBeforeGetter(OVERRIDE);
+        sample.addFloatProperty("bodyFatPercent");
+        sample.addFloatProperty("bodyWaterPercent");
+        sample.addFloatProperty("muscleMassKg");
+        sample.addFloatProperty("boneMassKg");
+        sample.addIntProperty("basalMetabolicRate");
         return sample;
     }
 
