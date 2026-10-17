@@ -1,7 +1,7 @@
 package nodomain.freeyourgadget.gadgetbridge.devices.garmin
 
 import nodomain.freeyourgadget.gadgetbridge.database.DBHelper
-import nodomain.freeyourgadget.gadgetbridge.devices.GarminEstimatedSleepStageSampleProvider
+import nodomain.freeyourgadget.gadgetbridge.devices.GenericEstimatedSleepStageSampleProvider
 import nodomain.freeyourgadget.gadgetbridge.entities.GarminEventSample
 import nodomain.freeyourgadget.gadgetbridge.model.ActivityKind
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.RawSleepStream
@@ -11,6 +11,7 @@ import nodomain.freeyourgadget.gadgetbridge.test.TestBase
 import nodomain.freeyourgadget.gadgetbridge.util.sleep.EstimatedSleepSession
 import nodomain.freeyourgadget.gadgetbridge.util.sleep.EstimatedStage
 import nodomain.freeyourgadget.gadgetbridge.util.sleep.EstimatedStageSpan
+import nodomain.freeyourgadget.gadgetbridge.util.sleep.RawSleepNights
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -61,7 +62,7 @@ class GarminEstimatedSleepTest : TestBase() {
             remThreshold = 0.6f,
         )
         events.deleteFakedSleepEvents(at(0).toEpochMilli(), at(180).toEpochMilli())
-        assertTrue(GarminEstimatedSleepStageSampleProvider(device, daoSession).persistSamples(RawSleepStream.stageSamples(night), null))
+        assertTrue(GenericEstimatedSleepStageSampleProvider(device, daoSession).persistSamples(RawSleepNights.stageSamples(night), null))
         assertTrue(events.persistSamples(RawSleepStream.sleepEvents(night), null))
 
         val samples = GarminActivitySampleProvider(device, daoSession)
@@ -78,5 +79,14 @@ class GarminEstimatedSleepTest : TestBase() {
         val partial = GarminActivitySampleProvider(device, daoSession)
             .getAllActivitySamples(at(0).epochSecond.toInt(), at(100).epochSecond.toInt())
         assertEquals(ActivityKind.REM_SLEEP, partial.single { it.timestamp.toLong() == at(95).epochSecond }.kind)
+
+        val sleepSession = GarminSleepSessionProvider(device, daoSession)
+            .getSleepSessions(at(0).epochSecond.toInt(), at(200).epochSecond.toInt())
+            .single()
+        assertEquals(at(30).toEpochMilli(), sleepSession.startTime)
+        assertEquals(
+            listOf(ActivityKind.LIGHT_SLEEP, ActivityKind.DEEP_SLEEP, ActivityKind.REM_SLEEP),
+            sleepSession.stages.map { it.kind },
+        )
     }
 }

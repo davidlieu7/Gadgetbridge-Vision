@@ -17,8 +17,8 @@
 package nodomain.freeyourgadget.gadgetbridge.devices.garmin
 
 import nodomain.freeyourgadget.gadgetbridge.database.DBHelper
-import nodomain.freeyourgadget.gadgetbridge.devices.GarminEstimatedSleepStageSampleProvider
-import nodomain.freeyourgadget.gadgetbridge.devices.GarminRawSleepSampleProvider
+import nodomain.freeyourgadget.gadgetbridge.devices.GenericEstimatedSleepStageSampleProvider
+import nodomain.freeyourgadget.gadgetbridge.devices.GenericRawSleepSampleProvider
 import nodomain.freeyourgadget.gadgetbridge.devices.GarminSleepStageSampleProvider
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice
 import nodomain.freeyourgadget.gadgetbridge.model.ActivityKind
@@ -203,8 +203,8 @@ class GarminRawSleepFitImportTest : TestBase() {
             estimatedEvents(device),
         )
         assertEquals(
-            expected.stages.size,
-            GarminEstimatedSleepStageSampleProvider(device, daoSession).getAllSamples(0, Long.MAX_VALUE).size
+            expected.stages.size + 1,
+            GenericEstimatedSleepStageSampleProvider(device, daoSession).getAllSamples(0, Long.MAX_VALUE).size
         )
         assertTrue(
             "the watch's own stage table is left alone",
@@ -212,7 +212,7 @@ class GarminRawSleepFitImportTest : TestBase() {
         )
         assertEquals(
             minutes.size,
-            GarminRawSleepSampleProvider(device, daoSession).getAllSamples(0, Long.MAX_VALUE).size
+            GenericRawSleepSampleProvider(device, daoSession).getAllSamples(0, Long.MAX_VALUE).size
         )
 
         // What the charts read: sleep inside the session, none before or after it
@@ -246,7 +246,7 @@ class GarminRawSleepFitImportTest : TestBase() {
         assertEquals(
             "raw minutes of a staging watch are not kept",
             0,
-            GarminRawSleepSampleProvider(device, daoSession).getAllSamples(0, Long.MAX_VALUE).size
+            GenericRawSleepSampleProvider(device, daoSession).getAllSamples(0, Long.MAX_VALUE).size
         )
         assertEquals(ActivityKind.DEEP_SLEEP, kindAt(device, bedtime.plusSeconds(90 * 60)))
     }

@@ -16,13 +16,11 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 package nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit
 
-import nodomain.freeyourgadget.gadgetbridge.entities.GarminEstimatedSleepStageSample
 import nodomain.freeyourgadget.gadgetbridge.entities.GarminEventSample
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.enums.Event
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.enums.EventType
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.enums.SleepLevel
 import nodomain.freeyourgadget.gadgetbridge.util.sleep.EstimatedSleepSession
-import nodomain.freeyourgadget.gadgetbridge.util.sleep.EstimatedStage
 import nodomain.freeyourgadget.gadgetbridge.util.sleep.SleepMinute
 import nodomain.freeyourgadget.gadgetbridge.util.sleep.SleepMinuteKind
 import java.time.Instant
@@ -89,20 +87,6 @@ class RawSleepStream {
          */
         const val ESTIMATED_SLEEP_DATA = -2L
 
-        /**
-         * Stage rows as Garmin stores them, each at the end of the span it covers, see
-         * GarminActivitySampleProvider#overlaySleep, but in a table of their own so the
-         * watch's own stages are never overwritten or deleted.
-         */
-        @JvmStatic
-        fun stageSamples(session: EstimatedSleepSession): List<GarminEstimatedSleepStageSample> =
-            session.stages.map { span ->
-                GarminEstimatedSleepStageSample().apply {
-                    timestamp = span.end.toEpochMilli()
-                    stage = levelOf(span.stage).num
-                }
-            }
-
         /** Sleep start at the onset and stop at the end, as a watch that stages sleep sends them, marked as estimated. */
         @JvmStatic
         fun sleepEvents(session: EstimatedSleepSession): List<GarminEventSample> =
@@ -116,14 +100,6 @@ class RawSleepStream {
             setEvent(Event.DETECT_SLEEP)
             setEventType(type)
             data = ESTIMATED_SLEEP_DATA
-        }
-
-        private fun levelOf(stage: EstimatedStage): SleepLevel = when (stage) {
-            EstimatedStage.AWAKE -> SleepLevel.AWAKE
-            EstimatedStage.LIGHT -> SleepLevel.LIGHT
-            EstimatedStage.DEEP -> SleepLevel.DEEP
-            EstimatedStage.REM -> SleepLevel.REM
-            EstimatedStage.UNKNOWN -> SleepLevel.UNMEASURABLE
         }
     }
 }

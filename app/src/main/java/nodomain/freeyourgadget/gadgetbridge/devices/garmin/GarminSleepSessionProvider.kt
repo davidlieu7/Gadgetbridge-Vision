@@ -1,8 +1,8 @@
 package nodomain.freeyourgadget.gadgetbridge.devices.garmin
 
-import nodomain.freeyourgadget.gadgetbridge.devices.GarminEstimatedSleepStageSampleProvider
 import nodomain.freeyourgadget.gadgetbridge.devices.GarminNapSampleProvider
 import nodomain.freeyourgadget.gadgetbridge.devices.GarminSleepStageSampleProvider
+import nodomain.freeyourgadget.gadgetbridge.devices.GenericEstimatedSleepStageSampleProvider
 import nodomain.freeyourgadget.gadgetbridge.devices.SleepSessionProvider
 import nodomain.freeyourgadget.gadgetbridge.entities.DaoSession
 import nodomain.freeyourgadget.gadgetbridge.entities.GarminNapSample
@@ -13,6 +13,7 @@ import nodomain.freeyourgadget.gadgetbridge.model.SleepStage
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.RawSleepStream
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.enums.SleepLevel
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.fieldDefinitions.FieldDefinitionSleepLevel
+import nodomain.freeyourgadget.gadgetbridge.util.sleep.RawSleepNights
 
 class GarminSleepSessionProvider(
     private val device: GBDevice,
@@ -29,7 +30,7 @@ class GarminSleepSessionProvider(
         val sleepEventSamples = eventSampleProvider.getSleepEvents(fromMillis, toMillis)
         if (!sleepEventSamples.isEmpty()) {
             val sleepStagesSampleProvider = GarminSleepStageSampleProvider(device, session)
-            val estimatedStagesSampleProvider = GarminEstimatedSleepStageSampleProvider(device, session)
+            val estimatedStagesSampleProvider = GenericEstimatedSleepStageSampleProvider(device, session)
 
             var sessionStart = -1L
             var sessionEnd = -1L
@@ -49,19 +50,21 @@ class GarminSleepSessionProvider(
 
                 if (sessionStart > 0 && sessionEnd > 0) {
                     // Stages estimated from raw sleep data (#4048) are in a table of their own
-                    val stageSamples: List<Pair<Long, Int>> = if (sessionEstimated) {
-                        estimatedStagesSampleProvider.getAllSamples(sessionStart, sessionEnd + 1L).map { it.timestamp to it.stage }
+                    val stageSamples: List<Pair<Long, ActivityKind>> = if (sessionEstimated) {
+                        estimatedStagesSampleProvider.getAllSamples(sessionStart, sessionEnd + 1L)
+                            .filter { it.stage != RawSleepNights.ONSET }
+                            .map { it.timestamp to estimatedToActivityKind(it.stage) }
                     } else {
-                        sleepStagesSampleProvider.getAllSamples(sessionStart, sessionEnd + 1L).map { it.timestamp to it.stage }
+                        sleepStagesSampleProvider.getAllSamples(sessionStart, sessionEnd + 1L).map { it.timestamp to fiSleepToActivityKind(it.stage) }
                     }
                     val stages = ArrayList<SleepStage>(stageSamples.size)
                     if (!stageSamples.isEmpty()) {
                         // GarminStageSamples are upper bound of the stage
                         var previousTs = sessionStart
-                        for ((timestamp, stage) in stageSamples) {
+                        for ((timestamp, kind) in stageSamples) {
                             stages.add(
                                 SleepStage(
-                                    fiSleepToActivityKind(stage),
+                                    kind,
                                     previousTs,
                                     timestamp
                                 )
@@ -115,5 +118,12 @@ class GarminSleepSessionProvider(
                 else -> ActivityKind.SLEEP_ANY
             }
         }
+
+        /** As [fiSleepToActivityKind], for a stage code from [RawSleepNights]. */
+        private fun estimatedToActivityKind(stage: Int): ActivityKind =
+            when (val kind = RawSleepNights.activityKindOfStored(stage)) {
+                ActivityKind.UNKNOWN -> ActivityKind.SLEEP_ANY
+                else -> kind
+            }
     }
 }

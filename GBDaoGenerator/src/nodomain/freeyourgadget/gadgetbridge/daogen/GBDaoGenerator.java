@@ -110,7 +110,7 @@ public class GBDaoGenerator {
             outputDir.mkdirs();
         }
 
-        final Schema schema = new Schema(157, MAIN_PACKAGE + ".entities");
+        final Schema schema = new Schema(158, MAIN_PACKAGE + ".entities");
 
         final List<Entity> sampleProvidersToGenerate = new LinkedList<>();
         final List<Entity> batterySampleProvidersToGenerate = new LinkedList<>();
@@ -199,8 +199,8 @@ public class GBDaoGenerator {
         sampleProvidersToGenerate.add(addGarminSolarChargeSample(schema, user, device));
         sampleProvidersToGenerate.add(addGarminSpo2Sample(schema, user, device));
         sampleProvidersToGenerate.add(addGarminSleepStageSample(schema, user, device));
-        sampleProvidersToGenerate.add(addGarminRawSleepSample(schema, user, device));
-        sampleProvidersToGenerate.add(addGarminEstimatedSleepStageSample(schema, user, device));
+        sampleProvidersToGenerate.add(addGenericRawSleepSample(schema, user, device));
+        sampleProvidersToGenerate.add(addGenericEstimatedSleepStageSample(schema, user, device));
         addGarminEventSample(schema, user, device);
         sampleProvidersToGenerate.add(addGarminHrvSummarySample(schema, user, device));
         sampleProvidersToGenerate.add(addGarminHrvValueSample(schema, user, device));
@@ -1230,16 +1230,16 @@ public class GBDaoGenerator {
         return sleepStageSample;
     }
 
-    private static Entity addGarminEstimatedSleepStageSample(Schema schema, Entity user, Entity device) {
-        Entity estimatedSleepStageSample = addEntity(schema, "GarminEstimatedSleepStageSample");
+    private static Entity addGenericEstimatedSleepStageSample(Schema schema, Entity user, Entity device) {
+        Entity estimatedSleepStageSample = addEntity(schema, "GenericEstimatedSleepStageSample");
         addCommonTimeSampleProperties("AbstractTimeSample", estimatedSleepStageSample, user, device);
         estimatedSleepStageSample.addIntProperty("stage").notNull()
-                .javaDocGetterAndSetter("A sleep stage estimated from raw sleep data, as in GarminSleepStageSample.");
+                .javaDocGetterAndSetter("ActivityKind code of the stage ending at this timestamp; NOT_MEASURED marks the onset of a session.");
         return estimatedSleepStageSample;
     }
 
-    private static Entity addGarminRawSleepSample(Schema schema, Entity user, Entity device) {
-        Entity rawSleepSample = addEntity(schema, "GarminRawSleepSample");
+    private static Entity addGenericRawSleepSample(Schema schema, Entity user, Entity device) {
+        Entity rawSleepSample = addEntity(schema, "GenericRawSleepSample");
         addCommonTimeSampleProperties("AbstractTimeSample", rawSleepSample, user, device);
         rawSleepSample.addIntProperty("kind").notNull()
                 .javaDocGetterAndSetter("Per SleepMinuteKind code: raw heart rate and movement, awake or unmeasurable.");

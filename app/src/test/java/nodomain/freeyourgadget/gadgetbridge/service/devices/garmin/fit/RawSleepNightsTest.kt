@@ -1,7 +1,7 @@
 package nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit
 
 import nodomain.freeyourgadget.gadgetbridge.database.DBHelper
-import nodomain.freeyourgadget.gadgetbridge.devices.GarminEstimatedSleepStageSampleProvider
+import nodomain.freeyourgadget.gadgetbridge.devices.GenericEstimatedSleepStageSampleProvider
 import nodomain.freeyourgadget.gadgetbridge.devices.GarminSleepStageSampleProvider
 import nodomain.freeyourgadget.gadgetbridge.devices.garmin.GarminEventSampleProvider
 import nodomain.freeyourgadget.gadgetbridge.entities.GarminEventSample
@@ -12,7 +12,6 @@ import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.enums.Eve
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.enums.SleepLevel
 import nodomain.freeyourgadget.gadgetbridge.test.TestBase
 import nodomain.freeyourgadget.gadgetbridge.util.sleep.EstimatedSleepSession
-import nodomain.freeyourgadget.gadgetbridge.util.sleep.RawSleepNights
 import nodomain.freeyourgadget.gadgetbridge.util.sleep.SleepMinute
 import nodomain.freeyourgadget.gadgetbridge.util.sleep.SleepMinuteKind
 import nodomain.freeyourgadget.gadgetbridge.util.sleep.SleepStageEstimator
@@ -76,13 +75,13 @@ class RawSleepNightsTest : TestBase() {
     }
 
     private fun import(device: GBDevice, minutes: List<SleepMinute>) =
-        RawSleepNights.importMinutes(device, daoSession, null, minutes)
+        GarminRawSleepNights.importMinutes(device, daoSession, null, minutes)
 
     private fun sleepEvents(device: GBDevice): List<GarminEventSample> =
         GarminEventSampleProvider(device, daoSession).getSleepEvents(0, Long.MAX_VALUE).sortedBy { it.timestamp }
 
     private fun stageCount(device: GBDevice): Int =
-        GarminEstimatedSleepStageSampleProvider(device, daoSession).getAllSamples(0, Long.MAX_VALUE).size
+        GenericEstimatedSleepStageSampleProvider(device, daoSession).getAllSamples(0, Long.MAX_VALUE).size
 
     /** The device holds exactly [expected]: a START and a STOP per session, and their stages. */
     private fun assertStored(expected: List<EstimatedSleepSession>, device: GBDevice) {
@@ -90,7 +89,7 @@ class RawSleepNightsTest : TestBase() {
             expected.flatMap { listOf(it.onset.toEpochMilli() to EventType.START.num, it.end.toEpochMilli() to EventType.STOP.num) },
             sleepEvents(device).map { it.timestamp to it.eventType },
         )
-        assertEquals(expected.sumOf { it.stages.size }, stageCount(device))
+        assertEquals(expected.sumOf { it.stages.size + 1 }, stageCount(device))
     }
 
     @Test
@@ -201,7 +200,7 @@ class RawSleepNightsTest : TestBase() {
             listOf(estimate.onset.toEpochMilli(), estimate.end.toEpochMilli()),
             sleepEvents(device).filter { it.data == RawSleepStream.ESTIMATED_SLEEP_DATA }.map { it.timestamp },
         )
-        assertEquals(estimate.stages.size, stageCount(device))
+        assertEquals(estimate.stages.size + 1, stageCount(device))
     }
 
     @Test

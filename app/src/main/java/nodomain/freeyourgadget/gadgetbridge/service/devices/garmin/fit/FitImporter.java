@@ -136,7 +136,6 @@ import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.messages.
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.messages.FitUserProfile;
 import nodomain.freeyourgadget.gadgetbridge.util.FileUtils;
 import nodomain.freeyourgadget.gadgetbridge.util.GB;
-import nodomain.freeyourgadget.gadgetbridge.util.sleep.RawSleepNights;
 
 public class FitImporter {
     private static final Logger LOG = LoggerFactory.getLogger(FitImporter.class);
@@ -920,7 +919,7 @@ public class FitImporter {
      * As per #4048, devices that do not have a sleep widget send raw sleep samples instead of sleep
      * stages (the stages they report are all awake or unmeasurable). Their raw stream runs around
      * the clock and is cut into a new file at midnight and at every sync, so sleep is estimated
-     * from the stored minutes of all the files around this one, see {@link RawSleepNights}.
+     * from the stored minutes of all the files around this one, see {@link GarminRawSleepNights}.
      */
     private void processRawSleepSamples(final DaoSession session) {
         if (rawSleepStream.getRawCount() == 0) {
@@ -935,7 +934,7 @@ public class FitImporter {
         }
 
         try {
-            RawSleepNights.importMinutes(gbDevice, session, context, rawSleepStream.minutes());
+            GarminRawSleepNights.INSTANCE.importMinutes(gbDevice, session, context, rawSleepStream.minutes());
         } catch (final Exception e) {
             GB.toast(context, "Error estimating sleep", Toast.LENGTH_LONG, GB.ERROR, e);
         }

@@ -8,6 +8,8 @@ import nodomain.freeyourgadget.gadgetbridge.util.sleep.EstimatedStage
 import nodomain.freeyourgadget.gadgetbridge.util.sleep.EstimatedStageSpan
 import nodomain.freeyourgadget.gadgetbridge.util.sleep.SleepMinuteKind
 import nodomain.freeyourgadget.gadgetbridge.util.sleep.SleepStageEstimator
+import nodomain.freeyourgadget.gadgetbridge.util.sleep.RawSleepNights
+import nodomain.freeyourgadget.gadgetbridge.model.ActivityKind
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNotNull
 import org.junit.Assert.assertNull
@@ -98,11 +100,11 @@ class RawSleepStreamTest {
             span(t, 60, 90, EstimatedStage.REM),
         )
 
-        val samples = RawSleepStream.stageSamples(night)
+        val samples = RawSleepNights.stageSamples(night)
 
-        assertEquals(listOf(20L, 50L, 55L, 60L, 90L), samples.map { (it.timestamp / 1000 - start) / 60 })
+        assertEquals(listOf(0L, 20L, 50L, 55L, 60L, 90L), samples.map { (it.timestamp / 1000 - start) / 60 })
         assertEquals(
-            listOf(SleepLevel.LIGHT, SleepLevel.DEEP, SleepLevel.AWAKE, SleepLevel.UNMEASURABLE, SleepLevel.REM).map { it.num },
+            listOf(RawSleepNights.ONSET) + listOf(ActivityKind.LIGHT_SLEEP, ActivityKind.DEEP_SLEEP, ActivityKind.AWAKE_SLEEP, ActivityKind.UNKNOWN, ActivityKind.REM_SLEEP).map { it.code },
             samples.map { it.stage },
         )
     }
@@ -131,12 +133,12 @@ class RawSleepStreamTest {
         val night = SleepStageEstimator.estimate(stream.minutes())
         assertNotNull(night)
         night!!
-        val samples = RawSleepStream.stageSamples(night)
+        val samples = RawSleepNights.stageSamples(night)
 
         assertEquals(night.end.toEpochMilli(), samples.last().timestamp)
         assertTrue(samples.zipWithNext().all { (a, b) -> a.timestamp < b.timestamp })
-        assertTrue(samples.any { it.stage == SleepLevel.DEEP.num })
-        assertTrue(samples.any { it.stage == SleepLevel.REM.num })
+        assertTrue(samples.any { it.stage == ActivityKind.DEEP_SLEEP.code })
+        assertTrue(samples.any { it.stage == ActivityKind.REM_SLEEP.code })
     }
 
     private fun nightHeartRate(index: Int): Float {
