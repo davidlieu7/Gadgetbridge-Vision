@@ -688,6 +688,12 @@ class HealthConnectUtils {
                                 currentSliceStartTs, currentSliceEndTs, grantedPermissions, activityBasedSamples
                             ))
                         }
+                        if (gbDevice.deviceCoordinator.supportsTotalCalories(gbDevice)) {
+                            sliceStats.add(TotalCaloriesSyncer.sync(
+                                healthConnectClient, gbDevice, metadata, offset,
+                                currentSliceStartTs, currentSliceEndTs, grantedPermissions, activityBasedSamples
+                            ))
+                        }
                         if (gbDevice.deviceCoordinator.supportsActivityDistance(gbDevice)) {
                             sliceStats.add(DistanceSyncer.sync(
                                 healthConnectClient, gbDevice, metadata, offset,
