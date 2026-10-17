@@ -165,10 +165,7 @@ class WeightMeasurementsActivity : AbstractGBActivity() {
         private var pastThreshold = false
 
         override fun getSwipeDirs(recyclerView: RecyclerView, viewHolder: RecyclerView.ViewHolder): Int =
-            when (val item = adapter.itemAt(viewHolder.bindingAdapterPosition)) {
-                is Item.Measurement -> if (item.row.manual) super.getSwipeDirs(recyclerView, viewHolder) else 0
-                else -> 0
-            }
+            if (adapter.itemAt(viewHolder.bindingAdapterPosition) is Item.Measurement) super.getSwipeDirs(recyclerView, viewHolder) else 0
 
         override fun getSwipeThreshold(viewHolder: RecyclerView.ViewHolder) = SWIPE_THRESHOLD
 
@@ -177,7 +174,7 @@ class WeightMeasurementsActivity : AbstractGBActivity() {
         override fun onSwiped(viewHolder: RecyclerView.ViewHolder, direction: Int) {
             pastThreshold = false
             val item = adapter.itemAt(viewHolder.bindingAdapterPosition) as? Item.Measurement ?: return
-            controller.delete(item.row.timestamp)
+            controller.delete(item.row)
         }
 
         override fun onChildDraw(

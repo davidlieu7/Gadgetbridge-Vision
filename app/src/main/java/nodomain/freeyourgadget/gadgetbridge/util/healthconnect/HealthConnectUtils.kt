@@ -263,26 +263,7 @@ class HealthConnectUtils {
             LOG.info("$HC_SYNC_TAG Starting sync for device: {}", gbDevice.aliasOrName)
 
             val deviceCoordinator = gbDevice.deviceCoordinator
-            val manufacturer = deviceCoordinator.manufacturer
-            var deviceName = context.getString(deviceCoordinator.deviceNameResource)
-            if (deviceName.startsWith(manufacturer) && deviceName != manufacturer) {
-                deviceName = deviceName.replace(manufacturer, "").trim();
-            }
-            val device = Device(
-                type = when (deviceCoordinator.getDeviceKind(gbDevice)) {
-                    DeviceCoordinator.DeviceKind.WATCH -> Device.TYPE_WATCH
-                    DeviceCoordinator.DeviceKind.PHONE -> Device.TYPE_PHONE
-                    DeviceCoordinator.DeviceKind.SCALE -> Device.TYPE_SCALE
-                    DeviceCoordinator.DeviceKind.RING -> Device.TYPE_RING
-                    DeviceCoordinator.DeviceKind.HEAD_MOUNTED -> Device.TYPE_HEAD_MOUNTED
-                    DeviceCoordinator.DeviceKind.FITNESS_BAND -> Device.TYPE_FITNESS_BAND
-                    DeviceCoordinator.DeviceKind.CHEST_STRAP -> Device.TYPE_CHEST_STRAP
-                    DeviceCoordinator.DeviceKind.SMART_DISPLAY -> Device.TYPE_SMART_DISPLAY
-                    else -> Device.TYPE_UNKNOWN
-                },
-                manufacturer = manufacturer,
-                model = deviceName
-            )
+            val device = healthConnectDevice(context, gbDevice)
 
             dataTypeLoop@ for (dataType in HealthConnectPermissionManager.HealthConnectDataType.entries) {
                 // Check if worker has been canceled
@@ -907,6 +888,33 @@ class HealthConnectUtils {
         }
 
         @Throws(SyncException::class)
+        /**
+         * The Health Connect device that records of [gbDevice] are written with.
+         */
+        internal fun healthConnectDevice(context: Context, gbDevice: GBDevice): Device {
+            val deviceCoordinator = gbDevice.deviceCoordinator
+            val manufacturer = deviceCoordinator.manufacturer
+            var deviceName = context.getString(deviceCoordinator.deviceNameResource)
+            if (deviceName.startsWith(manufacturer) && deviceName != manufacturer) {
+                deviceName = deviceName.replace(manufacturer, "").trim();
+            }
+            return Device(
+                type = when (deviceCoordinator.getDeviceKind(gbDevice)) {
+                    DeviceCoordinator.DeviceKind.WATCH -> Device.TYPE_WATCH
+                    DeviceCoordinator.DeviceKind.PHONE -> Device.TYPE_PHONE
+                    DeviceCoordinator.DeviceKind.SCALE -> Device.TYPE_SCALE
+                    DeviceCoordinator.DeviceKind.RING -> Device.TYPE_RING
+                    DeviceCoordinator.DeviceKind.HEAD_MOUNTED -> Device.TYPE_HEAD_MOUNTED
+                    DeviceCoordinator.DeviceKind.FITNESS_BAND -> Device.TYPE_FITNESS_BAND
+                    DeviceCoordinator.DeviceKind.CHEST_STRAP -> Device.TYPE_CHEST_STRAP
+                    DeviceCoordinator.DeviceKind.SMART_DISPLAY -> Device.TYPE_SMART_DISPLAY
+                    else -> Device.TYPE_UNKNOWN
+                },
+                manufacturer = manufacturer,
+                model = deviceName
+            )
+        }
+
         internal suspend fun insertRecords(records: List<Record>, healthConnectClient: HealthConnectClient) {
             if (records.isEmpty()) {
                 return

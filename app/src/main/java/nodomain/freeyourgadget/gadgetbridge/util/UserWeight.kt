@@ -2,10 +2,12 @@ package nodomain.freeyourgadget.gadgetbridge.util
 
 import nodomain.freeyourgadget.gadgetbridge.GBApplication
 import nodomain.freeyourgadget.gadgetbridge.database.DBHelper
+import nodomain.freeyourgadget.gadgetbridge.devices.AbstractTimeSampleProvider
 import nodomain.freeyourgadget.gadgetbridge.devices.GenericWeightSampleProvider
 import nodomain.freeyourgadget.gadgetbridge.devices.ManualWeightSampleProvider
 import nodomain.freeyourgadget.gadgetbridge.devices.TimeSampleProvider
 import nodomain.freeyourgadget.gadgetbridge.devices.WeightWithManualSampleProvider
+import nodomain.freeyourgadget.gadgetbridge.entities.AbstractTimeSample
 import nodomain.freeyourgadget.gadgetbridge.entities.DaoSession
 import nodomain.freeyourgadget.gadgetbridge.entities.ManualWeightSample
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice
@@ -80,6 +82,22 @@ object UserWeight {
     fun deleteRecord(session: DaoSession, timestampMillis: Long): ManualWeightSample? {
         val manual = ManualWeightSampleProvider(session)
         return manual.get(timestampMillis)?.also { manual.delete(timestampMillis) }
+    }
+
+    /**
+     * Deletes the reading of [device] at [timestampMillis] and returns it so it can be restored.
+     */
+    @JvmStatic
+    fun deleteDeviceRecord(session: DaoSession, device: GBDevice, timestampMillis: Long): AbstractTimeSample? {
+        val provider = device.deviceCoordinator.getWeightSampleProvider(device, session) as? AbstractTimeSampleProvider<*> ?: return null
+        val sample = provider.getAllSamples(timestampMillis, timestampMillis).firstOrNull() ?: return null
+        provider.deleteSamples(timestampMillis)
+        return sample
+    }
+
+    @JvmStatic
+    fun restoreDeviceRecord(session: DaoSession, sample: AbstractTimeSample) {
+        session.insertOrReplace(sample)
     }
 
     @JvmStatic

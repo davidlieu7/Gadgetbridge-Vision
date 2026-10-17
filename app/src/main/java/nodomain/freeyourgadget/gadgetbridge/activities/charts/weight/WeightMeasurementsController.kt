@@ -15,10 +15,12 @@ import com.google.android.material.snackbar.Snackbar
 import nodomain.freeyourgadget.gadgetbridge.GBApplication
 import nodomain.freeyourgadget.gadgetbridge.R
 import nodomain.freeyourgadget.gadgetbridge.activities.charts.WeightEntryBottomSheet
+import nodomain.freeyourgadget.gadgetbridge.entities.AbstractTimeSample
 import nodomain.freeyourgadget.gadgetbridge.entities.DaoSession
 import nodomain.freeyourgadget.gadgetbridge.entities.ManualWeightSample
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice
 import nodomain.freeyourgadget.gadgetbridge.model.ActivityUser
+import nodomain.freeyourgadget.gadgetbridge.model.WeightSample
 import nodomain.freeyourgadget.gadgetbridge.model.WeightUnit
 import nodomain.freeyourgadget.gadgetbridge.util.UserWeight
 import nodomain.freeyourgadget.gadgetbridge.util.healthconnect.HealthConnectWeightDeletion
@@ -66,22 +68,42 @@ class WeightMeasurementsController(
         WeightEntryBottomSheet.newEditInstance(unit, row.weightKg, row.timestamp).show(fragmentManager, WeightEntryBottomSheet.TAG)
     }
 
-    fun delete(timestamp: Long) {
+    fun delete(row: WeightMeasurementRow) {
+        if (row.manual) deleteManual(row.timestamp) else deleteReading(row.timestamp)
+    }
+
+    private fun deleteManual(timestamp: Long) {
         var deleted: ManualWeightSample? = null
         change({ session -> deleted = UserWeight.deleteRecord(session, timestamp) }) {
             val sample = deleted ?: return@change
             HealthConnectWeightDeletion.deleteManualSample(context, sample)
-            val parent = snackbarParent() ?: return@change
-            Snackbar.make(parent, R.string.weight_measurement_deleted, Snackbar.LENGTH_LONG)
-                .setDuration(UNDO_DURATION_MS)
-                .setAnchorView(snackbarAnchor())
-                .setAction(R.string.weight_measurement_undo) { change({ session -> UserWeight.restoreRecord(session, sample) }) }
-                .show()
+            showUndo { session -> UserWeight.restoreRecord(session, sample) }
         }
     }
 
+    private fun deleteReading(timestamp: Long) {
+        var deleted: AbstractTimeSample? = null
+        change({ session -> deleted = UserWeight.deleteDeviceRecord(session, device, timestamp) }) {
+            val sample = deleted ?: return@change
+            HealthConnectWeightDeletion.deleteDeviceSample(context, timestamp)
+            showUndo { session ->
+                UserWeight.restoreDeviceRecord(session, sample)
+                (sample as? WeightSample)?.let { HealthConnectWeightDeletion.restoreDeviceSample(context, device, it) }
+            }
+        }
+    }
+
+    private fun showUndo(restore: (DaoSession) -> Unit) {
+        val parent = snackbarParent() ?: return
+        Snackbar.make(parent, R.string.weight_measurement_deleted, Snackbar.LENGTH_LONG)
+            .setDuration(UNDO_DURATION_MS)
+            .setAnchorView(snackbarAnchor())
+            .setAction(R.string.weight_measurement_undo) { change(restore) }
+            .show()
+    }
+
     /**
-     * Fills a row inflated from item_weight_measurement. Only manual weights can be edited and deleted.
+     * Fills a row inflated from item_weight_measurement. Only manual weights can be edited, every weight can be deleted.
      */
     fun bind(view: View, row: WeightMeasurementRow) {
         val editable = row.manual
@@ -107,36 +129,33 @@ class WeightMeasurementsController(
         rowView.contentDescription = listOf(date, time, "$value $valueUnit".trim(), delta).filter { it.isNotEmpty() }.joinToString(", ")
         (rowView.getTag(R.id.weight_measurement_row) as? IntArray)?.forEach { ViewCompat.removeAccessibilityAction(rowView, it) }
         rowView.setTag(R.id.weight_measurement_row, null)
-        more.visibility = if (editable) View.VISIBLE else View.INVISIBLE
         rowView.isClickable = editable
-        if (!editable) {
-            rowView.setOnClickListener(null)
-            return
-        }
-        rowView.setOnClickListener { edit(row) }
+        rowView.setOnClickListener(if (editable) View.OnClickListener { edit(row) } else null)
         more.setOnClickListener { anchor ->
             PopupMenu(context, anchor).apply {
-                menu.add(Menu.NONE, MENU_EDIT, Menu.NONE, R.string.weight_measurement_edit)
+                if (editable) {
+                    menu.add(Menu.NONE, MENU_EDIT, Menu.NONE, R.string.weight_measurement_edit)
+                }
                 menu.add(Menu.NONE, MENU_DELETE, Menu.NONE, R.string.delete)
                 setOnMenuItemClickListener { item ->
-                    if (item.itemId == MENU_EDIT) edit(row) else delete(row.timestamp)
+                    if (item.itemId == MENU_EDIT) edit(row) else delete(row)
                     true
                 }
             }.show()
         }
-        rowView.setTag(
-            R.id.weight_measurement_row,
-            intArrayOf(
-                ViewCompat.addAccessibilityAction(rowView, context.getString(R.string.weight_measurement_edit)) { _, _ -> edit(row); true },
-                ViewCompat.addAccessibilityAction(rowView, context.getString(R.string.delete)) { _, _ -> delete(row.timestamp); true },
-            )
-        )
+        val deleteAction = ViewCompat.addAccessibilityAction(rowView, context.getString(R.string.delete)) { _, _ -> delete(row); true }
+        val editAction = if (editable) {
+            ViewCompat.addAccessibilityAction(rowView, context.getString(R.string.weight_measurement_edit)) { _, _ -> edit(row); true }
+        } else {
+            null
+        }
+        rowView.setTag(R.id.weight_measurement_row, listOfNotNull(deleteAction, editAction).toIntArray())
     }
 
     private fun onResult(result: Bundle) {
         val original = result.getLong(WeightEntryBottomSheet.RESULT_ORIGINAL_TIMESTAMP, WeightEntryBottomSheet.NO_TIMESTAMP)
         if (result.getBoolean(WeightEntryBottomSheet.RESULT_DELETE)) {
-            delete(original)
+            deleteManual(original)
             return
         }
         val kg = result.getDouble(WeightEntryBottomSheet.RESULT_KG)

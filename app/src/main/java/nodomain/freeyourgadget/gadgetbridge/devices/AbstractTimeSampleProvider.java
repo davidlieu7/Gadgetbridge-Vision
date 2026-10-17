@@ -88,6 +88,21 @@ public abstract class AbstractTimeSampleProvider<T extends AbstractTimeSample> i
         return samples;
     }
 
+    /**
+     * Deletes this device's samples at the given timestamp, in milliseconds.
+     */
+    public void deleteSamples(final long timestamp) {
+        final Device dbDevice = DBHelper.findDevice(getDevice(), getSession());
+        if (dbDevice == null) {
+            return;
+        }
+        getSampleDao().queryBuilder()
+                .where(getDeviceIdentifierSampleProperty().eq(dbDevice.getId()), getTimestampSampleProperty().eq(timestamp))
+                .buildDelete()
+                .executeDeleteWithoutDetachingEntities();
+        detachFromSession();
+    }
+
     @Override
     public void addSample(final T activitySample) {
         getSampleDao().insertOrReplace(activitySample);
