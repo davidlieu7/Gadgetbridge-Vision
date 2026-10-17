@@ -6283,4 +6283,10 @@
     <string name="service_setup_title">%1$s setup</string>
     <string name="service_setup_server_hostname">Server hostname</string>
     <string name="service_setup_api_token">API token</string>
+
+    <string name="pref_itag_alert_level">Find-device alert level</string>
+    <string name="pref_itag_alert_level_high">High (0x02)</string>
+    <string name="pref_itag_alert_level_mild">Mild (0x01)</string>
+    <string name="pref_itag_beep_on_disconnect">Beep on disconnect</string>
+    <string name="pref_itag_button_press">Action on button press</string>
 </resources>
