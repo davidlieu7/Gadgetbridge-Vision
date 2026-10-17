@@ -18,6 +18,7 @@ package nodomain.freeyourgadget.gadgetbridge.service.devices.canon
 
 import android.bluetooth.BluetoothGatt
 import android.bluetooth.BluetoothGattCharacteristic
+import android.bluetooth.le.ScanResult
 import android.content.Intent
 import android.widget.Toast
 import androidx.core.content.edit
@@ -65,6 +66,15 @@ class CanonCameraSupport : AbstractBTLESingleDeviceSupport(LOG) {
 
     override fun connectFirstTime(): Boolean {
         needsAuth = true
+        return connect()
+    }
+
+    override fun connectFromScan(scanResult: ScanResult): Boolean {
+        val data = scanResult.scanRecord?.getManufacturerSpecificData(CanonCameraConstants.MANUFACTURER_ID)
+        if (data?.size == 6 && data[5] != CanonCameraConstants.ADV_POWER_STATE_ON) {
+            LOG.debug("Not connecting to powered-off device")
+            return false
+        }
         return connect()
     }
 

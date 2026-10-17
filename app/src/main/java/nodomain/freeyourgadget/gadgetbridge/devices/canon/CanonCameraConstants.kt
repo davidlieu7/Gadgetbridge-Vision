@@ -21,6 +21,11 @@ import java.util.UUID
 object CanonCameraConstants {
     const val MANUFACTURER_ID = 0x01a9
 
+    // Advertised power state (last byte of 6-byte manufacturer-specific data)
+    const val ADV_POWER_STATE_OFF: Byte = 0x05
+    const val ADV_POWER_STATE_ON: Byte = 0x02
+    const val ADV_POWER_STATE_SLEEP: Byte = 0x01
+
     private const val BASE_UUID_FORMAT = "000%05x-0000-1000-0000-d8492fffa821"
     private fun uuid(prefix: Int): UUID {
         return UUID.fromString(String.format(BASE_UUID_FORMAT, prefix))
