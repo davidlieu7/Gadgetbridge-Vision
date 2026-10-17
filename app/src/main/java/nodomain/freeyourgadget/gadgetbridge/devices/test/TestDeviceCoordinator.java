@@ -281,6 +281,9 @@ public class TestDeviceCoordinator extends AbstractDeviceCoordinator {
             metrics.add(MetricSample.Metric.GARMIN_TRAINING_READINESS);
             metrics.add(MetricSample.Metric.GARMIN_RECOVERY_TIME);
         }
+        if (supportsTrainingStatus(device)) {
+            metrics.add(MetricSample.Metric.GARMIN_TRAINING_STATUS);
+        }
         return metrics;
     }
 
@@ -552,6 +555,11 @@ public class TestDeviceCoordinator extends AbstractDeviceCoordinator {
     @Override
     public boolean supportsTrainingReadiness(@NonNull GBDevice device) {
         return supports(getTestDevice(), TestFeature.TRAINING_READINESS);
+    }
+
+    @Override
+    public boolean supportsTrainingStatus(@NonNull GBDevice device) {
+        return supports(getTestDevice(), TestFeature.TRAINING_STATUS);
     }
 
     @Override
