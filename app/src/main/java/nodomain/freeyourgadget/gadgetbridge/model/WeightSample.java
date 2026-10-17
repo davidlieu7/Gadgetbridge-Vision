@@ -18,6 +18,8 @@ package nodomain.freeyourgadget.gadgetbridge.model;
 
 import androidx.annotation.Nullable;
 
+import nodomain.freeyourgadget.gadgetbridge.util.BodyCompositionCalculator;
+
 public interface WeightSample extends TimeSample {
     /**
      * Returns the weight value.
@@ -30,6 +32,15 @@ public interface WeightSample extends TimeSample {
      */
     @Nullable
     default Integer getImpedanceOhm() {
+        return null;
+    }
+
+    /**
+     * Returns the body composition as finished values reported by the device, or null when the
+     * device does not report them (the display then estimates them from weight and impedance).
+     */
+    @Nullable
+    default BodyCompositionCalculator.BodyComposition getReportedBodyComposition() {
         return null;
     }
 }

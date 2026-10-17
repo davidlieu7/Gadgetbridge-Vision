@@ -57,7 +57,7 @@ public class BodyCompositionCalculator {
         public final float boneMassKg;
         public final int basalMetabolicRate;
 
-        BodyComposition(final float bodyFatPercent,
+        public BodyComposition(final float bodyFatPercent,
                         final float bodyWaterPercent,
                         final float muscleMassKg,
                         final float boneMassKg,
