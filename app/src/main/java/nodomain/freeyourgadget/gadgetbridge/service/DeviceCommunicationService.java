@@ -41,6 +41,7 @@ import android.app.ApplicationExitInfo;
 import android.app.Service;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
+import android.bluetooth.le.ScanResult;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
@@ -284,7 +285,12 @@ public class DeviceCommunicationService extends Service implements SharedPrefere
                     sendDeviceAPIBroadcast(device.getAddress(), API_LEGACY_ACTION_DEVICE_SCANNED);
                 }
             } else if (BLEScanService.EVENT_DEVICE_FOUND.equals(action)) {
-                String deviceAddress = intent.getStringExtra(BLEScanService.EXTRA_DEVICE_ADDRESS);
+                ScanResult result = intent.getParcelableExtra(BLEScanService.EXTRA_SCAN_RESULT);
+                if (result == null) {
+                    LOG.error("onReceive: no scan result in EVENT_DEVICE_FOUND");
+                    return;
+                }
+                String deviceAddress = result.getDevice().getAddress();
 
                 GBDevice target = GBApplication
                         .app()
@@ -297,7 +303,7 @@ public class DeviceCommunicationService extends Service implements SharedPrefere
                 }
 
                 if (!target.getDeviceCoordinator().isConnectable()) {
-                    int actualRSSI = intent.getIntExtra(BLEScanService.EXTRA_RSSI, 0);
+                    int actualRSSI = result.getRssi();
                     Prefs prefs = new Prefs(
                             GBApplication.getDeviceSpecificSharedPrefs(target.getAddress())
                     );

@@ -23,7 +23,6 @@ import android.app.Notification;
 import android.app.NotificationManager;
 import android.app.Service;
 import android.bluetooth.BluetoothAdapter;
-import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothManager;
 import android.bluetooth.le.BluetoothLeScanner;
 import android.bluetooth.le.ScanCallback;
@@ -39,7 +38,6 @@ import android.content.pm.ServiceInfo;
 import android.os.Build;
 import android.os.Handler;
 import android.os.IBinder;
-import android.os.Parcel;
 
 import androidx.annotation.RequiresApi;
 import androidx.core.app.ActivityCompat;
@@ -66,10 +64,7 @@ public class BLEScanService extends Service {
 
     public static final String EVENT_DEVICE_FOUND = "nodomain.freeyourgadget.gadgetbridge.service.ble.scan.event.DEVICE_FOUND";
 
-    public static final String EXTRA_DEVICE = "EXTRA_DEVICE";
-    public static final String EXTRA_DEVICE_ADDRESS = "EXTRA_DEVICE_ADDRESS";
-    public static final String EXTRA_RSSI = "EXTRA_RSSI";
-    public static final String EXTRA_MANUFACTURER_SPECIFIC_DATA = "EXTRA_MANUFACTURER_SPECIFIC_DATA";
+    public static final String EXTRA_SCAN_RESULT = "EXTRA_SCAN_RESULT";
 
     // 5 minutes scan restart interval
     private final int DELAY_SCAN_RESTART = 5 * 60 * 1000;
@@ -102,24 +97,13 @@ public class BLEScanService extends Service {
         @Override
         public void onScanResult(int callbackType, ScanResult result) {
             super.onScanResult(callbackType, result);
-            BluetoothDevice device = result.getDevice();
 
             LOG.debug("onScanResult: {}", result);
 
             Intent intent = new Intent(EVENT_DEVICE_FOUND);
-            intent.putExtra(EXTRA_DEVICE_ADDRESS, device.getAddress());
-            intent.putExtra(EXTRA_RSSI, result.getRssi());
+            intent.putExtra(EXTRA_SCAN_RESULT, result);
 
-            Parcel parcel = Parcel.obtain();
-            try {
-                if (result.getScanRecord() != null) {
-                    parcel.writeSparseArray(result.getScanRecord().getManufacturerSpecificData());
-                    intent.putExtra(EXTRA_MANUFACTURER_SPECIFIC_DATA, parcel.readBundle(getClass().getClassLoader()));
-                }
-                localBroadcastManager.sendBroadcast(intent);
-            } finally {
-                parcel.recycle();
-            }
+            localBroadcastManager.sendBroadcast(intent);
 
             // device found, attempt connection
             // stop scanning for device for now
