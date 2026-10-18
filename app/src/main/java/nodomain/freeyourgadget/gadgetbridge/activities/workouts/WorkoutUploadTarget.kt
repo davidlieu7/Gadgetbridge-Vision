@@ -21,7 +21,6 @@ import androidx.annotation.StringRes
 import nodomain.freeyourgadget.gadgetbridge.GBApplication
 import nodomain.freeyourgadget.gadgetbridge.R
 import nodomain.freeyourgadget.gadgetbridge.activities.endurain.EndurainTokenManager
-import nodomain.freeyourgadget.gadgetbridge.activities.endurain.FitTrackeeTokenManager
 import nodomain.freeyourgadget.gadgetbridge.activities.endurain.WandererTokenManager
 import nodomain.freeyourgadget.gadgetbridge.entities.BaseActivitySummary
 import nodomain.freeyourgadget.gadgetbridge.entities.WorkoutUpload
@@ -127,7 +126,7 @@ interface WorkoutUploadTarget {
 
 /** Every supported upload target. */
 object WorkoutUploadTargets {
-    val ALL: List<WorkoutUploadTarget> = listOf(EndurainUploadTarget, WandererUploadTarget, FitTrackeeUploadTarget)
+    val ALL: List<WorkoutUploadTarget> = listOf(EndurainUploadTarget, WandererUploadTarget)
 
     /** Targets the user has finished setting up, whether or not auto-upload is on for them. */
     fun loggedIn(context: Context): List<WorkoutUploadTarget> =
@@ -266,54 +265,6 @@ object WandererUploadTarget : WorkoutUploadTarget {
     ) = TrackUpdateResult(
         success = WorkoutUploader.updateWandererTrackBlocking(context, remoteActivityId, payload, summary)
     )
-
-    override fun syncPhoto(
-        context: Context,
-        remoteActivityId: String,
-        photoFile: File?,
-        previousMediaId: Int?
-    ): WorkoutUploader.PhotoSyncResult? = null
-}
-
-
-object FitTrackeeUploadTarget : WorkoutUploadTarget {
-    override val service = WorkoutUploadStore.SERVICE_FITTRACKEE
-    override val nameRes = R.string.pref_category_fittrackee
-    override val format = WorkoutPayloadFormat.FIT
-
-    // FitTrackee builds a workout from the recorded track, so there is nothing to upload without one.
-    override val requiresTrack = true
-
-    override val failureNotificationId = 4713
-
-    override fun isLoggedIn(context: Context) = FitTrackeeTokenManager(context).isLoggedIn()
-
-    override fun isAutoUploadEnabled(prefs: GBPrefs) =
-        prefs.getBoolean(GBPrefs.FITTRACKEE_AUTO_UPLOAD_ENABLED, false)
-
-    override fun failureMessage(context: Context, reason: String): String =
-        context.getString(R.string.auto_upload_failed_fittrackee, reason)
-
-    override fun activityUrl(context: Context, remoteActivityId: String): String? {
-        val server = GBApplication.getPrefs().preferences
-            .getString(WorkoutUploader.PREF_FITTRACKEE_SERVER, null) ?: return null
-        return "${server.trimEnd('/')}/workouts/$remoteActivityId"
-    }
-
-    override fun upload(context: Context, summary: BaseActivitySummary, payload: File) =
-        WorkoutUploader.uploadToFitTrackeeBlocking(context, summary, payload)
-
-    override fun updateMetadata(context: Context, remoteActivityId: String, summary: BaseActivitySummary) =
-        WorkoutUploader.updateFitTrackeeMetadataBlocking(context, remoteActivityId, summary)
-
-    // The API cannot replace the file of an existing workout, only edit its metadata.
-    override fun updateTrack(
-        context: Context,
-        remoteActivityId: String,
-        payload: File,
-        summary: BaseActivitySummary,
-        row: WorkoutUpload
-    ) = TrackUpdateResult(success = false, unsupported = true)
 
     override fun syncPhoto(
         context: Context,

@@ -64,29 +64,4 @@
             android:title="@string/pref_wanderer_auto_upload_title"
             android:summary="@string/pref_wanderer_auto_upload_summary" />
     </PreferenceCategory>
-    <PreferenceCategory
-        android:title="@string/pref_category_fittrackee">
-        <Preference
-            android:icon="@drawable/ic_info"
-            android:key="pref_key_fittrackee_status"
-            android:title="@string/pref_fittrackee_status_title"
-            android:summary="Logged in on fittrackee.example.com" />
-        <Preference
-            android:icon="@drawable/ic_language"
-            android:key="pref_key_fittrackee_log_in"
-            android:title="@string/pref_fittrackee_log_in_title"
-            android:summary="@string/pref_fittrackee_log_in_summary" />
-        <Preference
-            android:icon="@drawable/ic_language"
-            android:key="pref_key_fittrackee_log_out"
-            android:title="@string/pref_fittrackee_log_out_title"
-            android:summary="@string/pref_endurain_log_out_summary" />
-        <SwitchPreferenceCompat
-            android:defaultValue="false"
-            android:key="fittrackee_auto_upload_enabled"
-            android:layout="@layout/preference_checkbox"
-            android:icon="@drawable/ic_file_upload"
-            android:title="@string/pref_fittrackee_auto_upload_title"
-            android:summary="@string/pref_fittrackee_auto_upload_summary" />
-    </PreferenceCategory>
 </PreferenceScreen>

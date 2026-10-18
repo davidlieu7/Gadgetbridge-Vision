@@ -1875,7 +1875,7 @@ public class GBDaoGenerator {
         Entity upload = addEntity(schema, "WorkoutUpload");
         upload.implementsSerializable();
         upload.setJavaDoc(
-                "Tracks the upload of a workout summary to an external service (Endurain, Wanderer, FitTrackee).\n"
+                "Tracks the upload of a workout summary to an external service (Endurain, Wanderer).\n"
                 + "Keyed by (summaryId, service). Stores the remote activity id and status so a workout\n"
                 + "is never uploaded twice and later edits can be re-synced.");
         upload.addLongProperty("summaryId").primaryKey().notNull();

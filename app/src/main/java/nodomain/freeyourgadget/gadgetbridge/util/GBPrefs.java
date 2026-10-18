@@ -141,11 +141,10 @@ public class GBPrefs extends Prefs {
     public static final String NAVIGATION_ALLOW_UNSUPPORTED_DEVICES = "navigation_allow_unsupported_devices";
     public static final String NAVIGATION_RIGHT_HAND_TRAFFIC = "navigation_right_hand_traffic";
 
-    // Online fitness trackers auto-upload (Endurain / Wanderer / FitTrackee)
+    // Online fitness trackers auto-upload (Endurain / Wanderer)
     public static final String ENDURAIN_AUTO_UPLOAD_ENABLED = "endurain_auto_upload_enabled";
     public static final String ENDURAIN_REPLACE_ON_TRACK_CHANGE = "endurain_replace_on_track_change";
     public static final String WANDERER_AUTO_UPLOAD_ENABLED = "wanderer_auto_upload_enabled";
-    public static final String FITTRACKEE_AUTO_UPLOAD_ENABLED = "fittrackee_auto_upload_enabled";
 
     public GBPrefs(final SharedPreferences sharedPrefs) {
         super(sharedPrefs);

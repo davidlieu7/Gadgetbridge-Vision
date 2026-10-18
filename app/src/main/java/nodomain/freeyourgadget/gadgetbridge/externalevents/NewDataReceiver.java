@@ -126,14 +126,13 @@ public class NewDataReceiver extends BroadcastReceiver {
     }
 
     /**
-     * Enqueues a {@link WorkoutUploadWorker} (debounced, per device) when any of Endurain,
-     * Wanderer or FitTrackee auto-upload is enabled. Mirrors the Health Connect debounce so a burst of
+     * Enqueues a {@link WorkoutUploadWorker} (debounced, per device) when either Endurain or
+     * Wanderer auto-upload is enabled. Mirrors the Health Connect debounce so a burst of
      * ACTION_NEW_DATA during one fetch results in a single upload run.
      */
     private void maybeScheduleAutoUpload(Context context, Intent intent, GBPrefs prefs) {
         if (!prefs.getBoolean(GBPrefs.ENDURAIN_AUTO_UPLOAD_ENABLED, false) &&
-                !prefs.getBoolean(GBPrefs.WANDERER_AUTO_UPLOAD_ENABLED, false) &&
-                !prefs.getBoolean(GBPrefs.FITTRACKEE_AUTO_UPLOAD_ENABLED, false)) {
+                !prefs.getBoolean(GBPrefs.WANDERER_AUTO_UPLOAD_ENABLED, false)) {
             return;
         }
 

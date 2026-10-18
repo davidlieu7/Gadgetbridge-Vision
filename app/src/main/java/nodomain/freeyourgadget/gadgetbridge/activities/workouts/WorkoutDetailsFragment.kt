@@ -50,7 +50,6 @@ import nodomain.freeyourgadget.gadgetbridge.activities.AbstractGBActivity
 import nodomain.freeyourgadget.gadgetbridge.activities.charts.IntervalChartUtils
 import nodomain.freeyourgadget.gadgetbridge.activities.endurain.EndurainApiClient
 import nodomain.freeyourgadget.gadgetbridge.activities.endurain.EndurainSetupViewModel
-import nodomain.freeyourgadget.gadgetbridge.activities.endurain.FitTrackeeTokenManager
 import nodomain.freeyourgadget.gadgetbridge.activities.endurain.WandererApiClient
 import nodomain.freeyourgadget.gadgetbridge.activities.endurain.WandererTokenManager
 import nodomain.freeyourgadget.gadgetbridge.activities.fit.FitViewerActivity
@@ -316,11 +315,6 @@ class WorkoutDetailsFragment : Fragment(), MenuProvider {
                 true
             }
 
-            R.id.activity_action_upload_to_fittrackee -> {
-                uploadToFitTrackee()
-                true
-            }
-
             R.id.activity_action_upload_to_wanderer -> {
                 uploadToWanderer()
                 true
@@ -492,8 +486,6 @@ class WorkoutDetailsFragment : Fragment(), MenuProvider {
             .getString(WorkoutUploader.PREF_ENDURAIN_SERVER, null)
         val wandererServer = GBApplication.getPrefs().preferences
             .getString(WorkoutUploader.PREF_WANDERER_SERVER, null)
-        val fitTrackeeServer = GBApplication.getPrefs().preferences
-            .getString(WorkoutUploader.PREF_FITTRACKEE_SERVER, null)
         viewLifecycleOwner.lifecycleScope.launch {
             val enduranVisible = withContext(Dispatchers.IO) {
                 endurainServer != null && endurainVm.endurainTokenManager.isLoggedIn()
@@ -502,13 +494,8 @@ class WorkoutDetailsFragment : Fragment(), MenuProvider {
                 hasGpx && wandererServer != null && WandererTokenManager(requireContext()).isLoggedIn()
             }
             overflowMenu?.findItem(R.id.activity_action_upload_to_endurain)?.isVisible = enduranVisible
-            val fitTrackeeVisible = withContext(Dispatchers.IO) {
-                hasGpx && fitTrackeeServer != null && FitTrackeeTokenManager(requireContext()).isLoggedIn()
-            }
             overflowMenu?.findItem(R.id.activity_action_upload_to_wanderer)?.isVisible = wandererVisible
-            overflowMenu?.findItem(R.id.activity_action_upload_to_fittrackee)?.isVisible = fitTrackeeVisible
-            overflowMenu?.findItem(R.id.activity_action_upload_status)?.isVisible =
-                enduranVisible || wandererVisible || fitTrackeeVisible
+            overflowMenu?.findItem(R.id.activity_action_upload_status)?.isVisible = enduranVisible || wandererVisible
 
         }
 
@@ -789,57 +776,6 @@ class WorkoutDetailsFragment : Fragment(), MenuProvider {
                             GB.ERROR
                         )
                 }
-            }
-        }
-    }
-
-    private fun uploadToFitTrackee() {
-        val workout = currentWorkout ?: return
-
-        lifecycleScope.launch {
-            val activityFile = try {
-                buildFitFile(workout)
-            } catch (e: Exception) {
-                LOG.error("Failed to build FIT for FitTrackee upload", e)
-                GB.toast(
-                    getString(R.string.fittrackee_toast_upload_error, e.localizedMessage),
-                    Toast.LENGTH_LONG,
-                    GB.ERROR,
-                    e
-                )
-                return@launch
-            }
-
-            val result = withContext(Dispatchers.IO) {
-                WorkoutUploader.uploadToFitTrackeeBlocking(requireContext(), workout.summary, activityFile)
-            }
-            val summaryId = workout.summary.id
-            withContext(Dispatchers.IO) {
-                if (result.success && summaryId != null) {
-                    WorkoutUploadStore.recordSuccess(
-                        summaryId, WorkoutUploadStore.SERVICE_FITTRACKEE, result.remoteActivityId, null,
-                        null,
-                        WorkoutUploadStore.sourceHashOf(workout.summary),
-                        WorkoutUploadStore.fileHashOf(activityFile),
-                        WorkoutUploader.summaryHasTrack(workout.summary)
-                    )
-                } else if (summaryId != null) {
-                    WorkoutUploadStore.recordFailure(
-                        summaryId, WorkoutUploadStore.SERVICE_FITTRACKEE, result.reason
-                    )
-                }
-            }
-            if (!isAdded) return@launch
-            notifyWorkoutChanged()
-            workoutViewModel.refreshWorkout(workoutId)
-            if (result.success) {
-                GB.toast(getString(R.string.fittrackee_toast_successfully_uploaded), Toast.LENGTH_LONG, GB.INFO)
-            } else {
-                GB.toast(
-                    getString(R.string.fittrackee_toast_upload_error, result.reason),
-                    Toast.LENGTH_LONG,
-                    GB.ERROR
-                )
             }
         }
     }
