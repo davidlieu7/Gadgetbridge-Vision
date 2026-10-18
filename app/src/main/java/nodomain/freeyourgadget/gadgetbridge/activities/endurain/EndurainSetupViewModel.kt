@@ -159,7 +159,7 @@ class EndurainSetupViewModel(application: Application) : AndroidViewModel(applic
             .buildUpon()
             .appendQueryParameter("code_challenge", codeChallenge)
             .appendQueryParameter("code_challenge_method", "S256")
-            .appendQueryParameter("redirect", BuildConfig.APPLICATION_ID + "://endurain/oauth/callback")
+            .appendQueryParameter("redirect", BuildConfig.ENDURAIN_REDIRECT_SCHEME + "://endurain/oauth/callback")
             .build()
             .toString()
     }

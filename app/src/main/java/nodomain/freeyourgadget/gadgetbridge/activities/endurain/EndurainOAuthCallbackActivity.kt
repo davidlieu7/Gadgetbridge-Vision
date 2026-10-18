@@ -55,7 +55,7 @@ class EndurainOAuthCallbackActivity : AbstractGBActivity() {
     }
 
     private fun handleOAuthCallback(uri: Uri) {
-        // Expected format: nodomain.freeyourgadget.gadgetbridge://endurain/oauth/callback?session_id={uuid}
+        // Expected format: endurain://endurain/oauth/callback?session_id={uuid}
 
         val sessionId = uri.getQueryParameter("session_id")
 

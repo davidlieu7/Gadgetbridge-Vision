@@ -150,8 +150,13 @@ android {
         buildConfigField "String", "GIT_DIRTY_STATUS", "\"${getGitDirtyFlag()}\""
         buildConfigField "boolean", "INTERNET_ACCESS", "false"
 
+        // Endurain (>= 0.19) only hands the SSO session back to custom schemes its
+        // frontend allow-lists (hardcoded to "endurain"), so the deep link cannot use
+        // the applicationId. The host/path ("endurain"/"/oauth/callback") keep it unique.
+        buildConfigField "String", "ENDURAIN_REDIRECT_SCHEME", "\"endurain\""
+
         manifestPlaceholders = [
-            appAuthRedirectScheme: "${applicationId}"
+            appAuthRedirectScheme: "endurain"
         ]
     }
 
