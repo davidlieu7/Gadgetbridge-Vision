@@ -141,11 +141,11 @@ class EndurainSetupBottomSheet : BottomSheetDialogFragment() {
 
     override fun onDestroyView() {
         super.onDestroyView()
-        try {
-            requireContext().unregisterReceiver(ssoCallbackReceiver)
-        } catch (e: Exception) {
-            // Already unregistered
-        }
+        // Must mirror the registration in onViewCreated (LocalBroadcastManager). Unregistering
+        // through the Context leaked the receiver, so every reopened sheet stacked one more and the
+        // SSO callback was exchanged several times: the first consumed the PKCE verifier, the rest
+        // failed with "No pending code verifier" and showed "SSO login failed".
+        LocalBroadcastManager.getInstance(requireContext()).unregisterReceiver(ssoCallbackReceiver)
     }
 
     private fun startSsoFlow() {
