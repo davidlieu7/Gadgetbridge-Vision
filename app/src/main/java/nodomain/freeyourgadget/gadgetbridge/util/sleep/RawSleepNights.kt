@@ -190,11 +190,12 @@ open class RawSleepNights {
                 heartRate = minute.heartRate
                 movement = minute.movement
             }
+            temperature = minute.temperature
         }
 
         private fun toMinute(sample: GenericRawSleepSample): SleepMinute? {
             val kind = SleepMinuteKind.fromCode(sample.kind) ?: return null
-            return SleepMinute(Instant.ofEpochMilli(sample.timestamp), kind, sample.movement ?: 0f, sample.heartRate)
+            return SleepMinute(Instant.ofEpochMilli(sample.timestamp), kind, sample.movement ?: 0f, sample.heartRate, sample.temperature)
         }
     }
 }

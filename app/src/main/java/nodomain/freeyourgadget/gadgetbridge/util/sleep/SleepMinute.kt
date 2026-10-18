@@ -44,4 +44,6 @@ data class SleepMinute(
     val movement: Float = 0f,
     /** Beats per minute, or null when the row carried none. */
     val heartRate: Float? = null,
+    /** Degrees Celsius, or null when the device measured none. */
+    val temperature: Float? = null,
 )

@@ -1245,6 +1245,8 @@ public class GBDaoGenerator {
                 .javaDocGetterAndSetter("Per SleepMinuteKind code: raw heart rate and movement, awake or unmeasurable.");
         rawSleepSample.addFloatProperty("heartRate");
         rawSleepSample.addFloatProperty("movement");
+        rawSleepSample.addFloatProperty("temperature")
+                .javaDocGetterAndSetter("Degrees Celsius, or null when the device measured none.");
         return rawSleepSample;
     }
 

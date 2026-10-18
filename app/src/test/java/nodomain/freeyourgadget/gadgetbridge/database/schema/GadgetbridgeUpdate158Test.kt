@@ -63,8 +63,8 @@ class GadgetbridgeUpdate158Test {
         GadgetbridgeUpdate_158().upgradeSchema(db)
 
         assertEquals(
-            listOf("60000 0 52.5 1.5", "120000 2 null null"),
-            rows("SELECT TIMESTAMP, KIND, HEART_RATE, MOVEMENT FROM GENERIC_RAW_SLEEP_SAMPLE ORDER BY TIMESTAMP")
+            listOf("60000 0 52.5 1.5 null", "120000 2 null null null"),
+            rows("SELECT TIMESTAMP, KIND, HEART_RATE, MOVEMENT, TEMPERATURE FROM GENERIC_RAW_SLEEP_SAMPLE ORDER BY TIMESTAMP")
         )
         assertFalse(DBHelper.existsColumn("GARMIN_RAW_SLEEP_SAMPLE", "TIMESTAMP", db))
     }

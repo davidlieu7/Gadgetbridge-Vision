@@ -2,6 +2,7 @@ package nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit
 
 import nodomain.freeyourgadget.gadgetbridge.database.DBHelper
 import nodomain.freeyourgadget.gadgetbridge.devices.GenericEstimatedSleepStageSampleProvider
+import nodomain.freeyourgadget.gadgetbridge.devices.GenericRawSleepSampleProvider
 import nodomain.freeyourgadget.gadgetbridge.devices.GarminSleepStageSampleProvider
 import nodomain.freeyourgadget.gadgetbridge.devices.garmin.GarminEventSampleProvider
 import nodomain.freeyourgadget.gadgetbridge.entities.GarminEventSample
@@ -281,6 +282,19 @@ class RawSleepNightsTest : TestBase() {
         val shuffled = device()
         cut.shuffled(kotlin.random.Random(7)).forEach { import(shuffled, it) }
         assertStored(expected, shuffled)
+    }
+
+    @Test
+    fun theTemperatureOfEachMinute_isStored() {
+        val device = device()
+        val minutes = night(bedtime).mapIndexed { i, minute -> minute.copy(temperature = 33f + i % 4 * 0.25f) } +
+            SleepMinute(bedtime.minusSeconds(60), SleepMinuteKind.UNMEASURABLE)
+        import(device, minutes)
+
+        assertEquals(
+            minutes.sortedBy { it.time }.map { it.time.toEpochMilli() to it.temperature },
+            GenericRawSleepSampleProvider(device, daoSession).getAllSamples(0, Long.MAX_VALUE).map { it.timestamp to it.temperature },
+        )
     }
 
     private fun sleepEvent(time: Instant, type: EventType, data: Long?) = GarminEventSample().apply {
