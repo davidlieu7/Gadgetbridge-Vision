@@ -45,6 +45,14 @@ object CanonCameraConstants {
     const val MAIN_IDENTITY_CMD_PHONE_UUID: Byte = 0x03
     const val MAIN_IDENTITY_CMD_PHONE_NAME: Byte = 0x04
 
+    // Service 30000 - Remote control
+    val UUID_SERVICE_CONTROL: UUID = uuid(0x30000)
+    val UUID_CHARACTERISTIC_CONTROL_SHUTTER: UUID = uuid(0x30030)
+
+    // Remote control Shutter characteristic (0x30030)
+    val CONTROL_SHUTTER_PRESS = byteArrayOf(0x00, 0x01)
+    val CONTROL_SHUTTER_RELEASE = byteArrayOf(0x00, 0x02)
+
     // Service 40000 - GPS
     val UUID_SERVICE_GPS: UUID = uuid(0x40000)
     val UUID_CHARACTERISTIC_GPS_WRITE: UUID = uuid(0x40002)
@@ -66,4 +74,8 @@ object CanonCameraConstants {
     const val PREF_GPS_UPDATE_INTERVAL_DEFAULT = 10
     const val PREF_GPS_USE_NETWORK = "gps_use_network"
     const val PREF_GPS_USE_NETWORK_DEFAULT = false
+
+    // Device actions (sent via onSendConfiguration)
+    const val ACTION_CONTROL_SHUTTER_PRESS = "control_shutter_press"
+    const val ACTION_CONTROL_SHUTTER_RELEASE = "control_shutter_release"
 }

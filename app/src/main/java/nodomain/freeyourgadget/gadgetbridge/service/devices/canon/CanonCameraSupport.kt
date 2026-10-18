@@ -56,6 +56,7 @@ class CanonCameraSupport : AbstractBTLESingleDeviceSupport(LOG) {
 
     init {
         addSupportedService(CanonCameraConstants.UUID_SERVICE_MAIN)
+        addSupportedService(CanonCameraConstants.UUID_SERVICE_CONTROL)
         addSupportedService(CanonCameraConstants.UUID_SERVICE_GPS)
 
         addSupportedService(GattService.SERVICE_DEVICE_INFORMATION.uuid)
@@ -138,6 +139,27 @@ class CanonCameraSupport : AbstractBTLESingleDeviceSupport(LOG) {
         synchronized (ConnectionMonitor) {
             setupGps(false)
             super.dispose()
+        }
+    }
+
+    override fun onSendConfiguration(config: String) {
+        LOG.debug("onSendConfiguration {}", config)
+        if (!device.isInitialized) {
+            LOG.debug("Ignoring configuration {} while not initialized", config)
+            return
+        }
+        when (config) {
+            CanonCameraConstants.ACTION_CONTROL_SHUTTER_PRESS ->
+                createTransactionBuilder("controlShutterPress").write(
+                    CanonCameraConstants.UUID_CHARACTERISTIC_CONTROL_SHUTTER,
+                    *CanonCameraConstants.CONTROL_SHUTTER_PRESS,
+                ).queue()
+            CanonCameraConstants.ACTION_CONTROL_SHUTTER_RELEASE ->
+                createTransactionBuilder("controlShutterRelease").write(
+                    CanonCameraConstants.UUID_CHARACTERISTIC_CONTROL_SHUTTER,
+                    *CanonCameraConstants.CONTROL_SHUTTER_RELEASE,
+                ).queue()
+            else -> LOG.debug("Unhandled configuration: {}", config)
         }
     }
 

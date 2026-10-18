@@ -1140,6 +1140,11 @@
             android:exported="true" />
 
         <activity
+            android:name=".devices.canon.CanonCameraControlActivity"
+            android:label="@string/remote_control"
+            android:parentActivityName=".activities.ControlCenterv2" />
+
+        <activity
             android:name=".devices.SolarEquipmentStatusActivity"
             android:label="Solar Equipment Status"
             android:exported="true" />

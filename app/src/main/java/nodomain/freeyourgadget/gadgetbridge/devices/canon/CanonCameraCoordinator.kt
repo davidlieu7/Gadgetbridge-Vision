@@ -24,6 +24,7 @@ import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSpec
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.DeviceSettingsSpec
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.deviceSettings
 import nodomain.freeyourgadget.gadgetbridge.devices.AbstractBLEDeviceCoordinator
+import nodomain.freeyourgadget.gadgetbridge.devices.DeviceCardAction
 import nodomain.freeyourgadget.gadgetbridge.devices.DeviceCoordinator
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDeviceCandidate
@@ -74,6 +75,16 @@ class CanonCameraCoordinator : AbstractBLEDeviceCoordinator() {
                 )
             }
         }
+    }
+
+    override fun getCustomActions(): List<DeviceCardAction> {
+        return listOf(
+            DeviceCardAction.forActivity(
+                R.drawable.ic_camera_remote,
+                R.string.canon_camera_remote_control,
+                CanonCameraControlActivity::class.java
+            ),
+        )
     }
 
     override fun getBondingStyle(): Int {
