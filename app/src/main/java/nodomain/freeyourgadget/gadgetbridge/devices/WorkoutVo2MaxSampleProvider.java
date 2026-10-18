@@ -179,9 +179,10 @@ public class WorkoutVo2MaxSampleProvider implements Vo2MaxSampleProvider<Vo2MaxS
         ActivitySummaryParser activitySummaryParser = coordinator.getActivitySummaryParser(device, GBApplication.getContext());
         for (final BaseActivitySummary summary : summaries) {
             final String json = summary.getSummaryData();
-            if (json == null
-                    || (!json.contains(ActivitySummaryEntries.MAXIMUM_OXYGEN_UPTAKE) && summary.getRawSummaryData() != null)) {
+            if (json == null) {
                 activitySummaryParser.parseBinaryData(summary, true);
+            } else if (!json.contains(ActivitySummaryEntries.MAXIMUM_OXYGEN_UPTAKE) && summary.getRawSummaryData() != null) {
+                activitySummaryParser.parseBinaryData(summary, false);
             }
         }
     }
@@ -228,9 +229,11 @@ public class WorkoutVo2MaxSampleProvider implements Vo2MaxSampleProvider<Vo2MaxS
     @Nullable
     private Vo2MaxSample findFirstSample(final DeviceCoordinator coordinator,
                                          final QueryBuilder<BaseActivitySummary> qb) {
+        final BaseActivitySummaryDao summaryDao = session.getBaseActivitySummaryDao();
         // Uncached, so the re-parsed summary json never ends up in the session
         try (LazyList<BaseActivitySummary> summaries = qb.build().listLazyUncached()) {
             for (final BaseActivitySummary summary : summaries) {
+                summaryDao.detach(summary);
                 fillSummaryData(coordinator, Collections.singletonList(summary));
                 final Vo2MaxSample sample = GarminVo2maxSample.fromActivitySummary(summary);
                 if (sample != null) {
