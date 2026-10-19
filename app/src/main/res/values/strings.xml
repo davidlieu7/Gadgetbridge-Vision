@@ -5889,6 +5889,9 @@
     <string name="prefs_online_fitness_trackers_summary">Configure how to reach and use online fitness trackers</string>
     <string name="warning_network_required_title">Network required</string>
     <string name="warning_network_required_summary">These integrations requires network connectivity. Please install and enable the internet helper add-on app.</string>
+    <string name="activity_detail_upload_to">Upload to…</string>
+    <string name="activity_detail_upload_to_all">All services</string>
+    <string name="workout_upload_status_track_change_declined">The track changed, but replacing the activity on %1$s is turned off</string>
     <!-- %1$s in the pref_service_* strings is the name of an online fitness tracker -->
     <string name="pref_service_status_title">%1$s status</string>
     <string name="pref_service_log_in_title">Log in to %1$s</string>
@@ -6322,4 +6325,9 @@
     <string name="pref_main_screens_title">Main screens</string>
     <string name="pref_main_screens_summary">Select and order the main screens of the app. Note that even when enabled, Dashboard and Workouts can remain hidden if no devices providing the necessary data are available.</string>
     <string name="pref_default_main_screen_title">First screen on startup</string>
+    <string name="activity_detail_upload_to_service">Upload to %1$s</string>
+    <string name="service_upload_succeeded">Successfully uploaded to %1$s</string>
+    <string name="service_upload_failed_generic">Error while uploading to %1$s</string>
+    <string name="service_upload_failed">%1$s upload error: %2$s</string>
+    <string name="service_remote_edited">The workout changed, but the activity on %1$s was edited there and was left untouched</string>
 </resources>

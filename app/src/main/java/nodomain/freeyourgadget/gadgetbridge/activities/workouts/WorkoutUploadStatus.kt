@@ -61,9 +61,7 @@ fun workoutUploadStatus(
     targets: List<WorkoutUploadTarget>,
     storedSummaryData: String? = null
 ): WorkoutUploadStatus? {
-    val applicable = targets.filter {
-        !it.requiresTrack || WorkoutUploader.summaryHasTrack(summary)
-    }
+    val applicable = targets.filter { it.capabilities.appliesTo(summary) }
     if (applicable.isEmpty() && rows.isEmpty()) {
         return null
     }

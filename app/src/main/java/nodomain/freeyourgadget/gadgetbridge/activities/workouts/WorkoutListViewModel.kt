@@ -140,7 +140,7 @@ class WorkoutListViewModel : ViewModel() {
         summaries: List<BaseActivitySummary>
     ): Map<Long, WorkoutUploadStatus> {
         val context = GBApplication.getContext()
-        val targets = WorkoutUploadTargets.active(context, GBApplication.getPrefs())
+        val targets = WorkoutUploadTargets.configured(context)
         val summaryIds = summaries.mapNotNull { it.id }
         val rowsBySummary = WorkoutUploadStore.rowsForSummaries(summaryIds)
         if (targets.isEmpty() && rowsBySummary.isEmpty()) {

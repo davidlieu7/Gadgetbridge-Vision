@@ -1,4 +1,4 @@
-/*  Copyright (C) 2020-2025 José Rebelo
+/*  Copyright (C) 2020-2026 José Rebelo, Dany Mestas
 
     This file is part of Gadgetbridge.
 
@@ -25,6 +25,7 @@ import android.view.LayoutInflater
 import android.view.Menu
 import android.view.MenuInflater
 import android.view.MenuItem
+import android.view.SubMenu
 import android.view.View
 import android.view.ViewGroup
 import android.widget.LinearLayout
@@ -93,6 +94,12 @@ class WorkoutDetailsFragment : Fragment(), MenuProvider {
 
     private var menu: Menu? = null
 
+    /** Services set up and able to take the workout on screen, resolved off the main thread. */
+    private var offeredServices: List<WorkoutUploadTarget> = emptyList()
+
+    /** Which service each upload menu item stands for, rebuilt whenever the menu is. */
+    private val uploadMenuItems = mutableMapOf<Int, WorkoutUploadTarget>()
+
     private lateinit var workoutViewModel: WorkoutViewModel
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -141,6 +148,8 @@ class WorkoutDetailsFragment : Fragment(), MenuProvider {
         super.onResume()
 
         updateActionBarTitle()
+        // A service may have been set up or logged out of while this screen was in the background.
+        refreshOfferedServices()
     }
 
     private fun updateActionBarTitle() {
@@ -225,6 +234,7 @@ class WorkoutDetailsFragment : Fragment(), MenuProvider {
                     updateActionBarTitle()
                     workoutViewModel.setWorkout(workout, workoutId)
                     tabsPagerAdapter.setOptionalTabs(hasCharts(workout), hasLaps(workout))
+                    refreshOfferedServices()
 
                     showLoading(false)
                 } ?: run {
@@ -290,7 +300,11 @@ class WorkoutDetailsFragment : Fragment(), MenuProvider {
     override fun onMenuItemSelected(menuItem: MenuItem): Boolean {
         val workout = currentWorkout ?: return false
 
-        WorkoutUploadTargets.ALL.firstOrNull { it.uploadMenuItemRes == menuItem.itemId }?.let {
+        if (menuItem.itemId == UPLOAD_ALL_ITEM_ID) {
+            uploadToAll()
+            return true
+        }
+        uploadMenuItems[menuItem.itemId]?.let {
             uploadTo(it)
             return true
         }
@@ -308,16 +322,6 @@ class WorkoutDetailsFragment : Fragment(), MenuProvider {
 
             R.id.activity_action_share_gpx -> {
                 shareGpxTrack()
-                true
-            }
-
-            R.id.activity_action_upload_to_endurain -> {
-                uploadTo(EndurainUploadTarget)
-                true
-            }
-
-            R.id.activity_action_upload_to_wanderer -> {
-                uploadTo(WandererUploadTarget)
                 true
             }
 
@@ -352,11 +356,6 @@ class WorkoutDetailsFragment : Fragment(), MenuProvider {
 
             R.id.activity_action_share_fit -> {
                 exportFit(workout)
-                true
-            }
-
-            R.id.activity_action_upload_status -> {
-                showUploadStatus(workout.summary)
                 true
             }
 
@@ -512,19 +511,69 @@ class WorkoutDetailsFragment : Fragment(), MenuProvider {
         overflowMenu2?.findItem(R.id.activity_summary_detail_action_add_photo)?.isVisible = workout.summary.headerPhoto == null
         overflowMenu2?.findItem(R.id.activity_summary_detail_action_remove_photo)?.isVisible = workout.summary.headerPhoto != null
 
-        // A service that stores tracks has nothing to take from a workout without one. The others
-        // are offered for any workout, since a FIT can be synthesized from the summary alone.
+        if (overflowMenu != null) {
+            buildUploadMenu(overflowMenu)
+        }
+    }
+
+    /**
+     * Adds an entry per service that can take the workout on screen: one item when there is a
+     * single service, and a submenu led by "all services" when there are several, since a row per
+     * service would crowd out everything else in the share menu.
+     *
+     * The items are built here rather than declared in the menu resource, so a service is offered
+     * because it is set up and can express this workout, not because someone remembered to add an
+     * id for it.
+     */
+    private fun buildUploadMenu(shareMenu: SubMenu) {
+        uploadMenuItems.clear()
+        if (offeredServices.isEmpty()) {
+            return
+        }
+        if (offeredServices.size == 1) {
+            val target = offeredServices.first()
+            shareMenu.add(
+                UPLOAD_GROUP_ID,
+                UPLOAD_ITEM_ID_BASE,
+                UPLOAD_MENU_ORDER,
+                getString(R.string.activity_detail_upload_to_service, getString(target.nameRes))
+            ).setIcon(R.drawable.ic_file_upload)
+            uploadMenuItems[UPLOAD_ITEM_ID_BASE] = target
+            return
+        }
+
+        val submenu = shareMenu.addSubMenu(
+            UPLOAD_GROUP_ID,
+            Menu.NONE,
+            UPLOAD_MENU_ORDER,
+            R.string.activity_detail_upload_to
+        )
+        submenu.setIcon(R.drawable.ic_file_upload)
+        submenu.add(UPLOAD_GROUP_ID, UPLOAD_ALL_ITEM_ID, 0, R.string.activity_detail_upload_to_all)
+        offeredServices.forEachIndexed { index, target ->
+            submenu.add(UPLOAD_GROUP_ID, UPLOAD_ITEM_ID_BASE + index, index + 1, target.nameRes)
+            uploadMenuItems[UPLOAD_ITEM_ID_BASE + index] = target
+        }
+    }
+
+    /**
+     * Re-reads which services can take this workout, then rebuilds the menu. Reading it touches
+     * encrypted preferences, so it happens off the main thread and the menu is rebuilt from
+     * scratch afterwards rather than edited in place from a continuation that may outlive it.
+     */
+    private fun refreshOfferedServices() {
+        val workout = currentWorkout ?: return
         val context = requireContext()
         viewLifecycleOwner.lifecycleScope.launch {
             val offered = withContext(Dispatchers.IO) {
-                WorkoutUploadTargets.ALL.filter {
-                    (!it.requiresTrack || hasGpx) && it.isLoggedIn(context)
-                }
+                WorkoutUploadTargets.configured(context)
+                    .filter { it.capabilities.appliesTo(workout.summary) }
             }
-            WorkoutUploadTargets.ALL.forEach { target ->
-                overflowMenu?.findItem(target.uploadMenuItemRes)?.isVisible = target in offered
+            if (offered == offeredServices) {
+                return@launch
             }
-            overflowMenu?.findItem(R.id.activity_action_upload_status)?.isVisible = offered.isNotEmpty()
+            offeredServices = offered
+            requireActivity().invalidateMenu()
         }
     }
 
@@ -546,8 +595,7 @@ class WorkoutDetailsFragment : Fragment(), MenuProvider {
         val view = layoutInflater.inflate(R.layout.dialog_workout_upload_status, null)
         val container = view.findViewById<LinearLayout>(R.id.upload_status_container)
 
-        WorkoutUploadTargets.ALL
-            .filter { it.isLoggedIn(context) }
+        WorkoutUploadTargets.configured(context)
             .forEach { target ->
                 val row = rows[target.service]
                 val state = when {
@@ -561,7 +609,7 @@ class WorkoutDetailsFragment : Fragment(), MenuProvider {
                     row?.status == WorkoutUploadStore.STATUS_SUCCESS ->
                         context.getString(R.string.workout_upload_status_pending)
 
-                    target.requiresTrack && !hasTrack ->
+                    !target.capabilities.appliesTo(summary) ->
                         context.getString(R.string.workout_upload_status_no_track)
 
                     !target.isAutoUploadEnabled(prefs) ->
@@ -744,6 +792,37 @@ class WorkoutDetailsFragment : Fragment(), MenuProvider {
     }
 
     /**
+     * Sends the workout to every service that can take it, one after another rather than at once,
+     * since each call blocks on a request and there is nothing on screen to show progress.
+     *
+     * The outcome is shown in the per-service breakdown instead of a toast: across several
+     * services they differ, and one line naming one service cannot say that one was uploaded,
+     * another was already in step and a third failed.
+     */
+    private fun uploadToAll() {
+        val workout = currentWorkout ?: return
+        val targets = offeredServices
+        if (targets.isEmpty()) {
+            return
+        }
+        val context = requireContext()
+
+        viewLifecycleOwner.lifecycleScope.launch {
+            withContext(Dispatchers.IO) {
+                val provider = gbDevice.deviceCoordinator.getActivityTrackProvider(gbDevice, context)
+                for (target in targets) {
+                    WorkoutUploader.syncWorkout(
+                        context, gbDevice, provider, target, workout.summary, workout.data
+                    )
+                }
+            }
+            if (!isAdded) return@launch
+            uploadStateChanged()
+            showUploadStatus(workout.summary)
+        }
+    }
+
+    /**
      * Sends the workout to [target], which uploads it, brings the activity the service already
      * holds in line with it, or leaves the service alone when it is already in step. Asking twice
      * therefore does not leave a second activity behind, and an activity deleted on the service is
@@ -767,7 +846,7 @@ class WorkoutDetailsFragment : Fragment(), MenuProvider {
             when (outcome) {
                 is WorkoutUploader.SyncOutcome.Uploaded -> {
                     uploadStateChanged()
-                    GB.toast(getString(target.uploadedRes), Toast.LENGTH_SHORT, GB.INFO)
+                    GB.toast(target.uploadedMessage(context), Toast.LENGTH_SHORT, GB.INFO)
                 }
 
                 is WorkoutUploader.SyncOutcome.Resynced -> {
@@ -791,7 +870,7 @@ class WorkoutDetailsFragment : Fragment(), MenuProvider {
                 )
 
                 is WorkoutUploader.SyncOutcome.NotApplicable -> {
-                    val message = if (target.requiresTrack && !WorkoutUploader.summaryHasTrack(workout.summary)) {
+                    val message = if (!target.capabilities.appliesTo(workout.summary)) {
                         getString(R.string.no_activity_track_in_activity_toast)
                     } else {
                         getString(R.string.workout_upload_toast_no_payload, serviceName)
@@ -925,6 +1004,20 @@ class WorkoutDetailsFragment : Fragment(), MenuProvider {
         private val LOG = LoggerFactory.getLogger(WorkoutDetailsFragment::class.java)
 
         private const val ARG_WORKOUT_ID = "workout_id"
+
+        /** Group the runtime-built upload entries belong to, so they can be cleared together. */
+        private const val UPLOAD_GROUP_ID = 0x0f000000
+
+        /**
+         * Id of the first upload entry, the rest following it. Outside the range aapt gives the
+         * ids in the menu resource, and not zero, which a menu reads as "no id at all".
+         */
+        private const val UPLOAD_ITEM_ID_BASE = 0x0f000010
+
+        private const val UPLOAD_ALL_ITEM_ID = 0x0f00000f
+
+        /** Between sharing the GPX and sharing the FIT; see the menu resource. */
+        private const val UPLOAD_MENU_ORDER = 40
 
         fun newInstance(workoutId: Long): WorkoutDetailsFragment {
             return WorkoutDetailsFragment().apply {

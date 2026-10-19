@@ -38,6 +38,7 @@ import java.util.Set;
 import java.util.concurrent.TimeUnit;
 
 import nodomain.freeyourgadget.gadgetbridge.GBApplication;
+import nodomain.freeyourgadget.gadgetbridge.activities.workouts.WorkoutUploadTargets;
 import nodomain.freeyourgadget.gadgetbridge.activities.workouts.WorkoutUploadWorker;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
 import nodomain.freeyourgadget.gadgetbridge.util.GBPrefs;
@@ -126,13 +127,12 @@ public class NewDataReceiver extends BroadcastReceiver {
     }
 
     /**
-     * Enqueues a {@link WorkoutUploadWorker} (debounced, per device) when either Endurain or
-     * Wanderer auto-upload is enabled. Mirrors the Health Connect debounce so a burst of
-     * ACTION_NEW_DATA during one fetch results in a single upload run.
+     * Enqueues a {@link WorkoutUploadWorker} (debounced, per device) when at least one online
+     * fitness tracker is set up and asked to take workouts on its own. Mirrors the Health Connect
+     * debounce so a burst of ACTION_NEW_DATA during one fetch results in a single upload run.
      */
     private void maybeScheduleAutoUpload(Context context, Intent intent, GBPrefs prefs) {
-        if (!prefs.getBoolean(GBPrefs.ENDURAIN_AUTO_UPLOAD_ENABLED, false) &&
-                !prefs.getBoolean(GBPrefs.WANDERER_AUTO_UPLOAD_ENABLED, false)) {
+        if (WorkoutUploadTargets.autoUploadEnabled(context, prefs).isEmpty()) {
             return;
         }
 

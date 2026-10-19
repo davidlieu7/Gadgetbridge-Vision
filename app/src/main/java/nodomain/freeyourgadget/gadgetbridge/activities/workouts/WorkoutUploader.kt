@@ -17,41 +17,31 @@
 package nodomain.freeyourgadget.gadgetbridge.activities.workouts
 
 import android.content.Context
-import nodomain.freeyourgadget.gadgetbridge.GBApplication
 import nodomain.freeyourgadget.gadgetbridge.R
-import nodomain.freeyourgadget.gadgetbridge.externalservices.endurain.EndurainActivityLookup
-import nodomain.freeyourgadget.gadgetbridge.externalservices.endurain.EndurainApiClient
-import nodomain.freeyourgadget.gadgetbridge.externalservices.endurain.EndurainTokenManager
-import nodomain.freeyourgadget.gadgetbridge.externalservices.wanderer.WandererApiClient
-import nodomain.freeyourgadget.gadgetbridge.externalservices.wanderer.WandererTokenManager
 import nodomain.freeyourgadget.gadgetbridge.entities.BaseActivitySummary
 import nodomain.freeyourgadget.gadgetbridge.entities.WorkoutUpload
 import nodomain.freeyourgadget.gadgetbridge.export.FitExporter
+import nodomain.freeyourgadget.gadgetbridge.externalservices.ExternalServiceCalls
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice
 import nodomain.freeyourgadget.gadgetbridge.model.ActivityKind
 import nodomain.freeyourgadget.gadgetbridge.model.ActivitySummaryData
-import nodomain.freeyourgadget.gadgetbridge.model.ActivitySummaryEntries
 import nodomain.freeyourgadget.gadgetbridge.model.ActivityTrackProvider
 import nodomain.freeyourgadget.gadgetbridge.util.ActivitySummaryUtils
 import nodomain.freeyourgadget.gadgetbridge.util.FileUtils
 import org.slf4j.LoggerFactory
 import java.io.File
-import java.util.concurrent.CountDownLatch
-import java.util.concurrent.TimeUnit
 
 /**
- * Shared orchestration for exporting a single workout and uploading it to Endurain (FIT) or
- * Wanderer (GPX). Used by the workout detail screen, the multi-select upload from the workout
- * list, and the background auto-upload worker.
+ * Exports one workout and drives whichever services hold it, used by the workout detail screen and
+ * by the background auto-upload worker so the two behave identically.
  *
- * All methods are blocking / callback-based and safe to call off the main thread; the upload
- * clients spawn their own worker threads internally.
+ * Nothing here knows which services exist: what a service accepts and what it can still change is
+ * read off its [WorkoutUploadTarget.capabilities], and the requests themselves live in the service.
+ *
+ * All methods are blocking and safe to call off the main thread.
  */
 object WorkoutUploader {
     private val LOG = LoggerFactory.getLogger(WorkoutUploader::class.java)
-
-    const val PREF_ENDURAIN_SERVER = "endurain_server"
-    const val PREF_WANDERER_SERVER = "wanderer_server"
 
     /**
      * A workout's display name, falling back to the localized activity-kind label when the
@@ -223,9 +213,12 @@ object WorkoutUploader {
             WorkoutUploadStore.recordFailure(id, target.service, result.reason)
             return SyncOutcome.Failed(result.reason)
         }
-        // A photo the service did not take leaves both fingerprints unset, so the next run comes
-        // back for it rather than treating the workout as fully in step.
-        val photoLanded = summary.headerPhoto == null || result.photoMediaId != null
+        // A photo the service could have taken and did not leaves both fingerprints unset, so the
+        // next run comes back for it rather than treating the workout as fully in step. A service
+        // that holds no media has nothing to come back for.
+        val photoLanded = summary.headerPhoto == null ||
+                RemoteOp.CREATE !in target.capabilities.media ||
+                result.photoMediaId != null
         WorkoutUploadStore.recordSuccess(
             id, target.service, result.remoteActivityId,
             if (photoLanded) WorkoutUploadStore.photoHashOf(summary.headerPhoto) else null,
@@ -269,65 +262,72 @@ object WorkoutUploader {
         // The track goes first: a service that can only update one by re-creating the activity
         // gives back a new activity id, and the photo and metadata belong on the replacement.
         var recreated = false
-        val payload = buildPayload(context, gbDevice, provider, target, summary, summaryData)
+        // A service with no way to change a track is not asked to build a payload it cannot use.
+        val payload = if (target.capabilities.activity.canChange()) {
+            buildPayload(context, gbDevice, provider, target, summary, summaryData)
+        } else {
+            null
+        }
         val newPayloadHash = payload?.let { WorkoutUploadStore.fileHashOf(it) }
         if (payload != null && newPayloadHash != row.payloadHash) {
-            val update = target.updateTrack(context, remoteId, payload, summary, row)
-            when {
-                update.success -> {
+            when (val update = target.updateTrack(context, remoteId, payload, summary, row)) {
+                is TrackUpdateResult.Updated -> {
                     payloadHash = newPayloadHash
                     hadTrack = summaryHasTrack(summary)
-                    update.newRemoteActivityId?.let {
-                        remoteId = it
-                        recreated = true
-                        photoMediaId = update.newPhotoMediaId
-                        // The replacement is uploaded from the current workout, so it carries the
-                        // current photo, but only once the media id comes back.
-                        if (summary.headerPhoto == null || update.newPhotoMediaId != null) {
-                            photoHash = WorkoutUploadStore.photoHashOf(summary.headerPhoto)
-                        } else {
-                            pending = true
-                        }
+                }
+
+                is TrackUpdateResult.Recreated -> {
+                    payloadHash = newPayloadHash
+                    hadTrack = summaryHasTrack(summary)
+                    remoteId = update.remoteActivityId
+                    recreated = true
+                    photoMediaId = update.photoMediaId
+                    // The replacement is uploaded from the current workout, so it carries the
+                    // current photo, but only once the media id comes back.
+                    if (summary.headerPhoto == null || update.photoMediaId != null) {
+                        photoHash = WorkoutUploadStore.photoHashOf(summary.headerPhoto)
+                    } else {
+                        pending = true
                     }
                 }
 
-                // Nothing this service can do about a changed track. Only the metadata and the
-                // photo can move, so the recorded payload stays what was uploaded.
-                update.unsupported -> Unit
+                // A deliberate refusal will not resolve itself, so the fingerprints advance and
+                // the user is told once rather than on every sync.
+                is TrackUpdateResult.Refused -> refusal = update.message
 
-                else -> {
+                is TrackUpdateResult.Failed -> {
+                    // A transient failure: keep the old fingerprints so the next run retries.
                     LOG.warn("Track update to service {} failed for summary {}", target.service, id)
-                    refusal = update.refusal
-                    if (refusal == null) {
-                        // A transient failure: keep the old fingerprints so the next run retries.
-                        return SyncOutcome.Failed(null)
-                    }
-                    // A deliberate refusal will not resolve itself, so the fingerprints advance
-                    // and the user is told once rather than on every sync.
+                    return SyncOutcome.Failed(null)
                 }
             }
         }
 
         val newPhotoHash = WorkoutUploadStore.photoHashOf(summary.headerPhoto)
         if (!recreated && newPhotoHash != row.photoHash) {
-            val sync = target.syncPhoto(
-                context, remoteId, summary.headerPhoto?.let { File(it) }, row.photoMediaId
+            val canSync = target.capabilities.canSyncMedia(
+                hadPhoto = row.photoHash != null,
+                hasPhoto = summary.headerPhoto != null
             )
-            when {
-                sync == null -> photoHash = newPhotoHash  // service has no media API
-                sync.success -> {
+            if (!canSync) {
+                // Nothing this service can do about the photo, so the fingerprint advances rather
+                // than bringing every later sync back to a step that cannot go through.
+                photoHash = newPhotoHash
+            } else {
+                val sync = target.syncPhoto(
+                    context, remoteId, summary.headerPhoto?.let { File(it) }, row.photoMediaId
+                )
+                if (sync.success) {
                     photoHash = newPhotoHash
                     photoMediaId = sync.mediaId
-                }
-
-                else -> {
+                } else {
                     LOG.warn("Photo sync to service {} failed for summary {}", target.service, id)
                     pending = true
                 }
             }
         }
 
-        if (!recreated) {
+        if (!recreated && target.capabilities.editableMetadata) {
             // A replacement activity is created with the right name and type already.
             target.updateMetadata(context, remoteId, summary)
         }
@@ -354,10 +354,7 @@ object WorkoutUploader {
         summary: BaseActivitySummary,
         summaryData: ActivitySummaryData?
     ): File? {
-        if (target.requiresTrack && !summaryHasTrack(summary)) {
-            return null
-        }
-        return when (target.format) {
+        return when (target.capabilities.formatFor(summary)) {
             WorkoutPayloadFormat.FIT -> try {
                 buildFitFile(context, gbDevice, summary, summaryData)
             } catch (e: Exception) {
@@ -368,6 +365,8 @@ object WorkoutUploader {
             WorkoutPayloadFormat.GPX -> provider?.let {
                 ActivitySummaryUtils.getShareableGpxFile(it, summary)
             }
+
+            null -> null
         }
     }
 
@@ -385,390 +384,21 @@ object WorkoutUploader {
     )
 
     /**
-     * Uploads [fitFile] to Endurain: refresh the access token, upload, then set the activity type,
-     * name and header photo on the created activity. [callback] fires with an [UploadResult].
-     *
-     * The type/name and photo steps are best-effort: they run only after a successful upload and
-     * their failure does not change the result.
-     */
-    fun uploadToEndurain(
-        context: Context,
-        summary: BaseActivitySummary,
-        fitFile: File,
-        callback: (UploadResult) -> Unit
-    ) {
-        val serverUrl = GBApplication.getPrefs().preferences.getString(PREF_ENDURAIN_SERVER, null)
-        if (serverUrl == null) {
-            callback(UploadResult(false, null, null))
-            return
-        }
-        val tokenManager = EndurainTokenManager(context)
-        val apiClient = EndurainApiClient(serverUrl, tokenManager)
-        val kind = ActivityKind.fromCode(summary.activityKind)
-        val name = nameFor(context, summary)
-
-        tokenManager.performTokenRefresh(serverUrl) {
-            LOG.info("Uploading workout '{}' (type {}) to Endurain", name, kind)
-            apiClient.uploadActivity(fitFile) { newId, reason ->
-                if (newId == null) {
-                    callback(UploadResult(false, null, reason))
-                    return@uploadActivity
-                }
-                try {
-                    apiClient.editActivity(newId, kind, name)
-                } catch (e: Exception) {
-                    LOG.warn("Endurain editActivity failed for id {}", newId, e)
-                }
-                val photoPath = summary.headerPhoto
-                if (photoPath == null) {
-                    callback(UploadResult(true, newId.toString(), null))
-                    return@uploadActivity
-                }
-                try {
-                    apiClient.uploadActivityPhoto(newId, File(photoPath)) { mediaId ->
-                        callback(UploadResult(true, newId.toString(), null, mediaId))
-                    }
-                } catch (e: Exception) {
-                    LOG.warn("Endurain uploadActivityPhoto failed for id {}", newId, e)
-                    callback(UploadResult(true, newId.toString(), null))
-                }
-            }
-        }
-    }
-
-    /**
-     * Uploads [gpxFile] to Wanderer (GPX only). [callback] fires with an [UploadResult].
-     */
-    fun uploadToWanderer(
-        context: Context,
-        gpxFile: File,
-        callback: (UploadResult) -> Unit
-    ) {
-        val serverUrl = GBApplication.getPrefs().preferences.getString(PREF_WANDERER_SERVER, null)
-        if (serverUrl == null) {
-            callback(UploadResult(false, null, null))
-            return
-        }
-        val apiClient = WandererApiClient(serverUrl, WandererTokenManager(context))
-        apiClient.uploadActivity(gpxFile) { newId, message ->
-            if (newId != null && message == null) {
-                LOG.info("Uploaded GPX to Wanderer, ID {}", newId)
-                callback(UploadResult(true, newId, null))
-            } else {
-                callback(UploadResult(false, null, message))
-            }
-        }
-    }
-
-    /**
-     * Blocking variant of [uploadToEndurain] for use off the main thread (background worker,
-     * batch upload from a coroutine on Dispatchers.IO). Waits up to [timeoutSeconds] for the
-     * async upload to complete.
-     */
-    fun uploadToEndurainBlocking(
-        context: Context,
-        summary: BaseActivitySummary,
-        fitFile: File,
-        timeoutSeconds: Long = DEFAULT_UPLOAD_TIMEOUT_SECONDS
-    ): UploadResult = awaitUpload(context, timeoutSeconds) { done ->
-        uploadToEndurain(context, summary, fitFile, done)
-    }
-
-    /**
-     * Blocking variant of [uploadToWanderer]. See [uploadToEndurainBlocking].
-     */
-    fun uploadToWandererBlocking(
-        context: Context,
-        gpxFile: File,
-        timeoutSeconds: Long = DEFAULT_UPLOAD_TIMEOUT_SECONDS
-    ): UploadResult = awaitUpload(context, timeoutSeconds) { done ->
-        uploadToWanderer(context, gpxFile, done)
-    }
-
-    /**
-     * Pushes the name and activity type of [summary] onto the already-uploaded Endurain activity
-     * [remoteActivityId]. Blocking; call off the main thread. Returns true on success.
-     */
-    fun updateEndurainMetadataBlocking(
-        context: Context,
-        remoteActivityId: String,
-        summary: BaseActivitySummary
-    ): Boolean {
-        val activityId = remoteActivityId.toIntOrNull() ?: return false
-        val serverUrl = GBApplication.getPrefs().preferences.getString(PREF_ENDURAIN_SERVER, null)
-            ?: return false
-        val tokenManager = EndurainTokenManager(context)
-        val apiClient = EndurainApiClient(serverUrl, tokenManager)
-        val kind = ActivityKind.fromCode(summary.activityKind)
-        val name = nameFor(context, summary)
-
-        val latch = CountDownLatch(1)
-        var success = false
-        tokenManager.performTokenRefresh(serverUrl) {
-            Thread {
-                success = try {
-                    apiClient.editActivity(activityId, kind, name)
-                } catch (e: Exception) {
-                    LOG.warn("Endurain editActivity failed for id {}", activityId, e)
-                    false
-                }
-                latch.countDown()
-            }.start()
-        }
-        return if (latch.await(DEFAULT_UPLOAD_TIMEOUT_SECONDS, TimeUnit.SECONDS)) success else false
-    }
-
-    /**
-     * Whether the Endurain activity [remoteActivityId] still exists. Refreshes the access token
-     * first, since a lookup with an expired one fails. Blocking; call off the main thread.
-     */
-    fun lookupEndurainActivityBlocking(context: Context, remoteActivityId: String): RemoteLookup {
-        val activityId = remoteActivityId.toIntOrNull() ?: return RemoteLookup.FAILED
-        val serverUrl = GBApplication.getPrefs().preferences.getString(PREF_ENDURAIN_SERVER, null)
-            ?: return RemoteLookup.FAILED
-        val tokenManager = EndurainTokenManager(context)
-        val apiClient = EndurainApiClient(serverUrl, tokenManager)
-
-        val latch = CountDownLatch(1)
-        var lookup = RemoteLookup.FAILED
-        tokenManager.performTokenRefresh(serverUrl) {
-            Thread {
-                lookup = when (apiClient.getActivityDetails(activityId)) {
-                    is EndurainActivityLookup.Found -> RemoteLookup.PRESENT
-                    is EndurainActivityLookup.Gone -> RemoteLookup.GONE
-                    is EndurainActivityLookup.Failed -> RemoteLookup.FAILED
-                }
-                latch.countDown()
-            }.start()
-        }
-        return if (latch.await(DEFAULT_UPLOAD_TIMEOUT_SECONDS, TimeUnit.SECONDS)) lookup else RemoteLookup.FAILED
-    }
-
-    /** Whether the Wanderer trail [trailId] still exists. Blocking; call off the main thread. */
-    fun lookupWandererTrailBlocking(context: Context, trailId: String): RemoteLookup {
-        val serverUrl = GBApplication.getPrefs().preferences.getString(PREF_WANDERER_SERVER, null)
-            ?: return RemoteLookup.FAILED
-        return when (WandererApiClient(serverUrl, WandererTokenManager(context)).trailExists(trailId)) {
-            true -> RemoteLookup.PRESENT
-            false -> RemoteLookup.GONE
-            null -> RemoteLookup.FAILED
-        }
-    }
-
-    /**
-     * Replaces the track of an existing Wanderer trail with [gpxFile], keeping the trail id.
-     * Blocking; call off the main thread. Returns true on success.
-     */
-    fun updateWandererTrackBlocking(
-        context: Context,
-        trailId: String,
-        gpxFile: File,
-        summary: BaseActivitySummary,
-        timeoutSeconds: Long = DEFAULT_UPLOAD_TIMEOUT_SECONDS
-    ): Boolean {
-        val serverUrl = GBApplication.getPrefs().preferences.getString(PREF_WANDERER_SERVER, null)
-            ?: return false
-        val apiClient = WandererApiClient(serverUrl, WandererTokenManager(context))
-        val latch = CountDownLatch(1)
-        var success = false
-        apiClient.updateActivityFile(trailId, gpxFile, wandererStatsOf(summary)) { ok, reason ->
-            success = ok
-            if (!ok) {
-                LOG.warn("Wanderer track update failed for trail {}: {}", trailId, reason)
-            }
-            latch.countDown()
-        }
-        return if (latch.await(timeoutSeconds, TimeUnit.SECONDS)) success else false
-    }
-
-    /**
-     * Trail statistics to send alongside a replacement track, since Wanderer stores the new file
-     * without re-deriving them. Values come from the workout summary, which is the authority on
-     * them anyway. Entries whose value the summary does not carry are left out, so the trail
-     * keeps what it had.
-     */
-    private fun wandererStatsOf(summary: BaseActivitySummary): Map<String, String> {
-        val data = summary.summaryData?.let {
-            try {
-                ActivitySummaryData.fromJson(it)
-            } catch (e: Exception) {
-                LOG.warn("Failed to parse stored summary data for summary {}", summary.id, e)
-                null
-            }
-        } ?: return emptyMap()
-
-        val stats = mutableMapOf<String, String>()
-        data.getNumber(ActivitySummaryEntries.DISTANCE_METERS, null)
-            ?.let { stats["distance"] = it.toString() }
-        data.getNumber(ActivitySummaryEntries.ACTIVE_SECONDS, null)
-            ?.let { stats["duration"] = it.toString() }
-        data.getNumber(ActivitySummaryEntries.ELEVATION_GAIN, null)
-            ?.let { stats["elevation_gain"] = it.toString() }
-        data.getNumber(ActivitySummaryEntries.ELEVATION_LOSS, null)
-            ?.let { stats["elevation_loss"] = it.toString() }
-        return stats
-    }
-
-    /**
-     * Why a re-create was not carried out, for the message shown to the user. Null means it was.
-     */
-    enum class RecreateRefusal { REMOTE_EDITED, FAILED }
-
-    /**
-     * Re-creates the Endurain activity [remoteActivityId] from [fitFile], because Endurain has
-     * no endpoint that replaces an activity's track: `PUT /api/v1/activities/edit` takes metadata
-     * only. Deleting and re-uploading is therefore the only way to push a track, and the reason
-     * this operation is destructive at all. An endpoint that replaced a track in place would
-     * remove the need for the whole function.
-     *
-     * Refuses when the remote activity carries anything the user wrote there (a description,
-     * private notes or a gear assignment), since re-creating would destroy it. Whatever the API
-     * does let us carry over is read first and restored afterwards, but the activity id changes,
-     * so links to it break and anything Endurain later attaches to an activity id would be lost.
-     *
-     * The re-upload reuses the workout's start time. Endurain wedges a start time that already
-     * carries two activities, and every upload at it fails with a 500 from then on, so a workout
-     * uploaded by hand more than once cannot be re-created at all:
-     * <https://codeberg.org/endurain-project/endurain/issues/858>.
-     *
-     * Blocking; call off the main thread. Returns the new [UploadResult] on success, or a
-     * [RecreateRefusal] describing why nothing was done.
-     */
-    fun recreateEndurainActivityBlocking(
-        context: Context,
-        summary: BaseActivitySummary,
-        remoteActivityId: String,
-        fitFile: File
-    ): Pair<UploadResult?, RecreateRefusal?> {
-        val activityId = remoteActivityId.toIntOrNull()
-            ?: return null to RecreateRefusal.FAILED
-        val serverUrl = GBApplication.getPrefs().preferences.getString(PREF_ENDURAIN_SERVER, null)
-            ?: return null to RecreateRefusal.FAILED
-        val tokenManager = EndurainTokenManager(context)
-        val apiClient = EndurainApiClient(serverUrl, tokenManager)
-
-        val details = when (val lookup = apiClient.getActivityDetails(activityId)) {
-            is EndurainActivityLookup.Failed -> return null to RecreateRefusal.FAILED
-
-            // Deleted on the server since we uploaded it. Nothing to preserve and nothing to
-            // delete, so this becomes a plain upload that adopts a new id.
-            is EndurainActivityLookup.Gone -> null
-
-            is EndurainActivityLookup.Found -> {
-                if (lookup.details.hasUserContent) {
-                    LOG.info("Not re-creating Endurain activity {}, it carries user edits", activityId)
-                    return null to RecreateRefusal.REMOTE_EDITED
-                }
-                val media = apiClient.listActivityMedia(activityId)
-                    ?: return null to RecreateRefusal.FAILED
-                if (media.size > 1) {
-                    LOG.info("Not re-creating Endurain activity {}, it carries extra media", activityId)
-                    return null to RecreateRefusal.REMOTE_EDITED
-                }
-                if (!apiClient.deleteActivity(activityId)) {
-                    return null to RecreateRefusal.FAILED
-                }
-                lookup.details
-            }
-        }
-
-        val result = uploadToEndurainBlocking(context, summary, fitFile)
-        if (!result.success || result.remoteActivityId == null) {
-            // The activity is already gone at this point, so the workout is left with no online
-            // copy until the next sync retries it.
-            LOG.error("Re-upload of summary {} failed after its activity was deleted", summary.id)
-            return null to RecreateRefusal.FAILED
-        }
-        if (details != null) {
-            result.remoteActivityId.toIntOrNull()?.let {
-                apiClient.restoreActivityDetails(
-                    it, ActivityKind.fromCode(summary.activityKind), nameFor(context, summary), details
-                )
-            }
-        }
-        return result to null
-    }
-
-    /**
      * Outcome of a header photo sync. [mediaId] is the media entry now holding the photo, null
      * when the photo was removed or the upload failed.
      */
     data class PhotoSyncResult(val success: Boolean, val mediaId: Int?)
 
     /**
-     * Brings the header photo of an already-uploaded Endurain activity in line with the local
-     * workout: deletes the media entry a previous sync created ([previousMediaId]) and uploads
-     * [photoFile], which may be null when the photo was removed locally.
-     *
-     * Media the user attached on the server is left alone, since only the entry Gadgetbridge
-     * created is deleted. Blocking; call off the main thread.
+     * Runs a service's callback-style upload to completion, answering a failure the user can read
+     * when it never comes back. Blocking: call from an IO context.
      */
-    fun syncEndurainPhotoBlocking(
+    fun awaitUpload(
         context: Context,
-        remoteActivityId: String,
-        photoFile: File?,
-        previousMediaId: Int?,
-        timeoutSeconds: Long = DEFAULT_UPLOAD_TIMEOUT_SECONDS
-    ): PhotoSyncResult {
-        val activityId = remoteActivityId.toIntOrNull()
-        if (activityId == null) {
-            LOG.warn("Cannot sync photo: non-numeric Endurain activity id '{}'", remoteActivityId)
-            return PhotoSyncResult(false, previousMediaId)
-        }
-        val serverUrl = GBApplication.getPrefs().preferences.getString(PREF_ENDURAIN_SERVER, null)
-            ?: return PhotoSyncResult(false, previousMediaId)
-        val tokenManager = EndurainTokenManager(context)
-        val apiClient = EndurainApiClient(serverUrl, tokenManager)
-
-        val latch = CountDownLatch(1)
-        var result = PhotoSyncResult(false, previousMediaId)
-        tokenManager.performTokenRefresh(serverUrl) {
-            Thread {
-                try {
-                    var removed = previousMediaId == null
-                    if (previousMediaId != null) {
-                        removed = apiClient.deleteActivityMedia(activityId, previousMediaId)
-                        if (!removed) {
-                            // Already gone server-side counts as removed, so a photo replaced
-                            // after a manual deletion still goes through.
-                            val remaining = apiClient.listActivityMedia(activityId)
-                            removed = remaining != null && remaining.none { it.id == previousMediaId }
-                        }
-                    }
-                    if (photoFile == null) {
-                        result = PhotoSyncResult(removed, null)
-                        latch.countDown()
-                    } else {
-                        apiClient.uploadActivityPhoto(activityId, photoFile) { mediaId ->
-                            result = PhotoSyncResult(mediaId != null, mediaId)
-                            latch.countDown()
-                        }
-                    }
-                } catch (e: Exception) {
-                    LOG.error("Endurain photo sync failed for activity {}", activityId, e)
-                    latch.countDown()
-                }
-            }.start()
-        }
-        return if (latch.await(timeoutSeconds, TimeUnit.SECONDS)) result else PhotoSyncResult(false, previousMediaId)
-    }
-
-    private inline fun awaitUpload(
-        context: Context,
-        timeoutSeconds: Long,
+        timeoutSeconds: Long = DEFAULT_UPLOAD_TIMEOUT_SECONDS,
         start: ((UploadResult) -> Unit) -> Unit
-    ): UploadResult {
-        val latch = CountDownLatch(1)
-        var result = UploadResult(false, null, null)
-        start { r ->
-            result = r
-            latch.countDown()
-        }
-        if (!latch.await(timeoutSeconds, TimeUnit.SECONDS)) {
-            return UploadResult(false, null, context.getString(R.string.auto_upload_timed_out))
-        }
-        return result
-    }
+    ): UploadResult = ExternalServiceCalls.await(timeoutSeconds, start)
+        ?: UploadResult(false, null, context.getString(R.string.auto_upload_timed_out))
 
     const val DEFAULT_UPLOAD_TIMEOUT_SECONDS = 90L
 }

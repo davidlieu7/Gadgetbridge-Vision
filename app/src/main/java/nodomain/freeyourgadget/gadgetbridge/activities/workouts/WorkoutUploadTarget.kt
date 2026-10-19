@@ -1,4 +1,4 @@
-/*  Copyright (C) 2026 Dany Mestas
+/*  Copyright (C) 2026 Dany Mestas, José Rebelo
 
     This file is part of Gadgetbridge.
 
@@ -17,86 +17,145 @@
 package nodomain.freeyourgadget.gadgetbridge.activities.workouts
 
 import android.content.Context
-import androidx.annotation.IdRes
-import androidx.annotation.StringRes
-import nodomain.freeyourgadget.gadgetbridge.GBApplication
 import nodomain.freeyourgadget.gadgetbridge.R
-import nodomain.freeyourgadget.gadgetbridge.externalservices.endurain.EndurainTokenManager
-import nodomain.freeyourgadget.gadgetbridge.externalservices.wanderer.WandererTokenManager
 import nodomain.freeyourgadget.gadgetbridge.entities.BaseActivitySummary
 import nodomain.freeyourgadget.gadgetbridge.entities.WorkoutUpload
+import nodomain.freeyourgadget.gadgetbridge.externalservices.ExternalService
+import nodomain.freeyourgadget.gadgetbridge.externalservices.ExternalServiceRegistry
 import nodomain.freeyourgadget.gadgetbridge.util.GBPrefs
 import java.io.File
 
-/** File format a service accepts when an activity is uploaded. */
-enum class WorkoutPayloadFormat { FIT, GPX }
+/**
+ * File format a service accepts when an activity is uploaded. A GPX is a route, so it can only be
+ * written for a workout that has one; a FIT is synthesized from the summary alone when it has not.
+ */
+enum class WorkoutPayloadFormat(val needsTrack: Boolean) { FIT(false), GPX(true) }
+
+/** What a service will let be done to one of the things it holds. */
+enum class RemoteOp {
+    /** Put it there in the first place. */
+    CREATE,
+
+    /** Change it where it stands, keeping its identity and anything the user did to it. */
+    UPDATE,
+
+    /** Change it only by removing it and putting a new one there, so its identity changes. */
+    REPLACE,
+
+    /** Take it away and leave nothing behind. */
+    DELETE
+}
+
+/** Whether these operations amount to a way of making something match the local workout. */
+fun Set<RemoteOp>.canChange(): Boolean = RemoteOp.UPDATE in this || RemoteOp.REPLACE in this
 
 /**
- * Outcome of bringing the track of an already-uploaded activity in line with the local workout.
- *
- * [newRemoteActivityId] and [newPhotoMediaId] are set when the service could only do this by
- * re-creating the activity, so the caller stores the new ids. [unsupported] means the service
- * offers no way to do it at all and there is nothing to retry. [refusal] is a localized reason
- * the update was deliberately not attempted, to show the user.
+ * What a service will do with an activity, beyond taking it in the first place. The engine asks
+ * this before it does any work, so a step the service has no way of taking costs nothing to skip
+ * rather than an export and a request that fail on every sync.
  */
-data class TrackUpdateResult(
-    val success: Boolean,
-    val newRemoteActivityId: String? = null,
-    val newPhotoMediaId: Int? = null,
-    val refusal: String? = null,
-    val unsupported: Boolean = false
-)
+data class UploadCapabilities(
+    /** Accepted formats, most preferred first. */
+    val formats: List<WorkoutPayloadFormat>,
+
+    /** The activity, which is to say the track inside it. */
+    val activity: Set<RemoteOp>,
+
+    /** Its name and activity kind. */
+    val metadata: Set<RemoteOp>,
+
+    /** Its header photo. */
+    val media: Set<RemoteOp>
+) {
+    /**
+     * Format to export [summary] in, or null when the service can take no form of this workout.
+     *
+     * The choice turns on nothing but whether the workout has a track, and has to stay that way:
+     * a re-sync is triggered by the exported file's fingerprint and no column records which format
+     * was sent, so a choice that could differ between two runs would re-upload on every sync.
+     */
+    fun formatFor(summary: BaseActivitySummary): WorkoutPayloadFormat? =
+        formats.firstOrNull { !it.needsTrack || WorkoutUploader.summaryHasTrack(summary) }
+
+    /** Whether this service can take [summary] at all. */
+    fun appliesTo(summary: BaseActivitySummary): Boolean = formatFor(summary) != null
+
+    /** Whether the name and activity kind can be pushed onto an activity that already exists. */
+    val editableMetadata: Boolean get() = RemoteOp.UPDATE in metadata
+
+    /**
+     * Whether the service can bring its copy of the header photo in line, which depends on which
+     * way it changed: a service that takes a photo on upload and offers nothing afterwards can
+     * neither replace nor remove one.
+     */
+    fun canSyncMedia(hadPhoto: Boolean, hasPhoto: Boolean): Boolean = when {
+        hadPhoto && !hasPhoto -> RemoteOp.DELETE in media
+        !hadPhoto && hasPhoto -> RemoteOp.CREATE in media
+        else -> media.canChange()
+    }
+}
 
 /** Whether a service still holds an activity it was given. [FAILED] means it could not be asked. */
 enum class RemoteLookup { PRESENT, GONE, FAILED }
 
+/** Outcome of bringing the track of an already-uploaded activity in line with the local workout. */
+sealed interface TrackUpdateResult {
+    /** The remote activity now carries the current track, under the id it already had. */
+    object Updated : TrackUpdateResult
+
+    /**
+     * The service could only do it by re-creating the activity, so the caller stores the new ids.
+     */
+    data class Recreated(val remoteActivityId: String, val photoMediaId: Int?) : TrackUpdateResult
+
+    /**
+     * The service could have done it and deliberately did not, for a reason the user has to
+     * resolve. [message] is localized and is shown once rather than on every sync.
+     */
+    data class Refused(val message: String) : TrackUpdateResult
+
+    /** It did not go through this time; the next run retries. */
+    object Failed : TrackUpdateResult
+}
+
 /**
- * One online fitness tracker, described by what it accepts and by what it can still change on an
- * activity after the initial upload. [WorkoutUploadWorker] drives every service through this, so
- * supporting another one means adding an implementation rather than another branch.
+ * An [ExternalService] that takes workouts, described by what it accepts and by what it can still
+ * change on an activity after the initial upload. [WorkoutUploadWorker] drives every service
+ * through this, so supporting another one means adding an implementation rather than another
+ * branch.
  */
-interface WorkoutUploadTarget {
+interface WorkoutUploadTarget : ExternalService {
     /**
      * Value stored in `WorkoutUpload.service`. Persisted, so see the registry in
      * [WorkoutUploadStore] before choosing one.
      */
     val service: Int
 
-    /** The service's own name, for anything that lists services to the user. */
-    @get:StringRes
-    val nameRes: Int
-
-    /** Menu item that uploads the workout on screen to this service. */
-    @get:IdRes
-    val uploadMenuItemRes: Int
-
-    /** Format to export a workout in for this service. */
-    val format: WorkoutPayloadFormat
-
-    /** Whether a workout with no GPS track can be uploaded at all. */
-    val requiresTrack: Boolean
-
-    /** Notification id used to report a failure, so services do not overwrite each other. */
-    val failureNotificationId: Int
-
-    /** Whether the user has finished setting this service up: an address and valid credentials. */
-    fun isLoggedIn(context: Context): Boolean
-
-    /** Whether the user asked for workouts to be uploaded to this service automatically. */
-    fun isAutoUploadEnabled(prefs: GBPrefs): Boolean
-
-    /** Localized "upload to this service failed: %s" message, for the auto-upload notification. */
-    fun failureMessage(context: Context, reason: String): String
-
-    /** Localized confirmation that this service took the workout. */
-    @get:StringRes
-    val uploadedRes: Int
+    /** What this service accepts, and what it can still change once it holds an activity. */
+    val capabilities: UploadCapabilities
 
     /**
-     * Localized "the upload to this service failed" message for an upload the user asked for,
-     * carrying [reason] when the service gave one.
+     * Notification id used to report a failure. Derived from [service], which is unique and never
+     * reused, so two services cannot end up overwriting each other's notification.
      */
-    fun uploadFailedMessage(context: Context, reason: String?): String
+    val failureNotificationId: Int
+        get() = FAILURE_NOTIFICATION_ID_BASE + service
+
+    /** Whether the user asked for workouts to be uploaded to this service automatically. */
+    fun isAutoUploadEnabled(prefs: GBPrefs): Boolean = prefs.getBoolean(autoUploadPrefKey, false)
+
+    /** Localized confirmation that this service took the workout. */
+    fun uploadedMessage(context: Context): String =
+        context.getString(R.string.service_upload_succeeded, context.getString(nameRes))
+
+    /**
+     * Localized "the upload to this service failed" message, carrying [reason] when the service
+     * gave one. Used both for the toast after an upload the user asked for and for the
+     * notification an auto-upload failure raises.
+     */
+    fun uploadFailedMessage(context: Context, reason: String?): String =
+        reason?.let { context.getString(R.string.service_upload_failed, context.getString(nameRes), it) }
+            ?: context.getString(R.string.service_upload_failed_generic, context.getString(nameRes))
 
     /**
      * Web address of the activity [remoteActivityId] on the service, for opening it in a browser,
@@ -110,16 +169,20 @@ interface WorkoutUploadTarget {
         payload: File
     ): WorkoutUploader.UploadResult
 
-    /** Pushes the name and activity kind onto an activity that already exists remotely. */
+    /**
+     * Pushes the name and activity kind onto an activity that already exists remotely. Called only
+     * when [UploadCapabilities.editableMetadata].
+     */
     fun updateMetadata(
         context: Context,
         remoteActivityId: String,
         summary: BaseActivitySummary
-    ): Boolean
+    ): Boolean = false
 
     /**
-     * Makes the track of the remote activity match [payload]. [row] is what was last uploaded, so
-     * a service that has to re-create the activity can tell a track being added from one merely
+     * Makes the track of the remote activity match [payload], which is called only when
+     * [UploadCapabilities.trackUpdate] says there is a way. [row] is what was last uploaded, so a
+     * service that has to re-create the activity can tell a track being added from one merely
      * changing, and can weigh that against how destructive re-creating is.
      */
     fun updateTrack(
@@ -128,195 +191,51 @@ interface WorkoutUploadTarget {
         payload: File,
         summary: BaseActivitySummary,
         row: WorkoutUpload
-    ): TrackUpdateResult
+    ): TrackUpdateResult = TrackUpdateResult.Failed
 
     /**
-     * Brings the header photo of an existing remote activity in line with the local workout, or
-     * null when the service has no media API. [photoFile] is null when the photo was removed.
+     * Brings the header photo of an existing remote activity in line with the local workout, which
+     * is called only when [UploadCapabilities.media]. [photoFile] is null when the photo was
+     * removed.
      */
     fun syncPhoto(
         context: Context,
         remoteActivityId: String,
         photoFile: File?,
         previousMediaId: Int?
-    ): WorkoutUploader.PhotoSyncResult?
+    ): WorkoutUploader.PhotoSyncResult = WorkoutUploader.PhotoSyncResult(false, previousMediaId)
 
     /**
      * Asks the service whether it still holds [remoteActivityId], which it no longer does once the
      * user deleted it there. Null when the service offers no way to tell. Blocking.
      */
-    fun lookupRemote(context: Context, remoteActivityId: String): RemoteLookup?
+    fun lookupRemote(context: Context, remoteActivityId: String): RemoteLookup? = null
+
+    companion object {
+        /** Clear of the ids the rest of the app posts notifications under. */
+        const val FAILURE_NOTIFICATION_ID_BASE = 4710
+    }
 }
 
-/** Every supported upload target. */
+/** Every registered service that takes workouts. */
 object WorkoutUploadTargets {
-    val ALL: List<WorkoutUploadTarget> = listOf(EndurainUploadTarget, WandererUploadTarget)
-
-    /** Targets the user has both enabled and finished setting up. */
-    fun active(context: Context, prefs: GBPrefs): List<WorkoutUploadTarget> =
-        ALL.filter { it.isAutoUploadEnabled(prefs) && it.isLoggedIn(context) }
-}
-
-object EndurainUploadTarget : WorkoutUploadTarget {
-    override val service = WorkoutUploadStore.SERVICE_ENDURAIN
-    override val nameRes = R.string.pref_category_endurain
-    override val uploadMenuItemRes = R.id.activity_action_upload_to_endurain
-    override val format = WorkoutPayloadFormat.FIT
-
-    // A FIT can be synthesized from the summary alone, so a trackless workout still uploads.
-    override val requiresTrack = false
-
-    override val failureNotificationId = 4711
-
-    private fun serverUrl(): String? = GBApplication.getPrefs().preferences
-        .getString(WorkoutUploader.PREF_ENDURAIN_SERVER, null)
-
-    override fun isLoggedIn(context: Context) =
-        serverUrl() != null && EndurainTokenManager(context).isLoggedIn()
-
-    override fun isAutoUploadEnabled(prefs: GBPrefs) =
-        prefs.getBoolean(GBPrefs.ENDURAIN_AUTO_UPLOAD_ENABLED, false)
-
-    override fun failureMessage(context: Context, reason: String): String =
-        context.getString(R.string.auto_upload_failed_endurain, reason)
-
-    override val uploadedRes = R.string.endurain_successfully_uploaded_toast
-
-    override fun uploadFailedMessage(context: Context, reason: String?): String =
-        reason ?: context.getString(R.string.endurain_error_while_uploading_toast)
-
-    override fun activityUrl(context: Context, remoteActivityId: String): String? {
-        val server = serverUrl() ?: return null
-        return "${server.trimEnd('/')}/activity/$remoteActivityId"
-    }
-
-    override fun upload(context: Context, summary: BaseActivitySummary, payload: File) =
-        WorkoutUploader.uploadToEndurainBlocking(context, summary, payload)
-
-    override fun updateMetadata(context: Context, remoteActivityId: String, summary: BaseActivitySummary) =
-        WorkoutUploader.updateEndurainMetadataBlocking(context, remoteActivityId, summary)
+    val ALL: List<WorkoutUploadTarget>
+        get() = ExternalServiceRegistry.services.filterIsInstance<WorkoutUploadTarget>()
 
     /**
-     * Endurain can edit an activity's metadata but never its track, so the only way to push a
-     * changed track is to delete the activity and upload it again under a new id.
-     *
-     * That is allowed unconditionally only when it is purely additive: the activity was uploaded
-     * without a track and now has one, which is the case of a workout synced from a watch that
-     * records none, with a GPX attached afterwards. Any other change re-creates an activity the
-     * user may have been looking at for a while, so it needs their explicit consent.
+     * Targets the user has finished setting up, whether or not they take workouts on their own.
+     * This is the set a workout can be sent to at all, so it is what the screens showing upload
+     * state answer against.
      */
-    override fun updateTrack(
-        context: Context,
-        remoteActivityId: String,
-        payload: File,
-        summary: BaseActivitySummary,
-        row: WorkoutUpload
-    ): TrackUpdateResult {
-        val trackAdded = row.hadTrack != true && WorkoutUploader.summaryHasTrack(summary)
-        val allowed = trackAdded || GBApplication.getPrefs()
-            .getBoolean(GBPrefs.ENDURAIN_REPLACE_ON_TRACK_CHANGE, false)
-        if (!allowed) {
-            return TrackUpdateResult(success = false, unsupported = true)
-        }
-
-        val (result, refusal) = WorkoutUploader.recreateEndurainActivityBlocking(
-            context, summary, remoteActivityId, payload
-        )
-        if (result != null) {
-            return TrackUpdateResult(
-                success = true,
-                newRemoteActivityId = result.remoteActivityId,
-                newPhotoMediaId = result.photoMediaId
-            )
-        }
-        return TrackUpdateResult(
-            success = false,
-            refusal = when (refusal) {
-                WorkoutUploader.RecreateRefusal.REMOTE_EDITED ->
-                    context.getString(R.string.auto_upload_endurain_remote_edited)
-
-                else -> null
-            }
-        )
-    }
-
-    override fun syncPhoto(
-        context: Context,
-        remoteActivityId: String,
-        photoFile: File?,
-        previousMediaId: Int?
-    ) = WorkoutUploader.syncEndurainPhotoBlocking(context, remoteActivityId, photoFile, previousMediaId)
-
-    override fun lookupRemote(context: Context, remoteActivityId: String) =
-        WorkoutUploader.lookupEndurainActivityBlocking(context, remoteActivityId)
-}
-
-object WandererUploadTarget : WorkoutUploadTarget {
-    override val service = WorkoutUploadStore.SERVICE_WANDERER
-    override val nameRes = R.string.pref_category_wanderer
-    override val uploadMenuItemRes = R.id.activity_action_upload_to_wanderer
-    override val format = WorkoutPayloadFormat.GPX
-
-    // Wanderer stores trails, so there is nothing to upload without a track.
-    override val requiresTrack = true
-
-    override val failureNotificationId = 4712
-
-    private fun serverUrl(): String? = GBApplication.getPrefs().preferences
-        .getString(WorkoutUploader.PREF_WANDERER_SERVER, null)
-
-    override fun isLoggedIn(context: Context) =
-        serverUrl() != null && WandererTokenManager(context).isLoggedIn()
-
-    override fun isAutoUploadEnabled(prefs: GBPrefs) =
-        prefs.getBoolean(GBPrefs.WANDERER_AUTO_UPLOAD_ENABLED, false)
-
-    override fun failureMessage(context: Context, reason: String): String =
-        context.getString(R.string.auto_upload_failed_wanderer, reason)
-
-    override val uploadedRes = R.string.wanderer_toast_successfully_uploaded
-
-    override fun uploadFailedMessage(context: Context, reason: String?): String =
-        context.getString(
-            R.string.wanderer_toast_upload_error,
-            reason ?: context.getString(R.string.unknown_error)
-        )
+    @JvmStatic
+    fun configured(context: Context): List<WorkoutUploadTarget> =
+        ALL.filter { it.isLoggedIn(context) }
 
     /**
-     * A trail page is namespaced by the handle of the account that owns it, and a handle that does
-     * not resolve answers 500 rather than falling back to the trail, so there is no link to give
-     * until the handle is known.
+     * Targets set up and asked to take every synced workout without being told to, which is the
+     * set the background worker drives.
      */
-    override fun activityUrl(context: Context, remoteActivityId: String): String? {
-        val server = serverUrl() ?: return null
-        val handle = WandererTokenManager(context).getHandle() ?: return null
-        return "${server.trimEnd('/')}/trail/view/@$handle/$remoteActivityId"
-    }
-
-    override fun upload(context: Context, summary: BaseActivitySummary, payload: File) =
-        WorkoutUploader.uploadToWandererBlocking(context, payload)
-
-    // Wanderer infers a trail's name and type from the uploaded file.
-    override fun updateMetadata(context: Context, remoteActivityId: String, summary: BaseActivitySummary) = true
-
-    // Wanderer replaces the track on the existing trail, so the id and the user's edits survive.
-    override fun updateTrack(
-        context: Context,
-        remoteActivityId: String,
-        payload: File,
-        summary: BaseActivitySummary,
-        row: WorkoutUpload
-    ) = TrackUpdateResult(
-        success = WorkoutUploader.updateWandererTrackBlocking(context, remoteActivityId, payload, summary)
-    )
-
-    override fun syncPhoto(
-        context: Context,
-        remoteActivityId: String,
-        photoFile: File?,
-        previousMediaId: Int?
-    ): WorkoutUploader.PhotoSyncResult? = null
-
-    override fun lookupRemote(context: Context, remoteActivityId: String) =
-        WorkoutUploader.lookupWandererTrailBlocking(context, remoteActivityId)
+    @JvmStatic
+    fun autoUploadEnabled(context: Context, prefs: GBPrefs): List<WorkoutUploadTarget> =
+        configured(context).filter { it.isAutoUploadEnabled(prefs) }
 }
