@@ -1229,7 +1229,7 @@
         </activity>
 
         <activity
-            android:name=".externalservices.endurain.EndurainOAuthCallbackActivity"
+            android:name=".externalservices.ExternalServiceOAuthCallbackActivity"
             android:exported="true"
             android:launchMode="singleTop">
             <intent-filter>
@@ -1237,10 +1237,9 @@
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
 
-                <!-- Deep link scheme for OAuth callback -->
+                <!-- Where a service's login sends the browser back; the host names the service -->
                 <data
                     android:scheme="${appAuthRedirectScheme}"
-                    android:host="endurain"
                     android:pathPrefix="/oauth/callback" />
             </intent-filter>
         </activity>
