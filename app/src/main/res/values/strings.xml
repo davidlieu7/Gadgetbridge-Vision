@@ -2448,6 +2448,7 @@
     <string name="devicetype_pinetime_jf" translatable="false">PineTime (JF Firmware)</string>
     <string name="devicetype_polarh9" translatable="false">Polar H9</string>
     <string name="devicetype_polarh10" translatable="false">Polar H10</string>
+    <string name="devicetype_polar_ignite_3" translatable="false">Polar Ignite 3</string>
     <string name="devicetype_sonyswr12" translatable="false">Sony SWR12</string>
     <string name="devicetype_waspos" translatable="false">Wasp-OS</string>
     <string name="devicetype_smaq2oss" translatable="false">SMA-Q2 OSS</string>
