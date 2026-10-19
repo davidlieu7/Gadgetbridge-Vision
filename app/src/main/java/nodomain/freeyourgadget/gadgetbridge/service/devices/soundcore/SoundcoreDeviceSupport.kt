@@ -27,6 +27,7 @@ import nodomain.freeyourgadget.gadgetbridge.activities.multipoint.MultipointPair
 import nodomain.freeyourgadget.gadgetbridge.util.kotlin.getParcelableCompat
 import android.content.Context
 import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreEarbudsCoordinator
+import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreEarbudsCoordinator.Capability
 import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEvent
 import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEventUpdateDeviceState
 import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEventVersionInfo
@@ -45,8 +46,9 @@ open class SoundcoreDeviceSupport : AbstractHeadphoneSerialDeviceSupportV2<Sound
             val intentDevice = intent.getParcelableCompat<GBDevice>(GBDevice.EXTRA_DEVICE)
             if (intentDevice?.address != getDevice().address) return
             val action = intent.action ?: return
-            val actions = (getDevice().deviceCoordinator as SoundcoreEarbudsCoordinator)
-                .getSupportedMultipointActions()
+            val coordinator = getDevice().deviceCoordinator as SoundcoreEarbudsCoordinator
+            if (!coordinator.supports(getDevice(), Capability.Multipoint)) return
+            val actions = coordinator.getSupportedMultipointActions()
             if (action !in actions) return
 
             when (action) {
@@ -163,7 +165,9 @@ open class SoundcoreDeviceSupport : AbstractHeadphoneSerialDeviceSupportV2<Sound
 
         addSupportedService(coordinator.getServiceUUID() ?: getServiceUUID(coordinator.getModelName()))
         val actions = coordinator.getSupportedMultipointActions()
-        if (actions.isNotEmpty() && !multipointReceiverRegistered) {
+        if (coordinator.supports(gbDevice, Capability.Multipoint) &&
+            actions.isNotEmpty() && !multipointReceiverRegistered
+        ) {
             val filter = IntentFilter().apply { actions.forEach { addAction(it) } }
             LocalBroadcastManager.getInstance(context).registerReceiver(multipointReceiver, filter)
             multipointReceiverRegistered = true
