@@ -543,6 +543,17 @@
         <item>@string/p_scheduled</item>
     </string-array>
 
+    <string-array name="polar_continuous_hr">
+        <item>@string/off</item>
+        <item>@string/polar_continuous_hr_always</item>
+        <item>@string/polar_continuous_hr_night</item>
+    </string-array>
+    <string-array name="polar_continuous_hr_values">
+        <item>@string/p_off</item>
+        <item>@string/p_always</item>
+        <item>night</item>
+    </string-array>
+
     <string-array name="do_not_disturb_always_scheduled">
         <item>@string/mi2_dnd_off</item>
         <item>@string/mi2_dnd_always</item>

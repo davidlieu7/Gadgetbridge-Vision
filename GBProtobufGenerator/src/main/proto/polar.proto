@@ -283,3 +283,633 @@ message PbPftpDHMediaControlRequest {
 message PbPftpDHMediaControlEnabled {
   optional bool enabled = 1;
 }
+
+message PbUserDeviceAlarmSettings {
+  enum PbAlarmMode {
+    ALARM_MODE_OFF = 1;
+    ALARM_MODE_ONCE = 2;
+    ALARM_MODE_MON_TO_FRI = 3;
+    ALARM_MODE_EVERY_DAY = 4;
+  }
+  optional PbUserDeviceAlarmSettings.PbAlarmMode alarm_mode = 1;
+  optional PbTime alarm_time = 2;
+}
+
+message PbUserDeviceAutoSyncSettings {
+  optional bool enabled = 1;
+}
+
+message PbIntelligentTimedMeasurementSettings {
+  optional PbTime start_time = 1;
+}
+
+message PbTimedMeasurementSettings {
+  optional PbTime start_time = 1;
+  optional PbTime end_time = 2;
+}
+
+message PbAutomaticMeasurementSettings {
+  enum PbAutomaticMeasurementState {
+    OFF = 0;
+    ALWAYS_ON = 1;
+    INTELLIGENT_TIMED = 2;
+    TIMED = 3;
+  }
+  optional PbAutomaticMeasurementSettings.PbAutomaticMeasurementState state = 1;
+  optional PbTimedMeasurementSettings timed_settings = 2;
+  optional PbIntelligentTimedMeasurementSettings intelligent_timed_settings = 3;
+}
+
+message PbAutomaticTrainingDetectionSettings {
+  enum PbAutomaticTrainingDetectionState {
+    OFF = 0;
+    ON = 1;
+  }
+  optional PbAutomaticTrainingDetectionSettings.PbAutomaticTrainingDetectionState state = 1;
+  optional uint32 sensitivity = 2;
+  optional uint32 minimum_training_duration_seconds = 3;
+}
+
+message PbUserAutomaticMeasurementSettings {
+  optional PbAutomaticMeasurementSettings automatic_ohr_measurement = 1;
+  optional PbAutomaticTrainingDetectionSettings automatic_training_detection_settings = 2;
+}
+
+message PbUserDeviceAutomaticSampleSettings {
+  optional bool ohr_247_enabled = 1;
+}
+
+message PbDuration {
+  optional uint32 hours = 1;
+  optional uint32 minutes = 2;
+  optional uint32 seconds = 3;
+  optional uint32 millis = 4;
+}
+
+message PbBreathingExerciseSettings {
+  optional PbDuration duration = 1;
+  optional uint32 target_inhale_duration = 2;
+  optional uint32 target_exhale_duration = 3;
+}
+
+message PbUserDeviceCountdownSettings {
+  optional PbDuration countdown_time = 1;
+}
+
+message PbUserDeviceDaylightSaving {
+  optional PbSystemDateTime next_daylight_saving_time = 1;
+  optional sint32 offset = 2;
+}
+
+message PbUserDeviceDoNotDisturbSettings {
+  enum PbDoNotDisturbSettingSource {
+    SOURCE_USER = 0;
+    SOURCE_TIMED = 1;
+  }
+  optional bool do_not_disturb_on = 1;
+  optional PbUserDeviceDoNotDisturbSettings.PbDoNotDisturbSettingSource setting_source = 2;
+}
+
+message PbTimedDoNotDisturbSettings {
+  optional PbTime start = 1;
+  optional PbTime end = 2;
+}
+
+message PbUserDeviceDoNotDisturbSettings_v2 {
+  enum PbDoNotDisturbState {
+    OFF = 0;
+    ON = 1;
+    TIMED = 2;
+  }
+  optional PbUserDeviceDoNotDisturbSettings_v2.PbDoNotDisturbState state = 1;
+  optional PbTimedDoNotDisturbSettings timed_settings = 2;
+}
+
+message PbUserEndTimeEstimatorSettings {
+  optional float end_time_estimator_target = 1;
+}
+
+enum PbHandedness {
+  WU_IN_LEFT_HAND = 1;
+  WU_IN_RIGHT_HAND = 2;
+  WU_IN_NECKLACE = 3;
+}
+
+enum PbTimeSelection {
+  TIME_1 = 1;
+  TIME_2 = 2;
+}
+
+message PbVolume {
+  optional uint32 volume = 1;
+}
+
+message PbUserDashboardSettings {
+  enum PbDashboard {
+    BASIC = 1;
+    ACTIVITY = 2;
+    TRAINING_LOAD = 3;
+    HEART_RATE = 4;
+    SLEEP = 5;
+    LAST_TRAINING = 6;
+    ON_DEMAND_TRAINING = 7;
+    WEATHER = 8;
+    WEEKLY_SUMMARY = 9;
+  }
+  optional PbUserDashboardSettings.PbDashboard dashboard = 1;
+  repeated PbUserDashboardSettings.PbDashboard available_dashboards = 2;
+}
+
+enum PbDeviceLocation {
+  DEVICE_LOCATION_UNDEFINED = 0;
+  DEVICE_LOCATION_OTHER = 1;
+  DEVICE_LOCATION_WRIST_LEFT = 2;
+  DEVICE_LOCATION_WRIST_RIGHT = 3;
+  DEVICE_LOCATION_NECKLACE = 4;
+  DEVICE_LOCATION_CHEST = 5;
+  DEVICE_LOCATION_UPPER_BACK = 6;
+  DEVICE_LOCATION_FOOT_LEFT = 7;
+  DEVICE_LOCATION_FOOT_RIGHT = 8;
+  DEVICE_LOCATION_LOWER_ARM_LEFT = 9;
+  DEVICE_LOCATION_LOWER_ARM_RIGHT = 10;
+  DEVICE_LOCATION_UPPER_ARM_LEFT = 11;
+  DEVICE_LOCATION_UPPER_ARM_RIGHT = 12;
+  DEVICE_LOCATION_BIKE_MOUNT = 13;
+}
+
+message PbUserDeviceGeneralSettings {
+  enum PbWatchFace {
+    BASIC = 1;
+    AWARD = 2;
+    USER_NAME = 3;
+    EVENT = 4;
+    ANALOG = 5;
+    BIG = 6;
+    ACTIVITY = 7;
+    BIG_ANALOG = 8;
+    WHITE_ANALOG = 9;
+    JUMBO = 10;
+    BIG_DIGITS = 11;
+    ACTIVITY_CIRCLE = 12;
+  }
+  enum PbButtonLockMode {
+    MANUAL = 1;
+    AUTO = 2;
+  }
+  enum PbFlightMode {
+    FLIGHTMODE_OFF = 1;
+    FLIGHTMODE_ON = 2;
+  }
+  enum PbInactivityAlert {
+    INACTIVITY_ALERT_OFF = 1;
+    INACTIVITY_ALERT_ON = 2;
+  }
+  enum PbTapButtonSensitivity {
+    TAP_BUTTON_SENSITIVITY_OFF = 1;
+    TAP_BUTTON_SENSITIVITY_LOW = 2;
+    TAP_BUTTON_SENSITIVITY_MEDIUM = 3;
+    TAP_BUTTON_SENSITIVITY_HIGH = 4;
+    TAP_BUTTON_SENSITIVITY_VERY_LOW = 5;
+  }
+  enum PbVibrationFeedbackMode {
+    VIBRATION_FEEDBACK_DISABLED = 0;
+    VIBRATION_FEEDBACK_ENABLED = 2;
+  }
+  optional PbTimeSelection OBSOLETE_time_selection = 1;
+  optional int32 OBSOLETE_time2_offset = 2;
+  optional PbUserDeviceGeneralSettings.PbWatchFace watch_face = 3;
+  optional PbUserDeviceGeneralSettings.PbButtonLockMode button_lock_mode = 4;
+  optional PbVolume button_sound_volume = 5;
+  optional bool vibration_mode = 7;
+  optional PbHandedness OBSOLETE_handedness = 8;
+  optional bool exeview_inverted = 9;
+  optional PbUserDeviceGeneralSettings.PbTapButtonSensitivity tap_button_sensitivity = 10;
+  optional PbUserDeviceGeneralSettings.PbInactivityAlert inactivity_alert = 11;
+  optional bool ble_connect_mode_enable = 12;
+  optional PbUserDeviceGeneralSettings.PbWatchFace backup_watch_face = 13;
+  optional PbUserDeviceGeneralSettings.PbFlightMode flightmode = 14;
+  optional PbDeviceLocation device_location = 15;
+  optional uint32 watch_face_color = 16;
+  optional PbUserDashboardSettings dashboard_settings = 17;
+  optional PbUserDeviceGeneralSettings.PbVibrationFeedbackMode vibration_feedback_mode = 18;
+}
+
+message PbSatelliteSystemSettings {
+  optional bool gps_enabled = 1;
+  optional bool glonass_enabled = 2;
+  optional bool galileo_enabled = 3;
+  optional bool sbas_enabled = 4;
+  optional bool beidou_enabled = 5;
+  optional bool qzss_enabled = 6;
+}
+
+message PbGnssSettings {
+  optional PbSatelliteSystemSettings satellite_system_settings = 1;
+}
+
+message PbIntervalTimerValue {
+  enum PbIntervalTimerType {
+    INTERVAL_TIMER_TYPE_DURATION = 1;
+    INTERVAL_TIMER_TYPE_DISTANCE = 2;
+  }
+  optional PbIntervalTimerValue.PbIntervalTimerType interval_timer_type = 1;
+  optional PbDuration interval_timer_duration = 2;
+  optional float interval_timer_distance = 3;
+}
+
+message PbUserIntervalTimerSettings {
+  repeated PbIntervalTimerValue interval_timer_value = 1;
+}
+
+message PbUserDeviceJumpTestSettings {
+  optional PbDuration cont_jump_duration = 1;
+}
+
+message PbUserMapSettings {
+  enum PbMapTopDirection {
+    TOP_DIRECTION_NORTH = 1;
+    TOP_DIRECTION_HEADING = 2;
+  }
+  optional PbUserMapSettings.PbMapTopDirection map_top_direction = 1;
+  optional bool altitude_data_enabled = 2;
+  optional bool bike_route_data_enabled = 3;
+}
+
+message PbUserDeviceMassStorageSettings {
+  optional bool enabled = 1;
+}
+
+message PbMediaControlSettings {
+  enum PbMediaControlMode {
+    ALWAYS_OFF = 0;
+    ALWAYS_ON = 1;
+    ON_WHEN_TRAINING = 2;
+    ON_WHEN_NOT_TRAINING = 3;
+  }
+  optional PbMediaControlSettings.PbMediaControlMode mode = 1;
+}
+
+message PbOrthostaticTestSchedule {
+  optional bool monday_scheduled = 1;
+  optional bool tuesday_scheduled = 2;
+  optional bool wednesday_scheduled = 3;
+  optional bool thursday_scheduled = 4;
+  optional bool friday_scheduled = 5;
+  optional bool saturday_scheduled = 6;
+  optional bool sunday_scheduled = 7;
+}
+
+message PbUserDeviceRecoveryProSettings {
+  optional bool recovery_pro_enabled = 1;
+}
+
+message PbUserDeviceResearchSettings {
+  optional bool accelerometer_raw_data_enable = 1;
+  optional bool gyroscope_raw_data_enable = 2;
+  optional bool magnetometer_raw_data_enable = 3;
+  optional bool linear_acceleration_data_enable = 4;
+  optional bool gps_data_enable = 5;
+}
+
+message PbUserDeviceRinseDryMessageSettings {
+  optional uint32 message_count = 1;
+  optional PbSystemDateTime last_modified = 2;
+}
+
+message PbRunningTestSettings {
+  optional float initial_speed = 1;
+}
+
+message PbUserSafetyLightSettings {
+  enum PbSafetyLightActivationLevel {
+    ACTIVATION_LEVEL_DARK = 1;
+    ACTIVATION_LEVEL_DUSK = 2;
+    ACTIVATION_LEVEL_LIGHT = 3;
+  }
+  enum PbSafetyLightBlinkRate {
+    BLINK_RATE_OFF = 1;
+    BLINK_RATE_SLOW = 2;
+    BLINK_RATE_FAST = 3;
+    BLINK_RATE_VERY_FAST = 4;
+  }
+  enum PbSafetyLightMode {
+    SAFETY_LIGHT_MANUAL = 1;
+    SAFETY_LIGHT_AUTOMATIC = 2;
+  }
+  optional PbUserSafetyLightSettings.PbSafetyLightMode mode = 1;
+  optional PbUserSafetyLightSettings.PbSafetyLightActivationLevel activation_level = 2;
+  optional PbUserSafetyLightSettings.PbSafetyLightBlinkRate blink_rate = 3;
+}
+
+message PbDoNotDisturbSettings {
+  optional bool enabled = 1;
+  optional PbTime start = 2;
+  optional PbTime end = 3;
+}
+
+message PbUserSmartWatchNotificationSettings {
+  optional bool enabled = 1;
+  optional bool preview_enabled = 2;
+  optional PbDoNotDisturbSettings do_not_disturb_settings = 3;
+  optional bool sounds_enabled = 4;
+  optional bool on_during_training = 5;
+  optional bool on_when_not_training = 6;
+}
+
+message PbUserDeviceStravaSegmentsSettings {
+  optional bool enabled = 1;
+}
+
+message PbUserDeviceTelemetrySettings {
+  optional bool telemetry_enabled = 1;
+}
+
+message PbUsbConnectionSettings {
+  enum PbUsbConnectionMode {
+    UNKNOWN = 0;
+    OFF = 1;
+    ON = 2;
+  }
+  optional PbUsbConnectionSettings.PbUsbConnectionMode mode = 1;
+}
+
+message PbUserDeviceSettings {
+  optional PbUserDeviceGeneralSettings general_settings = 1;
+  optional PbUserDeviceAlarmSettings alarm_settings = 2;
+  optional PbUserDeviceCountdownSettings countdown_settings = 3;
+  optional PbUserDeviceJumpTestSettings jumptest_settings = 4;
+  optional PbUserIntervalTimerSettings interval_timer_settings = 5;
+  optional PbUserEndTimeEstimatorSettings end_time_estimator_settings = 6;
+  optional PbUserDeviceResearchSettings research_settings = 7;
+  optional PbUserSafetyLightSettings safety_light_settings = 8;
+  optional PbUserSmartWatchNotificationSettings smart_watch_notification_settings = 9;
+  optional PbUserMapSettings map_settings = 10;
+  optional PbUserDeviceRinseDryMessageSettings rinse_dry_message_settings = 11;
+  optional PbUserDeviceMassStorageSettings mass_storage_settings = 12;
+  optional PbUserDeviceDoNotDisturbSettings do_not_disturb_settings = 13;
+  optional PbUserDeviceAutoSyncSettings auto_sync_settings = 14;
+  optional PbUserDeviceAutomaticSampleSettings automatic_sample_settings = 15;
+  optional PbUserDeviceStravaSegmentsSettings strava_segments_settings = 16;
+  optional PbUserDeviceDaylightSaving daylight_saving = 17;
+  optional PbUserDeviceRecoveryProSettings recovery_pro_settings = 18;
+  optional PbOrthostaticTestSchedule orthostatic_test_schedule = 19;
+  optional PbUserDeviceDoNotDisturbSettings_v2 do_not_disturb_settings_v2 = 20;
+  optional PbUserAutomaticMeasurementSettings automatic_measurement_settings = 21;
+  optional PbGnssSettings gnss_settings = 22;
+  optional PbBreathingExerciseSettings breathing_exercise_settings = 23;
+  optional PbRunningTestSettings running_test_settings = 24;
+  optional PbMediaControlSettings media_control_settings = 25;
+  optional PbUserDeviceTelemetrySettings telemetry_settings = 26;
+  optional PbUsbConnectionSettings usb_connection_settings = 27;
+  optional PbSystemDateTime last_modified = 101;
+}
+
+message PbActivityCardioLoadSettings {
+  optional bool enabled = 1;
+}
+
+message PbActivityGoalPreferences {
+  optional bool visible = 1;
+}
+
+enum PbDateFormat {
+  DD_MM_YYYY = 1;
+  MM_DD_YYYY = 2;
+  YYYY_MM_DD = 3;
+}
+
+enum PbDateFormatSeparator {
+  DOT = 1;
+  SLASH = 2;
+  HYPHEN = 3;
+}
+
+enum PbStartDayOfWeek {
+  MONDAY = 1;
+  SATURDAY = 2;
+  SUNDAY = 3;
+}
+
+message PbLanguageId {
+  optional string language = 1;
+  optional string region = 2;
+  optional string script = 3;
+}
+
+enum PbTimeFormat {
+  TIME_FORMAT_24H = 1;
+  TIME_FORMAT_12H = 2;
+}
+
+enum PbTimeFormatSeparator {
+  TIME_FORMAT_SEPARATOR_DOT = 1;
+  TIME_FORMAT_SEPARATOR_COLON = 2;
+}
+
+enum PbUnitSystem {
+  METRIC = 1;
+  IMPERIAL = 2;
+}
+
+message PbLocalizationPreferences {
+  optional PbLanguageId language = 1;
+  optional PbUnitSystem unit_system = 2;
+  optional PbTimeFormat time_format = 3;
+  optional PbTimeFormatSeparator time_format_separator = 4;
+  optional PbDateFormat date_format = 5;
+  optional PbDateFormatSeparator date_format_separator = 6;
+  optional PbStartDayOfWeek firstday_of_week = 7;
+}
+
+enum PbHeartRateView {
+  HEART_RATE_VIEW_BPM = 1;
+  HEART_RATE_VIEW_PERCENTS_OF_HR_RESERVE = 2;
+  HEART_RATE_VIEW_PERCENTS_OF_MAX_HR = 3;
+}
+
+message PbTrainingPreferences {
+  optional uint32 OBSOLETE_heart_rate_zone_lock = 1;
+  optional PbHeartRateView OBSOLETE_heart_rate_view = 2;
+}
+
+message PbGeneralPreferences {
+  optional PbLocalizationPreferences localization_preferences = 1;
+  optional PbTrainingPreferences training_preferences = 2;
+  optional PbActivityGoalPreferences activity_goal_preferences = 3;
+  optional PbActivityCardioLoadSettings activity_cardio_load_settings = 4;
+  optional PbSystemDateTime last_modified = 101;
+}
+
+message PbUserHrAttribute {
+  enum HrSettingSource {
+    SOURCE_DEFAULT = 0;
+    SOURCE_AGE_BASED = 1;
+    SOURCE_USER = 2;
+    SOURCE_MEASURED = 3;
+    SOURCE_KEEP = 4;
+  }
+  optional uint32 value = 1;
+  optional PbSystemDateTime last_modified = 2;
+  optional PbUserHrAttribute.HrSettingSource setting_source = 3;
+}
+
+message PbSpeedCalibrationOffset {
+  optional float value = 1;
+  optional PbSystemDateTime last_modified = 2;
+}
+
+message PbUserBirthday {
+  optional PbDate value = 1;
+  optional PbSystemDateTime last_modified = 2;
+}
+
+message PbUserFunctionalThresholdPower {
+  enum FTPSettingSource {
+    SOURCE_DEFAULT = 0;
+    SOURCE_ESTIMATE = 1;
+    SOURCE_USER = 2;
+  }
+  optional uint32 value = 1;
+  optional PbSystemDateTime last_modified = 2;
+  optional PbUserFunctionalThresholdPower.FTPSettingSource setting_source = 3;
+}
+
+message PbUserGender {
+  enum Gender {
+    MALE = 1;
+    FEMALE = 2;
+  }
+  optional PbUserGender.Gender value = 1;
+  optional PbSystemDateTime last_modified = 2;
+}
+
+message PbUserHeight {
+  optional float value = 1;
+  optional PbSystemDateTime last_modified = 2;
+}
+
+message PbUserMaximumAerobicPower {
+  enum MAPSettingSource {
+    SOURCE_DEFAULT = 0;
+    SOURCE_ESTIMATE = 1;
+    SOURCE_USER = 2;
+  }
+  optional uint32 value = 1;
+  optional PbSystemDateTime last_modified = 2;
+  optional PbUserMaximumAerobicPower.MAPSettingSource setting_source = 3;
+}
+
+message PbUserMaximumAerobicSpeed {
+  enum MASSettingSource {
+    SOURCE_DEFAULT = 0;
+    SOURCE_ESTIMATE = 1;
+    SOURCE_USER = 2;
+  }
+  optional float value = 1;
+  optional PbSystemDateTime last_modified = 2;
+  optional PbUserMaximumAerobicSpeed.MASSettingSource setting_source = 3;
+}
+
+enum PbSampleSourceType {
+  SAMPLE_SOURCE_TYPE_UNDEFINED = 0;
+  SAMPLE_SOURCE_TYPE_OFFLINE = 1;
+  SAMPLE_SOURCE_TYPE_HEART_RATE = 2;
+  SAMPLE_SOURCE_TYPE_HEART_RATE_BLE = 3;
+  SAMPLE_SOURCE_TYPE_HEART_RATE_5_KHZ = 4;
+  SAMPLE_SOURCE_TYPE_HEART_RATE_OPTICAL = 5;
+  SAMPLE_SOURCE_TYPE_GPS = 6;
+  SAMPLE_SOURCE_TYPE_STRIDE = 7;
+  SAMPLE_SOURCE_TYPE_WRIST_METRICS = 8;
+  SAMPLE_SOURCE_TYPE_CHEST_METRICS = 9;
+  SAMPLE_SOURCE_TYPE_BIKE_PEDAL = 10;
+  SAMPLE_SOURCE_TYPE_BIKE_WHEEL = 11;
+  SAMPLE_SOURCE_TYPE_BIKE_CRANK = 12;
+  SAMPLE_SOURCE_TYPE_COMBINED_CHEST_METRICS_AND_GPS = 13;
+  SAMPLE_SOURCE_TYPE_UPPER_BACK_METRICS = 14;
+  SAMPLE_SOURCE_TYPE_COMBINED_UPPER_BACK_METRICS_AND_GPS = 15;
+}
+
+message PbSensorCalibrationOffset {
+  optional PbSampleSourceType sample_source_type = 1;
+  optional float speed_cal_offset = 2;
+}
+
+message PbSleepGoal {
+  optional uint32 sleep_goal_minutes = 1;
+  optional PbSystemDateTime last_modified = 2;
+}
+
+message PbUserTrainingBackground {
+  enum TrainingBackground {
+    OCCASIONAL = 10;
+    REGULAR = 20;
+    FREQUENT = 30;
+    HEAVY = 40;
+    SEMI_PRO = 50;
+    PRO = 60;
+  }
+  optional PbUserTrainingBackground.TrainingBackground value = 1;
+  optional PbSystemDateTime last_modified = 2;
+}
+
+message PbUserTypicalDay {
+  enum TypicalDay {
+    MOSTLY_SITTING = 1;
+    MOSTLY_STANDING = 2;
+    MOSTLY_MOVING = 3;
+  }
+  optional PbUserTypicalDay.TypicalDay value = 1;
+  optional PbSystemDateTime last_modified = 2;
+}
+
+message PbUserVo2Max {
+  enum Vo2MaxSettingSource {
+    SOURCE_DEFAULT = 0;
+    SOURCE_ESTIMATE = 1;
+    SOURCE_USER = 2;
+    SOURCE_FITNESSTEST = 3;
+  }
+  optional uint32 value = 1;
+  optional PbSystemDateTime last_modified = 2;
+  optional PbUserVo2Max.Vo2MaxSettingSource setting_source = 3;
+}
+
+message PbWeeklyRecoveryTimeSum {
+  optional float value = 1;
+  optional PbSystemDateTime last_modified = 2;
+}
+
+message PbUserWeight {
+  enum WeightSettingSource {
+    SOURCE_DEFAULT = 0;
+    SOURCE_USER = 2;
+    SOURCE_MEASURED = 3;
+  }
+  optional float value = 1;
+  optional PbSystemDateTime last_modified = 2;
+  optional PbUserWeight.WeightSettingSource setting_source = 3;
+}
+
+message PbUserPhysData {
+  optional PbUserBirthday birthday = 1;
+  optional PbUserGender gender = 2;
+  optional PbUserWeight weight = 3;
+  optional PbUserHeight height = 4;
+  optional PbUserHrAttribute maximum_heartrate = 5;
+  optional PbUserHrAttribute resting_heartrate = 6;
+  optional PbUserHrAttribute OBSOLETE_sitting_heartrate = 7;
+  optional PbUserHrAttribute aerobic_threshold = 8;
+  optional PbUserHrAttribute anaerobic_threshold = 9;
+  optional PbUserVo2Max vo2max = 10;
+  optional PbUserTrainingBackground training_background = 11;
+  optional PbUserTypicalDay typical_day = 12;
+  optional PbWeeklyRecoveryTimeSum weekly_recovery_time_sum = 13;
+  optional PbSpeedCalibrationOffset OBSOLETE_speed_calibration_offset = 14;
+  optional PbUserFunctionalThresholdPower functional_threshold_power = 15;
+  repeated PbSensorCalibrationOffset sensor_calibration_offset = 16;
+  optional PbSleepGoal sleep_goal = 17;
+  optional PbUserMaximumAerobicPower running_maximum_aerobic_power = 18;
+  optional PbUserMaximumAerobicSpeed running_maximum_aerobic_speed = 19;
+  optional PbSystemDateTime last_modified = 100;
+  optional PbLocalDateTime snapshot_start_time = 101;
+}
