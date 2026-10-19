@@ -1,0 +1,142 @@
+syntax = "proto2";
+
+package polar;
+
+option java_package = "nodomain.freeyourgadget.gadgetbridge.proto.polar";
+option java_outer_classname = "PolarProto";
+
+// Protobuf payloads of Polar's PFTP file transfer protocol (BLE service 0xFEEE),
+// as used by the Polar Ignite 3 and related watches.
+//
+// Message, field and enum numbers were recovered from the field metadata of the
+// official Polar Flow app (7.37.1) and verified against BLE HCI captures of a
+// real Ignite 3 (firmware 6.0.18).
+//
+// All fields are optional on purpose, even those the watch treats as required:
+// firmware versions omit fields and protobuf-lite would otherwise refuse to
+// parse the whole message. Enums whose values could not be recovered are
+// declared as int32.
+
+message PbPFtpOperation {
+  enum Command {
+    GET = 0;
+    PUT = 1;
+    MERGE = 2;
+    REMOVE = 3;
+  }
+  optional PbPFtpOperation.Command command = 1;
+  optional string path = 2;
+}
+
+message PbDate {
+  optional uint32 year = 1;
+  optional uint32 month = 2;
+  optional uint32 day = 3;
+}
+
+message PbTime {
+  optional uint32 hour = 1;
+  optional uint32 minute = 2;
+  optional uint32 seconds = 3;
+  optional uint32 millis = 4;
+}
+
+message PbPFtpSetSystemTimeParams {
+  optional PbDate date = 1;
+  optional PbTime time = 2;
+  optional bool trusted = 3;
+}
+
+message PbPFtpSetLocalTimeParams {
+  optional PbDate date = 1;
+  optional PbTime time = 2;
+  optional int32 tz_offset = 3;
+}
+
+message PbPFtpBatteryStatusResult {
+  optional uint32 battery_status = 1;
+  optional bool charging = 2;
+}
+
+enum PbPFtpSyncTriggerSource {
+  NO_SOURCE = 0;
+  USER = 1;
+  TIMED = 2;
+  FEATURE = 3;
+}
+
+message PbPFtpSyncTrigger {
+  optional PbPFtpSyncTriggerSource source = 1;
+  optional string feature_name = 2;
+}
+
+message PbPFtpSyncRequiredParams {
+  repeated PbPFtpSyncTrigger sync_triggers = 1;
+}
+
+message PbSystemDateTime {
+  optional PbDate date = 1;
+  optional PbTime time = 2;
+  optional bool trusted = 3;
+}
+
+message PbPFtpEntry {
+  optional string name = 1;
+  optional uint64 size = 2;
+  optional PbSystemDateTime created = 3;
+  optional PbSystemDateTime modified = 4;
+  optional PbSystemDateTime touched = 5;
+}
+
+message PbPFtpDirectory {
+  repeated PbPFtpEntry entries = 1;
+}
+
+message PbVersion {
+  optional uint32 major = 1;
+  optional uint32 minor = 2;
+  optional uint32 patch = 3;
+  optional string specifier = 4;
+}
+
+message PbAlgorithmVersion {
+  optional PbVersion ohr_version = 1;
+}
+
+message PbFontInfo {
+  optional string file_name = 1;
+  optional uint32 version = 2;
+}
+
+message PbSubcomponentInfo {
+  optional string name = 1;
+  optional PbVersion OBSOLETE_required_version = 2;
+  optional PbVersion version = 3;
+}
+
+message PbDeviceInfo {
+  enum PbDisplayShape {
+    RECTANGLE = 0;
+    FULLY_ROUND = 1;
+    ROUND_FLAT_BOTTOM = 2;
+  }
+  optional PbVersion bootloader_version = 1;
+  optional PbVersion platform_version = 2;
+  optional PbVersion device_version = 3;
+  optional uint32 svn_rev = 4;
+  optional string electrical_serial_number = 5;
+  optional string deviceID = 6;
+  optional string model_name = 7;
+  optional string hardware_code = 8;
+  optional string product_color = 9;
+  optional string product_design = 10;
+  optional string system_id = 11;
+  optional bytes git_hash = 12;
+  optional PbVersion polarmathsmart_version = 13;
+  repeated PbSubcomponentInfo sub_component_info = 14;
+  optional PbDeviceInfo.PbDisplayShape display_shape = 15;
+  optional PbAlgorithmVersion algorithm_version = 16;
+  repeated PbFontInfo font_info = 17;
+  repeated string capabilities = 18;
+  optional string sales_region = 19;
+}
