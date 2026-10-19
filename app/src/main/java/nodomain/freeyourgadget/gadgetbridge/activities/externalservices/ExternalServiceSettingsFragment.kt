@@ -73,11 +73,21 @@ class ExternalServiceSettingsFragment : AbstractPreferenceFragment() {
         ) { _, bundle ->
             if (bundle.getBoolean("success", false)) {
                 refresh()
+                refreshStatus()
             }
         }
 
         service.onSettingsScreenCreated(this)
         refresh()
+        refreshStatus()
+    }
+
+    private fun refreshStatus() {
+        service.refreshStatus(requireContext()) {
+            activity?.runOnUiThread {
+                if (isAdded) refresh()
+            }
+        }
     }
 
     override fun onResume() {

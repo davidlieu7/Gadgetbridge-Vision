@@ -99,6 +99,13 @@ interface ExternalService {
         else -> context.getString(R.string.service_logged_in)
     }
 
+    /**
+     * Fetches whatever [statusSummary] shows that the service has to be asked for, calling
+     * [onRefreshed] on a background thread each time something new arrived. Called when the
+     * service's settings screen opens.
+     */
+    fun refreshStatus(context: Context, onRefreshed: () -> Unit) {}
+
     /** Shows this service's setup UI, which reports back on [externalServiceLoginResultKey]. */
     fun showSetup(fragment: Fragment)
 
