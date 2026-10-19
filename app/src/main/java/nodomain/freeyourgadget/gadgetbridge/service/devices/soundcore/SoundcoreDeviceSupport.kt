@@ -95,12 +95,14 @@ open class SoundcoreDeviceSupport : AbstractHeadphoneSerialDeviceSupportV2<Sound
     }
 
     override fun dispose() {
-        firmwareReceivedForConnection = false
-        if (multipointReceiverRegistered) {
-            LocalBroadcastManager.getInstance(getContext()).unregisterReceiver(multipointReceiver)
-            multipointReceiverRegistered = false
+        synchronized(ConnectionMonitor) {
+            firmwareReceivedForConnection = false
+            if (multipointReceiverRegistered) {
+                LocalBroadcastManager.getInstance(getContext()).unregisterReceiver(multipointReceiver)
+                multipointReceiverRegistered = false
+            }
+            super.dispose()
         }
-        super.dispose()
     }
 
     override fun evaluateGBDeviceEvent(deviceEvent: GBDeviceEvent) {
