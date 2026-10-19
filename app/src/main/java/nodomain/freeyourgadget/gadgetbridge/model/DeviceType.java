@@ -521,6 +521,7 @@ import nodomain.freeyourgadget.gadgetbridge.devices.pinetime.PineTimeJFCoordinat
 import nodomain.freeyourgadget.gadgetbridge.devices.pixel.PixelBudsACoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.polar.PolarH10DeviceCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.polar.PolarH9DeviceCoordinator;
+import nodomain.freeyourgadget.gadgetbridge.devices.polar.PolarIgnite3Coordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.bose.NC700Coordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.bose.QC35Coordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.qhybrid.QHybridCoordinator;
@@ -818,6 +819,7 @@ public enum DeviceType {
     PINETIME_JF(PineTimeJFCoordinator.class),
     POLARH9(PolarH9DeviceCoordinator.class),
     POLARH10(PolarH10DeviceCoordinator.class),
+    POLAR_IGNITE_3(PolarIgnite3Coordinator.class),
     MIJIA_LYWSD02(MijiaLywsd02Coordinator.class),
     MIJIA_LYWSD03(MijiaLywsd03Coordinator.class),
     MIJIA_XMWSDJ04(MijiaXmwsdj04Coordinator.class),
