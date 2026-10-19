@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.preference.PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+    <ListPreference
+        android:defaultValue="always"
+        android:entries="@array/polar_continuous_hr"
+        android:entryValues="@array/polar_continuous_hr_values"
+        android:icon="@drawable/ic_heartrate"
+        android:key="polar_continuous_hr"
+        android:title="@string/polar_pref_continuous_hr"
+        app:useSimpleSummaryProvider="true" />
+</androidx.preference.PreferenceScreen>

@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.preference.PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android">
+    <PreferenceScreen
+        android:icon="@drawable/ic_notifications"
+        android:key="pref_screen_polar_watch_notifications"
+        android:persistent="false"
+        android:title="@string/polar_pref_watch_notifications_title">
+        <!-- workaround for missing toolbar -->
+        <PreferenceCategory android:title="@string/polar_pref_watch_notifications_title" />
+        <SwitchPreference
+            android:defaultValue="true"
+            android:key="polar_watch_notifications"
+            android:title="@string/polar_pref_watch_notifications" />
+        <SwitchPreference
+            android:defaultValue="true"
+            android:dependency="polar_watch_notifications"
+            android:key="polar_watch_notification_preview"
+            android:title="@string/polar_pref_watch_notification_preview" />
+        <SwitchPreference
+            android:defaultValue="true"
+            android:dependency="polar_watch_notifications"
+            android:key="polar_watch_notifications_training"
+            android:title="@string/polar_pref_watch_notifications_training" />
+    </PreferenceScreen>
+</androidx.preference.PreferenceScreen>

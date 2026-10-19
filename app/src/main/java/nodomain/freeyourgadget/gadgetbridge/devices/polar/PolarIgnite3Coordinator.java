@@ -78,7 +78,12 @@ public class PolarIgnite3Coordinator extends AbstractBLEDeviceCoordinator {
     @Override
     public int[] getSupportedDeviceSpecificSettings(final GBDevice device) {
         return new int[]{
+                R.xml.devicesettings_polar_watch_notifications,
                 R.xml.devicesettings_canned_reply_16,
+                R.xml.devicesettings_ak102_dnd,
+                R.xml.devicesettings_polar_continuous_hr,
+                R.xml.devicesettings_inactivity_noshed,
+                R.xml.devicesettings_timeformat,
         };
     }
 
