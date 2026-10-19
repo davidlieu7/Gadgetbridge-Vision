@@ -66,6 +66,23 @@ public class PolarIgnite3Coordinator extends AbstractBLEDeviceCoordinator {
     }
 
     @Override
+    public boolean supportsMusicInfo(@NonNull final GBDevice device) {
+        return true;
+    }
+
+    @Override
+    public int getCannedRepliesSlotCount(final GBDevice device) {
+        return PolarIgnite3DeviceSupport.CANNED_REPLY_SLOTS;
+    }
+
+    @Override
+    public int[] getSupportedDeviceSpecificSettings(final GBDevice device) {
+        return new int[]{
+                R.xml.devicesettings_canned_reply_16,
+        };
+    }
+
+    @Override
     public DeviceKind getDeviceKind(@NonNull final GBDevice device) {
         return DeviceKind.WATCH;
     }
