@@ -167,16 +167,19 @@ public class ActivityListingAdapter extends AbstractActivityListingAdapter<Activ
                 ActivityListingViews.formatDuration(session), percentOf(duration, activeTimeGoalTimeMillis), WidgetColors.INSTANCE.getActiveTime());
 
             ActivityListingViews.fillTile(totalStepsTile, R.drawable.ic_steps, String.valueOf(session.getTotalDaySteps()), R.string.live_activity_total_steps);
-            ActivityListingViews.fillTile(activitiesTile, R.drawable.ic_list_numbered, String.valueOf(session.getSessionCount()), R.string.activity_list_summary_activities);
             final int hr = session.getHeartRateAverage();
             ActivityListingViews.fillTile(avgHrTile, R.drawable.ic_heartrate, hr > 0 ? context.getString(R.string.bpm_value_unit, hr) : "-", R.string.averageHR);
             final float intensity = session.getIntensity();
+            final View activitiesSlot;
             if (intensity > 0) {
                 ActivityListingViews.fillTile(intensityTile, R.drawable.ic_intensity, String.valueOf(Math.round(intensity)), R.string.movement_intensity);
-                intensityTile.setVisibility(View.VISIBLE);
+                activitiesSlot = activitiesTile;
+                activitiesTile.setVisibility(View.VISIBLE);
             } else {
-                intensityTile.setVisibility(View.GONE);
+                activitiesSlot = intensityTile;
+                activitiesTile.setVisibility(View.INVISIBLE);
             }
+            ActivityListingViews.fillTile(activitiesSlot, R.drawable.ic_list_numbered, String.valueOf(session.getSessionCount()), R.string.activity_list_summary_activities);
 
             // Only the dashboard and the end spacer are left when the day has no activities.
             noActivitiesView.setVisibility(getItemCount() <= 2 ? View.VISIBLE : View.GONE);
