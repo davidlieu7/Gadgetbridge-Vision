@@ -19,7 +19,7 @@ package nodomain.freeyourgadget.gadgetbridge.devices.soundcore
 import nodomain.freeyourgadget.gadgetbridge.R
 import nodomain.freeyourgadget.gadgetbridge.devices.DeviceCoordinator
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice
-import nodomain.freeyourgadget.gadgetbridge.service.devices.soundcore.sport_x20.SoundcoreSportX20Protocol
+import nodomain.freeyourgadget.gadgetbridge.service.devices.soundcore.devices.SoundcoreSportX20Protocol
 import nodomain.freeyourgadget.gadgetbridge.activities.multipoint.MultipointPairingActivity
 import java.util.regex.Pattern
 
@@ -28,7 +28,7 @@ class SoundcoreR50iNCCoordinator : SoundcoreEarbudsCoordinator() {
 
     override fun getModelName(): String = "A3959"
 
-    override fun getSupportedDeviceName(): Pattern = Pattern.compile("^soundcore R50i( NC)?$")
+    override fun getSupportedDeviceName(): Pattern = Pattern.compile("^soundcore R50i NC$")
 
     override fun getDeviceNameResource(): Int = R.string.devicetype_soundcore_r50i_nc
 
@@ -82,26 +82,7 @@ class SoundcoreR50iNCCoordinator : SoundcoreEarbudsCoordinator() {
         TapFunction.NONE,
     )
 
-    override fun getSupportedTapFunctions(action: ButtonAction): List<TapFunction> =
-        when (action) {
-            ButtonAction.SINGLE_TAP -> supportedTapFunctions.filterNot {
-                it == TapFunction.VOICE_ASSISTANT ||
-                it == TapFunction.AMBIENT_SOUND_CONTROL
-            }
-            else -> supportedTapFunctions
-        }
-
     override fun createProtocol(device: GBDevice): SoundcoreSportX20Protocol =
         SoundcoreSportX20Protocol(device)
 
-    override fun getSupportedMultipointActions(): Set<String> = setOf(
-        MultipointPairingActivity.ACTION_MULTIPOINT_ENABLE,
-        MultipointPairingActivity.ACTION_MULTIPOINT_DISABLE,
-        MultipointPairingActivity.ACTION_MULTIPOINT_GET_DEVICES,
-        MultipointPairingActivity.ACTION_MULTIPOINT_GET_STATUS,
-        MultipointPairingActivity.ACTION_MULTIPOINT_CONNECT_DEVICE,
-        MultipointPairingActivity.ACTION_MULTIPOINT_DISCONNECT_DEVICE,
-        MultipointPairingActivity.ACTION_MULTIPOINT_FORGET_DEVICE,
-        MultipointPairingActivity.ACTION_MULTIPOINT_START_PAIRING,
-    )
 }
