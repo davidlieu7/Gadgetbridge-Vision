@@ -19,6 +19,7 @@ package nodomain.freeyourgadget.gadgetbridge.service.devices.polar;
 import android.bluetooth.BluetoothGatt;
 import android.bluetooth.BluetoothGattCharacteristic;
 import android.content.Context;
+import android.content.SharedPreferences;
 import android.media.AudioManager;
 import android.os.Handler;
 import android.os.Looper;
@@ -40,12 +41,15 @@ import java.util.Locale;
 import java.util.TimeZone;
 import java.util.UUID;
 
+import nodomain.freeyourgadget.gadgetbridge.GBApplication;
 import nodomain.freeyourgadget.gadgetbridge.R;
+import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsPreferenceConst;
 import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEvent;
 import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEventBatteryInfo;
 import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEventMusicControl;
 import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEventVersionInfo;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
+import nodomain.freeyourgadget.gadgetbridge.model.ActivityUser;
 import nodomain.freeyourgadget.gadgetbridge.model.BatteryState;
 import nodomain.freeyourgadget.gadgetbridge.model.CallSpec;
 import nodomain.freeyourgadget.gadgetbridge.model.MusicSpec;
@@ -68,13 +72,17 @@ import nodomain.freeyourgadget.gadgetbridge.util.StringUtils;
  * at a time; notifications are fire-and-forget on the separate H2D/D2H characteristics.
  *
  * <p>Supported: time, firmware version, battery, push notifications with actions and canned
- * replies, incoming calls, music info and control.
+ * replies, incoming calls, music info and control, watch settings and body data.
  */
 public class PolarIgnite3DeviceSupport extends AbstractBTLESingleDeviceSupport {
     private static final Logger LOG = LoggerFactory.getLogger(PolarIgnite3DeviceSupport.class);
 
     /** The watch has four free action buttons, which canned replies share with the notification's own actions */
     public static final int CANNED_REPLY_SLOTS = PolarNotifications.ACTION_SLOT_COUNT;
+
+    private static final String PATH_DEVICE_SETTINGS = "/U/0/S/UDEVSET.BPB";
+    private static final String PATH_GENERAL_PREFERENCES = "/U/0/S/PREFS.BPB";
+    private static final String PATH_PHYSICAL_DATA = "/U/0/S/PHYSDATA.BPB";
 
     private static final int REQUESTED_MTU = 517;
     private static final long RESPONSE_TIMEOUT_MILLIS = 30_000;
@@ -114,6 +122,13 @@ public class PolarIgnite3DeviceSupport extends AbstractBTLESingleDeviceSupport {
     private MusicSpec musicInfo;
     @Nullable
     private MusicStateSpec musicState;
+    /** Last known content of the settings files, edited and written back on preference changes */
+    @Nullable
+    private PolarProto.PbUserDeviceSettings deviceSettings;
+    @Nullable
+    private PolarProto.PbGeneralPreferences generalPreferences;
+    @Nullable
+    private PolarProto.PbUserPhysData physicalData;
 
     public PolarIgnite3DeviceSupport() {
         super(LOG);
@@ -137,6 +152,11 @@ public class PolarIgnite3DeviceSupport extends AbstractBTLESingleDeviceSupport {
             d2hReassembler.reset();
         }
         notifications.clear();
+        synchronized (this) {
+            deviceSettings = null;
+            generalPreferences = null;
+            physicalData = null;
+        }
 
         builder.setDeviceState(GBDevice.State.INITIALIZING);
         builder.requestMtu(REQUESTED_MTU);
@@ -160,6 +180,9 @@ public class PolarIgnite3DeviceSupport extends AbstractBTLESingleDeviceSupport {
         setTime();
         getFile("/DEVICE.BPB", this::handleDeviceInfo);
         query(PftpConstants.QUERY_GET_BATTERY_STATUS, null, this::handleBatteryStatusResult);
+        getFile(PATH_DEVICE_SETTINGS, this::handleDeviceSettings);
+        getFile(PATH_GENERAL_PREFERENCES, this::handleGeneralPreferences);
+        getFile(PATH_PHYSICAL_DATA, this::handlePhysicalData);
     }
 
     @Override
@@ -329,6 +352,127 @@ public class PolarIgnite3DeviceSupport extends AbstractBTLESingleDeviceSupport {
             default:
                 LOG.debug("Unhandled PFTP notification {}: {}", id, GB.hexdump(params));
         }
+    }
+
+    // ---- settings ----
+
+    @Override
+    public void onSendConfiguration(final String config) {
+        if (PolarSettings.DEVICE_SETTINGS_KEYS.contains(config)) {
+            writeDeviceSettings();
+        } else if (DeviceSettingsPreferenceConst.PREF_TIMEFORMAT.equals(config)) {
+            writeGeneralPreferences();
+        } else if (config.startsWith("activity_user_")) {
+            writePhysicalData();
+        } else {
+            super.onSendConfiguration(config);
+        }
+    }
+
+    private void handleDeviceSettings(@Nullable final PftpFraming.Message message) {
+        final byte[] payload = payloadOrLog(PATH_DEVICE_SETTINGS, message);
+        if (payload == null) {
+            return;
+        }
+        final PolarProto.PbUserDeviceSettings settings;
+        try {
+            settings = PolarProto.PbUserDeviceSettings.parseFrom(payload);
+        } catch (final InvalidProtocolBufferException e) {
+            LOG.warn("Failed to parse {}", PATH_DEVICE_SETTINGS, e);
+            return;
+        }
+        synchronized (this) {
+            deviceSettings = settings;
+        }
+        // The watch settings may have been changed on the watch, show them as they are
+        final SharedPreferences.Editor editor = GBApplication.getDeviceSpecificSharedPrefs(getDevice().getAddress()).edit();
+        PolarSettings.importDeviceSettings(settings, editor);
+        editor.apply();
+        // ...but keep the daylight saving time switch up to date
+        writeDeviceSettings();
+    }
+
+    private void handleGeneralPreferences(@Nullable final PftpFraming.Message message) {
+        final byte[] payload = payloadOrLog(PATH_GENERAL_PREFERENCES, message);
+        if (payload == null) {
+            return;
+        }
+        try {
+            final PolarProto.PbGeneralPreferences preferences = PolarProto.PbGeneralPreferences.parseFrom(payload);
+            synchronized (this) {
+                generalPreferences = preferences;
+            }
+        } catch (final InvalidProtocolBufferException e) {
+            LOG.warn("Failed to parse {}", PATH_GENERAL_PREFERENCES, e);
+            return;
+        }
+        writeGeneralPreferences();
+    }
+
+    private void handlePhysicalData(@Nullable final PftpFraming.Message message) {
+        final byte[] payload = payloadOrLog(PATH_PHYSICAL_DATA, message);
+        if (payload == null) {
+            return;
+        }
+        try {
+            final PolarProto.PbUserPhysData data = PolarProto.PbUserPhysData.parseFrom(payload);
+            synchronized (this) {
+                physicalData = data;
+            }
+        } catch (final InvalidProtocolBufferException e) {
+            LOG.warn("Failed to parse {}", PATH_PHYSICAL_DATA, e);
+            return;
+        }
+        writePhysicalData();
+    }
+
+    private void writeDeviceSettings() {
+        final PolarProto.PbUserDeviceSettings updated;
+        synchronized (this) {
+            if (deviceSettings == null) {
+                LOG.warn("Device settings not read yet, not writing them");
+                return;
+            }
+            updated = PolarSettings.applyDeviceSettings(deviceSettings, getDevicePrefs());
+            if (updated == null) {
+                return;
+            }
+            deviceSettings = updated;
+        }
+        putFile(PATH_DEVICE_SETTINGS, updated.toByteArray());
+    }
+
+    private void writeGeneralPreferences() {
+        final PolarProto.PbGeneralPreferences updated;
+        synchronized (this) {
+            if (generalPreferences == null) {
+                LOG.warn("General preferences not read yet, not writing them");
+                return;
+            }
+            updated = PolarSettings.applyGeneralPreferences(generalPreferences, getDevicePrefs(),
+                    GBApplication.getPrefs().getDistanceUnit());
+            if (updated == null) {
+                return;
+            }
+            generalPreferences = updated;
+        }
+        putFile(PATH_GENERAL_PREFERENCES, updated.toByteArray());
+    }
+
+    private void writePhysicalData() {
+        final PolarProto.PbUserPhysData updated;
+        synchronized (this) {
+            if (physicalData == null) {
+                LOG.warn("Physical data not read yet, not writing it");
+                return;
+            }
+            updated = PolarSettings.applyUserProfile(physicalData, new ActivityUser(), GBApplication.getPrefs());
+            if (updated == null) {
+                return;
+            }
+            physicalData = updated;
+        }
+        putFile(PATH_PHYSICAL_DATA, updated.toByteArray());
     }
 
     // ---- notifications and calls ----
@@ -556,6 +700,11 @@ public class PolarIgnite3DeviceSupport extends AbstractBTLESingleDeviceSupport {
     private void getFile(final String path, final ResponseCallback callback) {
         enqueue(new Operation("GET " + path, PftpConstants.UUID_CHARACTERISTIC_MTU,
                 PftpFraming.request(PolarProto.PbPFtpOperation.Command.GET, path, null), callback));
+    }
+
+    private void putFile(final String path, final byte[] data) {
+        enqueue(new Operation("PUT " + path, PftpConstants.UUID_CHARACTERISTIC_MTU,
+                PftpFraming.request(PolarProto.PbPFtpOperation.Command.PUT, path, data), statusLogger("PUT " + path)));
     }
 
     private void query(final int queryId, @Nullable final byte[] params, final ResponseCallback callback) {
