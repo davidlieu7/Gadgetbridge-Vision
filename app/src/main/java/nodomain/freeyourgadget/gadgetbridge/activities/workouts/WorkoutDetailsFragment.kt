@@ -671,7 +671,7 @@ class WorkoutDetailsFragment : Fragment(), MenuProvider {
                 LOG.warn("Unable to open {}", url, e)
                 GB.toast(
                     requireContext(),
-                    getString(R.string.endurain_failed_to_open_browser, e.message),
+                    getString(R.string.service_failed_to_open_browser, e.message),
                     Toast.LENGTH_LONG,
                     GB.WARN
                 )

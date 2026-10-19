@@ -95,9 +95,6 @@ data class UploadCapabilities(
     }
 }
 
-/** Whether a service still holds an activity it was given. [FAILED] means it could not be asked. */
-enum class RemoteLookup { PRESENT, GONE, FAILED }
-
 /** Outcome of bringing the track of an already-uploaded activity in line with the local workout. */
 sealed interface TrackUpdateResult {
     /** The remote activity now carries the current track, under the id it already had. */
@@ -205,12 +202,6 @@ interface WorkoutUploadTarget : ExternalService {
         previousMediaId: Int?
     ): WorkoutUploader.PhotoSyncResult = WorkoutUploader.PhotoSyncResult(false, previousMediaId)
 
-    /**
-     * Asks the service whether it still holds [remoteActivityId], which it no longer does once the
-     * user deleted it there. Null when the service offers no way to tell. Blocking.
-     */
-    fun lookupRemote(context: Context, remoteActivityId: String): RemoteLookup? = null
-
     companion object {
         /** Clear of the ids the rest of the app posts notifications under. */
         const val FAILURE_NOTIFICATION_ID_BASE = 4710
@@ -229,7 +220,7 @@ object WorkoutUploadTargets {
      */
     @JvmStatic
     fun configured(context: Context): List<WorkoutUploadTarget> =
-        ALL.filter { it.isLoggedIn(context) }
+        ALL.filter { it.isConfigured(context) }
 
     /**
      * Targets set up and asked to take every synced workout without being told to, which is the

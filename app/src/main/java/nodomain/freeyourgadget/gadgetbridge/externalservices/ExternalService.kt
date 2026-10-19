@@ -45,7 +45,8 @@ enum class AuthStyle(
  *
  * Implementations are stateless singletons registered once in [ExternalServiceRegistry]; anything
  * they need to remember lives in the preferences [id] namespaces, or in an
- * [ExternalServiceTokenStore].
+ * [ExternalServiceTokenStore]. What a service can then be asked to *do* is a separate interface,
+ * so a service that is not an upload target does not have to answer for one.
  */
 interface ExternalService {
     /**
@@ -75,28 +76,26 @@ interface ExternalService {
     fun serverUrl(): String? =
         serverPrefKey?.let { GBApplication.getPrefs().preferences.getString(it, null) }
 
-    /**
-     * Whether the user has finished setting this service up: an address, for a self-hosted one,
-     * and credentials that are held and still usable.
-     */
+    /** Whether credentials for this service are held and still usable. */
     fun isLoggedIn(context: Context): Boolean
+
+    /**
+     * Whether the service can be reached at all, which for a self-hosted one also means the user
+     * gave an address. Kept apart from [isLoggedIn] because credentials can outlive the address
+     * they were obtained from, and a service with no address to give answers on login alone.
+     */
+    fun isConfigured(context: Context): Boolean =
+        (serverPrefKey == null || serverUrl() != null) && isLoggedIn(context)
 
     /**
      * One line saying where the user stands with this service, for its settings rows. Names the
      * instance for a self-hosted service, since the user may have more than one in mind.
      */
     fun statusSummary(context: Context): CharSequence = when {
-        !isLoggedIn(context) -> context.getString(R.string.service_not_logged_in)
+        !isConfigured(context) -> context.getString(R.string.service_not_logged_in)
         serverUrl() != null -> context.getString(R.string.service_logged_in_to, serverUrl())
         else -> context.getString(R.string.service_logged_in)
     }
-
-    /**
-     * Fetches whatever [statusSummary] shows that the service has to be asked for, calling
-     * [onRefreshed] on a background thread each time something new arrived. Called when the
-     * service's settings screen opens.
-     */
-    fun refreshStatus(context: Context, onRefreshed: () -> Unit) {}
 
     /** Shows this service's setup UI, which reports back on [externalServiceLoginResultKey]. */
     fun showSetup(fragment: Fragment)
@@ -129,13 +128,6 @@ interface ExternalService {
      * from a worker.
      */
     fun refreshCredentials(context: Context): Boolean = true
-
-    /**
-     * Whether the stored credentials have run out and [refreshCredentials] has to go first. A
-     * service whose access token is short-lived says so here, so a call is not spent finding out
-     * with a 401. Answers false for a service whose credentials do not expire.
-     */
-    fun credentialsExpired(context: Context): Boolean = false
 
     /**
      * Handles the link the browser comes back on after a login, whose host is this service's [id].

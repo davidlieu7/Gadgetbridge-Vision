@@ -1,4 +1,4 @@
-/*  Copyright (C) 2026 José Rebelo, Dany Mestas
+/*  Copyright (C) 2026 Dany Mestas, José Rebelo
 
     This file is part of Gadgetbridge.
 
@@ -19,7 +19,6 @@ package nodomain.freeyourgadget.gadgetbridge.externalservices.wanderer
 import android.content.Context
 import androidx.fragment.app.Fragment
 import nodomain.freeyourgadget.gadgetbridge.R
-import nodomain.freeyourgadget.gadgetbridge.activities.workouts.RemoteLookup
 import nodomain.freeyourgadget.gadgetbridge.activities.workouts.RemoteOp
 import nodomain.freeyourgadget.gadgetbridge.activities.workouts.TrackUpdateResult
 import nodomain.freeyourgadget.gadgetbridge.activities.workouts.UploadCapabilities
@@ -54,8 +53,7 @@ object WandererService : WorkoutUploadTarget {
         media = emptySet()
     )
 
-    override fun isLoggedIn(context: Context) =
-        serverUrl() != null && WandererTokenManager(context).isLoggedIn()
+    override fun isLoggedIn(context: Context) = WandererTokenManager(context).isLoggedIn()
 
     override fun showSetup(fragment: Fragment) {
         WandererSetupBottomSheet().show(fragment.parentFragmentManager, "wanderer_setup")
@@ -66,6 +64,7 @@ object WandererService : WorkoutUploadTarget {
         WandererTokenManager(context).clearTokens()
         return true
     }
+
 
     /**
      * A trail page is namespaced by the handle of the account that owns it, and a handle that does
@@ -115,15 +114,6 @@ object WandererService : WorkoutUploadTarget {
                 }
         }
         return if (updated == true) TrackUpdateResult.Updated else TrackUpdateResult.Failed
-    }
-
-    override fun lookupRemote(context: Context, remoteActivityId: String): RemoteLookup {
-        val server = serverUrl() ?: return RemoteLookup.FAILED
-        return when (WandererApiClient(server, WandererTokenManager(context)).trailExists(remoteActivityId)) {
-            true -> RemoteLookup.PRESENT
-            false -> RemoteLookup.GONE
-            null -> RemoteLookup.FAILED
-        }
     }
 
     /**

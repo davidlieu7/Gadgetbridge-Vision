@@ -5868,6 +5868,7 @@
     <string name="service_failed_to_open_browser">Failed to open browser: %1$s</string>
     <string name="service_sso_login_successful">SSO login successful</string>
     <string name="service_invalid_server_url">Invalid server URL</string>
+    <string name="service_failed_to_connect_to_server">Failed to connect to server</string>
     <string name="service_verify_mfa">Verify MFA</string>
     <string name="service_enter_your_mfa_code">Enter your MFA code</string>
     <string name="service_login_successful">Login successful</string>
@@ -5881,16 +5882,15 @@
     <string name="service_not_logged_in">Not logged in, integration is disabled</string>
     <string name="service_logged_in_refresh_token">Logged in to %1$s\nRefresh token expires: %2$s</string>
     <string name="service_server_version">\nServer version: %1$s</string>
+    <string name="service_logout_failed">Logout failed</string>
     <string name="service_logged_out">Logged out successfully</string>
-    <string name="service_logged_out_unconfirmed">Logged out on this phone, but %1$s did not confirm the end of the session</string>
-    <string name="endurain_failed_to_open_browser">Failed to open browser: %1$s</string>
-    <string name="endurain_failed_to_connect_to_server">Failed to connect to server</string>
     <string name="prefs_online_fitness_trackers_title">Online fitness trackers</string>
     <string name="prefs_online_fitness_trackers_summary">Configure how to reach and use online fitness trackers</string>
     <string name="warning_network_required_title">Network required</string>
     <string name="warning_network_required_summary">These integrations requires network connectivity. Please install and enable the internet helper add-on app.</string>
     <string name="activity_detail_upload_to">Upload to…</string>
     <string name="activity_detail_upload_to_all">All services</string>
+    <!-- %1$s is the name of an online fitness tracker -->
     <string name="workout_upload_status_track_change_declined">The track changed, but replacing the activity on %1$s is turned off</string>
     <!-- %1$s in the pref_service_* strings is the name of an online fitness tracker -->
     <string name="pref_service_status_title">%1$s status</string>
@@ -5902,10 +5902,6 @@
     <string name="pref_service_auto_upload_title">Auto-upload to %1$s</string>
     <string name="pref_service_auto_upload_summary">Automatically upload newly synced workouts to %1$s</string>
     <string name="pref_service_log_out_summary">Tap here to log out, this disables the integration</string>
-    <string name="pref_info_endurain_status_title">Endurain status</string>
-    <string name="pref_endurain_log_in_title">Log in to Endurain</string>
-    <string name="pref_endurain_log_in_summary">Tap here to enter the Endurain server and log in</string>
-    <string name="pref_endurain_log_out_title">Log out of Endurain</string>
     <string name="no_gpx_track_in_activity_toast">No GPX track in this activity</string>
     <string name="no_activity_track_in_activity_toast">No activity track in this activity</string>
     <string name="unable_to_display_gpx_track_toast">Unable to display GPX track: %1$s</string>
@@ -5919,22 +5915,9 @@
     <string name="service_setup_missing_information">Please fill both fields</string>
     <string name="service_name_endurain" translatable="false">Endurain</string>
     <string name="service_name_wanderer" translatable="false">Wanderer</string>
-    <string name="endurain_uploading_started">Uploading to Endurain…</string>
-    <string name="endurain_successfully_uploaded_toast">Successfully uploaded to Endurain</string>
-    <string name="wanderer_unable_to_upload_gpx_file_toast">Unable to upload GPX file to Wanderer: %1$s</string>
-    <string name="pref_wanderer_status_title">Wanderer status</string>
-    <string name="pref_wanderer_enter_api_token_title">Enter Wanderer API token</string>
-    <string name="pref_wanderer_enter_api_token_summary">Tap here to enter the Wanderer server and API token</string>
-    <string name="pref_wanderer_log_out_title">Log out of Wanderer</string>
-    <string name="pref_category_endurain" translatable="false">Endurain</string>
-    <string name="pref_category_wanderer" translatable="false">Wanderer</string>
     <string name="select_at_least_option">Please select at least %1$d option</string>
 
     <!-- Auto-upload to online fitness trackers -->
-    <string name="pref_endurain_auto_upload_title">Auto-upload to Endurain</string>
-    <string name="pref_endurain_auto_upload_summary">Automatically upload newly synced workouts to Endurain</string>
-    <string name="pref_wanderer_auto_upload_title">Auto-upload to Wanderer</string>
-    <string name="pref_wanderer_auto_upload_summary">Automatically upload newly synced workouts with a GPS track to Wanderer</string>
     <string name="auto_upload_failed_notification_title">Workout upload failed</string>
     <string name="auto_upload_timed_out">Upload timed out</string>
     <string name="workout_upload_status_title">Upload status</string>
@@ -6303,10 +6286,6 @@
     <string name="datestep_next_week">Next week</string>
     <string name="datestep_prev_month">Previous month</string>
     <string name="datestep_next_month">Next month</string>
-    <string name="service_setup_api_token_prefix_error">API token should start with %1$s</string>
-    <string name="service_setup_title">%1$s setup</string>
-    <string name="service_setup_server_hostname">Server hostname</string>
-    <string name="service_setup_api_token">API token</string>
 
     <string name="pref_itag_alert_level">Find-device alert level</string>
     <string name="pref_itag_alert_level_high">High (0x02)</string>
@@ -6322,4 +6301,11 @@
     <string name="service_upload_failed_generic">Error while uploading to %1$s</string>
     <string name="service_upload_failed">%1$s upload error: %2$s</string>
     <string name="service_remote_edited">The workout changed, but the activity on %1$s was edited there and was left untouched</string>
+    <string name="service_setup_api_token_prefix_error">API token should start with %1$s</string>
+    <string name="service_setup_title">%1$s setup</string>
+    <string name="service_setup_server_hostname">Server hostname</string>
+    <string name="service_setup_api_token">API token</string>
+    <string name="service_setup_upload_token">Upload token</string>
+    <string name="service_setup_client_id">Client ID</string>
+    <string name="service_setup_client_secret">Client secret</string>
 </resources>

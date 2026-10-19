@@ -26,6 +26,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import nodomain.freeyourgadget.gadgetbridge.R
 import nodomain.freeyourgadget.gadgetbridge.activities.AbstractPreferenceFragment
+import nodomain.freeyourgadget.gadgetbridge.activities.workouts.WorkoutUploadTarget
 import nodomain.freeyourgadget.gadgetbridge.externalservices.ExternalService
 import nodomain.freeyourgadget.gadgetbridge.externalservices.ExternalServiceRegistry
 import nodomain.freeyourgadget.gadgetbridge.externalservices.externalServiceLoginResultKey
@@ -63,6 +64,31 @@ class ExternalServiceSettingsFragment : AbstractPreferenceFragment() {
                 true
             }
         }
+        addAutoUploadPreference(name)
+
+        parentFragmentManager.setFragmentResultListener(
+            externalServiceLoginResultKey(service.id),
+            this
+        ) { _, bundle ->
+            if (bundle.getBoolean("success", false)) {
+                refresh()
+            }
+        }
+
+        service.onSettingsScreenCreated(this)
+        refresh()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        refresh()
+    }
+
+    /** Only a service that takes workouts has anything to upload automatically. */
+    private fun addAutoUploadPreference(name: String) {
+        if (service !is WorkoutUploadTarget) {
+            return
+        }
         preferenceScreen.addPreference(
             SwitchPreferenceCompat(preferenceScreen.context).apply {
                 key = service.autoUploadPrefKey
@@ -73,47 +99,16 @@ class ExternalServiceSettingsFragment : AbstractPreferenceFragment() {
                 summary = getString(R.string.pref_service_auto_upload_summary, name)
             }
         )
-
-        parentFragmentManager.setFragmentResultListener(
-            externalServiceLoginResultKey(service.id),
-            this
-        ) { _, bundle ->
-            if (bundle.getBoolean("success", false)) {
-                refresh()
-                refreshStatus()
-            }
-        }
-
-        service.onSettingsScreenCreated(this)
-        refresh()
-        refreshStatus()
-    }
-
-    private fun refreshStatus() {
-        service.refreshStatus(requireContext()) {
-            activity?.runOnUiThread {
-                if (isAdded) refresh()
-            }
-        }
-    }
-
-    override fun onResume() {
-        super.onResume()
-        refresh()
     }
 
     private fun logOut() {
         lifecycleScope.launch {
             val context = requireContext()
-            val confirmed = withContext(Dispatchers.IO) { service.logout(context) }
-            if (confirmed) {
+            val success = withContext(Dispatchers.IO) { service.logout(context) }
+            if (success) {
                 GB.toast(getString(R.string.service_logged_out), Toast.LENGTH_SHORT, GB.INFO)
             } else {
-                GB.toast(
-                    getString(R.string.service_logged_out_unconfirmed, getString(service.nameRes)),
-                    Toast.LENGTH_LONG,
-                    GB.WARN
-                )
+                GB.toast(getString(R.string.service_logout_failed), Toast.LENGTH_SHORT, GB.WARN)
             }
             refresh()
         }
@@ -121,12 +116,12 @@ class ExternalServiceSettingsFragment : AbstractPreferenceFragment() {
 
     private fun refresh() {
         val context = requireContext()
-        val loggedIn = service.isLoggedIn(context)
+        val configured = service.isConfigured(context)
         findPreference<Preference>(KEY_STATUS)?.summary = service.statusSummary(context)
-        findPreference<Preference>(KEY_LOG_IN)?.isVisible = !loggedIn
-        findPreference<Preference>(KEY_LOG_OUT)?.isVisible = loggedIn
+        findPreference<Preference>(KEY_LOG_IN)?.isVisible = !configured
+        findPreference<Preference>(KEY_LOG_OUT)?.isVisible = configured
         // Auto-upload only makes sense once the service is set up.
-        findPreference<Preference>(service.autoUploadPrefKey)?.isEnabled = loggedIn
+        findPreference<Preference>(service.autoUploadPrefKey)?.isEnabled = configured
     }
 
     companion object {

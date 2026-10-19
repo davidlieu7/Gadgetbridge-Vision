@@ -25,12 +25,10 @@ import nodomain.freeyourgadget.gadgetbridge.activities.AbstractPreferenceFragmen
 import nodomain.freeyourgadget.gadgetbridge.activities.AbstractSettingsActivityV2
 import nodomain.freeyourgadget.gadgetbridge.externalservices.ExternalService
 import nodomain.freeyourgadget.gadgetbridge.externalservices.ExternalServiceRegistry
-import java.text.Collator
 
 /**
- * One row per registered [ExternalService], sorted by name, each opening that service's own
- * screen. The rows come from [ExternalServiceRegistry], so a new service appears here without
- * this screen being touched.
+ * One row per registered [ExternalService], each opening that service's own screen. The rows come
+ * from [ExternalServiceRegistry], so a new service appears here without this screen being touched.
  */
 class OnlineFitnessTrackersPreferencesActivity : AbstractSettingsActivityV2() {
     override fun newFragment(): PreferenceFragmentCompat =
@@ -44,10 +42,7 @@ class OnlineFitnessTrackersPreferencesActivity : AbstractSettingsActivityV2() {
             findPreference<Preference>("pref_key_network_required")?.isVisible =
                 !GBApplication.hasInternetAccess()
 
-            val collator = Collator.getInstance()
-            val services = ExternalServiceRegistry.services
-                .sortedWith(compareBy(collator) { getString(it.nameRes) })
-            for (service in services) {
+            for (service in ExternalServiceRegistry.services) {
                 preferenceScreen.addPreference(
                     Preference(preferenceScreen.context).apply {
                         key = rowKey(service)

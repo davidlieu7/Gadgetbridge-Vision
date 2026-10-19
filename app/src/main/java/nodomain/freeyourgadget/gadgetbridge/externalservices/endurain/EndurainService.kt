@@ -1,4 +1,4 @@
-/*  Copyright (C) 2026 José Rebelo, Dany Mestas
+/*  Copyright (C) 2026 Dany Mestas, José Rebelo
 
     This file is part of Gadgetbridge.
 
@@ -19,13 +19,12 @@ package nodomain.freeyourgadget.gadgetbridge.externalservices.endurain
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
-import androidx.fragment.app.Fragment
 import androidx.localbroadcastmanager.content.LocalBroadcastManager
+import androidx.fragment.app.Fragment
 import androidx.preference.PreferenceFragmentCompat
 import androidx.preference.SwitchPreferenceCompat
 import nodomain.freeyourgadget.gadgetbridge.GBApplication
 import nodomain.freeyourgadget.gadgetbridge.R
-import nodomain.freeyourgadget.gadgetbridge.activities.workouts.RemoteLookup
 import nodomain.freeyourgadget.gadgetbridge.activities.workouts.RemoteOp
 import nodomain.freeyourgadget.gadgetbridge.activities.workouts.TrackUpdateResult
 import nodomain.freeyourgadget.gadgetbridge.activities.workouts.UploadCapabilities
@@ -63,15 +62,13 @@ object EndurainService : WorkoutUploadTarget {
     )
 
     /**
-     * Version the server reported when it was last asked, and that server's address, for the
-     * settings summary. Kept here rather than on a screen so it survives the screen being closed
-     * and reopened.
+     * Version the server reported when it was last asked, for the settings summary. Kept here
+     * rather than on a screen so it survives the screen being closed and reopened.
      */
     @Volatile
-    private var serverVersion: Pair<String, String>? = null
+    var serverVersion: String? = null
 
-    override fun isLoggedIn(context: Context) =
-        serverUrl() != null && EndurainTokenManager(context).isLoggedIn()
+    override fun isLoggedIn(context: Context) = EndurainTokenManager(context).isLoggedIn()
 
     override fun statusSummary(context: Context): CharSequence {
         val server = serverUrl()
@@ -85,28 +82,8 @@ object EndurainService : WorkoutUploadTarget {
         } else {
             context.getString(R.string.service_not_logged_in)
         }
-        serverVersion?.takeIf { it.first == server }?.let {
-            summary += context.getString(R.string.service_server_version, it.second)
-        }
+        serverVersion?.let { summary += context.getString(R.string.service_server_version, it) }
         return summary
-    }
-
-    /** Renews an access token that ran out, and asks the server for its version. */
-    override fun refreshStatus(context: Context, onRefreshed: () -> Unit) {
-        val server = serverUrl() ?: return
-        val tokenManager = EndurainTokenManager(context.applicationContext)
-        if (tokenManager.isLoggedIn() && tokenManager.isAccessTokenExpired()) {
-            tokenManager.performTokenRefresh(server) { onRefreshed() }
-        }
-        Thread {
-            serverVersion = try {
-                EndurainApiClient(server, tokenManager).fetchVersion()?.let { server to it }
-            } catch (e: Exception) {
-                LOG.error("Fetching the Endurain server version failed", e)
-                null
-            }
-            onRefreshed()
-        }.start()
     }
 
     override fun showSetup(fragment: Fragment) {
@@ -114,19 +91,46 @@ object EndurainService : WorkoutUploadTarget {
     }
 
     override fun logout(context: Context): Boolean {
+        val server = serverUrl()
         val tokenManager = EndurainTokenManager(context)
-        val confirmed = serverUrl()?.let { EndurainApiClient(it, tokenManager).logout() } ?: true
-        tokenManager.clearTokens()
-        return confirmed
+        if (server == null) {
+            tokenManager.clearTokens()
+            return true
+        }
+        return try {
+            EndurainApiClient(server, tokenManager).logout()
+        } catch (e: Exception) {
+            // The session may well be gone on the server already, and a user who cannot reach it
+            // still has to be able to disconnect, so the credentials go either way.
+            tokenManager.clearTokens()
+            true
+        }
+    }
+
+    /**
+     * Re-creating an activity to push a changed track destroys one the user may have been looking
+     * at, so it is offered as a choice rather than done silently. See [updateTrack].
+     */
+    override fun onSettingsScreenCreated(fragment: PreferenceFragmentCompat) {
+        val screen = fragment.preferenceScreen
+        val replaceOnTrackChange = SwitchPreferenceCompat(screen.context).apply {
+            key = GBPrefs.ENDURAIN_REPLACE_ON_TRACK_CHANGE
+            setDefaultValue(false)
+            layoutResource = R.layout.preference_checkbox
+            setIcon(R.drawable.ic_warning)
+            setTitle(R.string.pref_endurain_replace_on_track_change_title)
+            setSummary(R.string.pref_endurain_replace_on_track_change_summary)
+        }
+        screen.addPreference(replaceOnTrackChange)
+        // Set once it is in the hierarchy: a dependency named on a preference that is not yet
+        // attached is resolved against an empty one, and throws.
+        replaceOnTrackChange.dependency = autoUploadPrefKey
     }
 
     /** The refresh token expires, so it is renewed on a schedule rather than at the next upload. */
     override fun scheduleBackgroundWork(context: Context) {
         ExternalServiceTokenRefreshWorker.schedule(context, this)
     }
-
-    override fun credentialsExpired(context: Context): Boolean =
-        EndurainTokenManager(context).isAccessTokenExpired()
 
     override fun refreshCredentials(context: Context): Boolean {
         val server = serverUrl() ?: return false
@@ -149,26 +153,6 @@ object EndurainService : WorkoutUploadTarget {
             LOG.error("SSO callback carried no session id")
         }
         LocalBroadcastManager.getInstance(context).sendBroadcast(result)
-    }
-
-    /**
-     * Re-creating an activity to push a changed track destroys one the user may have been looking
-     * at, so it is offered as a choice rather than done silently.
-     */
-    override fun onSettingsScreenCreated(fragment: PreferenceFragmentCompat) {
-        val screen = fragment.preferenceScreen
-        val replaceOnTrackChange = SwitchPreferenceCompat(screen.context).apply {
-            key = GBPrefs.ENDURAIN_REPLACE_ON_TRACK_CHANGE
-            setDefaultValue(false)
-            layoutResource = R.layout.preference_checkbox
-            setIcon(R.drawable.ic_warning)
-            setTitle(R.string.pref_endurain_replace_on_track_change_title)
-            setSummary(R.string.pref_endurain_replace_on_track_change_summary)
-        }
-        screen.addPreference(replaceOnTrackChange)
-        // Set once it is in the hierarchy: a dependency named on a preference that is not yet
-        // attached is resolved against an empty one, and throws.
-        replaceOnTrackChange.dependency = autoUploadPrefKey
     }
 
     override fun activityUrl(context: Context, remoteActivityId: String): String? {
@@ -422,28 +406,6 @@ object EndurainService : WorkoutUploadTarget {
             }
         }
         return result ?: failed
-    }
-
-    /** Refreshes the access token first, since a lookup with an expired one fails. */
-    override fun lookupRemote(context: Context, remoteActivityId: String): RemoteLookup {
-        val activityId = remoteActivityId.toIntOrNull() ?: return RemoteLookup.FAILED
-        val server = serverUrl() ?: return RemoteLookup.FAILED
-        val tokenManager = EndurainTokenManager(context)
-        val apiClient = EndurainApiClient(server, tokenManager)
-
-        return ExternalServiceCalls.await<RemoteLookup>(WorkoutUploader.DEFAULT_UPLOAD_TIMEOUT_SECONDS) { done ->
-            tokenManager.performTokenRefresh(server) {
-                Thread {
-                    done(
-                        when (apiClient.getActivityDetails(activityId)) {
-                            is EndurainActivityLookup.Found -> RemoteLookup.PRESENT
-                            is EndurainActivityLookup.Gone -> RemoteLookup.GONE
-                            is EndurainActivityLookup.Failed -> RemoteLookup.FAILED
-                        }
-                    )
-                }.start()
-            }
-        } ?: RemoteLookup.FAILED
     }
 
     private val LOG = LoggerFactory.getLogger(EndurainService::class.java)

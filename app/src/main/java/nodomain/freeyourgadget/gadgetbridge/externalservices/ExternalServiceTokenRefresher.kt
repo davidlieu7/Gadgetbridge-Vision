@@ -43,7 +43,7 @@ class ExternalServiceTokenRefreshWorker(
             LOG.warn("Token refresh asked for unknown service '{}'", id)
             return Result.success()
         }
-        if (!service.isLoggedIn(applicationContext)) {
+        if (!service.isConfigured(applicationContext)) {
             LOG.info("Not refreshing {}, it is not set up", id)
             return Result.success()
         }
@@ -63,7 +63,7 @@ class ExternalServiceTokenRefreshWorker(
         fun schedule(context: Context, service: ExternalService) {
             val workName = WORK_NAME_PREFIX + service.id
             val workManager = WorkManager.getInstance(context)
-            if (!service.isLoggedIn(context)) {
+            if (!service.isConfigured(context)) {
                 workManager.cancelUniqueWork(workName)
                 return
             }
