@@ -110,7 +110,7 @@ public class GBDaoGenerator {
             outputDir.mkdirs();
         }
 
-        final Schema schema = new Schema(157, MAIN_PACKAGE + ".entities");
+        final Schema schema = new Schema(158, MAIN_PACKAGE + ".entities");
 
         final List<Entity> sampleProvidersToGenerate = new LinkedList<>();
         final List<Entity> batterySampleProvidersToGenerate = new LinkedList<>();
@@ -538,6 +538,7 @@ public class GBDaoGenerator {
         device.addIntProperty("type").notNull().javaDocGetterAndSetter("The DeviceType key, i.e. the GBDevice's type.").codeBeforeGetterAndSetter("@Deprecated");
         device.addStringProperty("typeName").notNull().javaDocGetterAndSetter("The DeviceType enum name, for example SONY_WH_1000XM3");
         device.addStringProperty("model").javaDocGetterAndSetter("An optional model, further specifying the kind of device.");
+        device.addStringProperty("manufacturerSpecificData").javaDocGetterAndSetter("The manufacturer-specific data advertised by the device, hex-encoded per vendor id. Null for devices paired before this was recorded.");
         device.addStringProperty("alias");
         device.addStringProperty("parentFolder").javaDocGetterAndSetter("Folder name containing this device.");
         Property deviceId = deviceAttributes.addLongProperty("deviceId").notNull().getProperty();
