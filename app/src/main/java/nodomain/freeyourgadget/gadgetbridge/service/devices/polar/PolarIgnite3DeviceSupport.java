@@ -18,6 +18,8 @@ package nodomain.freeyourgadget.gadgetbridge.service.devices.polar;
 
 import android.bluetooth.BluetoothGatt;
 import android.bluetooth.BluetoothGattCharacteristic;
+import android.content.Context;
+import android.media.AudioManager;
 import android.os.Handler;
 import android.os.Looper;
 
@@ -29,6 +31,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.ArrayDeque;
+import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Deque;
 import java.util.GregorianCalendar;
@@ -37,16 +40,24 @@ import java.util.Locale;
 import java.util.TimeZone;
 import java.util.UUID;
 
+import nodomain.freeyourgadget.gadgetbridge.R;
+import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEvent;
 import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEventBatteryInfo;
+import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEventMusicControl;
 import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEventVersionInfo;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
 import nodomain.freeyourgadget.gadgetbridge.model.BatteryState;
+import nodomain.freeyourgadget.gadgetbridge.model.CallSpec;
+import nodomain.freeyourgadget.gadgetbridge.model.MusicSpec;
+import nodomain.freeyourgadget.gadgetbridge.model.MusicStateSpec;
+import nodomain.freeyourgadget.gadgetbridge.model.NotificationSpec;
 import nodomain.freeyourgadget.gadgetbridge.proto.polar.PolarProto;
 import nodomain.freeyourgadget.gadgetbridge.service.btle.AbstractBTLESingleDeviceSupport;
 import nodomain.freeyourgadget.gadgetbridge.service.btle.TransactionBuilder;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.polar.pftp.PftpConstants;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.polar.pftp.PftpFraming;
 import nodomain.freeyourgadget.gadgetbridge.util.GB;
+import nodomain.freeyourgadget.gadgetbridge.util.StringUtils;
 
 /**
  * Support for the Polar Ignite 3 over Polar's PFTP protocol (BLE service 0xFEEE).
@@ -56,10 +67,14 @@ import nodomain.freeyourgadget.gadgetbridge.util.GB;
  * go out on {@link PftpConstants#UUID_CHARACTERISTIC_MTU} and are answered there, strictly one
  * at a time; notifications are fire-and-forget on the separate H2D/D2H characteristics.
  *
- * <p>This first version sets the time and reports firmware version and battery.
+ * <p>Supported: time, firmware version, battery, push notifications with actions and canned
+ * replies, incoming calls, music info and control.
  */
 public class PolarIgnite3DeviceSupport extends AbstractBTLESingleDeviceSupport {
     private static final Logger LOG = LoggerFactory.getLogger(PolarIgnite3DeviceSupport.class);
+
+    /** The watch has four free action buttons, which canned replies share with the notification's own actions */
+    public static final int CANNED_REPLY_SLOTS = PolarNotifications.ACTION_SLOT_COUNT;
 
     private static final int REQUESTED_MTU = 517;
     private static final long RESPONSE_TIMEOUT_MILLIS = 30_000;
@@ -94,6 +109,11 @@ public class PolarIgnite3DeviceSupport extends AbstractBTLESingleDeviceSupport {
     private final PftpFraming.Reassembler d2hReassembler = new PftpFraming.Reassembler();
     private final Handler handler = new Handler(Looper.getMainLooper());
     private final Runnable responseTimeout = this::onResponseTimeout;
+    private final PolarNotifications notifications = new PolarNotifications();
+    @Nullable
+    private MusicSpec musicInfo;
+    @Nullable
+    private MusicStateSpec musicState;
 
     public PolarIgnite3DeviceSupport() {
         super(LOG);
@@ -116,6 +136,7 @@ public class PolarIgnite3DeviceSupport extends AbstractBTLESingleDeviceSupport {
             mtuReassembler.reset();
             d2hReassembler.reset();
         }
+        notifications.clear();
 
         builder.setDeviceState(GBDevice.State.INITIALIZING);
         builder.requestMtu(REQUESTED_MTU);
@@ -292,6 +313,15 @@ public class PolarIgnite3DeviceSupport extends AbstractBTLESingleDeviceSupport {
             case PftpConstants.D2H_BATTERY_STATUS:
                 handleBatteryStatus(params);
                 return;
+            case PftpConstants.D2H_PNS_NOTIFICATION_RESPONSE:
+                handleNotificationResponse(params);
+                return;
+            case PftpConstants.D2H_MEDIA_CONTROL_REQUEST:
+                handleMediaControlRequest(params);
+                return;
+            case PftpConstants.D2H_MEDIA_CONTROL_COMMAND:
+                handleMediaControlCommand(params);
+                return;
             case PftpConstants.D2H_SYNC_REQUIRED:
                 // Data sync is not implemented yet
                 LOG.info("Watch requests a sync: {}", GB.hexdump(params));
@@ -301,7 +331,227 @@ public class PolarIgnite3DeviceSupport extends AbstractBTLESingleDeviceSupport {
         }
     }
 
+    // ---- notifications and calls ----
+
+    @Override
+    public void onNotification(final NotificationSpec notificationSpec) {
+        final PolarProto.PbPftpPnsHDNotification notification = notifications.create(
+                notificationSpec, cannedReplies(), getContext().getString(R.string.delete));
+        sendNotification(PftpConstants.H2D_PNS_HD_NOTIFICATION, notification.toByteArray());
+    }
+
+    @Override
+    public void onDeleteNotification(final int id) {
+        removeNotification(id, false);
+    }
+
+    @Override
+    public void onSetCallState(final CallSpec callSpec) {
+        if (callSpec.getCommand() == CallSpec.CALL_INCOMING) {
+            final PolarProto.PbPftpPnsHDNotification notification = notifications.incomingCall(callSpec,
+                    getContext().getString(R.string.call_accept),
+                    getContext().getString(R.string.call_rejection_method_reject));
+            sendNotification(PftpConstants.H2D_PNS_HD_NOTIFICATION, notification.toByteArray());
+        } else {
+            removeNotification(PolarNotifications.CALL_NOTIFICATION_ID, false);
+        }
+    }
+
+    private void removeNotification(final int id, final boolean evenIfUnknown) {
+        final PolarProto.PbPftpPnsHDNotification removal = notifications.remove(id, evenIfUnknown);
+        if (removal != null) {
+            sendNotification(PftpConstants.H2D_PNS_HD_NOTIFICATION, removal.toByteArray());
+        }
+    }
+
+    private List<String> cannedReplies() {
+        final List<String> replies = new ArrayList<>();
+        for (int i = 1; i <= CANNED_REPLY_SLOTS; i++) {
+            final String reply = getDevicePrefs().getString("canned_reply_" + i, null);
+            if (!StringUtils.isNullOrEmpty(reply)) {
+                replies.add(reply);
+            }
+        }
+        return replies;
+    }
+
+    private void handleNotificationResponse(final byte[] params) {
+        final PolarProto.PbPftpPnsDHNotificationResponse response;
+        try {
+            response = PolarProto.PbPftpPnsDHNotificationResponse.parseFrom(params);
+        } catch (final InvalidProtocolBufferException e) {
+            LOG.warn("Failed to parse notification response", e);
+            return;
+        }
+        LOG.debug("Notification response: {}", response);
+        final GBDeviceEvent event = notifications.onResponse(response);
+        if (event != null) {
+            evaluateGBDeviceEvent(event);
+        }
+        // Like Polar Flow, take the notification off the watch once a button was pressed on it
+        removeNotification(response.getNotificationId(), true);
+    }
+
+    // ---- music ----
+
+    @Override
+    public void onSetMusicInfo(final MusicSpec musicSpec) {
+        synchronized (this) {
+            musicInfo = musicSpec;
+        }
+        sendMediaData();
+    }
+
+    @Override
+    public void onSetMusicState(final MusicStateSpec stateSpec) {
+        final boolean playingChanged;
+        synchronized (this) {
+            playingChanged = musicState == null || musicState.getState() != stateSpec.getState();
+            musicState = stateSpec;
+        }
+        // The available commands (play or pause) depend on the state
+        if (playingChanged) {
+            sendMediaData();
+        }
+        sendPlaybackState();
+    }
+
+    @Override
+    public void onSetPhoneVolume(final float volume) {
+        sendPlaybackState();
+    }
+
+    private boolean isPlaying() {
+        return musicState != null && musicState.getState() == MusicStateSpec.STATE_PLAYING;
+    }
+
+    private void sendMediaData() {
+        final PolarProto.PbPFtpHDMediaData.Builder data = PolarProto.PbPFtpHDMediaData.newBuilder();
+        synchronized (this) {
+            if (musicInfo != null) {
+                data.addCommands(PolarProto.MediaControlCommand.TOGGLER_PLAY_PAUSE)
+                        .addCommands(isPlaying() ? PolarProto.MediaControlCommand.PAUSE : PolarProto.MediaControlCommand.PLAY)
+                        .addCommands(PolarProto.MediaControlCommand.NEXT)
+                        .addCommands(PolarProto.MediaControlCommand.PREVIOUS)
+                        .addCommands(PolarProto.MediaControlCommand.VOLUME_UP)
+                        .addCommands(PolarProto.MediaControlCommand.VOLUME_DOWN);
+                if (musicInfo.getArtist() != null) {
+                    data.setArtistName(musicInfo.getArtist());
+                }
+                if (musicInfo.getTrack() != null) {
+                    data.setTrackName(musicInfo.getTrack());
+                }
+                if (musicInfo.getDuration() > 0) {
+                    data.setTrackDuration(musicInfo.getDuration());
+                }
+            }
+        }
+        sendNotification(PftpConstants.H2D_MEDIA_DATA, data.build().toByteArray());
+    }
+
+    private void sendPlaybackState() {
+        final PolarProto.PbPFtpHDMediaControlPlaybackState.Builder state = PolarProto.PbPFtpHDMediaControlPlaybackState.newBuilder()
+                .setVolumeLevel(volumePercent());
+        synchronized (this) {
+            if (musicState == null) {
+                state.setPlaybackState(PolarProto.PlaybackState.STATE_NONE);
+            } else {
+                switch (musicState.getState()) {
+                    case MusicStateSpec.STATE_PLAYING:
+                        state.setPlaybackState(PolarProto.PlaybackState.STATE_PLAYING);
+                        break;
+                    case MusicStateSpec.STATE_PAUSED:
+                        state.setPlaybackState(PolarProto.PlaybackState.STATE_PAUSED);
+                        break;
+                    case MusicStateSpec.STATE_STOPPED:
+                        state.setPlaybackState(PolarProto.PlaybackState.STATE_STOPPED);
+                        break;
+                    default:
+                        state.setPlaybackState(PolarProto.PlaybackState.STATE_NONE);
+                }
+                state.setPlaybackRate(isPlaying() ? 1f : 0f);
+                if (musicState.getPosition() >= 0) {
+                    state.setElapsedTime(musicState.getPosition());
+                }
+            }
+        }
+        sendNotification(PftpConstants.H2D_MEDIA_PLAYBACK_STATE, state.build().toByteArray());
+    }
+
+    private int volumePercent() {
+        final AudioManager audioManager = (AudioManager) getContext().getSystemService(Context.AUDIO_SERVICE);
+        final int max = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC);
+        return max > 0 ? Math.round(100f * audioManager.getStreamVolume(AudioManager.STREAM_MUSIC) / max) : 0;
+    }
+
+    private void handleMediaControlRequest(final byte[] params) {
+        final PolarProto.PbPftpDHMediaControlRequest request;
+        try {
+            request = PolarProto.PbPftpDHMediaControlRequest.parseFrom(params);
+        } catch (final InvalidProtocolBufferException e) {
+            LOG.warn("Failed to parse media control request", e);
+            return;
+        }
+        switch (request.getRequest()) {
+            case GET_MEDIA_DATA:
+                sendMediaData();
+                break;
+            case GET_PLAYBACK_STATE:
+                sendPlaybackState();
+                break;
+        }
+    }
+
+    private void handleMediaControlCommand(final byte[] params) {
+        final PolarProto.PbPftpDHMediaControlCommand command;
+        try {
+            command = PolarProto.PbPftpDHMediaControlCommand.parseFrom(params);
+        } catch (final InvalidProtocolBufferException e) {
+            LOG.warn("Failed to parse media control command", e);
+            return;
+        }
+        final GBDeviceEventMusicControl musicControl = new GBDeviceEventMusicControl();
+        switch (command.getCommand()) {
+            case PLAY:
+                musicControl.event = GBDeviceEventMusicControl.Event.PLAY;
+                break;
+            case PAUSE:
+                musicControl.event = GBDeviceEventMusicControl.Event.PAUSE;
+                break;
+            case TOGGLER_PLAY_PAUSE:
+                musicControl.event = GBDeviceEventMusicControl.Event.PLAYPAUSE;
+                break;
+            case NEXT:
+                musicControl.event = GBDeviceEventMusicControl.Event.NEXT;
+                break;
+            case PREVIOUS:
+                musicControl.event = GBDeviceEventMusicControl.Event.PREVIOUS;
+                break;
+            case FAST_FORWARD:
+                musicControl.event = GBDeviceEventMusicControl.Event.FORWARD;
+                break;
+            case FAST_BACKWARD:
+                musicControl.event = GBDeviceEventMusicControl.Event.REWIND;
+                break;
+            case VOLUME_UP:
+                musicControl.event = GBDeviceEventMusicControl.Event.VOLUMEUP;
+                break;
+            case VOLUME_DOWN:
+                musicControl.event = GBDeviceEventMusicControl.Event.VOLUMEDOWN;
+                break;
+            default:
+                LOG.warn("Unknown media control command {}", command.getCommand());
+                return;
+        }
+        evaluateGBDeviceEvent(musicControl);
+    }
+
     // ---- operation queue ----
+
+    private void sendNotification(final int notificationId, final byte[] params) {
+        enqueue(new Operation("notification " + notificationId, PftpConstants.UUID_CHARACTERISTIC_H2D,
+                PftpFraming.notification(notificationId, params), null));
+    }
 
     private void getFile(final String path, final ResponseCallback callback) {
         enqueue(new Operation("GET " + path, PftpConstants.UUID_CHARACTERISTIC_MTU,

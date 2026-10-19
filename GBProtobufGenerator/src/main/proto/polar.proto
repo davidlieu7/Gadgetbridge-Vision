@@ -140,3 +140,146 @@ message PbDeviceInfo {
   repeated string capabilities = 18;
   optional string sales_region = 19;
 }
+
+enum Action {
+  CREATED = 0;
+  UPDATED = 1;
+  REMOVED = 2;
+}
+
+enum PbPftpPnsHDAttributeType {
+  TITLE = 0;
+  SUBTITLE = 1;
+  MESSAGE = 2;
+  POSITIVE_ACTION_LABEL = 3;
+  NEGATIVE_ACTION_LABEL = 4;
+  APPLICATION_NAME = 5;
+  CLEAR_ACTION_LABEL = 6;
+  A_ACTION_LABEL = 7;
+  B_ACTION_LABEL = 8;
+  C_ACTION_LABEL = 9;
+  D_ACTION_LABEL = 10;
+}
+
+message PbPftpPnsHDAttribute {
+  optional PbPftpPnsHDAttributeType type = 1;
+  optional string data = 2;
+  optional uint32 attribute_full_size = 3;
+}
+
+enum PbPftpPnsHDCategoryID {
+  CATEGORY_ID_OTHER = 0;
+  CATEGORY_ID_POLAR = 1;
+  CATEGORY_ID_INCOMINGCALL = 2;
+  CATEGORY_ID_MISSEDCALL = 3;
+  CATEGORY_ID_VOICEMAIL = 4;
+  CATEGORY_ID_SOCIAL = 5;
+  CATEGORY_ID_SCHEDULE = 6;
+  CATEGORY_ID_EMAIL = 7;
+  CATEGORY_ID_NEWS = 8;
+  CATEGORY_ID_HEALTHANDFITNESS = 9;
+  CATEGORY_ID_BUSINESSANDFINANCE = 10;
+  CATEGORY_ID_LOCATION = 11;
+  CATEGORY_ID_ENTERTAINMENT = 12;
+  CATEGORY_ID_ALARM = 13;
+  CATEGORY_ID_PROMO = 14;
+  CATEGORY_ID_RECOMMENDATION = 15;
+  CATEGORY_ID_STATUS = 16;
+  CATEGORY_ID_TRANSPORT = 17;
+}
+
+message PbLocalDateTime {
+  optional PbDate date = 1;
+  optional PbTime time = 2;
+  optional bool OBSOLETE_trusted = 3;
+  optional int32 time_zone_offset = 4;
+}
+
+message PbPftpPnsHDNotification {
+  optional uint32 notification_id = 1;
+  optional PbPftpPnsHDCategoryID category_id = 2;
+  optional Action action = 3;
+  optional PbLocalDateTime issue_time = 4;
+  optional uint32 new_same_category_notifications = 5;
+  optional uint32 unread_same_category_notifications = 6;
+  repeated PbPftpPnsHDAttribute attributes = 7;
+}
+
+enum PbPftpPnsDHAttributeType {
+  UNKNOWN_ACTION = 1;
+  POSITIVE_ACTION = 2;
+  NEGATIVE_ACTION = 3;
+  CLEAR_ACTION = 4;
+  A_ACTION = 5;
+  B_ACTION = 6;
+  C_ACTION = 7;
+  D_ACTION = 8;
+}
+
+message PbPftpPnsDHAttribute {
+  optional PbPftpPnsDHAttributeType type = 1;
+}
+
+message PbPftpPnsDHNotificationResponse {
+  optional uint32 notification_id = 1;
+  repeated PbPftpPnsDHAttribute attributes = 2;
+}
+
+enum MediaControlCommand {
+  PLAY = 1;
+  PAUSE = 2;
+  TOGGLER_PLAY_PAUSE = 3;
+  NEXT = 4;
+  PREVIOUS = 5;
+  FAST_FORWARD = 6;
+  FAST_BACKWARD = 7;
+  VOLUME_UP = 8;
+  VOLUME_DOWN = 9;
+}
+
+message PbPFtpHDMediaData {
+  repeated MediaControlCommand commands = 1;
+  optional string playerName = 2;
+  optional string artistName = 3;
+  optional string trackName = 4;
+  optional float track_duration = 5;
+}
+
+enum PlaybackState {
+  STATE_NONE = 1;
+  STATE_STOPPED = 2;
+  STATE_PLAYING = 3;
+  STATE_PAUSED = 4;
+  STATE_FAST_FORWARDING = 5;
+  STATE_REWINDING = 6;
+  STATE_BUFFERING = 7;
+  STATE_ERROR = 8;
+  STATE_CONNECTING = 9;
+  STATE_SKIPPING_TO_PREVIOUS = 10;
+  STATE_SKIPPING_TO_NEXT = 11;
+  STATE_SKIPPING_TO_QUEUE_ITEM = 12;
+}
+
+message PbPFtpHDMediaControlPlaybackState {
+  optional PlaybackState playback_state = 1;
+  optional float playback_rate = 2;
+  optional float elapsed_time = 3;
+  optional uint32 volume_level = 4;
+}
+
+message PbPftpDHMediaControlCommand {
+  optional MediaControlCommand command = 1;
+}
+
+enum MediaControlRequest {
+  GET_MEDIA_DATA = 1;
+  GET_PLAYBACK_STATE = 2;
+}
+
+message PbPftpDHMediaControlRequest {
+  optional MediaControlRequest request = 1;
+}
+
+message PbPftpDHMediaControlEnabled {
+  optional bool enabled = 1;
+}
