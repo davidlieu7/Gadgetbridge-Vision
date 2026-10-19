@@ -211,6 +211,7 @@ public class DeviceSettingsPreferenceConst {
     public static final String PREF_OFFLINE_VOICE_RESPONSE_DURING_SCREEN_LIGHTING = "offline_voice_response_during_screen_lighting";
     public static final String PREF_OFFLINE_VOICE_LANGUAGE = "offline_voice_language";
 
+    public static final String PREF_SLEEP_TRACKING = "sleep_tracking";
     public static final String PREF_SLEEP_TIME = "prefs_enable_sleep_time";
     public static final String PREF_SLEEP_TIME_START = "prefs_sleep_time_start";
     public static final String PREF_SLEEP_TIME_END = "prefs_sleep_time_end";

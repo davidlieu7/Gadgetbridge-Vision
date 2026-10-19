@@ -841,6 +841,14 @@ abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator(
                     }
                 }
             }
+            if (supportsSleepMeasurement(device)) {
+                switchSetting(
+                    key = DeviceSettingsPreferenceConst.PREF_SLEEP_TRACKING,
+                    title = R.string.title_activity_sleepmonitor,
+                    icon = R.drawable.ic_activity_sleep,
+                    defaultValue = true,
+                )
+            }
             if (supportsDataFetching(device)) {
                 keepActivityDataOnDevice()
             }

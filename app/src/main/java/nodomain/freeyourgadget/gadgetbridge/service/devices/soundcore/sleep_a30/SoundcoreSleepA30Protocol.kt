@@ -97,6 +97,7 @@ open class SoundcoreSleepA30Protocol(device: GBDevice?) : SoundcoreProtocolImplV
         localAudioSelector = payload[72]
         decodeBooleanPreference(payload, 73, PREF_SOUNDCORE_LOCAL_PLAYBACK, preferences)
         decodeLocalVolume(payload[71], preferences)
+        decodeBooleanPreference(payload, 135, PREF_SLEEP_TRACKING, preferences)
         decodeBooleanPreference(payload, 137, PREF_SOUNDCORE_POWER_OFF_TONE, preferences)
         decodeBooleanPreference(payload, 138, PREF_SOUNDCORE_MODE_TONE, preferences)
         decodeBooleanPreference(payload, 141, PREF_SOUNDCORE_CALLS_ENABLED, preferences)
@@ -378,6 +379,7 @@ open class SoundcoreSleepA30Protocol(device: GBDevice?) : SoundcoreProtocolImplV
     override fun encodeSendConfiguration(config: String): ByteArray? {
         val prefs = devicePrefs
         return when (config) {
+            PREF_SLEEP_TRACKING -> encodeBooleanCommand(CMD_SET_SLEEP_TRACKING, prefs.getBoolean(config, true))
             ACTION_TOGGLE_LOCAL_PLAYBACK -> {
                 if (prefs.getString(PREF_SOUNDCORE_LISTENING_MODE, "0") != "1") return null
                 encodeLocalPlayback(!prefs.getBoolean(PREF_SOUNDCORE_LOCAL_PLAYBACK, false))
@@ -427,6 +429,7 @@ open class SoundcoreSleepA30Protocol(device: GBDevice?) : SoundcoreProtocolImplV
 
     companion object {
         private val LOG = LoggerFactory.getLogger(SoundcoreSleepA30Protocol::class.java)
+        private const val CMD_SET_SLEEP_TRACKING: Short = 0x8415.toShort()
 
         private const val CMD_ACK_SLEEP_SESSIONS: Short = 0x8915.toShort()
         private const val CMD_ACK_SLEEP_STAGES: Short = 0x8315.toShort()
