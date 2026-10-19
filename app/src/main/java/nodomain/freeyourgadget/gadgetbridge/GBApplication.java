@@ -30,6 +30,7 @@ import android.app.Application;
 import android.app.NotificationManager;
 import android.app.NotificationManager.Policy;
 import android.app.PendingIntent;
+import android.app.UiModeManager;
 import android.bluetooth.BluetoothAdapter;
 import android.content.Context;
 import android.content.Intent;
@@ -107,6 +108,11 @@ public class GBApplication extends Application {
     private static GBApplication context;
     private static DeviceService deviceService;
     private static SharedPreferences sharedPrefs;
+    private static final SharedPreferences.OnSharedPreferenceChangeListener themePreferenceListener = (final SharedPreferences sharedPreferences, final String key) -> {
+        if ("pref_key_theme".equals(key)) {
+            updateApplicationNightMode();
+        }
+    };
 
     private static final LimitedQueue<Integer, String> mIDSenderLookup = new LimitedQueue<>(16);
     private static GBPrefs prefs;
@@ -253,6 +259,8 @@ public class GBApplication extends Application {
         }
 
         migratePrefsIfNeeded();
+        updateApplicationNightMode();
+        sharedPrefs.registerOnSharedPreferenceChangeListener(themePreferenceListener);
 
         setupExceptionHandler(prefs.getBoolean("crash_notification", isDebug()));
 
@@ -689,6 +697,28 @@ public class GBApplication extends Application {
             return (resources.getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES;
         } else {
             return selectedTheme.equals(context.getString(R.string.pref_theme_value_dark));
+        }
+    }
+
+    /**
+     * Ensures the splash screen follows the theme preference, if manually set to light or derk.
+     */
+    private static void updateApplicationNightMode() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
+            return;
+        }
+        final String selectedTheme = prefs.getString("pref_key_theme", context.getString(R.string.pref_theme_value_system));
+        final int nightMode;
+        if (selectedTheme.equals(context.getString(R.string.pref_theme_value_light))) {
+            nightMode = UiModeManager.MODE_NIGHT_NO;
+        } else if (selectedTheme.equals(context.getString(R.string.pref_theme_value_dark))) {
+            nightMode = UiModeManager.MODE_NIGHT_YES;
+        } else {
+            nightMode = UiModeManager.MODE_NIGHT_AUTO;
+        }
+        final UiModeManager uiModeManager = context.getSystemService(UiModeManager.class);
+        if (uiModeManager != null) {
+            uiModeManager.setApplicationNightMode(nightMode);
         }
     }
 

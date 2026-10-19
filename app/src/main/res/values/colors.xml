@@ -32,6 +32,7 @@
 
     <!-- Static Light theme screen background -->
     <color name="window_background_light" type="color">#FFFFFF</color>
+    <color name="splash_icon_hand" type="color">#000000</color>
     <color name="surface_container_lowest_light" type="color">#FFFFFF</color>
     <color name="surface_container_low_light" type="color">#F5F5F5</color>
     <color name="surface_container_light" type="color">#F0F0F0</color>

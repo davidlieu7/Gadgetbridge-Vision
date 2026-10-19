@@ -38,6 +38,7 @@ import androidx.appcompat.app.ActionBarDrawerToggle;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.graphics.Insets;
+import androidx.core.splashscreen.SplashScreen;
 import androidx.core.view.GravityCompat;
 import androidx.core.view.MenuProvider;
 import androidx.core.view.ViewCompat;
@@ -167,6 +168,8 @@ public class ControlCenterv2 extends AppCompatActivity
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+        // installSplashScreen must run before init sets the real theme
+        SplashScreen.installSplashScreen(this);
         AbstractGBActivity.init(this, AbstractGBActivity.NO_ACTIONBAR);
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
