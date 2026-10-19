@@ -29,6 +29,7 @@ import org.json.JSONArray
 import org.json.JSONObject
 import org.slf4j.LoggerFactory
 import java.io.File
+import java.util.UUID
 
 enum class EndurainAuthType {
     NONE,
@@ -96,9 +97,10 @@ sealed interface EndurainActivityLookup {
 
 /**
  * A photo or video attached to an Endurain activity. [mediaPath] is the server-side storage
- * path rather than a fetchable one, so a client that needs the file takes its basename and asks
- * for /activity_media/{basename}:
- * <https://codeberg.org/endurain-project/endurain/issues/912>.
+ * path before Endurain 0.20 (not a fetchable one, so a client that needs the file takes its
+ * basename and asks for /activity_media/{basename}:
+ * <https://codeberg.org/endurain-project/endurain/issues/912>), and the signed, expiring URL of
+ * the file from 0.20 on.
  */
 @GsonSerialized
 data class EndurainActivityMedia(
@@ -114,12 +116,37 @@ data class EndurainIdentityProvider(
     val slug: String
 )
 
+/**
+ * Endurain 0.20 reworked the REST API of activities and their media (new paths, `PATCH` instead
+ * of `PUT`, uploads answered with a job to poll). The authentication and health routes did not
+ * change.
+ */
+object EndurainApiVersion {
+    /** Whether a server reporting [version] (e.g. `v0.20.0-beta1`) speaks the 0.20 activities API. */
+    fun usesActivitiesApiV2(version: String?): Boolean {
+        val parts = version?.trim()?.removePrefix("v")?.split('.', '-') ?: return false
+        val major = parts.getOrNull(0)?.toIntOrNull() ?: return false
+        val minor = parts.getOrNull(1)?.toIntOrNull() ?: return false
+        return major > 0 || minor >= 20
+    }
+}
+
 class EndurainApiClient(
     private val baseUrl: String,
     private val tokenManager: EndurainTokenManager
 ) {
     private val gson = Gson()
     private val LOG = LoggerFactory.getLogger(EndurainApiClient::class.java)
+
+    /**
+     * Asked once per client, the first time an activities route is needed. A server whose version
+     * cannot be read is treated as the older API, which is what every server spoke before 0.20.
+     */
+    private val activitiesApiV2: Boolean by lazy {
+        EndurainApiVersion.usesActivitiesApiV2(fetchVersion()).also {
+            LOG.debug("Endurain activities API v2: {}", it)
+        }
+    }
 
     /**
      * Build headers with authentication tokens
@@ -354,12 +381,18 @@ class EndurainApiClient(
      * Upload an activity file. Endurain accepts FIT or GPX; Gadgetbridge currently always sends
      * FIT (built from the workout). [callback] receives the new activity id on success, or a
      * null id plus a human-readable [reason] on failure.
+     *
+     * Since Endurain 0.20 the upload is only accepted (202) and imported in the background, so the
+     * job is polled until it ends, which is why this runs on its own thread.
      */
     fun uploadActivity(file: File, callback: (id: Int?, reason: String?) -> Unit) {
         Thread {
             try {
-                val uri = "$baseUrl/api/v1/activities/create/upload".toUri()
+                val v2 = activitiesApiV2
+                val uri = (if (v2) "$baseUrl/api/v1/activities/upload" else "$baseUrl/api/v1/activities/create/upload").toUri()
                 val headers = buildHeaders(EndurainAuthType.AUTH_TOKEN)
+                // Makes a replay of the same upload safe, should the 202 never reach us.
+                if (v2) headers["Idempotency-Key"] = UUID.randomUUID().toString()
 
                 InternetUtils.uploadBinaryFile(
                     uri = uri,
@@ -368,10 +401,15 @@ class EndurainApiClient(
                 ) { success, statusCode, responseText, reason ->
                     if (success && statusCode != null && statusCode in 200..299 && responseText != null) {
                         LOG.debug("Response $statusCode from Endurain: $responseText")
-                        val jsonArray = JSONArray(responseText)
-                        val firstObject = jsonArray.getJSONObject(0)
-                        val id = firstObject.getInt("id")
-                        callback(id, null)
+                        if (v2) {
+                            val (id, failure) = awaitIngestion(JSONObject(responseText))
+                            callback(id, failure)
+                        } else {
+                            val jsonArray = JSONArray(responseText)
+                            val firstObject = jsonArray.getJSONObject(0)
+                            val id = firstObject.getInt("id")
+                            callback(id, null)
+                        }
                     } else {
                         LOG.error("Activity upload failed (status {}, reason {})", statusCode, reason)
                         callback(null, reason ?: statusCode?.let { "HTTP $it" })
@@ -382,6 +420,45 @@ class EndurainApiClient(
                 callback(null, e.localizedMessage)
             }
         }.start()
+    }
+
+    /**
+     * Follows an accepted upload ([job], the 202 body) until it completes, and answers the id of
+     * the activity it created or, failing that, why there is none. Blocks, up to
+     * [INGESTION_POLL_ATTEMPTS] seconds.
+     */
+    private fun awaitIngestion(job: JSONObject): Pair<Int?, String?> {
+        val jobId = job.getString("id")
+        var current = job
+        for (attempt in 0 until INGESTION_POLL_ATTEMPTS) {
+            when (current.optString("status")) {
+                "completed" -> {
+                    val ids = current.optJSONArray("activity_ids")
+                    return if (ids != null && ids.length() > 0) {
+                        ids.getInt(0) to null
+                    } else {
+                        null to "no activity was created"
+                    }
+                }
+                "failed" -> {
+                    val code = current.optStringOrNull("error_code")
+                    LOG.error("Endurain could not import the upload (job {}): {}", jobId, code)
+                    return null to (code ?: "import failed")
+                }
+            }
+            Thread.sleep(1000)
+            val response = InternetUtils.doStringRequestWithStatus(
+                uri = "$baseUrl/api/v1/activities/ingestion-jobs/$jobId".toUri(),
+                requestHeaders = buildHeaders(EndurainAuthType.AUTH_TOKEN)
+            )
+            if (response.statusCode !in 200..299 || response.body == null) {
+                LOG.error("Reading ingestion job {} failed (status {})", jobId, response.statusCode)
+                return null to "HTTP ${response.statusCode}"
+            }
+            current = JSONObject(response.body)
+        }
+        LOG.error("Endurain did not finish importing the upload in time (job {})", jobId)
+        return null to "import timed out"
     }
 
     /**
@@ -403,7 +480,11 @@ class EndurainApiClient(
                     }
                     converted
                 }
-                val uri = "$baseUrl/api/v1/activities_media/upload/activity_id/$activityId".toUri()
+                val uri = (if (activitiesApiV2) {
+                    "$baseUrl/api/v1/activities/$activityId/media"
+                } else {
+                    "$baseUrl/api/v1/activities_media/upload/activity_id/$activityId"
+                }).toUri()
                 val headers = buildHeaders(EndurainAuthType.AUTH_TOKEN)
 
                 InternetUtils.uploadBinaryFile(
@@ -502,11 +583,15 @@ class EndurainApiClient(
 
     /**
      * Deletes an activity and everything derived from it. The endpoint answers 200 with a message
-     * body.
+     * body, and 204 with none from Endurain 0.20.
      */
     fun deleteActivity(activityId: Int): Boolean {
         try {
-            val uri = "$baseUrl/api/v1/activities/$activityId/delete".toUri()
+            val uri = (if (activitiesApiV2) {
+                "$baseUrl/api/v1/activities/$activityId"
+            } else {
+                "$baseUrl/api/v1/activities/$activityId/delete"
+            }).toUri()
             val response = InternetUtils.doStringRequestWithStatus(
                 uri = uri,
                 method = "DELETE",
@@ -535,12 +620,14 @@ class EndurainApiClient(
         details: EndurainActivityDetails
     ): Boolean {
         try {
-            val uri = "$baseUrl/api/v1/activities/edit".toUri()
+            val v2 = activitiesApiV2
+            val uri = (if (v2) "$baseUrl/api/v1/activities/$activityId" else "$baseUrl/api/v1/activities/edit").toUri()
             val headers = buildHeaders(EndurainAuthType.AUTH_TOKEN)
             headers["Content-Type"] = "application/json"
 
             val bodyJson = JSONObject().apply {
-                put("id", activityId)
+                // The id is in the path from 0.20, and the body refuses unknown fields.
+                if (!v2) put("id", activityId)
                 put("activity_type", activityLookup[activityKind.ordinal] ?: GENERIC_ACTIVITY_TYPE)
                 if (name != null) put("name", name)
                 details.description?.let { put("description", it) }
@@ -554,7 +641,7 @@ class EndurainApiClient(
 
             val response = InternetUtils.doStringRequestWithStatus(
                 uri = uri,
-                method = "PUT",
+                method = if (v2) "PATCH" else "PUT",
                 requestHeaders = headers,
                 body = bodyJson.toString()
             )
@@ -581,7 +668,12 @@ class EndurainApiClient(
      */
     fun listActivityMedia(activityId: Int): List<EndurainActivityMedia>? {
         try {
-            val uri = "$baseUrl/api/v1/activities_media/activity_id/$activityId".toUri()
+            val v2 = activitiesApiV2
+            val uri = (if (v2) {
+                "$baseUrl/api/v1/activities/$activityId/media"
+            } else {
+                "$baseUrl/api/v1/activities_media/activity_id/$activityId"
+            }).toUri()
             val response = InternetUtils.doStringRequestWithStatus(
                 uri = uri,
                 requestHeaders = buildHeaders(EndurainAuthType.AUTH_TOKEN)
@@ -594,13 +686,15 @@ class EndurainApiClient(
             if (response.body.isBlank() || response.body == "null") {
                 return emptyList()
             }
-            val array = JSONArray(response.body)
+            // From 0.20 the list is a page ({"items": [...], "total": n}) whose entries carry a
+            // signed `url` instead of the storage path. A page holds up to 200 entries.
+            val array = if (v2) JSONObject(response.body).getJSONArray("items") else JSONArray(response.body)
             return (0 until array.length()).map { i ->
                 val entry = array.getJSONObject(i)
                 EndurainActivityMedia(
                     entry.getInt("id"),
                     entry.getInt("activity_id"),
-                    entry.getString("media_path")
+                    entry.getString(if (v2) "url" else "media_path")
                 )
             }
         } catch (e: Exception) {
@@ -610,11 +704,15 @@ class EndurainApiClient(
     }
 
     /**
-     * Deletes one media entry. The endpoint answers 204 with no body.
+     * Deletes one media entry of [activityId]. The endpoint answers 204 with no body.
      */
-    fun deleteActivityMedia(mediaId: Int): Boolean {
+    fun deleteActivityMedia(activityId: Int, mediaId: Int): Boolean {
         try {
-            val uri = "$baseUrl/api/v1/activities_media/$mediaId".toUri()
+            val uri = (if (activitiesApiV2) {
+                "$baseUrl/api/v1/activities/$activityId/media/$mediaId"
+            } else {
+                "$baseUrl/api/v1/activities_media/$mediaId"
+            }).toUri()
             val response = InternetUtils.doStringRequestWithStatus(
                 uri = uri,
                 method = "DELETE",
@@ -636,26 +734,28 @@ class EndurainApiClient(
      */
     fun editActivity(id: Int, activityKind: ActivityKind, name: String?): Boolean {
         try {
-            val uri = "$baseUrl/api/v1/activities/edit".toUri()
+            val v2 = activitiesApiV2
+            val uri = (if (v2) "$baseUrl/api/v1/activities/$id" else "$baseUrl/api/v1/activities/edit").toUri()
             val headers = buildHeaders(EndurainAuthType.AUTH_TOKEN)
             headers["Content-Type"] = "application/json"
 
             val activityType = activityLookup[activityKind.ordinal] ?: GENERIC_ACTIVITY_TYPE
 
             val bodyJson = JSONObject().apply {
-                put("id", id)
+                // The id is in the path from 0.20, and the body refuses unknown fields.
+                if (!v2) put("id", id)
                 put("activity_type", activityType)
                 if (name != null) put("name", name)
             }
 
-            val result = InternetUtils.doStringRequest(
-                method = "PUT",
+            val response = InternetUtils.doStringRequestWithStatus(
+                method = if (v2) "PATCH" else "PUT",
                 uri = uri,
                 requestHeaders = headers,
                 body = bodyJson.toString()
             )
-            LOG.info("editActivity result: {}", result)
-            return true
+            LOG.info("editActivity result ({}): {}", response.statusCode, response.body)
+            return response.statusCode in 200..299
         } catch (e: Exception) {
             LOG.error("Activity edit error", e)
             return false
@@ -681,6 +781,9 @@ class EndurainApiClient(
             return null
         }
     }
+
+    /** How long an upload is followed while Endurain imports it, one poll per second. */
+    private val INGESTION_POLL_ATTEMPTS = 60
 
     /** Endurain's activity type for a workout whose kind it has no code for. */
     private val GENERIC_ACTIVITY_TYPE = 10
