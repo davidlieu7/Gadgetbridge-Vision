@@ -166,16 +166,16 @@ public class ActivityListingAdapter extends AbstractActivityListingAdapter<Activ
             fillGoalRow(activeTimeRow, R.drawable.ic_access_time, R.string.activity_list_summary_active_time,
                 ActivityListingViews.formatDuration(session), percentOf(duration, activeTimeGoalTimeMillis), WidgetColors.INSTANCE.getActiveTime());
 
-            ActivityListingViews.fillTile(totalStepsTile, String.valueOf(session.getTotalDaySteps()), R.string.live_activity_total_steps);
-            ActivityListingViews.fillTile(activitiesTile, String.valueOf(session.getSessionCount()), R.string.activity_list_summary_activities);
+            ActivityListingViews.fillTile(totalStepsTile, R.drawable.ic_steps, String.valueOf(session.getTotalDaySteps()), R.string.live_activity_total_steps);
+            ActivityListingViews.fillTile(activitiesTile, R.drawable.ic_list_numbered, String.valueOf(session.getSessionCount()), R.string.activity_list_summary_activities);
             final int hr = session.getHeartRateAverage();
-            ActivityListingViews.fillTile(avgHrTile, hr > 0 ? context.getString(R.string.bpm_value_unit, hr) : "-", R.string.averageHR);
+            ActivityListingViews.fillTile(avgHrTile, R.drawable.ic_heartrate, hr > 0 ? context.getString(R.string.bpm_value_unit, hr) : "-", R.string.averageHR);
             final float intensity = session.getIntensity();
             if (intensity > 0) {
-                ActivityListingViews.fillTile(intensityTile, String.valueOf(Math.round(intensity)), R.string.movement_intensity);
+                ActivityListingViews.fillTile(intensityTile, R.drawable.ic_intensity, String.valueOf(Math.round(intensity)), R.string.movement_intensity);
                 intensityTile.setVisibility(View.VISIBLE);
             } else {
-                intensityTile.setVisibility(View.INVISIBLE);
+                intensityTile.setVisibility(View.GONE);
             }
 
             // Only the dashboard and the end spacer are left when the day has no activities.

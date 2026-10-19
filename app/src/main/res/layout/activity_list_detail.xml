@@ -60,6 +60,18 @@
             </LinearLayout>
         </LinearLayout>
 
+        <FrameLayout
+            android:id="@+id/chartsFragmentHolder"
+            android:layout_width="match_parent"
+            android:layout_height="300dp" />
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:layout_marginTop="24dp"
+            android:layout_marginBottom="18dp"
+            android:background="?attr/row_separator" />
+
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -80,11 +92,26 @@
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_marginStart="4dp"
+                android:layout_weight="1" />
+        </LinearLayout>
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:baselineAligned="false"
+            android:orientation="horizontal">
+
+            <include
+                android:id="@+id/activity_detail_tile_avg_hr"
+                layout="@layout/activity_list_summary_tile"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
                 android:layout_marginEnd="4dp"
                 android:layout_weight="1" />
 
             <include
-                android:id="@+id/activity_detail_tile_avg_hr"
+                android:id="@+id/activity_detail_tile_distance"
                 layout="@layout/activity_list_summary_tile"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
@@ -101,32 +128,18 @@
             android:orientation="horizontal">
 
             <include
-                android:id="@+id/activity_detail_tile_distance"
+                android:id="@+id/activity_detail_tile_intensity"
                 layout="@layout/activity_list_summary_tile"
                 android:layout_width="0dp"
                 android:layout_height="wrap_content"
                 android:layout_marginEnd="4dp"
                 android:layout_weight="1" />
 
-            <include
-                android:id="@+id/activity_detail_tile_intensity"
-                layout="@layout/activity_list_summary_tile"
+            <View
                 android:layout_width="0dp"
-                android:layout_height="wrap_content"
+                android:layout_height="0dp"
                 android:layout_marginStart="4dp"
                 android:layout_weight="1" />
         </LinearLayout>
-
-        <View
-            android:layout_width="match_parent"
-            android:layout_height="1dp"
-            android:layout_marginTop="24dp"
-            android:layout_marginBottom="18dp"
-            android:background="?attr/row_separator" />
-
-        <FrameLayout
-            android:id="@+id/chartsFragmentHolder"
-            android:layout_width="match_parent"
-            android:layout_height="300dp" />
     </LinearLayout>
 </ScrollView>

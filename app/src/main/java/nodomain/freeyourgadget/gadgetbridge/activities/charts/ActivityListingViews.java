@@ -2,8 +2,10 @@ package nodomain.freeyourgadget.gadgetbridge.activities.charts;
 
 import android.content.Context;
 import android.view.View;
+import android.widget.ImageView;
 import android.widget.TextView;
 
+import androidx.annotation.DrawableRes;
 import androidx.annotation.Nullable;
 import androidx.annotation.StringRes;
 
@@ -19,7 +21,8 @@ final class ActivityListingViews {
     private ActivityListingViews() {
     }
 
-    static void fillTile(final View tile, final String value, @StringRes final int label) {
+    static void fillTile(final View tile, @DrawableRes final int icon, final String value, @StringRes final int label) {
+        ((ImageView) tile.findViewById(R.id.stat_tile_icon)).setImageResource(icon);
         ((TextView) tile.findViewById(R.id.stat_tile_value)).setText(value);
         ((TextView) tile.findViewById(R.id.stat_tile_label)).setText(label);
     }

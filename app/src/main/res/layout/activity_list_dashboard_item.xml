@@ -57,15 +57,15 @@
 
         <include
             android:id="@+id/activity_list_tile_total_steps"
-            layout="@layout/activity_list_stat_tile"
+            layout="@layout/activity_list_summary_tile"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_marginEnd="4dp"
             android:layout_weight="1" />
 
         <include
-            android:id="@+id/activity_list_tile_activities"
-            layout="@layout/activity_list_stat_tile"
+            android:id="@+id/activity_list_tile_avg_hr"
+            layout="@layout/activity_list_summary_tile"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_marginStart="4dp"
@@ -82,16 +82,16 @@
         android:orientation="horizontal">
 
         <include
-            android:id="@+id/activity_list_tile_avg_hr"
-            layout="@layout/activity_list_stat_tile"
+            android:id="@+id/activity_list_tile_intensity"
+            layout="@layout/activity_list_summary_tile"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_marginEnd="4dp"
             android:layout_weight="1" />
 
         <include
-            android:id="@+id/activity_list_tile_intensity"
-            layout="@layout/activity_list_stat_tile"
+            android:id="@+id/activity_list_tile_activities"
+            layout="@layout/activity_list_summary_tile"
             android:layout_width="0dp"
             android:layout_height="wrap_content"
             android:layout_marginStart="4dp"

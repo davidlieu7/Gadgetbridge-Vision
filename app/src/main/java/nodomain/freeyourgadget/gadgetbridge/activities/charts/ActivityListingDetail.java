@@ -94,23 +94,21 @@ public class ActivityListingDetail extends MaterialDialogFragment {
         ((TextView) view.findViewById(R.id.activity_detail_name)).setText(item.getActivityKind().getLabel(context));
         ((TextView) view.findViewById(R.id.activity_detail_meta)).setText(ActivityListingViews.formatMeta(context, item));
 
-        ActivityListingViews.fillTile(view.findViewById(R.id.activity_detail_tile_duration), ActivityListingViews.formatDuration(item), R.string.activity_detail_duration_label);
+        ActivityListingViews.fillTile(view.findViewById(R.id.activity_detail_tile_duration), R.drawable.ic_access_time, ActivityListingViews.formatDuration(item), R.string.activity_detail_duration_label);
         final int steps = item.getActiveSteps();
-        ActivityListingViews.fillTile(view.findViewById(R.id.activity_detail_tile_steps), steps > 0 ? String.valueOf(steps) : "-", R.string.steps);
+        ActivityListingViews.fillTile(view.findViewById(R.id.activity_detail_tile_steps), R.drawable.ic_steps, steps > 0 ? String.valueOf(steps) : "-", R.string.steps);
         final int hr = item.getHeartRateAverage();
-        ActivityListingViews.fillTile(view.findViewById(R.id.activity_detail_tile_avg_hr), hr > 0 ? context.getString(R.string.bpm_value_unit, hr) : "-", R.string.averageHR);
+        ActivityListingViews.fillTile(view.findViewById(R.id.activity_detail_tile_avg_hr), R.drawable.ic_heartrate, hr > 0 ? context.getString(R.string.bpm_value_unit, hr) : "-", R.string.averageHR);
         final float distance = item.getDistance();
         final View distanceTile = view.findViewById(R.id.activity_detail_tile_distance);
         if (distance > 0) {
-            ActivityListingViews.fillTile(distanceTile, FormatUtils.getFormattedDistanceLabel(distance), R.string.distance);
+            ActivityListingViews.fillTile(distanceTile, R.drawable.ic_distance, FormatUtils.getFormattedDistanceLabel(distance), R.string.distance);
         }
-        distanceTile.setVisibility(distance > 0 ? View.VISIBLE : View.GONE);
+        distanceTile.setVisibility(distance > 0 ? View.VISIBLE : View.INVISIBLE);
         final float intensity = item.getIntensity();
-        final View intensityTile = view.findViewById(R.id.activity_detail_tile_intensity);
         if (intensity >= 1f) {
-            ActivityListingViews.fillTile(intensityTile, String.valueOf(Math.round(intensity)), R.string.movement_intensity);
+            ActivityListingViews.fillTile(view.findViewById(R.id.activity_detail_tile_intensity), R.drawable.ic_intensity, String.valueOf(Math.round(intensity)), R.string.movement_intensity);
         }
-        intensityTile.setVisibility(intensity >= 1f ? View.VISIBLE : View.GONE);
-        view.findViewById(R.id.activity_detail_tiles_extra).setVisibility(distance > 0 || intensity >= 1f ? View.VISIBLE : View.GONE);
+        view.findViewById(R.id.activity_detail_tiles_extra).setVisibility(intensity >= 1f ? View.VISIBLE : View.GONE);
     }
 }

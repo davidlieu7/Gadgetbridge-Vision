@@ -305,13 +305,13 @@ public class ActivityListingDashboard extends MaterialDialogFragment {
             return;
         }
 
-        ActivityListingViews.fillTile(view.findViewById(R.id.activity_list_summary_active_steps), String.valueOf(item.getActiveSteps()), R.string.activity_list_summary_active_steps);
-        ActivityListingViews.fillTile(view.findViewById(R.id.activity_list_summary_total_steps), String.valueOf(item.getTotalDaySteps()), R.string.live_activity_total_steps);
+        ActivityListingViews.fillTile(view.findViewById(R.id.activity_list_summary_active_steps), R.drawable.ic_footprint, String.valueOf(item.getActiveSteps()), R.string.activity_list_summary_active_steps);
+        ActivityListingViews.fillTile(view.findViewById(R.id.activity_list_summary_total_steps), R.drawable.ic_steps, String.valueOf(item.getTotalDaySteps()), R.string.live_activity_total_steps);
         final View distanceTile = view.findViewById(R.id.activity_list_summary_distance);
-        ActivityListingViews.fillTile(distanceTile, FormatUtils.getFormattedDistanceLabel(item.getDistance()), R.string.distance);
+        ActivityListingViews.fillTile(distanceTile, R.drawable.ic_distance, FormatUtils.getFormattedDistanceLabel(item.getDistance()), R.string.distance);
         distanceTile.setVisibility(item.getDistance() > 0 ? View.VISIBLE : View.GONE);
-        ActivityListingViews.fillTile(view.findViewById(R.id.activity_list_summary_active_time), ActivityListingViews.formatDuration(item), R.string.activity_list_summary_active_time);
-        ActivityListingViews.fillTile(view.findViewById(R.id.activity_list_summary_activities), String.valueOf(item.getSessionCount()), R.string.activity_list_summary_activities);
+        ActivityListingViews.fillTile(view.findViewById(R.id.activity_list_summary_active_time), R.drawable.ic_access_time, ActivityListingViews.formatDuration(item), R.string.activity_list_summary_active_time);
+        ActivityListingViews.fillTile(view.findViewById(R.id.activity_list_summary_activities), R.drawable.ic_list_numbered, String.valueOf(item.getSessionCount()), R.string.activity_list_summary_activities);
     }
 
     public class RefreshTask extends DBAccess {

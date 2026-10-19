@@ -24,10 +24,91 @@
             android:textSize="20sp"
             android:textStyle="bold" />
 
+        <FrameLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content">
+
+            <LinearLayout
+                android:id="@+id/activity_list_dashboard_results_layout"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:baselineAligned="false"
+                    android:orientation="horizontal">
+
+                <include
+                    android:id="@+id/activity_list_summary_active_steps"
+                    layout="@layout/activity_list_summary_tile"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:layout_marginEnd="6dp" />
+
+                <include
+                    android:id="@+id/activity_list_summary_total_steps"
+                    layout="@layout/activity_list_summary_tile"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:layout_marginStart="6dp" />
+                </LinearLayout>
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:baselineAligned="false"
+                    android:orientation="horizontal">
+
+                <include
+                    android:id="@+id/activity_list_summary_distance"
+                    layout="@layout/activity_list_summary_tile"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:layout_marginEnd="6dp" />
+
+                <include
+                    android:id="@+id/activity_list_summary_active_time"
+                    layout="@layout/activity_list_summary_tile"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:layout_marginStart="6dp" />
+                </LinearLayout>
+
+                <include
+                    android:id="@+id/activity_list_summary_activities"
+                    layout="@layout/activity_list_summary_tile"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp" />
+            </LinearLayout>
+
+            <ProgressBar
+                android:id="@+id/activity_list_dashboard_loading_layout"
+                android:layout_width="48dp"
+                android:layout_height="48dp"
+                android:layout_gravity="center"
+                android:indeterminate="true"
+                android:visibility="gone" />
+        </FrameLayout>
+
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:layout_marginTop="24dp"
+            android:background="?attr/row_separator" />
+
         <androidx.constraintlayout.widget.ConstraintLayout
             android:id="@+id/activity_list_summary_slider_layout"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content">
+            android:layout_height="wrap_content"
+            android:layout_marginTop="18dp">
 
             <SeekBar
                 android:id="@+id/battery_status_time_span_seekbar"
@@ -187,86 +268,5 @@
             </com.google.android.material.card.MaterialCardView>
 
         </LinearLayout>
-
-        <View
-            android:layout_width="match_parent"
-            android:layout_height="1dp"
-            android:layout_marginTop="24dp"
-            android:background="?attr/row_separator" />
-
-        <FrameLayout
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="18dp">
-
-            <LinearLayout
-                android:id="@+id/activity_list_dashboard_results_layout"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="vertical">
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:baselineAligned="false"
-                    android:orientation="horizontal">
-
-                <include
-                    android:id="@+id/activity_list_summary_active_steps"
-                    layout="@layout/activity_list_summary_tile"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:layout_marginEnd="6dp" />
-
-                <include
-                    android:id="@+id/activity_list_summary_total_steps"
-                    layout="@layout/activity_list_summary_tile"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:layout_marginStart="6dp" />
-                </LinearLayout>
-
-                <LinearLayout
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="12dp"
-                    android:baselineAligned="false"
-                    android:orientation="horizontal">
-
-                <include
-                    android:id="@+id/activity_list_summary_distance"
-                    layout="@layout/activity_list_summary_tile"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:layout_marginEnd="6dp" />
-
-                <include
-                    android:id="@+id/activity_list_summary_active_time"
-                    layout="@layout/activity_list_summary_tile"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:layout_marginStart="6dp" />
-                </LinearLayout>
-
-                <include
-                    android:id="@+id/activity_list_summary_activities"
-                    layout="@layout/activity_list_summary_tile"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content"
-                    android:layout_marginTop="12dp" />
-            </LinearLayout>
-
-            <ProgressBar
-                android:id="@+id/activity_list_dashboard_loading_layout"
-                android:layout_width="48dp"
-                android:layout_height="48dp"
-                android:layout_gravity="center"
-                android:indeterminate="true"
-                android:visibility="gone" />
-        </FrameLayout>
     </LinearLayout>
 </ScrollView>
