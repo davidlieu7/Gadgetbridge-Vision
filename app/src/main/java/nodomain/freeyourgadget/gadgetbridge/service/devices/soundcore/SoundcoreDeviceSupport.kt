@@ -16,7 +16,6 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 package nodomain.freeyourgadget.gadgetbridge.service.devices.soundcore
 
-import android.graphics.Color
 import android.bluetooth.BluetoothAdapter
 import android.content.BroadcastReceiver
 import android.content.Intent
@@ -158,8 +157,6 @@ open class SoundcoreDeviceSupport : AbstractHeadphoneSerialDeviceSupportV2<Sound
         val coordinator = gbDevice.deviceCoordinator as? SoundcoreEarbudsCoordinator
             ?: throw IllegalArgumentException("Expected a SoundcoreEarbudsCoordinator for Soundcore earbuds support")
 
-        if (coordinator.supportsLedColor(gbDevice)) updateLedColor()
-
         addSupportedService(coordinator.getServiceUUID() ?: getServiceUUID(coordinator.getModelName()))
         val actions = coordinator.getSupportedMultipointActions()
         if (coordinator.supports(gbDevice, Capability.Multipoint) &&
@@ -173,36 +170,6 @@ open class SoundcoreDeviceSupport : AbstractHeadphoneSerialDeviceSupportV2<Sound
 
     protected override fun createDeviceProtocol(): SoundcoreProtocolImplV1 =
         (getDevice().deviceCoordinator as SoundcoreEarbudsCoordinator).createProtocol(getDevice())
-
-    override fun onSetLedColor(color: Int) {
-        if (getDevice().deviceCoordinator.supportsLedColor(getDevice())) {
-            GBApplication.getDeviceSpecificSharedPrefs(getDevice().address).edit()
-                .putInt(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_LIGHT_COLOR_RED, Color.red(color))
-                .putInt(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_LIGHT_COLOR_GREEN, Color.green(color))
-                .putInt(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_LIGHT_COLOR_BLUE, Color.blue(color))
-                .apply()
-            updateLedColor()
-        }
-        super.onSetLedColor(color)
-    }
-
-    private fun updateLedColor() {
-        val prefs = GBApplication.getDevicePrefs(getDevice())
-        val enabled = prefs.getBoolean(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_LIGHT_ON, false)
-        val red = prefs.getInt(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_LIGHT_COLOR_RED, 23)
-        val green = prefs.getInt(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_LIGHT_COLOR_GREEN, 187)
-        val blue = prefs.getInt(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_LIGHT_COLOR_BLUE, 239)
-        // This is the configured color, not device readback.
-        getDevice().setExtraInfo("led_color", if (enabled) Color.rgb(red, green, blue) else null)
-    }
-
-    override fun onSendConfiguration(config: String) {
-        super.onSendConfiguration(config)
-        if (config in LED_COLOR_PREFERENCES) {
-            updateLedColor()
-            getDevice().sendDeviceUpdateIntent(getContext())
-        }
-    }
 
     fun getServiceUUID(modelId: String): UUID {
         require(MODEL_ID_PATTERN.matches(modelId)) {
@@ -235,12 +202,6 @@ open class SoundcoreDeviceSupport : AbstractHeadphoneSerialDeviceSupportV2<Sound
     }
 
     private companion object {
-        val LED_COLOR_PREFERENCES = setOf(
-            DeviceSettingsPreferenceConst.PREF_SOUNDCORE_LIGHT_ON,
-            DeviceSettingsPreferenceConst.PREF_SOUNDCORE_LIGHT_COLOR_RED,
-            DeviceSettingsPreferenceConst.PREF_SOUNDCORE_LIGHT_COLOR_GREEN,
-            DeviceSettingsPreferenceConst.PREF_SOUNDCORE_LIGHT_COLOR_BLUE,
-        )
         const val UUID_DEVICE_CTRL_PREFIX = "0cf12d31-fac3-4553-bd80-d6832e7"
         val MODEL_ID_PATTERN = Regex("[0-9A-Fa-f]{5}")
     }

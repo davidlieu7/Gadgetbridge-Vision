@@ -16,6 +16,9 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 package nodomain.freeyourgadget.gadgetbridge.service.devices.soundcore.devices;
 
+import android.graphics.Color;
+
+import nodomain.freeyourgadget.gadgetbridge.GBApplication;
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsPreferenceConst;
 import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEvent;
 import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreEarbudsCoordinator;
@@ -38,6 +41,7 @@ public class SoundcoreV20iProtocol extends SoundcoreProtocolImplV1 {
 
     public SoundcoreV20iProtocol(final GBDevice device) {
         super(device);
+        updateLedColor();
     }
 
     @Override
@@ -80,13 +84,6 @@ public class SoundcoreV20iProtocol extends SoundcoreProtocolImplV1 {
     }
 
     @Override
-    public byte[] encodeLedColor(final int color) {
-        return encodeCommand(CMD_SET_LIGHT_COLOR, new byte[]{
-                (byte) (color >> 16), (byte) (color >> 8), (byte) color
-        });
-    }
-
-    @Override
     public byte[] encodeSendConfiguration(final String config) {
         final Prefs prefs = getDevicePrefs();
         switch (config) {
@@ -95,6 +92,8 @@ public class SoundcoreV20iProtocol extends SoundcoreProtocolImplV1 {
             case DeviceSettingsPreferenceConst.PREF_SOUNDCORE_AUDIO_BALANCE: // -6 .. 6
                 return encodeByteCommand(CMD_SET_AUDIO_BALANCE, (byte) (100 + prefs.getInt(config, 0)));
             case DeviceSettingsPreferenceConst.PREF_SOUNDCORE_LIGHT_ON:
+                updateLedColor();
+                getDevice().sendDeviceUpdateIntent(GBApplication.getContext());
                 return encodeBooleanCommand(CMD_SET_LIGHTS_ENABLED, prefs.getBoolean(config, false));
             case DeviceSettingsPreferenceConst.PREF_SOUNDCORE_LIGHT_BRIGHTNESS: // 1-10
                 return encodeByteCommand(CMD_SET_LIGHT_INTENSITY, prefs.getInt(config, 5));
@@ -109,13 +108,38 @@ public class SoundcoreV20iProtocol extends SoundcoreProtocolImplV1 {
                 if (red < 0 || red > 255 || green < 0 || green > 255 || blue < 0 || blue > 255) {
                     return null;
                 }
-                return encodeLedColor((red << 16) | (green << 8) | blue);
+                final byte[] command = encodeLedColor((red << 16) | (green << 8) | blue);
+                getDevice().sendDeviceUpdateIntent(GBApplication.getContext());
+                return command;
             case DeviceSettingsPreferenceConst.PREF_SOUNDCORE_LIGHT_MODE:
                 final int mode = Integer.parseInt(prefs.getString(config, "0"));
                 return encodeByteCommand(CMD_SET_LIGHT_MODE, (byte) mode);
             default:
                 return super.encodeSendConfiguration(config);
         }
+    }
+
+    @Override
+    public byte[] encodeLedColor(final int color) {
+        getDevicePrefs().getPreferences().edit()
+                .putInt(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_LIGHT_COLOR_RED, Color.red(color))
+                .putInt(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_LIGHT_COLOR_GREEN, Color.green(color))
+                .putInt(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_LIGHT_COLOR_BLUE, Color.blue(color))
+                .apply();
+        updateLedColor();
+        return encodeCommand(CMD_SET_LIGHT_COLOR, new byte[]{
+                (byte) (color >> 16), (byte) (color >> 8), (byte) color
+        });
+    }
+
+    private void updateLedColor() {
+        final Prefs prefs = getDevicePrefs();
+        final boolean enabled = prefs.getBoolean(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_LIGHT_ON, false);
+        final int red = prefs.getInt(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_LIGHT_COLOR_RED, 23);
+        final int green = prefs.getInt(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_LIGHT_COLOR_GREEN, 187);
+        final int blue = prefs.getInt(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_LIGHT_COLOR_BLUE, 239);
+        // This is the configured color, not device readback.
+        getDevice().setExtraInfo("led_color", enabled ? Color.rgb(red, green, blue) : null);
     }
 
     @Override
