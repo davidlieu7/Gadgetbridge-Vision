@@ -122,13 +122,14 @@ abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator(
     enum class AmbientSoundMode(
         private val preferenceValue: String,
         private val byteValue: Byte,
+        @androidx.annotation.StringRes val label: Int,
     ) {
-        NOISE_CANCELLING("noise_cancelling", 0x00),
-        AMBIENT_SOUND("ambient_sound", 0x01),
-        OFF("off", 0x02),
+        NOISE_CANCELLING("noise_cancelling", 0x00, R.string.sony_ambient_sound_noise_cancelling),
+        AMBIENT_SOUND("ambient_sound", 0x01, R.string.sony_ambient_sound_ambient_sound),
+        OFF("off", 0x02, R.string.sony_ambient_sound_off),
         // Model-specific aliases follow the standard modes to preserve fromByte lookups.
-        TRANSPARENCY("transparency", 0x01),
-        ADAPTIVE_ANC("adaptive_anc", 0x00);
+        TRANSPARENCY("transparency", 0x01, R.string.prefs_active_noise_cancelling_transparency),
+        ADAPTIVE_ANC("adaptive_anc", 0x00, R.string.pref_adaptive_noise_cancelling_title);
 
         override fun toString(): String = preferenceValue
 
@@ -600,27 +601,27 @@ abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator(
 
             if (has(arrayOf(Capability.NoiseControl, Capability.AmbientSound))) {
                 val ambientSoundControlEntries = buildList {
-                    add(ListEntry.Res("off", R.string.sony_ambient_sound_off))
+                    add(AmbientSoundMode.OFF)
                     if (has(Capability.Transparency)) {
-                        add(ListEntry.Res("transparency", R.string.prefs_active_noise_cancelling_transparency))
+                        add(AmbientSoundMode.TRANSPARENCY)
                     }
                     if (has(Capability.NoiseControl)) {
-                        add(ListEntry.Res("noise_cancelling", R.string.sony_ambient_sound_noise_cancelling))
+                        add(AmbientSoundMode.NOISE_CANCELLING)
                     }
                     if (has(Capability.AdaptiveNoiseCancellationMode)) {
-                        add(ListEntry.Res("adaptive_anc", R.string.pref_adaptive_noise_cancelling_title))
+                        add(AmbientSoundMode.ADAPTIVE_ANC)
                     }
                     if (has(Capability.AmbientSound)) {
-                        add(ListEntry.Res("ambient_sound", R.string.sony_ambient_sound_ambient_sound))
+                        add(AmbientSoundMode.AMBIENT_SOUND)
                     }
-                }
+                }.map { ListEntry.Res(it.toString(), it.label) }
                 category(key = "pref_header_soundcore_ambient_sound_control", title = R.string.pref_header_sony_ambient_sound_control) {
                     list(
                         key = DeviceSettingsPreferenceConst.PREF_SOUNDCORE_AMBIENT_SOUND_CONTROL,
                         title = R.string.sony_ambient_sound,
                         icon = R.drawable.ic_hearing,
                         entries = ambientSoundControlEntries,
-                        defaultValue = "off",
+                        defaultValue = AmbientSoundMode.OFF.toString(),
                     )
                     if (has(Capability.NoiseCancellationModes)) {
                         list(
