@@ -64,7 +64,7 @@ class WorkoutUploadWorker(
 
     override fun doWork(): Result {
         val context = applicationContext
-        val targets = WorkoutUploadTargets.active(context, GBApplication.getPrefs())
+        val targets = WorkoutUploadTargets.autoUploadEnabled(context, GBApplication.getPrefs())
         if (targets.isEmpty()) {
             return Result.success()
         }
@@ -152,7 +152,7 @@ class WorkoutUploadWorker(
             notifyFailure(
                 context,
                 target.failureNotificationId,
-                target.failureMessage(context, reason)
+                target.uploadFailedMessage(context, reason)
             )
         }
         return result

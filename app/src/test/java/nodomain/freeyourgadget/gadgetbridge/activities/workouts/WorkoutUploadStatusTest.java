@@ -33,6 +33,8 @@ import java.util.Map;
 
 import nodomain.freeyourgadget.gadgetbridge.entities.BaseActivitySummary;
 import nodomain.freeyourgadget.gadgetbridge.entities.WorkoutUpload;
+import nodomain.freeyourgadget.gadgetbridge.externalservices.endurain.EndurainService;
+import nodomain.freeyourgadget.gadgetbridge.externalservices.wanderer.WandererService;
 import nodomain.freeyourgadget.gadgetbridge.model.ActivityKind;
 import nodomain.freeyourgadget.gadgetbridge.test.TestBase;
 
@@ -42,7 +44,7 @@ import nodomain.freeyourgadget.gadgetbridge.test.TestBase;
 public class WorkoutUploadStatusTest extends TestBase {
 
     private static final List<WorkoutUploadTarget> BOTH =
-            Arrays.asList(EndurainUploadTarget.INSTANCE, WandererUploadTarget.INSTANCE);
+            Arrays.asList(EndurainService.INSTANCE, WandererService.INSTANCE);
 
     private BaseActivitySummary summaryWithTrack() throws Exception {
         final BaseActivitySummary summary = new BaseActivitySummary();

@@ -1,9 +1,10 @@
 package nodomain.freeyourgadget.gadgetbridge.activities.workouts
 
 import android.content.Context
+import androidx.fragment.app.Fragment
 import nodomain.freeyourgadget.gadgetbridge.R
 import nodomain.freeyourgadget.gadgetbridge.entities.BaseActivitySummary
-import nodomain.freeyourgadget.gadgetbridge.entities.WorkoutUpload
+import nodomain.freeyourgadget.gadgetbridge.externalservices.AuthStyle
 import nodomain.freeyourgadget.gadgetbridge.model.ActivityKind
 import nodomain.freeyourgadget.gadgetbridge.test.TestBase
 import nodomain.freeyourgadget.gadgetbridge.util.GBPrefs
@@ -23,41 +24,29 @@ class WorkoutUploaderSyncTest : TestBase() {
         val lookedUp = mutableListOf<String>()
         var uploads = 0
 
-        override val service = 99
+        override val id = "fake"
         override val nameRes = R.string.pref_category_endurain
-        override val uploadMenuItemRes = R.id.activity_action_upload_to_endurain
-        override val format = WorkoutPayloadFormat.FIT
-        override val requiresTrack = false
+        override val authStyle = AuthStyle.API_TOKEN
+        override val service = 99
+        override val capabilities = UploadCapabilities(
+            formats = listOf(WorkoutPayloadFormat.FIT),
+            activity = setOf(RemoteOp.CREATE),
+            metadata = emptySet(),
+            media = emptySet()
+        )
         override val failureNotificationId = 0
-        override val uploadedRes = R.string.endurain_successfully_uploaded_toast
 
         override fun isLoggedIn(context: Context) = true
+        override fun statusSummary(context: Context) = ""
+        override fun showSetup(fragment: Fragment) = Unit
+        override fun logout(context: Context) = true
         override fun isAutoUploadEnabled(prefs: GBPrefs) = false
-        override fun failureMessage(context: Context, reason: String) = reason
-        override fun uploadFailedMessage(context: Context, reason: String?) = reason ?: ""
         override fun activityUrl(context: Context, remoteActivityId: String): String? = null
 
         override fun upload(context: Context, summary: BaseActivitySummary, payload: File): WorkoutUploader.UploadResult {
             uploads++
             return WorkoutUploader.UploadResult(true, "new-$uploads", null)
         }
-
-        override fun updateMetadata(context: Context, remoteActivityId: String, summary: BaseActivitySummary) = true
-
-        override fun updateTrack(
-            context: Context,
-            remoteActivityId: String,
-            payload: File,
-            summary: BaseActivitySummary,
-            row: WorkoutUpload
-        ) = TrackUpdateResult(success = true)
-
-        override fun syncPhoto(
-            context: Context,
-            remoteActivityId: String,
-            photoFile: File?,
-            previousMediaId: Int?
-        ): WorkoutUploader.PhotoSyncResult? = null
 
         override fun lookupRemote(context: Context, remoteActivityId: String): RemoteLookup? {
             lookedUp.add(remoteActivityId)

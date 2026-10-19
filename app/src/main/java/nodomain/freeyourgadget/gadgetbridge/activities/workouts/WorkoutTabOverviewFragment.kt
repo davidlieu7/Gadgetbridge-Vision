@@ -261,7 +261,7 @@ class WorkoutTabOverviewFragment : Fragment(), WorkoutTabScreenshotProvider {
         val context = requireContext()
         lifecycleScope.launch {
             val status = withContext(Dispatchers.IO) {
-                val targets = WorkoutUploadTargets.active(context, GBApplication.getPrefs())
+                val targets = WorkoutUploadTargets.configured(context)
                 val rows = WorkoutUploadStore.rowsForSummaries(listOf(summaryId))[summaryId].orEmpty()
                 workoutUploadStatus(summary, rows, targets)
             } ?: return@launch

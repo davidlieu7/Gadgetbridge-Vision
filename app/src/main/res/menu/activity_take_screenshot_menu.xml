@@ -55,52 +55,41 @@
         app:iconTint="?attr/actionmenu_icon_color"
         app:showAsAction="always">
 
+        <!-- The upload entries land at order 40, built from the configured services in
+             WorkoutDetailsFragment, so every item here carries an explicit order. -->
         <menu>
             <item
                 android:id="@+id/activity_action_take_screenshot"
                 android:icon="@drawable/ic_screenshot"
+                android:orderInCategory="10"
                 android:title="@string/controlcenter_take_screenshot"
                 app:showAsAction="never" />
 
             <item
                 android:id="@+id/activity_action_show_gpx"
                 android:icon="@drawable/ic_map"
+                android:orderInCategory="20"
                 android:title="@string/activity_detail_show_gps_label"
                 app:showAsAction="never" />
 
             <item
                 android:id="@+id/activity_action_share_gpx"
                 android:icon="@drawable/ic_share"
+                android:orderInCategory="30"
                 android:title="@string/activity_detail_share_gps_label"
-                app:showAsAction="never" />
-
-            <item
-                android:id="@+id/activity_action_upload_to_endurain"
-                android:icon="@drawable/ic_file_upload"
-                android:title="@string/activity_detail_upload_to_endurain"
-                app:showAsAction="never" />
-
-            <item
-                android:id="@+id/activity_action_upload_to_wanderer"
-                android:icon="@drawable/ic_file_upload"
-                android:title="@string/activity_detail_upload_to_wanderer"
-                app:showAsAction="never" />
-
-            <item
-                android:id="@+id/activity_action_upload_status"
-                android:icon="@drawable/ic_info"
-                android:title="@string/workout_upload_status_title"
                 app:showAsAction="never" />
 
             <item
                 android:id="@+id/activity_action_share_fit"
                 android:icon="@drawable/ic_share"
+                android:orderInCategory="60"
                 android:title="@string/activity_detail_export_fit"
                 app:showAsAction="never" />
 
             <item
                 android:id="@+id/activity_action_dev_tools"
                 android:icon="@drawable/ic_developer_mode"
+                android:orderInCategory="70"
                 android:title="@string/dev_tools"
                 app:showAsAction="never">
                 <menu>
