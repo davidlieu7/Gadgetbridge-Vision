@@ -5921,10 +5921,6 @@
     <string name="service_name_wanderer" translatable="false">Wanderer</string>
     <string name="endurain_uploading_started">Uploading to Endurain…</string>
     <string name="endurain_successfully_uploaded_toast">Successfully uploaded to Endurain</string>
-    <string name="endurain_error_while_uploading_toast">Error while uploading to Endurain</string>
-    <string name="activity_detail_upload_to_endurain">Upload to Endurain</string>
-    <string name="wanderer_toast_successfully_uploaded">Successfully uploaded to Wanderer</string>
-    <string name="wanderer_toast_upload_error">Wanderer upload error: %1$s</string>
     <string name="wanderer_unable_to_upload_gpx_file_toast">Unable to upload GPX file to Wanderer: %1$s</string>
     <string name="pref_wanderer_status_title">Wanderer status</string>
     <string name="pref_wanderer_enter_api_token_title">Enter Wanderer API token</string>
@@ -5932,7 +5928,6 @@
     <string name="pref_wanderer_log_out_title">Log out of Wanderer</string>
     <string name="pref_category_endurain" translatable="false">Endurain</string>
     <string name="pref_category_wanderer" translatable="false">Wanderer</string>
-    <string name="activity_detail_upload_to_wanderer">Upload GPX to Wanderer</string>
     <string name="select_at_least_option">Please select at least %1$d option</string>
 
     <!-- Auto-upload to online fitness trackers -->
@@ -5942,9 +5937,6 @@
     <string name="pref_wanderer_auto_upload_summary">Automatically upload newly synced workouts with a GPS track to Wanderer</string>
     <string name="auto_upload_failed_notification_title">Workout upload failed</string>
     <string name="auto_upload_timed_out">Upload timed out</string>
-    <string name="auto_upload_failed_endurain">Endurain upload failed: %1$s</string>
-    <string name="auto_upload_failed_wanderer">Wanderer upload failed: %1$s</string>
-    <string name="auto_upload_endurain_remote_edited">The workout changed, but the activity on Endurain was edited there and was left untouched</string>
     <string name="workout_upload_status_title">Upload status</string>
     <string name="workout_upload_status_uploaded">Uploaded</string>
     <string name="workout_upload_status_partial">Partly uploaded</string>
