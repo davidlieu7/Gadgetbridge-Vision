@@ -14,7 +14,7 @@
 
     You should have received a copy of the GNU Affero General Public License
     along with this program.  If not, see <https://www.gnu.org/licenses/>. */
-package nodomain.freeyourgadget.gadgetbridge.service.devices.soundcore;
+package nodomain.freeyourgadget.gadgetbridge.service.devices.soundcore.devices;
 
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsPreferenceConst;
 import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEvent;
@@ -30,7 +30,9 @@ public class SoundcoreV20iProtocol extends SoundcoreProtocolImplV1 {
     public static final short CMD_SET_AUDIO_BALANCE = (short) 0x8c10;
     public static final short CMD_SET_LIGHT_INTENSITY = (short) 0x820e;
     public static final short CMD_SET_LIGHT_AUTO_OFF = (short) 0x840e;
+    public static final short CMD_SET_LIGHT_COLOR = (short) 0x850e;
     public static final short CMD_SET_LIGHT_MODE = (short) 0x860e;
+    public static final short CMD_SET_LIGHTS_ENABLED = (short) 0x870e;
 
     private static final int LEFT_LONG_PRESS_OFFSET = 65;
 
@@ -78,6 +80,13 @@ public class SoundcoreV20iProtocol extends SoundcoreProtocolImplV1 {
     }
 
     @Override
+    public byte[] encodeLedColor(final int color) {
+        return encodeCommand(CMD_SET_LIGHT_COLOR, new byte[]{
+                (byte) (color >> 16), (byte) (color >> 8), (byte) color
+        });
+    }
+
+    @Override
     public byte[] encodeSendConfiguration(final String config) {
         final Prefs prefs = getDevicePrefs();
         switch (config) {
@@ -85,6 +94,8 @@ public class SoundcoreV20iProtocol extends SoundcoreProtocolImplV1 {
                 return encodeBooleanCommand(CMD_SET_VOICE_PROMPTS, prefs.getBoolean(config, true));
             case DeviceSettingsPreferenceConst.PREF_SOUNDCORE_AUDIO_BALANCE: // -6 .. 6
                 return encodeByteCommand(CMD_SET_AUDIO_BALANCE, (byte) (100 + prefs.getInt(config, 0)));
+            case DeviceSettingsPreferenceConst.PREF_SOUNDCORE_LIGHT_ON:
+                return encodeBooleanCommand(CMD_SET_LIGHTS_ENABLED, prefs.getBoolean(config, false));
             case DeviceSettingsPreferenceConst.PREF_SOUNDCORE_LIGHT_BRIGHTNESS: // 1-10
                 return encodeByteCommand(CMD_SET_LIGHT_INTENSITY, prefs.getInt(config, 5));
             case DeviceSettingsPreferenceConst.PREF_SOUNDCORE_LIGHT_AUTO_OFF:  // 1-120

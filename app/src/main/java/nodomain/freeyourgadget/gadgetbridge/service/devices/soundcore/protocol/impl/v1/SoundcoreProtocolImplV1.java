@@ -78,8 +78,6 @@ public class SoundcoreProtocolImplV1 extends AbstractSoundcoreProtocol {
     public static final short CMD_SET_BATTERY_LOW_TONE = (short) 0x8210;
 
     public static final short CMD_SET_GAMING_MODE = (short) 0x8701;
-    public static final short CMD_SET_LIGHT_COLOR = (short) 0x850e;
-    public static final short CMD_SET_LIGHTS_ENABLED = (short) 0x870e;
     public static final short CMD_SET_EQUALIZER = (short) 0x8703;
     public static final short CMD_SET_FIT_TEST = (short) 0x0109;
 
@@ -99,13 +97,6 @@ public class SoundcoreProtocolImplV1 extends AbstractSoundcoreProtocol {
 
     public SoundcoreProtocolImplV1(final GBDevice device) {
         super(device);
-    }
-
-    @Override
-    public byte[] encodeLedColor(final int color) {
-        return encodeCommand(CMD_SET_LIGHT_COLOR, new byte[]{
-                (byte) (color >> 16), (byte) (color >> 8), (byte) color
-        });
     }
 
     @Override
@@ -168,8 +159,6 @@ public class SoundcoreProtocolImplV1 extends AbstractSoundcoreProtocol {
                 return encodeByteCommand(CMD_SET_EQUALIZER_PRESET, Integer.parseInt(prefs.getString(config, "0")));
             case DeviceSettingsPreferenceConst.PREF_SOUNDCORE_FIT_TEST:
                 return encodeCommand(CMD_SET_FIT_TEST, new byte[]{0x0a});
-            case DeviceSettingsPreferenceConst.PREF_SOUNDCORE_LIGHT_ON:
-                return encodeBooleanCommand(CMD_SET_LIGHTS_ENABLED, prefs.getBoolean(config, false));
             default:
                 return super.encodeSendConfiguration(config);
         }

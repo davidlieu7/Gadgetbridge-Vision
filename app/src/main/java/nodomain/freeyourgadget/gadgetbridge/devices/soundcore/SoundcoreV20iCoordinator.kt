@@ -19,7 +19,7 @@ package nodomain.freeyourgadget.gadgetbridge.devices.soundcore
 import nodomain.freeyourgadget.gadgetbridge.R
 import nodomain.freeyourgadget.gadgetbridge.devices.DeviceCoordinator
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice
-import nodomain.freeyourgadget.gadgetbridge.service.devices.soundcore.SoundcoreV20iProtocol
+import nodomain.freeyourgadget.gadgetbridge.service.devices.soundcore.devices.SoundcoreV20iProtocol
 import java.util.regex.Pattern
 
 class SoundcoreV20iCoordinator : SoundcoreEarbudsCoordinator() {
@@ -33,8 +33,6 @@ class SoundcoreV20iCoordinator : SoundcoreEarbudsCoordinator() {
 
     override fun getDeviceKind(device: GBDevice): DeviceCoordinator.DeviceKind =
         DeviceCoordinator.DeviceKind.EARBUDS
-
-    override fun isExperimental(): Boolean = true
 
     override fun getBatteryCount(device: GBDevice): Int = 2
 
