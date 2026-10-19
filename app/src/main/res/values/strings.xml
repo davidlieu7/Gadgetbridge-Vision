@@ -106,6 +106,7 @@
     <string name="duration_short_two_weeks">2w</string>
     <string name="duration_short_month">1m</string>
     <string name="duration_short_six_months">6m</string>
+    <string name="duration_short_three_months">3m</string>
     <string name="duration_short_year">1y</string>
     <!-- Strings related to Debug Activity -->
     <string name="title_activity_debug">Debug</string>
@@ -1091,6 +1092,13 @@
     <string name="activity_list_summary_active_time">Active time</string>
     <string name="activity_list_summary_intensity">Movement\nIntensity</string>
     <string name="activity_list_summary_activities">Activities</string>
+    <string name="activity_list_row_meta">%1$s - %2$s · %3$s</string>
+    <string name="activity_list_row_stats_pair">%1$s · %2$s</string>
+    <string name="activity_list_intensity_value">Intensity %s</string>
+    <plurals name="activity_list_steps_count">
+        <item quantity="one">%d step</item>
+        <item quantity="other">%d steps</item>
+    </plurals>
     <string name="dialog_hide">Hide</string>
     <string name="show_ongoing_activity">Show ongoing activity popup</string>
     <string name="charts_show_balance_sleep_title">Show sleep balance</string>
