@@ -54,6 +54,9 @@ open class DefaultChartsProvider : DeviceChartsProvider {
         }
         if (coordinator.supportsSleepMeasurement(device)) {
             supportedCharts.add("sleep")
+            if (coordinator.supportsSleepScore(device)) {
+                supportedCharts.add("sleepscore")
+            }
         }
         if (coordinator.supportsHrvMeasurement(device)) {
             supportedCharts.add("hrvstatus")
@@ -153,6 +156,7 @@ open class DefaultChartsProvider : DeviceChartsProvider {
             "activity" -> context.getString(R.string.activity_sleepchart_activity_and_sleep)
             "activitylist" -> context.getString(R.string.charts_activity_list)
             "sleep" -> context.getString(R.string.sleepchart_your_sleep)
+            "sleepscore" -> context.getString(R.string.sleep_score)
             "heartrate" -> context.getString(R.string.menuitem_hr)
             "hrvstatus" -> context.getString(R.string.pref_header_hrv_status)
             "bodyenergy" -> context.getString(R.string.body_energy)
@@ -189,6 +193,7 @@ open class DefaultChartsProvider : DeviceChartsProvider {
             "activity" -> ActivitySleepChartFragment()
             "activitylist" -> ActivityListingChartFragment()
             "sleep" -> SleepCollectionFragment.newInstance(allowSwipe)
+            "sleepscore" -> SleepScoreCollectionFragment.newInstance(allowSwipe)
             "heartrate" -> HeartRateCollectionFragment.newInstance(allowSwipe)
             "hrvstatus" -> HrvStatusCollectionFragment.newInstance(allowSwipe)
             "bodyenergy" -> BodyEnergyCollectionFragment.newInstance(allowSwipe)
@@ -220,7 +225,7 @@ open class DefaultChartsProvider : DeviceChartsProvider {
             OVERVIEW -> R.drawable.ic_dashboard
             "activity" -> R.drawable.ic_activity_walking
             "activitylist" -> R.drawable.ic_list_numbered
-            "sleep" -> R.drawable.ic_activity_sleep
+            "sleep", "sleepscore" -> R.drawable.ic_activity_sleep
             "heartrate" -> R.drawable.ic_heartrate
             "hrvstatus" -> R.drawable.ic_ecg
             "bodyenergy" -> R.drawable.ic_bolt
@@ -290,6 +295,16 @@ open class DefaultChartsProvider : DeviceChartsProvider {
                 } else {
                     null
                 }
+            }
+
+            // Sleep score - the last score of the day
+            "sleepscore" -> {
+                coordinator.getSleepScoreProvider(device, db.daoSession)
+                    ?.getAllSamples(start, end)
+                    ?.lastOrNull()
+                    ?.sleepScore
+                    ?.takeIf { it > 0 }
+                    ?.toString()
             }
 
             // Calories - latest active calories value for the day

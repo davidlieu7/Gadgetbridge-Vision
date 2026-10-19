@@ -43,6 +43,16 @@
                 android:layout_height="350dp"
         />
 
+        <com.google.android.material.chip.ChipGroup
+            android:id="@+id/week_sleep_chart_chips"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="10dp"
+            android:layout_marginTop="8dp"
+            android:layout_marginEnd="10dp"
+            android:visibility="gone"
+            app:singleLine="true" />
+
         <nodomain.freeyourgadget.gadgetbridge.activities.charts.mpchart.ChartLegendView
             android:id="@+id/week_sleep_chart_legend"
             android:layout_width="match_parent"
@@ -57,33 +67,6 @@
             android:layout_marginStart="15dp"
             android:layout_marginEnd="15dp"
             android:orientation="vertical" />
-    <LinearLayout
-        android:id="@+id/sleep_score_wrapper"
-        android:layout_width="fill_parent"
-        android:layout_height="wrap_content"
-        android:gravity="center"
-        android:orientation="vertical"
-        >
-        <nodomain.freeyourgadget.gadgetbridge.activities.workouts.SectionHeaderView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="@dimen/chart_section_spacing"
-            app:sectionTitle="@string/sleep_score" />
-        <nodomain.freeyourgadget.gadgetbridge.activities.charts.mpchart.GbChartView
-            android:id="@+id/sleep_score_chart"
-            android:layout_width="fill_parent"
-            android:layout_height="250dp"
-            />
-        <LinearLayout
-            android:id="@+id/sleep_score_stats_container"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="15dp"
-            android:layout_marginBottom="15dp"
-            android:layout_marginStart="15dp"
-            android:layout_marginEnd="15dp"
-            android:orientation="vertical" />
-    </LinearLayout>
 
     </LinearLayout>
 

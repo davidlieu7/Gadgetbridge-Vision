@@ -1,5 +1,6 @@
 package nodomain.freeyourgadget.gadgetbridge.activities.charts.sleep
 
+import nodomain.freeyourgadget.gadgetbridge.activities.charts.spec.AxisSide
 import nodomain.freeyourgadget.gadgetbridge.activities.charts.spec.AxisSpec
 import nodomain.freeyourgadget.gadgetbridge.activities.charts.spec.ChartPoint
 import nodomain.freeyourgadget.gadgetbridge.activities.charts.spec.ChartSeries
@@ -32,6 +33,27 @@ object SleepScoreChartData {
                 maximum = epochDays.last().toDouble(),
             ),
             yAxis = AxisSpec(format = ChartValueFormat.INTEGER, minimum = 0.0, maximum = MAX_SCORE),
+        )
+    }
+
+    /**
+     * [spec] with each day's sleep score as a line on a 0-100 end axis, broken at days without a score.
+     */
+    @JvmStatic
+    fun withScores(spec: ChartSpec, epochDays: LongArray, scores: IntArray, label: String, color: Int): ChartSpec {
+        val points = epochDays.indices
+            .filter { scores[it] > 0 }
+            .map { ChartPoint(epochDays[it].toDouble(), scores[it].toDouble()) }
+        if (spec.isEmpty || points.isEmpty()) {
+            return spec
+        }
+        val line = ChartSeries(
+            "score", label, points,
+            SeriesStyle.Line(color, showPoints = true, maxGap = MAX_GAP_DAYS), AxisSide.END,
+        )
+        return spec.copy(
+            series = spec.series + line,
+            endYAxis = AxisSpec(format = ChartValueFormat.INTEGER, minimum = 0.0, maximum = MAX_SCORE),
         )
     }
 }

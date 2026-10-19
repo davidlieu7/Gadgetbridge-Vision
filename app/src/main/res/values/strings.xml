@@ -1266,6 +1266,11 @@
     <string name="sleep_stages">Sleep Stages</string>
     <string name="sleep_score">Sleep Score</string>
     <string name="sleep_score_value">Score: %1d</string>
+    <string name="sleep_score_quality">Quality</string>
+    <string name="sleep_score_quality_excellent">Excellent</string>
+    <string name="sleep_score_quality_good">Good</string>
+    <string name="sleep_score_quality_fair">Fair</string>
+    <string name="sleep_score_quality_poor">Poor</string>
     <string name="stats_empty_value">-</string>
     <string name="time_empty_value" translatable="false">--:--</string>
     <string name="date_placeholders__date__time">%1$s, %2$s</string>
