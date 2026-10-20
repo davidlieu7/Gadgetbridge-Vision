@@ -665,6 +665,8 @@ abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator(
                                 ListEntry.Res("keep", R.string.soundcore_sleep_keep),
                             ),
                             defaultValue = "keep",
+                        )
+                    }
                     if (has(Capability.AudioBalance)) {
                         seekbar(
                             key = DeviceSettingsPreferenceConst.PREF_SOUNDCORE_AUDIO_BALANCE,
