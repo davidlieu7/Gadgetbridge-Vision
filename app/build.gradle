@@ -341,6 +341,9 @@ dependencies {
     implementation libs.mpandroidchart
     implementation libs.durationformatter
     implementation libs.ckchangelog
+    implementation libs.coil
+    implementation libs.androidx.media3.exoplayer
+    implementation libs.androidx.media3.ui
     implementation libs.solarpositioning
     implementation libs.cbor
     // use pristine greendao instead of our custom version, since our custom jitpack-packaged

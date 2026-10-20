@@ -5,17 +5,11 @@ import android.content.SharedPreferences;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.nio.charset.StandardCharsets;
-import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsPreferenceConst;
-import nodomain.freeyourgadget.gadgetbridge.activities.multipoint.MultipointDevice;
-import nodomain.freeyourgadget.gadgetbridge.activities.multipoint.MultipointPairingActivity;
 import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEvent;
-import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreEarbudsCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreEarbudsCoordinator.TapFunction;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.soundcore.protocol.impl.v1.SoundcoreProtocolImplV1;
@@ -92,9 +86,6 @@ public class SoundcoreSportX20Protocol extends SoundcoreProtocolImplV1 {
 
     private static final Map<Integer, byte[]> EQ_PRESET_PAYLOADS = buildPresetPayloads();
 
-    private final List<MultipointDevice> pairedDevices = new ArrayList<>();
-    private String activeSourceAddress;
-
     public SoundcoreSportX20Protocol(final GBDevice device) {
         super(device);
     }
@@ -105,18 +96,6 @@ public class SoundcoreSportX20Protocol extends SoundcoreProtocolImplV1 {
         // common Liberty header still carries battery and version information.
         decodeControlFunctionsFromDeviceInfo(payload);
         return decodeStandardEarbudDeviceInfo(payload);
-    }
-
-    @Override
-    protected GBDeviceEvent[] decodePairedDevices(final byte[] payload) {
-        decodePairedDevicesPayload(payload);
-        return new GBDeviceEvent[0];
-    }
-
-    @Override
-    protected GBDeviceEvent[] decodeConnectionStatus(final byte[] payload) {
-        decodeConnectionStatusPayload(payload);
-        return new GBDeviceEvent[0];
     }
 
     @Override
@@ -224,58 +203,6 @@ public class SoundcoreSportX20Protocol extends SoundcoreProtocolImplV1 {
                 .putBoolean(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_TOUCH_TONE, touchTone)
                 .putString(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_AUTO_POWER_OFF, String.valueOf(autoPowerDuration))
                 .apply();
-    }
-
-    /**
-     * Decodes the paired-device list sent by the device (CMD_NOTIFY_PAIRED_DEVICES) and broadcasts
-     * it to {@link MultipointPairingActivity}.
-     *
-     * Payload layout:
-     * <pre>
-     * [0..1]   = unknown header (01 01 even with two connected devices)
-     * then, per paired device:
-     *   [0]      = entry length (including this byte), e.g. 0x28 = 40
-     *   [1]      = connection flag (0x01 = connected, 0x00 = not connected)
-     *   [2..7]   = 6-byte Bluetooth address, little-endian
-     *   [8..]    = device name, UTF-8, zero-padded, (entry length - 8) bytes
-     * </pre>
-     */
-    private void decodePairedDevicesPayload(final byte[] payload) {
-        if (payload.length < 2) {
-            return;
-        }
-        final List<MultipointDevice> devices = new ArrayList<>();
-        int offset = 2; // skip the 2-byte header
-        while (offset + 8 <= payload.length) {
-            final int entrySize = Byte.toUnsignedInt(payload[offset]);
-            if (entrySize < 8 || offset + entrySize > payload.length) {
-                break;
-            }
-            final boolean connected = payload[offset + 1] != 0;
-            final String address = formatMacAddress(payload, offset + 2);
-            final int nameLen = entrySize - 8;
-            int nameEnd = 0;
-            while (nameEnd < nameLen && payload[offset + 8 + nameEnd] != 0) {
-                nameEnd++;
-            }
-            final String name = new String(payload, offset + 8, nameEnd, StandardCharsets.UTF_8);
-            LOG.debug("Paired device: addr={} name='{}' connected={}", address, name, connected);
-            devices.add(new MultipointDevice(address, name, connected, false, ((SoundcoreEarbudsCoordinator) getDevice().getDeviceCoordinator())
-                    .getSupportedMultipointActions().contains(MultipointPairingActivity.ACTION_MULTIPOINT_FORGET_DEVICE)));
-            offset += entrySize;
-        }
-        pairedDevices.clear();
-        pairedDevices.addAll(devices);
-        broadcastPairedDevices(pairedDevices, activeSourceAddress);
-    }
-
-    private void decodeConnectionStatusPayload(final byte[] payload) {
-        if (payload.length != 7 || (payload[0] != 0x00 && payload[0] != 0x01)) {
-            LOG.warn("Invalid connection status payload");
-            return;
-        }
-        activeSourceAddress = payload[0] == 0x01 ? formatMacAddress(payload, 1) : null;
-        broadcastPairedDevices(pairedDevices, activeSourceAddress);
     }
 
     /** Maps a low-nibble TapFunction code (0–15) back to the TapFunction enum. */

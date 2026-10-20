@@ -73,6 +73,8 @@ abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator(
         AudioEqualizer,
         GamingMode,
         VoicePrompts,
+        AudioBalance,
+        ColorfulLights,
         ButtonBrightness,
         LDAC,
         AdaptiveDirection,
@@ -173,6 +175,7 @@ abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator(
         AMBIENT_SOUND_CONTROL(4, R.string.sony_button_mode_ambient_sound_control),
         ANC_TOGGLE(8, R.string.soundcore_anc_toggle),
         SWITCH_MODE(13, R.string.soundcore_switch_mode),
+        COLORFUL_LIGHTS(14, R.string.soundcore_colorful_lights),
         NONE(15, R.string.none),
 
         ;
@@ -262,6 +265,12 @@ abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator(
 
     override fun supportsFindDevicePerEarbud(device: GBDevice): Boolean =
         supportsFindDevice(device) && getDeviceKind(device) == DeviceCoordinator.DeviceKind.EARBUDS
+
+    override fun supportsLedColor(device: GBDevice): Boolean =
+        supports(device, Capability.ColorfulLights)
+
+    override fun supportsRgbLedColor(device: GBDevice): Boolean =
+        supports(device, Capability.ColorfulLights)
 
     override fun getSupportedDeviceSpecificConnectionSettings(): IntArray =
         connectionSettings + super.getSupportedDeviceSpecificConnectionSettings()
@@ -456,8 +465,64 @@ abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator(
                 }
             }
 
+            if (has(Capability.ColorfulLights)) {
+                screen(
+                    key = "pref_soundcore_light_screen",
+                    title = R.string.soundcore_colorful_lights,
+                    icon = R.drawable.ic_lightbulb,
+                ) {
+                    switchSetting(
+                        key = DeviceSettingsPreferenceConst.PREF_SOUNDCORE_LIGHT_ON,
+                        title = R.string.soundcore_colorful_lights,
+                        icon = R.drawable.ic_lightbulb,
+                    )
+                    list(
+                        key = DeviceSettingsPreferenceConst.PREF_SOUNDCORE_LIGHT_MODE,
+                        title = R.string.soundcore_light_mode,
+                        icon = R.drawable.ic_light_mode_auto,
+                        entries = listOf(
+                            ListEntry.Res("0", R.string.soundcore_light_effect_on),
+                            ListEntry.Res("1", R.string.soundcore_light_effect_breathing),
+                            ListEntry.Res("2", R.string.soundcore_light_effect_flash),
+                            ListEntry.Res("3", R.string.soundcore_light_effect_music),
+                        ),
+                        defaultValue = "0",
+                        dependency = DeviceSettingsPreferenceConst.PREF_SOUNDCORE_LIGHT_ON,
+                    )
+                    seekbar(
+                        key = DeviceSettingsPreferenceConst.PREF_SOUNDCORE_LIGHT_BRIGHTNESS,
+                        title = R.string.menuitem_brightness,
+                        icon = R.drawable.ic_wb_sunny,
+                        min = 1, max = 10, defaultValue = 5,
+                        dependency = DeviceSettingsPreferenceConst.PREF_SOUNDCORE_LIGHT_ON,
+                    )
+                    seekbar(
+                        key = DeviceSettingsPreferenceConst.PREF_SOUNDCORE_LIGHT_AUTO_OFF,
+                        title = R.string.sony_automatic_power_off,
+                        icon = R.drawable.ic_timer,
+                        min = 1, max = 120, defaultValue = 45,
+                        dependency = DeviceSettingsPreferenceConst.PREF_SOUNDCORE_LIGHT_ON,
+                    )
+                    val channels = listOf(
+                        Triple(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_LIGHT_COLOR_RED, R.string.red, 23),
+                        Triple(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_LIGHT_COLOR_GREEN, R.string.green, 187),
+                        Triple(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_LIGHT_COLOR_BLUE, R.string.blue, 239),
+                    )
+                    channels.forEach { (key, title, initialValue) ->
+                        seekbar(
+                            key = key, title = title,
+                            icon = R.drawable.ic_led_color,
+                            min = 0,
+                            max = 255,
+                            defaultValue = initialValue,
+                            dependency = DeviceSettingsPreferenceConst.PREF_SOUNDCORE_LIGHT_ON,
+                        )
+                    }
+                }
+            }
+
             if (has(arrayOf(
-                    Capability.AudioEqualizer, Capability.SurroundSound, Capability.GamingMode, Capability.LDAC,
+                    Capability.AudioEqualizer, Capability.SurroundSound, Capability.GamingMode, Capability.LDAC, Capability.AudioBalance,
                     Capability.ListeningMode, Capability.DefaultListeningMode, Capability.LocalAudioPlayback,
                     Capability.LocalAudioVolume, Capability.DynamicSnoreMasking, Capability.SleepAudioAutoSwitch, Capability.LocalAudioAutoStop,
                 ))) {
@@ -600,6 +665,14 @@ abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator(
                                 ListEntry.Res("keep", R.string.soundcore_sleep_keep),
                             ),
                             defaultValue = "keep",
+                    if (has(Capability.AudioBalance)) {
+                        seekbar(
+                            key = DeviceSettingsPreferenceConst.PREF_SOUNDCORE_AUDIO_BALANCE,
+                            title = R.string.pref_balance,
+                            icon = R.drawable.ic_balance,
+                            min = -6,
+                            max = 6,
+                            defaultValue = 0,
                         )
                     }
                     if (has(Capability.GamingMode)) {
@@ -841,6 +914,7 @@ abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator(
                     }
                 }
             }
+
             if (supportsSleepMeasurement(device)) {
                 switchSetting(
                     key = DeviceSettingsPreferenceConst.PREF_SLEEP_TRACKING,
@@ -852,7 +926,8 @@ abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator(
             if (supportsDataFetching(device)) {
                 keepActivityDataOnDevice()
             }
-            if (has(arrayOf(Capability.WearingDetection, Capability.WearingTone, Capability.FitTest, Capability.AutoPowerOff, Capability.VoicePrompts, Capability.ButtonBrightness))) {
+
+            if (has(arrayOf(Capability.WearingDetection, Capability.WearingTone, Capability.FitTest, Capability.AutoPowerOff, Capability.BatteryLowTone, Capability.VoicePrompts, Capability.ButtonBrightness))) {
                 category(key = "pref_header_soundcore_general", title = R.string.pref_header_general) {
                     if (has(Capability.WearingDetection)) {
                         switchSetting(

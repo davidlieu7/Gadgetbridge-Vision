@@ -34,6 +34,10 @@ abstract class AbstractDjiCameraCoordinator : AbstractBLEDeviceCoordinator() {
         return DeviceCoordinator.DeviceKind.CAMERA
     }
 
+    override fun supportsGallery(device: GBDevice): Boolean {
+        return true
+    }
+
     override fun getDeviceSettings(device: GBDevice): DeviceSettingsSpec = deviceSettings {
 
     }

@@ -241,6 +241,9 @@ public class DeviceSpecificSettingsFragment extends AbstractPreferenceFragment i
         LOG.debug("onCreatePreferences: {}", rootKey);
 
         final DeviceSettingsSpec modelSpec = device.getDeviceCoordinator().getDeviceSettings(device);
+        if (modelSpec != null) {
+            modelManagedKeys = modelSpec.collectAllKeys();
+        }
 
         if (rootKey != null) {
             // Check whether rootKey belongs to a model-defined ScreenSetting and, if so, render
@@ -283,6 +286,7 @@ public class DeviceSpecificSettingsFragment extends AbstractPreferenceFragment i
                         }
                     }
                     addDynamicSettings(rootKey);
+                    setChangeListener(rootKey);
                     reloadEnabledPreferences();
                     return;
                 }
@@ -292,7 +296,6 @@ public class DeviceSpecificSettingsFragment extends AbstractPreferenceFragment i
         if (rootKey == null) {
             // we are the main preference screen
             if (modelSpec != null) {
-                modelManagedKeys = modelSpec.collectAllKeys();
                 setPreferenceScreen(getPreferenceManager().createPreferenceScreen(requireContext()));
                 // Declares the (invisible) "searchPreference" preference that getSearchConfiguration()
                 // looks up, so that this device's settings can be searched - see indexModelSettings().

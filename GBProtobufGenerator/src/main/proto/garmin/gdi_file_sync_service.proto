@@ -40,10 +40,12 @@ message PushItemRequest {
   optional File file = 1;
   optional uint32 unk2 = 2; // 24, 34 or 37, does not seem related to the app type
   optional uint32 unk3 = 3; // 0
-  optional uint32 unk4 = 4; // 15
+  optional uint32 requested_compression_window = 4; // 15
 }
 
 message DeleteItemRequest {
+    optional FileId file = 1;
+    optional uint32 unk_2 = 2;
 }
 
 message CancelTransferRequest {
@@ -59,13 +61,13 @@ message GetItemChecksumResponse {
 }
 
 message PushItemResponse {
-    optional uint32 unk1 = 1;
+    optional uint32 status = 1; // 0=success
     optional uint32 unk2 = 2; // 0
     optional uint32 unk3 = 3; // 0
     optional uint32 token = 4;
-    optional uint32 unk6 = 6;
-    optional uint32 unk7 = 7;
-    optional uint32 unk8 = 8; // 10
+    optional uint32 error_code = 6;
+    optional uint32 error_source = 7;
+    optional uint32 compression_window = 8; // 10
 }
 
 message PriorityUpdateResponse {
@@ -73,9 +75,9 @@ message PriorityUpdateResponse {
 }
 
 message DeleteItemResponse {
-    optional uint32 unk1 = 1;
-    optional uint32 unk2 = 2;
-    optional uint32 unk3 = 3;
+    optional uint32 status = 1; // 0=success
+    optional uint32 error_code = 2;
+    optional uint32 error_source = 3;
 }
 
 message CancelTransferResponse {
@@ -92,8 +94,8 @@ message ResourceUpdateNotification {
 
 message ModifyFlagsResponse {
   optional uint32 status = 1; // 0: success
-  optional uint32 unk2 = 2;
-  optional uint32 unk3 = 3;
+  optional uint32 error_code = 2;
+  optional uint32 error_source = 3;
 }
 
 message TransferStatusRequest {
@@ -134,17 +136,17 @@ message PullItemRequest {
   optional File file = 1;
   optional uint32 unk2 = 2; // 24
   optional uint32 unk3 = 3; // 0
-  optional uint64 unk4 = 4; // 0 - likely a content offset
-  optional uint32 unk5 = 5; // 15
+  optional uint64 offset = 4;
+  optional uint32 requested_compression_window = 5; // 15
 }
 
 message PullItemResponse {
   optional uint32 status = 1; // 0 success 3 failure
   optional uint32 unk2 = 2; // 0
   optional uint32 handle = 3; // varies
-  optional uint32 unk5 = 5; // error related
-  optional uint32 unk6 = 6; // error related
-  optional uint32 unk7 = 7; // 11
+  optional sint32 error_code = 5;
+  optional uint32 error_source = 6;
+  optional uint32 compression_window = 7; // 11
   optional uint32 unk8 = 8; // error related
   optional sint32 unk9 = 9; // error related
 }
@@ -171,7 +173,7 @@ message ItemListResponse {
   optional uint32 cursor_id = 2; // 2 on venu 4, 1 on venu 3
   optional uint32 next_page_id = 3; // 33737, incrementing
   repeated File file = 4;
-  optional uint32 unk5 = 5; // error related
+  optional uint32 error_code = 5;
   optional uint32 unk6 = 6; // 1 on venu 4
   optional FileType unk7 = 7; // error related
 }

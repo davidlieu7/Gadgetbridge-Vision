@@ -54,6 +54,7 @@
         <item name="device_card_bg">?attr/stat_tile_bg</item>
         <item name="bottom_bar_divider">@null</item>
         <item name="stat_tile_border">?attr/colorOutlineVariant</item>
+        <item name="chart_marker_bg">?attr/colorSurfaceContainerLow</item>
         <item name="activity_icon_bg">?attr/colorSurfaceContainerHigh</item>
         <item name="table_header_rule">@color/table_header_rule_light</item>
 
@@ -163,6 +164,7 @@
         <item name="device_card_bg">?attr/stat_tile_bg</item>
         <item name="bottom_bar_divider">@null</item>
         <item name="stat_tile_border">?attr/colorOutlineVariant</item>
+        <item name="chart_marker_bg">?attr/colorSurfaceContainerHigh</item>
         <item name="activity_icon_bg">?attr/colorSurfaceContainerHigh</item>
         <item name="table_header_rule">@color/table_header_rule_dark</item>
 
@@ -247,6 +249,7 @@
         <item name="device_card_bg">?attr/colorSurfaceContainer</item>
         <item name="bottom_bar_divider">@null</item>
         <item name="stat_tile_border">?attr/colorOutlineVariant</item>
+        <item name="chart_marker_bg">?attr/colorSurfaceContainerHigh</item>
         <item name="activity_icon_bg">?attr/colorSurfaceContainerHigh</item>
         <item name="table_header_rule">@color/table_header_rule_light</item>
         <item name="preferenceTheme">@style/AppPreferenceThemeOverlay</item>
@@ -314,6 +317,7 @@
         <item name="device_card_bg">?attr/colorSurfaceContainer</item>
         <item name="bottom_bar_divider">@null</item>
         <item name="stat_tile_border">?attr/colorOutlineVariant</item>
+        <item name="chart_marker_bg">?attr/colorSurfaceContainerHigh</item>
         <item name="activity_icon_bg">?attr/colorSurfaceContainerHigh</item>
         <item name="table_header_rule">@color/table_header_rule_dark</item>
         <item name="preferenceTheme">@style/AppPreferenceThemeOverlay</item>
@@ -890,6 +894,7 @@
     <style name="ThemeOverlay.App.ContrastingSurfaces.Light" parent="">
         <item name="toolbar_bg">?attr/stat_tile_bg</item>
         <item name="stat_tile_bg">@color/surface_contrasting_light</item>
+        <item name="chart_marker_bg">?attr/stat_tile_bg</item>
         <item name="grid_tile_bg">@color/surface_contrasting_light</item>
         <item name="activity_icon_bg">@color/surface_contrasting_light</item>
         <item name="toolbar_divider">@color/toolbar_divider_contrasting_light</item>
@@ -905,5 +910,32 @@
         <item name="toolbar_bg">?attr/stat_tile_bg</item>
         <item name="grid_tile_bg">@color/stat_tile_bg_amoled</item>
         <item name="bar_shade">@drawable/bar_shade_amoled</item>
+    </style>
+
+    <style name="ThemeOverlay.App.MaterialAlertDialog.WindowBackground" parent="ThemeOverlay.Material3.MaterialAlertDialog">
+        <item name="alertDialogStyle">@style/MaterialAlertDialog.App.WindowBackground</item>
+    </style>
+    <style name="MaterialAlertDialog.App.WindowBackground" parent="MaterialAlertDialog.Material3">
+        <item name="backgroundTint">?android:attr/colorBackground</item>
+    </style>
+
+    <style name="GalleryViewerTheme" parent="Theme.Material3.Dark.NoActionBar">
+        <item name="android:windowIsFloating">false</item>
+        <item name="android:windowBackground">@android:color/black</item>
+        <item name="android:statusBarColor">@android:color/black</item>
+        <item name="android:navigationBarColor">@android:color/black</item>
+    </style>
+
+    <style name="GalleryViewerAction" parent="Widget.Material3.Button.TextButton">
+        <item name="android:layout_width">0dp</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:layout_weight">1</item>
+        <item name="android:ellipsize">end</item>
+        <item name="android:maxLines">1</item>
+        <item name="android:textAppearance">?attr/textAppearanceLabelMedium</item>
+        <item name="android:textColor">@color/gallery_viewer_action</item>
+        <item name="iconGravity">top</item>
+        <item name="iconPadding">4dp</item>
+        <item name="iconTint">@color/gallery_viewer_action</item>
     </style>
 </resources>

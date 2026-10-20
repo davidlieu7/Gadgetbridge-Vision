@@ -811,6 +811,12 @@ public interface DeviceCoordinator {
     File getWritableExportDirectory(@NonNull final GBDevice device, boolean createIfRequired) throws IOException;
 
     /**
+     * Returns the dedicated cache directory of this device.
+     * This directory will be deleted when the device is deleted.
+     */
+    File getDeviceCacheDir(@NonNull final GBDevice device);
+
+    /**
      * Returns a String containing the device app sort order filename.
      */
     @Nullable
@@ -913,6 +919,13 @@ public interface DeviceCoordinator {
      * like artist, title, album, play state etc.
      */
     boolean supportsMusicInfo(@NonNull final GBDevice device);
+
+    /**
+     * Indicates whether the device support provides a GallerySource to manage photos and videos on the device.
+     */
+    default boolean supportsGallery(@NonNull final GBDevice device) {
+        return false;
+    }
 
     /**
      * Indicates whether the device supports features required by Sleep As Android

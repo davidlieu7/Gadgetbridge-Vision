@@ -2231,7 +2231,7 @@ public class GarminSupport extends AbstractBTLESingleDeviceSupport implements IC
                                         .setFile(file)
                                         .setUnk2(37)
                                         .setUnk3(0)
-                                        .setUnk4(15)
+                                        .setRequestedCompressionWindow(15)
                         )
                 ).build());
     }

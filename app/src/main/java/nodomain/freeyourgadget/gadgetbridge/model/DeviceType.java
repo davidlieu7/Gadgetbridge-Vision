@@ -584,6 +584,7 @@ import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreMotion300
 import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreQ30Coordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.sleep_a30.SoundcoreSleepA30Coordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreSportX20Coordinator;
+import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreV20iCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.supercars.SuperCarsCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.test.TestDeviceCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.thermalprinter.ThermalPrinterCoordinator;
@@ -1095,6 +1096,7 @@ public enum DeviceType {
     SOUNDCORE_AEROFIT2(SoundcoreAeroFit2Coordinator.class),
     SOUNDCORE_SPORT_X20(SoundcoreSportX20Coordinator.class),
     SOUNDCORE_SLEEP_A30(SoundcoreSleepA30Coordinator.class),
+    SOUNDCORE_V20I(SoundcoreV20iCoordinator.class),
     SOUNDCORE_A30I(SoundcoreA30iCoordinator.class),
     HAYLOU_S35_ANC(HaylouS35AncCoordinator.class),
     MOONDROP_SPACE_TRAVEL(MoondropSpaceTravelCoordinator.class),

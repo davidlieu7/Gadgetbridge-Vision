@@ -15,6 +15,7 @@ androidx-gridlayout = "1.1.0"
 androidx-health-connect = "1.1.0"
 androidx-legacy = "1.0.0"
 androidx-lifecycle = "2.11.0"
+androidx-media3 = "1.11.1"
 androidx-palette = "1.0.0"
 androidx-preference = "1.2.1"
 androidx-recyclerview = "1.4.0"
@@ -23,6 +24,7 @@ androidx-workmanager = "2.11.2"
 apache-commons = "3.21.0"
 cbor = "0.9"
 ckchangelog = "1.2.2"
+coil = "3.6.3"
 colorpicker = "1.1.0"
 cyanogenmod = "6.0"
 desugar-jdk-libs = "2.1.5"
@@ -81,6 +83,8 @@ androidx-legacy-support-v4 = { group = "androidx.legacy", name = "legacy-support
 androidx-lifecycle-process = { group = "androidx.lifecycle", name = "lifecycle-process", version.ref = "androidx-lifecycle" }
 androidx-lifecycle-runtime-ktx = { group = "androidx.lifecycle", name = "lifecycle-runtime-ktx", version.ref = "androidx-lifecycle" }
 androidx-lifecycle-viewmodel-ktx = { group = "androidx.lifecycle", name = "lifecycle-viewmodel-ktx", version.ref = "androidx-lifecycle" }
+androidx-media3-exoplayer = { group = "androidx.media3", name = "media3-exoplayer", version.ref = "androidx-media3" }
+androidx-media3-ui = { group = "androidx.media3", name = "media3-ui", version.ref = "androidx-media3" }
 androidx-palette-ktx = { group = "androidx.palette", name = "palette-ktx", version.ref = "androidx-palette" }
 androidx-preference-ktx = { group = "androidx.preference", name = "preference-ktx", version.ref = "androidx-preference" }
 androidx-recyclerview = { group = "androidx.recyclerview", name = "recyclerview", version.ref = "androidx-recyclerview" }
@@ -89,6 +93,7 @@ androidx-work-runtime-ktx = { group = "androidx.work", name = "work-runtime-ktx"
 apache-commons-lang3 = { group = "org.apache.commons", name = "commons-lang3", version.ref = "apache-commons" }
 cbor = { group = "co.nstant.in", name = "cbor", version.ref = "cbor" }
 ckchangelog = { group = "de.cketti.library.changelog", name = "ckchangelog", version.ref = "ckchangelog" }
+coil = { group = "io.coil-kt.coil3", name = "coil", version.ref = "coil" }
 colorpicker = { group = "com.jaredrummler", name = "colorpicker", version.ref = "colorpicker" }
 cyanogenmod-sdk = { group = "org.cyanogenmod", name = "platform.sdk", version.ref = "cyanogenmod" }
 desugar-jdk-libs = { group = "com.android.tools", name = "desugar_jdk_libs", version.ref = "desugar-jdk-libs" }

@@ -20,7 +20,7 @@ import "garmin/gdi_settings_service.proto";
 import "garmin/gdi_notifications_service.proto";
 import "garmin/gdi_ecg_service.proto";
 import "garmin/gdi_explore_sync.proto";
-import "garmin/gdI_event_sharing_service.proto";
+import "garmin/gdi_event_sharing_service.proto";
 import "garmin/gdi_launch_monitor_service.proto";
 
 message Smart {

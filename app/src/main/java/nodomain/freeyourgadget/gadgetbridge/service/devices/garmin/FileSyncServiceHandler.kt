@@ -196,8 +196,8 @@ class FileSyncServiceHandler(val deviceSupport: GarminSupport) {
                 file = fileToRequest
                 unk2 = 24
                 unk3 = 0
-                unk4 = 0
-                unk5 = 15
+                offset = 0
+                requestedCompressionWindow = 15
             }
         }
     }

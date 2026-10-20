@@ -276,6 +276,7 @@ public abstract class AbstractDeviceCoordinator implements DeviceCoordinator {
         if (deleteFiles) {
             deleteDeviceFiles(gbDevice);
         }
+        deleteDeviceCacheDir(gbDevice);
     }
 
     /**
@@ -304,6 +305,14 @@ public abstract class AbstractDeviceCoordinator implements DeviceCoordinator {
             String message = GBApplication.getContext().getString(R.string.error_deleting_file_exception,
                 export.getPath(), e.getLocalizedMessage());
             GB.toast(message, Toast.LENGTH_LONG, GB.ERROR, e);
+        }
+    }
+
+    private void deleteDeviceCacheDir(final GBDevice gbDevice) {
+        final File cacheDir = getDeviceCacheDir(gbDevice);
+        LOG.debug("Deleting device cache directory {}", cacheDir);
+        if (!FileUtils.deleteRecursively(cacheDir)) {
+            LOG.warn("Failed to delete device cache directory {}", cacheDir);
         }
     }
 
@@ -566,6 +575,12 @@ public abstract class AbstractDeviceCoordinator implements DeviceCoordinator {
             }
         }
         return dir;
+    }
+
+    @Override
+    public File getDeviceCacheDir(@NonNull final GBDevice device) {
+        final File devicesDir = new File(GBApplication.getContext().getCacheDir(), "devices");
+        return new File(devicesDir, FileUtils.makeValidFileName(device.getAddress()));
     }
 
     @Override

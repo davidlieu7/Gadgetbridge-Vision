@@ -106,6 +106,7 @@
     <string name="duration_short_two_weeks">2w</string>
     <string name="duration_short_month">1m</string>
     <string name="duration_short_six_months">6m</string>
+    <string name="duration_short_three_months">3m</string>
     <string name="duration_short_year">1y</string>
     <!-- Strings related to Debug Activity -->
     <string name="title_activity_debug">Debug</string>
@@ -1091,6 +1092,13 @@
     <string name="activity_list_summary_active_time">Active time</string>
     <string name="activity_list_summary_intensity">Movement\nIntensity</string>
     <string name="activity_list_summary_activities">Activities</string>
+    <string name="activity_list_row_meta">%1$s - %2$s · %3$s</string>
+    <string name="activity_list_row_stats_pair">%1$s · %2$s</string>
+    <string name="activity_list_intensity_value">Intensity %s</string>
+    <plurals name="activity_list_steps_count">
+        <item quantity="one">%d step</item>
+        <item quantity="other">%d steps</item>
+    </plurals>
     <string name="dialog_hide">Hide</string>
     <string name="show_ongoing_activity">Show ongoing activity popup</string>
     <string name="charts_show_balance_sleep_title">Show sleep balance</string>
@@ -2474,6 +2482,7 @@
     <string name="devicetype_soundcore_aerofit2" translatable="false">Soundcore AeroFit 2</string>
     <string name="devicetype_soundcore_sport_x20" translatable="false">Soundcore Sport X20</string>
     <string name="devicetype_soundcore_sleep_a30" translatable="false">Soundcore Sleep A30</string>
+    <string name="devicetype_soundcore_v20i" translatable="false">Soundcore V20i</string>
     <string name="devicetype_haylou_s35_anc" translatable="false">Haylou S35 ANC</string>
     <string name="devicetype_sennheiser_momentum_in_ear_wireless" translatable="false">Sennheiser MOMENTUM In-Ear Wireless</string>
     <string name="devicetype_pixel_buds_a_series" translatable="false">Pixel Buds A-Series</string>
@@ -4172,6 +4181,12 @@
     <string name="soundcore_gaming_mode_summary">Reduce Latency and enhance sounds of footsteps and voices. May reduce connection stability.</string>
     <string name="soundcore_adaptive_direction_title">Adaptive Direction</string>
     <string name="soundcore_adaptive_direction_summary">Adjust equalizer preset automatically based on device direction</string>
+    <string name="soundcore_colorful_lights">Colorful lights</string>
+    <string name="soundcore_light_mode">Light mode</string>
+    <string name="soundcore_light_effect_on">Light on</string>
+    <string name="soundcore_light_effect_breathing">Breathing</string>
+    <string name="soundcore_light_effect_flash">Flash</string>
+    <string name="soundcore_light_effect_music">Music follows</string>
     <string name="haylou_s35_anc_eq_classic">Classic</string>
     <string name="haylou_s35_anc_eq_bass">Bass</string>
     <string name="soundcore_equalizer_preset">Preset</string>
@@ -5618,6 +5633,40 @@
     <string name="wifi_ftp_explainer">To transfer files, Gadgetbridge starts a Wi-Fi hotspot on the device, and the Internet Helper connects the phone to it. Android asks you to confirm this connection.\n\nWhile the connection is open, the phone can disconnect from other Wi-Fi networks, and the device uses more battery. The connection will be closed automatically when you leave the screen. You can also close it from the notification.</string>
     <string name="wifi_ftp_turn_on_wifi">Turn on Wi-Fi</string>
     <string name="wifi_ftp_progress_step">%1$s (%2$d/%3$d)</string>
+    <string name="dji_wifi_state_opening_control_channel">Connecting to the camera…</string>
+    <string name="dji_wifi_error_credentials">The camera did not send the name and password for its Wi-Fi</string>
+    <string name="dji_wifi_error_control_channel">The camera did not answer over Wi-Fi</string>
+    <string name="photo_gallery">Gallery</string>
+    <string name="gallery_filter_all">All</string>
+    <string name="gallery_filter_photos">Photos</string>
+    <string name="gallery_filter_videos">Videos</string>
+    <string name="gallery_filter_favorites">Favorites</string>
+    <string name="gallery_empty">No photos or videos</string>
+    <string name="gallery_clear_cache">Clear cache</string>
+    <string name="gallery_download_progress">Downloading %1$d/%2$d</string>
+    <string name="gallery_download_summary">%1$d downloaded, %2$d skipped, %3$d failed</string>
+    <string name="gallery_download_failed">Download failed</string>
+    <string name="gallery_download_error_storage_permission">Storage permission not granted</string>
+    <string name="gallery_favorite">Favorite</string>
+    <string name="gallery_unfavorite">Unfavorite</string>
+    <plurals name="gallery_delete_confirm">
+        <item quantity="one">Delete %d file from the camera?</item>
+        <item quantity="other">Delete %d files from the camera?</item>
+    </plurals>
+    <string name="gallery_deleting">Deleting…</string>
+    <string name="gallery_updating_favorites">Updating favorites…</string>
+    <string name="gallery_delete_error">Delete failed: %1$s</string>
+    <string name="gallery_favorite_error">Favorite change failed: %1$s</string>
+    <string name="gallery_download_queued">Queued</string>
+    <string name="gallery_downloaded">Downloaded</string>
+    <plurals name="gallery_download_added">
+        <item quantity="one">%d file added to downloads</item>
+        <item quantity="other">%d files added to downloads</item>
+    </plurals>
+    <plurals name="gallery_download_already_downloaded">
+        <item quantity="one">%d file is already downloaded</item>
+        <item quantity="other">%d files are already downloaded</item>
+    </plurals>
     <string name="toast_error_invalid_api_key">Invalid API key</string>
     <string name="eco">Eco</string>
     <string name="prefs_title_offgrid_mode">Off-grid mode</string>
