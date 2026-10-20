@@ -20,12 +20,18 @@ object QuickControls {
     private val LOG = LoggerFactory.getLogger(QuickControls::class.java)
 
     /**
-     * Returns an optional quick control for each of the preference [keys], in the same order.
+     * Returns a quick control for each of the preference keys in [keys] / [optionalKeys].
+     * The preference order is kept, and optional preferences are placed after the default ones.
      * Each key must be a switch, a list or a seek bar from the device settings DSL.
      * The control visibility follows the same logic as the device settings.
      */
     @JvmStatic
-    fun fromDeviceSettings(device: GBDevice, vararg keys: String): List<QuickControl> {
+    @JvmOverloads
+    fun fromDeviceSettings(
+        device: GBDevice,
+        keys: List<String>,
+        optionalKeys: List<String> = emptyList(),
+    ): List<QuickControl> {
         val spec = device.deviceCoordinator.getDeviceSettings(device) ?: return emptyList()
 
         val switches = mutableMapOf<String, SwitchSetting>()
@@ -33,9 +39,10 @@ object QuickControls {
 
         val prefs = Prefs(GBApplication.getDeviceSpecificSharedPrefs(device.address))
         val controls = mutableMapOf<String, QuickControl>()
-        collect(spec.items, keys.toSet(), emptyList(), R.drawable.ic_settings, prefs, switches, controls)
+        val allKeys = keys + optionalKeys
+        collect(spec.items, allKeys.toSet(), optionalKeys.toSet(), emptyList(), R.drawable.ic_settings, prefs, switches, controls)
 
-        return keys.mapNotNull { key ->
+        return allKeys.mapNotNull { key ->
             controls[key] ?: run {
                 LOG.warn("No quick control for device setting {}", key)
                 null
@@ -56,6 +63,7 @@ object QuickControls {
     private fun collect(
         items: List<DeviceSetting>,
         keys: Set<String>,
+        optionalKeys: Set<String>,
         conditions: List<(Prefs) -> Boolean>,
         @DrawableRes parentIcon: Int,
         prefs: Prefs,
@@ -79,6 +87,7 @@ object QuickControls {
                 is ScreenSetting -> collect(
                     setting.children,
                     keys,
+                    optionalKeys,
                     settingConditions + listOfNotNull(setting.enabled),
                     icon,
                     prefs,
@@ -89,6 +98,7 @@ object QuickControls {
                 is CategorySetting -> collect(
                     setting.children,
                     keys,
+                    optionalKeys,
                     settingConditions,
                     icon,
                     prefs,
@@ -102,7 +112,7 @@ object QuickControls {
                     title = setting.title,
                     defaultValue = setting.defaultValue,
                     visible = visible,
-                    optional = true,
+                    optional = setting.key in optionalKeys,
                 )
 
                 is ListSetting -> out[setting.key] = QuickControlDialog.forPreference(
@@ -117,7 +127,7 @@ object QuickControls {
                         }
                     },
                     visible = visible,
-                    optional = true,
+                    optional = setting.key in optionalKeys,
                 )
 
                 is SeekBarSetting -> out[setting.key] = QuickControlSlider.forPreference(
@@ -134,7 +144,7 @@ object QuickControls {
                         { _, value -> value.toString() }
                     },
                     visible = visible,
-                    optional = true,
+                    optional = setting.key in optionalKeys,
                 )
 
                 else -> {}

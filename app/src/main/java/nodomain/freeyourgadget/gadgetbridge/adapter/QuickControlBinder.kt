@@ -19,6 +19,7 @@ import com.google.android.material.slider.Slider
 import nodomain.freeyourgadget.gadgetbridge.GBApplication
 import nodomain.freeyourgadget.gadgetbridge.R
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsPreferenceConst
+import nodomain.freeyourgadget.gadgetbridge.devices.cards.QuickControlButtons
 import nodomain.freeyourgadget.gadgetbridge.devices.cards.QuickControlDialog
 import nodomain.freeyourgadget.gadgetbridge.devices.cards.QuickControl
 import nodomain.freeyourgadget.gadgetbridge.devices.cards.QuickControlTrailingAction
@@ -65,6 +66,7 @@ object QuickControlBinder {
                 is QuickControlDialog -> bindDialog(inflater, container, control, device, context, rebind)
                 is QuickControlSlider -> bindSlider(inflater, container, control, device, context, rebind)
                 is QuickControlSwitch -> bindSwitch(inflater, container, control, device, context, rebind)
+                is QuickControlButtons -> bindButtons(inflater, container, control, device, context, rebind)
             }
             container.addView(row)
         }
@@ -216,6 +218,30 @@ object QuickControlBinder {
             rebind()
         }
         row.findViewById<View>(R.id.quick_control_switch_button).setOnClickListener { switch.toggle() }
+        return row
+    }
+
+    private fun bindButtons(
+        inflater: LayoutInflater,
+        container: LinearLayout,
+        control: QuickControlButtons,
+        device: GBDevice,
+        context: Context,
+        rebind: () -> Unit,
+    ): View {
+        val row = inflater.inflate(R.layout.quick_control_buttons, container, false) as LinearLayout
+        for (button in control.buttons) {
+            val view = inflater.inflate(R.layout.quick_control_button, row, false) as MaterialButton
+            view.setIconResource(button.icon(device))
+            val description = context.getString(button.description)
+            view.contentDescription = description
+            TooltipCompat.setTooltipText(view, description)
+            view.setOnClickListener {
+                button.onClick(device, context)
+                rebind()
+            }
+            row.addView(view)
+        }
         return row
     }
 

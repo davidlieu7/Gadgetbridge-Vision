@@ -188,7 +188,11 @@ abstract class ShokzCoordinator : AbstractBLClassicDeviceCoordinator() {
                 )
             )
             controls.addAll(
-                QuickControls.fromDeviceSettings(device, DeviceSettingsPreferenceConst.PREF_MEDIA_PLAYBACK_MODE)
+                QuickControls.fromDeviceSettings(
+                    device,
+                    keys = emptyList(),
+                    optionalKeys = listOf(DeviceSettingsPreferenceConst.PREF_MEDIA_PLAYBACK_MODE),
+                )
             )
         }
 

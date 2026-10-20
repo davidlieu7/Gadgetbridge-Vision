@@ -232,6 +232,26 @@ data class QuickControlSwitch(
     }
 }
 
+/**
+ * A row with buttons.
+ */
+data class QuickControlButtons(
+    override val id: String,
+    @param:DrawableRes override val icon: Int,
+    @param:StringRes override val title: Int,
+    val buttons: List<QuickControlButton>,
+    val visible: (GBDevice) -> Boolean = { true },
+    override val optional: Boolean = false,
+) : QuickControl {
+    override fun isVisible(device: GBDevice) = visible(device)
+}
+
+data class QuickControlButton(
+    @param:StringRes val description: Int,
+    val icon: (GBDevice) -> Int,
+    val onClick: (GBDevice, Context) -> Unit,
+)
+
 private object QuickControlPreferences {
     private val LOG = LoggerFactory.getLogger(QuickControlPreferences::class.java)
 
