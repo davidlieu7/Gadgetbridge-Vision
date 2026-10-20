@@ -912,7 +912,8 @@ public class WorkoutDetailsParser extends XiaomiActivityParser {
 
     /**
      * Applies the v1 height change byte of a record, as the official app does:
-     * bit 7 marks a whole kilometre, bit 6 set means up, bits 0-5 are the change in dm.
+     * bit 7 marks a whole kilometre and is ignored, bit 6 set means up, bits 0-5 are the
+     * change in dm.
      */
     private static float addHeightChange(final float altitude, final byte heightChange) {
         final float change = (heightChange & 0x3F) / 10f;
