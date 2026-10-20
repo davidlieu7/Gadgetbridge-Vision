@@ -36,6 +36,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreEarbudsCoordinator.AmbientSoundMode;
 import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreEarbudsCoordinator.TapFunction;
 import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.sleep_a30.SoundcoreSleepA30Coordinator.AudioSource;
 import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEvent;
@@ -144,6 +145,8 @@ public class SoundcoreSleepA30Protocol extends SoundcoreProtocolImplV1 {
         decodeBooleanPreference(payload, 135, PREF_SLEEP_TRACKING, preferences);
         decodeBooleanPreference(payload, 137, PREF_SOUNDCORE_POWER_OFF_TONE, preferences);
         decodeBooleanPreference(payload, 138, PREF_SOUNDCORE_MODE_TONE, preferences);
+        preferences.withPreference(PREF_SOUNDCORE_AMBIENT_SOUND_CONTROL,
+                (payload[140] == 1 ? AmbientSoundMode.NOISE_CANCELLING : AmbientSoundMode.OFF).toString());
         decodeBooleanPreference(payload, 141, PREF_SOUNDCORE_CALLS_ENABLED, preferences);
         decodeBooleanPreference(payload, 143, PREF_SOUNDCORE_SNORE_MASKING, preferences);
         decodeBooleanPreference(payload, 147, PREF_SOUNDCORE_ANC_TONE, preferences);
@@ -224,7 +227,8 @@ public class SoundcoreSleepA30Protocol extends SoundcoreProtocolImplV1 {
             case CMD_SET_ANC_ENABLED:
                 if (payload.length == 1 && (payload[0] == 0 || payload[0] == 1)) {
                     return new GBDeviceEvent[]{new GBDeviceEventUpdatePreferences(
-                            PREF_SOUNDCORE_AMBIENT_SOUND_CONTROL, payload[0] == 1 ? "noise_cancelling" : "off")};
+                            PREF_SOUNDCORE_AMBIENT_SOUND_CONTROL,
+                            (payload[0] == 1 ? AmbientSoundMode.NOISE_CANCELLING : AmbientSoundMode.OFF).toString())};
                 }
                 break;
         }
@@ -455,7 +459,8 @@ public class SoundcoreSleepA30Protocol extends SoundcoreProtocolImplV1 {
                         PREF_SOUNDCORE_LISTENING_MODE, AudioSource.BLUETOOTH.toString()))) return null;
                 return encodeLocalPlayback(!prefs.getBoolean(PREF_SOUNDCORE_LOCAL_PLAYBACK, false));
             case PREF_SOUNDCORE_AMBIENT_SOUND_CONTROL:
-                return encodeAncEnabled("noise_cancelling".equals(prefs.getString(config, "off")));
+                return encodeAncEnabled(AmbientSoundMode.NOISE_CANCELLING.toString().equals(
+                        prefs.getString(config, AmbientSoundMode.OFF.toString())));
             case PREF_SOUNDCORE_LISTENING_MODE:
                 return encodeListeningMode(AudioSource.LOCAL.toString().equals(
                         prefs.getString(config, AudioSource.BLUETOOTH.toString())));
