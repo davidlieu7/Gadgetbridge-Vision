@@ -140,8 +140,11 @@ class DevicePairingViewModel(
             }
         }
 
-        LOG.info("Starting pairing of {}, needsAssociation={}, bondMode={}", address, needsAssociation, bondMode)
-        dispatch(PairingEvent.Start(needsAssociation, bondMode))
+        // Connecting to a scan-only device only puts it into waiting for scan, see DeviceCommunicationService
+        val scanOnly = !coordinator.isConnectable && coordinator.handlesScanResults()
+
+        LOG.info("Starting pairing of {}, needsAssociation={}, bondMode={}, scanOnly={}", address, needsAssociation, bondMode, scanOnly)
+        dispatch(PairingEvent.Start(needsAssociation, bondMode, scanOnly))
     }
 
     fun onBondDecision(bond: Boolean) {

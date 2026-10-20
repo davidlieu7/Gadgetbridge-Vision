@@ -51,10 +51,14 @@ data class PairingState(
      */
     val deviceBonding: Boolean = false,
     val deviceState: GBDevice.State? = null,
+    /**
+     * True for a device that is only scanned for, never connected: waiting for its scan ends its pairing.
+     */
+    val scanOnly: Boolean = false,
 )
 
 sealed interface PairingEvent {
-    data class Start(val associate: Boolean, val bondMode: BondMode) : PairingEvent
+    data class Start(val associate: Boolean, val bondMode: BondMode, val scanOnly: Boolean = false) : PairingEvent
     data class AssociationFinished(val associated: Boolean) : PairingEvent
     data class BondDecision(val bond: Boolean) : PairingEvent
     data class BondStateChanged(val bonded: Boolean?) : PairingEvent
@@ -122,7 +126,7 @@ object PairingStateMachine {
             put(PairingStep.CONNECT, StepStatus.PENDING)
             put(PairingStep.INITIALIZE, StepStatus.PENDING)
         }
-        val state = PairingState(steps = steps, bondMode = event.bondMode)
+        val state = PairingState(steps = steps, bondMode = event.bondMode, scanOnly = event.scanOnly)
         if (event.associate) {
             return PairingTransition(
                 state.withStep(PairingStep.ASSOCIATE, StepStatus.ACTIVE).copy(phase = PairingPhase.Associating),
@@ -191,6 +195,13 @@ object PairingStateMachine {
     }
 
     private fun reduceDeviceState(state: PairingState, deviceState: GBDevice.State): PairingTransition {
+        if (state.scanOnly && (deviceState == GBDevice.State.WAITING_FOR_SCAN || deviceState == GBDevice.State.SCANNED)) {
+            return PairingTransition(
+                state.withStep(PairingStep.CONNECT, StepStatus.DONE)
+                    .withStep(PairingStep.INITIALIZE, StepStatus.DONE)
+                    .copy(phase = PairingPhase.Initialized, deviceBonding = false)
+            )
+        }
         return when (deviceState) {
             GBDevice.State.INITIALIZED -> PairingTransition(
                 state.withStep(PairingStep.CONNECT, StepStatus.DONE)
