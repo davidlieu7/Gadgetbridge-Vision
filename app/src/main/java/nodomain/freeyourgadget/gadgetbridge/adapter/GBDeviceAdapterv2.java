@@ -412,6 +412,12 @@ public class GBDeviceAdapterv2 extends ListAdapter<GBDevice, GBDeviceAdapterv2.V
                 notifyItemChanged(holder.getBindingAdapterPosition());
             });
         }
+        // The card items have a bottom margin. When they are hidden, we need to add a margin to the quick controls.
+        final ViewGroup.MarginLayoutParams quickControlsParams = (ViewGroup.MarginLayoutParams) holder.quickControls.getLayoutParams();
+        quickControlsParams.topMargin = holder.infoIcons.getVisibility() == View.VISIBLE
+            ? 0
+            : context.getResources().getDimensionPixelSize(R.dimen.quick_control_spacing);
+        holder.quickControls.setLayoutParams(quickControlsParams);
         holder.deviceImageView.setOnLongClickListener(v -> {
             DeviceSettingsActivity.start(context, device);
             return true;
