@@ -23,12 +23,14 @@ import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSett
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSpecificSettingsScreen
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.DeviceSettingsSpec
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.ListEntry
+import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.components.enumList
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.components.keepActivityDataOnDevice
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.components.multipointPairing
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.deviceSettings
 import nodomain.freeyourgadget.gadgetbridge.activities.multipoint.MultipointPairingActivity
 import nodomain.freeyourgadget.gadgetbridge.devices.AbstractBLClassicDeviceCoordinator
 import nodomain.freeyourgadget.gadgetbridge.devices.DeviceCoordinator
+import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.sleep_a30.SoundcoreSleepA30Coordinator.AudioSource
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice
 import nodomain.freeyourgadget.gadgetbridge.model.BatteryConfig
 import nodomain.freeyourgadget.gadgetbridge.service.DeviceSupport
@@ -531,24 +533,18 @@ abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator(
                     title = R.string.pref_header_audio,
                     icon = R.drawable.ic_music_note,
                 ) {
-                    val listeningModeEntries = listOf(
-                        ListEntry.Res("0", R.string.soundcore_bluetooth_mode),
-                        ListEntry.Res("1", R.string.soundcore_local_mode),
-                    )
                     if (has(Capability.ListeningMode)) {
-                        list(
+                        enumList<AudioSource>(
                             key = DeviceSettingsPreferenceConst.PREF_SOUNDCORE_LISTENING_MODE,
                             title = R.string.soundcore_listening_mode,
-                            entries = listeningModeEntries,
-                            defaultValue = "0",
+                            defaultValue = AudioSource.BLUETOOTH,
                         )
                     }
                     if (has(Capability.DefaultListeningMode)) {
-                        list(
+                        enumList<AudioSource>(
                             key = DeviceSettingsPreferenceConst.PREF_SOUNDCORE_DEFAULT_LISTENING_MODE,
                             title = R.string.soundcore_default_listening_mode,
-                            entries = listeningModeEntries,
-                            defaultValue = "0",
+                            defaultValue = AudioSource.BLUETOOTH,
                         )
                     }
                     if (has(Capability.LocalAudioPlayback)) {

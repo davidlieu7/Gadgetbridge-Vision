@@ -37,6 +37,7 @@ import java.util.Map;
 import java.util.Set;
 
 import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreEarbudsCoordinator.TapFunction;
+import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.sleep_a30.SoundcoreSleepA30Coordinator.AudioSource;
 import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEvent;
 import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEventSendBytes;
 import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEventUpdatePreferences;
@@ -134,7 +135,8 @@ public class SoundcoreSleepA30Protocol extends SoundcoreProtocolImplV1 {
                 readString(payload, 4, 5), readString(payload, 36, 5), // charging case, fw2
                 readString(payload, 14, 16));
         final GBDeviceEventUpdatePreferences preferences = new GBDeviceEventUpdatePreferences();
-        decodeBooleanPreference(payload, 65, PREF_SOUNDCORE_LISTENING_MODE, preferences, "0", "1");
+        final String audioSource = payload.length > 65 ? AudioSource.fromValue(payload[65]) : null;
+        if (audioSource != null) preferences.withPreference(PREF_SOUNDCORE_LISTENING_MODE, audioSource);
         decodeBooleanPreference(payload, 69, PREF_SOUNDCORE_BATTERY_LOW_TONE, preferences);
         localAudioSelector = payload[72];
         decodeBooleanPreference(payload, 73, PREF_SOUNDCORE_LOCAL_PLAYBACK, preferences);
@@ -160,14 +162,8 @@ public class SoundcoreSleepA30Protocol extends SoundcoreProtocolImplV1 {
 
     private void decodeBooleanPreference(final byte[] payload, final int offset, final String key,
                                          final GBDeviceEventUpdatePreferences preferences) {
-        decodeBooleanPreference(payload, offset, key, preferences, false, true);
-    }
-
-    private void decodeBooleanPreference(final byte[] payload, final int offset, final String key,
-                                         final GBDeviceEventUpdatePreferences preferences,
-                                         final Object falseValue, final Object trueValue) {
         if (payload.length > offset && (payload[offset] == 0 || payload[offset] == 1)) {
-            preferences.withPreference(key, payload[offset] == 1 ? trueValue : falseValue);
+            preferences.withPreference(key, payload[offset] == 1);
         }
     }
 
@@ -208,9 +204,11 @@ public class SoundcoreSleepA30Protocol extends SoundcoreProtocolImplV1 {
             case CMD_GET_SLEEP_SETTINGS:
                 return decodeAutoStop(payload);
             case CMD_NOTIFY_LISTENING_MODE:
-                if (payload.length == 1 && (payload[0] == 0 || payload[0] == 1)) {
-                    return new GBDeviceEvent[]{new GBDeviceEventUpdatePreferences(
-                            PREF_SOUNDCORE_LISTENING_MODE, payload[0] == 1 ? "1" : "0")};
+                if (payload.length == 1) {
+                    final String source = AudioSource.fromValue(payload[0]);
+                    if (source != null) {
+                        return new GBDeviceEvent[]{new GBDeviceEventUpdatePreferences(PREF_SOUNDCORE_LISTENING_MODE, source)};
+                    }
                 }
                 break;
             case CMD_NOTIFY_LOCAL_AUDIO:
@@ -453,14 +451,17 @@ public class SoundcoreSleepA30Protocol extends SoundcoreProtocolImplV1 {
             case PREF_SLEEP_TRACKING:
                 return encodeBooleanCommand(CMD_SET_SLEEP_TRACKING, prefs.getBoolean(config, true));
             case ACTION_TOGGLE_LOCAL_PLAYBACK:
-                if (!"1".equals(prefs.getString(PREF_SOUNDCORE_LISTENING_MODE, "0"))) return null;
+                if (!AudioSource.LOCAL.toString().equals(prefs.getString(
+                        PREF_SOUNDCORE_LISTENING_MODE, AudioSource.BLUETOOTH.toString()))) return null;
                 return encodeLocalPlayback(!prefs.getBoolean(PREF_SOUNDCORE_LOCAL_PLAYBACK, false));
             case PREF_SOUNDCORE_AMBIENT_SOUND_CONTROL:
                 return encodeAncEnabled("noise_cancelling".equals(prefs.getString(config, "off")));
             case PREF_SOUNDCORE_LISTENING_MODE:
-                return encodeListeningMode("1".equals(prefs.getString(config, "0")));
+                return encodeListeningMode(AudioSource.LOCAL.toString().equals(
+                        prefs.getString(config, AudioSource.BLUETOOTH.toString())));
             case PREF_SOUNDCORE_DEFAULT_LISTENING_MODE:
-                return encodeBooleanCommand(CMD_SET_DEFAULT_LISTENING_MODE, "1".equals(prefs.getString(config, "0")));
+                return encodeBooleanCommand(CMD_SET_DEFAULT_LISTENING_MODE, AudioSource.LOCAL.toString().equals(
+                        prefs.getString(config, AudioSource.BLUETOOTH.toString())));
             case PREF_SOUNDCORE_LOCAL_PLAYBACK:
                 return encodeLocalPlayback(prefs.getBoolean(config, false));
             case PREF_SOUNDCORE_LOCAL_VOLUME:

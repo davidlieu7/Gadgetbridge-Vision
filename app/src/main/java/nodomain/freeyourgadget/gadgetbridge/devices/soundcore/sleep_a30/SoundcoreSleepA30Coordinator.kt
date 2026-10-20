@@ -23,6 +23,7 @@ import nodomain.freeyourgadget.gadgetbridge.R
 import nodomain.freeyourgadget.gadgetbridge.activities.charts.DefaultChartsProvider
 import nodomain.freeyourgadget.gadgetbridge.activities.charts.DeviceChartsProvider
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsPreferenceConst
+import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.LabeledEntry
 import nodomain.freeyourgadget.gadgetbridge.devices.DeviceCardAction
 import nodomain.freeyourgadget.gadgetbridge.devices.deviceCardAction
 import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreSleepSampleProvider
@@ -34,6 +35,19 @@ import nodomain.freeyourgadget.gadgetbridge.service.devices.soundcore.sleep_a30.
 import nodomain.freeyourgadget.gadgetbridge.service.devices.soundcore.sleep_a30.SoundcoreSleepA30DeviceSupport
 
 class SoundcoreSleepA30Coordinator : SoundcoreEarbudsCoordinator() {
+    enum class AudioSource(override val label: Int) : LabeledEntry {
+        BLUETOOTH(R.string.media_source_bluetooth),
+        LOCAL(R.string.media_source_local),
+        ;
+
+        override fun toString(): String = name.lowercase()
+
+        companion object {
+            @JvmStatic
+            fun fromValue(value: Int): String? = entries.getOrNull(value)?.toString()
+        }
+    }
+
     override fun getModelName(): String = "D1301"
 
     override fun getSupportedDeviceName(): Pattern = Pattern.compile("soundcore Sleep A30")
@@ -91,7 +105,10 @@ class SoundcoreSleepA30Coordinator : SoundcoreEarbudsCoordinator() {
             id = "soundcore_local_audio"
             isVisible = { device ->
                 device.isConnected && GBApplication.getDevicePrefs(device)
-                    .getString(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_LISTENING_MODE, "0") == "1"
+                    .getString(
+                        DeviceSettingsPreferenceConst.PREF_SOUNDCORE_LISTENING_MODE,
+                        AudioSource.BLUETOOTH.toString(),
+                    ) == AudioSource.LOCAL.toString()
             }
             icon = { device ->
                 if (GBApplication.getDevicePrefs(device).getBoolean(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_LOCAL_PLAYBACK, false)) {

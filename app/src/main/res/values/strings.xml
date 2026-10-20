@@ -5822,6 +5822,8 @@
     <string name="media_source_usb">USB</string>
     <string name="media_source_audio_card">Audio card</string>
     <string name="media_source_aux">AUX</string>
+    <string name="media_source_bluetooth">Bluetooth</string>
+    <string name="media_source_local">Local</string>
     <string name="sinilink_prompt_tone">Prompt tone</string>
     <string name="required">Required</string>
     <string name="endurain_sso_login_failed">SSO login failed</string>
