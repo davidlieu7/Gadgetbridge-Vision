@@ -271,10 +271,13 @@ public class DevicesFragment extends Fragment implements HeaderShadePage {
 
     public class RefreshTask extends DBAccess {
         private final GBDevice device;
+        private final List<GBDevice> devices;
 
         public RefreshTask(final String task, final Context context, final GBDevice device) {
             super(task, context, false);
             this.device = device;
+            // The DeviceManager updates the device list on the main thread
+            this.devices = new ArrayList<>(deviceList);
         }
 
         @Override
@@ -282,7 +285,7 @@ public class DevicesFragment extends Fragment implements HeaderShadePage {
             if (device != null) {
                 updateDevice(db, device);
             } else {
-                for (GBDevice gbDevice : deviceList) {
+                for (final GBDevice gbDevice : devices) {
                     updateDevice(db, gbDevice);
                 }
             }
