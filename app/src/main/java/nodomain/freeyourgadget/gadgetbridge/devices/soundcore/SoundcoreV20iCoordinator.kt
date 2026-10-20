@@ -38,12 +38,12 @@ class SoundcoreV20iCoordinator : SoundcoreEarbudsCoordinator() {
 
     override fun getBatteryProperties(): BatteryProperties = BatteryProperties(multiplier = 10, offset = 1)
 
+    // TODO: Device supports Capability.AudioEqualizer as Sport X20, needs more captures and validation.
     override fun getDefaultCapabilities(): Set<Capability> = setOf(
         Capability.FindDevice,
         Capability.Multipoint,
         Capability.TouchControls,
         Capability.AutoPowerOff,
-        Capability.AudioEqualizer,
         Capability.GamingMode,
         Capability.VoicePrompts,
         Capability.AudioBalance,
@@ -67,8 +67,6 @@ class SoundcoreV20iCoordinator : SoundcoreEarbudsCoordinator() {
         TapFunction.COLORFUL_LIGHTS,
         TapFunction.NONE,
     )
-
-    override fun getCustomEqualizerPresetArray(): Int = R.array.soundcore_sport_x20_equalizer_preset_names
 
     override fun createProtocol(device: GBDevice): SoundcoreV20iProtocol =
         SoundcoreV20iProtocol(device)
