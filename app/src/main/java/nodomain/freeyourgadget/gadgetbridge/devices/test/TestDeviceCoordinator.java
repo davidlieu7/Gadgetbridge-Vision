@@ -51,6 +51,7 @@ import nodomain.freeyourgadget.gadgetbridge.devices.InstallHandler;
 import nodomain.freeyourgadget.gadgetbridge.devices.SampleProvider;
 import nodomain.freeyourgadget.gadgetbridge.devices.TimeSampleProvider;
 import nodomain.freeyourgadget.gadgetbridge.devices.Vo2MaxSampleProvider;
+import nodomain.freeyourgadget.gadgetbridge.devices.cards.QuickControl;
 import nodomain.freeyourgadget.gadgetbridge.devices.roidmi.RoidmiConst;
 import nodomain.freeyourgadget.gadgetbridge.devices.test.activity.TestActivitySummaryParser;
 import nodomain.freeyourgadget.gadgetbridge.devices.test.activity.TestActivityTrackProvider;
@@ -953,6 +954,14 @@ public class TestDeviceCoordinator extends AbstractDeviceCoordinator {
 
     protected static Prefs getPrefs(final GBDevice device) {
         return new Prefs(GBApplication.getDeviceSpecificSharedPrefs(device.getAddress()));
+    }
+
+    @Override
+    public List<QuickControl> getQuickControls(@NonNull final GBDevice device) {
+        if (!supports(device, TestFeature.QUICK_CONTROLS)) {
+            return Collections.emptyList();
+        }
+        return TestDeviceQuickControlsKt.testDeviceQuickControls();
     }
 
     @Override

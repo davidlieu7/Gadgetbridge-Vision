@@ -220,6 +220,7 @@ public class GBDeviceAdapterv2 extends ListAdapter<GBDevice, GBDeviceAdapterv2.V
         holder.container.setVisibility(View.VISIBLE);
         holder.deviceNameLabel.setText(folder.getName());
         holder.infoIcons.setVisibility(View.GONE);
+        holder.quickControls.setVisibility(View.GONE);
         holder.companionHint.setVisibility(View.GONE);
         holder.deviceImageView.setOnLongClickListener(null);
         holder.deviceInfoBox.setVisibility(View.GONE);
@@ -356,10 +357,16 @@ public class GBDeviceAdapterv2 extends ListAdapter<GBDevice, GBDeviceAdapterv2.V
         }
         DeviceCardItemBinder.bind(
             holder.infoIcons,
-            DeviceCardLayout.apply(device, coordinator.getCardItems(device)),
+            DeviceCardLayout.ITEMS.apply(device, coordinator.getCardItems(device)),
             device,
             context,
             hrSampleText
+        );
+        QuickControlBinder.bind(
+            holder.quickControls,
+            DeviceCardLayout.QUICK_CONTROLS.apply(device, coordinator.getQuickControls(device)),
+            device,
+            context
         );
 
         bindCompanionHint(holder, device);
@@ -798,6 +805,8 @@ public class GBDeviceAdapterv2 extends ListAdapter<GBDevice, GBDeviceAdapterv2.V
         // dynamically into this container by DeviceCardItemBinder.
         FlexboxLayout infoIcons;
 
+        LinearLayout quickControls;
+
         final LinearLayout companionHint;
         final Button companionHintDismiss;
         final Button companionHintPair;
@@ -832,6 +841,7 @@ public class GBDeviceAdapterv2 extends ListAdapter<GBDevice, GBDeviceAdapterv2.V
             //overflow
             deviceInfoList = view.findViewById(R.id.device_item_infos);
             infoIcons = view.findViewById(R.id.device_info_icons);
+            quickControls = view.findViewById(R.id.device_quick_controls);
 
             companionHint = view.findViewById(R.id.companion_hint);
             companionHintDismiss = view.findViewById(R.id.companion_hint_dismiss);

@@ -229,9 +229,13 @@
     <string name="pref_device_card_show_items_title">Show card items</string>
     <string name="pref_device_card_items_title">Card items</string>
     <string name="pref_device_card_items_summary">Customize the items on the device card</string>
+    <string name="pref_device_card_show_quick_controls_title">Show quick controls</string>
+    <string name="pref_device_card_quick_controls_title">Quick controls</string>
+    <string name="pref_device_card_quick_controls_summary">Customize the quick controls on the device card</string>
     <string name="device_card_add_item">Add item</string>
     <string name="device_card_more_summary">The items below this one are displayed in a popup</string>
     <string name="device_card_items_reset_confirmation">Reset the order of the device card items, and restore the removed items?</string>
+    <string name="device_card_quick_controls_reset_confirmation">Reset the order of the quick controls, and restore the removed quick controls?</string>
     <string name="pref_header_display">Display</string>
     <string name="pref_header_generic">Generic</string>
     <string name="pref_header_health">Health</string>
@@ -3975,6 +3979,9 @@
     <string name="sony_ambient_sound_ambient_sound">Ambient Sound</string>
     <string name="sony_ambient_sound_focus_voice">Focus on Voice</string>
     <string name="sony_ambient_sound_level">Ambient Sound Level</string>
+    <string name="sony_ambient_sound_noise_cancelling_short">ANC</string>
+    <string name="sony_ambient_sound_wind_noise_reduction_short">Wind</string>
+    <string name="sony_ambient_sound_ambient_sound_short">Ambient</string>
     <string name="pref_header_sony_anc_optimizer">Noise Cancelling Optimizer</string>
     <string name="sony_anc_optimize_title">Optimize</string>
     <string name="sony_anc_optimize_description">Click to start the noise-cancelling optimizer.</string>
