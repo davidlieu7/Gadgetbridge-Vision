@@ -108,6 +108,16 @@ public class CasioGGB100DeviceCoordinator extends Casio2C2DDeviceCoordinator {
     }
 
     @Override
+    public boolean supportsSleepMeasurement(@NonNull GBDevice device) {
+        return false;
+    }
+
+    @Override
+    public boolean supportsSpeedzones(@NonNull GBDevice device) {
+        return false;
+    }
+
+    @Override
     public SampleProvider<? extends ActivitySample> getSampleProvider(GBDevice device, DaoSession session) {
         return new CasioGBX100SampleProvider(device, session);
     }
@@ -163,13 +173,13 @@ public class CasioGGB100DeviceCoordinator extends Casio2C2DDeviceCoordinator {
         return new int[]{ 
             R.xml.devicesettings_find_phone, 
             R.xml.devicesettings_wearlocation,
-                R.xml.devicesettings_timeformat, 
-                R.xml.devicesettings_autolight, 
-                R.xml.devicesettings_operating_sounds,
-                R.xml.devicesettings_hourly_chime_enable, 
-                R.xml.devicesettings_casio_connection_duration,
-                R.xml.devicesettings_casio_location_indicator
-                // R.xml.devicesettings_casio_interval_timer
+            R.xml.devicesettings_timeformat, 
+            R.xml.devicesettings_autolight, 
+            R.xml.devicesettings_operating_sounds,
+            R.xml.devicesettings_hourly_chime_enable, 
+            R.xml.devicesettings_casio_connection_duration,
+            R.xml.devicesettings_casio_location_indicator
+            // R.xml.devicesettings_casio_interval_timer
         };
     }
 
