@@ -34,6 +34,7 @@ import android.graphics.ColorMatrix;
 import android.graphics.ColorMatrixColorFilter;
 import android.graphics.drawable.Icon;
 import android.os.Build;
+import android.os.Bundle;
 import android.text.Editable;
 import android.text.InputType;
 import android.text.TextWatcher;
@@ -123,6 +124,10 @@ import nodomain.freeyourgadget.gadgetbridge.util.StringUtils;
 public class GBDeviceAdapterv2 extends ListAdapter<GBDevice, GBDeviceAdapterv2.ViewHolder> {
     private static final Logger LOG = LoggerFactory.getLogger(GBDeviceAdapterv2.class);
 
+    private static final String STATE_EXPANDED_DEVICE = "devices_expanded_device";
+    private static final String STATE_EXPANDED_FOLDER = "devices_expanded_folder";
+    private static final String STATE_REVEALED_CARD_ITEMS = "devices_revealed_card_items";
+
     private final Context context;
     private final GaugeDrawer gaugeDrawer = new GaugeDrawer();
     private List<GBDevice> deviceList;
@@ -141,6 +146,23 @@ public class GBDeviceAdapterv2 extends ListAdapter<GBDevice, GBDeviceAdapterv2.V
         this.deviceList = deviceList;
         rebuildFolders();
         this.deviceActivityMap = deviceMap;
+    }
+
+    public void saveInstanceState(final Bundle outState) {
+        outState.putString(STATE_EXPANDED_DEVICE, expandedDeviceAddress);
+        outState.putString(STATE_EXPANDED_FOLDER, expandedFolderName);
+        outState.putStringArrayList(STATE_REVEALED_CARD_ITEMS, new ArrayList<>(revealedCardItemsAddresses));
+    }
+
+    public void restoreInstanceState(final Bundle savedInstanceState) {
+        expandedDeviceAddress = savedInstanceState.getString(STATE_EXPANDED_DEVICE, "");
+        expandedFolderName = savedInstanceState.getString(STATE_EXPANDED_FOLDER, "");
+        revealedCardItemsAddresses.clear();
+        final ArrayList<String> revealed = savedInstanceState.getStringArrayList(STATE_REVEALED_CARD_ITEMS);
+        if (revealed != null) {
+            revealedCardItemsAddresses.addAll(revealed);
+        }
+        rebuildFolders();
     }
 
     public void rebuildFolders() {

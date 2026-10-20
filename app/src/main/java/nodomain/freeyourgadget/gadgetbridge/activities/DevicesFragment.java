@@ -30,6 +30,7 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 
+import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.fragment.app.Fragment;
 import androidx.localbroadcastmanager.content.LocalBroadcastManager;
@@ -39,6 +40,7 @@ import androidx.recyclerview.widget.RecyclerView;
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
 
 import java.io.Serializable;
+import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.GregorianCalendar;
 import java.util.HashMap;
@@ -122,6 +124,9 @@ public class DevicesFragment extends Fragment implements HeaderShadePage {
         deviceList = deviceManager.getDevices();
         mGBDeviceAdapter = new GBDeviceAdapterv2(currentView.getContext(), deviceList, deviceActivityHashMap);
         mGBDeviceAdapter.setHasStableIds(true);
+        if (savedInstanceState != null) {
+            mGBDeviceAdapter.restoreInstanceState(savedInstanceState);
+        }
 
         deviceListView.setAdapter(this.mGBDeviceAdapter);
 
@@ -231,6 +236,14 @@ public class DevicesFragment extends Fragment implements HeaderShadePage {
         if (deviceListView != null) unregisterForContextMenu(deviceListView);
         LocalBroadcastManager.getInstance(requireContext()).unregisterReceiver(mReceiver);
         super.onDestroy();
+    }
+
+    @Override
+    public void onSaveInstanceState(@NonNull final Bundle outState) {
+        super.onSaveInstanceState(outState);
+        if (mGBDeviceAdapter != null) {
+            mGBDeviceAdapter.saveInstanceState(outState);
+        }
     }
 
     private DailyTotals getSteps(GBDevice device, DBHandler db) {

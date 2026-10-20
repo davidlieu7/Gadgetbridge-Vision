@@ -179,6 +179,7 @@
         android:theme="@style/GadgetbridgeTheme">
         <activity
             android:name=".activities.ControlCenterv2"
+            android:configChanges="keyboard|keyboardHidden|navigation"
             android:label="@string/title_activity_controlcenter"
             android:theme="@style/SplashTheme"
             android:launchMode="singleTop"
