@@ -644,7 +644,8 @@ public class DeviceCommunicationService extends Service implements SharedPrefere
         return registeredStruct;
     }
 
-    private void connectToDevice(@Nullable final GBDevice device, final boolean firstTime) {
+    @VisibleForTesting
+    void connectToDevice(@Nullable final GBDevice device, final boolean firstTime) {
         final List<GBDevice> gbDevs = new ArrayList<>(2);
         final boolean fromExtra;
 

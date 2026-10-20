@@ -22,9 +22,11 @@ import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.doReturn;
 import static org.mockito.Mockito.doThrow;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.spy;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
@@ -38,6 +40,7 @@ import org.junit.Test;
 import org.robolectric.Robolectric;
 
 import nodomain.freeyourgadget.gadgetbridge.GBException;
+import nodomain.freeyourgadget.gadgetbridge.devices.DeviceCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.database.DBHelper;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
 import nodomain.freeyourgadget.gadgetbridge.test.TestBase;
@@ -61,6 +64,21 @@ public class DeviceCommunicationServiceScanResultTest extends TestBase {
         factory = mock(DeviceSupportFactory.class);
         service.setDeviceSupportFactory(factory);
         device = createDummyGDevice(ADDRESS);
+    }
+
+    @Test
+    public void connectToDeviceSendsAScanOnlyDeviceToWaitForScan() throws Exception {
+        final GBDevice scanOnly = spy(device);
+        final DeviceCoordinator coordinator = mock(DeviceCoordinator.class);
+        when(coordinator.isConnectable()).thenReturn(false);
+        when(coordinator.handlesScanResults()).thenReturn(true);
+        doReturn(coordinator).when(scanOnly).getDeviceCoordinator();
+
+        service.connectToDevice(scanOnly, true);
+
+        assertEquals(GBDevice.State.WAITING_FOR_SCAN, scanOnly.getState());
+        assertNotNull(service.getDeviceStruct(scanOnly));
+        verifyNoMoreInteractions(factory);
     }
 
     @Test
