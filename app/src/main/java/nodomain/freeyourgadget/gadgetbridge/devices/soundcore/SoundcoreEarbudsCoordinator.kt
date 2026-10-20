@@ -16,6 +16,7 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 package nodomain.freeyourgadget.gadgetbridge.devices.soundcore
 
+import java.util.Locale
 import java.util.UUID
 import nodomain.freeyourgadget.gadgetbridge.GBApplication
 import nodomain.freeyourgadget.gadgetbridge.R
@@ -619,37 +620,37 @@ abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator(
                         )
                     }
                     if (has(Capability.LocalAudioAutoStop)) {
-                        switchSetting(
-                            key = DeviceSettingsPreferenceConst.PREF_SOUNDCORE_AUTO_STOP,
-                            title = R.string.soundcore_auto_stop,
-                            summary = R.string.soundcore_auto_stop_summary,
-                            disableDependentsState = true,
-                        )
-                        list(
-                            key = DeviceSettingsPreferenceConst.PREF_SOUNDCORE_AUTO_STOP_TIMER,
-                            title = R.string.soundcore_auto_stop_timer,
-                            entries = listOf(
-                                ListEntry.Res("10", R.string.minutes_10),
-                                ListEntry.Res("20", R.string.minutes_20),
-                                ListEntry.Res("30", R.string.minutes_30),
-                                ListEntry.Res("60", R.string.minutes_60),
-                                ListEntry.Res("90", R.string.minutes_90),
-                                ListEntry.Res("custom", R.string.custom),
-                            ),
-                            defaultValue = "30",
-                            visibleWhen = { prefs -> prefs.getBoolean(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_AUTO_STOP, false) },
-                        )
-                        seekbar(
-                            key = DeviceSettingsPreferenceConst.PREF_SOUNDCORE_AUTO_STOP_MINUTES,
-                            title = R.string.soundcore_auto_stop_minutes,
-                            min = 1,
-                            max = 240,
-                            defaultValue = 30,
-                            visibleWhen = { prefs ->
-                                prefs.getBoolean(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_AUTO_STOP, false) &&
-                                    prefs.getString(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_AUTO_STOP_TIMER, "30") == "custom"
-                            },
-                        )
+                        category(key = "pref_header_soundcore_auto_stop", title = R.string.soundcore_auto_stop) {
+                            switchSetting(
+                                key = DeviceSettingsPreferenceConst.PREF_SOUNDCORE_AUTO_STOP,
+                                title = R.string.soundcore_auto_stop,
+                                icon = R.drawable.ic_stop,
+                                summary = R.string.soundcore_auto_stop_summary,
+                            )
+                            info(
+                                key = DeviceSettingsPreferenceConst.PREF_SOUNDCORE_AUTO_STOP_REMAINING_SECONDS,
+                                title = R.string.menuitem_countdown,
+                                icon = R.drawable.ic_timer,
+                                summaryProvider = { _, prefs ->
+                                    val seconds = prefs.getInt(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_AUTO_STOP_REMAINING_SECONDS, 0)
+                                    String.format(Locale.ROOT, "%02d:%02d", seconds / 60, seconds % 60)
+                                },
+                                dependency = DeviceSettingsPreferenceConst.PREF_SOUNDCORE_AUTO_STOP,
+                                visibleWhen = { prefs ->
+                                    prefs.getInt(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_AUTO_STOP_REMAINING_SECONDS, 0) > 0
+                                },
+                            )
+                            seekbar(
+                                key = DeviceSettingsPreferenceConst.PREF_SOUNDCORE_AUTO_STOP_MINUTES,
+                                title = R.string.soundcore_auto_stop_minutes,
+                                icon = R.drawable.ic_timer,
+                                min = 0,
+                                max = 150,
+                                step = 5,
+                                defaultValue = 30,
+                                dependency = DeviceSettingsPreferenceConst.PREF_SOUNDCORE_AUTO_STOP,
+                            )
+                        }
                     }
                     if (has(Capability.SleepAudioAutoSwitch)) {
                         list(

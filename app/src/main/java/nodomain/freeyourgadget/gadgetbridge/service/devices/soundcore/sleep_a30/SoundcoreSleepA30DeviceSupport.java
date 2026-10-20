@@ -37,6 +37,7 @@ import nodomain.freeyourgadget.gadgetbridge.GBApplication;
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsPreferenceConst;
 import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEventSendBytes;
 import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.sleep_a30.SoundcoreSleepA30AudioInstallHandler;
+import nodomain.freeyourgadget.gadgetbridge.service.btbr.TransactionBuilder;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.soundcore.SoundcoreDeviceSupport;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.soundcore.SoundcoreSleepHistory;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.soundcore.SoundcoreSleepHistoryEvent;
@@ -68,6 +69,14 @@ public final class SoundcoreSleepA30DeviceSupport extends SoundcoreDeviceSupport
         ScheduledFuture<?> timeout;
         long timeoutVersion;
         int lastPercent = -1;
+    }
+
+    @Override public synchronized void onSendConfiguration(final String config) {
+        if (disposed || !getDevice().isConnected() || mDeviceProtocol == null) return;
+        final TransactionBuilder builder = createTransactionBuilder("send configuration");
+        if (((SoundcoreSleepA30Protocol) mDeviceProtocol).encodeSendConfiguration(builder, config)) {
+            builder.queue();
+        }
     }
 
     @Override public synchronized void onFetchRecordedData(int dataTypes) {

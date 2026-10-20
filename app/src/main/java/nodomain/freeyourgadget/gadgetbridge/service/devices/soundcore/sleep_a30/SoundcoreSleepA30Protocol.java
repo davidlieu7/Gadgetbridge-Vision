@@ -47,6 +47,7 @@ import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
 import nodomain.freeyourgadget.gadgetbridge.model.Alarm;
 import nodomain.freeyourgadget.gadgetbridge.model.RecordedDataTypes;
 import nodomain.freeyourgadget.gadgetbridge.service.btle.BLETypeConversions;
+import nodomain.freeyourgadget.gadgetbridge.service.btbr.TransactionBuilder;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.soundcore.SoundcoreSleepHistory;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.soundcore.SoundcoreSleepHistoryEvent;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.soundcore.protocol.impl.v1.SoundcoreProtocolImplV1;
@@ -59,7 +60,6 @@ public class SoundcoreSleepA30Protocol extends SoundcoreProtocolImplV1 {
     private static final short CMD_ACK_SLEEP_STAGES = (short) 0x8315;
 
     public static final String ACTION_TOGGLE_LOCAL_PLAYBACK = "soundcore_toggle_local_playback";
-    private static final Set<Integer> AUTO_STOP_PRESETS = Set.of(10, 20, 30, 60, 90);
     private static final String[] TAP_PREFERENCES = {
             PREF_SOUNDCORE_CONTROL_DOUBLE_TAP_ACTION_LEFT,
             PREF_SOUNDCORE_CONTROL_DOUBLE_TAP_ACTION_RIGHT,
@@ -136,6 +136,7 @@ public class SoundcoreSleepA30Protocol extends SoundcoreProtocolImplV1 {
                 readString(payload, 4, 5), readString(payload, 36, 5), // charging case, fw2
                 readString(payload, 14, 16));
         final GBDeviceEventUpdatePreferences preferences = new GBDeviceEventUpdatePreferences();
+        decodeAutoStop(payload, 58, preferences);
         final String audioSource = payload.length > 65 ? AudioSource.fromValue(payload[65]) : null;
         if (audioSource != null) preferences.withPreference(PREF_SOUNDCORE_LISTENING_MODE, audioSource);
         decodeBooleanPreference(payload, 69, PREF_SOUNDCORE_BATTERY_LOW_TONE, preferences);
@@ -344,22 +345,33 @@ public class SoundcoreSleepA30Protocol extends SoundcoreProtocolImplV1 {
     }
 
     private GBDeviceEvent[] decodeAutoStop(final byte[] payload) {
-        if (payload.length != 8 || (payload[0] != 0 && payload[0] != 1)) return new GBDeviceEvent[0];
-        final int minutes = BLETypeConversions.toUint16(payload, 1);
-        if (minutes < 1 || minutes > 240) return new GBDeviceEvent[0];
-        return new GBDeviceEvent[]{new GBDeviceEventUpdatePreferences()
-                .withPreference(PREF_SOUNDCORE_AUTO_STOP, payload[0] == 1)
-                .withPreference(PREF_SOUNDCORE_AUTO_STOP_TIMER, AUTO_STOP_PRESETS.contains(minutes) ? Integer.toString(minutes) : "custom")
-                .withPreference(PREF_SOUNDCORE_AUTO_STOP_MINUTES, minutes)};
+        if (payload.length != 8) return new GBDeviceEvent[0];
+        final GBDeviceEventUpdatePreferences preferences = new GBDeviceEventUpdatePreferences();
+        if (!decodeAutoStop(payload, 0, preferences)) return new GBDeviceEvent[0];
+        final long remainingSeconds = BLETypeConversions.toUint32(payload, 4) & 0xffffffffL;
+        preferences.withPreference(PREF_SOUNDCORE_AUTO_STOP_REMAINING_SECONDS,
+                remainingSeconds <= BLETypeConversions.toUint16(payload, 1) * 60 ? (int) remainingSeconds : null);
+        return new GBDeviceEvent[]{preferences};
     }
 
-    @Nullable
-    public byte[] encodeAutoStop(final boolean enabled, final int minutes) {
-        if (minutes < 1 || minutes > 240) return null;
+    private boolean decodeAutoStop(final byte[] payload, final int offset,
+                                   final GBDeviceEventUpdatePreferences preferences) {
+        if (payload.length < offset + 3 || (payload[offset] != 0 && payload[offset] != 1)) return false;
+        final int minutes = BLETypeConversions.toUint16(payload, offset + 1);
+        if (minutes < 1 || minutes > 240) return false;
+        preferences.withPreference(PREF_SOUNDCORE_AUTO_STOP, payload[offset] == 1)
+                .withPreference(PREF_SOUNDCORE_AUTO_STOP_MINUTES, minutes);
+        return true;
+    }
+
+    public boolean encodeAutoStop(final TransactionBuilder builder, final boolean enabled, final int minutes) {
+        if (minutes < 1 || minutes > 240) return false;
         // Timer writes use action 0 (stop audio), not the auto-switch sentinel ff ff ff.
-        return concatenate(encodeCommand(CMD_SET_SLEEP_AUDIO,
-                        ByteBuffer.allocate(4).put(encodeBoolean(enabled)).put(BLETypeConversions.fromUint16(minutes)).put((byte) 0).array()),
-                encodeRequest(CMD_GET_SLEEP_SETTINGS));
+        builder.write(encodeCommand(CMD_SET_SLEEP_AUDIO,
+                ByteBuffer.allocate(4).put(encodeBoolean(enabled)).put(BLETypeConversions.fromUint16(minutes)).put((byte) 0).array()));
+        builder.sleep(200);
+        builder.write(encodeRequest(CMD_GET_SLEEP_SETTINGS));
+        return true;
     }
 
     private static byte[] concatenate(final byte[] first, final byte[] second) {
@@ -447,6 +459,21 @@ public class SoundcoreSleepA30Protocol extends SoundcoreProtocolImplV1 {
         return new GBDeviceEvent[]{new SoundcoreSleepA30AlarmEvent(records)};
     }
 
+    public boolean encodeSendConfiguration(final TransactionBuilder builder, final String config) {
+        switch (config) {
+            case PREF_SOUNDCORE_AUTO_STOP:
+            case PREF_SOUNDCORE_AUTO_STOP_MINUTES:
+                final Prefs prefs = getDevicePrefs();
+                return encodeAutoStop(builder, prefs.getBoolean(PREF_SOUNDCORE_AUTO_STOP, false),
+                        prefs.getInt(PREF_SOUNDCORE_AUTO_STOP_MINUTES, 30));
+            default:
+                final byte[] command = encodeSendConfiguration(config);
+                if (command == null) return false;
+                builder.write(command);
+                return true;
+        }
+    }
+
     @Override
     @Nullable
     public byte[] encodeSendConfiguration(final String config) {
@@ -471,24 +498,6 @@ public class SoundcoreSleepA30Protocol extends SoundcoreProtocolImplV1 {
                 return encodeLocalPlayback(prefs.getBoolean(config, false));
             case PREF_SOUNDCORE_LOCAL_VOLUME:
                 return encodeLocalVolume(prefs.getInt(config, 0));
-            case PREF_SOUNDCORE_AUTO_STOP:
-            case PREF_SOUNDCORE_AUTO_STOP_TIMER:
-            case PREF_SOUNDCORE_AUTO_STOP_MINUTES:
-                final String timer = prefs.getString(PREF_SOUNDCORE_AUTO_STOP_TIMER, "30");
-                // Selecting Custom only reveals the duration control; it must not restart the timer.
-                if (PREF_SOUNDCORE_AUTO_STOP_TIMER.equals(config) && "custom".equals(timer)) return null;
-                final int minutes;
-                if ("custom".equals(timer)) {
-                    minutes = prefs.getInt(PREF_SOUNDCORE_AUTO_STOP_MINUTES, 30);
-                } else {
-                    try {
-                        minutes = Integer.parseInt(timer);
-                    } catch (final NumberFormatException e) {
-                        return null;
-                    }
-                    if (!AUTO_STOP_PRESETS.contains(minutes)) return null;
-                }
-                return encodeAutoStop(prefs.getBoolean(PREF_SOUNDCORE_AUTO_STOP, false), minutes);
             case PREF_SOUNDCORE_SLEEP_AUDIO:
                 if (prefs.getBoolean(PREF_SOUNDCORE_AUTO_STOP, false)) return null;
                 return encodeSleepAudio(prefs.getString(config, "keep"));
