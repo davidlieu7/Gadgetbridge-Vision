@@ -22,6 +22,7 @@ import android.net.Uri
 import androidx.core.net.toUri
 import com.google.gson.Gson
 import nodomain.freeyourgadget.gadgetbridge.GBApplication
+import nodomain.freeyourgadget.gadgetbridge.R
 import nodomain.freeyourgadget.gadgetbridge.model.ActivityKind
 import nodomain.freeyourgadget.gadgetbridge.util.InternetUtils
 import nodomain.freeyourgadget.gadgetbridge.util.gson.GsonSerialized
@@ -29,6 +30,8 @@ import org.json.JSONArray
 import org.json.JSONObject
 import org.slf4j.LoggerFactory
 import java.io.File
+import java.security.MessageDigest
+import java.util.concurrent.ConcurrentHashMap
 
 enum class EndurainAuthType {
     NONE,
@@ -84,9 +87,9 @@ data class EndurainActivityDetails(
  * Result of looking an activity up. [Gone] exists because an activity that is merely absent has
  * to be told apart from a request that failed: the first is re-uploaded, the second retried.
  *
- * Endurain answers 200 with a body of `null` for an activity that does not exist, rather than
- * 404, so the body decides: <https://codeberg.org/endurain-project/endurain/issues/911>. A 404 is
- * read as [Gone] too, which is what the same answer looks like from a corrected server.
+ * Up to 0.19, Endurain answers 200 with a body of `null` for an activity that does not exist,
+ * rather than 404, so the body decides: <https://github.com/endurain-project/endurain/issues/758>.
+ * From 0.20 it answers 404, which is read as [Gone] too.
  */
 sealed interface EndurainActivityLookup {
     data class Found(val details: EndurainActivityDetails) : EndurainActivityLookup
@@ -94,17 +97,17 @@ sealed interface EndurainActivityLookup {
     object Failed : EndurainActivityLookup
 }
 
-/**
- * A photo or video attached to an Endurain activity. [mediaPath] is the server-side storage
- * path rather than a fetchable one, so a client that needs the file takes its basename and asks
- * for /activity_media/{basename}:
- * <https://codeberg.org/endurain-project/endurain/issues/912>.
- */
-@GsonSerialized
+/** What an 0.20 upload job says so far, read from its `status`, `activity_ids` and `error_code`. */
+internal sealed interface EndurainJobOutcome {
+    data class Created(val activityId: Int) : EndurainJobOutcome
+    data class Failed(val reason: String?) : EndurainJobOutcome
+    object Running : EndurainJobOutcome
+}
+
+/** A photo or video attached to an Endurain activity. */
 data class EndurainActivityMedia(
     val id: Int,
-    val activityId: Int,
-    val mediaPath: String
+    val activityId: Int
 )
 
 @GsonSerialized
@@ -114,12 +117,32 @@ data class EndurainIdentityProvider(
     val slug: String
 )
 
+/**
+ * Endurain's API. From 0.20 every activity route moved: an upload becomes a job that is polled for
+ * the activity it created, an edit is a `PATCH` on the activity, and media live under it. Which
+ * routes a server takes is read from the version it reports; see [usesResourceRoutes].
+ */
 class EndurainApiClient(
     private val baseUrl: String,
     private val tokenManager: EndurainTokenManager
 ) {
     private val gson = Gson()
     private val LOG = LoggerFactory.getLogger(EndurainApiClient::class.java)
+
+    /**
+     * Whether this server takes the 0.20 routes. Asked once per server and process; a server whose
+     * version cannot be read is given the older routes and asked again next time. Blocking.
+     */
+    private fun resourceRoutes(): Boolean {
+        ROUTES_BY_SERVER[baseUrl]?.let { return it }
+        val version = fetchVersion() ?: return false
+        return usesResourceRoutes(version).also {
+            LOG.debug("Endurain {} reports {}, 0.20 routes: {}", baseUrl, version, it)
+            ROUTES_BY_SERVER[baseUrl] = it
+        }
+    }
+
+    private fun activityPath(activityId: Int) = "$baseUrl/api/v1/activities/$activityId"
 
     /**
      * Build headers with authentication tokens
@@ -358,6 +381,10 @@ class EndurainApiClient(
     fun uploadActivity(file: File, callback: (id: Int?, reason: String?) -> Unit) {
         Thread {
             try {
+                if (resourceRoutes()) {
+                    uploadThroughJob(file, callback)
+                    return@Thread
+                }
                 val uri = "$baseUrl/api/v1/activities/create/upload".toUri()
                 val headers = buildHeaders(EndurainAuthType.AUTH_TOKEN)
 
@@ -385,6 +412,80 @@ class EndurainApiClient(
     }
 
     /**
+     * Uploads [file] the 0.20 way: the server answers 202 with a job, which is polled until it
+     * names the activity it created. Blocking.
+     *
+     * The `Idempotency-Key` is the file's own fingerprint, so a retry after a lost answer or a job
+     * that outlived [JOB_WAIT_MILLIS] is handed back the job the first attempt started rather than
+     * a second one. The server keeps the key for as long as it keeps the job, and still answers
+     * with that job after the user deleted its activity. A job naming an activity that is gone is
+     * therefore uploaded again under a key that also names that activity (see [idempotencyKeyFor]).
+     */
+    private fun uploadThroughJob(file: File, callback: (id: Int?, reason: String?) -> Unit) {
+        val fingerprint = sha256Hex(file)
+        var replaced: Int? = null
+        repeat(MAX_REPLAYED_JOBS) {
+            val outcome = runUploadJob(file, idempotencyKeyFor(fingerprint, replaced))
+            if (outcome !is EndurainJobOutcome.Created) {
+                return callback(null, (outcome as? EndurainJobOutcome.Failed)?.reason)
+            }
+            if (getActivityDetails(outcome.activityId) !is EndurainActivityLookup.Gone) {
+                return callback(outcome.activityId, null)
+            }
+            LOG.info("Endurain answered the upload with deleted activity {}, uploading it as a new one", outcome.activityId)
+            replaced = outcome.activityId
+        }
+        callback(null, null)
+    }
+
+    /**
+     * Uploads [file] under [idempotencyKey] and polls the job until it names an activity, fails, or
+     * outlives [JOB_WAIT_MILLIS]. Blocking. Never answers [EndurainJobOutcome.Running].
+     */
+    private fun runUploadJob(file: File, idempotencyKey: String): EndurainJobOutcome {
+        val headers = buildHeaders(EndurainAuthType.AUTH_TOKEN)
+        headers["Idempotency-Key"] = idempotencyKey
+        var job: JSONObject? = null
+        var failure: String? = null
+        InternetUtils.uploadBinaryFile(
+            uri = "$baseUrl/api/v1/activities/upload".toUri(),
+            file = file,
+            requestHeaders = headers
+        ) { success, statusCode, responseText, reason ->
+            if (success && statusCode != null && statusCode in 200..299) {
+                job = jsonObjectOrNull(responseText)
+            } else {
+                failure = detailOf(responseText) ?: reason ?: statusCode?.let { "HTTP $it" }
+                LOG.error("Activity upload failed (status {}): {}", statusCode, failure)
+            }
+        }
+        var current = job ?: return EndurainJobOutcome.Failed(failure)
+        val deadline = System.currentTimeMillis() + JOB_WAIT_MILLIS
+        while (true) {
+            when (val outcome = jobOutcomeOf(current)) {
+                is EndurainJobOutcome.Created -> return outcome
+                is EndurainJobOutcome.Failed -> {
+                    LOG.error("Endurain could not import the upload: {}", outcome.reason)
+                    return outcome
+                }
+                EndurainJobOutcome.Running -> Unit
+            }
+            if (System.currentTimeMillis() > deadline) {
+                LOG.warn("Endurain upload job {} still running, leaving it to the next attempt", current.optString("id"))
+                return EndurainJobOutcome.Failed(GBApplication.getContext().getString(R.string.auto_upload_timed_out))
+            }
+            Thread.sleep(JOB_POLL_MILLIS)
+            val response = InternetUtils.doStringRequestWithStatus(
+                uri = "$baseUrl/api/v1/activities/ingestion-jobs/${Uri.encode(current.optString("id"))}".toUri(),
+                requestHeaders = buildHeaders(EndurainAuthType.AUTH_TOKEN)
+            )
+            current = response.takeIf { it.statusCode in 200..299 }
+                ?.let { jsonObjectOrNull(it.body) }
+                ?: return EndurainJobOutcome.Failed(detailOf(response.body) ?: response.statusCode?.let { "HTTP $it" })
+        }
+    }
+
+    /**
      * Upload activity photo. [callback], when provided, fires with the id of the created media
      * entry, or null on failure, so callers off the main thread (the auto-upload worker's photo
      * sync) can wait for the result and remember which entry to replace later.
@@ -403,7 +504,8 @@ class EndurainApiClient(
                     }
                     converted
                 }
-                val uri = "$baseUrl/api/v1/activities_media/upload/activity_id/$activityId".toUri()
+                val uri = (if (resourceRoutes()) "${activityPath(activityId)}/media"
+                else "$baseUrl/api/v1/activities_media/upload/activity_id/$activityId").toUri()
                 val headers = buildHeaders(EndurainAuthType.AUTH_TOKEN)
 
                 InternetUtils.uploadBinaryFile(
@@ -459,14 +561,11 @@ class EndurainApiClient(
     /** Reads back the user-owned parts of [activityId]. */
     fun getActivityDetails(activityId: Int): EndurainActivityLookup {
         try {
-            val uri = "$baseUrl/api/v1/activities/$activityId".toUri()
             val response = InternetUtils.doStringRequestWithStatus(
-                uri = uri,
+                uri = activityPath(activityId).toUri(),
                 requestHeaders = buildHeaders(EndurainAuthType.AUTH_TOKEN)
             )
-            // An activity that does not exist is reported as 200 with a body of `null`
-            // (<https://codeberg.org/endurain-project/endurain/issues/911>); 404 is what the same
-            // answer looks like once that is corrected. Both mean gone, not failed.
+            // See EndurainActivityLookup for the two ways a missing activity is reported.
             if (response.statusCode == 404) {
                 LOG.info("Endurain activity {} no longer exists", activityId)
                 return EndurainActivityLookup.Gone
@@ -501,12 +600,13 @@ class EndurainApiClient(
     }
 
     /**
-     * Deletes an activity and everything derived from it. The endpoint answers 200 with a message
-     * body.
+     * Deletes an activity and everything derived from it. Up to 0.19 the endpoint answers 200 with
+     * a message body, from 0.20 204.
      */
     fun deleteActivity(activityId: Int): Boolean {
         try {
-            val uri = "$baseUrl/api/v1/activities/$activityId/delete".toUri()
+            val uri = (if (resourceRoutes()) activityPath(activityId)
+            else "${activityPath(activityId)}/delete").toUri()
             val response = InternetUtils.doStringRequestWithStatus(
                 uri = uri,
                 method = "DELETE",
@@ -534,37 +634,45 @@ class EndurainApiClient(
         name: String?,
         details: EndurainActivityDetails
     ): Boolean {
+        val fields = JSONObject().apply {
+            put("activity_type", activityLookup[activityKind.ordinal] ?: GENERIC_ACTIVITY_TYPE)
+            if (name != null) put("name", name)
+            details.description?.let { put("description", it) }
+            details.privateNotes?.let { put("private_notes", it) }
+            details.gearId?.let { put("gear_id", it) }
+            details.visibility?.let { put("visibility", it) }
+            for ((flag, value) in details.hideFlags) {
+                put(flag, value)
+            }
+        }
+        return writeActivity(activityId, fields)
+    }
+
+    /**
+     * Writes [fields] onto [activityId], leaving the others alone. Up to 0.19 that is
+     * `PUT /activities/edit` with the id in the body; from 0.20 a `PATCH` on the activity, which
+     * refuses an `id` (or any other unknown key) in the body with a 422.
+     */
+    private fun writeActivity(activityId: Int, fields: JSONObject): Boolean {
         try {
-            val uri = "$baseUrl/api/v1/activities/edit".toUri()
+            val resourceRoutes = resourceRoutes()
+            if (!resourceRoutes) fields.put("id", activityId)
             val headers = buildHeaders(EndurainAuthType.AUTH_TOKEN)
             headers["Content-Type"] = "application/json"
-
-            val bodyJson = JSONObject().apply {
-                put("id", activityId)
-                put("activity_type", activityLookup[activityKind.ordinal] ?: GENERIC_ACTIVITY_TYPE)
-                if (name != null) put("name", name)
-                details.description?.let { put("description", it) }
-                details.privateNotes?.let { put("private_notes", it) }
-                details.gearId?.let { put("gear_id", it) }
-                details.visibility?.let { put("visibility", it) }
-                for ((flag, value) in details.hideFlags) {
-                    put(flag, value)
-                }
-            }
-
             val response = InternetUtils.doStringRequestWithStatus(
-                uri = uri,
-                method = "PUT",
+                uri = (if (resourceRoutes) activityPath(activityId) else "$baseUrl/api/v1/activities/edit").toUri(),
+                method = if (resourceRoutes) "PATCH" else "PUT",
                 requestHeaders = headers,
-                body = bodyJson.toString()
+                body = fields.toString()
             )
             if (response.statusCode !in 200..299) {
-                LOG.error("Restoring activity {} failed (status {})", activityId, response.statusCode)
+                LOG.error("Editing activity {} failed (status {}): {}", activityId, response.statusCode,
+                    detailOf(response.body))
                 return false
             }
             return true
         } catch (e: Exception) {
-            LOG.error("Error restoring activity {}", activityId, e)
+            LOG.error("Error editing activity {}", activityId, e)
             return false
         }
     }
@@ -581,7 +689,9 @@ class EndurainApiClient(
      */
     fun listActivityMedia(activityId: Int): List<EndurainActivityMedia>? {
         try {
-            val uri = "$baseUrl/api/v1/activities_media/activity_id/$activityId".toUri()
+            val resourceRoutes = resourceRoutes()
+            val uri = (if (resourceRoutes) "${activityPath(activityId)}/media"
+            else "$baseUrl/api/v1/activities_media/activity_id/$activityId").toUri()
             val response = InternetUtils.doStringRequestWithStatus(
                 uri = uri,
                 requestHeaders = buildHeaders(EndurainAuthType.AUTH_TOKEN)
@@ -590,19 +700,7 @@ class EndurainApiClient(
                 LOG.error("Listing media of activity {} failed (status {})", activityId, response.statusCode)
                 return null
             }
-            // The endpoint answers null rather than [] when the activity has no media.
-            if (response.body.isBlank() || response.body == "null") {
-                return emptyList()
-            }
-            val array = JSONArray(response.body)
-            return (0 until array.length()).map { i ->
-                val entry = array.getJSONObject(i)
-                EndurainActivityMedia(
-                    entry.getInt("id"),
-                    entry.getInt("activity_id"),
-                    entry.getString("media_path")
-                )
-            }
+            return parseMediaList(response.body, resourceRoutes)
         } catch (e: Exception) {
             LOG.error("Error listing media of activity {}", activityId, e)
             return null
@@ -610,11 +708,12 @@ class EndurainApiClient(
     }
 
     /**
-     * Deletes one media entry. The endpoint answers 204 with no body.
+     * Deletes the media entry [mediaId] of [activityId]. The endpoint answers 204 with no body.
      */
-    fun deleteActivityMedia(mediaId: Int): Boolean {
+    fun deleteActivityMedia(activityId: Int, mediaId: Int): Boolean {
         try {
-            val uri = "$baseUrl/api/v1/activities_media/$mediaId".toUri()
+            val uri = (if (resourceRoutes()) "${activityPath(activityId)}/media/$mediaId"
+            else "$baseUrl/api/v1/activities_media/$mediaId").toUri()
             val response = InternetUtils.doStringRequestWithStatus(
                 uri = uri,
                 method = "DELETE",
@@ -631,35 +730,13 @@ class EndurainApiClient(
         }
     }
 
-    /**
-     * Edit uploaded activity
-     */
+    /** Sets the activity type and, when [name] is not null, the name of [id]. */
     fun editActivity(id: Int, activityKind: ActivityKind, name: String?): Boolean {
-        try {
-            val uri = "$baseUrl/api/v1/activities/edit".toUri()
-            val headers = buildHeaders(EndurainAuthType.AUTH_TOKEN)
-            headers["Content-Type"] = "application/json"
-
-            val activityType = activityLookup[activityKind.ordinal] ?: GENERIC_ACTIVITY_TYPE
-
-            val bodyJson = JSONObject().apply {
-                put("id", id)
-                put("activity_type", activityType)
-                if (name != null) put("name", name)
-            }
-
-            val result = InternetUtils.doStringRequest(
-                method = "PUT",
-                uri = uri,
-                requestHeaders = headers,
-                body = bodyJson.toString()
-            )
-            LOG.info("editActivity result: {}", result)
-            return true
-        } catch (e: Exception) {
-            LOG.error("Activity edit error", e)
-            return false
+        val fields = JSONObject().apply {
+            put("activity_type", activityLookup[activityKind.ordinal] ?: GENERIC_ACTIVITY_TYPE)
+            if (name != null) put("name", name)
         }
+        return writeActivity(id, fields)
     }
 
     /**
@@ -782,4 +859,83 @@ class EndurainApiClient(
         ActivityKind.PLATFORM_TENNIS.ordinal to 21,
         ActivityKind.BEACH_SOCCER.ordinal to 38
     )
+
+    companion object {
+        /** How long an upload job is polled for the activity it creates, and how often. */
+        private const val JOB_WAIT_MILLIS = 60_000L
+        private const val JOB_POLL_MILLIS = 1_000L
+
+        /** How many replayed jobs of deleted activities one upload works through before failing. */
+        private const val MAX_REPLAYED_JOBS = 3
+
+        private val ROUTES_BY_SERVER = ConcurrentHashMap<String, Boolean>()
+
+        /**
+         * Whether [version], as `GET /api/v1/about` reports it ("v0.19.3", "v0.20.0-beta1"), is
+         * 0.20 or later, which moved every activity route.
+         */
+        internal fun usesResourceRoutes(version: String): Boolean {
+            val match = Regex("""^v?(\d+)\.(\d+)""").find(version.trim()) ?: return false
+            val major = match.groupValues[1].toInt()
+            val minor = match.groupValues[2].toInt()
+            return major > 0 || minor >= 20
+        }
+
+        /**
+         * The `Idempotency-Key` for a file with SHA-256 [fingerprint]. Endurain replays a key's job
+         * even after the activity it created was deleted, so an upload following the deletion of
+         * activity [replaced] needs a key of its own.
+         */
+        internal fun idempotencyKeyFor(fingerprint: String, replaced: Int?): String =
+            "gadgetbridge-$fingerprint" + (replaced?.let { "-after-$it" } ?: "")
+
+        internal fun jobOutcomeOf(job: JSONObject): EndurainJobOutcome = when (job.optString("status")) {
+            "completed" -> job.optJSONArray("activity_ids")?.takeIf { it.length() > 0 }?.optInt(0)
+                ?.takeIf { it > 0 }
+                ?.let { EndurainJobOutcome.Created(it) }
+                ?: EndurainJobOutcome.Failed("no_activities_found")
+
+            "failed" -> EndurainJobOutcome.Failed(job.optString("error_code").ifEmpty { "failed" })
+            else -> EndurainJobOutcome.Running
+        }
+
+        /**
+         * Reads a media list. Up to 0.19 it is an array, or `null` when the activity has none; from
+         * 0.20 a page whose entries are under `items`.
+         */
+        internal fun parseMediaList(body: String, resourceRoutes: Boolean): List<EndurainActivityMedia> {
+            if (body.isBlank() || body == "null") {
+                return emptyList()
+            }
+            val array = if (resourceRoutes) JSONObject(body).getJSONArray("items") else JSONArray(body)
+            return (0 until array.length()).map { i ->
+                val entry = array.getJSONObject(i)
+                EndurainActivityMedia(entry.getInt("id"), entry.getInt("activity_id"))
+            }
+        }
+
+        private fun jsonObjectOrNull(text: String?): JSONObject? =
+            try {
+                text?.let { JSONObject(it) }
+            } catch (_: Exception) {
+                null
+            }
+
+        /** The `detail` Endurain gives with an error, which says what was wrong. */
+        private fun detailOf(responseText: String?): String? =
+            jsonObjectOrNull(responseText)?.optString("detail")?.takeIf { it.isNotEmpty() }
+
+        private fun sha256Hex(file: File): String {
+            val digest = MessageDigest.getInstance("SHA-256")
+            file.inputStream().use { input ->
+                val buffer = ByteArray(8192)
+                while (true) {
+                    val read = input.read(buffer)
+                    if (read < 0) break
+                    digest.update(buffer, 0, read)
+                }
+            }
+            return digest.digest().joinToString("") { "%02x".format(it) }
+        }
+    }
 }

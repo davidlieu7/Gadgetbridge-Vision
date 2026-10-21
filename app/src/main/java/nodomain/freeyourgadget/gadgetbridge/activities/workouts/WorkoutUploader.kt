@@ -727,7 +727,7 @@ object WorkoutUploader {
                 try {
                     var removed = previousMediaId == null
                     if (previousMediaId != null) {
-                        removed = apiClient.deleteActivityMedia(previousMediaId)
+                        removed = apiClient.deleteActivityMedia(activityId, previousMediaId)
                         if (!removed) {
                             // Already gone server-side counts as removed, so a photo replaced
                             // after a manual deletion still goes through.
