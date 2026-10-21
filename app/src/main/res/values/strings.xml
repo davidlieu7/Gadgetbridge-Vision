@@ -4825,6 +4825,8 @@
     <string name="pref_override_features_summary">Enable/disable specific device features. This can cause issues and/or make your device work incorrectly</string>
     <string name="pref_test_features_title">Features</string>
     <string name="pref_test_features_summary">Enabled features for this test device</string>
+    <string name="pref_override_features_default">Default features</string>
+    <string name="pref_override_features_unsupported">Unsupported features</string>
     <string name="pref_developer_add_test_activities_title">Add test activities</string>
     <string name="pref_developer_add_test_activities_summary">Populate the database with dummy test activities</string>
     <string name="device_state_waiting_scan">Waiting for device scan</string>
