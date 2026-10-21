@@ -285,9 +285,7 @@ public class XiaomiHealthService extends AbstractXiaomiService {
 
     @Override
     public void dispose() {
-        stopLocation();
-        locationRequested = false;
-        locationWorkoutOpen = false;
+        endLocationWorkout();
         synchronized (realtimeConsumers) {
             realtimeConsumers.clear();
         }
@@ -795,7 +793,7 @@ public class XiaomiHealthService extends AbstractXiaomiService {
             gpsTimeoutHandler.removeCallbacksAndMessages(null);
             gpsTimeoutHandler.postDelayed(() -> {
                 LOG.debug("Timed out waiting for workout");
-                stopLocation();
+                endLocationWorkout();
             }, timeout);
         }
     }
@@ -828,12 +826,23 @@ public class XiaomiHealthService extends AbstractXiaomiService {
     }
 
     /**
+     * Stops location and forgets the band's location request. {@link #stopLocation()} alone keeps
+     * it, so that live stats arriving after a quiet spell resume location for the same workout.
+     */
+    private void endLocationWorkout() {
+        stopLocation();
+        locationRequested = false;
+        locationWorkoutOpen = false;
+    }
+
+    /**
      * The band does not repeat the workout start after a reconnection, so a workout that was
      * running before it is kept, as long as the band goes on pushing live stats for it.
      */
     private void resumeLocationAfterReconnect() {
         gpsTimeoutHandler.removeCallbacksAndMessages(null);
         if (!gpsStarted) {
+            stopLocation();
             return;
         }
         if (!workoutStarted || !workoutLiveStatsSeen) {
@@ -899,9 +908,7 @@ public class XiaomiHealthService extends AbstractXiaomiService {
             case WORKOUT_RESUMED:
                 break;
             case WORKOUT_FINISHED:
-                stopLocation();
-                locationRequested = false;
-                locationWorkoutOpen = false;
+                endLocationWorkout();
                 if (startOnPhone) {
                     OpenTracksController.stopRecording(getSupport().getContext());
                 }

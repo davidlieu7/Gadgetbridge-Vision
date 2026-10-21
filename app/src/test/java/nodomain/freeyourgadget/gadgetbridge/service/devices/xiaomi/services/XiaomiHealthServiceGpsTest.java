@@ -343,6 +343,34 @@ public class XiaomiHealthServiceGpsTest extends TestBase {
     }
 
     @Test
+    public void indoorWorkoutEndedWhileDisconnectedKeepsTheOpenRequestTimeout() {
+        bandStatus(STATUS_STARTED);
+        // the indoor workout ends while disconnected, so no finished status arrives
+        service.onDisconnect();
+        service.initialize();
+
+        bandOpens();
+        idle(OPEN_TIMEOUT_MS + 100);
+
+        assertFalse(locationRunning());
+    }
+
+    @Test
+    public void indoorWorkoutAfterAnUnansweredOpenRequestDoesNotStartLocation() {
+        bandOpens();
+        idle(OPEN_TIMEOUT_MS + 100);
+        assertFalse(locationRunning());
+
+        bandStatus(STATUS_STARTED);
+        bandLiveStats();
+        idle(120_000);
+        bandLiveStats();
+        idle(1000);
+
+        assertFalse(locationRunning());
+    }
+
+    @Test
     public void disposeStopsLocation() {
         bandOpens();
         bandStatus(STATUS_STARTED);
