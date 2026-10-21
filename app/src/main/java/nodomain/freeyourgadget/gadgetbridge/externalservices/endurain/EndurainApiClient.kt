@@ -85,11 +85,8 @@ data class EndurainActivityDetails(
 
 /**
  * Result of looking an activity up. [Gone] exists because an activity that is merely absent has
- * to be told apart from a request that failed: the first is re-uploaded, the second retried.
- *
- * Up to 0.19, Endurain answers 200 with a body of `null` for an activity that does not exist,
- * rather than 404, so the body decides: <https://github.com/endurain-project/endurain/issues/758>.
- * From 0.20 it answers 404, which is read as [Gone] too.
+ * to be told apart from a request that failed: the first is re-uploaded, the second retried. See
+ * [EndurainApiClient.activityLookupOf].
  */
 sealed interface EndurainActivityLookup {
     data class Found(val details: EndurainActivityDetails) : EndurainActivityLookup
@@ -565,34 +562,14 @@ class EndurainApiClient(
                 uri = activityPath(activityId).toUri(),
                 requestHeaders = buildHeaders(EndurainAuthType.AUTH_TOKEN)
             )
-            // See EndurainActivityLookup for the two ways a missing activity is reported.
-            if (response.statusCode == 404) {
-                LOG.info("Endurain activity {} no longer exists", activityId)
-                return EndurainActivityLookup.Gone
+            return activityLookupOf(response.statusCode, response.body).also {
+                when (it) {
+                    is EndurainActivityLookup.Gone -> LOG.info("Endurain activity {} no longer exists", activityId)
+                    is EndurainActivityLookup.Failed ->
+                        LOG.error("Reading activity {} failed (status {})", activityId, response.statusCode)
+                    is EndurainActivityLookup.Found -> Unit
+                }
             }
-            if (response.statusCode !in 200..299 || response.body == null) {
-                LOG.error("Reading activity {} failed (status {})", activityId, response.statusCode)
-                return EndurainActivityLookup.Failed
-            }
-            if (response.body.isBlank() || response.body == "null") {
-                LOG.info("Endurain activity {} no longer exists", activityId)
-                return EndurainActivityLookup.Gone
-            }
-            val json = JSONObject(response.body)
-            val hideFlags = HIDE_FLAGS
-                .filter { json.has(it) && !json.isNull(it) }
-                .associateWith { json.getBoolean(it) }
-            return EndurainActivityLookup.Found(
-                EndurainActivityDetails(
-                    name = json.optStringOrNull("name"),
-                    activityType = json.optIntOrNull("activity_type"),
-                    description = json.optStringOrNull("description"),
-                    privateNotes = json.optStringOrNull("private_notes"),
-                    gearId = json.optIntOrNull("gear_id"),
-                    visibility = json.optIntOrNull("visibility"),
-                    hideFlags = hideFlags
-                )
-            )
         } catch (e: Exception) {
             LOG.error("Error reading activity {}", activityId, e)
             return EndurainActivityLookup.Failed
@@ -600,8 +577,8 @@ class EndurainApiClient(
     }
 
     /**
-     * Deletes an activity and everything derived from it. Up to 0.19 the endpoint answers 200 with
-     * a message body, from 0.20 204.
+     * Deletes an activity and everything derived from it; one that is already gone counts as
+     * deleted. Up to 0.19 the endpoint answers 200 with a message body, from 0.20 204.
      */
     fun deleteActivity(activityId: Int): Boolean {
         try {
@@ -612,6 +589,10 @@ class EndurainApiClient(
                 method = "DELETE",
                 requestHeaders = buildHeaders(EndurainAuthType.AUTH_TOKEN)
             )
+            if (isActivityNotFound(response.statusCode, response.body)) {
+                LOG.info("Endurain activity {} was already deleted", activityId)
+                return true
+            }
             if (response.statusCode !in 200..299) {
                 LOG.error("Deleting activity {} failed (status {}): {}", activityId, response.statusCode, response.body)
                 return false
@@ -676,12 +657,6 @@ class EndurainApiClient(
             return false
         }
     }
-
-    private fun JSONObject.optStringOrNull(key: String): String? =
-        if (has(key) && !isNull(key)) getString(key) else null
-
-    private fun JSONObject.optIntOrNull(key: String): Int? =
-        if (has(key) && !isNull(key)) getInt(key) else null
 
     /**
      * Media currently attached to [activityId], or null when the request failed. An activity
@@ -764,16 +739,6 @@ class EndurainApiClient(
 
     /** The only photo extensions Endurain accepts; anything else is answered 400 EXTENSION_NOT_ALLOWED. */
     private val ALLOWED_PHOTO_EXTENSIONS = setOf("jpg", "jpeg", "png")
-
-    /**
-     * Per-activity display toggles the user can set. Listed so they survive an activity being
-     * re-created, since the new upload would otherwise reset them to their defaults.
-     */
-    private val HIDE_FLAGS = listOf(
-        "hide_start_time", "hide_location", "hide_map", "hide_hr", "hide_power",
-        "hide_cadence", "hide_elevation", "hide_speed", "hide_pace", "hide_laps",
-        "hide_workout_sets_steps", "hide_gear"
-    )
 
     /**
      * Lookup map to convert ActivityKind to the integer Endurain expects,
@@ -869,6 +834,63 @@ class EndurainApiClient(
         private const val MAX_REPLAYED_JOBS = 3
 
         private val ROUTES_BY_SERVER = ConcurrentHashMap<String, Boolean>()
+
+        /**
+         * Per-activity display toggles the user can set. Listed so they survive an activity being
+         * re-created, since the new upload would otherwise reset them to their defaults.
+         */
+        private val HIDE_FLAGS = listOf(
+            "hide_start_time", "hide_location", "hide_map", "hide_hr", "hide_power",
+            "hide_cadence", "hide_elevation", "hide_speed", "hide_pace", "hide_laps",
+            "hide_workout_sets_steps", "hide_gear"
+        )
+
+        /**
+         * Whether a 404 is Endurain saying that the activity does not exist, which it does with a
+         * JSON `detail` naming its id: "Activity ID 7 for user 1 not found" up to 0.19, "Activity 7
+         * not found" or "Activity with id 7 not found" (problem+json) from 0.20. An unknown route,
+         * or a proxy in front of the server, answers 404 without such a `detail`.
+         */
+        internal fun isActivityNotFound(statusCode: Int?, responseText: String?): Boolean {
+            if (statusCode != 404) return false
+            val detail = jsonObjectOrNull(responseText)?.optString("detail") ?: return false
+            return ACTIVITY_NOT_FOUND.matches(detail)
+        }
+
+        private val ACTIVITY_NOT_FOUND = Regex("""^Activity\D*\d+.*not found$""")
+
+        /**
+         * Reads the answer to `GET /api/v1/activities/{id}`. Up to 0.19, an activity that does not
+         * exist is answered 200 with a body of `null`
+         * (<https://github.com/endurain-project/endurain/issues/758>); from 0.20 it is a 404, see
+         * [isActivityNotFound].
+         */
+        internal fun activityLookupOf(statusCode: Int?, responseText: String?): EndurainActivityLookup {
+            if (isActivityNotFound(statusCode, responseText)) return EndurainActivityLookup.Gone
+            if (statusCode !in 200..299 || responseText == null) return EndurainActivityLookup.Failed
+            if (responseText.isBlank() || responseText.trim() == "null") return EndurainActivityLookup.Gone
+            val json = jsonObjectOrNull(responseText) ?: return EndurainActivityLookup.Failed
+            val hideFlags = HIDE_FLAGS
+                .filter { json.has(it) && !json.isNull(it) }
+                .associateWith { json.getBoolean(it) }
+            return EndurainActivityLookup.Found(
+                EndurainActivityDetails(
+                    name = json.optStringOrNull("name"),
+                    activityType = json.optIntOrNull("activity_type"),
+                    description = json.optStringOrNull("description"),
+                    privateNotes = json.optStringOrNull("private_notes"),
+                    gearId = json.optIntOrNull("gear_id"),
+                    visibility = json.optIntOrNull("visibility"),
+                    hideFlags = hideFlags
+                )
+            )
+        }
+
+        private fun JSONObject.optStringOrNull(key: String): String? =
+            if (has(key) && !isNull(key)) getString(key) else null
+
+        private fun JSONObject.optIntOrNull(key: String): Int? =
+            if (has(key) && !isNull(key)) getInt(key) else null
 
         /**
          * Whether [version], as `GET /api/v1/about` reports it ("v0.19.3", "v0.20.0-beta1"), is

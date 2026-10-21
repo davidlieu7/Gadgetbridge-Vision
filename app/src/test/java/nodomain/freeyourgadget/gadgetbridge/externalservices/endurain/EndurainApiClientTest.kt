@@ -77,6 +77,48 @@ class EndurainApiClientTest : TestBase() {
     }
 
     @Test
+    fun anActivityThatIsThereIsFoundWithWhatTheUserWroteOnIt() {
+        val found = EndurainApiClient.activityLookupOf(
+            200, """{"id":7,"name":"Run","activity_type":1,"description":"Hills","hide_map":true}"""
+        )
+        assertTrue(found is EndurainActivityLookup.Found)
+        val details = (found as EndurainActivityLookup.Found).details
+        assertEquals("Hills", details.description)
+        assertEquals(mapOf("hide_map" to true), details.hideFlags)
+        assertTrue(details.hasUserContent)
+    }
+
+    @Test
+    fun aMissingActivityIsGoneOnBothVersions() {
+        assertEquals(EndurainActivityLookup.Gone, EndurainApiClient.activityLookupOf(200, "null"))
+        assertEquals(
+            EndurainActivityLookup.Gone,
+            EndurainApiClient.activityLookupOf(
+                404,
+                """{"type":"urn:endurain:error:not-found","title":"Not Found","status":404,"detail":"Activity 1 not found","instance":"/api/v1/activities/1"}"""
+            )
+        )
+    }
+
+    @Test
+    fun a404ThatDoesNotNameTheActivitySaysNothingAboutIt() {
+        assertEquals(EndurainActivityLookup.Failed, EndurainApiClient.activityLookupOf(404, """{"detail":"Not Found"}"""))
+        assertEquals(EndurainActivityLookup.Failed, EndurainApiClient.activityLookupOf(404, "<html>Not Found</html>"))
+        assertEquals(EndurainActivityLookup.Failed, EndurainApiClient.activityLookupOf(404, null))
+        assertEquals(EndurainActivityLookup.Failed, EndurainApiClient.activityLookupOf(401, """{"detail":"Not authenticated"}"""))
+        assertEquals(EndurainActivityLookup.Failed, EndurainApiClient.activityLookupOf(null, null))
+    }
+
+    @Test
+    fun aDeleteOfAnActivityAlreadyGoneIsRecognisedOnBothVersions() {
+        assertTrue(EndurainApiClient.isActivityNotFound(404, """{"detail":"Activity ID 7 for user 1 not found"}"""))
+        assertTrue(EndurainApiClient.isActivityNotFound(404, """{"type":"urn:endurain:error:not-found","detail":"Activity with id 7 not found"}"""))
+        assertFalse(EndurainApiClient.isActivityNotFound(404, """{"detail":"Not Found"}"""))
+        assertFalse(EndurainApiClient.isActivityNotFound(404, """{"detail":"Activity media not found"}"""))
+        assertFalse(EndurainApiClient.isActivityNotFound(200, """{"detail":"Activity 7 not found"}"""))
+    }
+
+    @Test
     fun theMediaListIsAnArrayOrNullUpTo019() {
         val array = """[{"id":3,"activity_id":7,"media_path":"/app/backend/data/activity_media/7_1.png"}]"""
         assertEquals(listOf(EndurainActivityMedia(3, 7)), EndurainApiClient.parseMediaList(array, false))
