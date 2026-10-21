@@ -66,6 +66,7 @@ public enum TestFeature {
     PAI_TIME,
     PAI,
     POWER_OFF,
+    QUICK_CONTROLS,
     RACE_PREDICTION,
     REALTIME_DATA,
     RECORDED_ACTIVITIES,

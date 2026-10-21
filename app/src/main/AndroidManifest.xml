@@ -179,6 +179,7 @@
         android:theme="@style/GadgetbridgeTheme">
         <activity
             android:name=".activities.ControlCenterv2"
+            android:configChanges="keyboard|keyboardHidden|navigation"
             android:label="@string/title_activity_controlcenter"
             android:theme="@style/SplashTheme"
             android:launchMode="singleTop"
@@ -853,6 +854,10 @@
             android:label="@string/title_activity_discovery"
             android:parentActivityName=".activities.ControlCenterv2" />
         <activity
+            android:name=".activities.discovery.DeviceCandidateDetailsActivity"
+            android:label="@string/title_activity_device_candidate_details"
+            android:parentActivityName=".activities.discovery.DiscoveryActivityV2" />
+        <activity
             android:name=".activities.AuthKeyActivity"
             android:label="@string/pref_title_authkey"
             android:parentActivityName=".activities.discovery.DiscoveryActivityV2" />
@@ -1237,7 +1242,7 @@
         </activity>
 
         <activity
-            android:name=".externalservices.endurain.EndurainOAuthCallbackActivity"
+            android:name=".externalservices.ExternalServiceOAuthCallbackActivity"
             android:exported="true"
             android:launchMode="singleTop">
             <intent-filter>
@@ -1245,10 +1250,9 @@
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
 
-                <!-- Deep link scheme for OAuth callback -->
+                <!-- Where a service's login sends the browser back; the host names the service -->
                 <data
                     android:scheme="${appAuthRedirectScheme}"
-                    android:host="endurain"
                     android:pathPrefix="/oauth/callback" />
             </intent-filter>
         </activity>

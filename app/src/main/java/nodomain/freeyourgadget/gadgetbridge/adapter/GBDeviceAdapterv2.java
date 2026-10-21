@@ -34,6 +34,7 @@ import android.graphics.ColorMatrix;
 import android.graphics.ColorMatrixColorFilter;
 import android.graphics.drawable.Icon;
 import android.os.Build;
+import android.os.Bundle;
 import android.text.Editable;
 import android.text.InputType;
 import android.text.TextWatcher;
@@ -123,6 +124,10 @@ import nodomain.freeyourgadget.gadgetbridge.util.StringUtils;
 public class GBDeviceAdapterv2 extends ListAdapter<GBDevice, GBDeviceAdapterv2.ViewHolder> {
     private static final Logger LOG = LoggerFactory.getLogger(GBDeviceAdapterv2.class);
 
+    private static final String STATE_EXPANDED_DEVICE = "devices_expanded_device";
+    private static final String STATE_EXPANDED_FOLDER = "devices_expanded_folder";
+    private static final String STATE_REVEALED_CARD_ITEMS = "devices_revealed_card_items";
+
     private final Context context;
     private final GaugeDrawer gaugeDrawer = new GaugeDrawer();
     private List<GBDevice> deviceList;
@@ -141,6 +146,23 @@ public class GBDeviceAdapterv2 extends ListAdapter<GBDevice, GBDeviceAdapterv2.V
         this.deviceList = deviceList;
         rebuildFolders();
         this.deviceActivityMap = deviceMap;
+    }
+
+    public void saveInstanceState(final Bundle outState) {
+        outState.putString(STATE_EXPANDED_DEVICE, expandedDeviceAddress);
+        outState.putString(STATE_EXPANDED_FOLDER, expandedFolderName);
+        outState.putStringArrayList(STATE_REVEALED_CARD_ITEMS, new ArrayList<>(revealedCardItemsAddresses));
+    }
+
+    public void restoreInstanceState(final Bundle savedInstanceState) {
+        expandedDeviceAddress = savedInstanceState.getString(STATE_EXPANDED_DEVICE, "");
+        expandedFolderName = savedInstanceState.getString(STATE_EXPANDED_FOLDER, "");
+        revealedCardItemsAddresses.clear();
+        final ArrayList<String> revealed = savedInstanceState.getStringArrayList(STATE_REVEALED_CARD_ITEMS);
+        if (revealed != null) {
+            revealedCardItemsAddresses.addAll(revealed);
+        }
+        rebuildFolders();
     }
 
     public void rebuildFolders() {
@@ -220,6 +242,7 @@ public class GBDeviceAdapterv2 extends ListAdapter<GBDevice, GBDeviceAdapterv2.V
         holder.container.setVisibility(View.VISIBLE);
         holder.deviceNameLabel.setText(folder.getName());
         holder.infoIcons.setVisibility(View.GONE);
+        holder.quickControls.setVisibility(View.GONE);
         holder.companionHint.setVisibility(View.GONE);
         holder.deviceImageView.setOnLongClickListener(null);
         holder.deviceInfoBox.setVisibility(View.GONE);
@@ -356,10 +379,16 @@ public class GBDeviceAdapterv2 extends ListAdapter<GBDevice, GBDeviceAdapterv2.V
         }
         DeviceCardItemBinder.bind(
             holder.infoIcons,
-            DeviceCardLayout.apply(device, coordinator.getCardItems(device)),
+            DeviceCardLayout.ITEMS.apply(device, coordinator.getCardItems(device)),
             device,
             context,
             hrSampleText
+        );
+        QuickControlBinder.bind(
+            holder.quickControls,
+            DeviceCardLayout.QUICK_CONTROLS.apply(device, coordinator.getQuickControls(device)),
+            device,
+            context
         );
 
         bindCompanionHint(holder, device);
@@ -383,6 +412,12 @@ public class GBDeviceAdapterv2 extends ListAdapter<GBDevice, GBDeviceAdapterv2.V
                 notifyItemChanged(holder.getBindingAdapterPosition());
             });
         }
+        // The card items have a bottom margin. When they are hidden, we need to add a margin to the quick controls.
+        final ViewGroup.MarginLayoutParams quickControlsParams = (ViewGroup.MarginLayoutParams) holder.quickControls.getLayoutParams();
+        quickControlsParams.topMargin = holder.infoIcons.getVisibility() == View.VISIBLE
+            ? 0
+            : context.getResources().getDimensionPixelSize(R.dimen.quick_control_spacing);
+        holder.quickControls.setLayoutParams(quickControlsParams);
         holder.deviceImageView.setOnLongClickListener(v -> {
             DeviceSettingsActivity.start(context, device);
             return true;
@@ -798,6 +833,8 @@ public class GBDeviceAdapterv2 extends ListAdapter<GBDevice, GBDeviceAdapterv2.V
         // dynamically into this container by DeviceCardItemBinder.
         FlexboxLayout infoIcons;
 
+        LinearLayout quickControls;
+
         final LinearLayout companionHint;
         final Button companionHintDismiss;
         final Button companionHintPair;
@@ -832,6 +869,7 @@ public class GBDeviceAdapterv2 extends ListAdapter<GBDevice, GBDeviceAdapterv2.V
             //overflow
             deviceInfoList = view.findViewById(R.id.device_item_infos);
             infoIcons = view.findViewById(R.id.device_info_icons);
+            quickControls = view.findViewById(R.id.device_quick_controls);
 
             companionHint = view.findViewById(R.id.companion_hint);
             companionHintDismiss = view.findViewById(R.id.companion_hint_dismiss);

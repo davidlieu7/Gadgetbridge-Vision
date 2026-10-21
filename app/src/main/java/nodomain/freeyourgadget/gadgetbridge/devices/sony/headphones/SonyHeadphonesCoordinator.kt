@@ -23,6 +23,7 @@ import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSett
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSpecificSettingsCustomizer
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.DeviceSettingsSpec
 import nodomain.freeyourgadget.gadgetbridge.devices.AbstractBLClassicDeviceCoordinator
+import nodomain.freeyourgadget.gadgetbridge.devices.cards.QuickControl
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice
 import nodomain.freeyourgadget.gadgetbridge.model.BatteryConfig
 import nodomain.freeyourgadget.gadgetbridge.service.DeviceSupport
@@ -136,6 +137,9 @@ abstract class SonyHeadphonesCoordinator : AbstractBLClassicDeviceCoordinator() 
 
     override fun getDeviceSettings(device: GBDevice): DeviceSettingsSpec =
         sonyHeadphonesDeviceSettings(device, getCapabilities(device))
+
+    override fun getQuickControls(device: GBDevice): List<QuickControl> =
+        sonyHeadphonesQuickControls(getCapabilities(device))
 
     open val defaultCapabilities: Set<SonyHeadphonesCapabilities>
         get() = mutableSetOf()

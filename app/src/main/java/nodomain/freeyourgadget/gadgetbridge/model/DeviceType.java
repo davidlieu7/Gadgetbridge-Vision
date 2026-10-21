@@ -445,6 +445,7 @@ import nodomain.freeyourgadget.gadgetbridge.devices.igpsport.IGPSportBiNaviCoord
 import nodomain.freeyourgadget.gadgetbridge.devices.igpsport.IGPSportiGS630Coordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.igpsport.IGPSportiGS630SCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.igpsport.IGPSportiGS800Coordinator;
+import nodomain.freeyourgadget.gadgetbridge.devices.innovo.InnovoPulseOximeterCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.itag.ITagCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.jabra.JabraEvolve255Coordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.jabra.JabraEvolve265Coordinator;
@@ -469,6 +470,7 @@ import nodomain.freeyourgadget.gadgetbridge.devices.mijia_lywsd.MijiaMhoC303Coor
 import nodomain.freeyourgadget.gadgetbridge.devices.mijia_lywsd.MijiaXmwsdj04Coordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.miscale.MiCompositionScaleCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.miscale.MiSmartScaleCoordinator;
+import nodomain.freeyourgadget.gadgetbridge.devices.ninebot.NinebotScooterCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.onebyone.OneByoneScaleCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.moondrop.MoondropSpaceTravel2Coordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.moondrop.MoondropSpaceTravel2UltraCoordinator;
@@ -1198,6 +1200,7 @@ public enum DeviceType {
     REALME_BUDS_AIR_6_PRO(RealmeBudsAir6ProCoordinator.class),
     SOFLOW_SO6(SoFlowCoordinator.class),
     XIAOMI_SCOOTER_5_MAX(XiaomiScooter5MaxCoordinator.class),
+    NINEBOT_KICKSCOOTER(NinebotScooterCoordinator.class),
     XIAOMI_HIPEE_P1(XiaomiHipeeP1Coordinator.class),
     WITHINGS_STEEL_HR(WithingsSteelHRDeviceCoordinator.class),
     SONY_WENA_3(SonyWena3Coordinator.class),
@@ -1289,6 +1292,7 @@ public enum DeviceType {
     CARDO_LS24X(Ls24xDeviceCoordinator.class),
     F8SCALE(F8ScaleCoordinator.class),
     EIGHTBITDO_MICRO(EightBitDoMicroCoordinator.class),
+    INNOVO_IP900BP_B(InnovoPulseOximeterCoordinator.class),
     TEST(TestDeviceCoordinator.class);
 
     private DeviceCoordinator coordinator;

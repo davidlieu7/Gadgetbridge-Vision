@@ -39,17 +39,10 @@ fun sonyHeadphonesDeviceSettings(
     if (capabilities.contains(SonyHeadphonesCapabilities.AmbientSoundControl) ||
         capabilities.contains(SonyHeadphonesCapabilities.AmbientSoundControl2)
     ) {
-        val ambientSoundDefault = if (capabilities.contains(SonyHeadphonesCapabilities.NoNoiseCancelling))
-            AmbientSoundControl.Mode.AMBIENT_SOUND
-        else
-            AmbientSoundControl.Mode.NOISE_CANCELLING
+        val ambientSoundDefault = sonyDefaultAmbientSoundMode(capabilities)
+        val ambientSoundModes = sonyAmbientSoundModes(capabilities)
 
-        val isAmbientSoundMode: (Prefs) -> Boolean = { prefs ->
-            prefs.getString(
-                DeviceSettingsPreferenceConst.PREF_SONY_AMBIENT_SOUND_CONTROL,
-                ambientSoundDefault.name.lowercase()
-            ).equals("ambient_sound", ignoreCase = true)
-        }
+        val isAmbientSoundMode: (Prefs) -> Boolean = { prefs -> sonyIsAmbientSoundMode(capabilities, prefs) }
 
         category(
             key = "pref_header_sony_ambient_sound_control",
@@ -60,17 +53,7 @@ fun sonyHeadphonesDeviceSettings(
                 title = R.string.sony_ambient_sound,
                 icon = R.drawable.ic_hearing,
                 defaultValue = ambientSoundDefault,
-                filter = { mode ->
-                    when {
-                        capabilities.contains(SonyHeadphonesCapabilities.NoNoiseCancelling) ->
-                            mode != AmbientSoundControl.Mode.NOISE_CANCELLING && mode != AmbientSoundControl.Mode.WIND_NOISE_REDUCTION
-
-                        !capabilities.contains(SonyHeadphonesCapabilities.WindNoiseReduction) ->
-                            mode != AmbientSoundControl.Mode.WIND_NOISE_REDUCTION
-
-                        else -> true
-                    }
-                },
+                filter = { mode -> mode in ambientSoundModes },
             )
             seekbar(
                 key = DeviceSettingsPreferenceConst.PREF_SONY_AMBIENT_SOUND_LEVEL,
@@ -115,7 +98,8 @@ fun sonyHeadphonesDeviceSettings(
                                 .setMessage(R.string.sony_anc_optimize_confirmation_description)
                                 .setIcon(R.drawable.ic_hearing)
                                 .setPositiveButton(R.string.start) { _, _ ->
-                                    GBApplication.deviceService(device).onSendConfiguration(DeviceSettingsPreferenceConst.PREF_SONY_NOISE_OPTIMIZER_START)
+                                    GBApplication.deviceService(device)
+                                        .onSendConfiguration(DeviceSettingsPreferenceConst.PREF_SONY_NOISE_OPTIMIZER_START)
 
                                     val density = context.resources.displayMetrics.density
                                     val pad = (16 * density).toInt()
@@ -138,7 +122,8 @@ fun sonyHeadphonesDeviceSettings(
                                             d.dismiss()
                                             ancOptimizerDialog = null
                                             ancOptimizerMessageView = null
-                                            GBApplication.deviceService(device).onSendConfiguration(DeviceSettingsPreferenceConst.PREF_SONY_NOISE_OPTIMIZER_CANCEL)
+                                            GBApplication.deviceService(device)
+                                                .onSendConfiguration(DeviceSettingsPreferenceConst.PREF_SONY_NOISE_OPTIMIZER_CANCEL)
                                         }
                                         .show()
                                 }
@@ -255,12 +240,7 @@ fun sonyHeadphonesDeviceSettings(
         // between user toggling HD and the next reconnect.
         val audioSettingsVisibleWhen: ((Prefs) -> Boolean)? =
             if (capabilities.contains(SonyHeadphonesCapabilities.AudioSettingsOnlyOnSbcCodec)) {
-                { prefs ->
-                    "sbc".equals(
-                        prefs.getString(DeviceSettingsPreferenceConst.PREF_SONY_AUDIO_CODEC, "sbc"),
-                        ignoreCase = true
-                    )
-                }
+                { prefs -> sonyAudioSettingsVisible(capabilities, prefs) }
             } else {
                 null
             }
@@ -654,3 +634,32 @@ fun sonyHeadphonesDeviceSettings(
         R.xml.devicesettings_sony_headphones_device_info,
     )
 }
+
+internal fun sonyDefaultAmbientSoundMode(capabilities: Set<SonyHeadphonesCapabilities>): AmbientSoundControl.Mode =
+    if (capabilities.contains(SonyHeadphonesCapabilities.NoNoiseCancelling))
+        AmbientSoundControl.Mode.AMBIENT_SOUND
+    else
+        AmbientSoundControl.Mode.NOISE_CANCELLING
+
+internal fun sonyAmbientSoundModes(capabilities: Set<SonyHeadphonesCapabilities>): List<AmbientSoundControl.Mode> =
+    AmbientSoundControl.Mode.entries.filter { mode ->
+        when {
+            capabilities.contains(SonyHeadphonesCapabilities.NoNoiseCancelling) ->
+                mode != AmbientSoundControl.Mode.NOISE_CANCELLING && mode != AmbientSoundControl.Mode.WIND_NOISE_REDUCTION
+
+            !capabilities.contains(SonyHeadphonesCapabilities.WindNoiseReduction) ->
+                mode != AmbientSoundControl.Mode.WIND_NOISE_REDUCTION
+
+            else -> true
+        }
+    }
+
+internal fun sonyIsAmbientSoundMode(capabilities: Set<SonyHeadphonesCapabilities>, prefs: Prefs): Boolean =
+    prefs.getString(
+        DeviceSettingsPreferenceConst.PREF_SONY_AMBIENT_SOUND_CONTROL,
+        sonyDefaultAmbientSoundMode(capabilities).name.lowercase()
+    ).equals(AmbientSoundControl.Mode.AMBIENT_SOUND.name, ignoreCase = true)
+
+internal fun sonyAudioSettingsVisible(capabilities: Set<SonyHeadphonesCapabilities>, prefs: Prefs): Boolean =
+    !capabilities.contains(SonyHeadphonesCapabilities.AudioSettingsOnlyOnSbcCodec) ||
+        "sbc".equals(prefs.getString(DeviceSettingsPreferenceConst.PREF_SONY_AUDIO_CODEC, "sbc"), ignoreCase = true)

@@ -24,6 +24,8 @@ import android.os.Handler
 import android.os.Looper
 import android.text.InputFilter
 import android.text.InputFilter.LengthFilter
+import android.widget.SeekBar
+import android.widget.TextView
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.preference.EditTextPreference
 import androidx.preference.ListPreference
@@ -31,6 +33,7 @@ import androidx.preference.MultiSelectListPreference
 import androidx.preference.Preference
 import androidx.preference.PreferenceCategory
 import androidx.preference.PreferenceGroup
+import androidx.preference.PreferenceViewHolder
 import androidx.preference.SeekBarPreference
 import androidx.preference.SwitchPreferenceCompat
 import com.google.android.material.dialog.MaterialAlertDialogBuilder
@@ -423,7 +426,49 @@ object DeviceSettingRenderer {
                 }
 
                 is SeekBarSetting -> {
-                    object: SeekBarPreference(context){
+                    fun snap(raw: Int): Int {
+                        if (setting.step <= 1) return raw
+                        val increments = ((raw.toLong() - setting.min).toDouble() / setting.step).roundToInt()
+                        return (setting.min.toLong() + increments.toLong() * setting.step)
+                            .coerceIn(setting.min.toLong(), setting.max.toLong()).toInt()
+                    }
+
+                    object : SeekBarPreference(context) {
+                        private var trackingTouch = false
+
+                        override fun onBindViewHolder(holder: PreferenceViewHolder) {
+                            super.onBindViewHolder(holder)
+                            if (setting.step <= 1) return
+                            val seekBar = holder.findViewById(androidx.preference.R.id.seekbar) as? SeekBar ?: return
+                            val valueView = holder.findViewById(androidx.preference.R.id.seekbar_value) as? TextView
+                            // AndroidX's increment applies only to keys, so snap touch progress too.
+                            seekBar.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+                                private fun updateProgress(seekBar: SeekBar, commit: Boolean) {
+                                    val snapped = snap(min + seekBar.progress)
+                                    if (commit && snapped != value && callChangeListener(snapped)) {
+                                        value = snapped
+                                    }
+                                    val displayed = if (commit) value else snapped
+                                    seekBar.progress = displayed - min
+                                    valueView?.text = displayed.toString()
+                                }
+
+                                override fun onProgressChanged(seekBar: SeekBar, progress: Int, fromUser: Boolean) {
+                                    // Ignore recursive callbacks from snapping or restoring the progress.
+                                    if (fromUser) updateProgress(seekBar, !trackingTouch || updatesContinuously)
+                                }
+
+                                override fun onStartTrackingTouch(seekBar: SeekBar) {
+                                    trackingTouch = true
+                                }
+
+                                override fun onStopTrackingTouch(seekBar: SeekBar) {
+                                    trackingTouch = false
+                                    if (min + seekBar.progress != value) updateProgress(seekBar, true)
+                                }
+                            })
+                        }
+
                         override fun onSetInitialValue(defaultValue: Any?) {
                             super.onSetInitialValue(defaultValue)
                             if (setting.valueFormat != 0) {
@@ -443,12 +488,7 @@ object DeviceSettingRenderer {
 
                         setOnPreferenceChangeListener { pref, newValue ->
                             val raw = newValue as Int
-                            val step = setting.step
-                            val snapped = if (step > 1) {
-                                setting.min + ((raw - setting.min).toDouble() / step).roundToInt() * step
-                            } else {
-                                raw
-                            }
+                            val snapped = snap(raw)
 
                             if (setting.valueFormat != 0) {
                                 summary = context.getString(setting.valueFormat, snapped * setting.scale)

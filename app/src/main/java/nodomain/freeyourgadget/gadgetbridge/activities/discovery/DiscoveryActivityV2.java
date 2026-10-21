@@ -29,8 +29,6 @@ import android.bluetooth.le.ScanRecord;
 import android.bluetooth.le.ScanResult;
 import android.bluetooth.le.ScanSettings;
 import android.content.BroadcastReceiver;
-import android.content.ClipData;
-import android.content.ClipboardManager;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
@@ -49,7 +47,6 @@ import android.os.Parcelable;
 import android.provider.Settings;
 import android.text.SpannableStringBuilder;
 import android.text.Spanned;
-import android.text.TextUtils;
 import android.text.style.StyleSpan;
 import android.util.SparseArray;
 import android.view.Menu;
@@ -324,7 +321,7 @@ public class DiscoveryActivityV2 extends AbstractGBActivity implements AdapterVi
                     final Boolean isConnected = (Boolean) isConnectedMethod.invoke(device);
                     if (isConnected != null && isConnected) {
                         LOG.debug("Pre-adding already bonded device {}", device.getAddress());
-                        deviceFoundProcessor.scheduleProcessing(new GBScanEvent(device, (short) -1, device.getUuids(), null));
+                        deviceFoundProcessor.scheduleProcessing(new GBScanEvent(device, (short) -1, device.getUuids(), null, null));
                     }
                 } catch (final Exception e) {
                     LOG.error("Failed to check whether {} is connected", device.getAddress());
@@ -686,13 +683,13 @@ public class DiscoveryActivityV2 extends AbstractGBActivity implements AdapterVi
     private void preparePair(final GBDeviceCandidate deviceCandidate) {
         final DeviceType deviceType = DeviceHelper.getInstance().resolveDeviceType(deviceCandidate);
 
+        stopDiscovery();
+
         if (!deviceType.isSupported()) {
             LOG.warn("Unsupported device candidate {}", deviceCandidate);
-            copyDetailsToClipboard(deviceCandidate);
+            startActivity(DeviceCandidateDetailsActivity.newIntent(this, deviceCandidate));
             return;
         }
-
-        stopDiscovery();
 
         final DeviceCoordinator coordinator = deviceType.getDeviceCoordinator();
         LOG.info("Using device candidate {} with coordinator {}", deviceCandidate, coordinator.getClass());
@@ -729,24 +726,6 @@ public class DiscoveryActivityV2 extends AbstractGBActivity implements AdapterVi
         startActivityForResult(intent, CHILD_RESULT);
     }
 
-    private void copyDetailsToClipboard(final GBDeviceCandidate deviceCandidate) {
-        final List<String> deviceDetails = new ArrayList<>();
-        deviceDetails.add(deviceCandidate.getName());
-        deviceDetails.add(deviceCandidate.getMacAddress());
-        try {
-            for (final ParcelUuid uuid : deviceCandidate.getServiceUuids()) {
-                deviceDetails.add(uuid.getUuid().toString());
-            }
-        } catch (final Exception e) {
-            LOG.error("Error collecting device uuids", e);
-        }
-        final String clipboardData = TextUtils.join(", ", deviceDetails);
-        final ClipboardManager clipboard = (ClipboardManager) getSystemService(Context.CLIPBOARD_SERVICE);
-        final ClipData clip = ClipData.newPlainText(deviceCandidate.getName(), clipboardData);
-        clipboard.setPrimaryClip(clip);
-        toast(this, "Device details copied to clipboard", Toast.LENGTH_SHORT, GB.INFO);
-    }
-
     @Override
     public boolean onItemLongClick(final AdapterView<?> adapterView, final View view, final int position, final long id) {
         stopDiscovery();
@@ -757,7 +736,18 @@ public class DiscoveryActivityV2 extends AbstractGBActivity implements AdapterVi
             return true;
         }
 
-        final List<RunnableListIconItem> longClickItems = new ArrayList<>(3);
+        showCandidateOptions(deviceCandidate);
+        return true;
+    }
+
+    private void showCandidateOptions(final GBDeviceCandidate deviceCandidate) {
+        final List<RunnableListIconItem> longClickItems = new ArrayList<>(4);
+
+        longClickItems.add(new RunnableListIconItem(
+                getString(R.string.discovery_show_details),
+                R.drawable.ic_info,
+                () -> startActivity(DeviceCandidateDetailsActivity.newIntent(this, deviceCandidate))
+        ));
 
         final DeviceType deviceType = DeviceHelper.getInstance().resolveDeviceType(deviceCandidate);
 
@@ -802,11 +792,6 @@ public class DiscoveryActivityV2 extends AbstractGBActivity implements AdapterVi
             ));
         }
 
-        if (longClickItems.isEmpty()) {
-            LOG.error("Device candidate long clicked, but there are no options");
-            return true;
-        }
-
         final SimpleIconListAdapter adapter = new SimpleIconListAdapter(this, longClickItems);
 
         new MaterialAlertDialogBuilder(this)
@@ -816,8 +801,6 @@ public class DiscoveryActivityV2 extends AbstractGBActivity implements AdapterVi
                 })
                 .create()
                 .show();
-
-        return true;
     }
 
     private void showUnsupportedDeviceDialog(final GBDeviceCandidate deviceCandidate) {
@@ -898,7 +881,7 @@ public class DiscoveryActivityV2 extends AbstractGBActivity implements AdapterVi
                     }
                     LOG.debug("ACTION_FOUND {}", device.getAddress());
                     final short rssi = intent.getShortExtra(BluetoothDevice.EXTRA_RSSI, GBDevice.RSSI_UNKNOWN);
-                    deviceFoundProcessor.scheduleProcessing(new GBScanEvent(device, rssi, device.getUuids(), null));
+                    deviceFoundProcessor.scheduleProcessing(new GBScanEvent(device, rssi, device.getUuids(), null, null));
                     break;
                 }
                 case BluetoothDevice.ACTION_UUID: {
@@ -911,7 +894,7 @@ public class DiscoveryActivityV2 extends AbstractGBActivity implements AdapterVi
                     final short rssi = intent.getShortExtra(BluetoothDevice.EXTRA_RSSI, GBDevice.RSSI_UNKNOWN);
                     final Parcelable[] uuids = intent.getParcelableArrayExtra(BluetoothDevice.EXTRA_UUID);
                     final ParcelUuid[] uuids2 = AndroidUtils.toParcelUuids(uuids);
-                    deviceFoundProcessor.scheduleProcessing(new GBScanEvent(device, rssi, uuids2, null));
+                    deviceFoundProcessor.scheduleProcessing(new GBScanEvent(device, rssi, uuids2, null, null));
                     break;
                 }
             }
@@ -945,7 +928,7 @@ public class DiscoveryActivityV2 extends AbstractGBActivity implements AdapterVi
                         rssi,
                         uuids != null ? uuids.length : "null"
                 );
-                deviceFoundProcessor.scheduleProcessing(new GBScanEvent(device, rssi, uuids, manufacturerSpecificData));
+                deviceFoundProcessor.scheduleProcessing(new GBScanEvent(device, rssi, uuids, manufacturerSpecificData, scanRecord.getBytes()));
             } catch (final Exception e) {
                 LOG.warn("Error handling BLE scan result", e);
             }
