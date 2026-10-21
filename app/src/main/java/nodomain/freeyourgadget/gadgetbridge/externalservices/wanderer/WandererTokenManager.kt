@@ -17,7 +17,6 @@
 package nodomain.freeyourgadget.gadgetbridge.externalservices.wanderer
 
 import android.content.Context
-import androidx.core.content.edit
 import nodomain.freeyourgadget.gadgetbridge.externalservices.ApiTokenStore
 
 class WandererTokenManager(context: Context) : ApiTokenStore(context, "wanderer_tokens") {
