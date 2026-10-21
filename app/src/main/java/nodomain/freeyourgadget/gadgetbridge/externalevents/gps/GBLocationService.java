@@ -18,6 +18,7 @@ package nodomain.freeyourgadget.gadgetbridge.externalevents.gps;
 
 import android.app.PendingIntent;
 import android.content.BroadcastReceiver;
+import androidx.annotation.Nullable;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
@@ -43,6 +44,7 @@ import nodomain.freeyourgadget.gadgetbridge.GBApplication;
 import nodomain.freeyourgadget.gadgetbridge.R;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
 import nodomain.freeyourgadget.gadgetbridge.util.GB;
+import nodomain.freeyourgadget.gadgetbridge.externalevents.gps.providers.PhoneLocationProvider;
 
 
 /**
@@ -58,6 +60,7 @@ public class GBLocationService extends BroadcastReceiver {
 
     public static final String EXTRA_TYPE = "extra_type";
     public static final String EXTRA_INTERVAL = "extra_interval";
+    public static final String EXTRA_DELIVER_LAST_KNOWN = "extra_deliver_last_known";
 
     private final Context context;
     // A device runs at most one provider of each type, so several can feed it at once (GPS and network).
@@ -101,6 +104,18 @@ public class GBLocationService extends BroadcastReceiver {
 
                 final GBLocationListener locationListener = new GBLocationListener(device);
                 final GBLocationProvider locationProvider = providerType.newInstance(context, locationListener);
+                if (locationProvider == null) {
+                    LOG.debug("Location provider {} is not available on this device, skipping", providerType);
+                    if (deviceProviders.isEmpty()) {
+                        providersByDevice.remove(device);
+                    }
+                    updateNotification();
+                    return;
+                }
+                if (locationProvider instanceof PhoneLocationProvider) {
+                    ((PhoneLocationProvider) locationProvider).setDeliverLastKnown(
+                            intent.getBooleanExtra(EXTRA_DELIVER_LAST_KNOWN, false));
+                }
                 try {
                     locationProvider.start(updateInterval);
                 } catch (final Exception e) {
@@ -168,10 +183,19 @@ public class GBLocationService extends BroadcastReceiver {
                              @NonNull final GBDevice device,
                              final GBLocationProviderType providerType,
                              final int updateInterval) {
+        start(context, device, providerType, updateInterval, false);
+    }
+
+    public static void start(final Context context,
+                             @NonNull final GBDevice device,
+                             final GBLocationProviderType providerType,
+                             final int updateInterval,
+                             final boolean deliverLastKnown) {
         final Intent intent = new Intent(ACTION_START);
         intent.putExtra(GBDevice.EXTRA_DEVICE, device);
         intent.putExtra(EXTRA_TYPE, providerType.name());
         intent.putExtra(EXTRA_INTERVAL, updateInterval);
+        intent.putExtra(EXTRA_DELIVER_LAST_KNOWN, deliverLastKnown);
         LocalBroadcastManager.getInstance(context).sendBroadcast(intent);
     }
 

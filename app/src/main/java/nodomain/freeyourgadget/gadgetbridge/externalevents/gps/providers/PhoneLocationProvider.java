@@ -38,11 +38,17 @@ public class PhoneLocationProvider extends GBLocationProvider {
 
     private final String provider;
 
+    private boolean deliverLastKnown = false;
+
     private static final int INTERVAL_MIN_DISTANCE = 0;
 
     public PhoneLocationProvider(final Context context, final LocationListener locationListener, final String provider) {
         super(context, locationListener);
         this.provider = provider;
+    }
+
+    public void setDeliverLastKnown(final boolean deliverLastKnown) {
+        this.deliverLastKnown = deliverLastKnown;
     }
 
     @Override
@@ -64,8 +70,29 @@ public class PhoneLocationProvider extends GBLocationProvider {
                 Looper.getMainLooper()
         );
 
-        final Location lastKnownLocation = locationManager.getLastKnownLocation(LocationManager.GPS_PROVIDER);
-        LOG.debug("Last known gps location: {}", lastKnownLocation);
+        if (deliverLastKnown) {
+            // Deliver the last known GPS location immediately when it is still fresh, so the
+            // consumer (e.g. a wearable waiting for its first GPS fix) does not have to wait
+            // for the next update. Opt-in, GPS-only: never report a cached network position
+            // as a high-accuracy fix.
+            try {
+                Location lastKnown = null;
+                if (locationManager.isProviderEnabled(LocationManager.GPS_PROVIDER)) {
+                    lastKnown = locationManager.getLastKnownLocation(LocationManager.GPS_PROVIDER);
+                }
+                if (lastKnown != null) {
+                    final long ageMs = System.currentTimeMillis() - lastKnown.getTime();
+                    final boolean fresh = ageMs >= 0 && ageMs <= 30_000L;
+                    final boolean accurate = !lastKnown.hasAccuracy() || lastKnown.getAccuracy() <= 100f;
+                    LOG.debug("Last known location: {} (age={}ms, fresh={}, accurate={})", lastKnown, ageMs, fresh, accurate);
+                    if (fresh && accurate) {
+                        getLocationListener().onLocationChanged(lastKnown);
+                    }
+                }
+            } catch (final Exception e) {
+                LOG.warn("Failed to deliver last known location", e);
+            }
+        }
     }
 
     @Override

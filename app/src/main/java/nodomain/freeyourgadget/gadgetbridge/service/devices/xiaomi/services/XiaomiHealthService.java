@@ -167,6 +167,8 @@ public class XiaomiHealthService extends AbstractXiaomiService {
     private volatile boolean locationRequested = false;
     // The band's current workout asked for location.
     private volatile boolean locationWorkoutOpen = false;
+    private volatile long lastReopenTime = 0L;
+    private volatile int lastOpenSport = -1;
     private final Handler gpsTimeoutHandler = new Handler();
     private final Handler workoutAliveHandler = new Handler();
 
@@ -799,8 +801,23 @@ public class XiaomiHealthService extends AbstractXiaomiService {
             return;
         }
 
+        boolean reopen = false;
+        if (locationWorkoutOpen) {
+            final long now = System.currentTimeMillis();
+            reopen = (workoutOpenWatch.getSport() != lastOpenSport)
+                    || (lastReopenTime == 0L)
+                    || (now - lastReopenTime > 5000L);
+            if (reopen) {
+                lastReopenTime = now;
+                lastOpenSport = workoutOpenWatch.getSport();
+            }
+        }
+
         locationRequested = true;
         locationWorkoutOpen = true;
+        if (reopen) {
+            gpsFixAcquired = false;
+        }
         startLocation();
 
         if (!workoutStarted) {
@@ -829,6 +846,7 @@ public class XiaomiHealthService extends AbstractXiaomiService {
         }
         gpsStarted = true;
         gpsFixAcquired = false;
+        GBLocationService.start(getSupport().getContext(), getSupport().getDevice(), GBLocationProviderType.FUSED, 500, true);
         GBLocationService.start(getSupport().getContext(), getSupport().getDevice(), GBLocationProviderType.GPS, 1000);
     }
 
@@ -840,6 +858,8 @@ public class XiaomiHealthService extends AbstractXiaomiService {
         gpsFixAcquired = false;
         workoutStarted = false;
         workoutLiveStatsSeen = false;
+        lastReopenTime = 0L;
+        lastOpenSport = -1;
         if (wasStarted) {
             GBLocationService.stop(getSupport().getContext(), getSupport().getDevice());
         }

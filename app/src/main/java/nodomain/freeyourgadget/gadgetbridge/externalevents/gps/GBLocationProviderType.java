@@ -16,8 +16,10 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 package nodomain.freeyourgadget.gadgetbridge.externalevents.gps;
 
+import androidx.annotation.Nullable;
 import android.content.Context;
 import android.location.LocationManager;
+import android.os.Build;
 
 import nodomain.freeyourgadget.gadgetbridge.externalevents.gps.providers.MockLocationProvider;
 import nodomain.freeyourgadget.gadgetbridge.externalevents.gps.providers.PhoneLocationProvider;
@@ -27,6 +29,33 @@ public enum GBLocationProviderType {
         @Override
         public GBLocationProvider newInstance(final Context context, final GBLocationListener locationListener) {
             return new PhoneLocationProvider(context, locationListener, LocationManager.GPS_PROVIDER);
+        }
+    },
+    FUSED {
+        @Override
+        @Nullable
+        public GBLocationProvider newInstance(final Context context, final GBLocationListener locationListener) {
+            final LocationManager locationManager = (LocationManager) context.getSystemService(Context.LOCATION_SERVICE);
+            if (locationManager == null) {
+                return null;
+            }
+            // "fused" may be provided by Google Play Services or, on API 31+, by the AOSP
+            // LocationManager itself (LocationManager.FUSED_PROVIDER). Fall back to NETWORK.
+            // Do NOT fall back to GPS here: handleWorkoutOpen starts GPS separately, so a
+            // GPS fallback would deliver every fix twice.
+            String provider = null;
+            if (locationManager.getAllProviders().contains("fused")) {
+                provider = "fused";
+            } else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S
+                    && locationManager.getAllProviders().contains(LocationManager.FUSED_PROVIDER)) {
+                provider = LocationManager.FUSED_PROVIDER;
+            } else if (locationManager.getAllProviders().contains(LocationManager.NETWORK_PROVIDER)) {
+                provider = LocationManager.NETWORK_PROVIDER;
+            }
+            if (provider == null) {
+                return null;
+            }
+            return new PhoneLocationProvider(context, locationListener, provider);
         }
     },
     NETWORK {
@@ -43,5 +72,6 @@ public enum GBLocationProviderType {
     },
     ;
 
+    @Nullable
     public abstract GBLocationProvider newInstance(final Context context, final GBLocationListener locationListener);
 }
