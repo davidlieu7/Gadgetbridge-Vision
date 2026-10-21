@@ -7,11 +7,9 @@ import nodomain.freeyourgadget.gadgetbridge.entities.MiBandActivitySample
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice
 import nodomain.freeyourgadget.gadgetbridge.model.ActivityKind
 import nodomain.freeyourgadget.gadgetbridge.model.SleepSession
-import nodomain.freeyourgadget.gadgetbridge.model.SleepStage
-import nodomain.freeyourgadget.gadgetbridge.util.sleep.EstimatedStage
+import nodomain.freeyourgadget.gadgetbridge.util.sleep.EstimatedSleepSessions
 import nodomain.freeyourgadget.gadgetbridge.util.sleep.SleepMinute
 import nodomain.freeyourgadget.gadgetbridge.util.sleep.SleepMinuteKind
-import nodomain.freeyourgadget.gadgetbridge.util.sleep.SleepStageEstimator
 import java.time.Instant
 
 class HuamiEstimatedSleepSessionProvider(
@@ -20,23 +18,14 @@ class HuamiEstimatedSleepSessionProvider(
 ) : SleepSessionProvider {
     override fun getSleepSessions(tsFrom: Int, tsTo: Int): List<SleepSession> {
         val samples = MiBand2SampleProvider(device, session).getDeviceSamples(
-            tsFrom - LOOK_BACK_SECONDS,
-            tsTo + LOOK_AHEAD_SECONDS
+            tsFrom - EstimatedSleepSessions.LOOK_BACK_SECONDS,
+            tsTo + EstimatedSleepSessions.LOOK_AHEAD_SECONDS
         )
 
-        return SleepStageEstimator.estimateAll(samples.map(::toMinute))
-            .filter { it.onset.epochSecond in tsFrom..<tsTo }
-            .map { estimate ->
-                SleepSession(estimate.stages.map {
-                    SleepStage(toActivityKind(it.stage), it.start.toEpochMilli(), it.end.toEpochMilli())
-                })
-            }
+        return EstimatedSleepSessions.of(samples.map(::toMinute), tsFrom, tsTo, ActivityKind.SLEEP_ANY)
     }
 
     companion object {
-        private const val LOOK_BACK_SECONDS: Int = 12 * 60 * 60
-        private const val LOOK_AHEAD_SECONDS: Int = 24 * 60 * 60
-
         /**
          * Divisor to convert intensity to movement, matched against 3 nights from Amazfit Bip samples.
          */
@@ -53,14 +42,6 @@ class HuamiEstimatedSleepSessionProvider(
                     sample.heartRate.takeIf { it in 1..254 }?.toFloat()
                 )
             }
-        }
-
-        private fun toActivityKind(stage: EstimatedStage): ActivityKind = when (stage) {
-            EstimatedStage.AWAKE -> ActivityKind.AWAKE_SLEEP
-            EstimatedStage.LIGHT -> ActivityKind.LIGHT_SLEEP
-            EstimatedStage.DEEP -> ActivityKind.DEEP_SLEEP
-            EstimatedStage.REM -> ActivityKind.REM_SLEEP
-            EstimatedStage.UNKNOWN -> ActivityKind.SLEEP_ANY
         }
     }
 }
