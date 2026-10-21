@@ -51,8 +51,7 @@ public class PinecilDeviceSupport extends AbstractBTLESingleDeviceSupport {
 
     @Override
     protected TransactionBuilder initializeDevice(TransactionBuilder builder) {
-        // mark the device as initializing
-        builder.add(new SetDeviceStateAction(getDevice(), GBDevice.State.INITIALIZING, getContext()));
+        builder.setDeviceState(GBDevice.State.INITIALIZING);
 
         // ... custom initialization logic ...
 
@@ -61,9 +60,6 @@ public class PinecilDeviceSupport extends AbstractBTLESingleDeviceSupport {
         // Error executing 'the bind value at index 2 is null'java.lang.IllegalArgumentException: the bind value at index 2 is null
         getDevice().setFirmwareVersion("N/A");
         getDevice().setFirmwareVersion2("N/A");
-
-        // mark the device as initialized
-        builder.add(new SetDeviceStateAction(getDevice(), GBDevice.State.INITIALIZED, getContext()));
 
         // request firmware version
         builder.read(getCharacteristic(PinecilConstants.UUID_CHARACTERISTIC_BULK_BUILD));
@@ -74,6 +70,8 @@ public class PinecilDeviceSupport extends AbstractBTLESingleDeviceSupport {
         builder.read(getCharacteristic(PinecilConstants.UUID_CHARACTERISTIC_LIVE_LIVE_TEMP));
         builder.read(getCharacteristic(PinecilConstants.UUID_CHARACTERISTIC_BULK_LIVE_DATA));
         builder.read(getCharacteristic(PinecilConstants.UUID_CHARACTERISTIC_SETTINGS_VALUE_1));
+
+        builder.setDeviceState(GBDevice.State.INITIALIZED);
 
         return builder;
     }
