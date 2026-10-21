@@ -7,6 +7,7 @@ import org.slf4j.LoggerFactory;
 
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsPreferenceConst;
 import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEvent;
+import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreEarbudsCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreEarbudsCoordinator.TapFunction;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.soundcore.SoundcoreEqualizer;
@@ -52,19 +53,6 @@ public class SoundcoreSportX20Protocol extends SoundcoreProtocolImplV1 {
     private static final int DEVICE_INFO_AUTO_POWER_OFF_OFFSET = 129;
     // Expected full length of CMD_GET_DEVICE_INFO payload as observed from the device.
     private static final int DEVICE_INFO_MIN_EXPECTED_LENGTH = 132; // 143
-
-    private static final int EQ_BANDS = 8;
-
-    public static final String[] EQUALIZER_PREFS_VALUE = new String[]{
-            DeviceSettingsPreferenceConst.PREF_SOUNDCORE_EQUALIZER_BAND1_VALUE,
-            DeviceSettingsPreferenceConst.PREF_SOUNDCORE_EQUALIZER_BAND2_VALUE,
-            DeviceSettingsPreferenceConst.PREF_SOUNDCORE_EQUALIZER_BAND3_VALUE,
-            DeviceSettingsPreferenceConst.PREF_SOUNDCORE_EQUALIZER_BAND4_VALUE,
-            DeviceSettingsPreferenceConst.PREF_SOUNDCORE_EQUALIZER_BAND5_VALUE,
-            DeviceSettingsPreferenceConst.PREF_SOUNDCORE_EQUALIZER_BAND6_VALUE,
-            DeviceSettingsPreferenceConst.PREF_SOUNDCORE_EQUALIZER_BAND7_VALUE,
-            DeviceSettingsPreferenceConst.PREF_SOUNDCORE_EQUALIZER_BAND8_VALUE,
-    };
 
     public SoundcoreSportX20Protocol(final GBDevice device) {
         super(device);
@@ -220,9 +208,10 @@ public class SoundcoreSportX20Protocol extends SoundcoreProtocolImplV1 {
             }
         }
 
-        final int[] bands = new int[EQ_BANDS];
-        for (int i = 0; i < EQ_BANDS; i++) {
-            bands[i] = clamp(prefs.getInt(EQUALIZER_PREFS_VALUE[i], 0), -6, 6);
+        final SoundcoreEarbudsCoordinator coordinator = (SoundcoreEarbudsCoordinator) getDevice().getDeviceCoordinator();
+        final int[] bands = new int[coordinator.getSupportedEqualizerBands().length];
+        for (int i = 0; i < bands.length; i++) {
+            bands[i] = clamp(prefs.getInt(SoundcoreEqualizer.EQUALIZER_PREFS_VALUE[i], 0), -6, 6);
         }
 
         return encodeCommand(CMD_SET_EQUALIZER, SoundcoreEqualizer.buildCustomPayload(bands));
@@ -244,9 +233,10 @@ public class SoundcoreSportX20Protocol extends SoundcoreProtocolImplV1 {
         editor.putString(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_EQUALIZER_PRESET,
                 String.valueOf(equalizer.getIndex()));
 
+        final SoundcoreEarbudsCoordinator coordinator = (SoundcoreEarbudsCoordinator) getDevice().getDeviceCoordinator();
         final int[] bands = equalizer.getBands();
-        for (int i = 0; i < EQ_BANDS; i++) {
-            editor.putInt(EQUALIZER_PREFS_VALUE[i], bands[i]);
+        for (int i = 0; i < coordinator.getSupportedEqualizerBands().length; i++) {
+            editor.putInt(SoundcoreEqualizer.EQUALIZER_PREFS_VALUE[i], bands[i]);
         }
         editor.apply();
     }
