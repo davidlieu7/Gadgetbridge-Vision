@@ -35,6 +35,8 @@ import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
 import nodomain.freeyourgadget.gadgetbridge.model.FindDeviceTarget;
 import nodomain.freeyourgadget.gadgetbridge.model.BatteryState;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.soundcore.AbstractSoundcoreProtocol;
+import nodomain.freeyourgadget.gadgetbridge.service.devices.soundcore.SoundcoreEqualizer;
+import nodomain.freeyourgadget.gadgetbridge.service.devices.soundcore.SoundcoreEqualizerPresets;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.soundcore.SoundcorePacket;
 import nodomain.freeyourgadget.gadgetbridge.util.GB;
 import nodomain.freeyourgadget.gadgetbridge.util.Prefs;
@@ -156,7 +158,20 @@ public class SoundcoreProtocolImplV1 extends AbstractSoundcoreProtocol {
             case DeviceSettingsPreferenceConst.PREF_SOUNDCORE_BUTTON_BRIGHTNESS:
                 return encodeByteCommand(CMD_SET_BUTTON_BRIGHTNESS, Integer.parseInt(prefs.getString(config, "0")));
             case DeviceSettingsPreferenceConst.PREF_SOUNDCORE_EQUALIZER_PRESET:
-                return encodeByteCommand(CMD_SET_EQUALIZER_PRESET, Integer.parseInt(prefs.getString(config, "0")));
+                // NOTE: This SET_EQUALIZER_PRESET is only sent in older models.
+                // Override in each device implementation to use it.
+                // Otherwise use the new `encodeEqualizer` to send the full payload.
+                // return encodeByteCommand(CMD_SET_EQUALIZER_PRESET, Integer.parseInt(prefs.getString(config, "0")));
+            case DeviceSettingsPreferenceConst.PREF_SOUNDCORE_EQUALIZER_BAND1_VALUE:
+            case DeviceSettingsPreferenceConst.PREF_SOUNDCORE_EQUALIZER_BAND2_VALUE:
+            case DeviceSettingsPreferenceConst.PREF_SOUNDCORE_EQUALIZER_BAND3_VALUE:
+            case DeviceSettingsPreferenceConst.PREF_SOUNDCORE_EQUALIZER_BAND4_VALUE:
+            case DeviceSettingsPreferenceConst.PREF_SOUNDCORE_EQUALIZER_BAND5_VALUE:
+            case DeviceSettingsPreferenceConst.PREF_SOUNDCORE_EQUALIZER_BAND6_VALUE:
+            case DeviceSettingsPreferenceConst.PREF_SOUNDCORE_EQUALIZER_BAND7_VALUE:
+            case DeviceSettingsPreferenceConst.PREF_SOUNDCORE_EQUALIZER_BAND8_VALUE:
+            case DeviceSettingsPreferenceConst.PREF_SOUNDCORE_EQUALIZER_BAND9_VALUE:
+                return encodeEqualizer();
             case DeviceSettingsPreferenceConst.PREF_SOUNDCORE_FIT_TEST:
                 return encodeCommand(CMD_SET_FIT_TEST, new byte[]{0x0a});
             default:
@@ -470,6 +485,11 @@ public class SoundcoreProtocolImplV1 extends AbstractSoundcoreProtocol {
      * Unknown commands are logged here and consumed without emitting device events.
      */
     protected GBDeviceEvent[] decodeCommand(final short command, final byte[] payload) {
+        if (command == CMD_SET_EQUALIZER) {
+            decodeEqualizer(payload);
+            return new GBDeviceEvent[0];
+        }
+
         if (command == CMD_SET_FIT_TEST) {
             if (payload.length >= 2) {
                 decodeFitTestResult(payload);
@@ -480,6 +500,55 @@ public class SoundcoreProtocolImplV1 extends AbstractSoundcoreProtocol {
         LOG.debug("Unknown incoming message - command: {} ({} bytes): {}",
                 command, payload.length, GB.lazyHexdump(payload));
         return new GBDeviceEvent[0];
+    }
+
+    private byte[] encodeEqualizer() {
+        final Prefs prefs = getDevicePrefs();
+        final int preset = Integer.parseInt(prefs.getString(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_EQUALIZER_PRESET, "0"));
+
+        final SoundcoreEqualizer equalizerPreset = SoundcoreEqualizerPresets.fromIndex(preset);
+        if (equalizerPreset != null) {
+            final byte[] presetPayload = equalizerPreset.getPayload();
+            if (presetPayload != null) {
+                return encodeCommand(CMD_SET_EQUALIZER, presetPayload);
+            }
+        }
+
+        final SoundcoreEarbudsCoordinator coordinator = (SoundcoreEarbudsCoordinator) getDevice().getDeviceCoordinator();
+        final int[] bands = new int[coordinator.getSupportedEqualizerBands().length];
+        for (int i = 0; i < bands.length; i++) {
+            bands[i] = clamp(prefs.getInt(SoundcoreEqualizer.EQUALIZER_PREFS_VALUE[i], 0), -6, 6);
+        }
+
+        return encodeCommand(CMD_SET_EQUALIZER, SoundcoreEqualizer.buildCustomPayload(bands));
+    }
+
+    private void decodeEqualizer(final byte[] payload) {
+        if (payload.length < 90) {
+            return;
+        }
+
+        final SoundcoreEqualizer equalizer = SoundcoreEqualizer.fromPayload(payload);
+        if (equalizer != null) {
+            storeEqualizer(equalizer);
+        }
+    }
+
+    protected void storeEqualizer(final SoundcoreEqualizer equalizer) {
+        final SharedPreferences.Editor editor = getDevicePrefs().getPreferences().edit();
+        editor.putString(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_EQUALIZER_PRESET,
+                String.valueOf(equalizer.getIndex()));
+
+        final SoundcoreEarbudsCoordinator coordinator = (SoundcoreEarbudsCoordinator) getDevice().getDeviceCoordinator();
+        final int[] bands = equalizer.getBands();
+        for (int i = 0; i < coordinator.getSupportedEqualizerBands().length; i++) {
+            editor.putInt(SoundcoreEqualizer.EQUALIZER_PREFS_VALUE[i], bands[i]);
+        }
+        editor.apply();
+    }
+
+    private static int clamp(final int value, final int min, final int max) {
+        return Math.max(min, Math.min(max, value));
     }
 
     /**
