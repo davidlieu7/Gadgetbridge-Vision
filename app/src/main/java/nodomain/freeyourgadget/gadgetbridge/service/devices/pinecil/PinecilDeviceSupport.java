@@ -41,8 +41,8 @@ public class PinecilDeviceSupport extends AbstractBTLESingleDeviceSupport {
     public PinecilDeviceSupport() {
         super(LOG);
 
-        addSupportedService(GattService.UUID_SERVICE_GENERIC_ATTRIBUTE);
-        addSupportedService(GattService.UUID_SERVICE_GENERIC_ACCESS);
+        addSupportedService(GattService.SERVICE_GATT.uuid);
+        addSupportedService(GattService.SERVICE_GAP.uuid);
 
         addSupportedService(PinecilConstants.UUID_SERVICE_BULK_DATA);
         addSupportedService(PinecilConstants.UUID_SERVICE_LIVE_DATA);
@@ -69,7 +69,7 @@ public class PinecilDeviceSupport extends AbstractBTLESingleDeviceSupport {
         builder.read(getCharacteristic(PinecilConstants.UUID_CHARACTERISTIC_BULK_BUILD));
 
         // // lines below are just for trying things, will be removed later
-        builder.read(getCharacteristic(GattCharacteristic.UUID_CHARACTERISTIC_DEVICE_NAME));
+        builder.read(getCharacteristic(GattCharacteristic.CHARACTERISTIC_DEVICE_NAME.uuid));
         builder.read(getCharacteristic(PinecilConstants.UUID_CHARACTERISTIC_LIVE_HANDLE_TEMP));
         builder.read(getCharacteristic(PinecilConstants.UUID_CHARACTERISTIC_LIVE_LIVE_TEMP));
         builder.read(getCharacteristic(PinecilConstants.UUID_CHARACTERISTIC_BULK_LIVE_DATA));
@@ -79,15 +79,15 @@ public class PinecilDeviceSupport extends AbstractBTLESingleDeviceSupport {
     }
 
     @Override
-    public boolean onCharacteristicRead(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic, int status) {
+    public boolean onCharacteristicRead(BluetoothGatt gatt, BluetoothGattCharacteristic characteristic, byte[] value, int status) {
         LOG.info("SERVICE: " + characteristic.getService().getUuid());
         LOG.info("STATUS: " + status);
 
         UUID uuid = characteristic.getUuid();
         if (uuid.equals(PinecilConstants.UUID_CHARACTERISTIC_LIVE_HANDLE_TEMP)) {
             LOG.info("HANDLE TEMP: " + characteristic.getFloatValue(BluetoothGattCharacteristic.FORMAT_FLOAT, 0) / 10f + "°C");
-        } else if (uuid.equals(GattCharacteristic.UUID_CHARACTERISTIC_DEVICE_NAME)) {
-            LOG.info("NAME: " + characteristic.getStringValue(0));
+        } else if (uuid.equals(GattCharacteristic.CHARACTERISTIC_DEVICE_NAME.uuid)) {
+            LOG.info("NAME: " + new String(value, java.nio.charset.StandardCharsets.UTF_8));
         } else {
             LOG.info("DATA: " + Arrays.toString(characteristic.getValue()));
         }
