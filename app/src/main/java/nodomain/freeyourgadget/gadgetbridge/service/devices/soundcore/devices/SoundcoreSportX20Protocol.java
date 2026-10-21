@@ -53,7 +53,6 @@ public class SoundcoreSportX20Protocol extends SoundcoreProtocolImplV1 {
     // Expected full length of CMD_GET_DEVICE_INFO payload as observed from the device.
     private static final int DEVICE_INFO_MIN_EXPECTED_LENGTH = 132; // 143
 
-    private static final int CUSTOM_PRESET_ID = Preset.CUSTOM.getIndex();
     private static final int EQ_BANDS = 8;
 
     public static final String[] EQUALIZER_PREFS_VALUE = new String[]{
@@ -66,9 +65,6 @@ public class SoundcoreSportX20Protocol extends SoundcoreProtocolImplV1 {
             DeviceSettingsPreferenceConst.PREF_SOUNDCORE_EQUALIZER_BAND7_VALUE,
             DeviceSettingsPreferenceConst.PREF_SOUNDCORE_EQUALIZER_BAND8_VALUE,
     };
-
-    private static final int[] EQ_TAIL_SCALE = new int[]{5, 3, 4, 4, 4, 4, 4, 6};
-    private static final int EQ_TAIL_DIVISOR = 6;
 
     public SoundcoreSportX20Protocol(final GBDevice device) {
         super(device);
@@ -229,24 +225,12 @@ public class SoundcoreSportX20Protocol extends SoundcoreProtocolImplV1 {
             }
         }
 
-        final int[] rawBands = new int[EQ_BANDS];
-        final int[] tailBands = new int[EQ_BANDS];
-
+        final int[] bands = new int[EQ_BANDS];
         for (int i = 0; i < EQ_BANDS; i++) {
-            final int value = clamp(prefs.getInt(EQUALIZER_PREFS_VALUE[i], 0), -6, 6);
-
-            rawBands[i] = 120 + (value * 10);
-            tailBands[i] = 120 + Math.round((float) (value * EQ_TAIL_SCALE[i]) / EQ_TAIL_DIVISOR);
+            bands[i] = clamp(prefs.getInt(EQUALIZER_PREFS_VALUE[i], 0), -6, 6);
         }
 
-        // 9th band value is +0dB (0x78)
-        final byte[] payload = SoundcoreEqualizerPresets.buildPayload(
-            CUSTOM_PRESET_ID,
-            bandsToHex(rawBands) + "78",
-            bandsToHex(tailBands) + "78"
-        );
-
-        return encodeCommand(CMD_SET_EQUALIZER, payload);
+        return encodeCommand(CMD_SET_EQUALIZER, SoundcoreEqualizerPresets.buildCustomPayload(bands));
     }
 
     private void decodeEqualizer(final byte[] payload) {
@@ -270,21 +254,6 @@ public class SoundcoreSportX20Protocol extends SoundcoreProtocolImplV1 {
         }
 
         editor.apply();
-    }
-
-    private static String bandsToHex(final int[] bands) {
-        final StringBuilder sb = new StringBuilder(bands.length * 2);
-
-        for (final int band : bands) {
-            sb.append(toHexByte(band));
-        }
-
-        return sb.toString();
-    }
-
-    private static String toHexByte(final int value) {
-        final String hex = Integer.toHexString(value & 0xff);
-        return hex.length() < 2 ? "0" + hex : hex;
     }
 
     private static int clamp(final int value, final int min, final int max) {

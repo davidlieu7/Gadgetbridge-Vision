@@ -25,6 +25,9 @@ import nodomain.freeyourgadget.gadgetbridge.R;
 import nodomain.freeyourgadget.gadgetbridge.util.StringUtils;
 
 public final class SoundcoreEqualizerPresets {
+    private static final int[] CUSTOM_TAIL_SCALE = new int[]{5, 3, 4, 4, 4, 4, 4, 6};
+    private static final int CUSTOM_TAIL_DIVISOR = 6;
+
     private static final String PRESET_CHANNEL_SEPARATOR = "00";
     private static final String PRESET_SUFFIX = "0000";
     private static final String PRESET_COMMON_REPEATED_BLOCK = "9fa18a998a8077643c3c";
@@ -124,15 +127,13 @@ public final class SoundcoreEqualizerPresets {
             return buildPayload(index, bands, tails);
         }
 
-        /** Encodes eight or nine signed dB gains, defaulting the ninth to 0 dB. */
+        /** Encodes up to nine signed dB gains, defaulting missing bands to 0 dB. */
         public static byte[] encodeBands(final int[] bands) {
             return encodeValues(bands, 10);
         }
 
         private static int[] normalizeBands(final int[] values) {
-            if (values.length != 8 && values.length != 9) {
-                throw new IllegalArgumentException("Expected eight or nine equalizer bands");
-            }
+            // copyOf fills missing bands with +0 dB (int). We expect at least 8 bands.
             return Arrays.copyOf(values, 9);
         }
 
@@ -160,7 +161,23 @@ public final class SoundcoreEqualizerPresets {
         }
     }
 
-    /** Builds a payload from signed dB gains and signed tail offsets in wire steps. */
+    /** Builds a custom payload from up to nine signed dB gains, padding missing bands with zero. */
+    public static byte[] buildCustomPayload(final int[] bands) {
+        final int[] normalizedBands = Preset.normalizeBands(bands);
+
+        // Preserve the custom tail approximation; named presets use their explicit tails.
+        // The ninth tail has no known coefficient, so it remains neutral.
+        final int[] tails = new int[normalizedBands.length];
+        for (int i = 0; i < CUSTOM_TAIL_SCALE.length; i++) {
+            tails[i] = Math.round((float) (normalizedBands[i] * CUSTOM_TAIL_SCALE[i]) / CUSTOM_TAIL_DIVISOR);
+        }
+        return buildPayload(Preset.CUSTOM.getIndex(), normalizedBands, tails);
+    }
+
+    /**
+     * Builds a payload from up to nine signed dB gains and signed tail offsets in wire steps.
+     * Missing values are padded with zero.
+     */
     public static byte[] buildPayload(final int presetId, final int[] bands, final int[] tails) {
         return buildPayload(presetId,
                 StringUtils.bytesToHex(Preset.encodeBands(bands)),
