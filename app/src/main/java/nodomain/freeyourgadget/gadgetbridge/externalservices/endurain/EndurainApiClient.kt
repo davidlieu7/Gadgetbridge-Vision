@@ -415,8 +415,10 @@ class EndurainApiClient(
      * The `Idempotency-Key` is the file's own fingerprint, so a retry after a lost answer or a job
      * that outlived [JOB_WAIT_MILLIS] is handed back the job the first attempt started rather than
      * a second one. The server keeps the key for as long as it keeps the job, and still answers
-     * with that job after the user deleted its activity. A job naming an activity that is gone is
-     * therefore uploaded again under a key that also names that activity (see [idempotencyKeyFor]).
+     * with that job after the user deleted its activity
+     * (<https://github.com/endurain-project/endurain/issues/843>). A job naming an activity that is
+     * gone is therefore uploaded again under a key that also names that activity (see
+     * [idempotencyKeyFor]).
      */
     private fun uploadThroughJob(file: File, callback: (id: Int?, reason: String?) -> Unit) {
         val fingerprint = sha256Hex(file)
