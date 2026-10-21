@@ -9,8 +9,8 @@ import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSett
 import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEvent;
 import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreEarbudsCoordinator.TapFunction;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
+import nodomain.freeyourgadget.gadgetbridge.service.devices.soundcore.SoundcoreEqualizer;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.soundcore.SoundcoreEqualizerPresets;
-import nodomain.freeyourgadget.gadgetbridge.service.devices.soundcore.SoundcoreEqualizerPresets.Preset;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.soundcore.protocol.impl.v1.SoundcoreProtocolImplV1;
 import nodomain.freeyourgadget.gadgetbridge.util.Prefs;
 import nodomain.freeyourgadget.gadgetbridge.util.StringUtils;
@@ -117,20 +117,15 @@ public class SoundcoreSportX20Protocol extends SoundcoreProtocolImplV1 {
             return;
         }
 
-        // Equalizer preset ID at offset 38 and 8 band values at offsets 40–47.
-        final int presetId = payload[DEVICE_INFO_EQUALIZER_PRESET_OFFSET] & 0xFF;
-        if (Preset.fromIndex(presetId) != null) {
-            LOG.debug("Equalizer preset from device info: {}", presetId);
-            final SharedPreferences.Editor eqEditor = getDevicePrefs().getPreferences().edit();
-            eqEditor.putString(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_EQUALIZER_PRESET, String.valueOf(presetId));
-            for (int i = 0; i < EQ_BANDS; i++) {
-                final int rawBand = payload[DEVICE_INFO_BANDS_OFFSET + i] & 0xFF;
-                final int value = clamp(Math.round((rawBand - 120) / 10f), -6, 6);
-                eqEditor.putInt(EQUALIZER_PREFS_VALUE[i], value);
+        final SoundcoreEqualizer equalizer = SoundcoreEqualizer.fromPayload(
+                payload, DEVICE_INFO_EQUALIZER_PRESET_OFFSET, DEVICE_INFO_BANDS_OFFSET);
+        if (equalizer != null) {
+            if (SoundcoreEqualizerPresets.fromIndex(equalizer.getIndex()) != null) {
+                LOG.debug("Equalizer preset from device info: {}", equalizer.getIndex());
+                storeEqualizer(equalizer);
+            } else {
+                LOG.warn("Unknown equalizer preset id in device info: 0x{}", Integer.toHexString(equalizer.getIndex()));
             }
-            eqEditor.apply();
-        } else {
-            LOG.warn("Unknown equalizer preset id in device info: 0x{}", Integer.toHexString(presetId));
         }
 
         // Button-control functions at offsets 110–115.
@@ -217,7 +212,7 @@ public class SoundcoreSportX20Protocol extends SoundcoreProtocolImplV1 {
         final Prefs prefs = getDevicePrefs();
         final int preset = Integer.parseInt(prefs.getString(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_EQUALIZER_PRESET, "0"));
 
-        final Preset equalizerPreset = Preset.fromIndex(preset);
+        final SoundcoreEqualizer equalizerPreset = SoundcoreEqualizerPresets.fromIndex(preset);
         if (equalizerPreset != null) {
             final byte[] presetPayload = equalizerPreset.getPayload();
             if (presetPayload != null) {
@@ -230,7 +225,7 @@ public class SoundcoreSportX20Protocol extends SoundcoreProtocolImplV1 {
             bands[i] = clamp(prefs.getInt(EQUALIZER_PREFS_VALUE[i], 0), -6, 6);
         }
 
-        return encodeCommand(CMD_SET_EQUALIZER, SoundcoreEqualizerPresets.buildCustomPayload(bands));
+        return encodeCommand(CMD_SET_EQUALIZER, SoundcoreEqualizer.buildCustomPayload(bands));
     }
 
     private void decodeEqualizer(final byte[] payload) {
@@ -238,21 +233,21 @@ public class SoundcoreSportX20Protocol extends SoundcoreProtocolImplV1 {
             return;
         }
 
-        final int preset = Byte.toUnsignedInt(payload[0]);
-        final SharedPreferences prefs = getDevicePrefs().getPreferences();
-        final SharedPreferences.Editor editor = prefs.edit();
-
-        editor.putString(
-                DeviceSettingsPreferenceConst.PREF_SOUNDCORE_EQUALIZER_PRESET,
-                String.valueOf(preset)
-        );
-
-        for (int i = 0; i < EQ_BANDS; i++) {
-            final int rawBand = Byte.toUnsignedInt(payload[4 + i]);
-            final int value = clamp(Math.round((rawBand - 120) / 10f), -6, 6);
-            editor.putInt(EQUALIZER_PREFS_VALUE[i], value);
+        final SoundcoreEqualizer equalizer = SoundcoreEqualizer.fromPayload(payload);
+        if (equalizer != null) {
+            storeEqualizer(equalizer);
         }
+    }
 
+    private void storeEqualizer(final SoundcoreEqualizer equalizer) {
+        final SharedPreferences.Editor editor = getDevicePrefs().getPreferences().edit();
+        editor.putString(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_EQUALIZER_PRESET,
+                String.valueOf(equalizer.getIndex()));
+
+        final int[] bands = equalizer.getBands();
+        for (int i = 0; i < EQ_BANDS; i++) {
+            editor.putInt(EQUALIZER_PREFS_VALUE[i], bands[i]);
+        }
         editor.apply();
     }
 
