@@ -87,6 +87,7 @@ public final class OuraProtocol {
 
     public static final int SWITCH_ALL_DAY_HR = 0x02;
     public static final int SWITCH_ACTIVITY_HR = 0x03;
+    public static final int SWITCH_BLOOD_OXYGEN = 0x04;
     public static final int SWITCH_STEPS = 0x0b;
 
     public static final int FEATURE_OFF = 0x00;

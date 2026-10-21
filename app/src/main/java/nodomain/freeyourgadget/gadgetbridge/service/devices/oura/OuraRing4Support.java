@@ -69,7 +69,7 @@ public class OuraRing4Support extends AbstractBTLESingleDeviceSupport {
     private static final long PENDING_RECORDS_DELAY_MS = 500L;
     private static final int MAX_PENDING_RECORDS_WAITS = 40;
 
-    private static final int[] FEATURES = {SWITCH_ALL_DAY_HR, SWITCH_ACTIVITY_HR, SWITCH_STEPS};
+    private static final int[] FEATURES = {SWITCH_ALL_DAY_HR, SWITCH_ACTIVITY_HR, SWITCH_BLOOD_OXYGEN, SWITCH_STEPS};
 
     private long syncMillis;
     /** The boot time of {@link OuraConstants#PREF_BOOT_MILLIS}; -1 before the set time reply. */
@@ -147,7 +147,8 @@ public class OuraRing4Support extends AbstractBTLESingleDeviceSupport {
             super.onSendConfiguration(config);
             return;
         }
-        final boolean enabled = getDevicePrefs().getBoolean(config, true);
+        // Defaults match devicesettings_oura_health.xml
+        final boolean enabled = getDevicePrefs().getBoolean(config, feature != SWITCH_BLOOD_OXYGEN);
         send("set feature " + feature, extended(EXT_FEATURE_SET, (byte) feature, (byte) (enabled ? FEATURE_ON : FEATURE_OFF)));
     }
 
@@ -156,6 +157,8 @@ public class OuraRing4Support extends AbstractBTLESingleDeviceSupport {
             return SWITCH_ALL_DAY_HR;
         } else if (DeviceSettingsPreferenceConst.PREF_HEARTRATE_ACTIVITY_MONITORING.equals(pref)) {
             return SWITCH_ACTIVITY_HR;
+        } else if (DeviceSettingsPreferenceConst.PREF_SPO2_ALL_DAY_MONITORING.equals(pref)) {
+            return SWITCH_BLOOD_OXYGEN;
         } else if (OuraConstants.PREF_STEPS.equals(pref)) {
             return SWITCH_STEPS;
         }
@@ -168,6 +171,8 @@ public class OuraRing4Support extends AbstractBTLESingleDeviceSupport {
                 return DeviceSettingsPreferenceConst.PREF_HEARTRATE_AUTOMATIC_ENABLE;
             case SWITCH_ACTIVITY_HR:
                 return DeviceSettingsPreferenceConst.PREF_HEARTRATE_ACTIVITY_MONITORING;
+            case SWITCH_BLOOD_OXYGEN:
+                return DeviceSettingsPreferenceConst.PREF_SPO2_ALL_DAY_MONITORING;
             case SWITCH_STEPS:
                 return OuraConstants.PREF_STEPS;
             default:
