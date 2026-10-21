@@ -24,6 +24,7 @@ import android.os.Looper;
 import android.widget.Toast;
 
 import androidx.annotation.Nullable;
+import androidx.annotation.VisibleForTesting;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -69,8 +70,20 @@ public class OuraRing4Support extends AbstractBTLESingleDeviceSupport {
     private static final long PENDING_RECORDS_DELAY_MS = 500L;
     private static final int MAX_PENDING_RECORDS_WAITS = 40;
 
+    /**
+     * Handshake states. Another app connected to the ring shares the link and its notifications,
+     * so its firmware replies, nonces and proof replies arrive here too.
+     */
+    private static final int AUTH_NONE = 0;
+    private static final int AUTH_NONCE_REQUESTED = 1;
+    private static final int AUTH_PROOF_SENT = 2;
+    private static final int AUTH_DONE = 3;
+
     private static final int[] FEATURES = {SWITCH_ALL_DAY_HR, SWITCH_ACTIVITY_HR, SWITCH_BLOOD_OXYGEN, SWITCH_STEPS};
 
+    private int authState = AUTH_NONE;
+    /** Set once the ring answered a request this connection did not send. */
+    private boolean otherAppSeen;
     private long syncMillis;
     /** The boot time of {@link OuraConstants#PREF_BOOT_MILLIS}; -1 before the set time reply. */
     private long bootMillis = -1;
@@ -82,7 +95,8 @@ public class OuraRing4Support extends AbstractBTLESingleDeviceSupport {
     private boolean radioIdle;
     private int historyRequests;
     private long requestCursor;
-    private long firstStoredAfter = -1;
+    /** Record bytes this fetch received, which with the bytes the ring reports left give its progress. */
+    private long fetchedBytes;
     private int pendingRecordsWaits;
     private long pendingRecordsCursor;
     private final Handler timeoutHandler = new Handler(Looper.getMainLooper());
@@ -123,6 +137,8 @@ public class OuraRing4Support extends AbstractBTLESingleDeviceSupport {
             }
         }
         radioIdle = false;
+        authState = AUTH_NONE;
+        otherAppSeen = false;
         // The set time reply confirms the time mapping again
         bootMillis = -1;
         builder.setDeviceState(GBDevice.State.INITIALIZING);
@@ -213,6 +229,11 @@ public class OuraRing4Support extends AbstractBTLESingleDeviceSupport {
         switch (command) {
             case RSP_FIRMWARE:
                 handleFirmware(payload);
+                if (authState != AUTH_NONE) {
+                    unrequested("firmware reply");
+                    break;
+                }
+                authState = AUTH_NONCE_REQUESTED;
                 send("capabilities 0", extended(EXT_CAPABILITIES, (byte) 0x00));
                 send("capabilities 1", extended(EXT_CAPABILITIES, (byte) 0x01));
                 send("nonce", extended(EXT_NONCE));
@@ -286,6 +307,10 @@ public class OuraRing4Support extends AbstractBTLESingleDeviceSupport {
     }
 
     private void handleNonce(final byte[] payload) {
+        if (authState != AUTH_NONCE_REQUESTED) {
+            unrequested("nonce");
+            return;
+        }
         if (payload.length < 1 + OuraAuth.NONCE_LEN) {
             LOG.error("Short nonce {}", GB.lazyHexdump(payload));
             disconnectWith(null);
@@ -299,19 +324,37 @@ public class OuraRing4Support extends AbstractBTLESingleDeviceSupport {
         }
         final byte[] nonce = new byte[OuraAuth.NONCE_LEN];
         System.arraycopy(payload, 1, nonce, 0, nonce.length);
+        authState = AUTH_PROOF_SENT;
         send("proof", extended(EXT_PROOF, OuraAuth.proof(nonce, key)));
     }
 
     private void handleProofReply(final int status) {
-        if (status != PROOF_ACCEPTED) {
-            LOG.error("Ring rejected the auth key, status {} ({})", status, proofStatusName(status));
-            fail();
+        if (authState != AUTH_PROOF_SENT) {
+            unrequested("proof reply");
             return;
         }
+        if (status != PROOF_ACCEPTED) {
+            LOG.error("Ring rejected the auth key, status {} ({})", status, proofStatusName(status));
+            // The other app's nonce replaces the one this connection proved
+            disconnectWith(getContext().getString(otherAppSeen
+                    ? R.string.authentication_failed_other_app
+                    : R.string.authentication_failed_check_key));
+            return;
+        }
+        authState = AUTH_DONE;
         send("radio mode sync", frame(CMD_RADIO_MODE, (byte) RADIO_MODE_SYNC));
         syncMillis = System.currentTimeMillis();
         send("set time", setTime(syncMillis / 1000L,
                 TimeZone.getDefault().getOffset(syncMillis) / 60_000));
+    }
+
+    private void unrequested(final String reply) {
+        if (!otherAppSeen) {
+            LOG.warn("Ring sent a {} this connection did not ask for, another app is connected to it", reply);
+            otherAppSeen = true;
+        } else {
+            LOG.debug("Ignoring {} for another app", reply);
+        }
     }
 
     private static String proofStatusName(final int status) {
@@ -370,6 +413,10 @@ public class OuraRing4Support extends AbstractBTLESingleDeviceSupport {
         }
         fetching = true;
         final SharedPreferences prefs = getDevicePrefs().getPreferences();
+        if (!prefs.contains(OuraConstants.PREF_HISTORY_CURSOR)) {
+            // The first fetch reads all the ring keeps, weeks of it
+            GB.toast(getContext(), getContext().getString(R.string.first_sync_takes_minutes), Toast.LENGTH_LONG, GB.INFO);
+        }
         final long cursor = prefs.getLong(OuraConstants.PREF_HISTORY_CURSOR, 0L);
         historyImport = new OuraHistoryImport(getDevice(), bootMillis);
         historyImport.startAfter(cursor);
@@ -382,9 +429,10 @@ public class OuraRing4Support extends AbstractBTLESingleDeviceSupport {
             radioIdle = false;
         }
         historyRequests = 0;
-        firstStoredAfter = -1;
+        fetchedBytes = 0;
         pendingRecordsWaits = 0;
         getDevice().setBusyTask(R.string.busy_task_fetch_activity_data, getContext());
+        GB.updateTransferNotification(getContext().getString(R.string.busy_task_fetch_activity_data), "", true, 0, getContext());
         getDevice().sendDeviceUpdateIntent(getContext());
         requestHistory(cursor);
     }
@@ -399,7 +447,9 @@ public class OuraRing4Support extends AbstractBTLESingleDeviceSupport {
             });
         }
         armHistoryTimeout();
-        return OuraHistory.walk(value, historyImport);
+        final int length = OuraHistory.walk(value, historyImport);
+        fetchedBytes += length;
+        return length;
     }
 
     private void armHistoryTimeout() {
@@ -415,7 +465,8 @@ public class OuraRing4Support extends AbstractBTLESingleDeviceSupport {
     }
 
     private void handleHistoryDone(final byte[] payload) {
-        final OuraHistoryImport finished;
+        final OuraHistoryImport batch;
+        final OuraHistoryImport nextBatch;
         synchronized (this) {
             if (!fetching || historyImport == null || payload.length < 6) {
                 return;
@@ -424,30 +475,40 @@ public class OuraRing4Support extends AbstractBTLESingleDeviceSupport {
             // A batch without records leaves the cursor where it was requested
             final long next = Math.max(historyImport.getMaxTicks() + 1, requestCursor);
             final boolean moved = next > requestCursor;
-            if (firstStoredAfter < 0) {
-                firstStoredAfter = Math.max(storedAfter, 1);
-            }
             LOG.debug("History batch done: {} bytes stored after it, cursor {}", storedAfter, next);
             if (storedAfter > 0 && moved && historyRequests < MAX_HISTORY_REQUESTS) {
-                final int percent = (int) Math.max(0, Math.min(100, 100 - storedAfter * 100 / firstStoredAfter));
+                final int percent = (int) (fetchedBytes * 100 / (fetchedBytes + storedAfter));
                 GB.updateTransferNotification(getContext().getString(R.string.busy_task_fetch_activity_data), "", true, percent, getContext());
+                // Each batch is stored as it ends, so a fetch cut short keeps the batches before
+                batch = historyImport;
+                nextBatch = new OuraHistoryImport(getDevice(), batch.getBootMillis());
+                nextBatch.startAfter(next);
+                if (batch.getOffSince() >= 0) {
+                    nextBatch.startOff(batch.getOffSince());
+                }
+                historyImport = nextBatch;
                 requestHistory(next);
-                return;
-            }
-            if (storedAfter == 0 && payload[1] != 0 && pendingRecordsWaits < MAX_PENDING_RECORDS_WAITS) {
+            } else if (storedAfter == 0 && payload[1] != 0 && pendingRecordsWaits < MAX_PENDING_RECORDS_WAITS) {
                 pendingRecordsWaits++;
                 pendingRecordsCursor = next;
                 armHistoryTimeout();
                 timeoutHandler.postDelayed(pendingRecordsRequest, PENDING_RECORDS_DELAY_MS);
                 return;
+            } else {
+                cancelHistoryCallbacks();
+                batch = historyImport;
+                nextBatch = null;
+                storing = batch;
+                // Still fetching, so no other fetch starts, but records arriving now are not collected
+                historyImport = null;
             }
-            cancelHistoryCallbacks();
-            finished = historyImport;
-            storing = finished;
-            // Still fetching, so no other fetch starts, but records arriving now are not collected
-            historyImport = null;
         }
-        finishHistory(finished);
+        if (nextBatch != null) {
+            // The next batch arrives on this thread, so it waits for the write
+            storeBatch(batch, nextBatch);
+        } else {
+            finishHistory(batch);
+        }
     }
 
     private synchronized void requestPendingRecords() {
@@ -457,31 +518,23 @@ public class OuraRing4Support extends AbstractBTLESingleDeviceSupport {
     }
 
     /**
-     * Stores the fetched history, and only then moves the cursor past it and keeps whether the
-     * ring was left off the finger, so a failed write is fetched again from the same state. The
-     * write runs outside the lock, which the main thread takes for the fetch timers.
+     * Stores a batch of a fetch still running. A batch that fails to store ends the fetch, so the
+     * next one fetches it again from the cursor rather than storing the batches after it.
      */
-    private void finishHistory(final OuraHistoryImport finished) {
-        boolean stored = false;
-        try (DBHandler db = GBApplication.acquireDB()) {
-            stored = finished.persist(db.getDaoSession(), getContext());
-        } catch (final Exception e) {
-            LOG.error("Failed to store the ring history", e);
+    private void storeBatch(final OuraHistoryImport batch, final OuraHistoryImport nextBatch) {
+        if (store(batch)) {
+            return;
         }
-        LOG.info("Ring history stored: {}, records {}", stored, finished.getRecordCounts());
         synchronized (this) {
-            final SharedPreferences prefs = getDevicePrefs().getPreferences();
-            final long next = finished.getMaxTicks() + 1;
-            // Stored rows move the cursor even when the connection ended during the write, unless
-            // the boot time changed meanwhile, as when the ticks started over
-            if (stored && finished.getMaxTicks() >= 0
-                    && finished.getBootMillis() == prefs.getLong(OuraConstants.PREF_BOOT_MILLIS, -1L)
-                    && next > prefs.getLong(OuraConstants.PREF_HISTORY_CURSOR, 0L)) {
-                prefs.edit()
-                        .putLong(OuraConstants.PREF_HISTORY_CURSOR, next)
-                        .putLong(OuraConstants.PREF_OFF_SINCE, finished.getOffSince())
-                        .apply();
+            if (fetching && historyImport == nextBatch) {
+                endFetch();
             }
+        }
+    }
+
+    private void finishHistory(final OuraHistoryImport finished) {
+        store(finished);
+        synchronized (this) {
             if (storing != finished) {
                 // The connection ended or restarted during the write
                 return;
@@ -490,6 +543,36 @@ public class OuraRing4Support extends AbstractBTLESingleDeviceSupport {
             radioIdle = true;
             endFetch();
         }
+    }
+
+    /**
+     * Stores fetched history, and only then moves the cursor past it and keeps whether the ring
+     * was left off the finger, so a failed write is fetched again from the same state. The write
+     * runs outside the lock, which the main thread takes for the fetch timers.
+     */
+    private boolean store(final OuraHistoryImport history) {
+        boolean stored = false;
+        try (DBHandler db = GBApplication.acquireDB()) {
+            stored = history.persist(db.getDaoSession(), getContext());
+        } catch (final Exception e) {
+            LOG.error("Failed to store the ring history", e);
+        }
+        LOG.info("Ring history stored: {}, records {}", stored, history.getRecordCounts());
+        synchronized (this) {
+            final SharedPreferences prefs = getDevicePrefs().getPreferences();
+            final long next = history.getMaxTicks() + 1;
+            // Stored rows move the cursor even when the connection ended during the write, unless
+            // the boot time changed meanwhile, as when the ticks started over
+            if (stored && history.getMaxTicks() >= 0
+                    && history.getBootMillis() == prefs.getLong(OuraConstants.PREF_BOOT_MILLIS, -1L)
+                    && next > prefs.getLong(OuraConstants.PREF_HISTORY_CURSOR, 0L)) {
+                prefs.edit()
+                        .putLong(OuraConstants.PREF_HISTORY_CURSOR, next)
+                        .putLong(OuraConstants.PREF_OFF_SINCE, history.getOffSince())
+                        .apply();
+            }
+        }
+        return stored;
     }
 
     private synchronized void abortHistory() {
@@ -520,7 +603,8 @@ public class OuraRing4Support extends AbstractBTLESingleDeviceSupport {
         disconnectWith(getContext().getString(R.string.authentication_failed_check_key));
     }
 
-    private void disconnectWith(@Nullable final String toast) {
+    @VisibleForTesting
+    protected void disconnectWith(@Nullable final String toast) {
         if (toast != null) {
             GB.toast(getContext(), toast, Toast.LENGTH_LONG, GB.ERROR);
         }
@@ -528,7 +612,8 @@ public class OuraRing4Support extends AbstractBTLESingleDeviceSupport {
         disconnect();
     }
 
-    private void send(final String task, final byte[] frame) {
+    @VisibleForTesting
+    protected void send(final String task, final byte[] frame) {
         final TransactionBuilder builder = createTransactionBuilder(task);
         builder.write(CHARACTERISTIC_WRITE, frame);
         builder.queue();

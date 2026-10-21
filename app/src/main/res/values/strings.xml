@@ -1552,6 +1552,8 @@
     <string name="authenticating">Authenticating</string>
     <string name="authentication_required">Authentication required</string>
     <string name="authentication_failed_check_key">Authentication failed, please check auth key</string>
+    <string name="first_sync_takes_minutes">First sync may take a few minutes</string>
+    <string name="authentication_failed_other_app">Authentication failed: another app is connected to the device</string>
     <string name="authentication_failed_negotiation">Authentication key negotiation failed</string>
     <string name="click_here_for_more_information">Click here for more information.</string>
     <string name="authentication_expired">Authentication expired</string>

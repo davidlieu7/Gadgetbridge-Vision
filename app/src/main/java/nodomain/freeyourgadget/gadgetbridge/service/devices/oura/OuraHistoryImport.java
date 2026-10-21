@@ -49,7 +49,7 @@ import nodomain.freeyourgadget.gadgetbridge.service.devices.oura.protocol.OuraHi
 import nodomain.freeyourgadget.gadgetbridge.service.devices.oura.protocol.OuraProtocol;
 
 /**
- * Collects the history records of one fetch into per-minute activity samples, beat intervals,
+ * Collects the history records of one fetch, or one batch of it, into per-minute activity samples, beat intervals,
  * HRV, skin temperature and battery levels. The activity samples carry the movement of the ring's
  * rest periods, from which sleep is estimated on read.
  */
