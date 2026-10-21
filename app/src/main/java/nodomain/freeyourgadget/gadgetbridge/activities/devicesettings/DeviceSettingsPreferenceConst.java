@@ -712,6 +712,17 @@ public class DeviceSettingsPreferenceConst {
     public static final String PREF_BOSE_MEDIA_PREVIOUS = "bose_media_previous";
     public static final String PREF_BOSE_MEDIA_SUPPORTED = "bose_media_supported";
 
+    public static final String PREF_TEUFEL_MYND_MUTE = "teufel_mynd_mute";
+    public static final String PREF_TEUFEL_MYND_EQ_BASS = "teufel_mynd_eq_bass";
+    public static final String PREF_TEUFEL_MYND_EQ_TREBLE = "teufel_mynd_eq_treble";
+    public static final String PREF_TEUFEL_MYND_ECO_MODE = "teufel_mynd_eco_mode";
+    public static final String PREF_TEUFEL_MYND_SOUND_ICONS = "teufel_mynd_sound_icons";
+    public static final String PREF_TEUFEL_MYND_BATTERY_FRIENDLY_CHARGING = "teufel_mynd_battery_friendly_charging";
+    public static final String PREF_TEUFEL_MYND_MULTIPOINT = "teufel_mynd_multipoint";
+    public static final String PREF_TEUFEL_MYND_LED_BRIGHTNESS = "teufel_mynd_led_brightness";
+    public static final String PREF_TEUFEL_MYND_AUTO_OFF = "teufel_mynd_auto_off";
+    public static final String PREF_TEUFEL_MYND_PARTY_LINK = "teufel_mynd_party_link";
+
     public static final String PREF_DUAL_DEVICE_SUPPORT = "dual_device_support";
 
     public static final String PREFS_ACTIVITY_IN_DEVICE_CARD = "prefs_activity_in_device_card";

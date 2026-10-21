@@ -5447,6 +5447,12 @@
     <string name="devicetype_dji_osmo_action_4" translatable="false">DJI Osmo Action 4</string>
     <string name="devicetype_sinilink" translatable="false">Sinilink</string>
     <string name="devicetype_eightbitdo_micro" translatable="false">8BitDo Micro</string>
+    <string name="devicetype_teufel_mynd" translatable="false">Teufel Mynd</string>
+    <string name="teufel_mynd_eco_mode">Eco mode</string>
+    <string name="teufel_mynd_sound_icons">Sound icons</string>
+    <string name="teufel_mynd_battery_friendly_charging">Battery friendly charging</string>
+    <string name="teufel_mynd_led_brightness">LED brightness</string>
+    <string name="teufel_mynd_party_link" translatable="false">PartyLink</string>
     <string name="devicetype_onetouch" translatable="false">OneTouch Glucose Meter</string>
     <string name="devicetype_innovo_ip900bp_b" translatable="false">Innovo iP900BP-B</string>
     <string name="eightbitdo_keyboard_mapping">Key mapping</string>
