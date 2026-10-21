@@ -163,6 +163,10 @@ public class XiaomiHealthService extends AbstractXiaomiService {
     // Set once the band has pushed live stats during the current workout. Those come every second
     // while a workout is open, so their absence tells that the workout is over.
     private volatile boolean workoutLiveStatsSeen = false;
+    // The band asked for location since the last workout start.
+    private volatile boolean locationRequested = false;
+    // The band's current workout asked for location.
+    private volatile boolean locationWorkoutOpen = false;
     private final Handler gpsTimeoutHandler = new Handler();
     private final Handler workoutAliveHandler = new Handler();
 
@@ -282,6 +286,8 @@ public class XiaomiHealthService extends AbstractXiaomiService {
     @Override
     public void dispose() {
         stopLocation();
+        locationRequested = false;
+        locationWorkoutOpen = false;
         synchronized (realtimeConsumers) {
             realtimeConsumers.clear();
         }
@@ -775,6 +781,8 @@ public class XiaomiHealthService extends AbstractXiaomiService {
             return;
         }
 
+        locationRequested = true;
+        locationWorkoutOpen = true;
         startLocation();
 
         if (!workoutStarted) {
@@ -848,14 +856,15 @@ public class XiaomiHealthService extends AbstractXiaomiService {
 
     /**
      * Live stats arrive every second while a workout is open on the band, including one it was
-     * already running when the connection came up, which never sends a start status again.
+     * already running when the connection came up, which never sends a start status again. They
+     * carry no sport, so they resume location only for a workout that asked for it.
      */
     private void onWorkoutLiveStats() {
         if (sleepAsAndroidManager.isSessionRequested() || sleepAsAndroidManager.isRawSensorActive()) {
             return;
         }
         if (!workoutStarted) {
-            if (!canSendLocation()) {
+            if (!locationWorkoutOpen || !canSendLocation()) {
                 return;
             }
             LOG.info("Band is running a workout, resuming location");
@@ -878,6 +887,8 @@ public class XiaomiHealthService extends AbstractXiaomiService {
 
         switch (workoutStatus.getStatus()) {
             case WORKOUT_STARTED:
+                locationWorkoutOpen = locationRequested;
+                locationRequested = false;
                 workoutStarted = true;
                 gpsTimeoutHandler.removeCallbacksAndMessages(null);
                 if (startOnPhone) {
@@ -889,6 +900,8 @@ public class XiaomiHealthService extends AbstractXiaomiService {
                 break;
             case WORKOUT_FINISHED:
                 stopLocation();
+                locationRequested = false;
+                locationWorkoutOpen = false;
                 if (startOnPhone) {
                     OpenTracksController.stopRecording(getSupport().getContext());
                 }

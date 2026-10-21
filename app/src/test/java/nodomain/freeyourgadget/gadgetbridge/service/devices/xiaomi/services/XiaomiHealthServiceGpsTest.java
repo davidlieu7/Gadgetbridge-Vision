@@ -299,6 +299,50 @@ public class XiaomiHealthServiceGpsTest extends TestBase {
     }
 
     @Test
+    public void liveStatsWithoutLocationRequestDoNotStartLocation() {
+        // an indoor workout already running when the connection comes up
+        for (int i = 0; i < 10; i++) {
+            bandLiveStats();
+            idle(1000);
+        }
+
+        assertFalse(locationRunning());
+        assertTrue(locationActions.isEmpty());
+    }
+
+    @Test
+    public void indoorWorkoutStartedWhileConnectedNeverStartsLocation() {
+        bandStatus(STATUS_STARTED);
+        bandLiveStats();
+        idle(120_000);
+        bandLiveStats();
+        idle(1000);
+
+        assertFalse(locationRunning());
+        assertTrue(locationActions.isEmpty());
+    }
+
+    @Test
+    public void indoorWorkoutAfterAnUnfinishedOutdoorOneDoesNotResumeLocation() {
+        bandOpens();
+        bandStatus(STATUS_STARTED);
+        bandLiveStats();
+        // the outdoor workout ends while disconnected, so no finished status arrives
+        service.onDisconnect();
+        service.initialize();
+        idle(120_000);
+        assertFalse(locationRunning());
+
+        bandStatus(STATUS_STARTED);
+        bandLiveStats();
+        idle(120_000);
+        bandLiveStats();
+        idle(1000);
+
+        assertFalse(locationRunning());
+    }
+
+    @Test
     public void disposeStopsLocation() {
         bandOpens();
         bandStatus(STATUS_STARTED);
