@@ -327,7 +327,6 @@ dependencies {
     implementation libs.androidx.lifecycle.process
     implementation libs.androidx.lifecycle.runtime.ktx
     implementation libs.androidx.lifecycle.viewmodel.ktx
-    implementation libs.androidx.security.crypto
     implementation libs.androidx.browser
     implementation libs.androidx.exifinterface
 

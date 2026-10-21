@@ -17,7 +17,6 @@
 package nodomain.freeyourgadget.gadgetbridge.externalservices
 
 import android.content.Context
-import androidx.core.content.edit
 
 /**
  * Credentials of a service the user authenticates to with OAuth: a short-lived access token and
