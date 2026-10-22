@@ -106,6 +106,17 @@ public class SoundcoreSleepA30Protocol extends SoundcoreProtocolImplV1 {
                 new byte[]{localAudioSelector, encodeBoolean(playing)});
     }
 
+    // PATCH: Somehow when switching from BT -> Local, volume gets reset to zero
+    // Although in device reading (connecting) we see the volume is set to a non-zero.
+    // Mitigation here: Force to send the device volume after switching to Local mode.
+    @Override
+    public byte[] encodeListeningMode(final boolean local) {
+        final int volume = getDevicePrefs().getInt(PREF_SOUNDCORE_LOCAL_VOLUME, 10);
+        final byte[] mode = super.encodeListeningMode(local);
+        if (!local) return mode;
+        return concatenate(mode, encodeLocalVolume(volume));
+    }
+
     @Override
     @Nullable
     public GBDeviceEvent[] decodeResponse(@Nullable final byte[] responseData) {
