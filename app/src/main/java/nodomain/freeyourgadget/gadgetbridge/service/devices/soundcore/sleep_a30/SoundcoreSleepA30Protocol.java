@@ -173,6 +173,7 @@ public class SoundcoreSleepA30Protocol extends SoundcoreProtocolImplV1 {
         decodeBooleanPreference(payload, 141, PREF_SOUNDCORE_CALLS_ENABLED, preferences);
         decodeBooleanPreference(payload, 143, PREF_SOUNDCORE_SNORE_MASKING, preferences);
         decodeBooleanPreference(payload, 147, PREF_SOUNDCORE_ANC_TONE, preferences);
+        // DO NOT REMOVE THIS CHECK! Sometimes the payload size is 150 bytes.
         if (payload.length >= 157) {
             // keep  = 0 | 0 , local = 1 | 1 , pause = 1 | 0
             preferences.withPreference(PREF_SOUNDCORE_SLEEP_AUDIO,
@@ -230,11 +231,9 @@ public class SoundcoreSleepA30Protocol extends SoundcoreProtocolImplV1 {
             case CMD_GET_SLEEP_SETTINGS:
                 return decodeAutoStop(payload);
             case CMD_NOTIFY_LISTENING_MODE:
-                if (payload.length == 1) {
-                    final String source = AudioSource.fromValue(payload[0]);
-                    if (source != null) {
-                        return new GBDeviceEvent[]{new GBDeviceEventUpdatePreferences(PREF_SOUNDCORE_LISTENING_MODE, source)};
-                    }
+                final String source = AudioSource.fromValue(payload[0]);
+                if (source != null) {
+                    return new GBDeviceEvent[]{new GBDeviceEventUpdatePreferences(PREF_SOUNDCORE_LISTENING_MODE, source)};
                 }
                 break;
             case CMD_NOTIFY_LOCAL_AUDIO:
@@ -252,8 +251,7 @@ public class SoundcoreSleepA30Protocol extends SoundcoreProtocolImplV1 {
                         PREF_SOUNDCORE_AMBIENT_SOUND_CONTROL,
                         (payload[0] == 1 ? AmbientSoundMode.NOISE_CANCELLING : AmbientSoundMode.OFF).toString())};
         }
-        // Empty setter responses are acknowledgements, not settings readback.
-        return new GBDeviceEvent[0];
+        return super.decodeCommand(command, payload);
     }
 
     @Override

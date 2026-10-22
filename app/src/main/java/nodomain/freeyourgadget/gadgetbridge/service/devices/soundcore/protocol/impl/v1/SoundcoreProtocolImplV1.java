@@ -93,8 +93,9 @@ public class SoundcoreProtocolImplV1 extends AbstractSoundcoreProtocol {
     public static final short CMD_SET_EQUALIZER_PRESET = (short) 0x8b02;
     public static final short CMD_POWER_OFF = (short) 0x8901;
 
+    // Sleep A30
     public static final short CMD_NOTIFY_ANC_ENABLED = (short) 0x0706;
-    public static final short CMD_SET_ANC_ENABLED = (short) 0x8706;
+    public static final short CMD_SET_ANC_ENABLED = (short) 0x8706; // Different from Ambient Sound
     public static final short CMD_NOTIFY_LISTENING_MODE = (short) 0x1401;
     public static final short CMD_SET_LISTENING_MODE = (short) 0xa901;
     public static final short CMD_SET_LOCAL_PLAYBACK = (short) 0x0213;
@@ -687,10 +688,6 @@ public class SoundcoreProtocolImplV1 extends AbstractSoundcoreProtocol {
         return encodeCommand(CMD_ENABLE_PAIRING_MODE, new byte[]{0x00, (byte) 0x90});
     }
 
-    public byte[] encodeAncEnabled(final boolean enabled) {
-        return encodeBooleanCommand(CMD_SET_ANC_ENABLED, enabled);
-    }
-
     public byte[] encodeListeningMode(final boolean local) {
         return encodeBooleanCommand(CMD_SET_LISTENING_MODE, local);
     }
@@ -719,6 +716,11 @@ public class SoundcoreProtocolImplV1 extends AbstractSoundcoreProtocol {
 
     protected byte[] encodeControlFunction(final boolean right, final byte action, final byte function) {
         return encodeCommand(CMD_SET_TAP_CONTROLS_FUNCTION, new byte[]{encodeBoolean(right), action, function});
+    }
+
+    // Uses a different command code, only for ANC ON/OFF.
+    public byte[] encodeAncEnabled(final boolean enabled) {
+        return encodeBooleanCommand(CMD_SET_ANC_ENABLED, enabled);
     }
 
     /** Encodes the audio-mode cycle assigned to a tap control. */
