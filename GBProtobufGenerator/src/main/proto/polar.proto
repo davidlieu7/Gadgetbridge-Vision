@@ -913,3 +913,396 @@ message PbUserPhysData {
   optional PbSystemDateTime last_modified = 100;
   optional PbLocalDateTime snapshot_start_time = 101;
 }
+
+message PbSourceDevice {
+  optional string name = 1;
+  optional string manufacturer = 2;
+  optional string model_number = 3;
+  optional string hardware_code = 4;
+  optional PbVersion platform_version = 5;
+  optional PbVersion software_version = 6;
+  optional PbVersion polarmathsmart_version = 7;
+  repeated PbSourceDevice collector = 8;
+}
+
+
+message PbActivityInfo {
+  enum ActivityClass {
+    SLEEP = 1;
+    SEDENTARY = 2;
+    LIGHT = 3;
+    CONTINUOUS_MODERATE = 4;
+    INTERMITTENT_MODERATE = 5;
+    CONTINUOUS_VIGOROUS = 6;
+    INTERMITTENT_VIGOROUS = 7;
+    NON_WEAR = 8;
+  }
+  optional PbActivityInfo.ActivityClass value = 1;
+  optional PbLocalDateTime time_stamp = 2;
+  optional float factor = 3;
+}
+
+
+message PbDeviceId {
+  optional string device_id = 1;
+}
+
+
+message PbActivitySource {
+  optional PbDeviceId met_source = 1;
+  optional uint32 met_algorithm_version = 2;
+}
+
+
+message PbInActivityNonWearTriggerInfo {
+  optional PbLocalDateTime start_time_stamp = 1;
+  optional PbLocalDateTime end_time_stamp = 2;
+}
+
+
+message PbInActivityTriggerInfo {
+  optional PbLocalDateTime time_stamp = 1;
+}
+
+
+message PbSportInfo {
+  optional float factor = 1;
+  optional PbLocalDateTime time_stamp = 2;
+  optional uint64 sport_profile_id = 3;
+}
+
+
+message PbActivitySamples {
+  optional PbLocalDateTime start_time = 1;
+  optional PbDuration met_recording_interval = 2;
+  optional PbDuration steps_recording_interval = 3;
+  repeated float met_samples = 4;
+  repeated uint32 steps_samples = 5 [packed = true];
+  repeated PbSportInfo sport_info = 6;
+  repeated PbActivityInfo activity_info = 7;
+  repeated PbInActivityTriggerInfo inactivity_trigger = 8;
+  repeated PbInActivityNonWearTriggerInfo inactivity_non_wear_trigger = 9;
+  optional PbSourceDevice OBSOLETE_met_source_device = 10;
+  optional uint32 OBSOLETE_polar_math_smart_met_source = 11;
+  optional PbActivitySource activity_source = 12;
+}
+
+
+message PbActivityClassTimes {
+  optional PbDuration time_non_wear = 1;
+  optional PbDuration time_sleep = 2;
+  optional PbDuration time_sedentary = 3;
+  optional PbDuration time_light_activity = 4;
+  optional PbDuration time_continuous_moderate = 5;
+  optional PbDuration time_intermittent_moderate = 6;
+  optional PbDuration time_continuous_vigorous = 7;
+  optional PbDuration time_intermittent_vigorous = 8;
+}
+
+
+message PbActivityGoalSummary {
+  optional float activity_goal = 1;
+  optional float achieved_activity = 2;
+  optional PbDuration time_to_go_up = 3;
+  optional PbDuration time_to_go_walk = 4;
+  optional PbDuration time_to_go_jog = 5;
+}
+
+
+enum PbDailyBalanceFeedback {
+  DB_NOT_CALCULATED = -1;
+  DB_SICK = 0;
+  DB_FATIGUE_TRY_TO_REDUCE_TRAINING_LOAD_INJURED = 1;
+  DB_FATIGUE_TRY_TO_REDUCE_TRAINING_LOAD = 2;
+  DB_LIMITED_TRAINING_RESPONSE_OTHER_INJURED = 3;
+  DB_LIMITED_TRAINING_RESPONSE_OTHER = 4;
+  DB_RESPONDING_WELL_CAN_CONTINUE_IF_INJURY_ALLOWS = 5;
+  DB_RESPONDING_WELL_CAN_CONTINUE = 6;
+  DB_YOU_COULD_DO_MORE_TRAINING_IF_INJURY_ALLOWS = 7;
+  DB_YOU_COULD_DO_MORE_TRAINING = 8;
+  DB_YOU_SEEM_TO_BE_STRAINED_INJURED = 9;
+  DB_YOU_SEEM_TO_BE_STRAINED = 10;
+}
+
+
+enum PbReadinessForSpeedAndStrengthTraining {
+  RSST_NOT_CALCULATED = -1;
+  RSST_A1_RECOVERED_READY_FOR_ALL_TRAINING = 0;
+  RSST_A2_RECOVERED_READY_FOR_ALL_TRAINING_IF_FEELING_OK_NIGHTLY_RECHARGE_COMPROMISED = 1;
+  RSST_A3_RECOVERED_READY_FOR_ALL_TRAINING_IF_FEELING_OK_POSSIBLY_STRESSED = 2;
+  RSST_A4_RECOVERED_READY_FOR_SPEED_AND_STRENGTH_TRAINING = 3;
+  RSST_B1_RECOVERED_READY_FOR_SPEED_AND_STRENGTH_TRAINING_AND_LIGHT_CARDIO = 4;
+  RSST_B2_RECOVERED_READY_FOR_SPEED_AND_STRENGTH_TRAINING_AND_LIGHT_CARDIO_POOR_NIGHTLY_RECHARGE = 5;
+  RSST_B3_RECOVERED_READY_FOR_SPEED_AND_STRENGTH_TRAINING_AND_LIGHT_CARDIO_POOR_CARDIO_RECOVERY = 6;
+  RSST_B4_NOT_RECOVERED_NO_LEG_TRAINING_OR_INTENSIVE_CARDIO = 7;
+  RSST_B5_NOT_RECOVERED_NO_LEG_TRAINING_OR_INTENSIVE_CARDIO_POOR_NIGHTLY_RECHARGE = 8;
+  RSST_C1_NOT_RECOVERED_NO_STRENGTH_OR_INTENSIVE_CARDIO = 9;
+  RSST_C2_NOT_RECOVERED_NO_STRENGTH_OR_INTENSIVE_CARDIO_POOR_NIGHTLY_RECHARGE = 10;
+  RSST_D1_RECOVERED_BUT_INJURY_AND_ILLNESS_RISK_CAUSED_BY_CARDIO_TRAINING = 11;
+  RSST_D2_NOT_RECOVERED_AND_INJURY_AND_ILLNESS_RISK_CAUSED_BY_CARDIO_TRAINING = 12;
+}
+
+
+message PbDailySummary {
+  optional PbDate date = 1;
+  optional uint32 steps = 2;
+  optional uint32 activity_calories = 3;
+  optional uint32 training_calories = 4;
+  optional uint32 bmr_calories = 5;
+  optional PbActivityGoalSummary activity_goal_summary = 6;
+  optional PbActivityClassTimes activity_class_times = 7;
+  optional float activity_distance = 8;
+  optional PbDailyBalanceFeedback daily_balance_feedback = 9;
+  optional PbReadinessForSpeedAndStrengthTraining readiness_for_speed_and_strength_training = 10;
+}
+
+
+message PbPpIntervalSamples {
+  repeated sint32 ppi_delta = 1 [packed = true];
+  repeated sint32 ppi_error_estimate_delta = 2 [packed = true];
+  repeated uint32 status = 3 [packed = true];
+}
+
+
+message PbPpIntervalAutoSamples {
+  enum PbPpIntervalRecordingTriggerType {
+    PPI_TRIGGER_TYPE_UNDEFINED = 0;
+    PPI_TRIGGER_TYPE_AUTOMATIC = 1;
+    PPI_TRIGGER_TYPE_MANUAL = 2;
+  }
+  optional PbPpIntervalAutoSamples.PbPpIntervalRecordingTriggerType trigger_type = 1;
+  optional PbTime recording_time = 2;
+  optional PbPpIntervalSamples ppi = 3;
+}
+
+
+enum PbMeasTriggerType {
+  TRIGGER_TYPE_HIGH_ACTIVITY = 1;
+  TRIGGER_TYPE_LOW_ACTIVITY = 2;
+  TRIGGER_TYPE_TIMED = 3;
+  TRIGGER_TYPE_MANUAL = 4;
+}
+
+
+message PbAutomaticHeartRateSamples {
+  optional PbMeasTriggerType trigger_type = 1;
+  optional PbTime time = 2;
+  repeated uint32 heart_rate = 3 [packed = true];
+}
+
+
+message PbAutomaticSampleSessions {
+  optional PbDate day = 1;
+  repeated PbAutomaticHeartRateSamples samples = 2;
+  repeated PbPpIntervalAutoSamples ppi_samples = 3;
+}
+
+
+message PbSleepWakeChange {
+  enum PbSleepWakeValue {
+    SLEEP_WAKE_VALUE_SLEEP = 0;
+    SLEEP_WAKE_VALUE_WAKE = 1;
+    SLEEP_WAKE_VALUE_NO_DATA = 2;
+  }
+  optional PbTime start_time = 1;
+  optional PbSleepWakeChange.PbSleepWakeValue value = 2;
+}
+
+
+message PbSleepWakeVector {
+  optional PbDate date = 1;
+  repeated PbSleepWakeChange sleep_wake_changes = 2;
+}
+
+
+message PbLocalDateTimeRange {
+  optional PbLocalDateTime start_time = 1;
+  optional PbLocalDateTime end_time = 2;
+}
+
+
+message PbSleepCycle {
+  optional uint32 seconds_from_sleep_start = 1;
+  optional float sleep_depth_start = 2;
+}
+
+
+enum PbSleepWakeState {
+  PB_NONREM3 = -6;
+  PB_NONREM12 = -5;
+  PB_REM = -3;
+  PB_WAKE = -2;
+  PB_UNKNOWN = 0;
+}
+
+
+message PbSleepWakePhase {
+  optional uint32 seconds_from_sleep_start = 1;
+  optional PbSleepWakeState sleepwake_state = 2;
+}
+
+
+enum PbSleepUserRating {
+  PB_SLEPT_UNDEFINED = -1;
+  PB_SLEPT_POORLY = 0;
+  PB_SLEPT_SOMEWHAT_POORLY = 1;
+  PB_SLEPT_NEITHER_POORLY_NOR_WELL = 2;
+  PB_SLEPT_SOMEWHAT_WELL = 3;
+  PB_SLEPT_WELL = 4;
+}
+
+
+message PbSleepAnalysisResult {
+  optional PbLocalDateTime sleep_start_time = 1;
+  optional PbLocalDateTime sleep_end_time = 2;
+  optional PbSystemDateTime last_modified = 3;
+  optional uint32 sleep_goal_minutes = 4;
+  repeated PbSleepWakePhase sleepwake_phases = 5;
+  repeated PbLocalDateTime snooze_time = 6;
+  optional PbLocalDateTime alarm_time = 7;
+  optional int32 sleep_start_offset_seconds = 8;
+  optional int32 sleep_end_offset_seconds = 9;
+  optional PbSleepUserRating user_sleep_rating = 10;
+  optional PbDeviceId recording_device = 11;
+  optional bool battery_ran_out = 12;
+  repeated PbSleepCycle sleep_cycles = 13;
+  optional PbDate sleep_result_date = 14;
+  optional PbSystemDateTime created_timestamp = 15;
+  optional PbLocalDateTimeRange original_sleep_range = 16;
+}
+
+// Not recovered from Flow: layout read off a real SKINTEMP/TEMPCONT.BPB. Fields 1 and 3 hold
+// small constants of unknown meaning. The first sample has no offset, so it sits at midnight.
+message PbSkinTemperatureSample {
+  optional uint32 offset_millis = 1;
+  optional float temperature = 2;
+}
+
+message PbSkinTemperatureContinuous {
+  repeated PbSkinTemperatureSample samples = 4;
+}
+
+message PbNightlyRecoveryStatus {
+  optional PbSystemDateTime created_timestamp = 1;
+  optional PbSystemDateTime modified_timestamp = 2;
+  optional float ans_status = 3;
+  optional int32 recovery_indicator = 4;
+  optional int32 recovery_indicator_sub_level = 5;
+  optional int32 ans_rate = 6;
+  optional int32 score_rate_OBSOLETE = 7;
+  optional int32 mean_nightly_recovery_RRI = 8;
+  optional int32 mean_nightly_recovery_RMSSD = 9;
+  optional int32 mean_nightly_recovery_respiration_interval = 10;
+  optional int32 mean_baseline_RRI = 11;
+  optional int32 sd_baseline_RRI = 12;
+  optional int32 mean_baseline_RMSSD = 13;
+  optional int32 sd_baseline_RMSSD = 14;
+  optional int32 mean_baseline_respiration_interval = 15;
+  optional int32 sd_baseline_respiration_interval = 16;
+  optional string sleep_tip = 17;
+  optional string vitality_tip = 18;
+  optional string exercise_tip = 19;
+  optional PbDate sleep_result_date = 20;
+}
+
+
+message PbSleepScore {
+  optional PbSystemDateTime created_timestamp = 1;
+  optional PbSystemDateTime modified_timestamp = 2;
+  optional float sleep_score = 3;
+  optional float score_sleep_time_own_target = 4;
+  optional float score_sleep_time_recommendation = 5;
+  optional float score_continuity = 6;
+  optional float score_efficiency = 7;
+  optional float score_rem = 8;
+  optional float score_n3 = 9;
+  optional float score_time_long_interruptions = 10;
+  optional float score_group_duration = 11;
+  optional float score_group_solidity = 12;
+  optional float score_group_refresh = 13;
+  optional int32 score_rate = 14;
+  optional float sleep_score_baseline = 15;
+  optional float score_sleep_time_baseline = 16;
+  optional uint32 sleep_time_average = 17;
+  optional float score_group_solidity_baseline = 18;
+  optional float score_time_long_interruptions_baseline = 19;
+  optional uint32 sleep_time_long_interruptions_average = 20;
+  optional float score_continuity_baseline = 21;
+  optional float sleep_continuity_average = 22;
+  optional float score_efficiency_baseline = 23;
+  optional float sleep_efficiency_average = 24;
+  optional float score_group_refresh_baseline = 25;
+  optional float score_rem_baseline = 26;
+  optional float score_rem_percent_average = 27;
+  optional float score_n3_baseline = 28;
+  optional float score_n3_percent_average = 29;
+  optional PbDate sleep_result_date = 30;
+}
+
+
+message PbDailyCardioLoads {
+  enum PbAcuteToChronicValidity {
+    ATOC_VALIDITY_CANNOT_CALCULATE_NEW_USER = -2;
+    ATOC_VALIDITY_CANNOT_CALCULATE_OLD_USER = -1;
+    ATOC_VALIDITY_ROUGH_ESTIMATE = 0;
+    ATOC_VALIDITY_OK = 1;
+  }
+  optional float daily_load = 1;
+  optional float acute_load = 2;
+  optional float chronic_load = 3;
+  optional PbDailyCardioLoads.PbAcuteToChronicValidity acute_to_chronic_validity = 4;
+}
+
+
+message PbHrvLimits {
+  optional float limit_min = 1;
+  optional float limit_max = 2;
+}
+
+
+message PbCardioRecoveryLevelResult {
+  enum PbCardioRecoveryLevel {
+    RECOVERY_LEVEL_NOT_CALCULATED = -1;
+    RECOVERY_LEVEL_OUTSIDE_LIMITS = 0;
+    RECOVERY_LEVEL_WITHIN_LIMITS = 1;
+  }
+  optional PbCardioRecoveryLevelResult.PbCardioRecoveryLevel cardio_recovery_level = 1;
+  optional PbHrvLimits supine_limits = 2;
+  optional PbHrvLimits standing_limits = 3;
+}
+
+
+message PbMuscleRecoveryLevelResult {
+  enum PbMuscleRecoveryLevel {
+    NOT_CALCULATED = -1;
+    NOT_RECOVERED = 0;
+    RECOVERED = 1;
+  }
+  optional PbMuscleRecoveryLevelResult.PbMuscleRecoveryLevel muscle_recovery_level = 1;
+  optional float low_limit = 2;
+  optional float baseline_average = 3;
+}
+
+
+message PbDailyTrainingLoadAndRecoveryStatus {
+  optional PbDailyCardioLoads cardio_loads = 1;
+  optional float cardio_load_90d_average = 2;
+  optional PbDailyBalanceFeedback OBSOLETE_daily_balance_feedback = 3;
+  optional PbCardioRecoveryLevelResult cardio_recovery_level_result = 4;
+  optional float muscle_load_90d_average = 5;
+  optional float perceived_load_90d_average = 6;
+  optional PbMuscleRecoveryLevelResult muscle_recovery_level_result = 7;
+  optional PbSystemDateTime last_modified = 100;
+}
+
+// Not recovered from Flow: layout read off a real NR/RESPRATE.BPB. Each chunk holds one
+// little endian float per second (breaths per minute) from its start time.
+message PbRespirationRateChunk {
+  optional PbTime start_time = 1;
+  optional bytes breaths_per_minute = 2;
+}
+
+message PbRespirationRate {
+  optional PbDate day = 1;
+  repeated PbRespirationRateChunk chunks = 2;
+}

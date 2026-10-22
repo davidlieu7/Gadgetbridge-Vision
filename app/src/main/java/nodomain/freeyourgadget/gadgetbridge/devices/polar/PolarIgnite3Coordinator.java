@@ -16,6 +16,30 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 package nodomain.freeyourgadget.gadgetbridge.devices.polar;
 
+import java.util.HashMap;
+import java.util.Map;
+
+import de.greenrobot.dao.AbstractDao;
+import de.greenrobot.dao.Property;
+import nodomain.freeyourgadget.gadgetbridge.devices.GenericHrvValueSampleProvider;
+import nodomain.freeyourgadget.gadgetbridge.devices.GenericRespiratoryRateSampleProvider;
+import nodomain.freeyourgadget.gadgetbridge.devices.GenericSleepScoreSampleProvider;
+import nodomain.freeyourgadget.gadgetbridge.devices.GenericTemperatureSampleProvider;
+import nodomain.freeyourgadget.gadgetbridge.devices.SampleProvider;
+import nodomain.freeyourgadget.gadgetbridge.devices.SleepSessionProvider;
+import nodomain.freeyourgadget.gadgetbridge.devices.TimeSampleProvider;
+import nodomain.freeyourgadget.gadgetbridge.entities.AbstractActivitySample;
+import nodomain.freeyourgadget.gadgetbridge.entities.DaoSession;
+import nodomain.freeyourgadget.gadgetbridge.entities.GenericHrvValueSampleDao;
+import nodomain.freeyourgadget.gadgetbridge.entities.GenericRespiratoryRateSampleDao;
+import nodomain.freeyourgadget.gadgetbridge.entities.GenericSleepScoreSampleDao;
+import nodomain.freeyourgadget.gadgetbridge.entities.GenericSleepStageSampleDao;
+import nodomain.freeyourgadget.gadgetbridge.model.HrvValueSample;
+import nodomain.freeyourgadget.gadgetbridge.model.RespiratoryRateSample;
+import nodomain.freeyourgadget.gadgetbridge.model.SleepScoreSample;
+import nodomain.freeyourgadget.gadgetbridge.entities.GenericTemperatureSampleDao;
+import nodomain.freeyourgadget.gadgetbridge.entities.PolarIgnite3ActivitySampleDao;
+import nodomain.freeyourgadget.gadgetbridge.model.TemperatureSample;
 import androidx.annotation.NonNull;
 
 import java.util.regex.Pattern;
@@ -85,6 +109,122 @@ public class PolarIgnite3Coordinator extends AbstractBLEDeviceCoordinator {
                 R.xml.devicesettings_inactivity_noshed,
                 R.xml.devicesettings_timeformat,
         };
+    }
+
+    @Override
+    public boolean supportsActivityTracking(@NonNull final GBDevice device) {
+        return true;
+    }
+
+    @Override
+    public boolean supportsActivityDistance(@NonNull final GBDevice device) {
+        return true;
+    }
+
+    @Override
+    public boolean supportsActiveCalories(@NonNull final GBDevice device) {
+        return true;
+    }
+
+    @Override
+    public boolean supportsDataFetching(@NonNull final GBDevice device) {
+        return true;
+    }
+
+    @Override
+    public boolean supportsHeartRateMeasurement(@NonNull final GBDevice device) {
+        return true;
+    }
+
+    @Override
+    public boolean supportsSleepMeasurement(@NonNull final GBDevice device) {
+        return true;
+    }
+
+    @Override
+    public boolean supportsRemSleep(@NonNull final GBDevice device) {
+        return true;
+    }
+
+    @Override
+    public boolean supportsAwakeSleep(@NonNull final GBDevice device) {
+        return true;
+    }
+
+    @Override
+    public boolean supportsContinuousTemperature(@NonNull final GBDevice device) {
+        return true;
+    }
+
+    @Override
+    public SampleProvider<? extends AbstractActivitySample> getSampleProvider(final GBDevice device, final DaoSession session) {
+        return new PolarIgnite3ActivitySampleProvider(device, session);
+    }
+
+    @Override
+    public SleepSessionProvider getSleepSessionProvider(@NonNull final GBDevice device, @NonNull final DaoSession session) {
+        return new PolarIgnite3SleepSessionProvider(device, session);
+    }
+
+    @Override
+    public TimeSampleProvider<? extends TemperatureSample> getTemperatureSampleProvider(@NonNull final GBDevice device,
+                                                                                         @NonNull final DaoSession session) {
+        return new GenericTemperatureSampleProvider(device, session, TemperatureSample.TYPE_SKIN, TemperatureSample.LOCATION_WRIST);
+    }
+
+    @Override
+    public boolean supportsHrvMeasurement(@NonNull final GBDevice device) {
+        return true;
+    }
+
+    @Override
+    public boolean supportsSleepScore(@NonNull final GBDevice device) {
+        return true;
+    }
+
+    @Override
+    public boolean supportsRespiratoryRate(@NonNull final GBDevice device) {
+        return true;
+    }
+
+    @Override
+    public boolean supportsDayRespiratoryRate(@NonNull final GBDevice device) {
+        return true;
+    }
+
+    @Override
+    public boolean supportsSleepRespiratoryRate(@NonNull final GBDevice device) {
+        return true;
+    }
+
+    @Override
+    public TimeSampleProvider<? extends HrvValueSample> getHrvValueSampleProvider(@NonNull final GBDevice device,
+                                                                                   @NonNull final DaoSession session) {
+        return new GenericHrvValueSampleProvider(device, session);
+    }
+
+    @Override
+    public TimeSampleProvider<? extends RespiratoryRateSample> getRespiratoryRateSampleProvider(@NonNull final GBDevice device,
+                                                                                                 @NonNull final DaoSession session) {
+        return new GenericRespiratoryRateSampleProvider(device, session);
+    }
+
+    @Override
+    public TimeSampleProvider<? extends SleepScoreSample> getSleepScoreProvider(@NonNull final GBDevice device,
+                                                                                 @NonNull final DaoSession session) {
+        return new GenericSleepScoreSampleProvider(device, session);
+    }
+
+    @Override
+    public Map<AbstractDao<?, ?>, Property> getAllDeviceDao(@NonNull final DaoSession session) {
+        final Map<AbstractDao<?, ?>, Property> map = new HashMap<>();
+        map.put(session.getPolarIgnite3ActivitySampleDao(), PolarIgnite3ActivitySampleDao.Properties.DeviceId);
+        map.put(session.getGenericSleepStageSampleDao(), GenericSleepStageSampleDao.Properties.DeviceId);
+        map.put(session.getGenericHrvValueSampleDao(), GenericHrvValueSampleDao.Properties.DeviceId);
+        map.put(session.getGenericRespiratoryRateSampleDao(), GenericRespiratoryRateSampleDao.Properties.DeviceId);
+        map.put(session.getGenericSleepScoreSampleDao(), GenericSleepScoreSampleDao.Properties.DeviceId);
+        map.put(session.getGenericTemperatureSampleDao(), GenericTemperatureSampleDao.Properties.DeviceId);
+        return map;
     }
 
     @Override

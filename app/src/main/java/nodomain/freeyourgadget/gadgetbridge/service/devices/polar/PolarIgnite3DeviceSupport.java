@@ -113,6 +113,7 @@ public class PolarIgnite3DeviceSupport extends AbstractBTLESingleDeviceSupport {
     @Nullable
     private Operation currentOperation;
     private boolean ready;
+    private boolean syncing;
     private final PftpFraming.Reassembler mtuReassembler = new PftpFraming.Reassembler();
     private final PftpFraming.Reassembler d2hReassembler = new PftpFraming.Reassembler();
     private final Handler handler = new Handler(Looper.getMainLooper());
@@ -148,6 +149,7 @@ public class PolarIgnite3DeviceSupport extends AbstractBTLESingleDeviceSupport {
             operations.clear();
             currentOperation = null;
             ready = false;
+            syncing = false;
             mtuReassembler.reset();
             d2hReassembler.reset();
         }
@@ -183,6 +185,30 @@ public class PolarIgnite3DeviceSupport extends AbstractBTLESingleDeviceSupport {
         getFile(PATH_DEVICE_SETTINGS, this::handleDeviceSettings);
         getFile(PATH_GENERAL_PREFERENCES, this::handleGeneralPreferences);
         getFile(PATH_PHYSICAL_DATA, this::handlePhysicalData);
+        syncHealthData();
+    }
+
+    private void syncHealthData() {
+        synchronized (this) {
+            if (syncing) {
+                return;
+            }
+            syncing = true;
+        }
+        new PolarHealthSync(getDevice(),
+                (path, callback) -> getFile(path, message ->
+                        callback.accept(path, message == null || message.isStatus() ? null : message.payload)),
+                () -> {
+                    synchronized (this) {
+                        syncing = false;
+                    }
+                    GB.signalActivityDataFinish(getDevice());
+                }).start();
+    }
+
+    @Override
+    public void onFetchRecordedData(final int dataTypes) {
+        syncHealthData();
     }
 
     @Override
@@ -192,6 +218,7 @@ public class PolarIgnite3DeviceSupport extends AbstractBTLESingleDeviceSupport {
             operations.clear();
             currentOperation = null;
             ready = false;
+            syncing = false;
         }
         super.dispose();
     }
@@ -346,8 +373,7 @@ public class PolarIgnite3DeviceSupport extends AbstractBTLESingleDeviceSupport {
                 handleMediaControlCommand(params);
                 return;
             case PftpConstants.D2H_SYNC_REQUIRED:
-                // Data sync is not implemented yet
-                LOG.info("Watch requests a sync: {}", GB.hexdump(params));
+                syncHealthData();
                 return;
             default:
                 LOG.debug("Unhandled PFTP notification {}: {}", id, GB.hexdump(params));
