@@ -368,10 +368,14 @@ public class CasioGBD200DeviceSupport extends Casio2C2DSupport
                     } catch (IOException e) {
                         LOG.warn("session_event_ack failed: {}", e.getMessage());
                     }
-                    OpenTracksController.startRecording(getContext(), ActivityKind.RUNNING);
+                    if (getDevicePrefs().getBoolean(DeviceSettingsPreferenceConst.PREF_WORKOUT_START_ON_PHONE, false)) {
+                        OpenTracksController.startRecording(getContext(), ActivityKind.RUNNING);
+                    }
                 } else if (data[1] == 0x01) {
                     LOG.info("Running session ended on watch (0x48 0x01)");
-                    OpenTracksController.stopRecording(getContext());
+                    if (getDevicePrefs().getBoolean(DeviceSettingsPreferenceConst.PREF_WORKOUT_START_ON_PHONE, false)) {
+                        OpenTracksController.stopRecording(getContext());
+                    }
                 }
                 return true;
             }
