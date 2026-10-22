@@ -32,6 +32,7 @@ import java.util.UUID;
 
 import nodomain.freeyourgadget.gadgetbridge.devices.casio.CasioConstants;
 import nodomain.freeyourgadget.gadgetbridge.externalevents.opentracks.OpenTracksController;
+import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsPreferenceConst;
 import nodomain.freeyourgadget.gadgetbridge.model.ActivityKind;
 import nodomain.freeyourgadget.gadgetbridge.service.btle.AbstractBTLEOperation;
 import nodomain.freeyourgadget.gadgetbridge.service.btle.TransactionBuilder;
@@ -333,12 +334,15 @@ public class InitOperation extends AbstractBTLEOperation<CasioGGB100DeviceSuppor
                         LOG.info("Init[NEW_DATA] flags=0x{}: {}", String.format("%02x", flags),
                                 parts.length() > 0 ? parts.toString().trim() : "nothing pending");
 
-                        if (flags == 0x01) {
-                            LOG.info("Init[NEW_DATA] mission START — starting OpenTracks recording");
-                            OpenTracksController.startRecording(getContext(), ActivityKind.ACTIVITY);
-                        } else if (flags == 0x03) {
-                            LOG.info("Init[NEW_DATA] mission GOAL — stopping OpenTracks recording");
-                            OpenTracksController.stopRecording(getContext());
+                        if (mSupport.getDevicePrefs().getBoolean(
+                                DeviceSettingsPreferenceConst.PREF_WORKOUT_START_ON_PHONE, false)) {
+                            if (flags == 0x01) {
+                                LOG.info("Init[NEW_DATA] mission START — starting OpenTracks recording");
+                                OpenTracksController.startRecording(getContext(), ActivityKind.ACTIVITY);
+                            } else if (flags == 0x03) {
+                                LOG.info("Init[NEW_DATA] mission GOAL — stopping OpenTracks recording");
+                                OpenTracksController.stopRecording(getContext());
+                            }
                         }
                     }
                     // Reasons 00/01/03/08 fetch the mission log and life log blocks
