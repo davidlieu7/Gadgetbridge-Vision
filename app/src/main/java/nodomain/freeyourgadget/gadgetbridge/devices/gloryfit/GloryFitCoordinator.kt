@@ -29,6 +29,7 @@ import nodomain.freeyourgadget.gadgetbridge.devices.DeviceCardAction
 import nodomain.freeyourgadget.gadgetbridge.devices.DeviceCoordinator
 import nodomain.freeyourgadget.gadgetbridge.devices.GenericSpo2SampleProvider
 import nodomain.freeyourgadget.gadgetbridge.devices.SampleProvider
+import nodomain.freeyourgadget.gadgetbridge.devices.SleepSessionProvider
 import nodomain.freeyourgadget.gadgetbridge.devices.TimeSampleProvider
 import nodomain.freeyourgadget.gadgetbridge.entities.AbstractActivitySample
 import nodomain.freeyourgadget.gadgetbridge.entities.DaoSession
@@ -74,6 +75,13 @@ abstract class GloryFitCoordinator : AbstractBLEDeviceCoordinator() {
         session: DaoSession
     ): SampleProvider<out AbstractActivitySample>? {
         return GloryFitActivitySampleProvider(device, session)
+    }
+
+    override fun getSleepSessionProvider(
+        device: GBDevice,
+        session: DaoSession
+    ): SleepSessionProvider {
+        return GloryFitSleepSessionProvider(device, session)
     }
 
     override fun getSpo2SampleProvider(

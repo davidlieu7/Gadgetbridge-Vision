@@ -19,6 +19,8 @@ package nodomain.freeyourgadget.gadgetbridge.adapter;
 
 import android.content.Context;
 import android.content.Intent;
+import android.os.Handler;
+import android.os.Looper;
 import android.text.TextUtils;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -63,32 +65,50 @@ public class AppBlacklistAdapter extends RecyclerView.Adapter<AppBlacklistAdapte
 
     private ApplicationFilter applicationFilter;
 
-    public AppBlacklistAdapter(int layoutId, Context context) {
+    public AppBlacklistAdapter(final int layoutId, final Context context, final Runnable onLoaded) {
         mLayoutId = layoutId;
         mContext = context;
+        applicationInfoList = new ArrayList<>();
+        mNameMap = new IdentityHashMap<>();
 
-        applicationInfoList = NotificationUtils.getAllApplications(mContext);
+        loadApplications(onLoaded);
+    }
 
-        // sort the package list by label and blacklist status
-        mNameMap = new IdentityHashMap<>(applicationInfoList.size());
-        for (String packageName : applicationInfoList) {
-            String name = NotificationUtils.getApplicationLabel(mContext, packageName);
-            if (name == null) {
-                name = packageName;
+    private void loadApplications(final Runnable onLoaded) {
+        final Context appContext = mContext.getApplicationContext();
+        new Thread(() -> {
+            final List<String> packageNames = NotificationUtils.getAllApplications(appContext);
+
+            // sort the package list by label and blacklist status
+            final IdentityHashMap<String, String> nameMap = new IdentityHashMap<>(packageNames.size());
+            for (final String packageName : packageNames) {
+                String name = NotificationUtils.getApplicationLabel(appContext, packageName);
+                if (name == null) {
+                    name = packageName;
+                }
+                if (GBApplication.appIsNotifBlacklisted(packageName) || GBApplication.appIsPebbleBlacklisted(packageNameToPebbleMsgSender(packageName))) {
+                    // sort blacklisted first by prefixing with a '!'
+                    name = "!" + name;
+                }
+                nameMap.put(packageName, name);
             }
-            if (GBApplication.appIsNotifBlacklisted(packageName) || GBApplication.appIsPebbleBlacklisted(packageNameToPebbleMsgSender(packageName))) {
-                // sort blacklisted first by prefixing with a '!'
-                name = "!" + name;
-            }
-            mNameMap.put(packageName, name);
-        }
 
-        Collections.sort(applicationInfoList, (ai1, ai2) -> {
-            final String s1 = mNameMap.get(ai1);
-            final String s2 = mNameMap.get(ai2);
-            return s1.compareToIgnoreCase(s2);
-        });
+            Collections.sort(packageNames, (ai1, ai2) -> {
+                final String s1 = nameMap.get(ai1);
+                final String s2 = nameMap.get(ai2);
+                return s1.compareToIgnoreCase(s2);
+            });
 
+            LOG.debug("Loaded {} applications", packageNames.size());
+
+            new Handler(Looper.getMainLooper()).post(() -> {
+                mNameMap.putAll(nameMap);
+                applicationInfoList.addAll(packageNames);
+                applicationFilter = null;
+                notifyDataSetChanged();
+                onLoaded.run();
+            });
+        }, "AppBlacklistLoader").start();
     }
 
     @NonNull
@@ -226,7 +246,7 @@ public class AppBlacklistAdapter extends RecyclerView.Adapter<AppBlacklistAdapte
                         name = packageName;
                     }
                     if (name.toLowerCase().contains(filterPattern) ||
-                            (packageName.contains(filterPattern))) {
+                        (packageName.contains(filterPattern))) {
                         filteredList.add(packageName);
                     }
                 }

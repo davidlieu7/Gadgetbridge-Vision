@@ -403,7 +403,7 @@ public class FileUtils {
 
     /**
      * Replaces some wellknown invalid characters in the given filename
-     * to underscrores.
+     * to underscores.
      * @param name the file name to make valid
      * @return the valid file name
      */

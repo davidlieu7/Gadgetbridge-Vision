@@ -14,6 +14,7 @@ import android.widget.ProgressBar
 import android.widget.Space
 import android.widget.TextView
 import com.google.android.material.color.MaterialColors
+import nodomain.freeyourgadget.gadgetbridge.GBApplication
 
 import nodomain.freeyourgadget.gadgetbridge.R
 import nodomain.freeyourgadget.gadgetbridge.activities.workouts.StatTileData
@@ -23,6 +24,7 @@ import nodomain.freeyourgadget.gadgetbridge.activities.workouts.addSectionDivide
 import nodomain.freeyourgadget.gadgetbridge.activities.workouts.addSectionHeader
 import nodomain.freeyourgadget.gadgetbridge.activities.workouts.addStatTileGrid
 import nodomain.freeyourgadget.gadgetbridge.entities.BaseActivitySummary
+import nodomain.freeyourgadget.gadgetbridge.entities.Device
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice
 import nodomain.freeyourgadget.gadgetbridge.model.ActivityKind
 import nodomain.freeyourgadget.gadgetbridge.model.ActivitySummaryEntries
@@ -34,7 +36,6 @@ import java.util.concurrent.TimeUnit
 
 class WorkoutSummariesAdapter(
     context: Context,
-    private val device: GBDevice,
     private var activityKindFilter: Int,
     private var dateFromFilter: Long,
     private var dateToFilter: Long,
@@ -100,6 +101,11 @@ class WorkoutSummariesAdapter(
 
     fun getActivityKindFilter(): Int = activityKindFilter
 
+    private fun getGBDevice(device: Device): GBDevice {
+        return GBApplication.app().deviceManager.devices
+            .first { it.address.equals(device.identifier, ignoreCase = true) }
+    }
+
     inner class ActivityItemViewHolder(itemView: View) : AbstractActivityListingViewHolder<BaseActivitySummary>(itemView) {
         private val iconView: ImageView = itemView.findViewById(R.id.workout_row_icon)
         private val nameView: TextView = itemView.findViewById(R.id.workout_row_name)
@@ -120,6 +126,8 @@ class WorkoutSummariesAdapter(
             )
             val hasName = !summary.name.isNullOrBlank()
 
+            if (summary.device == null) return
+            val device = getGBDevice(summary.device)
             val parser = device.deviceCoordinator.getActivitySummaryParser(device, itemView.context)
             val workout = parser.parseWorkout(summary, false)
 

@@ -403,13 +403,15 @@ public abstract class AbstractChartFragment<D extends ChartsData> extends Abstra
         protected void onPostExecute(final Object o) {
             super.onPostExecute(o);
             final FragmentActivity activity = getActivity();
+            loadingHandler.removeCallbacksAndMessages(null);
+            if (activity instanceof ChartsHost) {
+                hideLoading((ChartsHost) activity);
+            }
+
             if (activity == null || activity.isFinishing() || activity.isDestroyed() || getView() == null) {
                 LOG.info("Not rendering charts because activity is not available anymore");
                 return;
             }
-
-            loadingHandler.removeCallbacksAndMessages(null);
-            hideLoading(getChartsHost());
 
             if (getTaskError() != null) {
                 // Async task failed - we will have no data, so avoid NPE crashes

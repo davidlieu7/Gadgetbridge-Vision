@@ -20,7 +20,6 @@ import android.content.Context
 import android.content.DialogInterface
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
-import android.graphics.Matrix
 import android.net.Uri
 import android.text.InputType
 import android.view.ViewGroup
@@ -41,6 +40,7 @@ import nodomain.freeyourgadget.gadgetbridge.entities.BaseActivitySummary
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice
 import nodomain.freeyourgadget.gadgetbridge.model.workout.Workout
 import nodomain.freeyourgadget.gadgetbridge.model.ActivityKind
+import nodomain.freeyourgadget.gadgetbridge.util.BitmapUtil
 import nodomain.freeyourgadget.gadgetbridge.util.FileUtils
 import nodomain.freeyourgadget.gadgetbridge.util.GB
 import org.slf4j.LoggerFactory
@@ -344,27 +344,6 @@ class WorkoutEditor(private val context: Context, resultCaller: ActivityResultCa
         }
     }
 
-    private fun matrixForExifOrientation(orientation: Int): Matrix {
-        val matrix = Matrix()
-        when (orientation) {
-            ExifInterface.ORIENTATION_FLIP_HORIZONTAL -> matrix.postScale(-1f, 1f)
-            ExifInterface.ORIENTATION_ROTATE_180 -> matrix.postRotate(180f)
-            ExifInterface.ORIENTATION_FLIP_VERTICAL -> matrix.postScale(1f, -1f)
-            ExifInterface.ORIENTATION_TRANSPOSE -> {
-                matrix.postRotate(90f)
-                matrix.postScale(-1f, 1f)
-            }
-            ExifInterface.ORIENTATION_ROTATE_90 -> matrix.postRotate(90f)
-            ExifInterface.ORIENTATION_TRANSVERSE -> {
-                matrix.postRotate(-90f)
-                matrix.postScale(-1f, 1f)
-            }
-            ExifInterface.ORIENTATION_ROTATE_270 -> matrix.postRotate(-90f)
-            else -> {} // ORIENTATION_NORMAL / ORIENTATION_UNDEFINED
-        }
-        return matrix
-    }
-
     private fun decodeRotateAndResize(
         uri: Uri,
         originalWidth: Int,
@@ -377,7 +356,7 @@ class WorkoutEditor(private val context: Context, resultCaller: ActivityResultCa
             BitmapFactory.decodeStream(input, null, decodeOptions)
         } ?: return null
 
-        val orientationMatrix = matrixForExifOrientation(orientation)
+        val orientationMatrix = BitmapUtil.matrixForExifOrientation(orientation)
         val rotatedBitmap = if (orientationMatrix.isIdentity) {
             sampledBitmap
         } else {

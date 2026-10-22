@@ -927,7 +927,9 @@ public class NotificationListener extends NotificationListenerService {
                     try (Cursor cursor = contentResolver.query(lastMessage.getDataUri(), null, null, null, null)) {
                         if (cursor != null && cursor.moveToFirst()) {
                             int dataIndex = cursor.getColumnIndex(MediaStore.Images.Media.DATA);
-                            notificationSpec.setPicturePath(cursor.getString(dataIndex));
+                            if (dataIndex >= 0) {
+                                notificationSpec.setPicturePath(cursor.getString(dataIndex));
+                            }
                         }
                     } catch (Exception e) {
                         LOG.error("Failed to get notification picture path", e);
@@ -1255,7 +1257,7 @@ public class NotificationListener extends NotificationListenerService {
                 source.equals("com.simplemobiletools.smsmessenger") ||
                 source.equals("dev.octoshrimpy.quik")) {
             if (!"never".equals(prefs.getString("notification_mode_sms", "when_screen_off"))) {
-                LOG.info("Ignoring notification, it's an sms notification");
+                LOG.info("Ignoring notification, it's a sms notification");
                 return true;
             }
         }

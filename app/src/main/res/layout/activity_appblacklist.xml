@@ -9,8 +9,9 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_alignParentTop="true"
+        android:paddingStart="16dp"
         android:paddingEnd="16dp"
-        android:paddingStart="16dp">
+        android:visibility="gone">
 
     </androidx.appcompat.widget.SearchView>
 
@@ -21,5 +22,12 @@
         android:layout_below="@id/appListViewSearch"
         android:layout_centerHorizontal="true"
         android:divider="@null" />
+
+    <ProgressBar
+        android:id="@+id/appListLoading"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_centerInParent="true"
+        android:indeterminate="true" />
 
 </RelativeLayout>

@@ -324,6 +324,13 @@ public class GBDeviceService implements DeviceService {
     }
 
     @Override
+    public void onInstall(final long sessionId) {
+        final Intent intent = createIntent().setAction(ACTION_INSTALL_SESSION)
+                .putExtra(EXTRA_INSTALL_SESSION_ID, sessionId);
+        invokeService(intent);
+    }
+
+    @Override
     public void onAppInfoReq() {
         Intent intent = createIntent().setAction(ACTION_REQUEST_APPINFO);
         invokeService(intent);

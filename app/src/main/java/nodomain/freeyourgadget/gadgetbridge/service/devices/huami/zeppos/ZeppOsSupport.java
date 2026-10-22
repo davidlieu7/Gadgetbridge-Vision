@@ -76,7 +76,6 @@ import nodomain.freeyourgadget.gadgetbridge.devices.huami.HuamiService;
 import nodomain.freeyourgadget.gadgetbridge.devices.huami.zeppos.ZeppOsAgpsInstallHandler;
 import nodomain.freeyourgadget.gadgetbridge.devices.huami.zeppos.ZeppOsGpxRouteInstallHandler;
 import nodomain.freeyourgadget.gadgetbridge.devices.miband.MiBandCoordinator;
-import nodomain.freeyourgadget.gadgetbridge.externalevents.CalendarReceiver;
 import nodomain.freeyourgadget.gadgetbridge.externalevents.sleepasandroid.SleepAsAndroidAction;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDeviceApp;
 import nodomain.freeyourgadget.gadgetbridge.model.Alarm;
@@ -140,10 +139,10 @@ import nodomain.freeyourgadget.gadgetbridge.service.devices.huami.zeppos.service
 import nodomain.freeyourgadget.gadgetbridge.service.devices.huami.zeppos.services.ZeppOsWatchfaceService;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.huami.zeppos.services.ZeppOsWeatherService;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.huami.zeppos.services.ZeppOsWifiService;
-import nodomain.freeyourgadget.gadgetbridge.service.ftp.WifiFtpSessionRegistry;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.huami.zeppos.services.ZeppOsWorkoutService;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.huami.zeppos.services.ZeppOsWorldClocksService;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.huami.zeppos.workouts.ZeppOsWorkoutTemplateUploader;
+import nodomain.freeyourgadget.gadgetbridge.service.wifi.WifiSessionRegistry;
 import nodomain.freeyourgadget.gadgetbridge.util.FileUtils;
 import nodomain.freeyourgadget.gadgetbridge.util.GB;
 import nodomain.freeyourgadget.gadgetbridge.util.Prefs;
@@ -282,7 +281,7 @@ public class ZeppOsSupport extends AbstractBluetoothDeviceSupport
             ftpExecutor = Executors.newSingleThreadExecutor();
             ftpMusicManager = new ZeppOsFtpMusicManager(this, wifiFtpSession, ftpExecutor);
             voiceMemosService.setFtpSession(wifiFtpSession, ftpExecutor);
-            WifiFtpSessionRegistry.register(gbDevice.getAddress(), wifiFtpSession);
+            WifiSessionRegistry.register(gbDevice.getAddress(), wifiFtpSession);
         }
     }
 
@@ -301,7 +300,7 @@ public class ZeppOsSupport extends AbstractBluetoothDeviceSupport
     public void dispose() {
         sleepAsAndroidSender.stopTracking();
         if (wifiFtpSession != null) {
-            WifiFtpSessionRegistry.unregister(gbDevice.getAddress(), wifiFtpSession);
+            WifiSessionRegistry.unregister(gbDevice.getAddress(), wifiFtpSession);
             voiceMemosService.setFtpSession(null, null);
             ftpExecutor.shutdownNow();
             wifiFtpSession.dispose();
@@ -738,7 +737,8 @@ public class ZeppOsSupport extends AbstractBluetoothDeviceSupport
             builder.queue();
         }
 
-        CalendarReceiver.forceSync(getDevice());
+        calendarService.syncCalendar();
+
     }
 
     @Override
@@ -1127,7 +1127,7 @@ public class ZeppOsSupport extends AbstractBluetoothDeviceSupport
         } else if (HuamiService.UUID_CHARACTERISTIC_ZEPP_OS_FILE_TRANSFER_V3_RECEIVE.equals(characteristicUUID)) {
             fileTransferService.onCharacteristicChanged(characteristicUUID, value);
             return true;
-        } else if (GattCharacteristic.UUID_CHARACTERISTIC_HEART_RATE_MEASUREMENT.equals(characteristicUUID)) {
+        } else if (GattCharacteristic.CHARACTERISTIC_HEART_RATE_MEASUREMENT.equals(characteristicUUID)) {
             heartRateService.handleHeartRate(value);
             return true;
         } else if (HuamiService.UUID_CHARACTERISTIC_RAW_SENSOR_DATA.equals(characteristicUUID)) {

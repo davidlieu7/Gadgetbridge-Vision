@@ -379,7 +379,7 @@ public class FitExporter {
                     gpsDistanceForPoint = gpsCumulativeDistance;
                 }
                 // Pause / segment-break markers — most non-Garmin parsers signal these via
-                // ActivityPoint.description. Emit a TIMER STOP_ALL event so importers that
+                // ActivityPoint.description. Emit a TIMER STOP_DISABLE_ALL event so importers that
                 // honour pauses (Strava, Garmin Connect) see them. Skip if a STOP/START
                 // event was already emitted at this same second.
                 if (p.getDescription() != null && !p.getDescription().isEmpty() && ts != lastEventTs) {
@@ -840,9 +840,6 @@ public class FitExporter {
             b.setEndPositionLong(last.getLongitude());
         }
         // Bounding box — drives map preview in Strava / Garmin Connect / Endurain.
-        // Note: codegen currently maps setNecLat to FIT field 25 and setNecLong to 26
-        // (legacy event_group slot); reader uses field 26 for nec_long and 27/28 for
-        // swc_lat/long so round-trip is self-consistent. Fix codegen mapping later.
         if (agg.hasBoundingBox()) {
             b.setNecLat(agg.getMaxLat());
             b.setNecLong(agg.getMaxLong());
@@ -870,7 +867,7 @@ public class FitExporter {
             final Double derived = deriveRowingDistanceMeters(overrides.strokes, strokeLen);
             if (derived != null) {
                 distance = derived;
-                b.setAvgStrokeDistance((int) Math.round(strokeLen * 100.0));
+                b.setAvgStrokeDistance((float) strokeLen);
             }
         }
         if (distance != null) {
@@ -1046,10 +1043,7 @@ public class FitExporter {
         b.setEventType(EventType.STOP);
         b.setSport(sport);
         b.setSubSport(subSport);
-        // SESSION field 7 (total_elapsed_time) is unscaled in NativeFITMessage and stored
-        // as-is in ms. Field 8 (total_timer_time) carries scale=1000 — the codec multiplies
-        // raw seconds by 1000 on encode, so pass seconds.
-        b.setTotalElapsedTime(elapsedSeconds * 1000L);
+        b.setTotalElapsedTime((double) elapsedSeconds);
         b.setTotalTimerTime((double) elapsedSeconds);
         b.setNumLaps(numLaps);
         b.setFirstLapIndex(0);

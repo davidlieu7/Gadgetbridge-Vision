@@ -242,6 +242,7 @@ public class DeviceSettingsPreferenceConst {
     public static final String PREF_INACTIVITY_STEPS = "inactivity_warnings_steps";
 
     public static final String PREF_HEARTRATE_USE_FOR_SLEEP_DETECTION = "heartrate_sleep_detection";
+    public static final String PREF_SLEEP_STAGE_ESTIMATION = "sleep_stage_estimation";
     public static final String PREF_HEARTRATE_MEASUREMENT_INTERVAL = "heartrate_measurement_interval";
     public static final String PREF_BLOOD_PRESSURE_ACTIVE_USER = "blood_pressure_active_user";
     public static final String PREF_HEARTRATE_ACTIVITY_MONITORING = "heartrate_activity_monitoring";
@@ -249,10 +250,13 @@ public class DeviceSettingsPreferenceConst {
     public static final String PREF_HEARTRATE_ALERT_ACTIVE_HIGH_THRESHOLD = "heartrate_alert_active_high_threshold";
     public static final String PREF_HEARTRATE_ALERT_HIGH_THRESHOLD = "heartrate_alert_threshold";
     public static final String PREF_HEARTRATE_ALERT_LOW_THRESHOLD = "heartrate_alert_low_threshold";
+    public static final String PREF_HEARTRATE_ALERT_IRREGULAR_RHYTHM = "heartrate_alert_irregular_rhythm";
     public static final String PREF_HEARTRATE_STRESS_MONITORING = "heartrate_stress_monitoring";
     public static final String PREF_HEARTRATE_STRESS_RELAXATION_REMINDER = "heartrate_stress_relaxation_reminder";
     public static final String PREF_HEARTRATE_SLEEP_BREATHING_QUALITY_MONITORING = "heartrate_sleep_breathing_quality_monitoring";
+    public static final String PREF_HEARTRATE_SLEEP_RESPIRATORY_RATE_MONITORING = "heartrate_sleep_respiratory_rate_monitoring";
     public static final String PREF_SPO2_ALL_DAY_MONITORING = "spo2_all_day_monitoring_enabled";
+    public static final String PREF_SPO2_MONITORING_MODE = "spo2_monitoring_mode";
     public static final String PREF_SPO2_MEASUREMENT_INTERVAL = "spo2_measurement_interval";
     public static final String PREF_SPO2_MEASUREMENT_TIME = "spo2_measurement_time";
     public static final String PREF_SPO2_MEASUREMENT_START = "spo2_measurement_start";
@@ -551,6 +555,14 @@ public class DeviceSettingsPreferenceConst {
     public static final String PREF_SOUNDCORE_FIT_TEST = "pref_soundcore_fit_test";
     public static final String PREF_SOUNDCORE_LDAC_MODE = "pref_soundcore_ldac_mode";
     public static final String PREF_SOUNDCORE_GAMING_MODE = "pref_soundcore_gaming_mode";
+    public static final String PREF_SOUNDCORE_AUDIO_BALANCE = "pref_soundcore_audio_balance";
+    public static final String PREF_SOUNDCORE_LIGHT_ON = "pref_soundcore_light_on";
+    public static final String PREF_SOUNDCORE_LIGHT_MODE = "pref_soundcore_light_mode";
+    public static final String PREF_SOUNDCORE_LIGHT_BRIGHTNESS = "pref_soundcore_light_brightness";
+    public static final String PREF_SOUNDCORE_LIGHT_AUTO_OFF = "pref_soundcore_light_auto_off";
+    public static final String PREF_SOUNDCORE_LIGHT_COLOR_RED = "pref_soundcore_light_color_red";
+    public static final String PREF_SOUNDCORE_LIGHT_COLOR_GREEN = "pref_soundcore_light_color_green";
+    public static final String PREF_SOUNDCORE_LIGHT_COLOR_BLUE = "pref_soundcore_light_color_blue";
     public static final String PREF_SOUNDCORE_ADAPTIVE_DIRECTION = "pref_soundcore_adaptive_direction";
     public static final String PREF_SOUNDCORE_EQUALIZER_PRESET = "pref_soundcore_equalizer_preset";
     public static final String PREF_SOUNDCORE_EQUALIZER_CUSTOM = "pref_soundcore_equalizer_custom";
@@ -574,8 +586,6 @@ public class DeviceSettingsPreferenceConst {
     public static final String PREF_SOUNDCORE_EQUALIZER_BAND8_VALUE = "pref_soundcore_equalizer_band8_value";
     public static final String PREF_SOUNDCORE_EQUALIZER_BAND9_FREQ = "pref_soundcore_equalizer_band9_freq";
     public static final String PREF_SOUNDCORE_EQUALIZER_BAND9_VALUE = "pref_soundcore_equalizer_band9_value";
-    public static final String PREF_SOUNDCORE_FIND_LEFT_EARBUD = "pref_soundcore_find_left_earbud";
-    public static final String PREF_SOUNDCORE_FIND_RIGHT_EARBUD = "pref_soundcore_find_right_earbud";
     public static final String PREF_SOUNDCORE_A30I_DISABLE_OPTION_AMBIENT_MODE = "pref_soundcore_a30i_disable_option_ambient_mode";
     public static final String PREF_SOUNDCORE_A30I_DISABLE_OPTION_AMBIENT_SOUND_LEVEL = "pref_soundcore_a30i_disable_option_ambient_sound_level";
     public static final String PREF_SOUNDCORE_A30I_DISABLE_OPTION_WIND_NOISE_REDUCTION = "pref_soundcore_a30i_disable_option_wind_noise_reduction";
@@ -709,6 +719,10 @@ public class DeviceSettingsPreferenceConst {
     public static final String PREFS_ACTIVITY_IN_DEVICE_CARD_STEPS = "prefs_activity_in_device_card_steps";
     public static final String PREFS_ACTIVITY_IN_DEVICE_CARD_SLEEP = "prefs_activity_in_device_card_sleep";
     public static final String PREFS_ACTIVITY_IN_DEVICE_CARD_DISTANCE = "prefs_activity_in_device_card_distance";
+    public static final String PREF_DEVICE_CARD_SHOW_ITEMS = "pref_device_card_show_items";
+    public static final String PREF_DEVICE_CARD_ITEMS = "pref_device_card_items";
+    public static final String PREF_DEVICE_CARD_SHOW_QUICK_CONTROLS = "pref_device_card_show_quick_controls";
+    public static final String PREF_DEVICE_CARD_QUICK_CONTROLS = "pref_device_card_quick_controls";
     public static final String PREFS_DEVICE_CHARTS_TABS = "charts_tabs";
     public static final String PREFS_PER_APP_NOTIFICATION_SETTINGS = "pref_per_app_notification_settings";
     public static final String PREF_MULTIPOINT = "pref_multipoint";

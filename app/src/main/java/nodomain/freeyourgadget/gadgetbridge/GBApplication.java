@@ -30,6 +30,7 @@ import android.app.Application;
 import android.app.NotificationManager;
 import android.app.NotificationManager.Policy;
 import android.app.PendingIntent;
+import android.app.UiModeManager;
 import android.bluetooth.BluetoothAdapter;
 import android.content.Context;
 import android.content.Intent;
@@ -71,13 +72,13 @@ import java.util.Locale;
 import java.util.Set;
 
 import nodomain.freeyourgadget.gadgetbridge.activities.ControlCenterv2;
-import nodomain.freeyourgadget.gadgetbridge.activities.endurain.PeriodicEndurainTokenRefresher;
 import nodomain.freeyourgadget.gadgetbridge.database.DBHandler;
 import nodomain.freeyourgadget.gadgetbridge.database.DBHelper;
 import nodomain.freeyourgadget.gadgetbridge.database.PeriodicDbExporter;
 import nodomain.freeyourgadget.gadgetbridge.devices.DeviceManager;
 import nodomain.freeyourgadget.gadgetbridge.externalevents.BluetoothStateChangeReceiver;
 import nodomain.freeyourgadget.gadgetbridge.externalevents.opentracks.OpenTracksContentObserver;
+import nodomain.freeyourgadget.gadgetbridge.externalservices.ExternalServiceRegistry;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDeviceService;
 import nodomain.freeyourgadget.gadgetbridge.model.DeviceService;
@@ -86,7 +87,7 @@ import nodomain.freeyourgadget.gadgetbridge.model.weather.WeatherCacheManager;
 import nodomain.freeyourgadget.gadgetbridge.prefs.GBPrefsMigrator;
 import nodomain.freeyourgadget.gadgetbridge.service.NotificationCollectorMonitorService;
 import nodomain.freeyourgadget.gadgetbridge.util.AndroidUtils;
-import nodomain.freeyourgadget.gadgetbridge.util.BondingUtil;
+import nodomain.freeyourgadget.gadgetbridge.util.CompanionDeviceUtil;
 import nodomain.freeyourgadget.gadgetbridge.util.GB;
 import nodomain.freeyourgadget.gadgetbridge.util.GBPrefs;
 import nodomain.freeyourgadget.gadgetbridge.util.InternetHelperSingleton;
@@ -107,6 +108,11 @@ public class GBApplication extends Application {
     private static GBApplication context;
     private static DeviceService deviceService;
     private static SharedPreferences sharedPrefs;
+    private static final SharedPreferences.OnSharedPreferenceChangeListener themePreferenceListener = (final SharedPreferences sharedPreferences, final String key) -> {
+        if ("pref_key_theme".equals(key)) {
+            updateApplicationNightMode();
+        }
+    };
 
     private static final LimitedQueue<Integer, String> mIDSenderLookup = new LimitedQueue<>(16);
     private static GBPrefs prefs;
@@ -134,7 +140,7 @@ public class GBApplication extends Application {
 
     public static void quit() {
         LOG.info("Quitting Gadgetbridge...");
-        BondingUtil.StopObservingAll(getContext());
+        CompanionDeviceUtil.StopObservingAll(getContext());
         Intent quitIntent = new Intent(GBApplication.ACTION_QUIT);
         LocalBroadcastManager.getInstance(context).sendBroadcast(quitIntent);
         GBApplication.deviceService().quit();
@@ -144,7 +150,7 @@ public class GBApplication extends Application {
 
     public static void restart() {
         LOG.info("Restarting Gadgetbridge...");
-        BondingUtil.StopObservingAll(getContext());
+        CompanionDeviceUtil.StopObservingAll(getContext());
         final Intent quitIntent = new Intent(GBApplication.ACTION_QUIT);
         LocalBroadcastManager.getInstance(context).sendBroadcast(quitIntent);
         GBApplication.deviceService().quit();
@@ -253,6 +259,8 @@ public class GBApplication extends Application {
         }
 
         migratePrefsIfNeeded();
+        updateApplicationNightMode();
+        sharedPrefs.registerOnSharedPreferenceChangeListener(themePreferenceListener);
 
         setupExceptionHandler(prefs.getBoolean("crash_notification", isDebug()));
 
@@ -284,7 +292,7 @@ public class GBApplication extends Application {
         }
         startNotificationCollectorMonitorService();
 
-        BondingUtil.StartObservingAll(getBaseContext());
+        CompanionDeviceUtil.StartObservingAll(getBaseContext());
 
         if (prefs.getBoolean(GBPrefs.HEALTH_CONNECT_ENABLED, false)) {
             HealthConnectPermissionManager.checkAndRectifyPermissions(this);
@@ -293,9 +301,9 @@ public class GBApplication extends Application {
         // Ensure the InternetHelper is bound, so that it works on first usage
         InternetHelperSingleton.INSTANCE.ensureInternetHelperBound();
 
-        // Refresh Endurain tokens and schedule periodic refresh
+        // Let every external service schedule its own upkeep, such as renewing a token
         if (!GBEnvironment.env().isTest()) {
-            PeriodicEndurainTokenRefresher.INSTANCE.scheduleNextExecution(context);
+            ExternalServiceRegistry.scheduleBackgroundWork(context);
         }
     }
 
@@ -689,6 +697,28 @@ public class GBApplication extends Application {
             return (resources.getConfiguration().uiMode & Configuration.UI_MODE_NIGHT_MASK) == Configuration.UI_MODE_NIGHT_YES;
         } else {
             return selectedTheme.equals(context.getString(R.string.pref_theme_value_dark));
+        }
+    }
+
+    /**
+     * Ensures the splash screen follows the theme preference, if manually set to light or derk.
+     */
+    private static void updateApplicationNightMode() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.S) {
+            return;
+        }
+        final String selectedTheme = prefs.getString("pref_key_theme", context.getString(R.string.pref_theme_value_system));
+        final int nightMode;
+        if (selectedTheme.equals(context.getString(R.string.pref_theme_value_light))) {
+            nightMode = UiModeManager.MODE_NIGHT_NO;
+        } else if (selectedTheme.equals(context.getString(R.string.pref_theme_value_dark))) {
+            nightMode = UiModeManager.MODE_NIGHT_YES;
+        } else {
+            nightMode = UiModeManager.MODE_NIGHT_AUTO;
+        }
+        final UiModeManager uiModeManager = context.getSystemService(UiModeManager.class);
+        if (uiModeManager != null) {
+            uiModeManager.setApplicationNightMode(nightMode);
         }
     }
 

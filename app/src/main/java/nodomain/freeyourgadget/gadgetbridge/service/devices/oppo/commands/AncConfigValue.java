@@ -116,4 +116,56 @@ public enum AncConfigValue implements LabeledEntry {
         }
         return mask;
     }
+
+    public enum Level implements LabeledEntry {
+        HIGH(0x08, R.string.prefs_active_noise_cancelling_level_high),
+        NORMAL(0x10, R.string.prefs_active_noise_cancelling_level_normal),
+        LOW(0x04, R.string.prefs_active_noise_cancelling_level_low),
+        DYNAMIC(0x20, R.string.prefs_active_noise_cancelling_level_dynamic),
+        ;
+
+        private final int code;
+        private final int label;
+
+        Level(final int code, @StringRes final int label) {
+            this.code = code;
+            this.label = label;
+        }
+
+        @Override
+        @StringRes
+        public int getLabel() {
+            return label;
+        }
+
+        public int getCode() {
+            return code;
+        }
+
+        public String getPrefId() {
+            return this.name().toLowerCase();
+        }
+
+        @Nullable
+        public static Level fromCode(final int code) {
+            for (final Level param : Level.values()) {
+                if (param.getCode() == code) {
+                    return param;
+                }
+            }
+
+            return null;
+        }
+
+        @Nullable
+        public static Level fromPrefId(final String value) {
+            for (final Level param : Level.values()) {
+                if (param.name().equalsIgnoreCase(value)) {
+                    return param;
+                }
+            }
+
+            return null;
+        }
+    }
 }

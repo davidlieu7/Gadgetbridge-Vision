@@ -48,6 +48,7 @@ import nodomain.freeyourgadget.gadgetbridge.capabilities.loyaltycards.BarcodeFor
 import nodomain.freeyourgadget.gadgetbridge.capabilities.password.PasswordCapabilityImpl;
 import nodomain.freeyourgadget.gadgetbridge.capabilities.widgets.WidgetManager;
 import nodomain.freeyourgadget.gadgetbridge.devices.cards.DeviceCardItem;
+import nodomain.freeyourgadget.gadgetbridge.devices.cards.QuickControl;
 import nodomain.freeyourgadget.gadgetbridge.entities.BaseActivitySummary;
 import nodomain.freeyourgadget.gadgetbridge.entities.CyclingSample;
 import nodomain.freeyourgadget.gadgetbridge.entities.DaoSession;
@@ -55,6 +56,7 @@ import nodomain.freeyourgadget.gadgetbridge.entities.Device;
 import nodomain.freeyourgadget.gadgetbridge.entities.GenericTrainingLoadAcuteSample;
 import nodomain.freeyourgadget.gadgetbridge.entities.GenericTrainingLoadChronicSample;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
+import nodomain.freeyourgadget.gadgetbridge.install.InstallHandlerV2;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDeviceCandidate;
 import nodomain.freeyourgadget.gadgetbridge.model.AbstractNotificationPattern;
 import nodomain.freeyourgadget.gadgetbridge.model.ActivitySample;
@@ -175,6 +177,8 @@ public interface DeviceCoordinator {
         CAMERA,
         VACUUM,
         GAMEPAD,
+        GYM_EQUIPMENT,
+        PULSE_OXIMETER,
     }
 
     /**
@@ -239,10 +243,17 @@ public interface DeviceCoordinator {
      * Returns the Activity class to be started in order to perform a pairing of a
      * given device after its discovery.
      *
-     * @return the activity class for pairing/initial authentication, or null if none
+     * @return the activity class for pairing/initial authentication, or null for the default pairing activity
      */
     @Nullable
     Class<? extends Activity> getPairingActivity();
+
+    /**
+     * Returns a text that the default pairing activity displays during the pairing, for example a PIN or an
+     * action to do on the device.
+     */
+    @Nullable
+    CharSequence getPairingHint(Context context, GBDeviceCandidate candidate);
 
     @Nullable
     Class<? extends Activity> getCalibrationActivity();
@@ -578,6 +589,13 @@ public interface DeviceCoordinator {
     TimeSampleProvider<? extends SleepScoreSample> getSleepScoreProvider(@NonNull final GBDevice device, @NonNull final DaoSession session);
 
     /**
+     * Returns the {@link SleepSessionProvider} for the device being supported. A device that records
+     * sleep sessions natively can override this to supply them directly.
+     */
+    @NonNull
+    SleepSessionProvider getSleepSessionProvider(@NonNull final GBDevice device, @NonNull final DaoSession session);
+
+    /**
      * Returns the sample provider for blood pressure data, for the device being supported.
      */
     @Nullable
@@ -622,9 +640,17 @@ public interface DeviceCoordinator {
      * uri on the device being managed.
      * @return the {@link InstallHandler} or {@code null} if the {@link Uri} cannot be installed
      *   on the device
+     * @deprecated For new implementations, prefer {@link #findInstallHandlerV2}
      */
     @Nullable
+    @Deprecated
     InstallHandler findInstallHandler(Uri uri, @NonNull final Bundle options, @NonNull final Context context);
+
+    /**
+     * Finds the {@link InstallHandlerV2} that accepts the files, or null if not supported.
+     */
+    @Nullable
+    InstallHandlerV2 findInstallHandlerV2(@NonNull List<Uri> files, @NonNull Context context);
 
     /**
      * Returns true if this device/coordinator supports taking screenshots.
@@ -787,6 +813,12 @@ public interface DeviceCoordinator {
     File getWritableExportDirectory(@NonNull final GBDevice device, boolean createIfRequired) throws IOException;
 
     /**
+     * Returns the dedicated cache directory of this device.
+     * This directory will be deleted when the device is deleted.
+     */
+    File getDeviceCacheDir(@NonNull final GBDevice device);
+
+    /**
      * Returns a String containing the device app sort order filename.
      */
     @Nullable
@@ -889,6 +921,13 @@ public interface DeviceCoordinator {
      * like artist, title, album, play state etc.
      */
     boolean supportsMusicInfo(@NonNull final GBDevice device);
+
+    /**
+     * Indicates whether the device support provides a GallerySource to manage photos and videos on the device.
+     */
+    default boolean supportsGallery(@NonNull final GBDevice device) {
+        return false;
+    }
 
     /**
      * Indicates whether the device supports features required by Sleep As Android
@@ -1179,16 +1218,27 @@ public interface DeviceCoordinator {
     List<DeviceCardAction> getCustomActions();
 
     /**
-     * Returns the items to render in the device list card's icon row, in display order. The preset
-     * items are built from the capabilities, and then appended {@link #getCustomActions()}.
+     * Returns all the items that the device supports in the device list card's icon row, in the
+     * default display order. The preset items are built from the capabilities, and then appended
+     * {@link #getCustomActions()}.
      */
     List<DeviceCardItem> getCardItems(@NonNull final GBDevice device);
+
+    /**
+     * Returns the quick controls of the device card, in display order.
+     */
+    List<QuickControl> getQuickControls(@NonNull final GBDevice device);
 
     DeviceKind getDeviceKind(@NonNull final GBDevice device);
 
     HeartRateZonesSpec getHeartRateZonesSpec(@NonNull final GBDevice device);
 
     Set<BarcodeFormat> getSupportedBarcodeFormats(@NonNull final GBDevice device);
+
+    /**
+     * Whether the device can request a sync of loyalty cards.
+     */
+    boolean supportsLoyaltyCardsSyncRequest(@NonNull final GBDevice device);
 
     /**
      * @return delay in ms for this device to wait before a reconnection attempt is made.

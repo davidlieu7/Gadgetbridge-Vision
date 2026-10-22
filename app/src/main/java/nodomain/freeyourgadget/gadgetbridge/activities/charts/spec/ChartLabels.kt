@@ -24,14 +24,21 @@ fun labelFor(format: ChartValueFormat): (Double) -> String = when (format) {
     ChartValueFormat.DAY_OF_MONTH -> wholeLabeler(1..31, ::dayOfMonthLabel)
     ChartValueFormat.MONTH_OF_YEAR -> wholeLabeler(1..12) { monthOfYearLabel(it) }
     ChartValueFormat.EPOCH_DAY -> wholeLabeler(Int.MIN_VALUE..Int.MAX_VALUE) { dayOfMonthLabel(epochDay(it).dayOfMonth.toDouble()) }
+    ChartValueFormat.DURATION_MINUTES -> { value -> minutesLabel(value) }
+    ChartValueFormat.BAR_INDEX -> decimalLabeler("0")
 }
 
 /**
- * Uses day names for an [ChartValueFormat.EPOCH_DAY] axis of a week or less.
+ * Uses day names for an [ChartValueFormat.EPOCH_DAY] axis of a week or less, when [dayNames] is true.
  */
-fun labelFor(axis: AxisSpec): (Double) -> String {
-    if (axis.format == ChartValueFormat.EPOCH_DAY && isWeekOrLess(axis)) {
+fun labelFor(axis: AxisSpec, dayNames: Boolean = true): (Double) -> String {
+    if (axis.format == ChartValueFormat.EPOCH_DAY && dayNames && isWeekOrLess(axis)) {
         return wholeLabeler(Int.MIN_VALUE..Int.MAX_VALUE) { dayOfWeekLabel(epochDay(it).dayOfWeek.value.toDouble()) }
+    }
+    if (axis.format == ChartValueFormat.EPOCH_DAY && isOverTwoMonths(axis)) {
+        return wholeLabeler(Int.MIN_VALUE..Int.MAX_VALUE) {
+            epochDay(it).month.getDisplayName(TextStyle.SHORT_STANDALONE, Locale.getDefault())
+        }
     }
     return labelFor(axis.format)
 }
@@ -44,7 +51,14 @@ private fun isWeekOrLess(axis: AxisSpec): Boolean {
     return max - min < DAYS_PER_WEEK
 }
 
+private fun isOverTwoMonths(axis: AxisSpec): Boolean {
+    val min = axis.minimum ?: return false
+    val max = axis.maximum ?: return false
+    return max - min >= DAYS_IN_TWO_MONTHS
+}
+
 private const val DAYS_PER_WEEK = 7
+private const val DAYS_IN_TWO_MONTHS = 62
 
 private fun wholeLabeler(valid: IntRange, label: (Double) -> String): (Double) -> String = { value ->
     val whole = Math.round(value).toInt()
@@ -79,6 +93,11 @@ fun durationLabel(value: Double): String {
     }
 }
 
+fun minutesLabel(value: Double): String {
+    val minutes = Math.round(value)
+    return String.format(Locale.getDefault(), "%d:%02d", minutes / 60, minutes % 60)
+}
+
 /**
  * Short name of an ISO day of the week (1 = Monday), e.g. "Mon".
  */
@@ -103,29 +122,43 @@ fun dayOfMonthValues(lastDay: Int): List<Double> =
     (listOf(1) + (DAY_LABEL_STEP..lastDay step DAY_LABEL_STEP)).map { it.toDouble() }
 
 /**
- * 2 to 7 labels from [min] to [max] (epoch seconds), at a round time interval.
+ * 2 to 7 labels between [min] and [max] (epoch seconds), on round local times. [zoneOffsetSeconds] gives the
+ * offset from UTC at an epoch second.
  */
-fun timeLabelValues(min: Double, max: Double, maxLabels: Int): List<Double> {
+fun timeLabelValues(
+    min: Double,
+    max: Double,
+    maxLabels: Int,
+    zoneOffsetSeconds: (Double) -> Int = { 0 },
+    spacings: List<Double> = TIME_LABEL_SPACINGS_SECONDS,
+): List<Double> {
     val range = max - min
     if (range <= 0.0) return emptyList()
     val count = maxLabels.coerceIn(MIN_TIME_LABELS, MAX_TIME_LABELS)
     val minimumSpacing = range / count
-    val spacing = TIME_LABEL_SPACINGS_SECONDS.firstOrNull { it >= minimumSpacing }
+    val spacing = spacings.firstOrNull { it >= minimumSpacing }
         ?: (ceil(minimumSpacing / SECONDS_PER_DAY) * SECONDS_PER_DAY)
-    val values = generateSequence(0) { it + 1 }
-        .map { min + it * spacing }
+    val minOffset = zoneOffsetSeconds(min)
+    val firstLocal = ceil((min + minOffset) / spacing) * spacing
+    // The offset can change inside the range, so each local time is converted with the offset at that time
+    return generateSequence(0) { it + 1 }
+        .map { firstLocal + it * spacing }
+        .map { local -> local - zoneOffsetSeconds(local - minOffset) }
         .takeWhile { it <= max }
-        .toMutableList()
-    if (max - values.last() > spacing / 2) {
-        values += max
-    }
-    return values
+        .filter { it >= min }
+        .distinct()
+        .toList()
 }
 
 private const val MIN_TIME_LABELS = 2
 private const val MAX_TIME_LABELS = 7
 private const val SECONDS_PER_DAY = 24 * 60 * 60.0
 private val TIME_LABEL_SPACINGS_SECONDS = listOf(5, 10, 15, 30, 60, 120, 180, 240, 360, 720, 1440).map { it * 60.0 }
+
+/**
+ * Label spacings for a duration axis, which can be zoomed down to seconds.
+ */
+val DURATION_LABEL_SPACINGS_SECONDS = listOf(5.0, 10.0, 15.0, 30.0, 60.0, 120.0) + TIME_LABEL_SPACINGS_SECONDS
 
 /**
  * Label positions for period axes, or null to let the chart choose.
@@ -138,11 +171,24 @@ fun fixedLabelValues(xAxis: AxisSpec): List<Double>? {
         ChartValueFormat.DAY_OF_WEEK, ChartValueFormat.MONTH_OF_YEAR ->
             (min.toInt()..max.toInt()).map { it.toDouble() }
         ChartValueFormat.EPOCH_DAY -> (min.toLong()..max.toLong())
-            .filter { isWeekOrLess(xAxis) || isLabelledDayOfMonth(LocalDate.ofEpochDay(it).dayOfMonth) }
+            .filter {
+                val dayOfMonth = LocalDate.ofEpochDay(it).dayOfMonth
+                when {
+                    isWeekOrLess(xAxis) -> true
+                    isOverTwoMonths(xAxis) -> dayOfMonth == 1
+                    else -> isLabelledDayOfMonth(dayOfMonth)
+                }
+            }
             .map { it.toDouble() }
+        ChartValueFormat.BAR_INDEX -> {
+            val step = ceil((max - min + 1) / MAX_BAR_INDEX_LABELS).toInt().coerceAtLeast(1)
+            (min.toInt()..max.toInt() step step).map { it.toDouble() }
+        }
         else -> null
     }
 }
+
+private const val MAX_BAR_INDEX_LABELS = 6.0
 
 /**
  * Skips the 30th, which would collide with the next month's 1st.

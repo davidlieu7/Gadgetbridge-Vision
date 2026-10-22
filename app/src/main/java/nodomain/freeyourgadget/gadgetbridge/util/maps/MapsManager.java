@@ -46,10 +46,13 @@ public final class MapsManager {
     public static final String PREF_MAPS_FOLDER = "maps_folder";
     public static final String PREF_TRACK_COLOR = "maps_track_color";
     public static final String PREF_MAP_THEME = "maps_theme";
+    public static final String PREF_MAP_THEME_DARK = "maps_theme_dark";
     /** Theme value that uses the user-picked theme file instead of a bundled theme. */
     public static final String MAP_THEME_VALUE_CUSTOM = "custom";
     /** Content URI of the user-picked render theme, used when the theme is custom. */
     public static final String PREF_MAP_THEME_CUSTOM_URI = "maps_theme_custom_uri";
+    /** Content URI of the user-picked render theme, used in dark mode when the dark theme is custom. */
+    public static final String PREF_MAP_THEME_DARK_CUSTOM_URI = "maps_theme_dark_custom_uri";
 
     private final Context mContext;
     private final MapView mapView;
@@ -105,6 +108,9 @@ public final class MapsManager {
         tileRendererLayer.setXmlRenderTheme(mapDataLoader.resolveTheme());
         // Do not add the tile renderer layer before setting the bounding box in setTrack,
         // otherwise we load the entire map to memory and might crash with OOM
+        if (tileRenderedAdded) {
+            mapView.getLayerManager().getLayers().add(0, tileRendererLayer);
+        }
     }
 
     public boolean isMapLoaded() {

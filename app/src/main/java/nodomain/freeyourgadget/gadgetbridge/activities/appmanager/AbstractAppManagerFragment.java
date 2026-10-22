@@ -50,6 +50,7 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
+import com.google.android.material.progressindicator.CircularProgressIndicator;
 
 import org.apache.commons.lang3.StringUtils;
 import org.json.JSONException;
@@ -105,6 +106,7 @@ public abstract class AbstractAppManagerFragment extends Fragment {
 
     protected final List<GBDeviceApp> appList = new ArrayList<>();
     private GBDeviceAppAdapter mGBDeviceAppAdapter;
+    private CircularProgressIndicator appListLoading;
     protected GBDevice mGBDevice = null;
     protected DeviceCoordinator mCoordinator = null;
     private Class<? extends Activity> watchfaceDesignerActivity;
@@ -266,6 +268,7 @@ public abstract class AbstractAppManagerFragment extends Fragment {
             }
             switch (action) {
                 case ACTION_REFRESH_APPLIST: {
+                    appListLoading.setVisibility(View.GONE);
                     if (intent.hasExtra(EXTRA_APP_LIST)) {
                         LOG.info("got app info from device");
                         if (!isCacheManager()) {
@@ -463,6 +466,8 @@ public abstract class AbstractAppManagerFragment extends Fragment {
             GBApplication.deviceService(mGBDevice).onAppInfoReq();
             if (isCacheManager()) {
                 refreshList();
+            } else if (mGBDevice.isInitialized()) {
+                appListLoading.setVisibility(View.VISIBLE);
             }
         } else {
             refreshList();
@@ -494,6 +499,7 @@ public abstract class AbstractAppManagerFragment extends Fragment {
         View rootView = inflater.inflate(R.layout.activity_appmanager, container, false);
 
         RecyclerView appListView = rootView.findViewById(R.id.appListView);
+        appListLoading = rootView.findViewById(R.id.appListLoading);
 
         appListView.addOnScrollListener(new RecyclerView.OnScrollListener() {
             @Override

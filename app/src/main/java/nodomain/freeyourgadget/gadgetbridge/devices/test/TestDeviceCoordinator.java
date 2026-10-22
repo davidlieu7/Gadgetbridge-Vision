@@ -26,6 +26,7 @@ import androidx.annotation.Nullable;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.EnumSet;
 import java.util.HashSet;
@@ -44,15 +45,21 @@ import nodomain.freeyourgadget.gadgetbridge.capabilities.password.PasswordCapabi
 import nodomain.freeyourgadget.gadgetbridge.capabilities.widgets.WidgetManager;
 import nodomain.freeyourgadget.gadgetbridge.devices.AbstractDeviceCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.DeviceCoordinator;
+import nodomain.freeyourgadget.gadgetbridge.devices.GenericMetricSampleProvider;
+import nodomain.freeyourgadget.gadgetbridge.devices.HydrationSampleProvider;
 import nodomain.freeyourgadget.gadgetbridge.devices.InstallHandler;
 import nodomain.freeyourgadget.gadgetbridge.devices.SampleProvider;
 import nodomain.freeyourgadget.gadgetbridge.devices.TimeSampleProvider;
 import nodomain.freeyourgadget.gadgetbridge.devices.Vo2MaxSampleProvider;
+import nodomain.freeyourgadget.gadgetbridge.devices.cards.QuickControl;
 import nodomain.freeyourgadget.gadgetbridge.devices.roidmi.RoidmiConst;
 import nodomain.freeyourgadget.gadgetbridge.devices.test.activity.TestActivitySummaryParser;
 import nodomain.freeyourgadget.gadgetbridge.devices.test.activity.TestActivityTrackProvider;
 import nodomain.freeyourgadget.gadgetbridge.devices.test.samples.TestBloodPressureSampleProvider;
 import nodomain.freeyourgadget.gadgetbridge.devices.test.samples.TestBodyEnergySampleProvider;
+import nodomain.freeyourgadget.gadgetbridge.devices.test.samples.TestCyclingSampleProvider;
+import nodomain.freeyourgadget.gadgetbridge.devices.test.samples.TestGenericMetricSampleProvider;
+import nodomain.freeyourgadget.gadgetbridge.devices.test.samples.TestHeartRateRestingSampleProvider;
 import nodomain.freeyourgadget.gadgetbridge.devices.test.samples.TestHrvSummarySampleProvider;
 import nodomain.freeyourgadget.gadgetbridge.devices.test.samples.TestHrvValueSampleProvider;
 import nodomain.freeyourgadget.gadgetbridge.devices.test.samples.TestPaiSampleProvider;
@@ -75,6 +82,7 @@ import nodomain.freeyourgadget.gadgetbridge.entities.GenericTrainingLoadChronicS
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDeviceCandidate;
 import nodomain.freeyourgadget.gadgetbridge.model.AbstractNotificationPattern;
+import nodomain.freeyourgadget.gadgetbridge.model.Alarm;
 import nodomain.freeyourgadget.gadgetbridge.model.ActivitySample;
 import nodomain.freeyourgadget.gadgetbridge.model.ActivitySummaryParser;
 import nodomain.freeyourgadget.gadgetbridge.model.ActivityTrackProvider;
@@ -85,6 +93,7 @@ import nodomain.freeyourgadget.gadgetbridge.model.DeviceType;
 import nodomain.freeyourgadget.gadgetbridge.model.HeartRateSample;
 import nodomain.freeyourgadget.gadgetbridge.model.HrvSummarySample;
 import nodomain.freeyourgadget.gadgetbridge.model.HrvValueSample;
+import nodomain.freeyourgadget.gadgetbridge.model.MetricSample;
 import nodomain.freeyourgadget.gadgetbridge.model.PaiSample;
 import nodomain.freeyourgadget.gadgetbridge.model.RespiratoryRateSample;
 import nodomain.freeyourgadget.gadgetbridge.model.RestingMetabolicRateSample;
@@ -93,6 +102,7 @@ import nodomain.freeyourgadget.gadgetbridge.model.SolarChargeSample;
 import nodomain.freeyourgadget.gadgetbridge.model.Spo2Sample;
 import nodomain.freeyourgadget.gadgetbridge.model.StressSample;
 import nodomain.freeyourgadget.gadgetbridge.model.TemperatureSample;
+import nodomain.freeyourgadget.gadgetbridge.model.TrainingLoadStatus;
 import nodomain.freeyourgadget.gadgetbridge.model.Vo2MaxSample;
 import nodomain.freeyourgadget.gadgetbridge.model.WeightSample;
 import nodomain.freeyourgadget.gadgetbridge.model.WorkoutLoadSample;
@@ -173,8 +183,7 @@ public class TestDeviceCoordinator extends AbstractDeviceCoordinator {
 
     @Override
     public TimeSampleProvider<? extends HeartRateSample> getHeartRateRestingSampleProvider(final GBDevice device, final DaoSession session) {
-        // TODO getHeartRateRestingSampleProvider
-        return super.getHeartRateRestingSampleProvider(device, session);
+        return supportsHeartRateRestingMeasurement(device) ? new TestHeartRateRestingSampleProvider() : super.getHeartRateRestingSampleProvider(device, session);
     }
 
     @Override
@@ -221,6 +230,69 @@ public class TestDeviceCoordinator extends AbstractDeviceCoordinator {
     @Override
     public TimeSampleProvider<? extends GenericTrainingLoadChronicSample> getTrainingChronicLoadSampleProvider(final GBDevice device, final DaoSession session) {
         return supportsTrainingLoadChronic(device) ? new TestTrainingLoadChronicSampleProvider() : super.getTrainingChronicLoadSampleProvider(device, session);
+    }
+
+    @Override
+    public TrainingLoadStatus getTrainingLoadStatus(@NonNull final GBDevice device, @NonNull final DaoSession session, final long untilTs) {
+        if (!supportsTrainingLoad(device)) {
+            return super.getTrainingLoadStatus(device, session, untilTs);
+        }
+        final GenericTrainingLoadAcuteSample acute = new TestTrainingLoadAcuteSampleProvider().getLatestSample(untilTs);
+        final GenericTrainingLoadChronicSample chronic = new TestTrainingLoadChronicSampleProvider().getLatestSample(untilTs);
+        if (acute == null || chronic == null) {
+            return null;
+        }
+        final float ratio = (float) acute.getValue() / chronic.getValue();
+        if (ratio < 0.8f) {
+            return TrainingLoadStatus.LOW;
+        } else if (ratio <= 1.3f) {
+            return TrainingLoadStatus.OPTIMAL;
+        } else if (ratio <= 1.5f) {
+            return TrainingLoadStatus.HIGH;
+        }
+        return TrainingLoadStatus.VERY_HIGH;
+    }
+
+    @Override
+    public GenericMetricSampleProvider getMetricsSampleProvider(@NonNull final GBDevice device, @NonNull final DaoSession session) {
+        return new TestGenericMetricSampleProvider(device, session);
+    }
+
+    @NonNull
+    @Override
+    public Set<MetricSample.Metric> supportsMetrics(@NonNull final GBDevice device) {
+        final Set<MetricSample.Metric> metrics = EnumSet.noneOf(MetricSample.Metric.class);
+        if (supports(device, TestFeature.GENERIC_METRICS)) {
+            metrics.addAll(EnumSet.complementOf(EnumSet.of(MetricSample.Metric.UNKNOWN)));
+            return metrics;
+        }
+        if (supportsTrainingLoad(device)) {
+            metrics.add(MetricSample.Metric.GENERIC_TRAINING_LOAD_ACUTE);
+        }
+        if (supportsTrainingLoadChronic(device)) {
+            metrics.add(MetricSample.Metric.GENERIC_TRAINING_LOAD_CHRONIC);
+        }
+        if (supportsRacePrediction(device)) {
+            metrics.add(MetricSample.Metric.GENERIC_RACE_PREDICTOR_5K);
+            metrics.add(MetricSample.Metric.GENERIC_RACE_PREDICTOR_10K);
+            metrics.add(MetricSample.Metric.GENERIC_RACE_PREDICTOR_HALF_MARATHON);
+            metrics.add(MetricSample.Metric.GENERIC_RACE_PREDICTOR_FULL_MARATHON);
+        }
+        if (supportsTrainingReadiness(device)) {
+            metrics.add(MetricSample.Metric.GARMIN_TRAINING_READINESS);
+            metrics.add(MetricSample.Metric.GARMIN_RECOVERY_TIME);
+        }
+        return metrics;
+    }
+
+    @Override
+    public TimeSampleProvider<CyclingSample> getCyclingSampleProvider(final GBDevice device, final DaoSession session) {
+        return supportsCyclingData(device) ? new TestCyclingSampleProvider() : super.getCyclingSampleProvider(device, session);
+    }
+
+    @Override
+    public HydrationSampleProvider getHydrationSampleProvider(final GBDevice device, final DaoSession session) {
+        return supportsHydration(device) ? new HydrationSampleProvider(device, session) : super.getHydrationSampleProvider(device, session);
     }
 
     @Override
@@ -301,6 +373,13 @@ public class TestDeviceCoordinator extends AbstractDeviceCoordinator {
     @Override
     public boolean supportsSmartWakeupInterval(@NonNull GBDevice device, int alarmPosition) {
         return supports(getTestDevice(), TestFeature.SMART_WAKEUP_INTERVAL) && (alarmPosition == 1 || alarmPosition == 3);
+    }
+
+    @Override
+    public String getSmartWakeupDescription(@NonNull final GBDevice device) {
+        return supports(getTestDevice(), TestFeature.SMART_WAKEUP_DESCRIPTION)
+            ? "Test device smart wake up description."
+            : super.getSmartWakeupDescription(device);
     }
 
     @Override
@@ -467,6 +546,21 @@ public class TestDeviceCoordinator extends AbstractDeviceCoordinator {
     }
 
     @Override
+    public boolean supportsRacePrediction(@NonNull GBDevice device) {
+        return supports(getTestDevice(), TestFeature.RACE_PREDICTION);
+    }
+
+    @Override
+    public boolean supportsTrainingReadiness(@NonNull GBDevice device) {
+        return supports(getTestDevice(), TestFeature.TRAINING_READINESS);
+    }
+
+    @Override
+    public boolean supportsHydration(@NonNull GBDevice device) {
+        return supports(getTestDevice(), TestFeature.HYDRATION);
+    }
+
+    @Override
     public boolean supportsVO2Max(@NonNull GBDevice device) {
         return supports(getTestDevice(), TestFeature.VO2_MAX);
     }
@@ -494,6 +588,11 @@ public class TestDeviceCoordinator extends AbstractDeviceCoordinator {
     @Override
     public int getPaiName() {
         return R.string.menuitem_pai;
+    }
+
+    @Override
+    public boolean supportsPaiLow(@NonNull GBDevice device) {
+        return supports(getTestDevice(), TestFeature.PAI_LOW);
     }
 
     @Override
@@ -534,6 +633,26 @@ public class TestDeviceCoordinator extends AbstractDeviceCoordinator {
     @Override
     public boolean supportsAlarmDescription(@NonNull final GBDevice device) {
         return supports(getTestDevice(), TestFeature.ALARM_DESCRIPTION);
+    }
+
+    @Override
+    public boolean supportsAlarmSounds(@NonNull final GBDevice device) {
+        return supports(getTestDevice(), TestFeature.ALARM_SOUNDS);
+    }
+
+    @Override
+    public boolean supportsAlarmBacklight(@NonNull final GBDevice device) {
+        return supports(getTestDevice(), TestFeature.ALARM_BACKLIGHT);
+    }
+
+    @Override
+    public boolean supportsAlarmTitlePresets(@NonNull final GBDevice device) {
+        return supports(getTestDevice(), TestFeature.ALARM_TITLE_PRESETS);
+    }
+
+    @Override
+    public List<Alarm.ALARM_LABEL> getAlarmTitlePresets(@NonNull final GBDevice device) {
+        return Arrays.asList(Alarm.ALARM_LABEL.values());
     }
 
     @Override
@@ -713,7 +832,7 @@ public class TestDeviceCoordinator extends AbstractDeviceCoordinator {
         final BatteryConfig[] ret = new BatteryConfig[getBatteryCount(device)];
 
         for (int i = 0; i < getBatteryCount(device); i++) {
-            ret[i] = new BatteryConfig(i, R.drawable.ic_battery_full, R.string.battery);
+            ret[i] = new BatteryConfig(i, R.drawable.ic_battery_full, GBDevice.BATTERY_LABEL_DEFAULT);
         }
 
         return ret;
@@ -835,6 +954,14 @@ public class TestDeviceCoordinator extends AbstractDeviceCoordinator {
 
     protected static Prefs getPrefs(final GBDevice device) {
         return new Prefs(GBApplication.getDeviceSpecificSharedPrefs(device.getAddress()));
+    }
+
+    @Override
+    public List<QuickControl> getQuickControls(@NonNull final GBDevice device) {
+        if (!supports(device, TestFeature.QUICK_CONTROLS)) {
+            return Collections.emptyList();
+        }
+        return TestDeviceQuickControlsKt.testDeviceQuickControls();
     }
 
     @Override

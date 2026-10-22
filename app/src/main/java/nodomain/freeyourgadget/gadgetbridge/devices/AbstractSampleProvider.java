@@ -35,6 +35,7 @@ import java.util.Collections;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.ListIterator;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 import java.util.TimeZone;
@@ -53,6 +54,8 @@ import nodomain.freeyourgadget.gadgetbridge.entities.User;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
 import nodomain.freeyourgadget.gadgetbridge.model.ActivityKind;
 import nodomain.freeyourgadget.gadgetbridge.model.ActivitySample;
+import nodomain.freeyourgadget.gadgetbridge.model.SleepSession;
+import nodomain.freeyourgadget.gadgetbridge.model.SleepStage;
 import nodomain.freeyourgadget.gadgetbridge.util.DateTimeUtils;
 import nodomain.freeyourgadget.gadgetbridge.util.GB;
 
@@ -65,6 +68,8 @@ public abstract class AbstractSampleProvider<T extends AbstractActivitySample> i
     private static final Logger LOG = LoggerFactory.getLogger(AbstractSampleProvider.class);
 
     private static final int CUMULATIVE_COUNTER_DAY_BOUNDARY_MAX_GAP_SECONDS = 30 * 60;
+    private static final int LOOK_BACK_SECONDS = 12 * 60 * 60;
+
     private final DaoSession mSession;
     private final GBDevice mDevice;
 
@@ -703,6 +708,98 @@ public abstract class AbstractSampleProvider<T extends AbstractActivitySample> i
         dummySample.setActiveCalories(ActivitySample.NOT_MEASURED);
         dummySample.setProvider(this);
         return dummySample;
+    }
+
+    protected void overlaySleep(final SleepSessionProvider sleepSessionProvider,
+                                final List<T> samples,
+                                final int timestamp_from,
+                                final int timestamp_to) {
+        overlaySleep(sleepSessionProvider, samples, timestamp_from, timestamp_to, false);
+    }
+
+    protected void overlaySleep(final SleepSessionProvider sleepSessionProvider,
+                                final List<T> samples,
+                                final int timestamp_from,
+                                final int timestamp_to,
+                                final boolean keepIntensity) {
+        // Look further back than this window so a session that started before it (e.g. sleep that
+        // started the previous day) is still found and overlaid onto samples in this window.
+        final List<SleepSession> sleepSessions = sleepSessionProvider.getSleepSessions(
+                timestamp_from - LOOK_BACK_SECONDS,
+                timestamp_to
+        );
+
+        if (sleepSessions.isEmpty()) {
+            return;
+        }
+
+        if (!samples.isEmpty()) {
+            for (final T sample : samples) {
+                final ActivityKind sleepType = sleepKindAt(sleepSessions, sample.getTimestamp() * 1000L);
+                if (sleepType != null) {
+                    sample.setRawKind(toRawActivityKind(sleepType));
+                    if (!keepIntensity) {
+                        sample.setRawIntensity(ActivitySample.NOT_MEASURED);
+                    }
+                }
+            }
+        } else {
+            for (int ts = firstWholeMinute(timestamp_from); ts <= timestamp_to; ts += 60) {
+                final T sample = createDummySample(ts);
+                final ActivityKind sleepType = sleepKindAt(sleepSessions, ts * 1000L);
+                if (sleepType != null) {
+                    sample.setRawKind(toRawActivityKind(sleepType));
+                    sample.setRawIntensity(ActivitySample.NOT_MEASURED);
+                }
+                samples.add(sample);
+            }
+        }
+    }
+
+    protected void overlaySleep(final SleepSessionProvider sleepSessionProvider,
+                                final Map<Integer, T> sampleByTs,
+                                final int timestamp_from,
+                                final int timestamp_to) {
+        // Look further back than this window so a session that started before it (e.g. sleep that
+        // started the previous day) is still found and overlaid onto samples in this window.
+        final List<SleepSession> sleepSessions = sleepSessionProvider.getSleepSessions(
+                timestamp_from - LOOK_BACK_SECONDS,
+                timestamp_to
+        );
+
+        for (int ts = firstWholeMinute(timestamp_from); ts <= timestamp_to; ts += 60) {
+            final ActivityKind sleepKind = sleepKindAt(sleepSessions, ts * 1000L);
+            if (sleepKind == null) {
+                continue;
+            }
+            T sample = sampleByTs.get(ts);
+            if (sample == null) {
+                LOG.trace("Adding dummy sample at {} for sleep", ts);
+                sample = createActivitySample();
+                sample.setTimestamp(ts);
+                sample.setProvider(this);
+                sampleByTs.put(ts, sample);
+            }
+            sample.setRawKind(toRawActivityKind(sleepKind));
+            sample.setRawIntensity(ActivitySample.NOT_MEASURED);
+        }
+    }
+
+    private static int firstWholeMinute(final int timestamp) {
+        return (timestamp + 59) / 60 * 60;
+    }
+
+    @Nullable
+    public static ActivityKind sleepKindAt(final List<SleepSession> sessions, final long timestampMillis) {
+        for (SleepSession session : sessions) {
+            for (SleepStage stage : session.getStages()) {
+                if (timestampMillis >= stage.getStartTime() && timestampMillis < stage.getEndTime()) {
+                    return stage.getKind();
+                }
+            }
+        }
+
+        return null;
     }
 
     @Override

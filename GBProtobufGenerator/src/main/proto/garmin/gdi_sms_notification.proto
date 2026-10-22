@@ -1,8 +1,36 @@
 syntax = "proto2";
 
-package garmin_vivomovehr;
-
+package GDI.Proto.SmsNotification;
 option java_package = "nodomain.freeyourgadget.gadgetbridge.proto.garmin";
+option java_outer_classname = "GdiSmsNotification";
+
+enum CannedListType {
+    PHONE_CALL_RESPONSE = 0;
+    SMS_MESSAGE_RESPONSE = 1;
+    GROUP_TRACK_RESPONSE = 2;
+}
+
+message SmsCannedList {
+    optional CannedListType type = 1;
+    repeated string responses = 2;
+}
+
+message SmsCannedListChangedNotification {
+    repeated CannedListType changed_types = 1;
+}
+
+message SmsCannedListRequest {
+    repeated CannedListType requested_types = 1;
+}
+
+message SmsCannedListResponse {
+    enum ResponseStatus {
+        SUCCESS = 0;
+        GENERIC_ERROR = 1;
+    }
+    optional ResponseStatus status = 1;
+    repeated SmsCannedList lists = 2;
+}
 
 message SmsNotificationService {
     optional SmsSendMessageRequest sms_send_message_request = 1;
@@ -10,42 +38,17 @@ message SmsNotificationService {
     optional SmsCannedListChangedNotification sms_canned_list_changed_notification = 3;
     optional SmsCannedListRequest sms_canned_list_request = 4;
     optional SmsCannedListResponse sms_canned_list_response = 5;
+}
 
-    message SmsSendMessageRequest {
-        optional string receiver_number = 1;
-        optional string message = 2;
-    }
+message SmsSendMessageRequest {
+    optional string receiver_number = 1;
+    optional string message = 2;
+}
 
-    message SmsSendMessageResponse {
-        optional ResponseStatus status = 1;
-    }
-
-    message SmsCannedListChangedNotification {
-        repeated CannedListType changed_type = 1;
-    }
-
-    message SmsCannedListRequest {
-        repeated CannedListType requested_types = 1;
-    }
-
-    message SmsCannedListResponse {
-        optional ResponseStatus status = 1;
-        repeated SmsCannedList lists = 2;
-    }
-
-    message SmsCannedList {
-        optional CannedListType type = 1;
-        repeated string response = 2;
-    }
-
-    enum CannedListType {
-        PHONE_CALL_RESPONSE = 0;
-        SMS_MESSAGE_RESPONSE = 1;
-        GROUP_TRACK_RESPONSE = 2;
-    }
-
+message SmsSendMessageResponse {
     enum ResponseStatus {
         SUCCESS = 0;
         GENERIC_ERROR = 1;
     }
+    optional ResponseStatus status = 1;
 }

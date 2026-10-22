@@ -38,7 +38,6 @@ import java.util.List;
 import java.util.Map;
 
 import nodomain.freeyourgadget.gadgetbridge.R;
-import nodomain.freeyourgadget.gadgetbridge.activities.charts.HeartRateZoneChartUtils;
 import nodomain.freeyourgadget.gadgetbridge.test.TestBase;
 
 public class ValueMarkerTest extends TestBase {
@@ -51,9 +50,8 @@ public class ValueMarkerTest extends TestBase {
     }
 
     private String markerTextAt(final float x) {
-        // A gapped HR series: only the first segment is labelled. A zone band spans both.
+        // A gapped HR series: only the first segment is labelled.
         final List<ILineDataSet<?>> dataSets = new ArrayList<>();
-        dataSets.add(new HeartRateZoneChartUtils.ZoneAreaDataSet(run(0, 30, 100)));
         dataSets.add(new LineDataSet(run(0, 10, 120), "HR"));
         dataSets.add(new LineDataSet(run(20, 30, 140), ""));
         final CombinedData data = new CombinedData();

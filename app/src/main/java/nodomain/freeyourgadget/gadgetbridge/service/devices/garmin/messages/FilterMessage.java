@@ -19,7 +19,7 @@ public class FilterMessage extends GFDIMessage {
 
     public enum FilterType {
         ALL_FILES_0,
-        UNK_1,
+        DEFAULT,
         UNK_2,
         ONLY_NEW_3
     }

@@ -159,6 +159,13 @@ public enum GarminCapability {
             OUR_CAPABILITIES.add(cap);
         }
 
+        // not implemented: GPS_EPHEMERIS_EPO_REQUEST, GPS_EPHEMERIS_DATA_REQUEST
+        OUR_CAPABILITIES.remove(GPS_EPHEMERIS_DOWNLOAD);
+
+        // not implemented: LIVE_TRACK_STOP, LIVE_TRACK_AUTO_STOP, LIVE_TRACK_AUTO_START
+        OUR_CAPABILITIES.remove(LIVETRACK);
+        OUR_CAPABILITIES.remove(LIVETRACK_AUTO_START);
+
         // so far dumps from Garmin Connect have only supported
         // UNK_112 and UNK_113
         OUR_CAPABILITIES.remove(UNK_104);

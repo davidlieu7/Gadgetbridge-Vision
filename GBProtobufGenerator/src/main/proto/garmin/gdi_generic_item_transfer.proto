@@ -1,0 +1,144 @@
+syntax = "proto2";
+
+package GDI.Proto.GenericItemTransfer;
+option java_package = "nodomain.freeyourgadget.gadgetbridge.proto.garmin";
+option java_outer_classname = "GdiGenericItemTransfer";
+
+import "garmin/gdi_data_types.proto";
+import "garmin/gdi_in_reach_tracking.proto";
+
+message GenericItemTransferService {
+    optional ArbitraryItemRequest arbitrary_item_request = 1;
+    optional ArbitraryItemResponse arbitrary_item_response = 2;
+    optional ItemListRequest item_list_request = 3;
+    optional ItemListResponse item_list_response = 4;
+    optional ItemRequest item_data_request = 5;
+    optional ItemResponse item_data_response = 6;
+    optional CancelSessionRequest cancel_session_request = 9;
+    optional CancelSessionResponse cancel_session_response = 10;
+    optional SessionCompletedNotification session_completed_notification = 11;
+}
+
+enum SessionEndReason {
+    COMPLETE = 1;
+    ERROR = 2;
+    TIMEOUT = 3;
+    USER_CANCEL = 4;
+    SHUTDOWN = 5;
+    RESTART = 6;
+    APP_RESTRICTION = 7;
+    APP_CLOSE = 8;
+}
+
+message DataTypeConfig {
+    optional GDI.Proto.InReachTracking.DataTypeConfigExt config_ext = 101;
+}
+
+message DataTypeStatus {
+}
+
+message GenericItem {
+    optional uint32 data_transfer_id = 1;
+    optional uint32 data_transfer_size = 2;
+}
+
+message GenericItemReference {
+    optional GDI.Proto.DataTypes.UUID uuid = 1;
+    optional GDI.Proto.InReachTracking.GenericItemReferenceExt reference_ext = 101;
+}
+
+message ArbitraryItemRequest {
+    optional DataTypeConfig config = 1;
+    optional uint32 item_request_count = 2;
+}
+
+message ArbitraryItemResponse {
+    enum Status {
+        SUCCESS = 1;
+        ABORT = 2;
+        ERROR = 3;
+        UNSUPPORTED_DATA_TYPE = 4;
+        UNSUPPORTED_REQUEST_TYPE = 5;
+        DATA_TYPE_IS_BUSY = 6;
+        SYSTEM_IS_BUSY = 7;
+        TRANSFER_LIMIT = 8;
+    }
+    optional Status status = 1;
+    optional DataTypeStatus data_type_status = 2;
+    optional uint32 session_id = 3;
+    optional uint32 max_request_count = 4;
+}
+
+message ItemListRequest {
+    optional uint32 session_id = 1;
+    optional DataTypeConfig config = 2;
+    optional uint32 list_offset = 3;
+    optional uint32 max_item_ref_count = 4;
+}
+
+message ItemListResponse {
+    enum Status {
+        SUCCESS = 1;
+        NO_ITEMS = 2;
+        ABORT = 3;
+        ERROR = 4;
+        INVALID_SESSION_ID = 5;
+        INVALID_LIST_OFFSET = 6;
+        WRONG_SESSION_TYPE = 7;
+        UNSUPPORTED_DATA_TYPE = 8;
+        UNSUPPORTED_REQUEST_TYPE = 9;
+        DATA_TYPE_IS_BUSY = 10;
+        SYSTEM_IS_BUSY = 11;
+        TRANSFER_LIMIT = 12;
+    }
+    optional Status status = 1;
+    optional DataTypeStatus data_type_status = 2;
+    optional uint32 session_id = 3;
+    repeated GenericItemReference items = 4;
+    optional uint32 max_request_count = 5;
+    optional uint32 next_list_offset = 6;
+}
+
+message ItemRequest {
+    optional uint32 session_id = 1;
+    repeated GenericItemReference items = 6;
+}
+
+message ItemResponse {
+    enum Status {
+        SUCCESS = 1;
+        INVALID_ITEM = 2;
+        ABORT = 3;
+        ERROR = 4;
+        INVALID_SESSION_ID = 5;
+        UNSUPPORTED_REQUEST_TYPE = 6;
+        REQUEST_TOO_LARGE = 7;
+    }
+    optional Status status = 1;
+    optional DataTypeStatus data_type_status = 2;
+    optional uint32 session_id = 3;
+    repeated GenericItem items = 4;
+    repeated GenericItemReference invalid_items = 5;
+    optional uint32 max_request_count = 6;
+}
+
+message SessionCompletedNotification {
+    optional uint32 session_id = 1;
+    optional SessionEndReason reason = 2;
+    optional DataTypeStatus data_type_status = 3;
+}
+
+message CancelSessionRequest {
+    optional uint32 session_id = 1;
+    optional SessionEndReason reason = 2;
+    optional DataTypeStatus data_type_status = 3;
+}
+
+message CancelSessionResponse {
+    enum Status {
+        SUCCESS = 1;
+        ERROR = 2;
+        INVALID_SESSION_ID = 3;
+    }
+    optional Status status = 1;
+}

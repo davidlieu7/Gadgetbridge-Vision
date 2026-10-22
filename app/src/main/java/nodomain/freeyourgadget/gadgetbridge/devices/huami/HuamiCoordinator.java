@@ -46,6 +46,8 @@ import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSpec
 import nodomain.freeyourgadget.gadgetbridge.capabilities.password.PasswordCapabilityImpl;
 import nodomain.freeyourgadget.gadgetbridge.devices.AbstractBLEDeviceCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.ComputedHrvSummarySampleProvider;
+import nodomain.freeyourgadget.gadgetbridge.devices.DefaultSleepSessionProvider;
+import nodomain.freeyourgadget.gadgetbridge.devices.FallbackSleepSessionProvider;
 import nodomain.freeyourgadget.gadgetbridge.devices.GenericHrvValueSampleProvider;
 import nodomain.freeyourgadget.gadgetbridge.devices.GenericTemperatureSampleProvider;
 import nodomain.freeyourgadget.gadgetbridge.devices.HuamiHeartRateManualSampleProvider;
@@ -57,6 +59,7 @@ import nodomain.freeyourgadget.gadgetbridge.devices.HuamiSpo2SampleProvider;
 import nodomain.freeyourgadget.gadgetbridge.devices.HuamiStressSampleProvider;
 import nodomain.freeyourgadget.gadgetbridge.devices.SampleProvider;
 import nodomain.freeyourgadget.gadgetbridge.devices.SleepAsAndroidFeature;
+import nodomain.freeyourgadget.gadgetbridge.devices.SleepSessionProvider;
 import nodomain.freeyourgadget.gadgetbridge.devices.TimeSampleProvider;
 import nodomain.freeyourgadget.gadgetbridge.devices.miband.DateTimeDisplay;
 import nodomain.freeyourgadget.gadgetbridge.devices.miband.DoNotDisturb;
@@ -201,6 +204,16 @@ public abstract class HuamiCoordinator extends AbstractBLEDeviceCoordinator {
     @Override
     public SampleProvider<? extends AbstractActivitySample> getSampleProvider(GBDevice device, DaoSession session) {
         return new MiBand2SampleProvider(device, session);
+    }
+
+    @NonNull
+    @Override
+    public SleepSessionProvider getSleepSessionProvider(@NonNull final GBDevice device, @NonNull final DaoSession session) {
+        return new FallbackSleepSessionProvider(
+            new HuamiSleepSessionProvider(device, session),
+            // For watches that do not report sleep sessions
+            new DefaultSleepSessionProvider(device, session)
+        );
     }
 
     @Override

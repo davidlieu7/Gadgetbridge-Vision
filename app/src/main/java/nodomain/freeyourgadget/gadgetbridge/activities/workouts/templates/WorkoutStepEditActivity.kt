@@ -21,6 +21,7 @@ import nodomain.freeyourgadget.gadgetbridge.activities.workouts.templates.editor
 import nodomain.freeyourgadget.gadgetbridge.activities.workouts.templates.editors.errorTextView
 import nodomain.freeyourgadget.gadgetbridge.activities.workouts.templates.editors.formatPairValue
 import nodomain.freeyourgadget.gadgetbridge.activities.workouts.templates.editors.formatScalarValue
+import nodomain.freeyourgadget.gadgetbridge.activities.workouts.templates.editors.formatTypedValue
 import nodomain.freeyourgadget.gadgetbridge.activities.workouts.templates.editors.hideKeyboard
 import nodomain.freeyourgadget.gadgetbridge.activities.workouts.templates.editors.setFieldError
 import nodomain.freeyourgadget.gadgetbridge.activities.workouts.templates.editors.showChoicePicker
@@ -511,8 +512,8 @@ internal class ExerciseGroup(
 
 /**
  * A field with a type and a value, for a duration, a target or a weight. A tap opens the type
- * dialog over [options], then the value dialog of the picked type. The field displays the type
- * label followed by the value.
+ * dialog over [options], then the value dialog of the picked type. The field displays the
+ * [formatTypedValue] text.
  *
  * [isAvailable] filters [options] when the type dialog opens. [onValueChanged] runs after either
  * dialog is confirmed.
@@ -645,8 +646,8 @@ private class TypeGroup<T : LabeledEntry>(
     }
 
     private fun refresh() {
-        val typeLabel = options.getOrNull(selectedIndex)?.first?.let { context.getString(it.label) }
-        field.setText(listOfNotNull(typeLabel, currentValueText()).joinToString(" "))
+        val type = options.getOrNull(selectedIndex)?.first
+        field.setText(type?.let { formatTypedValue(context, it, low, currentValueText()) }.orEmpty())
     }
 
     private fun currentValueText(): String? {
@@ -658,7 +659,7 @@ private class TypeGroup<T : LabeledEntry>(
                 if (l != null && h != null) formatPairValue(context, spec, l, h) else null
             }
 
-            is ValueSpec.Zone -> zone?.let { formatScalarValue(context, spec, it.toLong()) }
+            is ValueSpec.Zone -> zone?.toString()
             is ValueSpec.EnumValues<*> -> enumValue
                 ?.let { name -> spec.values.find { (it as Enum<*>).name == name } }
                 ?.let { context.getString(it.label) }

@@ -1,0 +1,104 @@
+syntax = "proto2";
+
+package GDI.Proto.ConnectIQAppSettings;
+option java_package = "nodomain.freeyourgadget.gadgetbridge.proto.garmin";
+option java_outer_classname = "GdiAppSettings";
+
+message ConnectIQAppSettingsService {
+    optional GetAppSettingsRequest get_app_settings_request = 1;
+    optional GetAppSettingsResponse get_app_settings_response = 2;
+    optional SaveAppSettingsRequest save_app_settings_request = 3;
+    optional SaveAppSettingsResponse save_app_settings_response = 4;
+    optional SendAppSettingsRequest send_app_settings_request = 5;
+    optional SendAppSettingsResponse send_app_settings_response = 6;
+    optional OpenAppSettingsRequest open_app_settings_request = 7;
+    optional OpenAppSettingsResponse open_app_settings_response = 8;
+    optional VerifyAppSettingsRequest verify_app_settings_request = 9;
+    optional VerifyAppSettingsResponse verify_app_settings_response = 10;
+    optional VerifiedAppSettingsNotification verified_app_settings_notification = 11;
+}
+
+message GetAppSettingsRequest {
+    optional bytes app_identifier = 1;
+}
+
+message GetAppSettingsResponse {
+    enum Response {
+        UNKNOWN_RESPONSE = 0;
+        SUCCESS = 1;
+        APP_NOT_INSTALLED = 2;
+    }
+    optional bytes app_identifier = 1;
+    optional Response response = 2;
+}
+
+message OpenAppSettingsRequest {
+    optional bytes store_uuid = 1;
+}
+
+message OpenAppSettingsResponse {
+    enum ResponseStatus {
+        UNKNOWN_RESPONSE = 0;
+        SUCCESS = 1;
+    }
+    optional bytes app_identifier = 1;
+    optional ResponseStatus status = 2;
+}
+
+message SaveAppSettingsRequest {
+    optional bytes app_identifier = 1;
+    optional bytes settings_values = 2;
+}
+
+message SaveAppSettingsResponse {
+    enum Response {
+        UNKNOWN_RESPONSE = 0;
+        SUCCESS = 1;
+        FAILED_TO_SAVE = 2;
+    }
+    optional bytes app_identifier = 1;
+    optional Response response = 2;
+}
+
+message SendAppSettingsRequest {
+    optional bytes app_identifier = 1;
+    optional bytes settings_values = 2;
+}
+
+message SendAppSettingsResponse {
+    enum Response {
+        UNKNOWN_RESPONSE = 0;
+        SUCCESS = 1;
+    }
+    optional Response response = 1;
+}
+
+message VerifiedAppSettingsNotification {
+    enum Result {
+        VERIFIED = 0;
+        UNKNOWN_ERROR = 1;
+        APP_ERROR = 2;
+        VERIFICIATION_FAILED = 3;
+    }
+    optional bytes store_uuid = 1;
+    optional bytes key = 2;
+    optional Result result = 3;
+    optional bytes error = 4;
+}
+
+message VerifyAppSettingsRequest {
+    optional bytes store_uuid = 1;
+    optional bytes key = 2;
+    optional bytes value = 3;
+}
+
+message VerifyAppSettingsResponse {
+    enum ResponseStatus {
+        UNKNOWN = 0;
+        OK = 1;
+        APP_NOT_INSTALLED = 2;
+        APP_CANNOT_RUN = 3;
+    }
+    optional bytes store_uuid = 1;
+    optional ResponseStatus status = 2;
+}

@@ -21,11 +21,14 @@ import android.os.Bundle;
 import android.view.Menu;
 import android.view.MenuInflater;
 import android.view.MenuItem;
+import android.view.View;
+import android.widget.ProgressBar;
 
 import androidx.appcompat.widget.SearchView;
 import androidx.core.app.NavUtils;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
+
 import nodomain.freeyourgadget.gadgetbridge.R;
 import nodomain.freeyourgadget.gadgetbridge.adapter.AppBlacklistAdapter;
 
@@ -37,16 +40,19 @@ public class AppBlacklistActivity extends AbstractGBActivity {
     protected void onCreate(final Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_appblacklist);
-        final RecyclerView appListView = (RecyclerView) findViewById(R.id.appListView);
+        final RecyclerView appListView = findViewById(R.id.appListView);
         appListView.setLayoutManager(new LinearLayoutManager(this));
 
-        appBlacklistAdapter = new AppBlacklistAdapter(R.layout.item_app_blacklist, this);
+        final ProgressBar loadingView = findViewById(R.id.appListLoading);
+        final SearchView searchView = findViewById(R.id.appListViewSearch);
+        appBlacklistAdapter = new AppBlacklistAdapter(R.layout.item_app_blacklist, this, () -> {
+            loadingView.setVisibility(View.GONE);
+            searchView.setVisibility(View.VISIBLE);
+        });
 
         appListView.setAdapter(appBlacklistAdapter);
 
-        final SearchView searchView = findViewById(R.id.appListViewSearch);
         searchView.setIconifiedByDefault(false);
-        searchView.setIconified(false);
         searchView.setOnQueryTextListener(new SearchView.OnQueryTextListener() {
             @Override
             public boolean onQueryTextSubmit(final String query) {

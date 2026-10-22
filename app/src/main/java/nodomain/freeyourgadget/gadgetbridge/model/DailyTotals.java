@@ -36,8 +36,10 @@ import nodomain.freeyourgadget.gadgetbridge.devices.AbstractTimeSampleProvider;
 import nodomain.freeyourgadget.gadgetbridge.devices.DefaultRestingMetabolicRateProvider;
 import nodomain.freeyourgadget.gadgetbridge.devices.DeviceCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.SampleProvider;
+import nodomain.freeyourgadget.gadgetbridge.devices.SleepSessionProvider;
 import nodomain.freeyourgadget.gadgetbridge.entities.AbstractActivitySample;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
+import nodomain.freeyourgadget.gadgetbridge.util.SleepRangeUtils;
 
 
 public class DailyTotals implements Serializable {
@@ -95,12 +97,10 @@ public class DailyTotals implements Serializable {
     public static DailyTotals getDailyTotalsForDevice(GBDevice device, Calendar day, DBHandler handler) {
         ActivityAnalysis analysis = new ActivityAnalysis();
         ActivityAmounts totalAmounts;
-        ActivityAmounts amountsSleep;
 
         totalAmounts = analysis.calculateActivityAmounts(getSamplesOfDay(handler, day, 0, device));
-        amountsSleep = analysis.calculateActivityAmounts(getSamplesOfDay(handler, day, -12, device));
 
-        long[] sleep = getTotalsSleepForActivityAmounts(amountsSleep);
+        final long[] sleep = getTotalsSleepForDay(handler, day, device);
 
         long totalSteps = 0;
         long totalDistance = 0;
@@ -131,27 +131,26 @@ public class DailyTotals implements Serializable {
         return totalSteps;
     }
 
-    private static long[] getTotalsSleepForActivityAmounts(ActivityAmounts activityAmounts) {
-        long totalSecondsDeepSleep = 0;
+    private static long[] getTotalsSleepForDay(final DBHandler db, final Calendar day, final GBDevice device) {
+        final int[] range = SleepRangeUtils.getSleepRange(day);
+        final SleepSessionProvider provider = device.getDeviceCoordinator().getSleepSessionProvider(device, db.getDaoSession());
+
         long totalSecondsLightSleep = 0;
+        long totalSecondsDeepSleep = 0;
         long totalSecondsRemSleep = 0;
         long totalSecondsAwakeSleep = 0;
-        for (ActivityAmount amount : activityAmounts.getAmounts()) {
-            if (amount.getActivityKind() == ActivityKind.DEEP_SLEEP) {
-                totalSecondsDeepSleep += amount.getTotalSeconds();
-            } else if (amount.getActivityKind() == ActivityKind.LIGHT_SLEEP) {
-                totalSecondsLightSleep += amount.getTotalSeconds();
-            } else if (amount.getActivityKind() == ActivityKind.REM_SLEEP) {
-                totalSecondsRemSleep += amount.getTotalSeconds();
-            } else if (amount.getActivityKind() == ActivityKind.AWAKE_SLEEP) {
-                totalSecondsAwakeSleep += amount.getTotalSeconds();
-            }
+        for (SleepSession session : provider.getSleepSessionsEndingIn(range[0], range[1])) {
+            totalSecondsLightSleep += session.getLightSleepDuration();
+            totalSecondsDeepSleep += session.getDeepSleepDuration();
+            totalSecondsRemSleep += session.getRemSleepDuration();
+            totalSecondsAwakeSleep += session.getAwakeSleepDuration();
         }
-        long totalMinutesDeepSleep = (totalSecondsDeepSleep / 60);
-        long totalMinutesLightSleep = (totalSecondsLightSleep / 60);
-        long totalMinutesRemSleep = (totalSecondsRemSleep / 60);
-        long totalMinutesAwakeSleep = (totalSecondsAwakeSleep / 60);
-        return new long[]{totalMinutesLightSleep, totalMinutesDeepSleep, totalMinutesRemSleep, totalMinutesAwakeSleep};
+        return new long[]{
+                totalSecondsLightSleep / 60,
+                totalSecondsDeepSleep / 60,
+                totalSecondsRemSleep / 60,
+                totalSecondsAwakeSleep / 60
+        };
     }
 
     private static List<? extends ActivitySample> getSamplesOfDay(DBHandler db, Calendar day, int offsetHours, GBDevice device) {

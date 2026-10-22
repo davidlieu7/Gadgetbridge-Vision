@@ -27,7 +27,7 @@ class RealtimeFloorsCallback : CommunicatorV2.ServiceCallback {
             val descended = BLETypeConversions.toUint16(value, 2);
             val ascendTarget = BLETypeConversions.toUint16(value, 4);
             LOG.info(
-                "Floors ascended:{}, descended:{}, acendTarget:{}",
+                "Floors ascended:{}, descended:{}, ascendTarget:{}",
                 ascended,
                 descended,
                 ascendTarget

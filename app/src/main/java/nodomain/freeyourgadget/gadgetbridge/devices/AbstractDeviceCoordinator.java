@@ -70,6 +70,7 @@ import nodomain.freeyourgadget.gadgetbridge.capabilities.widgets.WidgetManager;
 import nodomain.freeyourgadget.gadgetbridge.database.DBHandler;
 import nodomain.freeyourgadget.gadgetbridge.devices.cards.DefaultDeviceCardItems;
 import nodomain.freeyourgadget.gadgetbridge.devices.cards.DeviceCardItem;
+import nodomain.freeyourgadget.gadgetbridge.devices.cards.QuickControl;
 import nodomain.freeyourgadget.gadgetbridge.database.DBHelper;
 import nodomain.freeyourgadget.gadgetbridge.database.repository.WorkoutTemplateRepository;
 import nodomain.freeyourgadget.gadgetbridge.entities.AlarmDao;
@@ -91,6 +92,7 @@ import nodomain.freeyourgadget.gadgetbridge.entities.HealthConnectSyncStateDao;
 import nodomain.freeyourgadget.gadgetbridge.entities.HealthConnectWorkoutSyncFailureDao;
 import nodomain.freeyourgadget.gadgetbridge.entities.InternetFirewallRuleDao;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
+import nodomain.freeyourgadget.gadgetbridge.install.InstallHandlerV2;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDeviceCandidate;
 import nodomain.freeyourgadget.gadgetbridge.model.AbstractNotificationPattern;
 import nodomain.freeyourgadget.gadgetbridge.model.ActivitySample;
@@ -275,6 +277,7 @@ public abstract class AbstractDeviceCoordinator implements DeviceCoordinator {
         if (deleteFiles) {
             deleteDeviceFiles(gbDevice);
         }
+        deleteDeviceCacheDir(gbDevice);
     }
 
     /**
@@ -303,6 +306,14 @@ public abstract class AbstractDeviceCoordinator implements DeviceCoordinator {
             String message = GBApplication.getContext().getString(R.string.error_deleting_file_exception,
                 export.getPath(), e.getLocalizedMessage());
             GB.toast(message, Toast.LENGTH_LONG, GB.ERROR, e);
+        }
+    }
+
+    private void deleteDeviceCacheDir(final GBDevice gbDevice) {
+        final File cacheDir = getDeviceCacheDir(gbDevice);
+        LOG.debug("Deleting device cache directory {}", cacheDir);
+        if (!FileUtils.deleteRecursively(cacheDir)) {
+            LOG.warn("Failed to delete device cache directory {}", cacheDir);
         }
     }
 
@@ -492,6 +503,12 @@ public abstract class AbstractDeviceCoordinator implements DeviceCoordinator {
     }
 
     @Override
+    @NonNull
+    public SleepSessionProvider getSleepSessionProvider(@NonNull final GBDevice device, @NonNull final DaoSession session) {
+        return new DefaultSleepSessionProvider(device, session);
+    }
+
+    @Override
     @Nullable
     public ActivitySummaryParser getActivitySummaryParser(final GBDevice device, final Context context) {
         return new ActivitySummaryParser.NoopActivitySummaryParser();
@@ -562,6 +579,12 @@ public abstract class AbstractDeviceCoordinator implements DeviceCoordinator {
     }
 
     @Override
+    public File getDeviceCacheDir(@NonNull final GBDevice device) {
+        final File devicesDir = new File(GBApplication.getContext().getCacheDir(), "devices");
+        return new File(devicesDir, FileUtils.makeValidFileName(device.getAddress()));
+    }
+
+    @Override
     @Nullable
     public String getAppCacheSortFilename() {
         return null;
@@ -586,6 +609,12 @@ public abstract class AbstractDeviceCoordinator implements DeviceCoordinator {
     @Nullable
     @Override
     public InstallHandler findInstallHandler(final Uri uri, final Bundle options, final Context context) {
+        return null;
+    }
+
+    @Nullable
+    @Override
+    public InstallHandlerV2 findInstallHandlerV2(@NonNull final List<Uri> files, @NonNull final Context context) {
         return null;
     }
 
@@ -1181,6 +1210,12 @@ public abstract class AbstractDeviceCoordinator implements DeviceCoordinator {
 
     @Nullable
     @Override
+    public CharSequence getPairingHint(final Context context, final GBDeviceCandidate candidate) {
+        return null;
+    }
+
+    @Nullable
+    @Override
     public Class<? extends Activity> getCalibrationActivity() {
         return null;
     }
@@ -1354,6 +1389,11 @@ public abstract class AbstractDeviceCoordinator implements DeviceCoordinator {
     }
 
     @Override
+    public List<QuickControl> getQuickControls(@NonNull final GBDevice device) {
+        return Collections.emptyList();
+    }
+
+    @Override
     public HeartRateZonesSpec getHeartRateZonesSpec(@NonNull GBDevice device) {
         return null;
     }
@@ -1361,6 +1401,11 @@ public abstract class AbstractDeviceCoordinator implements DeviceCoordinator {
     @Override
     public Set<BarcodeFormat> getSupportedBarcodeFormats(@NonNull final GBDevice device) {
         return Collections.emptySet();
+    }
+
+    @Override
+    public boolean supportsLoyaltyCardsSyncRequest(@NonNull final GBDevice device) {
+        return false;
     }
 
     @Override

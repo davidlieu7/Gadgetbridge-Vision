@@ -87,7 +87,7 @@ public class BangleJSCoordinator extends AbstractBLEDeviceCoordinator {
     }
 
     @Override
-    public boolean supportsCalendarEvents(final GBDevice device) {
+    public boolean supportsCalendarEvents(@NonNull final GBDevice device) {
         return true;
     }
 
@@ -129,7 +129,7 @@ public class BangleJSCoordinator extends AbstractBLEDeviceCoordinator {
     }
 
     @Override
-    public boolean supportsWeather(final GBDevice device) {
+    public boolean supportsWeather(@NonNull final GBDevice device) {
         return true;
     }
 
@@ -149,7 +149,7 @@ public class BangleJSCoordinator extends AbstractBLEDeviceCoordinator {
     }
 
     @Override
-    public boolean supportsRecordedActivities(final GBDevice device) {
+    public boolean supportsRecordedActivities(@NonNull final GBDevice device) {
         return true;
     }
 
@@ -159,12 +159,12 @@ public class BangleJSCoordinator extends AbstractBLEDeviceCoordinator {
     }
 
     @Override
-    public boolean supportsHeartRateMeasurement(GBDevice device) {
+    public boolean supportsHeartRateMeasurement(@NonNull final GBDevice device) {
         return true;
     }
 
     @Override
-    public boolean supportsManualHeartRateMeasurement(GBDevice device) {
+    public boolean supportsManualHeartRateMeasurement(@NonNull final GBDevice device) {
         /* we could do this, but the current code for onHeartRateTest
         looks completely broken. There's no way to stop heart rate measurements
         and it doesn't even appear to care what device it's getting the current
@@ -180,7 +180,7 @@ public class BangleJSCoordinator extends AbstractBLEDeviceCoordinator {
     }
 
     @Override
-    public boolean supportsAppsManagement(final GBDevice device) {
+    public boolean supportsAppsManagement(@NonNull final GBDevice device) {
         return GBApplication.hasInternetAccess();
     }
 
@@ -192,11 +192,6 @@ public class BangleJSCoordinator extends AbstractBLEDeviceCoordinator {
     @Override
     public boolean suggestUnbindBeforePair() {
         return false;
-    }
-
-    @Override
-    public Class<? extends Activity> getPairingActivity() {
-        return null;
     }
 
     @Override
@@ -266,7 +261,7 @@ public class BangleJSCoordinator extends AbstractBLEDeviceCoordinator {
     }
 
     @Override
-    public boolean supportsNavigation(final GBDevice device) {
+    public boolean supportsNavigation(@NonNull final GBDevice device) {
         return true;
     }
 
@@ -277,7 +272,7 @@ public class BangleJSCoordinator extends AbstractBLEDeviceCoordinator {
 
     @NonNull
     @Override
-    public Class<? extends DeviceSupport> getDeviceSupportClass(final GBDevice device) {
+    public Class<? extends DeviceSupport> getDeviceSupportClass(@NonNull final GBDevice device) {
         return BangleJSDeviceSupport.class;
     }
 

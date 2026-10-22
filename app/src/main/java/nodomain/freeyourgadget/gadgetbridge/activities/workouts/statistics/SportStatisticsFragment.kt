@@ -1,5 +1,6 @@
 package nodomain.freeyourgadget.gadgetbridge.activities.workouts.statistics
 
+import android.content.res.ColorStateList
 import android.os.Bundle
 import android.text.format.DateFormat
 import android.text.format.DateUtils
@@ -7,10 +8,16 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import androidx.core.content.ContextCompat
+import androidx.core.util.Pair as DateRange
 import androidx.fragment.app.Fragment
 import androidx.fragment.app.activityViewModels
 import androidx.lifecycle.lifecycleScope
 import com.google.android.material.color.MaterialColors
+import com.google.android.material.datepicker.CalendarConstraints
+import com.google.android.material.datepicker.CompositeDateValidator
+import com.google.android.material.datepicker.DateValidatorPointBackward
+import com.google.android.material.datepicker.DateValidatorPointForward
+import com.google.android.material.datepicker.MaterialDatePicker
 import com.google.android.material.tabs.TabLayout
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Job
@@ -25,6 +32,7 @@ import nodomain.freeyourgadget.gadgetbridge.databinding.FragmentSportStatisticsB
 import nodomain.freeyourgadget.gadgetbridge.model.ActivityKind
 import nodomain.freeyourgadget.gadgetbridge.model.ActivitySummaryEntries
 import org.slf4j.LoggerFactory
+import java.time.Instant
 import java.time.LocalDate
 import java.time.LocalTime
 import java.time.ZoneId
@@ -35,7 +43,7 @@ import java.util.Locale
 import kotlin.math.roundToLong
 
 /**
- * Statistics of one sport over a week, month or year.
+ * Statistics of one sport over a week, month, year or custom range.
  */
 class SportStatisticsFragment : Fragment() {
     private val viewModel: WorkoutStatisticsViewModel by activityViewModels()
@@ -51,13 +59,19 @@ class SportStatisticsFragment : Fragment() {
     private var overview: SportOverview? = null
     private var stats: PeriodStats? = null
     private var loadJob: Job? = null
+    private var tabTextColors: ColorStateList? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         if (savedInstanceState != null) {
             kind = PeriodKind.valueOf(savedInstanceState.getString(STATE_KIND, kind.name))
             if (savedInstanceState.containsKey(STATE_PERIOD_START)) {
-                period = StatisticsPeriod(kind, LocalDate.ofEpochDay(savedInstanceState.getLong(STATE_PERIOD_START)))
+                val start = LocalDate.ofEpochDay(savedInstanceState.getLong(STATE_PERIOD_START))
+                period = if (kind == PeriodKind.CUSTOM) {
+                    StatisticsPeriod.custom(start, LocalDate.ofEpochDay(savedInstanceState.getLong(STATE_PERIOD_END)))
+                } else {
+                    StatisticsPeriod(kind, start)
+                }
             }
         }
     }
@@ -70,7 +84,7 @@ class SportStatisticsFragment : Fragment() {
         _binding = FragmentSportStatisticsBinding.inflate(inflater, container, false)
         binding.sportChart.dismissSelectionOnTapOutside(binding.sportContent)
 
-        PeriodKind.entries.forEach { periodKind ->
+        PRESET_KINDS.forEach { periodKind ->
             val tab = binding.sportPeriodTabs.newTab().setText(tabLabel(periodKind)).setTag(periodKind)
             binding.sportPeriodTabs.addTab(tab, periodKind == kind)
         }
@@ -84,11 +98,17 @@ class SportStatisticsFragment : Fragment() {
 
             override fun onTabUnselected(tab: TabLayout.Tab) = Unit
 
-            override fun onTabReselected(tab: TabLayout.Tab) = Unit
+            override fun onTabReselected(tab: TabLayout.Tab) {
+                if (kind == PeriodKind.CUSTOM) {
+                    onTabSelected(tab)
+                }
+            }
         })
+        tabTextColors = binding.sportPeriodTabs.tabTextColors
 
-        binding.sportPeriodPrevious.setOnClickListener { period?.let { showPeriod(it.previous()) } }
+        binding.sportPeriodPrevious.setOnClickListener { period?.let { showPeriod(startingAfterFirstWorkout(it.previous())) } }
         binding.sportPeriodNext.setOnClickListener { period?.let { showPeriod(it.next()) } }
+        binding.sportPeriodTitle.setOnClickListener { showRangePicker() }
         binding.sportChartEdit.setOnClickListener {
             val available = overview?.availableMetrics ?: return@setOnClickListener
             val current = config ?: return@setOnClickListener
@@ -106,6 +126,10 @@ class SportStatisticsFragment : Fragment() {
             config = applied
             GBApplication.getPrefs().preferences.edit().putString(configKey(), applied.serialize()).apply()
             stats?.let { renderChart(it) }
+        }
+        (childFragmentManager.findFragmentByTag(TAG_RANGE_PICKER) as? MaterialDatePicker<*>)?.let {
+            @Suppress("UNCHECKED_CAST")
+            listenToRangePicker(it as MaterialDatePicker<DateRange<Long, Long>>)
         }
         viewLifecycleOwner.lifecycleScope.launch {
             try {
@@ -132,7 +156,10 @@ class SportStatisticsFragment : Fragment() {
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)
         outState.putString(STATE_KIND, kind.name)
-        period?.let { outState.putLong(STATE_PERIOD_START, it.start.toEpochDay()) }
+        period?.let {
+            outState.putLong(STATE_PERIOD_START, it.start.toEpochDay())
+            outState.putLong(STATE_PERIOD_END, it.endInclusive.toEpochDay())
+        }
     }
 
     override fun onDestroyView() {
@@ -145,6 +172,7 @@ class SportStatisticsFragment : Fragment() {
             PeriodKind.WEEK -> R.string.calendar_week
             PeriodKind.MONTH -> R.string.calendar_month
             PeriodKind.YEAR -> R.string.calendar_year
+            PeriodKind.CUSTOM -> R.string.statistics_custom_range
         }
     )
 
@@ -165,10 +193,71 @@ class SportStatisticsFragment : Fragment() {
     private fun configKey() = PREF_CHART_CONFIG_PREFIX + kindCode
 
     /**
+     * Moves a custom range that starts before the first workout to start on it, keeping its length.
+     */
+    private fun startingAfterFirstWorkout(shown: StatisticsPeriod): StatisticsPeriod {
+        val first = overview?.firstDate ?: return shown
+        if (shown.kind != PeriodKind.CUSTOM || !shown.start.isBefore(first)) {
+            return shown
+        }
+        return StatisticsPeriod.custom(first, first.plusDays(shown.dayCount - 1))
+    }
+
+    private fun showRangePicker() {
+        val shown = period ?: return
+        if (overview == null || childFragmentManager.findFragmentByTag(TAG_RANGE_PICKER) != null) {
+            return
+        }
+        val today = today()
+        val first = overview?.firstDate?.takeIf { !it.isAfter(today) }
+        val validators = listOfNotNull(
+            first?.let { DateValidatorPointForward.from(utcMillis(it)) },
+            DateValidatorPointBackward.before(utcMillis(today)),
+        )
+        val selectedStart = first?.let { maxOf(shown.start, it) } ?: shown.start
+        val selectedEnd = minOf(shown.endInclusive, today)
+        val constraints = CalendarConstraints.Builder()
+            .setEnd(utcMillis(today))
+            .setOpenAt(utcMillis(first?.let { maxOf(selectedEnd, it) } ?: selectedEnd))
+            .setValidator(CompositeDateValidator.allOf(validators))
+        first?.let { constraints.setStart(utcMillis(it)) }
+
+        val builder = MaterialDatePicker.Builder.dateRangePicker()
+            .setTitleText(R.string.statistics_custom_range)
+            .setCalendarConstraints(constraints.build())
+        if (!selectedEnd.isBefore(selectedStart)) {
+            builder.setSelection(DateRange(utcMillis(selectedStart), utcMillis(selectedEnd)))
+        }
+        val picker = builder.build()
+        listenToRangePicker(picker)
+        picker.show(childFragmentManager, TAG_RANGE_PICKER)
+    }
+
+    private fun listenToRangePicker(picker: MaterialDatePicker<DateRange<Long, Long>>) {
+        picker.addOnPositiveButtonClickListener { selection ->
+            val start = selection.first ?: return@addOnPositiveButtonClickListener
+            val end = selection.second ?: return@addOnPositiveButtonClickListener
+            val custom = StatisticsPeriod.custom(utcDate(start), utcDate(end))
+            if (_binding != null && overview != null) {
+                showPeriod(custom)
+            } else {
+                period = custom
+                kind = PeriodKind.CUSTOM
+            }
+        }
+    }
+
+    private fun utcMillis(date: LocalDate) = date.atStartOfDay(ZoneOffset.UTC).toInstant().toEpochMilli()
+
+    private fun utcDate(millis: Long) = Instant.ofEpochMilli(millis).atZone(ZoneOffset.UTC).toLocalDate()
+
+    /**
      * Cancels any load still running for another period.
      */
     private fun showPeriod(newPeriod: StatisticsPeriod) {
         period = newPeriod
+        kind = newPeriod.kind
+        renderTabs(newPeriod)
         renderHeader(newPeriod)
 
         loadJob?.cancel()
@@ -185,12 +274,33 @@ class SportStatisticsFragment : Fragment() {
     }
 
     /**
+     * No tab is highlighted while a custom range is shown.
+     */
+    private fun renderTabs(shown: StatisticsPeriod) {
+        val tabs = binding.sportPeriodTabs
+        val colors = tabTextColors ?: return
+        if (shown.kind == PeriodKind.CUSTOM) {
+            tabs.selectTab(null)
+            tabs.tabTextColors = ColorStateList.valueOf(colors.defaultColor)
+            tabs.setSelectedTabIndicatorColor(HIDDEN_INDICATOR_COLOR)
+        } else {
+            tabs.tabTextColors = colors
+            tabs.setSelectedTabIndicatorColor(MaterialColors.getColor(tabs, R.attr.subtab_active))
+        }
+    }
+
+    /**
      * Period title and arrows, limited to the range with workouts.
      */
     private fun renderHeader(shown: StatisticsPeriod) {
         binding.sportPeriodTitle.text = periodTitle(shown)
 
         val overview = overview ?: return
+        if (shown.kind == PeriodKind.CUSTOM) {
+            binding.sportPeriodPrevious.isEnabled = overview.firstDate?.isBefore(shown.start) == true
+            binding.sportPeriodNext.isEnabled = shown.endInclusive.isBefore(today())
+            return
+        }
         val earliest = overview.firstDate?.let { StatisticsPeriod.containing(kind, it).start }
         val latestDate = overview.lastDate?.takeIf { it.isAfter(today()) } ?: today()
         val latest = StatisticsPeriod.containing(kind, latestDate).start
@@ -199,7 +309,7 @@ class SportStatisticsFragment : Fragment() {
     }
 
     /**
-     * Locale-formatted, e.g. "Sep 22 – 28, 2026", "September 2026", "2026".
+     * Locale-formatted, e.g. "Sep 22 - 28, 2026", "September 2026", "2026", "Sep 3, 2025 - Feb 1, 2026".
      */
     private fun periodTitle(shown: StatisticsPeriod): String {
         fun millis(date: LocalDate) = date.atTime(LocalTime.NOON).toInstant(ZoneOffset.UTC).toEpochMilli()
@@ -213,7 +323,7 @@ class SportStatisticsFragment : Fragment() {
         ).toString()
 
         return when (shown.kind) {
-            PeriodKind.WEEK -> range(shown.start, shown.endInclusive, DateUtils.FORMAT_ABBREV_MONTH)
+            PeriodKind.WEEK, PeriodKind.CUSTOM -> range(shown.start, shown.endInclusive, DateUtils.FORMAT_ABBREV_MONTH)
             PeriodKind.MONTH -> range(shown.start, shown.start, DateUtils.FORMAT_NO_MONTH_DAY)
             PeriodKind.YEAR -> shown.start.year.toString()
         }
@@ -254,7 +364,8 @@ class SportStatisticsFragment : Fragment() {
             }
         }
 
-        val spec = SportChartSpecBuilder.build(stats, charts.first(), charts.getOrNull(1))
+        val barLabel = if (stats.period.kind == PeriodKind.CUSTOM) customBarLabeler(stats.period) else null
+        val spec = SportChartSpecBuilder.build(stats, charts.first(), charts.getOrNull(1), barLabel)
         binding.sportChart.selectionContent = { x -> selection(stats, x.toInt(), charts, formatter) }
         binding.sportChart.setSpec(spec)
         binding.sportChart.contentDescription =
@@ -270,14 +381,14 @@ class SportStatisticsFragment : Fragment() {
     ): ChartSelection {
         val title = slotTitle(stats.period, slot)
         val totals = stats.bars.firstOrNull { it.x == slot.toDouble() }?.totals
-        val values = charts.map { chart ->
+        val shown = charts.mapNotNull { chart ->
             val raw = totals?.let { chart.metric.valueOf(it) } ?: 0.0
-            if (raw == 0.0) getString(R.string.stats_empty_value) else formatMetric(chart.metric, raw, formatter)
+            if (raw == 0.0) null else chart to formatMetric(chart.metric, raw, formatter)
         }
         return ChartSelection(
             title = title,
-            rows = charts.zip(values) { chart, value -> ChartSelection.Row(chart.color, value) },
-            description = (listOf(title) + charts.zip(values) { chart, value -> "${chart.label} $value" })
+            rows = shown.map { (chart, value) -> ChartSelection.Row(chart.color, value) },
+            description = (listOf(title) + shown.map { (chart, value) -> "${chart.label} $value" })
                 .joinToString(". ", postfix = "."),
         )
     }
@@ -286,15 +397,23 @@ class SportStatisticsFragment : Fragment() {
      * Locale-formatted, e.g. "Wed, Sep 24", "Sep 24, 2026", "September 2026".
      */
     private fun slotTitle(period: StatisticsPeriod, slot: Int): String {
-        val locale = Locale.getDefault()
-        fun format(skeleton: String, date: LocalDate) =
-            DateTimeFormatter.ofPattern(DateFormat.getBestDateTimePattern(locale, skeleton), locale).format(date)
-
+        val date = period.barStart(slot)
         return when (period.kind) {
-            PeriodKind.WEEK -> format("EEEMMMd", period.start.plusDays(slot - 1L))
-            PeriodKind.MONTH -> format("yMMMd", period.start.plusDays(slot - 1L))
-            PeriodKind.YEAR -> format("yMMMM", period.start.withMonth(slot))
+            PeriodKind.WEEK -> formatDate("EEEMMMd", date)
+            PeriodKind.YEAR -> formatDate("yMMMM", date)
+            PeriodKind.MONTH, PeriodKind.CUSTOM -> formatDate("yMMMd", date)
         }
+    }
+
+    /**
+     * Locale-formatted, e.g. "Sep 1".
+     */
+    private fun customBarLabeler(period: StatisticsPeriod): (Int) -> String =
+        { slot -> formatDate("MMMd", period.barStart(slot)) }
+
+    private fun formatDate(skeleton: String, date: LocalDate): String {
+        val locale = Locale.getDefault()
+        return DateTimeFormatter.ofPattern(DateFormat.getBestDateTimePattern(locale, skeleton), locale).format(date)
     }
 
     private fun chartDescription(
@@ -303,11 +422,18 @@ class SportStatisticsFragment : Fragment() {
         label: String,
         formatter: WorkoutValueFormatter,
     ): String = getString(
-        when {
-            stats.period.kind == PeriodKind.YEAR && metric.average -> R.string.statistics_chart_description_monthly_average
-            stats.period.kind == PeriodKind.YEAR -> R.string.statistics_chart_description_monthly
-            metric.average -> R.string.statistics_chart_description_daily_average
-            else -> R.string.statistics_chart_description_daily
+        if (stats.period.kind == PeriodKind.YEAR) {
+            when (metric.aggregation) {
+                MetricAggregation.TOTAL -> R.string.statistics_chart_description_monthly
+                MetricAggregation.AVERAGE -> R.string.statistics_chart_description_monthly_average
+                MetricAggregation.MAXIMUM -> R.string.statistics_chart_description_monthly_maximum
+            }
+        } else {
+            when (metric.aggregation) {
+                MetricAggregation.TOTAL -> R.string.statistics_chart_description_daily
+                MetricAggregation.AVERAGE -> R.string.statistics_chart_description_daily_average
+                MetricAggregation.MAXIMUM -> R.string.statistics_chart_description_daily_maximum
+            }
         },
         label,
         periodTitle(stats.period),
@@ -319,12 +445,13 @@ class SportStatisticsFragment : Fragment() {
         SportMetric.DISTANCE ->
             formatter.convert(raw / METERS_PER_KM, ActivitySummaryEntries.UNIT_KILOMETERS, true).value
         SportMetric.DURATION -> raw / SECONDS_PER_HOUR
-        SportMetric.AVG_PACE -> pace(raw).let { (value, unit) ->
+        SportMetric.AVG_PACE, SportMetric.MAX_PACE -> pace(raw).let { (value, unit) ->
             formatter.convert(value, unit, true).value * SECONDS_PER_MINUTE
         }
-        SportMetric.AVG_SPEED -> formatter.convert(raw, ActivitySummaryEntries.UNIT_METERS_PER_SECOND, true).value
-        SportMetric.AVG_HEART_RATE, SportMetric.AVG_POWER, SportMetric.AVG_SWOLF,
-        SportMetric.AVG_AEROBIC_EFFECT, SportMetric.AVG_ANAEROBIC_EFFECT -> raw
+        SportMetric.AVG_SPEED, SportMetric.MAX_SPEED -> formatter.convert(raw, ActivitySummaryEntries.UNIT_METERS_PER_SECOND, true).value
+        SportMetric.AVG_HEART_RATE, SportMetric.MAX_HEART_RATE, SportMetric.AVG_POWER, SportMetric.MAX_POWER,
+        SportMetric.AVG_CADENCE, SportMetric.MAX_CADENCE, SportMetric.AVG_SWOLF, SportMetric.AVG_AEROBIC_EFFECT,
+        SportMetric.AVG_ANAEROBIC_EFFECT -> raw
         SportMetric.ASCENT, SportMetric.DESCENT ->
             formatter.convert(raw, ActivitySummaryEntries.UNIT_METERS, true).value
         SportMetric.CALORIES, SportMetric.STEPS, SportMetric.TRAINING_LOAD, SportMetric.SETS -> raw
@@ -333,7 +460,9 @@ class SportStatisticsFragment : Fragment() {
     private fun emptyAxisMaximum(metric: SportMetric): Double = when (metric) {
         SportMetric.DISTANCE -> 10.0
         SportMetric.DURATION -> 1.0
-        SportMetric.AVG_PACE, SportMetric.AVG_SPEED, SportMetric.AVG_HEART_RATE, SportMetric.AVG_POWER,
+        SportMetric.AVG_PACE, SportMetric.MAX_PACE, SportMetric.AVG_SPEED, SportMetric.MAX_SPEED,
+        SportMetric.AVG_HEART_RATE, SportMetric.MAX_HEART_RATE, SportMetric.AVG_POWER, SportMetric.MAX_POWER,
+        SportMetric.AVG_CADENCE, SportMetric.MAX_CADENCE,
         SportMetric.AVG_SWOLF, SportMetric.AVG_AEROBIC_EFFECT, SportMetric.AVG_ANAEROBIC_EFFECT -> 0.0
         SportMetric.CALORIES -> 500.0
         SportMetric.ASCENT, SportMetric.DESCENT -> 100.0
@@ -343,15 +472,20 @@ class SportStatisticsFragment : Fragment() {
     }
 
     private fun formatTotal(metric: SportMetric, raw: Double, formatter: WorkoutValueFormatter): String =
-        if (metric.average && raw == 0.0) getString(R.string.stats_empty_value) else formatMetric(metric, raw, formatter)
+        if (metric.lineOnly && raw == 0.0) getString(R.string.stats_empty_value) else formatMetric(metric, raw, formatter)
 
     private fun formatMetric(metric: SportMetric, raw: Double, formatter: WorkoutValueFormatter): String = when (metric) {
         SportMetric.DISTANCE -> formatter.formatValue(raw / METERS_PER_KM, ActivitySummaryEntries.UNIT_KILOMETERS)
         SportMetric.DURATION -> formatter.formatValue(raw, ActivitySummaryEntries.UNIT_SECONDS)
-        SportMetric.AVG_PACE -> pace(raw).let { (value, unit) -> formatter.formatValue(value, unit) }
-        SportMetric.AVG_SPEED -> formatter.formatValue(raw, ActivitySummaryEntries.UNIT_METERS_PER_SECOND)
-        SportMetric.AVG_HEART_RATE -> formatter.formatValue(raw.roundToLong(), ActivitySummaryEntries.UNIT_BPM)
-        SportMetric.AVG_POWER -> formatter.formatValue(raw.roundToLong(), ActivitySummaryEntries.UNIT_WATT)
+        SportMetric.AVG_PACE, SportMetric.MAX_PACE -> pace(raw).let { (value, unit) -> formatter.formatValue(value, unit) }
+        SportMetric.AVG_SPEED, SportMetric.MAX_SPEED ->
+            formatter.formatValue(raw, ActivitySummaryEntries.UNIT_METERS_PER_SECOND)
+        SportMetric.AVG_HEART_RATE, SportMetric.MAX_HEART_RATE ->
+            formatter.formatValue(raw.roundToLong(), ActivitySummaryEntries.UNIT_BPM)
+        SportMetric.AVG_POWER, SportMetric.MAX_POWER ->
+            formatter.formatValue(raw.roundToLong(), ActivitySummaryEntries.UNIT_WATT)
+        SportMetric.AVG_CADENCE, SportMetric.MAX_CADENCE -> overview?.cadenceUnit?.let { formatter.formatValue(raw.roundToLong(), it) }
+            ?: raw.roundToLong().toString()
         SportMetric.AVG_AEROBIC_EFFECT, SportMetric.AVG_ANAEROBIC_EFFECT ->
             String.format(Locale.getDefault(), "%.1f", raw)
         SportMetric.CALORIES -> formatter.formatValue(raw.roundToLong(), ActivitySummaryEntries.UNIT_KCAL)
@@ -381,6 +515,12 @@ class SportStatisticsFragment : Fragment() {
         private const val ARG_KIND_CODE = "kindCode"
         private const val STATE_KIND = "kind"
         private const val STATE_PERIOD_START = "periodStart"
+        private const val STATE_PERIOD_END = "periodEnd"
+        private const val TAG_RANGE_PICKER = "rangePicker"
+
+        // Color.TRANSPARENT would remove the tint instead of hiding the indicator
+        private const val HIDDEN_INDICATOR_COLOR = 0x00000001
+        private val PRESET_KINDS = listOf(PeriodKind.WEEK, PeriodKind.MONTH, PeriodKind.YEAR)
         private const val PREF_CHART_CONFIG_PREFIX = "sport_statistics_chart_"
         private const val METERS_PER_KM = 1000.0
         private const val METERS_PER_100 = 100.0

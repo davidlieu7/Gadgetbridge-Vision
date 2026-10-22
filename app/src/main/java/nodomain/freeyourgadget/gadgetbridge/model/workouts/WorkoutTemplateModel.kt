@@ -118,6 +118,12 @@ data class WorkoutStepNode(
      */
     fun flattenSelfAndDescendants(): List<WorkoutStepNode> =
         listOf(this) + children.flatMap { it.flattenSelfAndDescendants() }
+
+    /**
+     * A copy of this node and its descendants, with new local ids.
+     */
+    fun deepCopy(): WorkoutStepNode =
+        copy(localId = nextLocalId(), children = children.mapTo(mutableListOf()) { it.deepCopy() })
 }
 
 /**

@@ -28,6 +28,7 @@ import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.Nullable;
 import androidx.documentfile.provider.DocumentFile;
 import androidx.localbroadcastmanager.content.LocalBroadcastManager;
+import androidx.preference.ListPreference;
 import androidx.preference.Preference;
 import androidx.preference.PreferenceCategory;
 
@@ -61,6 +62,7 @@ public class MapsSettingsFragment extends AbstractPreferenceFragment {
     private static final String PREF_CATEGORY_MAP_FILES = "pref_category_map_files";
     private static final String PREF_MAP_FILE_PREFIX = "pref_map_file_";
     private static final String PREF_MAP_THEME_CUSTOM_FILE = "maps_theme_custom_file";
+    private static final String PREF_MAP_THEME_DARK_CUSTOM_FILE = "maps_theme_dark_custom_file";
     private static final String[] THEME_FILE_MIME_TYPES = {"application/zip", "application/x-zip-compressed", "*/*"};
 
     @Override
@@ -76,27 +78,27 @@ public class MapsSettingsFragment extends AbstractPreferenceFragment {
         final Preference prefDownload = Objects.requireNonNull(findPreference("maps_download"));
         prefDownload.setOnPreferenceClickListener(preference -> {
             startActivity(new Intent(
-                    Intent.ACTION_VIEW,
-                    Uri.parse("https://ftp-stud.hs-esslingen.de/pub/Mirrors/download.mapsforge.org/maps/v5/")
+                Intent.ACTION_VIEW,
+                Uri.parse("https://ftp-stud.hs-esslingen.de/pub/Mirrors/download.mapsforge.org/maps/v5/")
             ));
             return true;
         });
 
         final Preference prefFolder = Objects.requireNonNull(findPreference(MapsManager.PREF_MAPS_FOLDER));
         final ActivityResultLauncher<Uri> mapsFolderChooser = registerForActivityResult(
-                new ActivityResultContracts.OpenDocumentTree(),
-                localUri -> {
-                    LOG.info("Maps folder: {}", localUri);
-                    if (localUri != null) {
-                        requireContext().getContentResolver().takePersistableUriPermission(localUri, Intent.FLAG_GRANT_READ_URI_PERMISSION);
-                        prefs.edit()
-                                .putString(MapsManager.PREF_MAPS_FOLDER, localUri.toString())
-                                .apply();
-                        prefFolder.setSummary(UriUtils.INSTANCE.resolveLocationSummary(requireContext(), localUri.toString()));
-                        broadcastPreferenceChange(MapsManager.PREF_MAPS_FOLDER);
-                        refreshMapFiles();
-                    }
+            new ActivityResultContracts.OpenDocumentTree(),
+            localUri -> {
+                LOG.info("Maps folder: {}", localUri);
+                if (localUri != null) {
+                    requireContext().getContentResolver().takePersistableUriPermission(localUri, Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                    prefs.edit()
+                        .putString(MapsManager.PREF_MAPS_FOLDER, localUri.toString())
+                        .apply();
+                    prefFolder.setSummary(UriUtils.INSTANCE.resolveLocationSummary(requireContext(), localUri.toString()));
+                    broadcastPreferenceChange(MapsManager.PREF_MAPS_FOLDER);
+                    refreshMapFiles();
                 }
+            }
         );
         final String currentFolder = prefs.getString(MapsManager.PREF_MAPS_FOLDER, "");
         prefFolder.setSummary(UriUtils.INSTANCE.resolveLocationSummary(requireContext(), currentFolder));
@@ -107,48 +109,8 @@ public class MapsSettingsFragment extends AbstractPreferenceFragment {
 
         refreshMapFiles();
 
-        final Preference prefMapTheme = Objects.requireNonNull(findPreference(MapsManager.PREF_MAP_THEME));
-        prefMapTheme.setOnPreferenceChangeListener((preference, newValue) -> {
-            broadcastPreferenceChange(MapsManager.PREF_MAP_THEME);
-            updateCustomThemeFileVisibility(String.valueOf(newValue));
-            return true;
-        });
-
-        final Preference prefThemeFile = Objects.requireNonNull(findPreference(PREF_MAP_THEME_CUSTOM_FILE));
-        final ActivityResultLauncher<String[]> themeFileChooser = registerForActivityResult(
-                new ActivityResultContracts.OpenDocument(),
-                fileUri -> {
-                    if (fileUri == null) {
-                        return;
-                    }
-                    final String problem = validateRenderTheme(fileUri);
-                    if (problem != null) {
-                        GB.toast(requireContext().getString(R.string.map_theme_custom_file_invalid, problem), Toast.LENGTH_LONG, GB.ERROR);
-                        return;
-                    }
-                    try {
-                        requireContext().getContentResolver().takePersistableUriPermission(fileUri, Intent.FLAG_GRANT_READ_URI_PERMISSION);
-                    } catch (final SecurityException e) {
-                        LOG.error("Could not persist permission for theme file {}", fileUri, e);
-                        GB.toast(requireContext().getString(R.string.map_theme_custom_file_invalid, e.getMessage()), Toast.LENGTH_LONG, GB.ERROR);
-                        return;
-                    }
-                    prefs.edit()
-                            .putString(MapsManager.PREF_MAP_THEME_CUSTOM_URI, fileUri.toString())
-                            .apply();
-                    prefThemeFile.setSummary(UriUtils.INSTANCE.resolveLocationSummary(requireContext(), fileUri.toString()));
-                    broadcastPreferenceChange(MapsManager.PREF_MAP_THEME);
-                }
-        );
-        final String currentThemeFile = prefs.getString(MapsManager.PREF_MAP_THEME_CUSTOM_URI, "");
-        if (!currentThemeFile.isEmpty()) {
-            prefThemeFile.setSummary(UriUtils.INSTANCE.resolveLocationSummary(requireContext(), currentThemeFile));
-        }
-        prefThemeFile.setOnPreferenceClickListener(preference -> {
-            themeFileChooser.launch(THEME_FILE_MIME_TYPES);
-            return true;
-        });
-        updateCustomThemeFileVisibility(prefs.getString(MapsManager.PREF_MAP_THEME, "default"));
+        setupTheme(prefs, MapsManager.PREF_MAP_THEME, PREF_MAP_THEME_CUSTOM_FILE, MapsManager.PREF_MAP_THEME_CUSTOM_URI);
+        setupTheme(prefs, MapsManager.PREF_MAP_THEME_DARK, PREF_MAP_THEME_DARK_CUSTOM_FILE, MapsManager.PREF_MAP_THEME_DARK_CUSTOM_URI);
 
         final Preference prefTrackColor = Objects.requireNonNull(findPreference(MapsManager.PREF_TRACK_COLOR));
         prefTrackColor.setOnPreferenceChangeListener((preference, newValue) -> {
@@ -157,11 +119,52 @@ public class MapsSettingsFragment extends AbstractPreferenceFragment {
         });
     }
 
-    private void updateCustomThemeFileVisibility(final String themeValue) {
-        final Preference prefThemeFile = findPreference(PREF_MAP_THEME_CUSTOM_FILE);
-        if (prefThemeFile != null) {
-            prefThemeFile.setVisible(MapsManager.MAP_THEME_VALUE_CUSTOM.equals(themeValue));
+    private void setupTheme(final SharedPreferences prefs,
+                            final String themePrefKey,
+                            final String filePrefKey,
+                            final String uriPrefKey) {
+        final ListPreference prefTheme = Objects.requireNonNull(findPreference(themePrefKey));
+        final Preference prefThemeFile = Objects.requireNonNull(findPreference(filePrefKey));
+        prefTheme.setOnPreferenceChangeListener((preference, newValue) -> {
+            broadcastPreferenceChange(themePrefKey);
+            prefThemeFile.setVisible(MapsManager.MAP_THEME_VALUE_CUSTOM.equals(newValue));
+            return true;
+        });
+        prefThemeFile.setVisible(MapsManager.MAP_THEME_VALUE_CUSTOM.equals(prefTheme.getValue()));
+
+        final ActivityResultLauncher<String[]> themeFileChooser = registerForActivityResult(
+            new ActivityResultContracts.OpenDocument(),
+            fileUri -> {
+                if (fileUri == null) {
+                    return;
+                }
+                final String problem = validateRenderTheme(fileUri);
+                if (problem != null) {
+                    GB.toast(requireContext().getString(R.string.map_theme_custom_file_invalid, problem), Toast.LENGTH_LONG, GB.ERROR);
+                    return;
+                }
+                try {
+                    requireContext().getContentResolver().takePersistableUriPermission(fileUri, Intent.FLAG_GRANT_READ_URI_PERMISSION);
+                } catch (final SecurityException e) {
+                    LOG.error("Could not persist permission for theme file {}", fileUri, e);
+                    GB.toast(requireContext().getString(R.string.map_theme_custom_file_invalid, e.getMessage()), Toast.LENGTH_LONG, GB.ERROR);
+                    return;
+                }
+                prefs.edit()
+                    .putString(uriPrefKey, fileUri.toString())
+                    .apply();
+                prefThemeFile.setSummary(UriUtils.INSTANCE.resolveLocationSummary(requireContext(), fileUri.toString()));
+                broadcastPreferenceChange(themePrefKey);
+            }
+        );
+        final String currentThemeFile = prefs.getString(uriPrefKey, "");
+        if (!currentThemeFile.isEmpty()) {
+            prefThemeFile.setSummary(UriUtils.INSTANCE.resolveLocationSummary(requireContext(), currentThemeFile));
         }
+        prefThemeFile.setOnPreferenceClickListener(preference -> {
+            themeFileChooser.launch(THEME_FILE_MIME_TYPES);
+            return true;
+        });
     }
 
     /**
@@ -268,9 +271,9 @@ public class MapsSettingsFragment extends AbstractPreferenceFragment {
             final MapFileInfo mapFileInfo = mapFile.getMapFileInfo();
 
             final String formattedDate = DateUtils.formatDateTime(
-                    requireContext(),
-                    mapFileInfo.mapDate,
-                    DateUtils.FORMAT_SHOW_DATE | DateUtils.FORMAT_SHOW_TIME
+                requireContext(),
+                mapFileInfo.mapDate,
+                DateUtils.FORMAT_SHOW_DATE | DateUtils.FORMAT_SHOW_TIME
             );
             pref.setSummary(formattedDate + "\n" + FormatUtils.formatBytes(mapFileInfo.fileSize));
 

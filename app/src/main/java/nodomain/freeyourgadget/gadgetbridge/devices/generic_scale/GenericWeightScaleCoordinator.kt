@@ -87,7 +87,7 @@ class GenericWeightScaleCoordinator : AbstractBLEDeviceCoordinator() {
     }
 
     override fun supports(candidate: GBDeviceCandidate): Boolean {
-        return candidate.supportsService(GattService.UUID_SERVICE_WEIGHT_SCALE)
+        return candidate.supportsService(GattService.SERVICE_WEIGHT_SCALE.uuid)
     }
 
     override fun supportsWeightMeasurement(device: GBDevice): Boolean {

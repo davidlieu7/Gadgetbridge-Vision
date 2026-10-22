@@ -34,7 +34,7 @@ abstract class GaugeWidget<D> : GBWidget<D> {
      **/
     protected open val chartMode: String = ""
 
-    private val gaugeDrawer = GaugeDrawer()
+    private val gaugeDrawer = GaugeDrawer(GaugeDrawer.Shape.HALF_CIRCLE)
 
     override fun createView(inflater: LayoutInflater, parent: ViewGroup): View =
         inflater.inflate(R.layout.dashboard_widget_generic_gauge, parent, false)

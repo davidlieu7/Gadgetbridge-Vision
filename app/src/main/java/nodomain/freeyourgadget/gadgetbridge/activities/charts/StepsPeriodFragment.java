@@ -85,6 +85,7 @@ public class StepsPeriodFragment extends StepsFragment<StepsPeriodFragment.Steps
 
         mDateView = rootView.findViewById(R.id.steps_date_view);
         stepsChart = rootView.findViewById(R.id.steps_chart);
+        stepsChart.setZoomable(TOTAL_DAYS > 7);
         stepsChart.dismissSelectionOnTapOutside(rootView);
         stepsPeriodStatsContainer = rootView.findViewById(R.id.steps_period_stats_container);
         STEPS_GOAL = GBApplication.getPrefs().getInt(ActivityUser.PREF_USER_STEPS_GOAL, ActivityUser.defaultUserStepsGoal);
@@ -164,9 +165,10 @@ public class StepsPeriodFragment extends StepsFragment<StepsPeriodFragment.Steps
                 daySteps = steps[i];
             }
         }
-        final String value = daySteps == 0
-                ? getString(R.string.stats_empty_value)
-                : new WorkoutValueFormatter().formatValue(daySteps, ActivitySummaryEntries.UNIT_STEPS);
+        if (daySteps == 0) {
+            return new ChartSelection(title, Collections.emptyList(), title + ".");
+        }
+        final String value = new WorkoutValueFormatter().formatValue(daySteps, ActivitySummaryEntries.UNIT_STEPS);
         return new ChartSelection(
                 title,
                 Collections.singletonList(new ChartSelection.Row(stepsColor, value)),

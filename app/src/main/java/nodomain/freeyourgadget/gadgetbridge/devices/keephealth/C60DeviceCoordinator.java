@@ -113,6 +113,12 @@ public class C60DeviceCoordinator extends AbstractDeviceCoordinator  {
         }
 
         DeviceCardAction action = new DeviceCardAction() {
+            @NonNull
+            @Override
+            public String getId() {
+                return "c60_camera";
+            }
+
             @Override
             public int getIcon(@NonNull GBDevice device) {
                 return R.drawable.ic_camera_remote;

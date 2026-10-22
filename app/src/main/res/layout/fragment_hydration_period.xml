@@ -21,12 +21,18 @@
             android:layout_width="match_parent"
             android:layout_height="250sp">
 
-            <com.github.mikephil.charting.charts.BarChart
+            <nodomain.freeyourgadget.gadgetbridge.activities.charts.mpchart.GbChartView
                 android:id="@+id/hydration_chart"
                 android:layout_width="0dp"
                 android:layout_height="match_parent"
                 android:layout_weight="2" />
         </LinearLayout>
+
+        <nodomain.freeyourgadget.gadgetbridge.activities.charts.mpchart.ChartLegendView
+            android:id="@+id/hydration_chart_legend"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp" />
 
         <LinearLayout
             android:id="@+id/hydration_period_stats_container"

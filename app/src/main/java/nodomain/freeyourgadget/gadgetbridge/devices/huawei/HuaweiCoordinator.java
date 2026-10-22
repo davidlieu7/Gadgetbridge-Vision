@@ -40,9 +40,12 @@ import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSpec
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSpecificSettingsScreen;
 import nodomain.freeyourgadget.gadgetbridge.devices.AbstractDeviceCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.ComputedHrvSummarySampleProvider;
+import nodomain.freeyourgadget.gadgetbridge.devices.DefaultSleepSessionProvider;
+import nodomain.freeyourgadget.gadgetbridge.devices.FallbackSleepSessionProvider;
 import nodomain.freeyourgadget.gadgetbridge.devices.HuaweiStressSampleProvider;
 import nodomain.freeyourgadget.gadgetbridge.devices.InstallHandler;
 import nodomain.freeyourgadget.gadgetbridge.devices.SampleProvider;
+import nodomain.freeyourgadget.gadgetbridge.devices.SleepSessionProvider;
 import nodomain.freeyourgadget.gadgetbridge.devices.TimeSampleProvider;
 import nodomain.freeyourgadget.gadgetbridge.entities.AbstractActivitySample;
 import nodomain.freeyourgadget.gadgetbridge.entities.BaseActivitySummaryDao;
@@ -420,6 +423,16 @@ public abstract class HuaweiCoordinator extends AbstractDeviceCoordinator {
         return new HuaweiSampleProvider(device, session);
     }
 
+    @NonNull
+    @Override
+    public SleepSessionProvider getSleepSessionProvider(@NonNull final GBDevice device, @NonNull final DaoSession session) {
+        return new FallbackSleepSessionProvider(
+            new HuaweiSleepSessionProvider(device, session),
+            // For non-TruSleep watches
+            new DefaultSleepSessionProvider(device, session)
+        );
+    }
+
     @Override
     public TimeSampleProvider<? extends Spo2Sample> getSpo2SampleProvider(GBDevice device, DaoSession session) {
         return new HuaweiSpo2SampleProvider(device, session);
@@ -479,7 +492,7 @@ public abstract class HuaweiCoordinator extends AbstractDeviceCoordinator {
         // Health
         if (deviceState.supportsInactivityWarnings())
             deviceSpecificSettings.addRootScreen(DeviceSpecificSettingsScreen.HEALTH, R.xml.devicesettings_inactivity_sheduled);
-        if (deviceState.supportsTruSleep())
+        if (deviceState.supportsTruSleep() || deviceState.supportsSleepBreath() || deviceState.supportsSleepApnea())
             deviceSpecificSettings.addRootScreen(DeviceSpecificSettingsScreen.HEALTH, R.xml.devicesettings_trusleep);
         if (deviceState.supportsHeartRate()) {
             deviceSpecificSettings.addRootScreen(DeviceSpecificSettingsScreen.HEALTH, R.xml.devicesettings_heartrate_automatic_enable);

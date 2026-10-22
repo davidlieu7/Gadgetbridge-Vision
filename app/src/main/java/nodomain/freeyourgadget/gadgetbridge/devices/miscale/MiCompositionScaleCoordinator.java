@@ -58,7 +58,7 @@ public class MiCompositionScaleCoordinator extends AbstractBLEDeviceCoordinator 
     @NonNull
     @Override
     public Collection<? extends ScanFilter> createBLEScanFilters() {
-        final ParcelUuid bodyCompositionService = new ParcelUuid(GattService.UUID_SERVICE_BODY_COMPOSITION);
+        final ParcelUuid bodyCompositionService = new ParcelUuid(GattService.SERVICE_BODY_COMPOSITION.uuid);
 
         final ScanFilter.Builder builder = new ScanFilter.Builder();
         builder.setServiceUuid(bodyCompositionService);

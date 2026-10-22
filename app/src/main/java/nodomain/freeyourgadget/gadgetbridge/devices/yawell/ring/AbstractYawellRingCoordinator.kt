@@ -31,6 +31,8 @@ import nodomain.freeyourgadget.gadgetbridge.devices.ColmiStressSampleProvider
 import nodomain.freeyourgadget.gadgetbridge.devices.ColmiTemperatureSampleProvider
 import nodomain.freeyourgadget.gadgetbridge.devices.ComputedHrvSummarySampleProvider
 import nodomain.freeyourgadget.gadgetbridge.devices.DeviceCoordinator
+import nodomain.freeyourgadget.gadgetbridge.devices.SleepSessionProvider
+import nodomain.freeyourgadget.gadgetbridge.devices.yawell.ring.samples.ColmiSleepSessionProvider
 import nodomain.freeyourgadget.gadgetbridge.devices.SampleProvider
 import nodomain.freeyourgadget.gadgetbridge.devices.TimeSampleProvider
 import nodomain.freeyourgadget.gadgetbridge.devices.yawell.ring.samples.ColmiActivitySampleProvider
@@ -148,6 +150,14 @@ abstract class AbstractYawellRingCoordinator : AbstractBLEDeviceCoordinator() {
         return false
     }
 
+    override fun supportsNotifications(device: GBDevice): Boolean {
+        return false
+    }
+
+    override fun getSleepSessionProvider(device: GBDevice, session: DaoSession): SleepSessionProvider {
+        return ColmiSleepSessionProvider(device, session)
+    }
+
     override fun getSampleProvider(
         device: GBDevice,
         session: DaoSession
@@ -250,6 +260,21 @@ abstract class AbstractYawellRingCoordinator : AbstractBLEDeviceCoordinator() {
                 icon = R.drawable.ic_temperature,
                 defaultValue = false,
                 visibleWhen = { supportsContinuousTemperature(device) },
+            )
+        }
+        screen(
+            key = DeviceSpecificSettingsScreen.CALLS_AND_NOTIFICATIONS.key,
+            title = R.string.pref_header_calls_and_notifications,
+            icon = R.drawable.ic_notifications,
+            visibleWhen = { supportsNotifications(device) },
+        ) {
+            seekbar(
+                key = YawellRingConstants.PREF_NOTIFICATION_VIBRATION_COUNT,
+                title = R.string.pref_header_vibration_count,
+                icon = R.drawable.ic_vibration,
+                min = 1,
+                max = 5,
+                defaultValue = 3,
             )
         }
         screen(

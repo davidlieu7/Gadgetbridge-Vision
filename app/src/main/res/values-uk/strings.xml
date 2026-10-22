@@ -1411,8 +1411,8 @@
     <string name="pref_title_touch_anc">Активне шумопоглинання</string>
     <string name="pref_title_touch_volume">Гучність</string>
     <string name="pref_ambient_sound_tone_summary">Від мʼякого до чистого</string>
-    <string name="pref_switch_controls_anc_off">Шумопоглинання ←→ Вимкнено</string>
-    <string name="pref_switch_controls_ambient_off">Довкілля ←→ Вимкнено</string>
+    <string name="pref_switch_controls_anc_off">Шумопоглинання ↔ Вимкнено</string>
+    <string name="pref_switch_controls_ambient_off">Довкілля ↔ Вимкнено</string>
     <string name="prefs_noise_control">Керування шумом</string>
     <string name="prefs_voice_detect">Виявлення голосу</string>
     <string name="prefs_double_tap_edge">Подвійний дотик краю</string>
@@ -1432,7 +1432,7 @@
     <string name="prefs_noise_control_with_one_earbud_summary">Дозволити керувати шумом під час використання лише одного навушника</string>
     <string name="pref_balance">Баланс</string>
     <string name="pref_ambient_sound_tone">Тон звуку довкілля</string>
-    <string name="pref_switch_controls_anc_ambient">Шумопоглинання ←→ Довкілля</string>
+    <string name="pref_switch_controls_anc_ambient">Шумопоглинання ↔ Довкілля</string>
     <string name="prefs_voice_detect_summary">Увімкнути звук довкілля та автоматичне зменшення гучності відтворення після виявлення голосу</string>
     <string name="prefs_double_tap_edge_summary">Виявляти подвійний дотик, навіть якщо торкання було не на сенсорній панелі</string>
     <string name="pref_voice_detect_duration_10">10 секунд</string>
@@ -1865,7 +1865,7 @@
     <string name="continue_pressing">Продовжуйте затискати</string>
     <string name="quick_attention">Швидка увага</string>
     <string name="long_press">Затискання</string>
-    <string name="pref_switch_controls_anc_ambient_off">Шумопоглинання ←→ Довкілля ←→ Вимкнено</string>
+    <string name="pref_switch_controls_anc_ambient_off">Шумопоглинання ↔ Довкілля ↔ Вимкнено</string>
     <string name="sony_button_mode_help_title">Режими кнопок – Довідка</string>
     <string name="menuitem_mi_ai">MI AI</string>
     <string name="menuitem_cards">Картки</string>

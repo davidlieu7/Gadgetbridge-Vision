@@ -59,6 +59,7 @@
     <string name="controlcenter_navigation_drawer_close">Close navigation drawer</string>
     <string name="controlcenter_snackbar_need_longpress">Long press the card to disconnect</string>
     <string name="controlcenter_snackbar_disconnecting">Disconnecting</string>
+    <string name="controlcenter_snackbar_discovering_services">Discovering services…</string>
     <string name="controlcenter_snackbar_connecting">Connecting…</string>
     <string name="controlcenter_snackbar_requested_screenshot">Taking a screenshot of the device</string>
     <string name="controlcenter_calibrate_device">Calibrate Device</string>
@@ -100,6 +101,14 @@
     <string name="calendar_three_months">3 months</string>
     <string name="calendar_six_months">6 months</string>
     <string name="calendar_year">Year</string>
+    <!-- Short duration labels under the battery info slider -->
+    <string name="duration_short_day">1d</string>
+    <string name="duration_short_week">1w</string>
+    <string name="duration_short_two_weeks">2w</string>
+    <string name="duration_short_month">1m</string>
+    <string name="duration_short_six_months">6m</string>
+    <string name="duration_short_three_months">3m</string>
+    <string name="duration_short_year">1y</string>
     <!-- Strings related to Debug Activity -->
     <string name="title_activity_debug">Debug</string>
     <string name="debugactivity_really_factoryreset_title">Really factory reset?</string>
@@ -217,6 +226,17 @@
     <string name="pref_header_calendar">Calendar</string>
     <string name="pref_header_connection">Connection</string>
     <string name="pref_header_dashboard">Dashboard</string>
+    <string name="pref_header_device_card">Device card</string>
+    <string name="pref_device_card_show_items_title">Show card items</string>
+    <string name="pref_device_card_items_title">Card items</string>
+    <string name="pref_device_card_items_summary">Customize the items on the device card</string>
+    <string name="pref_device_card_show_quick_controls_title">Show quick controls</string>
+    <string name="pref_device_card_quick_controls_title">Quick controls</string>
+    <string name="pref_device_card_quick_controls_summary">Customize the quick controls on the device card</string>
+    <string name="device_card_add_item">Add item</string>
+    <string name="device_card_more_summary">The items below this one are displayed in a popup</string>
+    <string name="device_card_items_reset_confirmation">Reset the order of the device card items, and restore the removed items?</string>
+    <string name="device_card_quick_controls_reset_confirmation">Reset the order of the quick controls, and restore the removed quick controls?</string>
     <string name="pref_header_display">Display</string>
     <string name="pref_header_generic">Generic</string>
     <string name="pref_header_health">Health</string>
@@ -263,6 +283,7 @@
     <string name="pref_title_datetime_syctimeonconnect">Sync time</string>
     <string name="pref_summary_datetime_syctimeonconnect">Sync time to Gadgetbridge device(s) when connecting, when time or time zone changes on Android device, and periodically</string>
     <string name="pref_header_main_screen">Main screen</string>
+    <string name="pref_header_devices_screen">Devices screen</string>
     <string name="pref_title_theme">Theme</string>
     <string name="pref_theme_light">Light</string>
     <string name="pref_theme_dark">Dark</string>
@@ -272,7 +293,9 @@
     <string name="map_theme_motorider">Motorider</string>
     <string name="map_theme_biker">Biker</string>
     <string name="map_theme_indigo">Indigo</string>
+    <string name="map_theme_dark_low_contrast">Dark (low contrast)</string>
     <string name="map_theme_custom">Custom…</string>
+    <string name="map_theme_dark_title">Theme in dark mode</string>
     <string name="map_theme_custom_file_title">Custom theme file</string>
     <string name="map_theme_custom_file_summary">Zip archive with the render theme and its icons, used when the theme above is set to Custom</string>
     <string name="map_theme_custom_file_invalid">Not a valid mapsforge render theme: %1$s</string>
@@ -377,6 +400,7 @@
     <string name="always">Always</string>
     <string name="when_screen_off">When screen is off</string>
     <string name="never">Never</string>
+    <string name="when_connected">When connected</string>
     <string name="pref_header_privacy">Privacy</string>
     <string name="pref_title_call_privacy_mode">Call privacy mode</string>
     <string name="pref_call_privacy_mode_off">Display name and number</string>
@@ -782,11 +806,14 @@
     <string name="discovery_bluetooth_scan">Bluetooth scan:</string>
     <string name="discovery_bluetooth_le_scan">Bluetooth LE scan:</string>
     <string name="action_discover">Connect new device</string>
-    <string name="device_with_rssi">%1$s (%2$s)</string>
+    <string name="device_rssi_dbm">%1$s dBm</string>
     <string name="title_activity_android_pairing">Pair device</string>
-    <string name="android_pairing_hint">Use the Android Bluetooth pairing dialog to pair the device.</string>
     <string name="title_activity_mi_band_pairing">Pair your Mi Band</string>
     <string name="pairing">Pairing with %s…</string>
+    <string name="pairing_step_bond">Bluetooth bond</string>
+    <string name="pairing_failed_connect">Could not connect to %1$s.</string>
+    <string name="pairing_success">Paired with %1$s</string>
+    <string name="pairing_change_auth_key">Change auth key</string>
     <string name="choose_device">Choose a device</string>
     <string name="no_supported_devices_found">No supported devices found</string>
     <string name="pairing_creating_bond_with">Creating bond with %1$s (%2$s)</string>
@@ -813,7 +840,7 @@
     <string name="miband_pairing_using_dummy_userdata">No valid user data given, using dummy user data for now.</string>
     <string name="miband_pairing_tap_hint">When your Mi Band vibrates and blinks, tap it a few times in a row.</string>
     <string name="appinstaller_install">Install</string>
-    <string name="discovery_connected_devices_hint">Make your device discoverable. Currently connected devices will likely not be discovered. Activate location (e.g. GPS). Disable Privacy Guard for Gadgetbridge, because it may crash and reboot your phone. If no device is found after a few minutes, try again after rebooting your mobile device.</string>
+    <string name="discovery_connected_devices_hint">Make your device discoverable. Currently connected devices will likely not be discovered. Activate location (e.g. GPS).</string>
     <string name="discovery_need_to_enter_authkey">This device needs a secret auth key, long press on the device to enter it. More information on the website.</string>
     <string name="discovery_entered_invalid_authkey">The secret auth key you entered is invalid! Long press on the device to edit.</string>
     <string name="discovery_note">Note:</string>
@@ -938,6 +965,8 @@
     <string name="spo2_perc_85">85%</string>
     <string name="spo2_perc_90">90%</string>
     <string name="spo2_off">Off</string>
+    <string name="spo2_mode_sleep">During sleep</string>
+    <string name="spo2_mode_all_day">All day</string>
     <string name="interval_one_hour">once an hour</string>
     <string name="interval_1_hour">every 1 hour</string>
     <string name="interval_2_hour">every 2 hours</string>
@@ -949,7 +978,6 @@
     <string name="stats_y_axis_label">Steps per minute</string>
     <string name="control_center_find_lost_device">Find lost device</string>
     <string name="control_center_cancel_to_stop_vibration">Cancel to stop vibration.</string>
-    <string name="title_activity_charts">Activity and Sleep</string>
     <string name="title_activity_set_alarm">Configure alarms</string>
     <string name="title_activity_set_reminders">Configure reminders</string>
     <string name="title_activity_set_contacts">Configure contacts</string>
@@ -1003,7 +1031,7 @@
     <string name="alarm_fri_short">Fri</string>
     <string name="alarm_sat_short">Sat</string>
     <string name="alarm_smart_wakeup">Smart wakeup</string>
-    <string name="alarm_smart_wakeup_interval">Smart wakeup interval:</string>
+    <string name="alarm_smart_wakeup_interval_minutes">Smart wakeup interval (minutes)</string>
     <string name="alarm_smart_wakeup_interval_default">5 minutes</string>
     <string name="alarm_snooze">Snooze</string>
     <string name="alarm_add">Add alarm</string>
@@ -1072,6 +1100,13 @@
     <string name="activity_list_summary_active_time">Active time</string>
     <string name="activity_list_summary_intensity">Movement\nIntensity</string>
     <string name="activity_list_summary_activities">Activities</string>
+    <string name="activity_list_row_meta">%1$s - %2$s · %3$s</string>
+    <string name="activity_list_row_stats_pair">%1$s · %2$s</string>
+    <string name="activity_list_intensity_value">Intensity %s</string>
+    <plurals name="activity_list_steps_count">
+        <item quantity="one">%d step</item>
+        <item quantity="other">%d steps</item>
+    </plurals>
     <string name="dialog_hide">Hide</string>
     <string name="show_ongoing_activity">Show ongoing activity popup</string>
     <string name="charts_show_balance_sleep_title">Show sleep balance</string>
@@ -1240,9 +1275,11 @@
     <string name="sleep_colored_stats_light_avg">Light AVG</string>
     <string name="sleep_colored_stats_rem_avg">REM AVG</string>
     <string name="sleep_colored_stats_awake_avg">Awake AVG</string>
+    <string name="sleep_total_value">Total sleep: %s</string>
     <string name="sleep_avg">Sleep AVG</string>
     <string name="lowest">Lowest</string>
     <string name="highest">Highest</string>
+    <string name="sleep_stages">Sleep Stages</string>
     <string name="sleep_score">Sleep Score</string>
     <string name="sleep_score_value">Score: %1d</string>
     <string name="stats_empty_value">-</string>
@@ -1257,6 +1294,8 @@
     <string name="charts_min_max_heartrate_popup">Lowest heart rate: %1$d \nHighest heart rate: %2$d \nMovement intensity: %3$s</string>
     <string name="device_not_connected">Not connected.</string>
     <string name="user_feedback_all_alarms_disabled">All alarms disabled</string>
+    <string name="pref_title_do_not_archive_activity_data">Do not archive activity data</string>
+    <string name="pref_summary_do_not_archive_activity_data">Do not mark activities as synced on the device. Useful if Gadgetbridge is used together with other apps. This may cause the watch to run out of space and/or stop syncing properly.</string>
     <string name="pref_title_keep_data_on_device">Keep activity data on device</string>
     <string name="miband_fwinstaller_incompatible_version">Incompatible firmware</string>
     <string name="fwinstaller_firmware_not_compatible_to_device">This firmware is not compatible with the device</string>
@@ -1270,7 +1309,11 @@
     <string name="miband_prefs_reserve_reminder_calendar">Reminders to reserve for upcoming events</string>
     <string name="prefs_reserve_reminder_calendar_summary">Number of calendar events that will be synchronized</string>
     <string name="miband_prefs_hr_sleep_detection">Use heart rate sensor to improve sleep detection</string>
+    <string name="pref_sleep_stage_estimation_title">Estimate sleep stages</string>
+    <string name="pref_sleep_stage_estimation_summary">Estimate light, deep and REM sleep from movement and heart rate, replacing any sleep information reported by the device.</string>
     <string name="pref_sleep_breathing_quality_monitoring">Sleep breathing quality monitoring</string>
+    <string name="pref_sleep_respiratory_rate_monitoring">Sleep breathing rate monitoring</string>
+    <string name="pref_heartrate_alert_irregular_rhythm">Irregular heart rhythm alert</string>
     <string name="miband_prefs_device_time_offset_hours">Device time offset in hours (for detecting sleep of shift workers)</string>
     <string name="prefs_find_phone">Find phone</string>
     <string name="prefs_enable_find_phone">Turn on \"Find phone\"</string>
@@ -1368,6 +1411,39 @@
     <string name="ak102_audio_unpaired">Call audio unpaired</string>
     <string name="ak102_pref_display_items_title">Display items</string>
     <string name="ak102_pref_display_items_summary">Screens shown on the watch</string>
+    <string name="stratos4pro_pref_audio_on_call_title">Connect call audio only for calls</string>
+    <string name="stratos4pro_pref_audio_on_call_summary">Leave the watch\'s Bluetooth Classic radio off and switch it on when a call comes in, so it can be answered on the watch. Uses less watch battery than keeping it connected. Needs call notifications.</string>
+    <string name="stratos4pro_incoming_call">Incoming call</string>
+    <string name="stratos4pro_pref_audio_auto_connect_title">Keep call audio connected</string>
+    <string name="stratos4pro_pref_audio_auto_connect_summary">The watch switches its Bluetooth Classic radio off after a few minutes idle, which stops calls reaching it. Switch it back on whenever that happens.</string>
+    <string name="stratos4pro_pref_audio_schedule_title">Only during a time window</string>
+    <string name="stratos4pro_pref_audio_schedule_summary">Outside the window the watch powers its own radio down, so call audio is unavailable until the window opens again</string>
+    <string name="stratos4pro_pref_audio_pair_summary">Pair the watch\'s Bluetooth Classic side so calls can be taken on the watch</string>
+    <string name="stratos4pro_audio_rebonding">The watch no longer knows this phone, removing the stale pairing and starting over</string>
+    <string name="stratos4pro_password_six_digits">The watch password must be exactly 6 digits</string>
+    <string name="stratos4pro_pref_reply_all_apps_title">Reply from the watch to any app</string>
+    <string name="stratos4pro_pref_reply_all_apps_summary">The watch offers replies only on WhatsApp notifications. With this on, every notification you can answer (SMS, Gmail, Telegram and others) is sent as a WhatsApp one, and its title starts with the app name.</string>
+    <string name="stratos4pro_pref_reply_icon_app_title">Keep the app\'s own icon</string>
+    <string name="stratos4pro_pref_reply_icon_app_summary">Show the Gmail, SMS or other app icon and name instead of WhatsApp. The watch keeps one icon for all of these, so older ones in its notification list change to the newest app\'s icon.</string>
+    <string name="stratos4pro_pref_scientific_sleep_title">Scientific sleep</string>
+    <string name="stratos4pro_pref_scientific_sleep_summary">Detailed sleep stage recording on the watch. Gadgetbridge reads its sleep data from this, so switching it off stops sleep stages from being synced.</string>
+    <string name="stratos4pro_prefs_lights_header">Watch lights</string>
+    <string name="stratos4pro_light_white">White light</string>
+    <string name="stratos4pro_light_red">Red light</string>
+    <string name="stratos4pro_light_strobe">Strobe</string>
+    <string name="stratos4pro_pref_light_white_strobe_title">White strobe (ms)</string>
+    <string name="stratos4pro_pref_light_red_strobe_title">Red strobe (ms)</string>
+    <string name="stratos4pro_pref_light_strobe_off">Off - steady light</string>
+    <string name="stratos4pro_pref_light_strobe_summary">%1$d ms on / %1$d ms off</string>
+    <string name="stratos4pro_pref_light_keepalive_title">Steady light keepalive (s)</string>
+    <string name="stratos4pro_pref_light_keepalive_off">Off - light turns off with the screen</string>
+    <string name="stratos4pro_pref_light_keepalive_summary">Re-send every %1$d s</string>
+    <string name="stratos4pro_pref_brightness_schedule_title">Scheduled brightness</string>
+    <string name="stratos4pro_pref_brightness_schedule_summary">The phone sets the highest level at the first time and the lowest at the second, once each. A time missed while disconnected is sent on reconnect.</string>
+    <string name="stratos4pro_brightness_schedule_inexact">Allow Gadgetbridge under Android settings, Alarms &amp; reminders, or brightness changes can be up to an hour late</string>
+    <string name="stratos4pro_pref_brightness_max_at">Highest brightness at</string>
+    <string name="stratos4pro_pref_brightness_min_at">Lowest brightness at</string>
+    <string name="stratos4pro_route_exists">This route is already on the watch</string>
     <string name="automatic">Automatic</string>
     <string name="manual">Manual</string>
     <string name="simplified_chinese">Chinese (Simplified)</string>
@@ -1404,6 +1480,7 @@
     <string name="serbian">Serbian</string>
     <string name="ukranian">Ukrainian</string>
     <string name="armenian">Armenian</string>
+    <string name="khmer">Khmer</string>
     <string name="italian">Italian</string>
     <string name="french">French</string>
     <string name="french_ca">French (Canada)</string>
@@ -1464,6 +1541,9 @@
     <string name="weeksleepchart_sleep_a_week_or_month">Sleep per week/month</string>
     <string name="pref_title_chart_sleep_rolling_24_hour">Sleep range</string>
     <string name="pref_summary_chart_sleep_range">Determines which day a sleep session is assigned to</string>
+    <string name="pref_title_chart_sleep_day_chart">Sleep chart</string>
+    <string name="pref_chart_sleep_day_chart_hypnogram">Hypnogram</string>
+    <string name="pref_chart_sleep_day_chart_legacy">Legacy hypnogram</string>
     <string name="pref_chart_sleep_range_rolling_24h">Rolling 24 hours</string>
     <string name="pref_chart_sleep_range_noon">Noon (12:00)</string>
     <string name="pref_chart_sleep_range_18h">Evening (18:00)</string>
@@ -1968,6 +2048,21 @@
     <string name="hrv_status_low">Low</string>
     <string name="hrv_status_poor">Poor</string>
     <string name="hrv_status_last_night">Last night</string>
+    <string name="last_night_timeline">Last Night Timeline</string>
+    <string name="hrv_status_trend">HRV Trend</string>
+    <string name="day_timeline">Day Timeline</string>
+    <string name="body_energy_daily">Daily Body Energy</string>
+    <string name="vo2max_trend">VO₂ Max Trend</string>
+    <string name="heart_rate_daily">Daily Heart Rate</string>
+    <string name="respiratory_rate_daily">Daily Respiratory Rate</string>
+    <string name="blood_oxygen_daily">Daily Blood Oxygen</string>
+    <string name="temperature_daily">Daily Temperature</string>
+    <string name="blood_pressure_daily">Daily Blood Pressure</string>
+    <string name="solar_charging_daily_lux_hours">Daily Lux Hours</string>
+    <string name="solar_charging_daily_battery_gain">Daily Battery Gain</string>
+    <string name="stress_daily_levels">Daily Stress Levels</string>
+    <string name="calories_daily_active">Daily Active Calories</string>
+    <string name="race_prediction_trend">Race Time Trend</string>
     <string name="hrv_status_last_night_legend">Last night (ms)</string>
     <string name="hrv_status_last_night_highest_5">Last night 5-min max avg</string>
     <string name="hrv_status_nightly_avg">Nightly average</string>
@@ -1984,11 +2079,13 @@
     <string name="this_week_total">This week total</string>
     <string name="last_week_total">Last week total</string>
     <string name="low">Low</string>
+    <string name="medium_amount">Medium</string>
     <string name="optimal">Optimal</string>
     <string name="high">High</string>
     <string name="very_high">Very High</string>
     <string name="training_daily_load">Daily Load</string>
     <string name="bpm_value_unit">%1$d bpm</string>
+    <string name="seconds_value_unit">%1$d seconds</string>
     <string name="glucose_value_mg_dl">%1$d mg/dL</string>
     <string name="steps_distance_unit">%1$,.2f km</string>
     <string name="body_energy_gained">Gained</string>
@@ -2029,6 +2126,9 @@
     <string name="devicetype_unknown">Unknown Device</string>
     <string name="devicetype_test" translatable="false">Test Device</string>
     <string name="add_test_device">Add test device</string>
+    <string name="discovery_show_details">Show details</string>
+    <string name="title_activity_device_candidate_details">Device details</string>
+    <string name="device_candidate_details_read_gatt">Read GATT characteristics</string>
     <string name="set_device_type">Set device type</string>
     <string name="devicetype_pebble" translatable="false">Pebble</string>
     <string name="devicetype_miband" translatable="false">Mi Band</string>
@@ -2048,6 +2148,7 @@
     <string name="devicetype_miband9pro" translatable="false">Xiaomi Smart Band 9 Pro</string>
     <string name="devicetype_miband10" translatable="false">Xiaomi Smart Band 10</string>
     <string name="devicetype_miband10pro" translatable="false">Xiaomi Smart Band 10 Pro</string>
+    <string name="devicetype_miband11" translatable="false">Xiaomi Smart Band 11</string>
     <string name="devicetype_amazfit_balance" translatable="false">Amazfit Balance</string>
     <string name="devicetype_amazfit_balance_2" translatable="false">Amazfit Balance 2</string>
     <string name="devicetype_amazfit_balance_2_xt" translatable="false">Amazfit Balance 2 XT</string>
@@ -2358,6 +2459,7 @@
     <string name="devicetype_ak75_pro" translatable="false">AK75 PRO</string>
     <string name="devicetype_ak86" translatable="false">AK86</string>
     <string name="devicetype_domyos_t540" translatable="false">Domyos T540</string>
+    <string name="devicetype_concept2_pm5" translatable="false">Concept2 PM5</string>
     <string name="devicetype_even_realities_g1" translatable="false">Even Realities G1</string>
     <string name="devicetype_laxasfit" translatable="false">LaxasFit</string>
     <string name="devicetype_sony_wh_1000xm2" translatable="false">Sony WH-1000XM2</string>
@@ -2405,6 +2507,7 @@
     <string name="devicetype_soundcore_a3i" translatable="false">Soundcore A3i</string>
     <string name="devicetype_soundcore_p3i" translatable="false">Soundcore P3i</string>
     <string name="devicetype_soundcore_k20i" translatable="false">Soundcore K20i</string>
+    <string name="devicetype_soundcore_v20i" translatable="false">Soundcore V20i</string>
     <string name="devicetype_haylou_s35_anc" translatable="false">Haylou S35 ANC</string>
     <string name="devicetype_sennheiser_momentum_in_ear_wireless" translatable="false">Sennheiser MOMENTUM In-Ear Wireless</string>
     <string name="devicetype_pixel_buds_a_series" translatable="false">Pixel Buds A-Series</string>
@@ -2463,6 +2566,8 @@
     <string name="devicetype_huawei_watch3" translatable="false">Huawei Watch 3 (Pro)</string>
     <string name="devicetype_huawei_watch4pro" translatable="false">Huawei Watch 4 (Pro)</string>
     <string name="devicetype_huawei_watch5" translatable="false">Huawei Watch 5</string>
+    <string name="devicetype_huawei_watch6" translatable="false">Huawei Watch 6</string>
+    <string name="devicetype_huawei_watch6pro" translatable="false">Huawei Watch 6 Pro</string>
     <string name="devicetype_huawei_freearc" translatable="false">Huawei FreeArc</string>
     <string name="devicetype_huawei_freeclip_2" translatable="false">Huawei FreeClip 2</string>
     <string name="devicetype_huawei_freebuds_5i" translatable="false">Huawei FreeBuds 5i</string>
@@ -2496,6 +2601,7 @@
     <string name="devicetype_yawell_r05" translatable="false">Yawell R05</string>
     <string name="devicetype_yawell_r10" translatable="false">Yawell R10</string>
     <string name="devicetype_yawell_r11" translatable="false">Yawell R11</string>
+    <string name="devicetype_yawell_y27" translatable="false">Yawell Y27 AI Health WatchPad</string>
     <string name="devicetype_colmi_r02" translatable="false">Colmi R02</string>
     <string name="devicetype_colmi_r03" translatable="false">Colmi R03</string>
     <string name="devicetype_colmi_r06" translatable="false">Colmi R06</string>
@@ -2507,15 +2613,16 @@
     <string name="devicetype_c60" translatable="false">C60</string>
     <string name="devicetype_colmi_i28_ultra" translatable="false">Colmi i28 Ultra</string>
     <string name="devicetype_colmi_i31" translatable="false">Colmi i31</string>
-    <string name="devicetype_colmi_p76" translatable="false">Colmi P76</string>
     <string name="devicetype_colmi_v72" translatable="false">Colmi V72</string>
     <string name="devicetype_colmi_v73" translatable="false">Colmi V73</string>
     <string name="devicetype_colmi_v76" translatable="false">Colmi V76</string>
     <string name="devicetype_colmi_v89" translatable="false">Colmi V89</string>
-    <string name="devicetype_itech_active_3" translatable="false">iTECH Active 3</string>
-    <string name="devicetype_zl02d" translatable="false">ZL02D</string>
+    <string name="devicetype_colmi_p10" translatable="false">Colmi P10</string>
+    <string name="devicetype_colmi_p76" translatable="false">Colmi P76</string>
     <string name="devicetype_colmi_p80" translatable="false">Colmi P80</string>
     <string name="devicetype_colmi_p81" translatable="false">Colmi P81</string>
+    <string name="devicetype_itech_active_3" translatable="false">iTECH Active 3</string>
+    <string name="devicetype_zl02d" translatable="false">ZL02D</string>
     <string name="devicetype_blackview_r60" translatable="false">Blackview R60</string>
     <string name="devicetype_misirun_c17" translatable="false">Misirun C17</string>
     <string name="devicetype_c20" translatable="false">C20</string>
@@ -2525,6 +2632,7 @@
     <string name="devicetype_kt80" translatable="false">KT80</string>
     <string name="devicetype_hc96" translatable="false">HC96</string>
     <string name="devicetype_ksix_venture" translatable="false">KSIX Venture</string>
+    <string name="devicetype_fireboltt_069" translatable="false">Fire-Boltt 069</string>
     <string name="devicetype_fireboltt_talk" translatable="false">Fire-Boltt Talk</string>
     <string name="devicetype_viran_c29" translatable="false">Viran C29</string>
     <string name="devicetype_r50pro" translatable="false">R50Pro</string>
@@ -2595,6 +2703,7 @@
     <string name="generic_metrics">Other</string>
     <string name="p_generic_metrics" translatable="false">genericmetrics</string>
     <string name="generic_metric_select_metric">Metric</string>
+    <string name="number_of_generic_metrics">%1$d metrics</string>
     <string name="generic_metric_samples">Samples</string>
     <string name="generic_metric_chart_label_with_unit">%1$s (%2$s)</string>
     <string name="metric_garmin_endurance_score">Endurance Score</string>
@@ -3017,6 +3126,8 @@
     <string name="workout_descent">Descent</string>
     <string name="avg_speed">Avg Speed</string>
     <string name="avg_power">Avg Power</string>
+    <string name="avg_cadence">Avg Cadence</string>
+    <string name="max_speed">Max Speed</string>
     <string name="avg_swolf">Avg SWOLF</string>
     <string name="avg_aerobic_effect">Avg Aerobic Effect</string>
     <string name="avg_anaerobic_effect">Avg Anaerobic Effect</string>
@@ -3387,19 +3498,24 @@
     <string name="statistics_chart_set_2">Set 2</string>
     <string name="statistics_chart_type_bar">Bar</string>
     <string name="statistics_chart_type_line">Line</string>
-    <string name="statistics_chart_average_hint">Averages are always shown as a line.</string>
+    <string name="statistics_chart_average_hint">Averages and maximums are always shown as a line.</string>
     <string name="statistics_chart_apply">Apply</string>
-    <!-- Accessibility description of the statistics chart, e.g. "Distance per day, Sep 22 – 28, 2026, total 31.4 km" -->
+    <!-- Accessibility description of the statistics chart, e.g. "Distance per day, Sep 22 - 28, 2026, total 31.4 km" -->
     <string name="statistics_chart_description_daily">%1$s per day, %2$s, total %3$s</string>
     <!-- Accessibility description of the statistics chart, e.g. "Distance per month, 2026, total 1,204 km" -->
     <string name="statistics_chart_description_monthly">%1$s per month, %2$s, total %3$s</string>
-    <!-- Accessibility description of the statistics chart, e.g. "Avg Pace per day, Sep 22 – 28, 2026, average 5:30 min/km" -->
+    <!-- Accessibility description of the statistics chart, e.g. "Avg Pace per day, Sep 22 - 28, 2026, average 5:30 min/km" -->
     <string name="statistics_chart_description_daily_average">%1$s per day, %2$s, average %3$s</string>
     <!-- Accessibility description of the statistics chart, e.g. "Power per month, 2026, average 215 W" -->
     <string name="statistics_chart_description_monthly_average">%1$s per month, %2$s, average %3$s</string>
+    <!-- Accessibility description of the statistics chart, e.g. "Max Heart Rate per day, Sep 22 - 28, 2026, highest 182 bpm" -->
+    <string name="statistics_chart_description_daily_maximum">%1$s per day, %2$s, highest %3$s</string>
+    <!-- Accessibility description of the statistics chart, e.g. "Max Heart Rate per month, 2026, highest 182 bpm" -->
+    <string name="statistics_chart_description_monthly_maximum">%1$s per month, %2$s, highest %3$s</string>
     <string name="statistics_sessions">Sessions</string>
     <string name="statistics_previous_period">Previous period</string>
     <string name="statistics_next_period">Next period</string>
+    <string name="statistics_custom_range">Custom range</string>
     <string name="sports_activity_quick_filter_this_week">This week</string>
     <string name="sports_activity_quick_filter_last_week">Previous week</string>
     <string name="sports_activity_quick_filter_this_month">This month</string>
@@ -3426,6 +3542,7 @@
     <string name="activity_summaries_all_devices">All devices</string>
     <string name="activity_filter_from_placeholder">distant past</string>
     <string name="activity_filter_to_placeholder">today</string>
+    <string name="activity_filter_to_before_from">Before the start date</string>
     <!-- swim styles -->
     <string name="breaststroke">Breaststroke</string>
     <string name="freestyle">Freestyle</string>
@@ -3471,6 +3588,9 @@
 
     <string name="category">Category</string>
     <string name="workout_intervals">Intervals</string>
+    <string name="interval_type_active">Active</string>
+    <string name="interval_type_rest">Rest</string>
+    <string name="interval_type_unknown">Unknown</string>
     <!-- Diving params -->
     <string name="diving_maximum_diving_depth">Maximum Diving Depth</string>
     <string name="diving_water_type">Water Type</string>
@@ -3684,6 +3804,7 @@
     <string name="prefs_active_noise_cancelling_adaptive">Adaptive Noise Cancelling</string>
     <string name="prefs_active_noise_cancelling_transparency">Transparency</string>
     <string name="prefs_active_noise_cancelling_level">Active Noise Cancelling Level</string>
+    <string name="prefs_active_noise_cancelling_effective_level">Active Noise Cancelling Effective Level</string>
     <string name="prefs_active_noise_reduction_level">Active noise reduction level</string>
     <string name="prefs_active_noise_cancelling_level_high">High</string>
     <string name="prefs_active_noise_cancelling_level_low">Low</string>
@@ -3750,6 +3871,7 @@
     <string name="prefs_earbud_lights_fade">Fade in and out</string>
     <string name="prefs_earbud_lights_steady">Steady</string>
     <string name="battery_i">Battery %d</string>
+    <string name="battery_with_label">Battery: %s</string>
     <string name="battery_case">Battery case</string>
     <string name="left_earbud">Left earbud</string>
     <string name="right_earbud">Right earbud</string>
@@ -3769,10 +3891,10 @@
     <string name="pref_ambient_sound_tone">Ambient Sound Tone</string>
     <string name="pref_ambient_sound_tone_summary">From Soft to Clear</string>
     <string name="pref_balance">Balance</string>
-    <string name="pref_switch_controls_anc_ambient">Noise cancelling ←→ Ambient</string>
-    <string name="pref_switch_controls_anc_off">Noise cancelling ←→ Off</string>
-    <string name="pref_switch_controls_ambient_off">Ambient ←→ Off</string>
-    <string name="pref_switch_controls_anc_ambient_off">Noise cancelling ←→ Ambient ←→ Off</string>
+    <string name="pref_switch_controls_anc_ambient">Noise cancelling ↔ Ambient</string>
+    <string name="pref_switch_controls_anc_off">Noise cancelling ↔ Off</string>
+    <string name="pref_switch_controls_ambient_off">Ambient ↔ Off</string>
+    <string name="pref_switch_controls_anc_ambient_off">Noise cancelling ↔ Ambient ↔ Off</string>
     <string name="prefs_noise_control">Noise control</string>
     <string name="prefs_voice_detect">Voice detect</string>
     <string name="prefs_voice_detect_summary">Enable Ambient sound and lower playback automatically after voice has been detected</string>
@@ -3806,6 +3928,10 @@
     <string name="stress_mild">Mild</string>
     <string name="stress_moderate">Moderate</string>
     <string name="stress_high">High</string>
+    <string name="stress_relaxed_avg">Relaxed AVG</string>
+    <string name="stress_mild_avg">Mild AVG</string>
+    <string name="stress_moderate_avg">Moderate AVG</string>
+    <string name="stress_high_avg">High AVG</string>
     <string name="pai_total">Total</string>
     <string name="pai_day">Day increase</string>
     <string name="weight_kg">%1$.2f kg</string>
@@ -3876,6 +4002,9 @@
     <string name="sony_ambient_sound_ambient_sound">Ambient Sound</string>
     <string name="sony_ambient_sound_focus_voice">Focus on Voice</string>
     <string name="sony_ambient_sound_level">Ambient Sound Level</string>
+    <string name="sony_ambient_sound_noise_cancelling_short">ANC</string>
+    <string name="sony_ambient_sound_wind_noise_reduction_short">Wind</string>
+    <string name="sony_ambient_sound_ambient_sound_short">Ambient</string>
     <string name="pref_header_sony_anc_optimizer">Noise Cancelling Optimizer</string>
     <string name="sony_anc_optimize_title">Optimize</string>
     <string name="sony_anc_optimize_description">Click to start the noise-cancelling optimizer.</string>
@@ -3949,6 +4078,7 @@
     <string name="sony_reon_pocket_tag_humidity_title">Tag humidity</string>
     <string name="sony_reon_pocket_tag_battery_title">Tag battery</string>
     <string name="pref_header_sony_equalizer_bands">Bands</string>
+    <string name="band_index">Band %d</string>
     <string name="pref_header_sony_equalizer_preset_custom_1">Custom Preset 1</string>
     <string name="pref_header_sony_equalizer_preset_custom_2">Custom Preset 2</string>
     <string name="sony_equalizer_band_400">400</string>
@@ -4067,13 +4197,10 @@
     <string name="soundbrenner_pref_subdivision_triplet">Triplets</string>
     <string name="soundcore_voice_prompts">Voice Prompts</string>
     <string name="soundcore_button_brightness">Button Brightness</string>
-    <string name="soundcore_button_brightness_low">Low</string>
-    <string name="soundcore_button_brightness_medium">Medium</string>
-    <string name="soundcore_button_brightness_high">High</string>
     <string name="soundcore_ldac_mode_title">LDAC Mode</string>
     <string name="soundcore_ldac_mode_summary">Enabling LDAC will decrease the battery life and might lead to connection instability</string>
     <string name="soundcore_auto_power_off_title">Auto Power Off</string>
-    <string name="soundcore_auto_power_off_summary">When disconnectiong from the phone, the device will power off after the specified timeout</string>
+    <string name="soundcore_auto_power_off_summary">When disconnecting from the phone, the device will power off after the specified timeout</string>
     <string name="soundcore_3d_surround_title">3D Surround Sound</string>
     <string name="soundcore_3d_surround_summary">Enable 3D surrounding sound</string>
     <string name="soundcore_enable_pairing_mode_summary">Enable discovery/pairing mode to connect a new device</string>
@@ -4083,6 +4210,12 @@
     <string name="soundcore_gaming_mode_summary">Reduce Latency and enhance sounds of footsteps and voices. May reduce connection stability.</string>
     <string name="soundcore_adaptive_direction_title">Adaptive Direction</string>
     <string name="soundcore_adaptive_direction_summary">Adjust equalizer preset automatically based on device direction</string>
+    <string name="soundcore_colorful_lights">Colorful lights</string>
+    <string name="soundcore_light_mode">Light mode</string>
+    <string name="soundcore_light_effect_on">Light on</string>
+    <string name="soundcore_light_effect_breathing">Breathing</string>
+    <string name="soundcore_light_effect_flash">Flash</string>
+    <string name="soundcore_light_effect_music">Music follows</string>
     <string name="haylou_s35_anc_eq_classic">Classic</string>
     <string name="haylou_s35_anc_eq_bass">Bass</string>
     <string name="soundcore_equalizer_preset">Preset</string>
@@ -4114,25 +4247,8 @@
     <string name="soundcore_equalizer_direction_hanging">Hanging</string>
     <string name="soundcore_equalizer_reset_title">Reset to default</string>
     <string name="soundcore_equalizer_reset_summary">Set all equalizer bands back to default settings</string>
-    <string name="soundcore_equalizer_band1">Band 1</string>
-    <string name="soundcore_equalizer_band2">Band 2</string>
-    <string name="soundcore_equalizer_band3">Band 3</string>
-    <string name="soundcore_equalizer_band4">Band 4</string>
-    <string name="soundcore_equalizer_band5">Band 5</string>
-    <string name="soundcore_equalizer_band6">Band 6</string>
-    <string name="soundcore_equalizer_band7">Band 7</string>
-    <string name="soundcore_equalizer_band8">Band 8</string>
-    <string name="soundcore_equalizer_band9">Band 9</string>
     <string name="soundcore_equalizer_frequency">Frequency</string>
     <string name="soundcore_equalizer_value">Value</string>
-    <string name="soundcore_equalizer_band1_freq">100 Hz</string>
-    <string name="soundcore_equalizer_band2_freq">200 Hz</string>
-    <string name="soundcore_equalizer_band3_freq">400 Hz</string>
-    <string name="soundcore_equalizer_band4_freq">800 Hz</string>
-    <string name="soundcore_equalizer_band5_freq">1.6 kHz</string>
-    <string name="soundcore_equalizer_band6_freq">3.2 kHz</string>
-    <string name="soundcore_equalizer_band7_freq">6.4 kHz</string>
-    <string name="soundcore_equalizer_band8_freq">12.8 kHz</string>
     <string name="miscale_weight_unit_title">Weight Unit</string>
     <string name="miscale_weight_unit_summary">Set unit of weight for displayed measurements</string>
     <string name="miscale_weight_unit_metric">Metric (kg)</string>
@@ -4478,6 +4594,8 @@
     <string name="changelog_show_full">More…</string>
     <string name="changelog_ok_button">OK</string>
     <string name="fit_file_viewer">FIT File Viewer</string>
+    <string name="text_file_viewer">Text File Viewer</string>
+    <string name="garmin_connect_iq_error_report">Connect IQ error report</string>
     <string name="reset">Reset</string>
     <string name="changelog_title">What\'s New</string>
     <string name="loyalty_cards_sync_groups_only">Sync only specific groups</string>
@@ -4488,6 +4606,8 @@
     <string name="loyalty_cards_sync_starred">Sync only starred cards</string>
     <string name="loyalty_cards_sync_title">Sync Loyalty Cards</string>
     <string name="loyalty_cards_sync_summary">Tap to sync the cards to the watch</string>
+    <string name="loyalty_cards_sync_watch_request_title">Sync automatically</string>
+    <string name="loyalty_cards_sync_watch_request_summary">Allow the watch to sync the latest cards automatically</string>
     <string name="loyalty_cards_sync_options">Sync Options</string>
     <string name="loyalty_cards_sync">Sync</string>
     <string name="loyalty_cards_catima">Catima</string>
@@ -4523,6 +4643,7 @@
     <string name="info_fossil_rebuild_watchface_custom_menu">Please rebuild your watchface for custom menu</string>
     <string name="devicetype_miband2_hrx" translatable="false">Mi Band HRX</string>
     <string name="devicetype_p22b1" translatable="false">P22B1</string>
+    <string name="devicetype_kw19_b" translatable="false">KW19-B</string>
 
     <string name="prefs_home_icon_left_item">Left</string>
     <string name="prefs_home_icon_center_item">Center</string>
@@ -4709,6 +4830,8 @@
     <string name="pref_force_connection_type_bt_classic">Bluetooth Classic</string>
     <string name="encryption">Encryption</string>
     <string name="development_preference_do_not_change">Do not change unless instructed, or if you are developer</string>
+    <string name="developer_settings_warning_message">These settings are for developers. Do not change them unless a developer tells you to, or if you know what you are doing. A wrong value can cause the device to stop working correctly.</string>
+    <string name="developer_settings_warning_understand">I understand</string>
     <string name="preference_force_enabled">Force enabled</string>
     <string name="preference_force_disabled">Force disabled</string>
     <string name="pref_force_connection_type_auto_value" translatable="false">BOTH</string>
@@ -4720,6 +4843,8 @@
     <string name="pref_override_features_summary">Enable/disable specific device features. This can cause issues and/or make your device work incorrectly</string>
     <string name="pref_test_features_title">Features</string>
     <string name="pref_test_features_summary">Enabled features for this test device</string>
+    <string name="pref_override_features_default">Default features</string>
+    <string name="pref_override_features_unsupported">Unsupported features</string>
     <string name="pref_developer_add_test_activities_title">Add test activities</string>
     <string name="pref_developer_add_test_activities_summary">Populate the database with dummy test activities</string>
     <string name="device_state_waiting_scan">Waiting for device scan</string>
@@ -4736,6 +4861,7 @@
     <string name="unbind_before_pair_title">Already bound</string>
     <string name="unbind_before_pair_message">This device is already bound in Android settings, which can make pairing fail for some devices.\n\nIf adding the device fails, please remove it in Android settings and try again.</string>
     <string name="companion_pairing_request_title">Companion device</string>
+    <string name="companion_pairing_hint">This device is not paired as companion device. Pair it to improve the connection stability, let Gadgetbridge reconnect, and to enable background functions.</string>
     <string name="companion_pairing_request_description">Pair this device as companion?.\n\nThis is recommended for some functions such as find device, and provides a better connection.</string>
     <string name="devicetype_scannable">Scannable device</string>
     <string name="state_scanned">Scanned</string>
@@ -4752,9 +4878,8 @@
     <string name="activity_type_ccr_diving">Closed-Circuit Rebreather</string>
     <string name="dashboard_settings">Dashboard settings</string>
     <string name="bottom_nav_dashboard">Dashboard</string>
+    <string name="bottom_nav_workouts">Workouts</string>
     <string name="bottom_nav_devices">Devices</string>
-    <string name="pref_dashboard_first_title">Show dashboard first</string>
-    <string name="pref_dashboard_first_summary">Show the dashboard when Gadgetbridge starts, instead of the devices screen</string>
     <string name="pref_dashboard_cards_title">Show widgets on cards</string>
     <string name="pref_dashboard_cards_summary">Draw cards around the widgets on the dashboard</string>
     <string name="pref_dashboard_widget_settings">Widget settings</string>
@@ -4896,6 +5021,11 @@
     <string name="pref_install_unsupported_files_title">Install unsupported files</string>
     <string name="pref_install_unsupported_files_summary">Allow upload of unsupported files to the device.</string>
     <string name="install_unsupported_files_warning">This file is not supported by the device, and might cause issues.\n\nYou are DISCOURAGED from installing it!</string>
+    <string name="install_files_not_supported">These files cannot be installed: %s</string>
+    <string name="install_another_in_progress">Another installation is already in progress on this device.</string>
+    <string name="install_show_running">Show installation</string>
+    <string name="install_item_skipped">Skipped</string>
+    <string name="install_progress">%1$d/%2$d (%3$d%%)</string>
     <string name="pref_refresh_on_swipe_summary">Swipe down to fetch new data from connected devices.</string>
     <string name="pref_refresh_on_swipe_title">Refresh on swipe</string>
     <string name="cannot_upload_watchface_too_many_watchfaces_installed">Cannot upload watchface, too many watchfaces installed</string>
@@ -5302,8 +5432,10 @@
     <string name="devicetype_swiss_peak" translatable="false">Swiss Peak</string>
     <string name="devicetype_una_watch" translatable="false">UNA Watch</string>
     <string name="devicetype_dm58" translatable="false">DM58</string>
+    <string name="devicetype_zeblaze_stratos_4_pro" translatable="false">Zeblaze Stratos 4 Pro</string>
     <string name="devicetype_y6" translatable="false">Y6</string>
     <string name="devicetype_y66" translatable="false">Y66</string>
+    <string name="devicetype_t70" translatable="false">T70</string>
     <string name="devicetype_d3" translatable="false">D3</string>
     <string name="devicetype_s52" translatable="false">S52</string>
     <string name="devicetype_kieslect_calling_smartwatch_kr_pro" translatable="false">Kieslect Calling Smartwatch Kr Pro</string>
@@ -5337,6 +5469,7 @@
     <string name="devicetype_sinilink" translatable="false">Sinilink</string>
     <string name="devicetype_eightbitdo_micro" translatable="false">8BitDo Micro</string>
     <string name="devicetype_onetouch" translatable="false">OneTouch Glucose Meter</string>
+    <string name="devicetype_innovo_ip900bp_b" translatable="false">Innovo iP900BP-B</string>
     <string name="eightbitdo_keyboard_mapping">Key mapping</string>
     <string name="eightbitdo_keymap_reset_title">Reset to defaults</string>
     <string name="eightbitdo_keymap_reset_confirmation">Reset the key mapping of all buttons to the factory defaults?</string>
@@ -5407,6 +5540,8 @@
     <string name="huawei_send_gps_and_time_title">Send GPS and Time to device</string>
     <string name="huawei_send_gps_and_time_summary">Send GPS and Time to device for weather and search stars optimization. Location should be set in the settings</string>
     <string name="garmin_mlr_protocol">Multi-Link Reliable Protocol</string>
+    <string name="garmin_prg_transfer_mlr_title">Install PRG files using MLR</string>
+    <string name="garmin_prg_transfer_mlr_summary">Faster file transfer, but might be unstable.</string>
     <string name="garmin_legacy_sync_flush_title" translatable="false">Legacy flush on sync</string>
     <string name="garmin_legacy_sync_flush_summary" translatable="false">Use the legacy sync protocol to flush data before sync. Disable this if your watch freezes when syncing. Might result in delayed data.</string>
     <string name="feature_exploresync_title">ExploreSync Protocol</string>
@@ -5529,6 +5664,40 @@
     <string name="wifi_ftp_explainer">To transfer files, Gadgetbridge starts a Wi-Fi hotspot on the device, and the Internet Helper connects the phone to it. Android asks you to confirm this connection.\n\nWhile the connection is open, the phone can disconnect from other Wi-Fi networks, and the device uses more battery. The connection will be closed automatically when you leave the screen. You can also close it from the notification.</string>
     <string name="wifi_ftp_turn_on_wifi">Turn on Wi-Fi</string>
     <string name="wifi_ftp_progress_step">%1$s (%2$d/%3$d)</string>
+    <string name="dji_wifi_state_opening_control_channel">Connecting to the camera…</string>
+    <string name="dji_wifi_error_credentials">The camera did not send the name and password for its Wi-Fi</string>
+    <string name="dji_wifi_error_control_channel">The camera did not answer over Wi-Fi</string>
+    <string name="photo_gallery">Gallery</string>
+    <string name="gallery_filter_all">All</string>
+    <string name="gallery_filter_photos">Photos</string>
+    <string name="gallery_filter_videos">Videos</string>
+    <string name="gallery_filter_favorites">Favorites</string>
+    <string name="gallery_empty">No photos or videos</string>
+    <string name="gallery_clear_cache">Clear cache</string>
+    <string name="gallery_download_progress">Downloading %1$d/%2$d</string>
+    <string name="gallery_download_summary">%1$d downloaded, %2$d skipped, %3$d failed</string>
+    <string name="gallery_download_failed">Download failed</string>
+    <string name="gallery_download_error_storage_permission">Storage permission not granted</string>
+    <string name="gallery_favorite">Favorite</string>
+    <string name="gallery_unfavorite">Unfavorite</string>
+    <plurals name="gallery_delete_confirm">
+        <item quantity="one">Delete %d file from the camera?</item>
+        <item quantity="other">Delete %d files from the camera?</item>
+    </plurals>
+    <string name="gallery_deleting">Deleting…</string>
+    <string name="gallery_updating_favorites">Updating favorites…</string>
+    <string name="gallery_delete_error">Delete failed: %1$s</string>
+    <string name="gallery_favorite_error">Favorite change failed: %1$s</string>
+    <string name="gallery_download_queued">Queued</string>
+    <string name="gallery_downloaded">Downloaded</string>
+    <plurals name="gallery_download_added">
+        <item quantity="one">%d file added to downloads</item>
+        <item quantity="other">%d files added to downloads</item>
+    </plurals>
+    <plurals name="gallery_download_already_downloaded">
+        <item quantity="one">%d file is already downloaded</item>
+        <item quantity="other">%d files are already downloaded</item>
+    </plurals>
     <string name="toast_error_invalid_api_key">Invalid API key</string>
     <string name="eco">Eco</string>
     <string name="prefs_title_offgrid_mode">Off-grid mode</string>
@@ -5576,9 +5745,11 @@
     </plurals>
     <string name="activity_send_waypoint_name_missing">name is empty</string>
     <string name="activity_send_waypoint_paste">Paste</string>
+    <string name="activity_send_waypoint_paste_hint">Paste or share coordinates, a geo: link or a Plus Code (8FVC9G8F+6X).</string>
     <string name="activity_send_waypoint_titel">Send Waypoint</string>
     <string name="activity_send_waypoint_no_location">No Location</string>
     <string name="activity_send_waypoint_no_location_details">No location information found in the received data.</string>
+    <string name="activity_send_waypoint_short_plus_code_details">A short Plus Code needs a nearby position to find its place. Set your location in the Gadgetbridge settings, or use the full code (for example 8FVC9G8F+6X instead of 9G8F+6X).</string>
     <string name="activity_send_waypoint_to_device">Send</string>
 
     <!-- Export Health Connect preferences -->
@@ -5684,54 +5855,63 @@
     <string name="media_source_aux">AUX</string>
     <string name="sinilink_prompt_tone">Prompt tone</string>
     <string name="required">Required</string>
-    <string name="endurain_sso_login_failed">SSO login failed</string>
-    <string name="endurain_no_sso_providers_available">No SSO providers available</string>
+    <string name="service_sso_login_failed">SSO login failed</string>
+    <string name="service_no_sso_providers_available">No SSO providers available</string>
+    <string name="service_failed_to_open_browser">Failed to open browser: %1$s</string>
+    <string name="service_sso_login_successful">SSO login successful</string>
+    <string name="service_invalid_server_url">Invalid server URL</string>
+    <string name="service_verify_mfa">Verify MFA</string>
+    <string name="service_enter_your_mfa_code">Enter your MFA code</string>
+    <string name="service_login_successful">Login successful</string>
+    <string name="service_login_failed">Login failed</string>
+    <string name="service_mfa_verification_successful">MFA verification successful</string>
+    <string name="service_invalid_mfa_code">Invalid MFA code</string>
+    <string name="service_mfa_verification_failed">MFA verification failed</string>
+    <string name="service_select_identity_provider">Select Identity Provider</string>
+    <string name="service_invalid_oauth_callback">Invalid OAuth callback</string>
+    <string name="service_oauth_completing_login">Completing login…</string>
+    <string name="service_not_logged_in">Not logged in, integration is disabled</string>
+    <string name="service_logged_in_refresh_token">Logged in to %1$s\nRefresh token expires: %2$s</string>
+    <string name="service_server_version">\nServer version: %1$s</string>
+    <string name="service_logged_out">Logged out successfully</string>
+    <string name="service_logged_out_unconfirmed">Logged out on this phone, but %1$s did not confirm the end of the session</string>
     <string name="endurain_failed_to_open_browser">Failed to open browser: %1$s</string>
-    <string name="endurain_sso_login_successful">SSO login successful</string>
-    <string name="endurain_invalid_server_url">Invalid server URL</string>
     <string name="endurain_failed_to_connect_to_server">Failed to connect to server</string>
-    <string name="endurain_verify_mfa">Verify MFA</string>
-    <string name="endurain_enter_your_mfa_code">Enter your MFA code</string>
-    <string name="endurain_login_successful">Login successful</string>
-    <string name="endurain_login_failed">Login failed</string>
-    <string name="endurain_mfa_verification_successful">MFA verification successful</string>
-    <string name="endurain_invalid_mfa_code">Invalid MFA code</string>
-    <string name="endurain_mfa_verification_failed">MFA verification failed</string>
-    <string name="endurain_select_identity_provider">Select Identity Provider</string>
-    <string name="endurain_invalid_oauth_callback">Invalid OAuth callback</string>
-    <string name="endurain_oauth_completing_login">Completing login…</string>
-    <string name="endurain_not_logged_in_integration_disabled">Not logged in, integration is disabled</string>
-    <string name="endurain_logged_in_refresh_token">Logged in to %1$s\nRefresh token expires: %2$s</string>
-    <string name="endurain_server_version">\nServer version: %1$s</string>
-    <string name="endurain_logout_failed">Logout failed</string>
-    <string name="endurain_logged_out_successfully">Logged out successfully</string>
     <string name="prefs_online_fitness_trackers_title">Online fitness trackers</string>
     <string name="prefs_online_fitness_trackers_summary">Configure how to reach and use online fitness trackers</string>
     <string name="warning_network_required_title">Network required</string>
     <string name="warning_network_required_summary">These integrations requires network connectivity. Please install and enable the internet helper add-on app.</string>
+    <!-- %1$s in the pref_service_* strings is the name of an online fitness tracker -->
+    <string name="pref_service_status_title">%1$s status</string>
+    <string name="pref_service_log_in_title">Log in to %1$s</string>
+    <string name="pref_service_log_in_summary">Tap here to enter the %1$s server and log in</string>
+    <string name="pref_service_api_token_title">Enter %1$s API token</string>
+    <string name="pref_service_api_token_summary">Tap here to enter the %1$s server and API token</string>
+    <string name="pref_service_log_out_title">Log out of %1$s</string>
+    <string name="pref_service_auto_upload_title">Auto-upload to %1$s</string>
+    <string name="pref_service_auto_upload_summary">Automatically upload newly synced workouts to %1$s</string>
+    <string name="pref_service_log_out_summary">Tap here to log out, this disables the integration</string>
     <string name="pref_info_endurain_status_title">Endurain status</string>
     <string name="pref_endurain_log_in_title">Log in to Endurain</string>
     <string name="pref_endurain_log_in_summary">Tap here to enter the Endurain server and log in</string>
     <string name="pref_endurain_log_out_title">Log out of Endurain</string>
-    <string name="pref_endurain_log_out_summary">Tap here to log out, this disables the integration</string>
     <string name="no_gpx_track_in_activity_toast">No GPX track in this activity</string>
     <string name="no_activity_track_in_activity_toast">No activity track in this activity</string>
     <string name="unable_to_display_gpx_track_toast">Unable to display GPX track: %1$s</string>
     <string name="unable_to_share_gpx_track_toast">Unable to share GPX track: %1$s</string>
+    <string name="service_setup_login_type_local">Local</string>
+    <string name="service_setup_login_type_sso">SSO</string>
+    <string name="service_setup_mfa_code">MFA code</string>
+    <string name="service_setup_next">Next</string>
+    <string name="service_logged_in">Logged in</string>
+    <string name="service_logged_in_to">Logged in to %s</string>
+    <string name="service_setup_missing_information">Please fill both fields</string>
+    <string name="service_name_endurain" translatable="false">Endurain</string>
+    <string name="service_name_wanderer" translatable="false">Wanderer</string>
     <string name="endurain_uploading_started">Uploading to Endurain…</string>
     <string name="endurain_successfully_uploaded_toast">Successfully uploaded to Endurain</string>
     <string name="endurain_error_while_uploading_toast">Error while uploading to Endurain</string>
-    <string name="endurain_unable_to_upload_gpx_file_toast">Unable to upload activity file to Endurain: %1$s</string>
-    <string name="endurain_setup_title">Endurain setup</string>
-    <string name="endurain_setup_server">Endurain server</string>
-    <string name="endurain_setup_login_type_local">Local</string>
-    <string name="endurain_setup_login_type_sso">SSO</string>
-    <string name="endurain_setup_mfa_code">MFA code</string>
-    <string name="endurain_setup_next">Next</string>
     <string name="activity_detail_upload_to_endurain">Upload to Endurain</string>
-    <string name="wanderer_logged_in">Logged in to %s</string>
-    <string name="wanderer_setup_api_token_error">API token should start with wanderer_key_</string>
-    <string name="wanderer_setup_missing_information">Please fill both fields</string>
     <string name="wanderer_toast_successfully_uploaded">Successfully uploaded to Wanderer</string>
     <string name="wanderer_toast_upload_error">Wanderer upload error: %1$s</string>
     <string name="wanderer_unable_to_upload_gpx_file_toast">Unable to upload GPX file to Wanderer: %1$s</string>
@@ -5764,6 +5944,9 @@
     <string name="workout_upload_status_disabled">Auto-upload off</string>
     <string name="workout_upload_status_remote_id">Activity %1$s</string>
     <string name="workout_upload_status_open">View activity</string>
+    <string name="workout_upload_toast_already_uploaded">%1$s already has this workout</string>
+    <string name="workout_upload_toast_updated">Updated the activity on %1$s</string>
+    <string name="workout_upload_toast_no_payload">Could not build the file to upload to %1$s</string>
     <string name="pref_endurain_replace_on_track_change_title">Replace workouts when the track changes</string>
     <string name="pref_endurain_replace_on_track_change_summary">Changing the track of an uploaded workout means deleting the activity and uploading it again, so it gets a new address. Activities you edited on Endurain are left untouched.</string>
 
@@ -6011,6 +6194,21 @@
     <string name="workout_weight_load_category">Load category</string>
     <string name="workout_load_heavy">Heavy</string>
     <string name="workout_load_very_heavy">Very heavy</string>
+    <string name="workout_value_percent_1rm">%1$s of 1RM</string>
+    <string name="workout_value_percent_ftp">%1$s of FTP</string>
+    <string name="workout_value_rm">%1$sRM</string>
+    <plurals name="workout_value_repetitions">
+        <item quantity="one">%1$s rep</item>
+        <item quantity="other">%1$s reps</item>
+    </plurals>
+    <plurals name="workout_value_laps">
+        <item quantity="one">%1$s lap</item>
+        <item quantity="other">%1$s laps</item>
+    </plurals>
+    <plurals name="workout_value_strokes">
+        <item quantity="one">%1$s stroke</item>
+        <item quantity="other">%1$s strokes</item>
+    </plurals>
 
     <string name="workout_swim_stroke_choice">Choice</string>
     <string name="workout_swim_stroke_individual_medley">Individual medley</string>
@@ -6102,4 +6300,18 @@
     <string name="datestep_next_week">Next week</string>
     <string name="datestep_prev_month">Previous month</string>
     <string name="datestep_next_month">Next month</string>
+    <string name="service_setup_api_token_prefix_error">API token should start with %1$s</string>
+    <string name="service_setup_title">%1$s setup</string>
+    <string name="service_setup_server_hostname">Server hostname</string>
+    <string name="service_setup_api_token">API token</string>
+
+    <string name="pref_itag_alert_level">Find-device alert level</string>
+    <string name="pref_itag_alert_level_high">High (0x02)</string>
+    <string name="pref_itag_alert_level_mild">Mild (0x01)</string>
+    <string name="pref_itag_beep_on_disconnect">Beep on disconnect</string>
+    <string name="pref_itag_button_press">Action on button press</string>
+    <string name="reset_fetch_timestamp_select_device">Select a single device first</string>
+    <string name="pref_main_screens_title">Main screens</string>
+    <string name="pref_main_screens_summary">Select and order the main screens of the app. Note that even when enabled, Dashboard and Workouts can remain hidden if no devices providing the necessary data are available.</string>
+    <string name="pref_default_main_screen_title">First screen on startup</string>
 </resources>

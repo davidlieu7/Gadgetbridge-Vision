@@ -1,0 +1,99 @@
+syntax = "proto2";
+
+package GDI.Proto.IncidentDetection;
+option java_package = "nodomain.freeyourgadget.gadgetbridge.proto.garmin";
+option java_outer_classname = "GdiIncidentDetection";
+
+import "garmin/gdi_data_types.proto";
+
+message IncidentDetectionService {
+    optional UpdateDeviceOwnerRequest update_device_owner_request = 1;
+    optional UpdateDeviceOwnerResponse update_device_owner_response = 2;
+    optional UpdateIncidentContactsRequest update_incident_contacts_request = 3;
+    optional UpdateIncidentContactsResponse update_incident_contacts_response = 4;
+    optional IncidentDetectedRequest incident_detected_request = 5;
+    optional IncidentDetectedResponse incident_detected_response = 6;
+    optional CancelIncidentRequest cancel_incident_request = 7;
+    optional CancelIncidentResponse cancel_incident_response = 8;
+    optional IncidentStatusNotification incident_status_notification = 9;
+    optional IncidentVideoNotification incident_video_notification = 10;
+}
+
+message UpdateDeviceOwnerRequest {
+    optional string name = 1;
+    optional string location = 2;
+}
+
+message UpdateDeviceOwnerResponse {
+    enum ResponseStatus {
+        UNKNOWN = 0;
+        OK = 100;
+        ERROR = 200;
+    }
+    optional ResponseStatus status = 1;
+}
+
+message UpdateIncidentContactsRequest {
+    repeated Contact contact = 1;
+}
+
+message UpdateIncidentContactsResponse {
+    enum ResponseStatus {
+        UNKNOWN = 0;
+        OK = 100;
+        ERROR = 200;
+    }
+    optional ResponseStatus status = 1;
+}
+
+message Contact {
+    optional string id = 1;
+    optional string name = 2;
+    repeated string telephone = 3;
+    repeated string email_address = 4;
+}
+
+message IncidentDetectedRequest {
+    enum RequestType {
+        UNKNOWN = 0;
+        CYCLING_INCIDENT = 1;
+        ASSISTANCE_NEEDED = 2;
+    }
+    optional GDI.Proto.DataTypes.ScPoint position = 1;
+    optional uint32 seconds_to_delay_before_notifying_contact_persons = 2;
+    optional RequestType type = 3;
+}
+
+message IncidentDetectedResponse {
+    enum ResponseStatus {
+        UNKNOWN = 0;
+        TIMER_STARTED = 100;
+        ERROR = 200;
+    }
+    optional ResponseStatus status = 1;
+}
+
+message IncidentStatusNotification {
+    enum Status {
+        UNKNOWN = 0;
+        SENT_NOTIFICATIONS_TO_CONTACTS_SUCCESS = 1;
+        SENT_NOTIFICATIONS_TO_CONTACTS_FAILURE = 2;
+        FINISHED = 3;
+    }
+    optional Status status = 1;
+}
+
+message CancelIncidentRequest {
+}
+
+message CancelIncidentResponse {
+    enum ResponseStatus {
+        UNKNOWN = 0;
+        SUCCESS = 100;
+        ERROR = 200;
+    }
+    optional CancelIncidentResponse.ResponseStatus status = 1;
+}
+
+message IncidentVideoNotification {
+}

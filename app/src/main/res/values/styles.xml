@@ -54,6 +54,7 @@
         <item name="device_card_bg">?attr/stat_tile_bg</item>
         <item name="bottom_bar_divider">@null</item>
         <item name="stat_tile_border">?attr/colorOutlineVariant</item>
+        <item name="chart_marker_bg">?attr/colorSurfaceContainerLow</item>
         <item name="activity_icon_bg">?attr/colorSurfaceContainerHigh</item>
         <item name="table_header_rule">@color/table_header_rule_light</item>
 
@@ -163,6 +164,7 @@
         <item name="device_card_bg">?attr/stat_tile_bg</item>
         <item name="bottom_bar_divider">@null</item>
         <item name="stat_tile_border">?attr/colorOutlineVariant</item>
+        <item name="chart_marker_bg">?attr/colorSurfaceContainerHigh</item>
         <item name="activity_icon_bg">?attr/colorSurfaceContainerHigh</item>
         <item name="table_header_rule">@color/table_header_rule_dark</item>
 
@@ -247,6 +249,7 @@
         <item name="device_card_bg">?attr/colorSurfaceContainer</item>
         <item name="bottom_bar_divider">@null</item>
         <item name="stat_tile_border">?attr/colorOutlineVariant</item>
+        <item name="chart_marker_bg">?attr/colorSurfaceContainerHigh</item>
         <item name="activity_icon_bg">?attr/colorSurfaceContainerHigh</item>
         <item name="table_header_rule">@color/table_header_rule_light</item>
         <item name="preferenceTheme">@style/AppPreferenceThemeOverlay</item>
@@ -314,6 +317,7 @@
         <item name="device_card_bg">?attr/colorSurfaceContainer</item>
         <item name="bottom_bar_divider">@null</item>
         <item name="stat_tile_border">?attr/colorOutlineVariant</item>
+        <item name="chart_marker_bg">?attr/colorSurfaceContainerHigh</item>
         <item name="activity_icon_bg">?attr/colorSurfaceContainerHigh</item>
         <item name="table_header_rule">@color/table_header_rule_dark</item>
         <item name="preferenceTheme">@style/AppPreferenceThemeOverlay</item>
@@ -424,7 +428,7 @@
         <item name="deviceIconPrimary">?attr/colorSurfaceContainerHighest</item>
         <item name="deviceIconLight">?attr/colorSurfaceContainerHighest</item>
         <item name="deviceIconDark">?attr/colorSurfaceContainerHighest</item>
-        <item name="deviceIconOnPrimary">?attr/colorPrimary</item>
+        <item name="deviceIconOnPrimary">?attr/colorOnSurfaceVariant</item>
         <item name="deviceIconBackground">@android:color/transparent</item>
         <item name="deviceIconBackgroundLight">@android:color/transparent</item>
         <item name="deviceIconBackgroundDark">@android:color/transparent</item>
@@ -437,6 +441,7 @@
         <item name="deviceIconOnPrimary">?attr/colorOnPrimaryContainer</item>
         <item name="deviceCardIconTile">?attr/colorPrimaryContainer</item>
     </style>
+    <style name="ThemeOverlay.App.DropdownDeviceIcon" parent="ThemeOverlay.App.DeviceCardIcon" />
     <style name="DeviceCardActionIcon">
         <item name="android:layout_width">40dp</item>
         <item name="android:layout_height">40dp</item>
@@ -501,11 +506,14 @@
     <style name="GadgetbridgeTheme.OverflowMenuStyle" parent="Widget.Material3.PopupMenu.Overflow" />
 
     <!-- splash screen -->
-    <style name="SplashTheme" parent="GadgetbridgeTheme.NoActionBar">
-        <item name="android:statusBarColor">@color/primarydark_dark</item>
-        <item name="android:navigationBarColor">@color/primarydark_dark</item>
-        <item name="android:windowLightNavigationBar" tools:targetApi="27">false</item>
-        <item name="android:windowBackground">@drawable/splash</item>
+    <style name="SplashTheme" parent="Theme.SplashScreen">
+        <item name="windowSplashScreenBackground">@color/window_background_light</item>
+        <item name="windowSplashScreenAnimatedIcon">@drawable/splash_icon</item>
+        <item name="postSplashScreenTheme">@style/GadgetbridgeTheme.NoActionBar</item>
+        <item name="android:statusBarColor">@color/window_background_light</item>
+        <item name="android:navigationBarColor">@color/window_background_light</item>
+        <item name="android:windowLightStatusBar">true</item>
+        <item name="android:windowLightNavigationBar" tools:targetApi="27">true</item>
     </style>
 
     <!-- preferences screens -->
@@ -602,6 +610,19 @@
         <item name="android:textColor">@color/chart_chip_text</item>
         <item name="chipIconTint">@color/chart_chip_text</item>
         <item name="rippleColor">?attr/subtab_pill</item>
+    </style>
+
+    <style name="Widget.App.Chip.Weekday" parent="Widget.App.Chip.Chart">
+        <item name="android:layout_width">40dp</item>
+        <item name="android:layout_height">40dp</item>
+        <item name="android:textAlignment">center</item>
+        <item name="chipMinHeight">40dp</item>
+        <item name="chipCornerRadius">20dp</item>
+        <item name="chipStartPadding">0dp</item>
+        <item name="chipEndPadding">0dp</item>
+        <item name="textStartPadding">0dp</item>
+        <item name="textEndPadding">0dp</item>
+        <item name="ensureMinTouchTargetSize">false</item>
     </style>
 
     <!-- Single-select metric chips above the sport statistics chart: a solid on-surface fill when
@@ -873,6 +894,7 @@
     <style name="ThemeOverlay.App.ContrastingSurfaces.Light" parent="">
         <item name="toolbar_bg">?attr/stat_tile_bg</item>
         <item name="stat_tile_bg">@color/surface_contrasting_light</item>
+        <item name="chart_marker_bg">?attr/stat_tile_bg</item>
         <item name="grid_tile_bg">@color/surface_contrasting_light</item>
         <item name="activity_icon_bg">@color/surface_contrasting_light</item>
         <item name="toolbar_divider">@color/toolbar_divider_contrasting_light</item>
@@ -888,5 +910,32 @@
         <item name="toolbar_bg">?attr/stat_tile_bg</item>
         <item name="grid_tile_bg">@color/stat_tile_bg_amoled</item>
         <item name="bar_shade">@drawable/bar_shade_amoled</item>
+    </style>
+
+    <style name="ThemeOverlay.App.MaterialAlertDialog.WindowBackground" parent="ThemeOverlay.Material3.MaterialAlertDialog">
+        <item name="alertDialogStyle">@style/MaterialAlertDialog.App.WindowBackground</item>
+    </style>
+    <style name="MaterialAlertDialog.App.WindowBackground" parent="MaterialAlertDialog.Material3">
+        <item name="backgroundTint">?android:attr/colorBackground</item>
+    </style>
+
+    <style name="GalleryViewerTheme" parent="Theme.Material3.Dark.NoActionBar">
+        <item name="android:windowIsFloating">false</item>
+        <item name="android:windowBackground">@android:color/black</item>
+        <item name="android:statusBarColor">@android:color/black</item>
+        <item name="android:navigationBarColor">@android:color/black</item>
+    </style>
+
+    <style name="GalleryViewerAction" parent="Widget.Material3.Button.TextButton">
+        <item name="android:layout_width">0dp</item>
+        <item name="android:layout_height">wrap_content</item>
+        <item name="android:layout_weight">1</item>
+        <item name="android:ellipsize">end</item>
+        <item name="android:maxLines">1</item>
+        <item name="android:textAppearance">?attr/textAppearanceLabelMedium</item>
+        <item name="android:textColor">@color/gallery_viewer_action</item>
+        <item name="iconGravity">top</item>
+        <item name="iconPadding">4dp</item>
+        <item name="iconTint">@color/gallery_viewer_action</item>
     </style>
 </resources>

@@ -431,8 +431,6 @@ public class GarminSupportTest extends TestBase {
         var devBuilder = new FitDeviceSettings.Builder();
         // UINT32
         devBuilder.setTimeOffset(new Long[]{0xFFFFFFFEL, 0xFFFFFFFFL, 1L, 0L});
-        // SINT8
-        devBuilder.setTimeZoneOffset(new Integer[]{0x7E, 0x7F, -1, 0});
         // UINT16
         devBuilder.setAlarmsTime(new Integer[]{0xFFFE, 0xFFFF, 1, 0});
         // ENUM
@@ -463,6 +461,8 @@ public class GarminSupportTest extends TestBase {
         messages.addRecordData(nav);
 
         var hsaBuilder = new FitHsaBodyBatteryData.Builder();
+        // SINT8
+        hsaBuilder.setLevel(new Integer[]{0x7E, 0x7F, -1, 0});
         // SINT16
         hsaBuilder.setUncharged(new Integer[]{0x7FFE, 0x7FFF, -1, 0});
         var hsa = hsaBuilder.build(messages.getNextAvailableLocalMessageType());
@@ -475,7 +475,7 @@ public class GarminSupportTest extends TestBase {
 
         String actual = genFit.toString().replace("}, Fit", "},\nFit").replace("}, RecordData{", "},\nRecordData{");
 
-        String expectedText = readTextResource("/TestFitArrays.txt");
+        String expectedText = readTextResource("/TestFitArrays.txt").trim();
         Assert.assertEquals(expectedText, actual);
     }
 

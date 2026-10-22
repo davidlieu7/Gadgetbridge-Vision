@@ -206,6 +206,7 @@ public class HydrationDailyFragment extends HydrationFragment<HydrationDailyFrag
             super.onPostExecute(o);
             if (getTaskError() == null) {
                 LocalBroadcastManager.getInstance(getContext()).sendBroadcast(new Intent(ChartsHost.REFRESH));
+                GB.signalActivityDataFinish(device);
                 if (day == HydrationSampleProvider.toDay(LocalDate.now()) && device.isInitialized()) {
                     GBApplication.deviceService(device).onSendConfiguration(DeviceSettingsPreferenceConst.PREF_HYDRATION_SEND_TODAY);
                 }

@@ -1526,7 +1526,7 @@
     <string name="pref_ambient_sound_tone">Omgevingsgeluidstoon</string>
     <string name="pref_ambient_sound_tone_summary">Van zacht naar helder</string>
     <string name="pref_balance">Balans</string>
-    <string name="pref_switch_controls_ambient_off">Omgeving ←→ Uit</string>
+    <string name="pref_switch_controls_ambient_off">Omgeving ↔ Uit</string>
     <string name="prefs_noise_control">Ruisbeheersing</string>
     <string name="prefs_voice_detect">Spraakdetectie</string>
     <string name="prefs_double_tap_edge">Dubbeltik op rand</string>
@@ -1542,9 +1542,9 @@
     <string name="prefs_ambient_sound_during_call_title">Omgevingsgeluid tijdens gesprekken</string>
     <string name="heartrate_bpm_145">145 bpm</string>
     <string name="prefs_heartrate_alert_experimental_description">Trillen wanneer de hartslag boven een bepaalde drempel komt, zonder enige duidelijke fysieke activiteit in de laatste 10 minuten. Deze functie is experimenteel en is niet uitgebreid getest.</string>
-    <string name="pref_switch_controls_anc_ambient">Ruisonderdrukking ←→ Omgeving</string>
+    <string name="pref_switch_controls_anc_ambient">Ruisonderdrukking ↔ Omgeving</string>
     <string name="pref_title_touch_volume">Volume</string>
-    <string name="pref_switch_controls_anc_off">Ruisonderdrukking ←→ Uit</string>
+    <string name="pref_switch_controls_anc_off">Ruisonderdrukking ↔ Uit</string>
     <string name="heartrate_bpm_130">130 bpm</string>
     <string name="heartrate_bpm_150">150 bpm</string>
     <string name="heartrate_bpm_135">135 bpm</string>
@@ -1991,7 +1991,7 @@
     <string name="pref_pair_bluetooth_calls_help_3">3. Schakel de instelling voor \"Bluetooth-oproepen\" hieronder in.</string>
     <string name="pref_pair_bluetooth_calls_help_warning">WAARSCHUWING: Als u Bluetooth-oproepen inschakelt zonder te koppelen met het tweede Bluetooth-apparaat, werken oproepmeldingen mogelijk niet zoals verwacht.</string>
     <string name="sony_button_mode_help_title">Knopmodi - Help</string>
-    <string name="pref_switch_controls_anc_ambient_off">Ruisonderdrukking ←→ Omgeving ←→ Uit</string>
+    <string name="pref_switch_controls_anc_ambient_off">Ruisonderdrukking ↔ Omgeving ↔ Uit</string>
     <string name="sony_button_mode_help_summary">Een beschrijving van elke knopmodus</string>
     <string name="single_tap">Enkele tik</string>
     <string name="double_tap">Dubbeltik</string>

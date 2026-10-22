@@ -34,6 +34,7 @@ public enum DeviceSpecificSettingsScreen {
     CONNECTION("pref_screen_connection", R.xml.devicesettings_root_connection, R.string.pref_header_connection),
     INTERNET("pref_screen_internet", R.xml.devicesettings_root_internet, R.string.permission_internet_access_title),
     DASHBOARD("pref_screen_dashboard", R.xml.devicesettings_root_dashboard, R.string.pref_header_dashboard),
+    DEVICE_CARD("pref_screen_device_card", R.xml.devicesettings_root_device_card, R.string.pref_header_device_card),
     DEVELOPER("pref_screen_developer", R.xml.devicesettings_root_developer, R.string.pref_title_developer_settings),
     DISPLAY("pref_screen_display", R.xml.devicesettings_root_display, R.string.pref_header_display),
     GENERIC("pref_screen_generic", R.xml.devicesettings_root_generic, R.string.pref_header_generic),

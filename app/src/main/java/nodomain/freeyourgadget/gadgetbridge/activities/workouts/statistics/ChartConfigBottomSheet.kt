@@ -8,7 +8,6 @@ import android.view.ViewGroup
 import android.widget.BaseAdapter
 import androidx.appcompat.widget.ListPopupWindow
 import androidx.core.content.ContextCompat
-import androidx.core.os.bundleOf
 import androidx.fragment.app.setFragmentResult
 import com.google.android.material.bottomsheet.BottomSheetDialogFragment
 import com.google.android.material.color.MaterialColors
@@ -55,7 +54,7 @@ class ChartConfigBottomSheet : BottomSheetDialogFragment() {
 
         binding.chartConfigCancel.setOnClickListener { dismiss() }
         binding.chartConfigApply.setOnClickListener {
-            setFragmentResult(REQUEST_KEY, bundleOf(RESULT_CONFIG to draft.serialize()))
+            setFragmentResult(REQUEST_KEY, Bundle().apply { putString(RESULT_CONFIG, draft.serialize()) })
             dismiss()
         }
 
@@ -104,9 +103,9 @@ class ChartConfigBottomSheet : BottomSheetDialogFragment() {
         set.setField.text = chartSet?.let { getString(it.metric.labelRes()) } ?: getString(R.string.none)
         set.setType.check(if (chartSet?.type == SeriesType.LINE) R.id.set_type_line else R.id.set_type_bar)
         set.setType.isEnabled = chartSet != null
-        set.setTypeBar.isEnabled = chartSet != null && !chartSet.metric.average
+        set.setTypeBar.isEnabled = chartSet != null && !chartSet.metric.lineOnly
         set.setTypeLine.isEnabled = chartSet != null
-        set.setHint.visibility = if (chartSet?.metric?.average == true) View.VISIBLE else View.GONE
+        set.setHint.visibility = if (chartSet?.metric?.lineOnly == true) View.VISIBLE else View.GONE
     }
 
     /**
@@ -188,10 +187,10 @@ class ChartConfigBottomSheet : BottomSheetDialogFragment() {
         private const val STATE_DRAFT = "draft"
 
         fun newInstance(available: List<SportMetric>, config: ChartConfig) = ChartConfigBottomSheet().apply {
-            arguments = bundleOf(
-                ARG_AVAILABLE to ArrayList(available.map { it.name }),
-                ARG_CONFIG to config.serialize(),
-            )
+            arguments = Bundle().apply {
+                putStringArrayList(ARG_AVAILABLE, ArrayList(available.map { it.name }))
+                putString(ARG_CONFIG, config.serialize())
+            }
         }
     }
 }

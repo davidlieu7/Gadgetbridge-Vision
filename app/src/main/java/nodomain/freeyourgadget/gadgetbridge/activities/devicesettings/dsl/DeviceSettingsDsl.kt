@@ -82,6 +82,7 @@ class DeviceSettingsScope {
         @StringRes confirmationMessage: Int = 0,
         connectedOnly: Boolean = true,
         visibleWhen: ((Prefs) -> Boolean)? = null,
+        onSharedPreferenceChanged: ((Boolean) -> Unit)? = null,
     ) {
         items.add(
             SwitchSetting(
@@ -98,6 +99,7 @@ class DeviceSettingsScope {
                 confirmationMessage = confirmationMessage,
                 connectedOnly = connectedOnly,
                 visibleWhen = visibleWhen,
+                onSharedPreferenceChanged = onSharedPreferenceChanged,
             )
         )
     }
@@ -193,6 +195,8 @@ class DeviceSettingsScope {
         dependency: String? = null,
         connectedOnly: Boolean = true,
         visibleWhen: ((Prefs) -> Boolean)? = null,
+        onSharedPreferenceChanged: ((Set<String>) -> Unit)? = null,
+        entryGroups: List<ListEntryGroup> = emptyList(),
     ) {
         items.add(
             MultiSelectSetting(
@@ -206,6 +210,8 @@ class DeviceSettingsScope {
                 dependency = dependency,
                 connectedOnly = connectedOnly,
                 visibleWhen = visibleWhen,
+                onSharedPreferenceChanged = onSharedPreferenceChanged,
+                entryGroups = entryGroups,
             )
         )
     }
@@ -314,6 +320,7 @@ class DeviceSettingsScope {
         onBindEditText: ((android.widget.EditText) -> Unit)? = null,
         defaultSummary: ((Context) -> String)? = null,
         @StringRes summaryTemplate: Int = 0,
+        summaryProvider: ((Context, Prefs) -> CharSequence?)? = null,
     ) {
         items.add(
             TextSetting(
@@ -332,6 +339,7 @@ class DeviceSettingsScope {
                 onBindEditText = onBindEditText,
                 defaultSummary = defaultSummary,
                 summaryTemplate = summaryTemplate,
+                summaryProvider = summaryProvider,
             )
         )
     }

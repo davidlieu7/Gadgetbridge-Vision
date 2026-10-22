@@ -1,7 +1,14 @@
 package nodomain.freeyourgadget.gadgetbridge.activities.debug
 
+import android.graphics.ColorMatrix
+import android.graphics.ColorMatrixColorFilter
+import android.graphics.drawable.Drawable
+import android.graphics.drawable.LayerDrawable
 import android.text.InputType
+import android.view.ContextThemeWrapper
 import android.widget.Toast
+import androidx.annotation.DrawableRes
+import androidx.appcompat.content.res.AppCompatResources
 import androidx.preference.EditTextPreference
 import androidx.preference.ListPreference
 import androidx.preference.Preference
@@ -106,6 +113,40 @@ abstract class AbstractDebugFragment : AbstractPreferenceFragment() {
         group?.addPreference(pref)
 
         return pref
+    }
+
+    protected fun addDynamicDevicePref(
+        group: PreferenceGroup?,
+        title: String,
+        summary: String,
+        @DrawableRes icon: Int,
+        connected: Boolean,
+        onClickFunction: () -> Unit,
+    ): Preference {
+        val pref = addDynamicPref(group, title, summary, onClickFunction = onClickFunction)
+        pref.layoutResource = R.layout.preference_debug_device
+        pref.icon = deviceIcon(icon, connected)
+        return pref
+    }
+
+    private fun deviceIcon(@DrawableRes iconRes: Int, connected: Boolean): Drawable {
+        val iconContext = ContextThemeWrapper(
+            requireContext(),
+            if (connected) R.style.ThemeOverlay_App_DeviceCardIcon_Connected else R.style.ThemeOverlay_App_DeviceCardIcon
+        )
+        val tile = AppCompatResources.getDrawable(iconContext, R.drawable.device_card_icon_bg)!!
+        val icon = AppCompatResources.getDrawable(iconContext, iconRes)!!
+        if (!connected) {
+            icon.colorFilter = ColorMatrixColorFilter(ColorMatrix().apply { setSaturation(0f) })
+        }
+
+        val tileSize = resources.getDimensionPixelSize(R.dimen.debug_device_icon_size)
+        val iconInset = resources.getDimensionPixelSize(R.dimen.debug_device_icon_inset)
+        return LayerDrawable(arrayOf(tile, icon)).apply {
+            setLayerSize(0, tileSize, tileSize)
+            setLayerInset(1, iconInset, iconInset, 0, 0)
+            setLayerSize(1, tileSize - iconInset, tileSize - iconInset)
+        }
     }
 
     protected fun addDynamicCategory(title: String) {

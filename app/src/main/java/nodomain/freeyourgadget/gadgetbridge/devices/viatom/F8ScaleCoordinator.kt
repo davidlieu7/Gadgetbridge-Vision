@@ -45,7 +45,7 @@ class F8ScaleCoordinator : AbstractBLEDeviceCoordinator() {
             icon = R.drawable.ic_badge
         ) {
             for (i in 1..numUsers()) {
-                //empty inactive row. Just to show a seprator
+                //empty inactive row. Just to show a separator
                 action(
                     key = "user${i}"
                 )

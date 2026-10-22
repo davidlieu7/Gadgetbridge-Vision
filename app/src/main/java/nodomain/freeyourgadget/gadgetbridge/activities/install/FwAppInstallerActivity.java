@@ -51,7 +51,7 @@ import java.util.List;
 import nodomain.freeyourgadget.gadgetbridge.GBApplication;
 import nodomain.freeyourgadget.gadgetbridge.R;
 import nodomain.freeyourgadget.gadgetbridge.activities.AbstractGBActivity;
-import nodomain.freeyourgadget.gadgetbridge.activities.wififtp.WifiFtpSessionScreen;
+import nodomain.freeyourgadget.gadgetbridge.activities.wifi.WifiSessionScreen;
 import nodomain.freeyourgadget.gadgetbridge.adapter.ItemWithDetailsAdapter;
 import nodomain.freeyourgadget.gadgetbridge.devices.InstallHandler;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
@@ -189,7 +189,7 @@ public class FwAppInstallerActivity extends AbstractGBActivity implements Instal
         }
 
         // Keeps a Wi-Fi file transfer session open
-        new WifiFtpSessionScreen(this, device);
+        new WifiSessionScreen(this, device);
 
         if (savedInstanceState != null) {
             details = savedInstanceState.getParcelableArrayList(ITEM_DETAILS);
@@ -235,7 +235,10 @@ public class FwAppInstallerActivity extends AbstractGBActivity implements Instal
             GBApplication.deviceService(device).onInstallApp(uri, options);
         });
 
-        closeButton.setOnClickListener(v -> finish());
+        closeButton.setOnClickListener(v -> {
+            GB.removeNotification(GB.NOTIFICATION_ID_INSTALL, this);
+            finish();
+        });
 
         uri = getIntent().getData();
         if (uri == null) { // For "share" intent

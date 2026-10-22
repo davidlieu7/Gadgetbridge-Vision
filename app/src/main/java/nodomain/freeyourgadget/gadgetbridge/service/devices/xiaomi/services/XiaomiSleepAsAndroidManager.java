@@ -24,6 +24,11 @@ import org.slf4j.LoggerFactory;
 
 import java.util.TimeZone;
 
+import nodomain.freeyourgadget.gadgetbridge.GBApplication;
+import nodomain.freeyourgadget.gadgetbridge.database.DBHandler;
+import nodomain.freeyourgadget.gadgetbridge.devices.GenericDurationSampleProvider;
+import nodomain.freeyourgadget.gadgetbridge.devices.xiaomi.XiaomiSampleProvider;
+import nodomain.freeyourgadget.gadgetbridge.entities.GenericDurationSample;
 import nodomain.freeyourgadget.gadgetbridge.proto.xiaomi.AxisSensor;
 import nodomain.freeyourgadget.gadgetbridge.proto.xiaomi.Health;
 import nodomain.freeyourgadget.gadgetbridge.proto.xiaomi.RawSensorBatch;
@@ -62,6 +67,12 @@ public final class XiaomiSleepAsAndroidManager {
     // The band ignores a finish that follows the preceding status too closely, and keeps the
     // workout open. A later start is then rejected until the band is power-cycled.
     private static final long FINISH_DELAY_MS = 500L;
+    // Wall-clock start of the open synthetic workout, so the span the band billed as a workout is
+    // known when it closes, whatever restarted in between.
+    private static final String PREF_SESSION_STARTED_TS = "xiaomi_saa_session_started_ts";
+    // Nothing on the band closes the synthetic workout by itself. Past this age a stored start
+    // belongs to no session anybody is still waiting on.
+    private static final long SESSION_MAX_AGE_MS = 12 * 60 * 60_000L;
     // Reported to the band until a real reading arrives.
     private static final int HEART_RATE_UNKNOWN = 255;
 
@@ -130,6 +141,7 @@ public final class XiaomiSleepAsAndroidManager {
      */
     public void start(final boolean withHeartRate) {
         sessionRequested = true;
+        rememberSession();
         restartAttempts = 0;
         closeThenOpenWorkout(withHeartRate, false);
     }
@@ -226,8 +238,73 @@ public final class XiaomiSleepAsAndroidManager {
         // echoing the status it was given until then.
         workoutStatusHandler.postDelayed(() -> {
             sendWorkoutStatus(XiaomiHealthService.WORKOUT_FINISHED);
-            sessionRequested = false;
+            forgetSession();
         }, FINISH_DELAY_MS);
+    }
+
+    /**
+     * Store when the synthetic workout opened. Sleep as Android repeats START_TRACKING as its own
+     * watchdog, so a start already stored for a session still in progress is kept.
+     */
+    private void rememberSession() {
+        if (sessionStartedRecently()) {
+            return;
+        }
+        GBApplication.getDeviceSpecificSharedPrefs(deviceAddress())
+                .edit()
+                .putLong(PREF_SESSION_STARTED_TS, System.currentTimeMillis())
+                .apply();
+    }
+
+    private boolean sessionStartedRecently() {
+        final long startedMs = health.getDevicePrefs().getLong(PREF_SESSION_STARTED_TS, 0L);
+        if (startedMs == 0) {
+            return false;
+        }
+        final long age = System.currentTimeMillis() - startedMs;
+        if (age < 0 || age > SESSION_MAX_AGE_MS) {
+            LOG.info("Discarding a Sleep as Android session started {}ms ago", age);
+            return false;
+        }
+        return true;
+    }
+
+    /**
+     * End the session and record the span its synthetic workout covered, which the band billed as
+     * exercise, for {@link nodomain.freeyourgadget.gadgetbridge.devices.xiaomi.XiaomiSampleProvider}.
+     */
+    private void forgetSession() {
+        sessionRequested = false;
+
+        final String address = deviceAddress();
+        final long startedMs = health.getDevicePrefs().getLong(PREF_SESSION_STARTED_TS, 0L);
+        final long now = System.currentTimeMillis();
+        if (startedMs > 0 && now > startedMs && now - startedMs <= SESSION_MAX_AGE_MS) {
+            recordWindow(startedMs, now);
+        }
+
+        GBApplication.getDeviceSpecificSharedPrefs(address)
+                .edit()
+                .remove(PREF_SESSION_STARTED_TS)
+                .apply();
+    }
+
+    private void recordWindow(final long startMs, final long endMs) {
+        try (DBHandler db = GBApplication.acquireDB()) {
+            final GenericDurationSampleProvider provider =
+                    new GenericDurationSampleProvider(health.getSupport().getDevice(), db.getDaoSession());
+            final GenericDurationSample window = provider.createSample();
+            window.setTimestamp(startMs);
+            window.setEndTimestamp(endMs);
+            window.setType(XiaomiSampleProvider.DURATION_TYPE_SLEEP_AS_ANDROID);
+            provider.persistSamples(window, health.getSupport().getContext());
+        } catch (final Exception e) {
+            LOG.error("Failed to record the Sleep as Android window", e);
+        }
+    }
+
+    private String deviceAddress() {
+        return health.getSupport().getDevice().getAddress();
     }
 
     private void startWorkoutStatsTicker() {

@@ -1,9 +1,5 @@
 package nodomain.freeyourgadget.gadgetbridge.activities.charts;
 
-import com.github.mikephil.charting.charts.Chart;
-import com.github.mikephil.charting.components.LegendEntry;
-
-import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.List;
 
@@ -51,32 +47,4 @@ abstract class SleepFragment<D extends ChartsData> extends AbstractActivityChart
         return (List<SleepScoreSample>) provider.getAllSamples(startTs * 1000L, endTs * 1000L);
     }
 
-    protected List<LegendEntry> createLegendEntries(Chart<?> chart) {
-        List<LegendEntry> legendEntries = new ArrayList<>(4);
-        LegendEntry lightSleepEntry = new LegendEntry();
-        lightSleepEntry.setLabel(getActivity().getString(R.string.sleep_colored_stats_light));
-        lightSleepEntry.setFormColor(akLightSleep.color);
-        legendEntries.add(lightSleepEntry);
-
-        LegendEntry deepSleepEntry = new LegendEntry();
-        deepSleepEntry.setLabel(getActivity().getString(R.string.sleep_colored_stats_deep));
-        deepSleepEntry.setFormColor(akDeepSleep.color);
-        legendEntries.add(deepSleepEntry);
-
-        if (supportsRemSleep(getChartsHost().getDevice())) {
-            LegendEntry remSleepEntry = new LegendEntry();
-            remSleepEntry.setLabel(getActivity().getString(R.string.sleep_colored_stats_rem));
-            remSleepEntry.setFormColor(akRemSleep.color);
-            legendEntries.add(remSleepEntry);
-        }
-
-        if (supportsAwakeSleep(getChartsHost().getDevice())) {
-            LegendEntry awakeSleepEntry = new LegendEntry();
-            awakeSleepEntry.setLabel(getActivity().getString(R.string.abstract_chart_fragment_kind_awake_sleep));
-            awakeSleepEntry.setFormColor(akAwakeSleep.color);
-            legendEntries.add(awakeSleepEntry);
-        }
-
-        return legendEntries;
-    }
 }

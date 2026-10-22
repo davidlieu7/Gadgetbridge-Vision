@@ -4,7 +4,9 @@ import nodomain.freeyourgadget.gadgetbridge.model.ActivitySummaryEntries
 import java.time.DayOfWeek
 import java.time.Instant
 import java.time.LocalDate
+import java.time.YearMonth
 import java.time.ZoneId
+import java.time.temporal.ChronoUnit
 import java.time.temporal.TemporalAdjusters
 
 /**
@@ -24,8 +26,14 @@ data class WorkoutInput(
     val descentMeters: Double = 0.0,
     val steps: Double = 0.0,
     val avgSpeedMetersPerSecond: Double = 0.0,
+    val maxSpeedMetersPerSecond: Double = 0.0,
     val avgHeartRate: Double = 0.0,
+    val maxHeartRate: Double = 0.0,
     val avgPowerWatts: Double = 0.0,
+    val maxPowerWatts: Double = 0.0,
+    val avgCadence: Double = 0.0,
+    val maxCadence: Double = 0.0,
+    val cadenceUnit: String? = null,
     val avgSwolf: Double = 0.0,
     val aerobicEffect: Double = 0.0,
     val anaerobicEffect: Double = 0.0,
@@ -48,8 +56,13 @@ data class WorkoutInput(
                 descentMeters = descentMeters,
                 steps = steps,
                 speed = WeightedSum.of(avgSpeedMetersPerSecond, movingSeconds),
+                maxSpeed = maxSpeedMetersPerSecond,
                 heartRate = WeightedSum.of(avgHeartRate, durationSeconds.toDouble()),
+                maxHeartRate = maxHeartRate,
                 power = WeightedSum.of(avgPowerWatts, durationSeconds.toDouble()),
+                maxPower = maxPowerWatts,
+                cadence = WeightedSum.of(avgCadence, durationSeconds.toDouble()),
+                maxCadence = maxCadence,
                 swolf = WeightedSum.of(avgSwolf, durationSeconds.toDouble()),
                 aerobicEffect = WeightedSum.of(aerobicEffect, durationSeconds.toDouble()),
                 anaerobicEffect = WeightedSum.of(anaerobicEffect, durationSeconds.toDouble()),
@@ -87,8 +100,13 @@ data class MetricTotals(
     val descentMeters: Double = 0.0,
     val steps: Double = 0.0,
     val speed: WeightedSum = WeightedSum(),
+    val maxSpeed: Double = 0.0,
     val heartRate: WeightedSum = WeightedSum(),
+    val maxHeartRate: Double = 0.0,
     val power: WeightedSum = WeightedSum(),
+    val maxPower: Double = 0.0,
+    val cadence: WeightedSum = WeightedSum(),
+    val maxCadence: Double = 0.0,
     val swolf: WeightedSum = WeightedSum(),
     val aerobicEffect: WeightedSum = WeightedSum(),
     val anaerobicEffect: WeightedSum = WeightedSum(),
@@ -103,8 +121,13 @@ data class MetricTotals(
         descentMeters = descentMeters + other.descentMeters,
         steps = steps + other.steps,
         speed = speed + other.speed,
+        maxSpeed = maxOf(maxSpeed, other.maxSpeed),
         heartRate = heartRate + other.heartRate,
+        maxHeartRate = maxOf(maxHeartRate, other.maxHeartRate),
         power = power + other.power,
+        maxPower = maxOf(maxPower, other.maxPower),
+        cadence = cadence + other.cadence,
+        maxCadence = maxOf(maxCadence, other.maxCadence),
         swolf = swolf + other.swolf,
         aerobicEffect = aerobicEffect + other.aerobicEffect,
         anaerobicEffect = anaerobicEffect + other.anaerobicEffect,
@@ -114,72 +137,110 @@ data class MetricTotals(
 }
 
 /**
+ * How a metric combines over several workouts.
+ */
+enum class MetricAggregation { TOTAL, AVERAGE, MAXIMUM }
+
+/**
  * Metrics a sport's chart can plot. Speed is in m/s, pace in s/m.
  */
-enum class SportMetric(val average: Boolean = false, val valueOf: (MetricTotals) -> Double) {
+enum class SportMetric(
+    val aggregation: MetricAggregation = MetricAggregation.TOTAL,
+    val valueOf: (MetricTotals) -> Double,
+) {
     DISTANCE(valueOf = { it.distanceMeters }),
     DURATION(valueOf = { it.durationSeconds.toDouble() }),
-    AVG_PACE(average = true, valueOf = { if (it.speed.average > 0.0) 1.0 / it.speed.average else 0.0 }),
-    AVG_SPEED(average = true, valueOf = { it.speed.average }),
-    AVG_HEART_RATE(average = true, valueOf = { it.heartRate.average }),
-    AVG_POWER(average = true, valueOf = { it.power.average }),
-    AVG_SWOLF(average = true, valueOf = { it.swolf.average }),
-    AVG_AEROBIC_EFFECT(average = true, valueOf = { it.aerobicEffect.average }),
-    AVG_ANAEROBIC_EFFECT(average = true, valueOf = { it.anaerobicEffect.average }),
+    AVG_PACE(
+        aggregation = MetricAggregation.AVERAGE,
+        valueOf = { if (it.speed.average > 0.0) 1.0 / it.speed.average else 0.0 },
+    ),
+    AVG_SPEED(aggregation = MetricAggregation.AVERAGE, valueOf = { it.speed.average }),
+    MAX_PACE(
+        aggregation = MetricAggregation.MAXIMUM,
+        valueOf = { if (it.maxSpeed > 0.0) 1.0 / it.maxSpeed else 0.0 },
+    ),
+    MAX_SPEED(aggregation = MetricAggregation.MAXIMUM, valueOf = { it.maxSpeed }),
+    AVG_HEART_RATE(aggregation = MetricAggregation.AVERAGE, valueOf = { it.heartRate.average }),
+    MAX_HEART_RATE(aggregation = MetricAggregation.MAXIMUM, valueOf = { it.maxHeartRate }),
+    AVG_POWER(aggregation = MetricAggregation.AVERAGE, valueOf = { it.power.average }),
+    MAX_POWER(aggregation = MetricAggregation.MAXIMUM, valueOf = { it.maxPower }),
+    AVG_CADENCE(aggregation = MetricAggregation.AVERAGE, valueOf = { it.cadence.average }),
+    MAX_CADENCE(aggregation = MetricAggregation.MAXIMUM, valueOf = { it.maxCadence }),
+    AVG_SWOLF(aggregation = MetricAggregation.AVERAGE, valueOf = { it.swolf.average }),
     CALORIES(valueOf = { it.calories }),
     ASCENT(valueOf = { it.ascentMeters }),
     DESCENT(valueOf = { it.descentMeters }),
     STEPS(valueOf = { it.steps }),
     TRAINING_LOAD(valueOf = { it.trainingLoad }),
     SETS(valueOf = { it.sets }),
+    AVG_AEROBIC_EFFECT(aggregation = MetricAggregation.AVERAGE, valueOf = { it.aerobicEffect.average }),
+    AVG_ANAEROBIC_EFFECT(aggregation = MetricAggregation.AVERAGE, valueOf = { it.anaerobicEffect.average }),
+    ;
+
+    /**
+     * Averages and maximums aren't totals, so they are only drawn as lines.
+     */
+    val lineOnly: Boolean get() = aggregation != MetricAggregation.TOTAL
 }
 
-enum class PeriodKind { WEEK, MONTH, YEAR }
+enum class PeriodKind { WEEK, MONTH, YEAR, CUSTOM }
 
 /**
- * A calendar week (Mon–Sun), month or year. Create with [containing].
+ * A calendar week (Mon-Sun), month or year, created with [containing], or a range of days, created with [custom].
+ * Years have a bar per month, the others a bar per day.
  */
-data class StatisticsPeriod(val kind: PeriodKind, val start: LocalDate) {
-    val endInclusive: LocalDate get() = next().start.minusDays(1)
+data class StatisticsPeriod(val kind: PeriodKind, val start: LocalDate, private val customEnd: LocalDate? = null) {
+    val endInclusive: LocalDate
+        get() = if (kind == PeriodKind.CUSTOM) checkNotNull(customEnd) else next().start.minusDays(1)
 
-    val barCount: Int
-        get() = when (kind) {
-            PeriodKind.WEEK -> DAYS_PER_WEEK
-            PeriodKind.MONTH -> start.lengthOfMonth()
-            PeriodKind.YEAR -> MONTHS_PER_YEAR
-        }
+    val dayCount: Long get() = ChronoUnit.DAYS.between(start, endInclusive) + 1
 
-    fun previous() = StatisticsPeriod(kind, shifted(-1))
+    val barCount: Int get() = barOf(endInclusive)
 
-    fun next() = StatisticsPeriod(kind, shifted(1))
+    /**
+     * Custom ranges move by their length.
+     */
+    fun previous() = shifted(-1)
 
-    private fun shifted(amount: Long): LocalDate = when (kind) {
-        PeriodKind.WEEK -> start.plusWeeks(amount)
-        PeriodKind.MONTH -> start.plusMonths(amount)
-        PeriodKind.YEAR -> start.plusYears(amount)
+    fun next() = shifted(1)
+
+    private fun shifted(amount: Long): StatisticsPeriod = when (kind) {
+        PeriodKind.WEEK -> StatisticsPeriod(kind, start.plusWeeks(amount))
+        PeriodKind.MONTH -> StatisticsPeriod(kind, start.plusMonths(amount))
+        PeriodKind.YEAR -> StatisticsPeriod(kind, start.plusYears(amount))
+        PeriodKind.CUSTOM -> custom(start.plusDays(amount * dayCount), endInclusive.plusDays(amount * dayCount))
     }
 
     /**
      * 1-based bar for [date].
      */
-    internal fun barOf(date: LocalDate): Int = when (kind) {
-        PeriodKind.WEEK -> date.dayOfWeek.value
-        PeriodKind.MONTH -> date.dayOfMonth
-        PeriodKind.YEAR -> date.monthValue
+    internal fun barOf(date: LocalDate): Int = if (kind == PeriodKind.YEAR) {
+        ChronoUnit.MONTHS.between(YearMonth.from(start), YearMonth.from(date)).toInt() + 1
+    } else {
+        ChronoUnit.DAYS.between(start, date).toInt() + 1
     }
 
-    companion object {
-        private const val DAYS_PER_WEEK = 7
-        private const val MONTHS_PER_YEAR = 12
+    /**
+     * First day of [bar].
+     */
+    fun barStart(bar: Int): LocalDate =
+        if (kind == PeriodKind.YEAR) start.plusMonths(bar - 1L) else start.plusDays(bar - 1L)
 
+    companion object {
         fun containing(kind: PeriodKind, date: LocalDate) = StatisticsPeriod(
             kind,
             when (kind) {
                 PeriodKind.WEEK -> date.with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
                 PeriodKind.MONTH -> date.withDayOfMonth(1)
                 PeriodKind.YEAR -> date.withDayOfYear(1)
+                PeriodKind.CUSTOM -> throw IllegalArgumentException("Custom periods have no calendar unit")
             },
         )
+
+        fun custom(start: LocalDate, endInclusive: LocalDate): StatisticsPeriod {
+            require(!endInclusive.isBefore(start)) { "Range ends before it starts" }
+            return StatisticsPeriod(PeriodKind.CUSTOM, start, endInclusive)
+        }
     }
 }
 
@@ -199,9 +260,14 @@ data class PeriodStats(
 )
 
 /**
- * Date range and metrics with data for a sport.
+ * Date range and metrics with data for a sport. [cadenceUnit] is the unit most of its workouts record cadence in.
  */
-data class SportOverview(val firstDate: LocalDate?, val lastDate: LocalDate?, val availableMetrics: List<SportMetric>)
+data class SportOverview(
+    val firstDate: LocalDate?,
+    val lastDate: LocalDate?,
+    val availableMetrics: List<SportMetric>,
+    val cadenceUnit: String? = null,
+)
 
 object StatisticsAggregation {
     /**
@@ -254,8 +320,12 @@ object StatisticsAggregation {
             firstDate = dateOf(workouts.minOf { it.startMillis }),
             lastDate = dateOf(workouts.maxOf { it.startMillis }),
             availableMetrics = SportMetric.entries
-                .filter { it != if (paceSport) SportMetric.AVG_SPEED else SportMetric.AVG_PACE }
+                .filter { it !in if (paceSport) SPEED_METRICS else PACE_METRICS }
                 .filter { metric -> metric == SportMetric.DURATION || totals.any { metric.valueOf(it) > 0.0 } },
+            cadenceUnit = workouts.filter { it.avgCadence > 0.0 || it.maxCadence > 0.0 }
+                .mapNotNull { it.cadenceUnit }
+                .groupingBy { it }.eachCount()
+                .maxByOrNull { it.value }?.key,
         )
     }
 
@@ -271,10 +341,13 @@ object StatisticsAggregation {
             ActivitySummaryEntries.UNIT_KMPH -> value / KMPH_PER_METER_PER_SECOND
             ActivitySummaryEntries.UNIT_SECONDS_PER_KM -> METERS_PER_KM / value
             ActivitySummaryEntries.UNIT_SECONDS_PER_100_METERS -> METERS_PER_100_M / value
+            ActivitySummaryEntries.UNIT_SECONDS_PER_M -> 1.0 / value
             else -> 0.0
         }
     }
 
+    private val PACE_METRICS = setOf(SportMetric.AVG_PACE, SportMetric.MAX_PACE)
+    private val SPEED_METRICS = setOf(SportMetric.AVG_SPEED, SportMetric.MAX_SPEED)
     private const val KMPH_PER_METER_PER_SECOND = 3.6
     private const val METERS_PER_KM = 1000.0
     private const val METERS_PER_100_M = 100.0

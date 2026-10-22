@@ -20,7 +20,6 @@ import java.util.Map;
 import java.util.Set;
 
 import nodomain.freeyourgadget.gadgetbridge.R;
-import nodomain.freeyourgadget.gadgetbridge.activities.charts.HeartRateZoneChartUtils;
 
 public class ValueMarker extends MarkerView {
     private final TextView markerContent;
@@ -53,7 +52,7 @@ public class ValueMarker extends MarkerView {
         String seriesLabel = null;
         for (int i = 0; i < lineData.getDataSetCount(); i++) {
             final IBarLineScatterCandleBubbleDataSet<?> dataSet = lineData.getDataSetByIndex(i);
-            if (dataSet == null || dataSet instanceof HeartRateZoneChartUtils.ZoneAreaDataSet) {
+            if (dataSet == null) {
                 continue;
             }
             if (!dataSet.getLabel().isEmpty()) {

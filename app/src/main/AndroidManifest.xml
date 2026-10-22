@@ -64,6 +64,8 @@
 
     <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE"
         android:maxSdkVersion="32" />
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE"
+        android:maxSdkVersion="28" />
     <uses-permission android:name="android.permission.READ_CALENDAR" />
     <uses-permission
         android:name="android.permission.MEDIA_CONTENT_CONTROL"
@@ -177,6 +179,7 @@
         android:theme="@style/GadgetbridgeTheme">
         <activity
             android:name=".activities.ControlCenterv2"
+            android:configChanges="keyboard|keyboardHidden|navigation"
             android:label="@string/title_activity_controlcenter"
             android:theme="@style/SplashTheme"
             android:launchMode="singleTop"
@@ -255,7 +258,7 @@
             android:label="@string/healthconnect_settings"
             android:parentActivityName=".activities.SettingsActivity" />
         <activity
-            android:name=".activities.endurain.OnlineFitnessTrackersPreferencesActivity"
+            android:name=".activities.externalservices.OnlineFitnessTrackersPreferencesActivity"
             android:label="@string/prefs_online_fitness_trackers_title"
             android:parentActivityName=".activities.SettingsActivity" />
         <activity
@@ -274,9 +277,15 @@
             android:name=".activities.files.FtpFileBrowserActivity"
             android:label="@string/ftp_file_browser" />
         <activity
+            android:name=".activities.gallery.GalleryActivity"
+            android:label="@string/photo_gallery" />
+        <activity
             android:name=".activities.fit.FitViewerActivity"
             android:exported="true"
             android:label="@string/fit_file_viewer" />
+        <activity
+            android:name=".activities.files.TextFileViewerActivity"
+            android:label="@string/text_file_viewer" />
         <activity
             android:name=".activities.BackupRestoreProgressActivity"
             android:label="@string/activity_db_management_backup_restore_label"
@@ -328,6 +337,11 @@
             android:parentActivityName=".activities.workouts.templates.WorkoutTemplateEditActivity"
             android:windowSoftInputMode="stateHidden" />
         <activity
+            android:name=".devices.test.TestFeaturesActivity"
+            android:label="@string/pref_test_features_title"
+            android:parentActivityName=".activities.devicesettings.DeviceSettingsActivity"
+            android:windowSoftInputMode="stateHidden" />
+        <activity
             android:name=".activities.workouts.templates.WorkoutExercisePickerActivity"
             android:label="@string/workout_exercise_picker_title"
             android:parentActivityName=".activities.workouts.templates.WorkoutStepEditActivity"
@@ -361,7 +375,8 @@
         <activity
             android:name=".activities.AppBlacklistActivity"
             android:label="@string/title_activity_notification_management"
-            android:parentActivityName=".activities.SettingsActivity" />
+            android:parentActivityName=".activities.SettingsActivity"
+            android:windowSoftInputMode="stateHidden" />
         <activity
             android:name=".activities.CalendarSelectionActivity"
             android:label="@string/pref_title_calendar_sync_choose"
@@ -399,10 +414,22 @@
             android:label="@string/title_activity_gps_track_installer"
             android:parentActivityName=".activities.ControlCenterv2" />
         <activity
+            android:name=".activities.install.InstallSessionActivity"
+            android:label="@string/title_activity_fw_app_insaller"
+            android:parentActivityName=".activities.ControlCenterv2" />
+        <activity
             android:name=".activities.install.FileInstallerActivity"
             android:label="@string/title_activity_file_installer"
             android:parentActivityName=".activities.ControlCenterv2"
             android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.SEND" />
+                <action android:name="android.intent.action.SEND_MULTIPLE" />
+
+                <category android:name="android.intent.category.DEFAULT" />
+
+                <data android:mimeType="*/*" />
+            </intent-filter>
             <intent-filter>
                 <action android:name="android.intent.action.VIEW" />
 
@@ -731,7 +758,10 @@
         </receiver>
 
         <receiver
-            android:name=".service.ftp.WifiFtpSessionStopReceiver"
+            android:name=".service.wifi.WifiSessionStopReceiver"
+            android:exported="false" />
+        <receiver
+            android:name=".service.gallery.GalleryDownloadCancelReceiver"
             android:exported="false" />
         <receiver
             android:name=".service.receivers.GBMusicControlReceiver"
@@ -824,12 +854,17 @@
             android:label="@string/title_activity_discovery"
             android:parentActivityName=".activities.ControlCenterv2" />
         <activity
+            android:name=".activities.discovery.DeviceCandidateDetailsActivity"
+            android:label="@string/title_activity_device_candidate_details"
+            android:parentActivityName=".activities.discovery.DiscoveryActivityV2" />
+        <activity
             android:name=".activities.AuthKeyActivity"
             android:label="@string/pref_title_authkey"
             android:parentActivityName=".activities.discovery.DiscoveryActivityV2" />
         <activity
-            android:name=".activities.AndroidPairingActivity"
-            android:label="@string/title_activity_android_pairing" />
+            android:name=".activities.pairing.DevicePairingActivity"
+            android:label="@string/title_activity_android_pairing"
+            android:parentActivityName=".activities.discovery.DiscoveryActivityV2" />
         <activity
             android:name=".devices.banglejs.AppsManagementActivity"
             android:label="@string/title_activity_appmanager"
@@ -876,7 +911,7 @@
             android:label="@string/title_activity_LenovoWatch_calibration" />
         <activity
             android:name=".activities.charts.ActivityChartsActivity"
-            android:label="@string/title_activity_charts"
+            android:label="@string/charts"
             android:parentActivityName=".activities.ControlCenterv2" />
         <activity
             android:name=".activities.ConfigureAlarms"
@@ -1166,6 +1201,11 @@
             android:parentActivityName=".activities.DashboardPreferencesActivity" />
 
         <activity
+            android:name=".activities.devicesettings.DeviceCardItemsActivity"
+            android:label="@string/pref_device_card_items_title"
+            android:parentActivityName=".activities.devicesettings.DeviceSettingsActivity" />
+
+        <activity
             android:name=".activities.dashboard.WidgetInstanceSettingsActivity"
             android:label="@string/pref_dashboard_widget_settings"
             android:parentActivityName=".activities.dashboard.DashboardWidgetsActivity" />
@@ -1202,7 +1242,7 @@
         </activity>
 
         <activity
-            android:name=".activities.endurain.EndurainOAuthCallbackActivity"
+            android:name=".externalservices.ExternalServiceOAuthCallbackActivity"
             android:exported="true"
             android:launchMode="singleTop">
             <intent-filter>
@@ -1210,10 +1250,9 @@
                 <category android:name="android.intent.category.DEFAULT" />
                 <category android:name="android.intent.category.BROWSABLE" />
 
-                <!-- Deep link scheme for OAuth callback -->
+                <!-- Where a service's login sends the browser back; the host names the service -->
                 <data
                     android:scheme="${appAuthRedirectScheme}"
-                    android:host="endurain"
                     android:pathPrefix="/oauth/callback" />
             </intent-filter>
         </activity>

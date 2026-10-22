@@ -70,6 +70,7 @@ class DeviceDebugFragment : AbstractDebugFragment() {
             }
             addDynamicPref(headerDetails, detail.name.replace(": *$".toRegex(), ""), detail.details)
         }
+        headerDetails?.isVisible = headerDetails.preferenceCount > 0
 
         val headerCoordinator = findPreference<PreferenceCategory>(PREF_HEADER_COORDINATOR)
         val coordinator = gbDevice.deviceCoordinator

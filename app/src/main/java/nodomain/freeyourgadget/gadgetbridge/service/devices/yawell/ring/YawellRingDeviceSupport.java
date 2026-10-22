@@ -59,7 +59,9 @@ import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
 import nodomain.freeyourgadget.gadgetbridge.model.ActivityUser;
 import nodomain.freeyourgadget.gadgetbridge.model.Alarm;
 import nodomain.freeyourgadget.gadgetbridge.model.BatteryState;
+import nodomain.freeyourgadget.gadgetbridge.model.CallSpec;
 import nodomain.freeyourgadget.gadgetbridge.model.DistanceUnit;
+import nodomain.freeyourgadget.gadgetbridge.model.NotificationSpec;
 import nodomain.freeyourgadget.gadgetbridge.service.btle.AbstractBTLESingleDeviceSupport;
 import nodomain.freeyourgadget.gadgetbridge.service.btle.BLETypeConversions;
 import nodomain.freeyourgadget.gadgetbridge.service.btle.GattService;
@@ -93,7 +95,7 @@ public class YawellRingDeviceSupport extends AbstractBTLESingleDeviceSupport {
         super(LOG);
         addSupportedService(YawellRingConstants.CHARACTERISTIC_SERVICE_V1);
         addSupportedService(YawellRingConstants.CHARACTERISTIC_SERVICE_V2);
-        addSupportedService(GattService.UUID_SERVICE_DEVICE_INFORMATION);
+        addSupportedService(GattService.SERVICE_DEVICE_INFORMATION.uuid);
 
         IntentListener mListener = intent -> {
             String action = intent.getAction();
@@ -713,6 +715,83 @@ public class YawellRingDeviceSupport extends AbstractBTLESingleDeviceSupport {
         byte[] findDevicePacket = buildPacket(new byte[]{YawellRingConstants.CMD_FIND_DEVICE, 0x55, (byte) 0xAA});
         LOG.info("Find device request sent: {}", StringUtils.bytesToHex(findDevicePacket));
         sendWrite("findDeviceRequest", findDevicePacket);
+    }
+
+    private boolean supportsNotifications() {
+        return getCoordinator().supportsNotifications(getDevice());
+    }
+
+    @Override
+    public void onNotification(NotificationSpec notificationSpec) {
+        if (!supportsNotifications()) return;
+
+        BluetoothGattCharacteristic characteristic = getCharacteristic(YawellRingConstants.CHARACTERISTIC_WRITE);
+        if (characteristic == null) return;
+
+        String from = notificationSpec.getSender() != null ? notificationSpec.getSender() : notificationSpec.getTitle();
+        String text = StringUtils.join(":", from, notificationSpec.getBody()).toString();
+        // The firmware only buzzes once per message, so repeat it to make it noticeable
+        int count = getDevicePrefs().getInt(YawellRingConstants.PREF_NOTIFICATION_VIBRATION_COUNT, 3);
+
+        // The device has no screen, so each repeat is just another buzz. Send them as separate
+        // transactions instead of sleeping in one, so that other BLE traffic is not blocked.
+        for (int i = 0; i < count; i++) {
+            backgroundTasksHandler.postDelayed(() -> {
+                TransactionBuilder builder = createTransactionBuilder("pushNotification");
+                writePushMessage(builder, characteristic, YawellRingConstants.PUSH_TYPE_SMS, text);
+                builder.queue();
+            }, i * 1000L);
+        }
+    }
+
+    @Override
+    public void onSetCallState(CallSpec callSpec) {
+        if (!supportsNotifications()) return;
+
+        byte type;
+        switch (callSpec.getCommand()) {
+            case CallSpec.CALL_INCOMING:
+                type = YawellRingConstants.PUSH_TYPE_CALL_INCOMING;
+                break;
+            case CallSpec.CALL_ACCEPT:
+            case CallSpec.CALL_REJECT:
+            case CallSpec.CALL_START:
+            case CallSpec.CALL_END:
+                type = YawellRingConstants.PUSH_TYPE_CALL_STOP;
+                break;
+            default:
+                return;
+        }
+
+        BluetoothGattCharacteristic characteristic = getCharacteristic(YawellRingConstants.CHARACTERISTIC_WRITE);
+        if (characteristic == null) return;
+
+        String caller = callSpec.getName() != null ? callSpec.getName() : callSpec.getNumber();
+        TransactionBuilder builder = createTransactionBuilder("pushCallState");
+        writePushMessage(builder, characteristic, type, caller);
+        builder.queue();
+    }
+
+    /**
+     * A push message is split into chunks of 11 bytes of UTF-8 text, each sent as
+     * {CMD_PUSH_MESSAGE, type, total chunks, chunk index (1-based), text...}.
+     */
+    private void writePushMessage(TransactionBuilder builder, BluetoothGattCharacteristic characteristic, byte type, String text) {
+        byte[] textBytes = StringUtils.truncateToBytes(text, YawellRingConstants.PUSH_CHUNK_SIZE * YawellRingConstants.PUSH_MAX_CHUNKS);
+        int chunks = Math.max(1, (textBytes.length + YawellRingConstants.PUSH_CHUNK_SIZE - 1) / YawellRingConstants.PUSH_CHUNK_SIZE);
+        for (int i = 0; i < chunks; i++) {
+            int start = i * YawellRingConstants.PUSH_CHUNK_SIZE;
+            int length = Math.min(YawellRingConstants.PUSH_CHUNK_SIZE, textBytes.length - start);
+            ByteBuffer contents = ByteBuffer.allocate(4 + length);
+            contents.put(YawellRingConstants.CMD_PUSH_MESSAGE);
+            contents.put(type);
+            contents.put((byte) chunks);
+            contents.put((byte) (i + 1));
+            contents.put(textBytes, start, length);
+            byte[] packet = buildPacket(contents.array());
+            LOG.debug("Push message chunk sent: {}", StringUtils.bytesToHex(packet));
+            builder.write(characteristic, packet);
+        }
     }
 
     @Override

@@ -32,6 +32,7 @@
 
     <!-- Static Light theme screen background -->
     <color name="window_background_light" type="color">#FFFFFF</color>
+    <color name="splash_icon_hand" type="color">#000000</color>
     <color name="surface_container_lowest_light" type="color">#FFFFFF</color>
     <color name="surface_container_low_light" type="color">#F5F5F5</color>
     <color name="surface_container_light" type="color">#F0F0F0</color>
@@ -102,6 +103,9 @@
     <color name="training_load_optimal_fill_color" type="color">#6659b22c</color>
     <color name="training_load_low" type="color">#D3D3D3</color>
     <color name="training_load_high" type="color">#d12a2a</color>
+    <color name="device_status_connected" type="color">#4ADE80</color>
+    <color name="device_status_connecting" type="color">#FACC15</color>
+    <color name="device_status_busy" type="color">#F87171</color>
     <color name="vo2max_running_char_line_color" type="color">#46acea</color>
     <color name="vo2max_cycling_char_line_color" type="color">#59b22c</color>
     <color name="vo2max_value_poor_color" type="color">#d93832</color>
@@ -113,13 +117,14 @@
     <color name="body_energy_lost_color" type="color">#ff6c43</color>
     <color name="chart_solar_charging_color" type="color">#ffc107</color>
     <color name="steps_color" type="color">#00c9bf</color>
-    <color name="calories_color" type="color">#fa4502</color>
-    <color name="calories_resting_color" type="color">#1f49f2</color>
+    <color name="calories_color" type="color">#d93832</color>
+    <color name="calories_resting_color" type="color">#3F84E5</color>
     <color name="hydration_color" type="color">#29b6f6</color>
-    <color name="respiratory_rate_color" type="color">#163ede</color>
+    <color name="respiratory_rate_color" type="color">#3F84E5</color>
     <color name="chart_temperature" type="color">#ff8f00</color>
     <color name="chart_temperature_average" type="color">#00acc1</color>
-    <color name="spo2_color" type="color">#aad93832</color>
+    <color name="spo2_color" type="color">#d93832</color>
+    <color name="spo2_sleep_overlay_color" type="color">#aad93832</color>
     <color name="spo2_avg_color_light" type="color">#630b0d</color>
     <color name="spo2_avg_color_dark" type="color">#ff9393</color>
     <color name="blood_pressure_systolic_color" type="color">#d93832</color>
@@ -161,10 +166,16 @@
     <color name="chart_line_body_energy" type="color">#884088</color>
     <color name="chart_line_stamina" type="color">#8888FF</color>
     <color name="chart_line_step_length" type="color">#FF4088</color>
+    <color name="chart_interval_active" type="color">#66BB6A</color>
+    <color name="chart_interval_rest" type="color">#FFC107</color>
+    <color name="chart_interval_unknown" type="color">#92a4ad</color>
     <color name="chart_cns_toxicity" type="color">#FF4040</color>
     <color name="chart_n2_load" type="color">#FF8840</color>
 
     <color name="chart_battery_level" type="color">#60bd6d</color>
+    <color name="chart_weight_body_fat" type="color">#F9A825</color>
+    <color name="chart_weight_body_water" type="color">#26A69A</color>
+    <color name="chart_weight_muscle_mass" type="color">#E53935</color>
     <color name="chart_battery_voltage" type="color">#3F84E5</color>
     <color name="chart_battery_current" type="color">#00796B</color>
     <color name="chart_battery_power" type="color">#6A0DAD</color>
@@ -176,6 +187,7 @@
     <attr name="row_separator" format="color" />
     <attr name="stat_tile_bg" format="color" />
     <attr name="stat_tile_border" format="color" />
+    <attr name="chart_marker_bg" format="color" />
     <attr name="activity_icon_bg" format="color" />
     <attr name="table_header_rule" format="color" />
 

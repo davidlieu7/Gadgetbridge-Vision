@@ -18,7 +18,6 @@
 /*  Based on code from BlueWatcher, https://github.com/masterjc/bluewatcher */
 package nodomain.freeyourgadget.gadgetbridge.devices.casio.gbx100;
 
-import android.app.Activity;
 import android.bluetooth.BluetoothDevice;
 
 import org.slf4j.Logger;
@@ -86,11 +85,6 @@ public class CasioGBX100DeviceCoordinator extends Casio2C2DDeviceCoordinator {
     @Override
     public boolean supportsAlarmSnoozing(@NonNull GBDevice device) {
         return true;
-    }
-
-    @Override
-    public Class<? extends Activity> getPairingActivity() {
-        return null;
     }
 
     @Override

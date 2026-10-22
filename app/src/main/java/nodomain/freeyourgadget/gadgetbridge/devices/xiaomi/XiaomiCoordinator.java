@@ -60,12 +60,14 @@ import nodomain.freeyourgadget.gadgetbridge.devices.SleepAsAndroidFeature;
 import nodomain.freeyourgadget.gadgetbridge.devices.InstallHandler;
 import nodomain.freeyourgadget.gadgetbridge.devices.GenericTrainingLoadAcuteSampleProvider;
 import nodomain.freeyourgadget.gadgetbridge.devices.SampleProvider;
+import nodomain.freeyourgadget.gadgetbridge.devices.SleepSessionProvider;
 import nodomain.freeyourgadget.gadgetbridge.devices.TimeSampleProvider;
 import nodomain.freeyourgadget.gadgetbridge.devices.WorkoutLoadSampleProvider;
 import nodomain.freeyourgadget.gadgetbridge.devices.XiaomiDailySummarySampleProvider;
 import nodomain.freeyourgadget.gadgetbridge.entities.BaseActivitySummary;
 import nodomain.freeyourgadget.gadgetbridge.entities.BaseActivitySummaryDao;
 import nodomain.freeyourgadget.gadgetbridge.entities.DaoSession;
+import nodomain.freeyourgadget.gadgetbridge.entities.GenericDurationSampleDao;
 import nodomain.freeyourgadget.gadgetbridge.entities.GenericTrainingLoadAcuteSample;
 import nodomain.freeyourgadget.gadgetbridge.entities.XiaomiActivityFileDao;
 import nodomain.freeyourgadget.gadgetbridge.entities.XiaomiActivitySampleDao;
@@ -143,8 +145,9 @@ public abstract class XiaomiCoordinator extends AbstractBLEDeviceCoordinator {
 
     @Override
     public Map<AbstractDao<?, ?>, Property> getAllDeviceDao(@NonNull final DaoSession session) {
-        Map<AbstractDao<?, ?>, Property> map = new HashMap<>(7);
+        Map<AbstractDao<?, ?>, Property> map = new HashMap<>(8);
         map.put(session.getBaseActivitySummaryDao(), BaseActivitySummaryDao.Properties.DeviceId);
+        map.put(session.getGenericDurationSampleDao(), GenericDurationSampleDao.Properties.DeviceId);
         map.put(session.getXiaomiActivitySampleDao(), XiaomiActivitySampleDao.Properties.DeviceId);
         map.put(session.getXiaomiActivityFileDao(), XiaomiActivityFileDao.Properties.DeviceId);
         map.put(session.getXiaomiDailySummarySampleDao(), XiaomiDailySummarySampleDao.Properties.DeviceId);
@@ -157,6 +160,12 @@ public abstract class XiaomiCoordinator extends AbstractBLEDeviceCoordinator {
     @Override
     public SampleProvider<? extends ActivitySample> getSampleProvider(@NonNull final GBDevice device, DaoSession session) {
         return new XiaomiSampleProvider(device, session);
+    }
+
+    @NonNull
+    @Override
+    public SleepSessionProvider getSleepSessionProvider(@NonNull final GBDevice device, @NonNull final DaoSession session) {
+        return new XiaomiSleepSessionProvider(device, session);
     }
 
     @Override

@@ -24,7 +24,7 @@ class RealtimeBodyBatteryCallback : CommunicatorV2.ServiceCallback {
         if (value != null && value.size >= 1) {
             val raw = value[0].toInt()
             if (raw == 0x7F) {
-                LOG.info("BodyBattery <unnknown>%")
+                LOG.info("BodyBattery <unknown>%")
             } else {
                 LOG.info("BodyBattery {}%", raw)
             }

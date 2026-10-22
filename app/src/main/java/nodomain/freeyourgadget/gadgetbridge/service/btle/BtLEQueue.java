@@ -348,13 +348,13 @@ public final class BtLEQueue implements Thread.UncaughtExceptionHandler {
 
     private boolean connectImp() {
         mPauseTransaction = false;
-        LOG.info("conenctImp: Attempting to connect to {} ({})", mGbDevice.getAddress(), mGbDevice.getName());
+        LOG.info("connectImp: Attempting to connect to {} ({})", mGbDevice.getAddress(), mGbDevice.getName());
         final boolean lowPower = GBApplication.getDevicePrefs(mGbDevice).getConnectionPriorityLowPower();
         // 30 seconds: the longest allowed ATT transaction timeout
         // 32 seconds: the longest allowed BLE connection timeout for an established  connection (supervision timeout)
         // => wait a few more seconds for establishing a new connection
         mGattConnectTimeoutHandler.postDelayed(() -> {
-            LOG.warn("conenctImp: Timed out connecting to GATT for {} ({})", mGbDevice.getAddress(), mGbDevice.getName());
+            LOG.warn("connectImp: Timed out connecting to GATT for {} ({})", mGbDevice.getAddress(), mGbDevice.getName());
             handleDisconnected(0x93 /* BluetoothGatt.GATT_CONNECTION_TIMEOUT */);
         }, lowPower ? 45000L : 5000L);
 
@@ -363,12 +363,12 @@ public final class BtLEQueue implements Thread.UncaughtExceptionHandler {
         if(!mSupportedServerServices.isEmpty()) {
             BluetoothManager bluetoothManager = (BluetoothManager) mContext.getSystemService(Context.BLUETOOTH_SERVICE);
             if (bluetoothManager == null) {
-                LOG.error("conenctImp: Error getting BluetoothManager");
+                LOG.error("connectImp: Error getting BluetoothManager");
                 return false;
             }
             mBluetoothGattServer = bluetoothManager.openGattServer(mContext, internalGattServerCallback);
             if (mBluetoothGattServer == null) {
-                LOG.error("conenctImp: Error opening BluetoothGattServer");
+                LOG.error("connectImp: Error opening BluetoothGattServer");
                 return false;
             }
             for(BluetoothGattService service : mSupportedServerServices) {

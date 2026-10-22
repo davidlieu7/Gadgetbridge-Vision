@@ -20,7 +20,6 @@ import android.Manifest;
 import android.annotation.SuppressLint;
 import android.app.Activity;
 import android.app.NotificationManager;
-import android.companion.CompanionDeviceManager;
 import android.content.ActivityNotFoundException;
 import android.content.ComponentName;
 import android.content.Context;
@@ -77,12 +76,7 @@ public class PermissionsUtils {
 
     public static ArrayList<PermissionDetails> getRequiredPermissionsList(Activity activity) {
         ArrayList<PermissionDetails> permissionsList = new ArrayList<>();
-        int companionDevicesCount = 0;
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            final CompanionDeviceManager manager = (CompanionDeviceManager) GBApplication.getContext().getSystemService(Context.COMPANION_DEVICE_SERVICE);
-            companionDevicesCount = manager.getAssociations().size();
-        }
-        if (companionDevicesCount == 0) {
+        if (CompanionDeviceUtil.getCompanionAssociations(GBApplication.getContext()).isEmpty()) {
             permissionsList.add(new PermissionDetails(
                     CUSTOM_PERM_IGNORE_BATT_OPTIM,
                     activity.getString(R.string.permission_disable_doze_title),

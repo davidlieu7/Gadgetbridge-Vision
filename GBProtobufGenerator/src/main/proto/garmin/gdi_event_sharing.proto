@@ -1,0 +1,118 @@
+syntax = "proto2";
+
+package GDI.Proto.EventSharing;
+option java_package = "nodomain.freeyourgadget.gadgetbridge.proto.garmin";
+option java_outer_classname = "GdiEventSharing";
+
+import "garmin/gdi_launch_monitor.proto";
+
+message EventSharing {
+    optional SubscribeRequest subscribe_request = 1;
+    optional SubscribeResponse subscribe_response = 2;
+    optional AlertNotification alert_notification = 3;
+    optional AlertSupportRequest support_request = 4;
+    optional AlertSupportResponse support_response = 5;
+}
+
+enum AlertType {
+    ACTIVITY_START = 0;
+    ACTIVITY_STOP = 1;
+    ACTIVITY_DISTANCE = 2;
+    ACTIVITY_TIME = 3;
+    ACTIVITY_AUTO_LAP = 4;
+    ACTIVITY_MANUAL_LAP = 5;
+    ACTIVITY_TRANSITION = 6;
+    SWITCHER_STATUS_CHANGE = 7;
+    LAUNCH_MONITOR = 8;
+    NAVIGATION_UPDATE = 9;
+    BREAK_PLANNER_STATE_CHANGE = 10;
+    DRIVING_STATE_CHANGE = 11;
+    BLUETOOTH_CLASSIC_STATE_CHANGE = 12;
+    GOLF_STATE_CHANGE = 13;
+    RANGEFINDER_MEASUREMENT = 14;
+    XERO_CHRONOGRAPH = 15;
+    GOLF_CLUB_STATUS_CHANGE = 16;
+    DIVE_READINESS_CHANGE = 17;
+    RADAR_SETTINGS_CHANGE = 18;
+    LIVE_SESSION = 19;
+    HEART_RATE_MEASUREMENT = 20;
+    RUNNING_MEASUREMENT = 21;
+    ACCESSORY_UTILITIES_ACTIVITY_STATE = 22;
+    RUNNING_ALGORITHM_INPUT = 23;
+    BIKE_POWER_MEASUREMENT = 24;
+    DEVELOPMENT_TESTING = 25;
+    PSA_SAMPLE = 26;
+    UNK_27 = 27;
+    BUTTON_CHANGE = 28;
+    UNK_29 = 29;
+    UNK_30 = 30;
+    UNK_31 = 31;
+    UNK_32 = 32;
+    XERO_RANGEFINDER = 33;
+    UNK_34 = 34;
+    UNK_35 = 35;
+    UNK_36 = 36;
+    UNK_37 = 37;
+    UNK_38 = 38;
+    UNK_39 = 39;
+}
+
+message AlertMessage {
+    optional AlertType type = 1;
+    optional uint32 interval = 2;
+}
+
+message SubscribeRequest {
+    repeated AlertMessage alerts = 1;
+    optional uint32 target_distance = 2;
+}
+
+message AlertStatusMessage {
+    optional Status subscribe_status = 1;
+    optional AlertMessage type = 2;
+
+    enum Status {
+        SUCCESS = 0;
+        FAIL = 1;
+    }
+}
+
+message SubscribeResponse {
+    repeated AlertStatusMessage alert_status = 1;
+}
+
+
+message AlertSupportRequest {
+}
+
+message AlertSupportResponse {
+    repeated AlertType supported_alerts = 1;
+    repeated uint32 version_number = 2;
+}
+
+message Sport {
+    optional uint32 sport_fit_type = 1;
+    optional uint32 sport_fit_sub_type = 2;
+}
+
+message ActivityAlertDetails {
+    optional uint32 total_distance = 1;
+    optional uint32 total_time = 2;
+    optional uint32 lap_time = 3;
+    optional uint32 average_pace = 4;
+    optional Sport sport_type = 5;
+    optional uint32 est_finish_time = 6;
+    optional uint32 lap_number = 7;
+    optional uint32 session_dist = 8;
+    optional uint32 session_time = 9;
+    optional uint32 local_time = 10;
+    optional Sport last_sport_type = 11;
+    optional uint32 interval_dist = 12;
+    optional uint32 interval_time = 13;
+}
+
+message AlertNotification {
+    optional AlertType type = 1;
+    optional ActivityAlertDetails activity_details = 2;
+    optional GDI.Proto.LaunchMonitor.LaunchAlertDetails launch_alert_details = 1001;
+}

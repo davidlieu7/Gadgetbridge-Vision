@@ -36,7 +36,7 @@ class GenericHeartRateCoordinator : AbstractBLEDeviceCoordinator() {
     }
 
     override fun supports(candidate: GBDeviceCandidate): Boolean {
-        return candidate.supportsService(GattService.UUID_SERVICE_HEART_RATE)
+        return candidate.supportsService(GattService.SERVICE_HEART_RATE.uuid)
     }
 
     override fun getManufacturer(): String {

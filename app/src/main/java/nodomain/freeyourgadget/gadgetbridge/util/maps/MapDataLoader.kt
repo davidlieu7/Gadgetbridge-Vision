@@ -55,10 +55,17 @@ class MapDataLoader(private val context: Context) {
 
     fun resolveTheme(): XmlRenderTheme {
         val prefs = GBApplication.getPrefs()
-        val themePrefValue = prefs.getString(MapsManager.PREF_MAP_THEME, "default")
+        val dark = GBApplication.isDarkThemeEnabled()
+        val themePrefValue = if (dark) {
+            prefs.getString(MapsManager.PREF_MAP_THEME_DARK, "dark_low_contrast")
+        } else {
+            prefs.getString(MapsManager.PREF_MAP_THEME, "default")
+        }
 
         if (MapsManager.MAP_THEME_VALUE_CUSTOM.equals(themePrefValue, ignoreCase = true)) {
-            return resolveCustomTheme()
+            return resolveCustomTheme(
+                if (dark) MapsManager.PREF_MAP_THEME_DARK_CUSTOM_URI else MapsManager.PREF_MAP_THEME_CUSTOM_URI
+            )
         }
 
         return try {
@@ -73,8 +80,8 @@ class MapDataLoader(private val context: Context) {
      * Custom themes are zip archives picked in the maps settings. Anything unexpected falls back
      * to the default theme instead of leaving the map blank.
      */
-    private fun resolveCustomTheme(): XmlRenderTheme {
-        val uriString = GBApplication.getPrefs().getString(MapsManager.PREF_MAP_THEME_CUSTOM_URI, "") ?: ""
+    private fun resolveCustomTheme(uriPrefKey: String): XmlRenderTheme {
+        val uriString = GBApplication.getPrefs().getString(uriPrefKey, "") ?: ""
         if (uriString.isEmpty()) {
             LOG.warn("Custom map theme selected, but no theme file has been picked yet")
             return MapTheme.DEFAULT

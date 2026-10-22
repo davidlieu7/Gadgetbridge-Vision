@@ -175,7 +175,7 @@ public class NotificationUtils {
         final List<String> ret = new LinkedList<>();
 
         // Get apps for the current user
-        final List<ApplicationInfo> currentUserApps = pm.getInstalledApplications(PackageManager.GET_META_DATA);
+        final List<ApplicationInfo> currentUserApps = pm.getInstalledApplications(0);
         for (final ApplicationInfo app : currentUserApps) {
             ret.add(app.packageName);
         }

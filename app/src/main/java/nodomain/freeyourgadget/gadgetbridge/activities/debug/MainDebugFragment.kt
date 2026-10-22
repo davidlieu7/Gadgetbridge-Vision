@@ -31,6 +31,10 @@ import kotlin.let
 class MainDebugFragment : AbstractDebugFragment() {
     override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
         setPreferencesFromResource(R.xml.debug_preferences_main, rootKey)
+        index(R.xml.debug_preferences_main)
+        for (screen in DebugActivityV2.searchableScreens()) {
+            index(screen.xml, screen.title)
+        }
 
         onClick(PREF_DEBUG_ADD_TEST_DEVICE) {
             DeviceTypeDialog(requireActivity(), R.string.add_test_device, null).show { address, deviceType ->

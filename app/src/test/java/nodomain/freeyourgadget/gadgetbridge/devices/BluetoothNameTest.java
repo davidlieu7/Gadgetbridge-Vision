@@ -43,6 +43,8 @@ public class BluetoothNameTest extends TestBase {
             put("CMF Buds 2", DeviceType.NOTHING_CMF_BUDS_2); // #5579
             put("CMF Buds 2a", DeviceType.NOTHING_CMF_BUDS_2A); // #6028
             put("HC96", DeviceType.HC96);
+            put("KW19-B", DeviceType.KW19_B); // #7092
+            put("FireBoltt 069", DeviceType.FIREBOLTT_069);
             put("soundcore A1", DeviceType.SOUNDCORE_A1); // #7006
             put("soundcore A2 NC", DeviceType.SOUNDCORE_A2_NC); // #7006
             put("soundcore A3i", DeviceType.SOUNDCORE_A3I); // #7006
@@ -58,6 +60,7 @@ public class BluetoothNameTest extends TestBase {
             put("soundcore P2", DeviceType.SOUNDCORE_P2); // #7006
             put("soundcore P2i", DeviceType.SOUNDCORE_P2I); // #7006
             put("soundcore P2 Mini", DeviceType.SOUNDCORE_P2_MINI); // #7006
+            put("soundcore V20i", DeviceType.SOUNDCORE_V20I); // #4644
             put("Soundcore Q30", DeviceType.SOUNDCORE_Q30); // #4316
             put("soundcore Q30", DeviceType.SOUNDCORE_Q30); // #6371
             put("soundcore  Q30", DeviceType.SOUNDCORE_Q30); // #6371 - unsure
@@ -65,11 +68,13 @@ public class BluetoothNameTest extends TestBase {
             put("P8", DeviceType.WASPOS); // from wasp-os source
             put("P8DFU", DeviceType.WASPOS); // from wasp-os source
             put("P80", DeviceType.COLMI_P80);
+            put("P10(ID-3B00)", DeviceType.COLMI_P10); // #2892
             put("P81c", DeviceType.COLMI_P81); // #6822
             put("i31", DeviceType.COLMI_I31);
             put("L 70", DeviceType.L70);
             put("V73", DeviceType.COLMI_V73); // #5715
             put("R05_9805", DeviceType.YAWELL_R05); // #3896
+            put("Y27_8B07", DeviceType.YAWELL_Y27); // #7049
             put("H59MAX_8502", DeviceType.H59); // #6906
             put("Swiss Peak-BA93", DeviceType.GLORYFIT_SWISS_PEAK); //#6626
             put("FC1(ID-8309)", DeviceType.GRV_FC1); //#6531
@@ -82,6 +87,8 @@ public class BluetoothNameTest extends TestBase {
             put("HAYLOU Watch 2 Pro", DeviceType.HAYLOU_WATCH_2_PRO);
             put("Y6(ID-28A8)", DeviceType.Y6); // #3949
             put("Y66(ID-AB01)", DeviceType.Y66);
+            put("T70(ID-AB01)", DeviceType.T70); // #7070
+            put("T70 (ID-AB01)", DeviceType.T70); // #7070
             put("D3(ID-417F)", DeviceType.D3);
             put("R3Max(ID-FC45)", DeviceType.BLACKVIEW_R3MAX); // matrix
             put("S10", DeviceType.QECNATO_S10);
@@ -89,10 +96,15 @@ public class BluetoothNameTest extends TestBase {
             put("ZL02D", DeviceType.ZL02D);
             put("R11C_B200", DeviceType.YAWELL_R11);
             put("R11_B200", DeviceType.YAWELL_R11);
+            put("iP900BPB", DeviceType.INNOVO_IP900BP_B); // #7134
             put("WF-C710N", DeviceType.SONY_WF_C710N);
             put("John's WF-C710N", DeviceType.SONY_WF_C710N);
             put("LE_WF-C710N", null);
             put("RNP-P1", DeviceType.SONY_REON_POCKET_PRO); // #6668
+            put("PM5 430070439", DeviceType.CONCEPT2_PM5);
+            put("PM5 430070439 Row", DeviceType.CONCEPT2_PM5);
+            put("PM5", null);
+            put("Domyos-TC-9610", DeviceType.DOMYOS_T540);
             put("MOMENTUM M2 IEBT", DeviceType.SENNHEISER_MOMENTUM_IN_EAR_WIRELESS);
             put("MOMENTUM M2 AEBT", null); // the over-ear MOMENTUM Wireless, not tested
             put("Polar H10 96C0B12D", DeviceType.POLARH10);
@@ -274,6 +286,7 @@ public class BluetoothNameTest extends TestBase {
             put("M4-4711", DeviceType.FITPRO);
             put("YBW-05", DeviceType.FITPRO); // #6069
             put("SERIES 11", DeviceType.FITPRO); // #6479
+            put("BRAZ-7HAR", DeviceType.FITPRO); // #6987
             put("C20", DeviceType.C20); // #4070
             put("C 20", DeviceType.C20); // #5495
             put("C20_Pro", DeviceType.C20PRO); // #6763
@@ -306,6 +319,8 @@ public class BluetoothNameTest extends TestBase {
             put("UCS LS2", DeviceType.CARDO_LS24X);
             put("Health Scale", DeviceType.ONEBYONE_SCALE); // LeFu / 1byone / Veeway, #6695
             put("F8", DeviceType.F8SCALE); // #5748
+            put("Stratos 4 Pro", DeviceType.ZEBLAZE_STRATOS_4_PRO); // #6884
+            put("Stratos 4 Pro 2", null); // #6884
         }};
 
         for (Map.Entry<String, DeviceType> e : bluetoothNameToExpectedType.entrySet()) {
