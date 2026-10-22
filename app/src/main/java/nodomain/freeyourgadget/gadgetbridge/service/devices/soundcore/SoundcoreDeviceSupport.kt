@@ -198,11 +198,7 @@ open class SoundcoreDeviceSupport : AbstractHeadphoneSerialDeviceSupportV2<Sound
             builder.sleep(300)
             builder.write(*mDeviceProtocol.encodeSessionInitRequest())
         }
-        // Retrieve alarms if device supports them
-        if (coordinator.getAlarmSlotCount(getDevice()) > 0) {
-            builder.sleep(300)
-            builder.write(*mDeviceProtocol.encodeAlarmsRequest())
-        }
+        mDeviceProtocol.postInitializeDeviceRequests(builder)
         return builder
     }
 

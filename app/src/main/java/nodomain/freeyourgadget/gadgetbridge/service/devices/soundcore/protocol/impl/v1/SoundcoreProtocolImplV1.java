@@ -34,6 +34,7 @@ import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreEarbudsCo
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
 import nodomain.freeyourgadget.gadgetbridge.model.FindDeviceTarget;
 import nodomain.freeyourgadget.gadgetbridge.model.BatteryState;
+import nodomain.freeyourgadget.gadgetbridge.service.btbr.TransactionBuilder;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.soundcore.AbstractSoundcoreProtocol;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.soundcore.SoundcorePacket;
 import nodomain.freeyourgadget.gadgetbridge.util.GB;
@@ -120,6 +121,12 @@ public class SoundcoreProtocolImplV1 extends AbstractSoundcoreProtocol {
 
     public SoundcoreProtocolImplV1(final GBDevice device) {
         super(device);
+    }
+
+    /** Appends optional requests after the base initialization commands. */
+    public void postInitializeDeviceRequests(final TransactionBuilder builder) {
+        final SoundcoreEarbudsCoordinator coordinator =
+                (SoundcoreEarbudsCoordinator) getDevice().getDeviceCoordinator();
     }
 
     @Override

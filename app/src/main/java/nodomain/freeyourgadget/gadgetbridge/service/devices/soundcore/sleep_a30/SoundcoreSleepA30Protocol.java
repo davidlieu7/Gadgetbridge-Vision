@@ -100,6 +100,16 @@ public class SoundcoreSleepA30Protocol extends SoundcoreProtocolImplV1 {
     }
 
     @Override
+    public void postInitializeDeviceRequests(final TransactionBuilder builder) {
+        builder.sleep(200);
+        builder.write(encodeAlarmsRequest());
+        builder.sleep(100);
+        builder.write(encodeRequest(CMD_GET_SLEEP_SETTINGS));
+        builder.sleep(100);
+        builder.write(encodeRequest(CMD_NOTIFY_LISTENING_MODE));
+    }
+
+    @Override
     @Nullable
     public byte[] encodeLocalPlayback(final boolean playing) {
         return localAudioSelector == null ? null : encodeCommand(CMD_SET_LOCAL_PLAYBACK,
@@ -167,13 +177,7 @@ public class SoundcoreSleepA30Protocol extends SoundcoreProtocolImplV1 {
         preferences.withPreference(PREF_SOUNDCORE_SLEEP_AUDIO,
                 payload[153] == 0 ? "keep" : payload[157] == 1 ? "local" : "pause");
         decodeBooleanPreference(payload, 155, PREF_SOUNDCORE_CONTROL_TOUCH_DISABLED, preferences);
-        if (version.fwVersion == null || version.fwVersion.chars().allMatch(c ->
-                c == 0 || Character.isWhitespace(c) || Character.isSpaceChar(c))) {
-            return new GBDeviceEvent[]{batteries[0], batteries[1], version, preferences};
-        }
-        return new GBDeviceEvent[]{batteries[0], batteries[1], version, preferences,
-                new GBDeviceEventSendBytes(encodeRequest(CMD_GET_SLEEP_SETTINGS)),
-                new GBDeviceEventSendBytes(encodeRequest(CMD_NOTIFY_LISTENING_MODE))};
+        return new GBDeviceEvent[]{batteries[0], batteries[1], version, preferences};
     }
 
     private void decodeLocalVolume(final byte value, final GBDeviceEventUpdatePreferences preferences) {
