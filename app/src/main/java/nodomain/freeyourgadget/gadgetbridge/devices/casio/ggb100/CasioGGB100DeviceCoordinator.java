@@ -84,7 +84,7 @@ public class CasioGGB100DeviceCoordinator extends Casio2C2DDeviceCoordinator {
 
     @Override
     public boolean supportsAlarmSnoozing(@NonNull GBDevice device) {
-        return true;
+        return false;
     }
 
     @Override
@@ -158,7 +158,7 @@ public class CasioGGB100DeviceCoordinator extends Casio2C2DDeviceCoordinator {
 
     @Override
     public int getAlarmSlotCount(GBDevice device) {
-        return 4;
+        return 5;
     }
 
     @Override
@@ -179,6 +179,7 @@ public class CasioGGB100DeviceCoordinator extends Casio2C2DDeviceCoordinator {
             R.xml.devicesettings_hourly_chime_enable,
             R.xml.devicesettings_casio_connection_duration,
             R.xml.devicesettings_casio_location_indicator,
+            R.xml.devicesettings_casio_ggb100_countdown_timer,
             R.xml.devicesettings_workout_start_on_phone
             // R.xml.devicesettings_casio_interval_timer
         };

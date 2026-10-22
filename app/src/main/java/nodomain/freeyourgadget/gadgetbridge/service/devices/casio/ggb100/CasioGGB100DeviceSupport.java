@@ -29,6 +29,8 @@ import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
+import java.util.Arrays;
+import java.util.Locale;
 import java.util.UUID;
 
 import nodomain.freeyourgadget.gadgetbridge.GBApplication;
@@ -46,6 +48,7 @@ import nodomain.freeyourgadget.gadgetbridge.webview.CurrentPosition;
 
 import static nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsPreferenceConst.PREF_FIND_PHONE;
 import static nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsPreferenceConst.PREF_FIND_PHONE_DURATION;
+import static nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsPreferenceConst.PREF_CASIO_COUNTDOWN_TIMER;
 
 public class CasioGGB100DeviceSupport extends Casio2C2DSupport
         implements SharedPreferences.OnSharedPreferenceChangeListener {
@@ -60,6 +63,8 @@ public class CasioGGB100DeviceSupport extends Casio2C2DSupport
     @Override
     public DevicePreference[] supportedDevicePreferences() {
         return new DevicePreference[] {
+            new HourlyChimePreference(),
+            new CountdownTimerPreference(),
         };
     }
 
@@ -268,6 +273,66 @@ public class CasioGGB100DeviceSupport extends Casio2C2DSupport
         }
     }
 
+    // ── Settings ───────────────────
+
+    public void fetchSettings() {
+        if (!isConnected() || !isInitialized()) return;
+        try {
+            TransactionBuilder b = performInitialized("fetchSettings");
+            initializeDeviceSettings(b);
+            b.queue();
+        } catch (IOException e) {
+            LOG.error("fetchSettings failed: {}", e.getMessage());
+        }
+    }
+
+    // ── Countdown timer (0x18) ────────────────────────────────────────────────
+
+    public class CountdownTimerPreference extends DevicePreference {
+        { name = PREF_CASIO_COUNTDOWN_TIMER; }
+        { feature = FEATURE_COUNTDOWN_TIMER; }
+
+        @Override
+        public void updateValue(byte[] data) {
+            if (data.length < 4) {
+                LOG.warn("countdown timer data too small: {}", Arrays.toString(data));
+                return;
+            }
+            final int totalSeconds = parseCountdownTimer(getDevicePrefs().getString(name, "0:00:00"));
+            data[1] = (byte) (totalSeconds / 3600);
+            data[2] = (byte) ((totalSeconds / 60) % 60);
+            data[3] = (byte) (totalSeconds % 60);
+        }
+
+        @Override
+        public boolean readValue(byte[] data, SharedPreferences.Editor editor) {
+            if (data.length < 4) {
+                LOG.warn("countdown timer data too small: {}", Arrays.toString(data));
+                return false;
+            }
+            final String value = String.format(Locale.ROOT, "%d:%02d:%02d",
+                    data[1] & 0xff, data[2] & 0xff, data[3] & 0xff);
+            if (!value.equals(getDevicePrefs().getString(name, "0:00:00"))) {
+                editor.putString(name, value);
+            }
+            return false;
+        }
+    }
+
+    /** Parses a {@code HH:MM:SS} duration */
+    private static int parseCountdownTimer(final String value) {
+        int hours = 0, minutes = 0, seconds = 0;
+        final String[] parts = value.trim().split(":");
+        try {
+            if (parts.length > 0) hours = Integer.parseInt(parts[0]);
+            if (parts.length > 1) minutes = Integer.parseInt(parts[1]);
+            if (parts.length > 2) seconds = Integer.parseInt(parts[2]);
+        } catch (NumberFormatException e) {
+            LOG.warn("Invalid countdown timer value '{}'", value);
+        }
+        final int total = hours * 3600 + minutes * 60 + seconds;
+        return Math.max(0, Math.min(total, 24 * 3600));
+    }
 
     // ── Characteristic change handler ─────────────────────────────────────────────────────────
 

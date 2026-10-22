@@ -477,6 +477,7 @@
     <string name="casio_location_indicator_no_fix">No GPS fix</string>
     <string name="casio_location_indicator_invalid_coordinates">Invalid coordiantes</string>
     <string name="casio_location_indicator_use_current">Use current location</string>
+    <string name="pref_casio_ggb100_countdown_timer_title">Countdown timer (HH:MM:SS)</string>
     <string name="pref_title_autoremove_notifications">Autoremove dismissed notifications</string>
     <string name="pref_summary_autoremove_notifications">Notifications are automatically removed from the device when dismissed from the phone</string>
     <string name="pref_title_screen_on_on_notifications">Screen On on Notifications</string>

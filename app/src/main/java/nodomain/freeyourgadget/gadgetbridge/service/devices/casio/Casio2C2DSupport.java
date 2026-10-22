@@ -578,7 +578,7 @@ public abstract class Casio2C2DSupport extends CasioSupport {
         }
     }
 
-    void initializeDeviceSettings(TransactionBuilder builder) {
+    protected void initializeDeviceSettings(TransactionBuilder builder) {
         Set<FeatureRequest> deviceSettingFeatures = new LinkedHashSet();
         for (DeviceSetting ds: deviceSettings)
             deviceSettingFeatures.addAll(Arrays.asList(ds.getFeatureRequests()));
@@ -844,7 +844,7 @@ public abstract class Casio2C2DSupport extends CasioSupport {
     }
 
     public abstract class DevicePreference extends DeviceSetting {
-        byte feature;
+        protected byte feature;
         public final FeatureRequest getFeatureRequest() {
             return new FeatureRequest(feature);
         };
@@ -854,7 +854,7 @@ public abstract class Casio2C2DSupport extends CasioSupport {
             return new FeatureRequest[] {getFeatureRequest()};
         };
 
-        String name;
+        protected String name;
         public final String getName() {
             return name;
         }

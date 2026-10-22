@@ -896,6 +896,7 @@ public class DeviceSpecificSettingsFragment extends AbstractPreferenceFragment i
         addPreferenceHandlerFor(PREF_CASIO_ALERT_CALL);
         addPreferenceHandlerFor(PREF_CASIO_ALERT_CALENDAR);
         addPreferenceHandlerFor(PREF_CASIO_ALERT_OTHER);
+        addPreferenceHandlerFor(PREF_CASIO_COUNTDOWN_TIMER);
         addPreferenceHandlerFor(PREF_SCREEN_ON_ON_NOTIFICATIONS);
         addPreferenceHandlerFor(PREF_SCREEN_ON_ON_NOTIFICATIONS_TIMEOUT);
         addPreferenceHandlerFor(PREF_WORKOUT_KEEP_SCREEN_ON);

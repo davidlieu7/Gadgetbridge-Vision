@@ -64,6 +64,8 @@ import nodomain.freeyourgadget.gadgetbridge.webview.CurrentPosition;
  * All:
  *   9. write CURRENT_TIME (0x09) - always the last step; no 47 01 confirmation
  *      follows on the GG-B100
+ *  10. (except reason 08) after initialization, fetch the settings features
+ *      0x15/0x16 so the Casio2C2DSupport alarm/chime cache is populated
  *
  * Reason 04 (manual sync) runs only steps 5, 6 and 9
  */
@@ -264,6 +266,10 @@ public class InitOperation extends AbstractBTLEOperation<CasioGGB100DeviceSuppor
         writeCurrentTime();
         mSupport.setInitialized();
         mState = S_DONE;
+
+        if (mConnectionReason != 0x08) {
+            mSupport.fetchSettings();
+        }
     }
 
     // ── AbstractBTLEOperation ────────────────────────────────────────────────
