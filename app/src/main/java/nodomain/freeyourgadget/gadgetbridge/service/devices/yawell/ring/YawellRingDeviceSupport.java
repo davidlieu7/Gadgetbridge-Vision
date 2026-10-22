@@ -85,6 +85,12 @@ public class YawellRingDeviceSupport extends AbstractBTLESingleDeviceSupport {
     private int packetsTotalNr;
     private Calendar syncingDay;
 
+    // The ring sometimes never answers a history request. Without a timeout the device stays
+    // busy forever, and ServiceDeviceSupport then drops every call and notification.
+    private static final int SYNC_TIMEOUT = 30000;
+    private final Runnable syncTimeoutRunnable = this::onSyncTimeout;
+    private boolean syncInProgress = false;
+
     private int bigDataPacketSize;
     private ByteBuffer bigDataPacket;
 
@@ -170,6 +176,7 @@ public class YawellRingDeviceSupport extends AbstractBTLESingleDeviceSupport {
 
         // Delay initialization with 2 seconds to give the ring time to settle
         backgroundTasksHandler.removeCallbacksAndMessages(null);
+        syncInProgress = false;
         backgroundTasksHandler.postDelayed(this::postConnectInitialization, 2000);
 
         return builder;
@@ -285,7 +292,7 @@ public class YawellRingDeviceSupport extends AbstractBTLESingleDeviceSupport {
                             getDevice().sendDeviceUpdateIntent(getContext());
                         }
                     }
-                    if (!getDevice().isBusy()) {
+                    if (syncInProgress && !getDevice().isBusy()) {
                         if (daysAgo < 7) {
                             daysAgo++;
                             fetchHistoryHR();
@@ -319,13 +326,13 @@ public class YawellRingDeviceSupport extends AbstractBTLESingleDeviceSupport {
                     break;
                 case YawellRingConstants.CMD_SYNC_STRESS:
                     YawellRingPacketHandler.historicalStress(getDevice(), getContext(), value);
-                    if (!getDevice().isBusy()) {
+                    if (syncInProgress && !getDevice().isBusy()) {
                         fetchHistorySpo2();
                     }
                     break;
                 case YawellRingConstants.CMD_SYNC_ACTIVITY:
                     YawellRingPacketHandler.historicalActivity(getDevice(), getContext(), value);
-                    if (!getDevice().isBusy()) {
+                    if (syncInProgress && !getDevice().isBusy()) {
                         if (daysAgo < 7) {
                             daysAgo++;
                             fetchHistoryActivity();
@@ -442,16 +449,21 @@ public class YawellRingDeviceSupport extends AbstractBTLESingleDeviceSupport {
                         case YawellRingConstants.BIG_DATA_TYPE_SLEEP:
                             YawellRingPacketHandler.historicalSleep(getDevice(), getContext(), value);
 
-                            daysAgo = 0;
-                            fetchHistoryHRV();
+                            if (syncInProgress) {
+                                // Signal history sync finished at this point, since older firmwares
+                                // will not send anything back after requesting HRV history.
+                                // Do it before the HRV request, so that request keeps its timeout.
+                                fetchRecordedDataFinished();
 
-                            // Signal history sync finished at this point, since older firmwares
-                            // will not send anything back after requesting HRV history
-                            fetchRecordedDataFinished();
+                                daysAgo = 0;
+                                fetchHistoryHRV();
+                            }
                             break;
                         case YawellRingConstants.BIG_DATA_TYPE_SPO2:
                             YawellRingPacketHandler.historicalSpo2(getDevice(), getContext(), value);
-                            fetchHistorySleep();
+                            if (syncInProgress) {
+                                fetchHistorySleep();
+                            }
                             break;
                         case YawellRingConstants.BIG_DATA_TYPE_ALARM:
                             YawellRingPacketHandler.alarmsSettings(getDevice(), getContext(), value);
@@ -839,17 +851,41 @@ public class YawellRingDeviceSupport extends AbstractBTLESingleDeviceSupport {
 
     @Override
     public void onFetchRecordedData(int dataTypes) {
+        if (syncInProgress) {
+            LOG.info("Sync already in progress, ignoring fetch request");
+            return;
+        }
+        syncInProgress = true;
         GB.updateTransferNotification(getContext().getString(R.string.busy_task_fetch_activity_data), "", true, 0, getContext());
         daysAgo = 0;
         fetchHistoryActivity();
     }
 
     private void fetchRecordedDataFinished() {
+        syncInProgress = false;
+        backgroundTasksHandler.removeCallbacks(syncTimeoutRunnable);
         GB.updateTransferNotification(null, "", false, 100, getContext());
         LOG.info("Sync finished!");
         getDevice().unsetBusyTask();
         getDevice().sendDeviceUpdateIntent(getContext());
         GB.signalActivityDataFinish(getDevice());
+    }
+
+    /**
+     * Restarts the sync timeout. Called with every history request, so it only fires when the
+     * ring stops answering in the middle of a sync.
+     */
+    private void armSyncTimeout() {
+        backgroundTasksHandler.removeCallbacks(syncTimeoutRunnable);
+        backgroundTasksHandler.postDelayed(syncTimeoutRunnable, SYNC_TIMEOUT);
+    }
+
+    private void onSyncTimeout() {
+        if (!syncInProgress && !getDevice().isBusy()) {
+            return;
+        }
+        LOG.warn("No answer from the ring during sync (busy with {}), aborting it", getDevice().getBusyTask());
+        fetchRecordedDataFinished();
     }
 
     private void fetchHistoryActivity() {
@@ -863,6 +899,7 @@ public class YawellRingDeviceSupport extends AbstractBTLESingleDeviceSupport {
         syncingDay.set(Calendar.MILLISECOND, 0);
         byte[] activityHistoryRequest = buildPacket(new byte[]{YawellRingConstants.CMD_SYNC_ACTIVITY, (byte) daysAgo, 0x0f, 0x00, 0x5f, 0x01});
         LOG.info("Fetch historical activity data request sent: {}", StringUtils.bytesToHex(activityHistoryRequest));
+        armSyncTimeout();
         sendWrite("activityHistoryRequest", activityHistoryRequest);
     }
 
@@ -884,6 +921,7 @@ public class YawellRingDeviceSupport extends AbstractBTLESingleDeviceSupport {
         hrHistoryRequestBB.putInt(1, (int) (requestTimestamp / 1000));
         byte[] hrHistoryRequest = buildPacket(hrHistoryRequestBB.array());
         LOG.info("Fetch historical HR data request sent ({}): {}", DateTimeUtils.formatIso8601(syncingDay.getTime()), StringUtils.bytesToHex(hrHistoryRequest));
+        armSyncTimeout();
         sendWrite("hrHistoryRequest", hrHistoryRequest);
     }
 
@@ -893,6 +931,7 @@ public class YawellRingDeviceSupport extends AbstractBTLESingleDeviceSupport {
         syncingDay = Calendar.getInstance();
         byte[] stressHistoryRequest = buildPacket(new byte[]{YawellRingConstants.CMD_SYNC_STRESS});
         LOG.info("Fetch historical stress data request sent: {}", StringUtils.bytesToHex(stressHistoryRequest));
+        armSyncTimeout();
         sendWrite("stressHistoryRequest", stressHistoryRequest);
     }
 
@@ -909,6 +948,7 @@ public class YawellRingDeviceSupport extends AbstractBTLESingleDeviceSupport {
                 (byte) 0xff
         };
         LOG.info("Fetch historical SpO2 data request sent: {}", StringUtils.bytesToHex(spo2HistoryRequest));
+        armSyncTimeout();
         sendCommand("spo2HistoryRequest", spo2HistoryRequest);
     }
 
@@ -925,6 +965,7 @@ public class YawellRingDeviceSupport extends AbstractBTLESingleDeviceSupport {
                 (byte) 0xff
         };
         LOG.info("Fetch historical sleep data request sent: {}", StringUtils.bytesToHex(sleepHistoryRequest));
+        armSyncTimeout();
         sendCommand("sleepHistoryRequest", sleepHistoryRequest);
     }
 
@@ -944,6 +985,7 @@ public class YawellRingDeviceSupport extends AbstractBTLESingleDeviceSupport {
         hrvHistoryRequestBB.putInt(1, daysAgo);
         byte[] hrvHistoryRequest = buildPacket(hrvHistoryRequestBB.array());
         LOG.info("Fetch historical HRV data request sent ({}): {}", formatIso8601(syncingDay), StringUtils.bytesToHex(hrvHistoryRequest));
+        armSyncTimeout();
         sendWrite("hrvHistoryRequest", hrvHistoryRequest);
     }
 
@@ -972,6 +1014,7 @@ public class YawellRingDeviceSupport extends AbstractBTLESingleDeviceSupport {
                 0x02
         };
         LOG.info("Fetch historical temperature data request sent: {}", StringUtils.bytesToHex(temperatureHistoryRequest));
+        armSyncTimeout();
         sendCommand("temperatureHistoryRequest", temperatureHistoryRequest);
     }
 }
