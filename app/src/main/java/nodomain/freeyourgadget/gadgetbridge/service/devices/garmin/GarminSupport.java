@@ -115,6 +115,7 @@ import nodomain.freeyourgadget.gadgetbridge.model.workouts.WorkoutTemplate;
 import nodomain.freeyourgadget.gadgetbridge.proto.garmin.GdiCore;
 import nodomain.freeyourgadget.gadgetbridge.proto.garmin.GdiDataTypes;
 import nodomain.freeyourgadget.gadgetbridge.proto.garmin.GdiDeviceStatus;
+import nodomain.freeyourgadget.gadgetbridge.proto.garmin.GdiDataTransfer;
 import nodomain.freeyourgadget.gadgetbridge.proto.garmin.GdiFileAccess;
 import nodomain.freeyourgadget.gadgetbridge.proto.garmin.GdiFindMyWatch;
 import nodomain.freeyourgadget.gadgetbridge.proto.garmin.GdiInstalledApps;
@@ -139,6 +140,7 @@ import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.deviceevents.
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.deviceevents.SupportedFileTypesDeviceEvent;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.deviceevents.WeatherRequestDeviceEvent;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.FitAsyncProcessor;
+import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.http.DataTransferHandler;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.FitFile;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.FitImporter;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.FitLocalMessageBuilder;
@@ -2228,6 +2230,40 @@ public class GarminSupport extends AbstractBTLESingleDeviceSupport implements IC
                 .build();
 
         pushItemViaMlr(communicatorV2, file, 37, rawPrgBytes, taskName, listener);
+    }
+
+    /**
+     * Sends a data_xfer item over a MLR file transfer, after the watch requested access to it.
+     */
+    public void pushDataXferItem(final GdiDataTransfer.FileAccessItemResponse fileAccessItem) {
+        final int dataId = fileAccessItem.getDataXferId();
+        final byte[] data = DataTransferHandler.getData(dataId);
+        if (data == null) {
+            LOG.error("No data to push for data_xfer id {}", dataId);
+            return;
+        }
+        if (!(communicator instanceof CommunicatorV2 communicatorV2) || !mlrEnabled()) {
+            LOG.error("Unable to push data_xfer id {} without MLR", dataId);
+            DataTransferHandler.onDataPushed(dataId, false);
+            return;
+        }
+
+        final GdiFileAccess.ItemReference item = GdiFileAccess.ItemReference.newBuilder()
+            .setUid(fileAccessItem.getFileAccessItemUid())
+            .setDataType(GdiFileAccess.DataType.newBuilder().setFormat(GdiFileAccess.DataType.Format.DATA_XFER))
+            .setDataSize(data.length)
+            .build();
+
+        pushItemViaMlr(communicatorV2, item, 34, data, "push data_xfer " + dataId, new FileTransferHandler.UploadListener() {
+            @Override
+            public void onProgress(final int percentage) {
+            }
+
+            @Override
+            public void onComplete(final boolean success) {
+                DataTransferHandler.onDataPushed(dataId, success);
+            }
+        });
     }
 
     /**

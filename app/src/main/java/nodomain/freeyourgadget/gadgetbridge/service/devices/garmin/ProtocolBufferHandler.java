@@ -71,6 +71,7 @@ public class ProtocolBufferHandler implements MessageHandler {
     private static final Logger LOG = LoggerFactory.getLogger(ProtocolBufferHandler.class);
     private final GarminSupport deviceSupport;
     private final Map<Integer, ProtobufFragment> chunkedFragmentsMap;
+    private final Map<Integer, GdiDataTransfer.FileAccessItemResponse> fileAccessResponsesByRequestId = new HashMap<>();
     private int maxChunkSize = 375; //tested on Vívomove Style
     private int lastProtobufRequestId;
     private final AppConfigHandler appConfigHandler;
@@ -145,6 +146,18 @@ public class ProtocolBufferHandler implements MessageHandler {
                 }
                 processed = true;
                 // Response will be async
+            }
+            if (smart.hasDataTransferService() && smart.getDataTransferService().hasFileAccessItemRequest()) {
+                final GdiDataTransfer.FileAccessItemResponse response = dataTransferHandler.handleFileAccessItemRequest(
+                        smart.getDataTransferService().getFileAccessItemRequest()
+                );
+                if (response.getStatus() == GdiDataTransfer.FileAccessItemResponse.Status.OK) {
+                    // The data will be pushed after the watch acknowledges this response
+                    fileAccessResponsesByRequestId.put(message.getRequestId(), response);
+                }
+                return prepareProtobufResponse(Smart.newBuilder().setDataTransferService(
+                        GdiDataTransfer.DataTransferService.newBuilder().setFileAccessItemResponse(response)
+                ).build(), message.getRequestId());
             }
             if (smart.hasDataTransferService()) {
                 final GdiDataTransfer.DataTransferService response = dataTransferHandler.handle(smart.getDataTransferService(), message.getRequestId());
@@ -287,6 +300,11 @@ public class ProtocolBufferHandler implements MessageHandler {
         //TODO: check status and react accordingly, right now we blindly proceed to next chunk
         if (statusMessage.isOK()) {
             DataTransferHandler.onDataChunkSuccessfullyReceived(statusMessage.getRequestId());
+
+            final GdiDataTransfer.FileAccessItemResponse fileAccess = fileAccessResponsesByRequestId.remove(statusMessage.getRequestId());
+            if (fileAccess != null) {
+                deviceSupport.pushDataXferItem(fileAccess);
+            }
 
             if (chunkedFragmentsMap.containsKey(statusMessage.getRequestId())) {
                 final ProtobufFragment protobufFragment = chunkedFragmentsMap.get(statusMessage.getRequestId());
