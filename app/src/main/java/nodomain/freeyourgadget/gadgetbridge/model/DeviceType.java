@@ -576,15 +576,6 @@ import nodomain.freeyourgadget.gadgetbridge.devices.sony.reonpocket.SonyReonPock
 import nodomain.freeyourgadget.gadgetbridge.devices.sony.wena3.SonyWena3Coordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.sonyswr12.SonySWR12DeviceCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.soundbrenner.SoundbrennerCoordinator;
-<<<<<<< HEAD
-import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.a30i.SoundcoreA30iCoordinator;
-import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.aerofit.SoundcoreAeroFit2Coordinator;
-import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.liberty3_pro.SoundcoreLiberty3ProCoordinator;
-import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.liberty4_nc.SoundcoreLiberty4NCCoordinator;
-import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.life_tune.SoundcoreLifeTuneCoordinator;
-import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.life_tune.SoundcoreLifeTuneXRCoordinator;
-import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.motion300.SoundcoreMotion300Coordinator;
-import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.q30.SoundcoreQ30Coordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreP42iCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreP41iCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreP40iCoordinator;
@@ -600,8 +591,6 @@ import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreP3iCoordi
 import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreK20iCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreP30iCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreP20iCoordinator;
-import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.sport_x20.SoundcoreSportX20Coordinator;
-=======
 import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreA30iCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreAeroFit2Coordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreLiberty3ProCoordinator;
@@ -612,7 +601,6 @@ import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreMotion300
 import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreQ30Coordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreSportX20Coordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreV20iCoordinator;
->>>>>>> master
 import nodomain.freeyourgadget.gadgetbridge.devices.supercars.SuperCarsCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.test.TestDeviceCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.thermalprinter.ThermalPrinterCoordinator;
