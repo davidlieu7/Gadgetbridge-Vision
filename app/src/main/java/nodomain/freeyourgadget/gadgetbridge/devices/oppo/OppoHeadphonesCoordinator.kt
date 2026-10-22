@@ -32,6 +32,10 @@ import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.compon
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.deviceSettings
 import nodomain.freeyourgadget.gadgetbridge.devices.AbstractBLClassicDeviceCoordinator
 import nodomain.freeyourgadget.gadgetbridge.devices.DeviceCoordinator
+import nodomain.freeyourgadget.gadgetbridge.devices.cards.QuickControl
+import nodomain.freeyourgadget.gadgetbridge.devices.cards.QuickControlOption
+import nodomain.freeyourgadget.gadgetbridge.devices.cards.QuickControlToggleGroup
+import nodomain.freeyourgadget.gadgetbridge.devices.cards.QuickControls
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDeviceCandidate
 import nodomain.freeyourgadget.gadgetbridge.model.BatteryConfig
@@ -125,8 +129,7 @@ abstract class OppoHeadphonesCoordinator : AbstractBLClassicDeviceCoordinator() 
                             prefs.getString(OppoHeadphonesPreferences.ANC_SELECTOR, null)
                         val mode = AncConfigValue.fromPrefId(modePreference)
                         mode == AncConfigValue.ON
-                    }
-                )
+                    })
                 enumInfo<AncConfigValue.Level>(
                     key = OppoHeadphonesPreferences.ANC_LEVEL_DYNAMIC,
                     title = R.string.prefs_active_noise_cancelling_effective_level,
@@ -141,32 +144,27 @@ abstract class OppoHeadphonesCoordinator : AbstractBLClassicDeviceCoordinator() 
                         val modeLevel = AncConfigValue.Level.fromPrefId(modeLevelPreference)
 
                         mode == AncConfigValue.ON && modeLevel == AncConfigValue.Level.DYNAMIC
-                    }
-                )
+                    })
             }
         }
     }
 
     private fun DeviceSettingsScope.touchOptions(device: GBDevice) {
         DeviceSpecificSettingsScreen.TOUCH_OPTIONS.screen {
-            touchOptions
-                .entries
-                .groupBy({ it.key.first }, { it.key.second to it.value })
+            touchOptions.entries.groupBy({ it.key.first }, { it.key.second to it.value })
                 .forEach { (side, typeGroups) ->
                     category(
                         key = "pref_key_header_oppo_${side.name.lowercase(Locale.ROOT)}",
                         title = side.label,
                     ) {
-                        typeGroups
-                            .forEach { (type, values) ->
-                                enumList<TouchConfigValue>(
-                                    key = OppoHeadphonesPreferences.getTouchKey(side, type),
-                                    title = type.label,
-                                    icon = type.icon,
-                                    defaultValue = TouchConfigValue.OFF,
-                                    filter = { it in values }
-                                )
-                            }
+                        typeGroups.forEach { (type, values) ->
+                            enumList<TouchConfigValue>(
+                                key = OppoHeadphonesPreferences.getTouchKey(side, type),
+                                title = type.label,
+                                icon = type.icon,
+                                defaultValue = TouchConfigValue.OFF,
+                                filter = { it in values })
+                        }
                     }
                 }
             if (supportsAnc(device)) {
@@ -195,13 +193,29 @@ abstract class OppoHeadphonesCoordinator : AbstractBLClassicDeviceCoordinator() 
                     val value = TouchConfigValue.fromPrefId(prefValue)
                     value == TouchConfigValue.NOISE_CONTROL
                 }
-            }
-        )
+            })
     }
 
     override fun getDeviceSpecificSettingsCustomizer(device: GBDevice): DeviceSpecificSettingsCustomizer =
         OppoHeadphonesSettingsCustomizer()
 
+    override fun getQuickControls(device: GBDevice): List<QuickControl> = listOf(
+        QuickControlToggleGroup.forPreference(
+            key = OppoHeadphonesPreferences.ANC_SELECTOR,
+            title = R.string.prefs_noise_control,
+            icon = R.drawable.ic_surround,
+            options = AncConfigValue.entries.map {
+                QuickControlOption(it.prefId, it.shortLabel, it.icon)
+            },
+            visible = { device -> supportsAnc(device) },
+            defaultValue = AncConfigValue.OFF.prefId,
+        ),
+        *QuickControls.fromDeviceSettings(
+            device = device, keys = listOf(
+                OppoHeadphonesPreferences.GAME_MODE, OppoHeadphonesPreferences.LDAC
+            )
+        ).toTypedArray(),
+    )
 
     final override fun getDeviceKind(device: GBDevice): DeviceCoordinator.DeviceKind =
         DeviceCoordinator.DeviceKind.EARBUDS
