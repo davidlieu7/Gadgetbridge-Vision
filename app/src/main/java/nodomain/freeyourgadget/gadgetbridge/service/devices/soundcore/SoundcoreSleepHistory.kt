@@ -139,27 +139,38 @@ object SoundcoreSleepHistory {
             if (mirror < 0) canonical.add(session)
             else if (session.end > canonical[mirror].end) canonical[mirror] = session
         }
-        val intervals = canonical.flatMap { session ->
+        // Retained partial summaries can begin later than the complete summary. They are
+        // the same sleep only when their nonterminal stage records are also covered by a
+        // containing summary of the same type. Keep empty or conflicting overlaps intact.
+        val completeSessions = canonical.filterNot { partial ->
+            val points = sorted.filter { it.stage != 4 && it.timestamp in partial.start..partial.end }
+            points.isNotEmpty() && canonical.any { other ->
+                other != partial && other.type == partial.type &&
+                    other.start <= partial.start && other.end >= partial.end &&
+                    sorted.filter { it.stage != 4 && it.timestamp in other.start..other.end }.containsAll(points)
+            }
+        }
+        val intervals = completeSessions.flatMap { session ->
             val boundedPoints = sorted.filter { it.timestamp in session.start..session.end }
             // Summary and stage endpoints are independently measured. A terminal marker may
             // follow the summary, but never skip another stage or borrow across a session.
             val following = sorted.firstOrNull { it.timestamp > session.end }
             val points = if (boundedPoints.isNotEmpty() && boundedPoints.last().stage != 4 &&
                 following?.stage == 4 && following.timestamp - session.start <= MAX_SESSION_SECONDS &&
-                canonical.none { other -> other != session &&
+                completeSessions.none { other -> other != session &&
                     other.start <= following.timestamp && other.end >= session.end }) {
                 boundedPoints + following
             } else boundedPoints
             // The last sleep transition precedes the terminal stage-4 record. Its timestamp is
             // the sleep endpoint; the short tail leading to the terminal record is not sleep.
-            val ambiguous = canonical.any { other -> other != session &&
+            val ambiguous = completeSessions.any { other -> other != session &&
                 points.any { it.timestamp in other.start..other.end } }
             if (ambiguous || points.size < 3 || points.last().stage != 4) emptyList()
             else points.dropLast(1).zipWithNext().map { (a, b) ->
                 Interval(a.timestamp, b.timestamp, a.stage, a.position)
             }
         }
-        return Report(sorted, canonical.sortedBy { it.start }, intervals)
+        return Report(sorted, completeSessions.sortedBy { it.start }, intervals)
     }
 }
 

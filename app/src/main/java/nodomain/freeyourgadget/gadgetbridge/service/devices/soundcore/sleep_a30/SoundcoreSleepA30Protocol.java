@@ -328,7 +328,8 @@ public class SoundcoreSleepA30Protocol extends SoundcoreProtocolImplV1 {
                 return new GBDeviceEvent[]{new SoundcoreSleepHistoryEvent(null)};
             }
             pendingSleepReport = report;
-            snorePages = new SoundcoreSleepHistory.Pages(9, Set.of(0, 1));
+            // Like stages, snores return a single selector stream, including an empty page.
+            snorePages = new SoundcoreSleepHistory.Pages(9, Collections.emptySet());
             return new GBDeviceEvent[]{new GBDeviceEventSendBytes(encodeRequest(SoundcoreSleepHistory.CMD_SNORES))};
         }
         final List<SoundcoreSleepHistory.Snore> snores = SoundcoreSleepHistory.decodeSnores(pages);
