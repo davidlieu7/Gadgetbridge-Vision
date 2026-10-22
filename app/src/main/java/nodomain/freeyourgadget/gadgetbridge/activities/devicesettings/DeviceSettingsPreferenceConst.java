@@ -535,6 +535,9 @@ public class DeviceSettingsPreferenceConst {
     public static final String PREF_SOUNDCORE_WEARING_TONE = "pref_soundcore_wearing_tone";
     public static final String PREF_SOUNDCORE_TOUCH_TONE = "pref_soundcore_touch_tone";
     public static final String PREF_SOUNDCORE_BATTERY_LOW_TONE = "pref_soundcore_battery_low_tone";
+    public static final String PREF_SOUNDCORE_POWER_OFF_TONE = "pref_soundcore_power_off_tone";
+    public static final String PREF_SOUNDCORE_ANC_TONE = "pref_soundcore_anc_tone";
+    public static final String PREF_SOUNDCORE_MODE_TONE = "pref_soundcore_mode_tone";
     public static final String PREF_SOUNDCORE_CONTROL_TOUCH_DISABLED = "pref_soundcore_control_touch_disabled";
     public static final String PREF_SOUNDCORE_CONTROL_SINGLE_TAP_DISABLED = "pref_soundcore_control_single_tap_disabled";
     public static final String PREF_SOUNDCORE_CONTROL_DOUBLE_TAP_DISABLED = "pref_soundcore_control_double_tap_disabled";
@@ -548,6 +551,7 @@ public class DeviceSettingsPreferenceConst {
     public static final String PREF_SOUNDCORE_CONTROL_DOUBLE_TAP_ACTION_RIGHT = "pref_soundcore_control_double_tap_action_right";
     public static final String PREF_SOUNDCORE_CONTROL_TRIPLE_TAP_ACTION_RIGHT = "pref_soundcore_control_triple_tap_action_right";
     public static final String PREF_SOUNDCORE_CONTROL_LONG_PRESS_ACTION_RIGHT = "pref_soundcore_control_long_press_action_right";
+    public static final String PREF_SOUNDCORE_CONTROL_RESET = "pref_soundcore_control_reset";
     public static final String PREF_SOUNDCORE_VOICE_PROMPTS = "pref_soundcore_voice_prompts";
     public static final String PREF_SOUNDCORE_BUTTON_BRIGHTNESS = "pref_soundcore_button_brightness";
     public static final String PREF_SOUNDCORE_AUTO_POWER_OFF = "pref_soundcore_auto_power_off";
@@ -578,10 +582,6 @@ public class DeviceSettingsPreferenceConst {
     public static final String PREF_SOUNDCORE_AUTO_STOP_REMAINING_SECONDS = "pref_soundcore_auto_stop_remaining_seconds";
     public static final String PREF_SOUNDCORE_SLEEP_AUDIO = "pref_soundcore_sleep_audio";
     public static final String PREF_SOUNDCORE_CALLS_ENABLED = "pref_soundcore_calls_enabled";
-    public static final String PREF_SOUNDCORE_POWER_OFF_TONE = "pref_soundcore_power_off_tone";
-    public static final String PREF_SOUNDCORE_ANC_TONE = "pref_soundcore_anc_tone";
-    public static final String PREF_SOUNDCORE_MODE_TONE = "pref_soundcore_mode_tone";
-    public static final String PREF_SOUNDCORE_CONTROL_RESET = "pref_soundcore_control_reset";
     public static final String PREF_SOUNDCORE_EQUALIZER_RESET = "pref_soundcore_equalizer_reset";
     public static final String PREF_SOUNDCORE_EQUALIZER_BAND1_FREQ = "pref_soundcore_equalizer_band1_freq";
     public static final String PREF_SOUNDCORE_EQUALIZER_BAND1_VALUE = "pref_soundcore_equalizer_band1_value";
