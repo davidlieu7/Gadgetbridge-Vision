@@ -139,12 +139,13 @@ public class SoundcoreSleepA30Protocol extends SoundcoreProtocolImplV1 {
 
     @Override
     protected GBDeviceEvent[] decodeDeviceInfo(final byte[] payload) {
-        if (payload == null || payload.length < 51) return new GBDeviceEvent[0];
+        if (payload == null || payload.length < 157) return new GBDeviceEvent[0];
         // Sleep A30's version header starts two bytes earlier than Liberty's.
         decodeTapControls(Arrays.copyOfRange(payload, 45, 51));
         final GBDeviceEvent[] batteries = handleBatteryInfo(new byte[]{payload[2], payload[3]});
         final GBDeviceEventVersionInfo version = buildVersionInfo(
-                readString(payload, 4, 5), readString(payload, 36, 5), // charging case, fw2
+                readString(payload, 4, 5),
+                readString(payload, 36, 5), // charging case, fw2
                 readString(payload, 14, 16));
         final GBDeviceEventUpdatePreferences preferences = new GBDeviceEventUpdatePreferences();
         decodeAutoStop(payload, 58, preferences);
@@ -162,6 +163,10 @@ public class SoundcoreSleepA30Protocol extends SoundcoreProtocolImplV1 {
         decodeBooleanPreference(payload, 141, PREF_SOUNDCORE_CALLS_ENABLED, preferences);
         decodeBooleanPreference(payload, 143, PREF_SOUNDCORE_SNORE_MASKING, preferences);
         decodeBooleanPreference(payload, 147, PREF_SOUNDCORE_ANC_TONE, preferences);
+        // keep  = 0 | 0 , local = 1 | 1 , pause = 1 | 0
+        preferences.withPreference(PREF_SOUNDCORE_SLEEP_AUDIO,
+                payload[153] == 0 ? "keep" : payload[157] == 1 ? "local" : "pause");
+        decodeBooleanPreference(payload, 155, PREF_SOUNDCORE_CONTROL_TOUCH_DISABLED, preferences);
         if (version.fwVersion == null || version.fwVersion.chars().allMatch(c ->
                 c == 0 || Character.isWhitespace(c) || Character.isSpaceChar(c))) {
             return new GBDeviceEvent[]{batteries[0], batteries[1], version, preferences};
@@ -237,12 +242,9 @@ public class SoundcoreSleepA30Protocol extends SoundcoreProtocolImplV1 {
                 break;
             case CMD_NOTIFY_ANC_ENABLED:
             case CMD_SET_ANC_ENABLED:
-                if (payload.length == 1 && (payload[0] == 0 || payload[0] == 1)) {
-                    return new GBDeviceEvent[]{new GBDeviceEventUpdatePreferences(
-                            PREF_SOUNDCORE_AMBIENT_SOUND_CONTROL,
-                            (payload[0] == 1 ? AmbientSoundMode.NOISE_CANCELLING : AmbientSoundMode.OFF).toString())};
-                }
-                break;
+                return new GBDeviceEvent[]{new GBDeviceEventUpdatePreferences(
+                        PREF_SOUNDCORE_AMBIENT_SOUND_CONTROL,
+                        (payload[0] == 1 ? AmbientSoundMode.NOISE_CANCELLING : AmbientSoundMode.OFF).toString())};
         }
         // Empty setter responses are acknowledgements, not settings readback.
         return new GBDeviceEvent[0];
