@@ -34,6 +34,5 @@ class SoundcoreP2Coordinator : SoundcoreEarbudsCoordinator() {
 
     override fun getDefaultCapabilities(): Set<Capability> = setOf(
         Capability.FindDevice,
-        Capability.NoiseControl,
     )
 }

@@ -35,5 +35,7 @@ class SoundcoreP42iCoordinator : SoundcoreEarbudsCoordinator() {
     override fun getDefaultCapabilities(): Set<Capability> = setOf(
         Capability.FindDevice,
         Capability.NoiseControl,
+        Capability.FitTest,
+        Capability.TouchTone,
     )
 }
