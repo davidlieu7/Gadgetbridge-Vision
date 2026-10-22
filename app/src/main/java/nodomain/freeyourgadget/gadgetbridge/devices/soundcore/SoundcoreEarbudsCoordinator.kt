@@ -517,6 +517,24 @@ abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator(
                 }
             }
 
+            if (supportsSleepMeasurement(device)) {
+                screen(
+                    key = "pref_soundcore_sleep",
+                    title = R.string.menuitem_sleep,
+                    icon = R.drawable.ic_activity_sleep,
+                ) {
+                    switchSetting(
+                        key = DeviceSettingsPreferenceConst.PREF_SLEEP_TRACKING,
+                        title = R.string.title_activity_sleepmonitor,
+                        icon = R.drawable.ic_activity_sleep,
+                        defaultValue = true,
+                    )
+                    if (supportsDataFetching(device)) {
+                        keepActivityDataOnDevice()
+                    }
+                }
+            }
+
             if (has(arrayOf(
                     Capability.AudioEqualizer, Capability.SurroundSound, Capability.GamingMode, Capability.LDAC, Capability.AudioBalance,
                     Capability.ListeningMode, Capability.DefaultListeningMode, Capability.LocalAudioPlayback,
@@ -531,6 +549,7 @@ abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator(
                         enumList<AudioSource>(
                             key = DeviceSettingsPreferenceConst.PREF_SOUNDCORE_LISTENING_MODE,
                             title = R.string.soundcore_listening_mode,
+                            icon = R.drawable.ic_swap_horiz,
                             defaultValue = AudioSource.BLUETOOTH,
                         )
                     }
@@ -538,8 +557,30 @@ abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator(
                         enumList<AudioSource>(
                             key = DeviceSettingsPreferenceConst.PREF_SOUNDCORE_DEFAULT_LISTENING_MODE,
                             title = R.string.soundcore_default_listening_mode,
+                            icon = R.drawable.ic_swap_horiz,
                             defaultValue = AudioSource.BLUETOOTH,
                         )
+                    }
+                    if (has(Capability.LocalAudioUpload)) {
+                        filePicker(
+                            key = "soundcore_local_audio_upload",
+                            title = R.string.soundcore_audio_upload,
+                            summary = R.string.soundcore_audio_upload_summary,
+                            icon = R.drawable.ic_file_upload,
+                        ) { context, selectedDevice, uris ->
+                            if (selectedDevice != null && uris.size == 1) {
+                                context.startActivity(android.content.Intent(context,
+                                    nodomain.freeyourgadget.gadgetbridge.activities.install.FwAppInstallerActivity::class.java).apply {
+                                    action = android.content.Intent.ACTION_VIEW
+                                    data = uris.single()
+                                    putExtra(GBDevice.EXTRA_DEVICE, selectedDevice)
+                                    addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
+                                })
+                            } else if (uris.size != 1) {
+                                android.widget.Toast.makeText(context, R.string.soundcore_audio_select_one,
+                                    android.widget.Toast.LENGTH_LONG).show()
+                            }
+                        }
                     }
                     if (has(Capability.LocalAudioPlayback)) {
                         action(
@@ -586,27 +627,6 @@ abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator(
                             },
                         )
                     }
-                    if (has(Capability.LocalAudioUpload)) {
-                        filePicker(
-                            key = "soundcore_local_audio_upload",
-                            title = R.string.soundcore_audio_upload,
-                            summary = R.string.soundcore_audio_upload_summary,
-                            icon = R.drawable.ic_file_upload,
-                        ) { context, selectedDevice, uris ->
-                            if (selectedDevice != null && uris.size == 1) {
-                                context.startActivity(android.content.Intent(context,
-                                    nodomain.freeyourgadget.gadgetbridge.activities.install.FwAppInstallerActivity::class.java).apply {
-                                    action = android.content.Intent.ACTION_VIEW
-                                    data = uris.single()
-                                    putExtra(GBDevice.EXTRA_DEVICE, selectedDevice)
-                                    addFlags(android.content.Intent.FLAG_GRANT_READ_URI_PERMISSION)
-                                })
-                            } else if (uris.size != 1) {
-                                android.widget.Toast.makeText(context, R.string.soundcore_audio_select_one,
-                                    android.widget.Toast.LENGTH_LONG).show()
-                            }
-                        }
-                    }
                     if (has(Capability.LocalAudioVolume)) {
                         val volumeRange: IntRange = 0..65
                         seekbar(
@@ -622,6 +642,7 @@ abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator(
                         switchSetting(
                             key = DeviceSettingsPreferenceConst.PREF_SOUNDCORE_SNORE_MASKING,
                             title = R.string.soundcore_snore_masking,
+                            icon = R.drawable.ic_activity_sleep,
                         )
                     }
                     if (has(Capability.LocalAudioAutoStop)) {
@@ -919,18 +940,6 @@ abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator(
                 }
             }
 
-            if (supportsSleepMeasurement(device)) {
-                switchSetting(
-                    key = DeviceSettingsPreferenceConst.PREF_SLEEP_TRACKING,
-                    title = R.string.title_activity_sleepmonitor,
-                    icon = R.drawable.ic_activity_sleep,
-                    defaultValue = true,
-                )
-            }
-            if (supportsDataFetching(device)) {
-                keepActivityDataOnDevice()
-            }
-
             if (has(arrayOf(Capability.WearingDetection, Capability.FitTest, Capability.AutoPowerOff, Capability.BatteryLowTone, Capability.VoicePrompts, Capability.ButtonBrightness))) {
                 category(key = "pref_header_soundcore_general", title = R.string.pref_header_general) {
                     if (has(Capability.WearingDetection)) {
@@ -991,6 +1000,9 @@ abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator(
                             defaultValue = "3",
                         )
                     }
+                    if (supportsDataFetching(device) && !supportsSleepMeasurement(device)) {
+                        keepActivityDataOnDevice()
+                    }
                 }
             }
 
@@ -1013,6 +1025,7 @@ abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator(
                     switchSetting(
                         key = DeviceSettingsPreferenceConst.PREF_SOUNDCORE_BATTERY_LOW_TONE,
                         title = R.string.soundcore_battery_low_tone_title,
+                        icon = R.drawable.ic_battery_alert,
                         summary = R.string.soundcore_battery_low_tone_summary,
                         defaultValue = false,
                     )
@@ -1035,6 +1048,7 @@ abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator(
                             switchSetting(
                                 key = DeviceSettingsPreferenceConst.PREF_SOUNDCORE_CALLS_ENABLED,
                                 title = R.string.soundcore_calls_enabled,
+                                icon = R.drawable.ic_phone,
                                 summary = R.string.soundcore_calls_enabled_summary,
                             )
                         }
@@ -1046,6 +1060,7 @@ abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator(
                             switchSetting(
                                 key = DeviceSettingsPreferenceConst.PREF_SOUNDCORE_POWER_OFF_TONE,
                                 title = R.string.soundcore_power_off_tone,
+                                icon = R.drawable.ic_power_settings_new,
                                 summary = R.string.soundcore_power_off_tone_summary,
                             )
                         }
@@ -1053,6 +1068,7 @@ abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator(
                             switchSetting(
                                 key = DeviceSettingsPreferenceConst.PREF_SOUNDCORE_ANC_TONE,
                                 title = R.string.soundcore_anc_tone,
+                                icon = R.drawable.ic_hearing,
                                 summary = R.string.soundcore_anc_tone_summary,
                             )
                         }
@@ -1060,6 +1076,7 @@ abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator(
                             switchSetting(
                                 key = DeviceSettingsPreferenceConst.PREF_SOUNDCORE_MODE_TONE,
                                 title = R.string.soundcore_mode_tone,
+                                icon = R.drawable.ic_speaker,
                                 summary = R.string.soundcore_mode_tone_summary,
                             )
                         }
@@ -1067,6 +1084,7 @@ abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator(
                             switchSetting(
                                 key = DeviceSettingsPreferenceConst.PREF_SOUNDCORE_WEARING_TONE,
                                 title = R.string.pref_wearing_tone,
+                                icon = R.drawable.ic_ear_sound,
                                 summary = R.string.pref_wearing_tone_summary,
                                 defaultValue = false,
                             )
