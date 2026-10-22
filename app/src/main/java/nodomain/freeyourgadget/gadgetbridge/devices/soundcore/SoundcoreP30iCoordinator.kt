@@ -24,7 +24,7 @@ class SoundcoreP30iCoordinator : SoundcoreEarbudsCoordinator() {
     override fun getModelName(): String = "A3959"
 
     override fun getSupportedDeviceName(): Pattern =
-        Pattern.compile("soundcore P30i", Pattern.CASE_INSENSITIVE)
+        Pattern.compile("^soundcore P30i$", Pattern.CASE_INSENSITIVE)
 
     override fun getDeviceNameResource(): Int = R.string.devicetype_soundcore_p30i
 
