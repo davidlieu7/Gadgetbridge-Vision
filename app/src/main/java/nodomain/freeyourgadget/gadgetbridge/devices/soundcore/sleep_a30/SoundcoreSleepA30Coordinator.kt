@@ -24,8 +24,11 @@ import nodomain.freeyourgadget.gadgetbridge.activities.charts.DefaultChartsProvi
 import nodomain.freeyourgadget.gadgetbridge.activities.charts.DeviceChartsProvider
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsPreferenceConst
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.LabeledEntry
-import nodomain.freeyourgadget.gadgetbridge.devices.DeviceCardAction
-import nodomain.freeyourgadget.gadgetbridge.devices.deviceCardAction
+import nodomain.freeyourgadget.gadgetbridge.devices.cards.QuickControl
+import nodomain.freeyourgadget.gadgetbridge.devices.cards.QuickControlOption
+import nodomain.freeyourgadget.gadgetbridge.devices.cards.QuickControlSlider
+import nodomain.freeyourgadget.gadgetbridge.devices.cards.QuickControlToggleGroup
+import nodomain.freeyourgadget.gadgetbridge.devices.cards.QuickControlTrailingAction
 import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreSleepSampleProvider
 import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreEarbudsCoordinator
 import nodomain.freeyourgadget.gadgetbridge.entities.DaoSession
@@ -125,40 +128,62 @@ class SoundcoreSleepA30Coordinator : SoundcoreEarbudsCoordinator() {
                 nodomain.freeyourgadget.gadgetbridge.entities.SoundcoreSleepSessionSampleDao.Properties.DeviceId)
         }
 
-    override fun getCustomActions(): List<DeviceCardAction> = listOf(
-        deviceCardAction {
-            id = "soundcore_local_audio"
-            isVisible = { device ->
-                device.isConnected && GBApplication.getDevicePrefs(device)
-                    .getString(
-                        DeviceSettingsPreferenceConst.PREF_SOUNDCORE_LISTENING_MODE,
-                        AudioSource.BLUETOOTH.toString(),
-                    ) == AudioSource.LOCAL.toString()
-            }
-            icon = { device ->
-                if (GBApplication.getDevicePrefs(device).getBoolean(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_LOCAL_PLAYBACK, false)) {
-                    R.drawable.ic_pause
-                } else {
-                    R.drawable.ic_play
-                }
-            }
-            description = { device, context ->
-                context.getString(
-                    if (GBApplication.getDevicePrefs(device).getBoolean(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_LOCAL_PLAYBACK, false)) {
+    override fun getQuickControls(device: GBDevice): List<QuickControl> {
+        val playing = GBApplication.getDevicePrefs(device)
+            .getBoolean(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_LOCAL_PLAYBACK, false)
+
+        return listOf(
+            QuickControlSlider.forPreference(
+                key = DeviceSettingsPreferenceConst.PREF_SOUNDCORE_LOCAL_VOLUME,
+                title = R.string.soundcore_local_volume,
+                icon = R.drawable.ic_volume_up,
+                min = 0,
+                max = 65,
+                defaultValue = 0,
+                visible = { d ->
+                    d.isConnected && GBApplication.getDevicePrefs(d)
+                        .getString(
+                            DeviceSettingsPreferenceConst.PREF_SOUNDCORE_LISTENING_MODE,
+                            AudioSource.BLUETOOTH.toString(),
+                        ) == AudioSource.LOCAL.toString()
+                },
+                trailingAction = QuickControlTrailingAction(
+                    icon = if (playing) R.drawable.ic_pause else R.drawable.ic_play,
+                    description = if (playing) {
                         R.string.soundcore_local_playback_pause
                     } else {
                         R.string.soundcore_local_playback
-                    }
-                )
-            }
-            onClick = { device, _ ->
-                if (device.isConnected) {
-                    GBApplication.deviceService(device)
-                        .onSendConfiguration(SoundcoreSleepA30Protocol.ACTION_TOGGLE_LOCAL_PLAYBACK)
-                }
-            }
-        }
-    )
+                    },
+                    visible = { _, _ -> true },
+                    onClick = { d, _ ->
+                        if (d.isConnected) {
+                            GBApplication.deviceService(d)
+                                .onSendConfiguration(SoundcoreSleepA30Protocol.ACTION_TOGGLE_LOCAL_PLAYBACK)
+                        }
+                    },
+                ),
+            ),
+            QuickControlToggleGroup.forPreference(
+                key = DeviceSettingsPreferenceConst.PREF_SOUNDCORE_AMBIENT_SOUND_CONTROL,
+                title = R.string.prefs_noise_control,
+                icon = R.drawable.ic_noise_control_on,
+                defaultValue = AmbientSoundMode.OFF.toString(),
+                options = listOf(
+                    QuickControlOption(
+                        AmbientSoundMode.OFF.toString(),
+                        R.string.sony_ambient_sound_off,
+                        R.drawable.ic_hearing_disabled,
+                    ),
+                    QuickControlOption(
+                        AmbientSoundMode.NOISE_CANCELLING.toString(),
+                        R.string.sony_ambient_sound_noise_cancelling_short,
+                        R.drawable.ic_noise_control_on,
+                    ),
+                ),
+                visible = { it.isConnected },
+            ),
+        )
+    }
 
     enum class AudioSource(override val label: Int) : LabeledEntry {
         BLUETOOTH(R.string.media_source_bluetooth),
