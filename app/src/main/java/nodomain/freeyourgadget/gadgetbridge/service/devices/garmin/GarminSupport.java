@@ -1943,6 +1943,10 @@ public class GarminSupport extends AbstractBTLESingleDeviceSupport implements IC
             error = file.getName();
         }
 
+        notifyWatchError(file, getContext().getString(R.string.garmin_connect_iq_error_report), error);
+    }
+
+    private void notifyWatchError(final File file, final String title, final String content) {
         final Intent viewIntent = new Intent(getContext(), TextFileViewerActivity.class);
         viewIntent.putExtra(TextFileViewerActivity.EXTRA_PATH, file.getAbsolutePath());
         final PendingIntent viewPendingIntent = PendingIntent.getActivity(
@@ -1954,8 +1958,8 @@ public class GarminSupport extends AbstractBTLESingleDeviceSupport implements IC
 
         final Notification notification = new NotificationCompat.Builder(getContext(), GB.NOTIFICATION_CHANNEL_ID_DEVICE_WARNINGS)
                 .setSmallIcon(R.drawable.ic_warning)
-                .setContentTitle(getContext().getString(R.string.garmin_connect_iq_error_report))
-                .setContentText(error)
+                .setContentTitle(title)
+                .setContentText(content)
                 .setOnlyAlertOnce(true)
                 .setAutoCancel(true)
                 .setContentIntent(viewPendingIntent)
@@ -2116,6 +2120,13 @@ public class GarminSupport extends AbstractBTLESingleDeviceSupport implements IC
                         }
                         if (BuildConfig.DEBUG && "IQErrorReports".equals(typeName)) {
                             notifyConnectIqErrorReport(outputFile, inflated);
+                        }
+                        if (BuildConfig.DEBUG && "ErrorShutdownReports".equals(typeName)) {
+                            notifyWatchError(
+                                outputFile,
+                                getContext().getString(R.string.watch_has_crashed, getDevice().getAliasOrName()),
+                                "Received ErrorShutdownReports"
+                            );
                         }
                     } catch (final IOException e) {
                         LOG.error("Failed to save file", e);

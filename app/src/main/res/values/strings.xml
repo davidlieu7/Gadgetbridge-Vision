@@ -4596,6 +4596,7 @@
     <string name="fit_file_viewer">FIT File Viewer</string>
     <string name="text_file_viewer">Text File Viewer</string>
     <string name="garmin_connect_iq_error_report">Connect IQ error report</string>
+    <string name="watch_has_crashed">%1$s has crashed</string>
     <string name="reset">Reset</string>
     <string name="changelog_title">What\'s New</string>
     <string name="loyalty_cards_sync_groups_only">Sync only specific groups</string>
