@@ -18,6 +18,10 @@ package nodomain.freeyourgadget.gadgetbridge.service.devices.soundcore;
 
 import androidx.annotation.Nullable;
 
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+
 import nodomain.freeyourgadget.gadgetbridge.R;
 
 public final class SoundcoreEqualizerPresets {
@@ -45,12 +49,16 @@ public final class SoundcoreEqualizerPresets {
     public static final SoundcoreEqualizer TREBLE_REDUCER = new SoundcoreEqualizer(0x15, R.string.soundcore_equalizer_preset_treble_reducer, new int[]{0, 0, 0, -2, -3, -4, -4, -6}, new int[]{0, 0, 1, -2, -1, -3, -1, -7});
     public static final SoundcoreEqualizer CUSTOM = new SoundcoreEqualizer(0xfe, R.string.custom, null, null);
 
-    private static final SoundcoreEqualizer[] PRESETS = new SoundcoreEqualizer[]{
+    public static final SoundcoreEqualizer EXTRA_BASS = new SoundcoreEqualizer(0x01, R.string.soundcore_equalizer_preset_xtra_bass, null, null);
+    public static final SoundcoreEqualizer VOICE = new SoundcoreEqualizer(0x02, R.string.soundcore_equalizer_preset_voice, null, null);
+    public static final SoundcoreEqualizer BALANCED = new SoundcoreEqualizer(0x03, R.string.soundcore_equalizer_preset_balanced, null, null);
+
+    public static final List<SoundcoreEqualizer> PRESETS = Collections.unmodifiableList(Arrays.asList(
             SIGNATURE, ACOUSTIC, BASS_BOOST, BASS_REDUCER, CLASSICAL, PODCAST,
             DANCE, DEEP, ELECTRONIC, FLAT, HIP_HOP, JAZZ, LATIN, LOUNGE,
             PIANO, POP, RNB, ROCK, SMALL_SPEAKERS, SPOKEN_WORD,
             TREBLE_BOOST, TREBLE_REDUCER, CUSTOM
-    };
+    ));
 
     private SoundcoreEqualizerPresets() {
     }

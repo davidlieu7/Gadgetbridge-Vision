@@ -32,6 +32,8 @@ import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice
 import nodomain.freeyourgadget.gadgetbridge.model.BatteryConfig
 import nodomain.freeyourgadget.gadgetbridge.service.DeviceSupport
 import nodomain.freeyourgadget.gadgetbridge.service.devices.soundcore.SoundcoreDeviceSupport
+import nodomain.freeyourgadget.gadgetbridge.service.devices.soundcore.SoundcoreEqualizer
+import nodomain.freeyourgadget.gadgetbridge.service.devices.soundcore.SoundcoreEqualizerPresets
 import nodomain.freeyourgadget.gadgetbridge.service.devices.soundcore.protocol.impl.v1.SoundcoreProtocolImplV1
 
 abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator() {
@@ -304,45 +306,11 @@ abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator(
     /** Per-band frequency choices in protocol index order. */
     open fun getSupportedEqualizerBandsRanges(): Array<IntArray> = emptyArray()
 
-    /**
-     * Returns preset label resources whose values map to zero-based preset indices.
-     * The Custom option (value 254) is appended automatically and must not be included here.
-     */
-    open fun getCustomEqualizerPresetNames(): Array<Int> = emptyArray()
+    /** Returns the supported presets, including Custom, with their protocol IDs and label resources. */
+    open fun getCustomEqualizerPresetNames(): List<SoundcoreEqualizer> = SoundcoreEqualizerPresets.PRESETS
 
-    open fun getCustomEqualizerPresetArray(): Int? = null
-
-    open fun getDefaultEqualizerPresetNames(): Array<Int> = arrayOf(
-        R.string.soundcore_equalizer_preset_signature,
-        R.string.soundcore_equalizer_preset_xtra_bass,
-        R.string.soundcore_equalizer_preset_voice,
-        R.string.soundcore_equalizer_preset_balanced,
-    )
-
-    private fun getEqualizerPresetEntries(): List<ListEntry> {
-        val customPresetNames = getCustomEqualizerPresetNames()
-        if (customPresetNames.isNotEmpty()) {
-            return customPresetNames.mapIndexed { index, name -> ListEntry.Res(index.toString(), name) } +
-                ListEntry.Res("254", R.string.custom)
-        }
-
-        val presetNamesArray = getCustomEqualizerPresetArray()
-        val presetNames = if (presetNamesArray == null) {
-            getDefaultEqualizerPresetNames().toList()
-        } else {
-            val typedArray = GBApplication.getContext().resources.obtainTypedArray(presetNamesArray)
-            try {
-                (0 until typedArray.length()).mapNotNull { index ->
-                    typedArray.getResourceId(index, 0).takeIf { it != 0 && it != R.string.custom }
-                }
-            } finally {
-                typedArray.recycle()
-            }
-        }
-        require(presetNames.isNotEmpty()) { "Equalizer preset names must not be empty" }
-        return presetNames.mapIndexed { index, name -> ListEntry.Res(index.toString(), name) } +
-            ListEntry.Res("254", R.string.custom)
-    }
+    private fun getEqualizerPresetEntries(): List<ListEntry> =
+        getCustomEqualizerPresetNames().map { preset -> ListEntry.Res(preset.index.toString(), preset.label) }
 
     private fun formatEqualizerFrequency(frequency: Int): String = if (frequency < 1000) {
         "$frequency Hz"
