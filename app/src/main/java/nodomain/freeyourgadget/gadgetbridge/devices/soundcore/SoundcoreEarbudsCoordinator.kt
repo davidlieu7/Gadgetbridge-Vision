@@ -524,6 +524,7 @@ abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator(
                                 title = R.string.soundcore_equalizer_custom_title,
                                 summary = R.string.soundcore_equalizer_custom_summary,
                                 icon = R.drawable.ic_graphic_eq,
+                                visibleWhen = { SoundcoreEqualizerPresets.CUSTOM in getCustomEqualizerPresetNames() },
                                 enabled = { prefs ->
                                     prefs.getString(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_EQUALIZER_PRESET, "0") == "254"
                                 },
