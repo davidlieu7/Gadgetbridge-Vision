@@ -27,6 +27,7 @@ import nodomain.freeyourgadget.gadgetbridge.entities.CasioGBX100ActivitySample;
 import nodomain.freeyourgadget.gadgetbridge.model.ActivityKind;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.casio.AbstractCasioConvoyFetchOperation;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.casio.Casio2C2DSupport;
+import nodomain.freeyourgadget.gadgetbridge.util.GB;
 
 
 public class FetchStepCountDataOperation extends AbstractCasioConvoyFetchOperation<CasioGGB100DeviceSupport> {
@@ -55,17 +56,18 @@ public class FetchStepCountDataOperation extends AbstractCasioConvoyFetchOperati
             return;
         }
 
+        LOG.debug("Life log payload:\n{}", GB.hexdump(data));
+
         final ArrayList<CasioGBX100ActivitySample> samples = new ArrayList<>();
+        final ArrayList<CasioGBX100ActivitySample> binSamples = new ArrayList<>();
 
         final Calendar now = Calendar.getInstance();
-        final int tsNow = (int) (now.getTimeInMillis() / 1000);
 
         final Calendar dayStart = (Calendar) now.clone();
         dayStart.set(Calendar.HOUR_OF_DAY, 0);
         dayStart.set(Calendar.MINUTE, 0);
         dayStart.set(Calendar.SECOND, 0);
         dayStart.set(Calendar.MILLISECOND, 0);
-        final int tsDayStart = (int) (dayStart.getTimeInMillis() / 1000);
 
         final Calendar hourStart = (Calendar) now.clone();
         hourStart.set(Calendar.MINUTE, 0);
@@ -73,8 +75,6 @@ public class FetchStepCountDataOperation extends AbstractCasioConvoyFetchOperati
         hourStart.set(Calendar.MILLISECOND, 0);
 
         // Hourly bins, most recent first: bin 0 = last completed hour
-        int stepsTodayFromBins = 0;
-        int kcalTodayFromBins = 0;
         for (int i = 0; i < 24; i++) {
             final int steps = (data[i * 2] & 0xff) | ((data[i * 2 + 1] & 0xff) << 8);
             final int kcal = (data[48 + i * 2] & 0xff) | ((data[48 + i * 2 + 1] & 0xff) << 8);
@@ -90,11 +90,7 @@ public class FetchStepCountDataOperation extends AbstractCasioConvoyFetchOperati
             sample.setTimestamp(ts);
             sample.setRawKind(ActivityKind.ACTIVITY.getCode());
             samples.add(sample);
-
-            if (ts >= tsDayStart) {
-                stepsTodayFromBins += sample.getSteps();
-                kcalTodayFromBins += sample.getCalories();
-            }
+            binSamples.add(sample);
         }
 
         final long totalSteps = (data[96] & 0xffL) | ((data[97] & 0xffL) << 8)
@@ -102,7 +98,17 @@ public class FetchStepCountDataOperation extends AbstractCasioConvoyFetchOperati
         final long totalKcal = (data[100] & 0xffL) | ((data[101] & 0xffL) << 8)
                 | ((data[102] & 0xffL) << 16) | ((data[103] & 0xffL) << 24);
 
-        // Daily totals of previous days, most recent first (?): slot 0 = yesterday
+        // Residual steps after bin subtracting; this is for a long term debug
+        // of bucket behaviour
+        int residualSteps = (int) totalSteps;
+        int residualKcal = (int) totalKcal;
+        for (final CasioGBX100ActivitySample s : binSamples) {
+            residualSteps -= s.getSteps();
+            residualKcal -= s.getCalories();
+        }
+
+        // Daily totals of previous days, most recent first: slot 0 = yesterday
+        // Update the days for only the part not vcovered by bins
         for (int j = 0; j < 7; j++) {
             final int base = 104 + j * 8;
             final long steps = (data[base] & 0xffL) | ((data[base + 1] & 0xffL) << 8)
@@ -113,30 +119,37 @@ public class FetchStepCountDataOperation extends AbstractCasioConvoyFetchOperati
 
             final Calendar d = (Calendar) dayStart.clone();
             d.add(Calendar.DAY_OF_YEAR, -(j + 1));
+            final int ts = (int) (d.getTimeInMillis() / 1000);
+            final Calendar e = (Calendar) d.clone();
+            e.add(Calendar.DAY_OF_YEAR, 1);
+            final int tsEnd = (int) (e.getTimeInMillis() / 1000);
+
+            final CasioGBX100ActivitySample stored = support.getSumWithinRange(ts, tsEnd);
+            int fetchedSteps = 0;
+            int fetchedKcal = 0;
+            for (final CasioGBX100ActivitySample s : binSamples) {
+                if (s.getTimestamp() >= ts && s.getTimestamp() <= tsEnd) {
+                    fetchedSteps += s.getSteps();
+                    fetchedKcal += s.getCalories();
+                }
+            }
+
+            final int diffSteps = (int) steps - stored.getSteps() - fetchedSteps;
+            final int diffKcal = (int) kcal - stored.getCalories() - fetchedKcal;
+            if (diffSteps <= 0 && diffKcal <= 0) continue;
 
             final CasioGBX100ActivitySample sample = new CasioGBX100ActivitySample();
-            sample.setSteps((int) steps);
-            sample.setCalories((int) kcal);
-            sample.setTimestamp((int) (d.getTimeInMillis() / 1000));
+            sample.setSteps(Math.max(diffSteps, 0));
+            sample.setCalories(Math.max(diffKcal, 0));
+            sample.setTimestamp(ts);
             sample.setRawKind(ActivityKind.ACTIVITY.getCode());
             samples.add(sample);
+            if (diffSteps > 0) residualSteps -= diffSteps;
+            if (diffKcal > 0) residualKcal -= diffKcal;
         }
 
-        LOG.debug("Life log: today={} steps / {} kcal, {} bins/days parsed",
-                totalSteps, totalKcal, samples.size());
-
-        // Today bin not cleared by the ACK, we have to check if data exist already
-        final CasioGBX100ActivitySample sum = support.getSumWithinRange(tsDayStart, tsNow);
-        final int remainSteps = (int) totalSteps - sum.getSteps() - stepsTodayFromBins;
-        final int remainKcal = (int) totalKcal - sum.getCalories() - kcalTodayFromBins;
-        if (remainSteps > 0 && remainKcal > 0) {
-            final CasioGBX100ActivitySample sample = new CasioGBX100ActivitySample();
-            sample.setSteps(remainSteps);
-            sample.setCalories(remainKcal);
-            sample.setTimestamp(tsNow);
-            sample.setRawKind(ActivityKind.ACTIVITY.getCode());
-            samples.add(0, sample);
-        }
+        LOG.debug("Life log: rolling24h={} steps / {} kcal, bins={} samples, unplaceable residual={} steps / {} kcal",
+                totalSteps, totalKcal, binSamples.size(), residualSteps, residualKcal);
 
         support.stepCountDataFetched((int) totalSteps, (int) totalKcal, samples);
     }

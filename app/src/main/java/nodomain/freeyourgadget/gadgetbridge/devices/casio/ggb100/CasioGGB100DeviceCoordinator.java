@@ -64,7 +64,7 @@ public class CasioGGB100DeviceCoordinator extends Casio2C2DDeviceCoordinator {
 
     @Override
     protected void applyDefaultPreferences(final DevicePrefs devicePreferences, final SharedPreferences.Editor editor) {
-        editor.putString(DeviceSettingsPreferenceConst.PREFS_DEVICE_CHARTS_TABS, "activity,activitylist,stepsweek");
+        editor.putString(DeviceSettingsPreferenceConst.PREFS_DEVICE_CHARTS_TABS, "overview,activity,activitylist,stepsweek");
     }
 
     @Override
@@ -170,15 +170,16 @@ public class CasioGGB100DeviceCoordinator extends Casio2C2DDeviceCoordinator {
 
     @Override
     public int[] getSupportedDeviceSpecificSettings(GBDevice device) {
-        return new int[]{ 
-            R.xml.devicesettings_find_phone, 
+        return new int[]{
+            R.xml.devicesettings_find_phone,
             R.xml.devicesettings_wearlocation,
-            R.xml.devicesettings_timeformat, 
-            R.xml.devicesettings_autolight, 
+            R.xml.devicesettings_timeformat,
+            R.xml.devicesettings_autolight,
             R.xml.devicesettings_operating_sounds,
-            R.xml.devicesettings_hourly_chime_enable, 
+            R.xml.devicesettings_hourly_chime_enable,
             R.xml.devicesettings_casio_connection_duration,
-            R.xml.devicesettings_casio_location_indicator
+            R.xml.devicesettings_casio_location_indicator,
+            R.xml.devicesettings_workout_start_on_phone
             // R.xml.devicesettings_casio_interval_timer
         };
     }
