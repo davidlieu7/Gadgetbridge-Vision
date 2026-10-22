@@ -18,7 +18,6 @@ package nodomain.freeyourgadget.gadgetbridge.devices.soundcore
 
 import nodomain.freeyourgadget.gadgetbridge.R
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice
-import nodomain.freeyourgadget.gadgetbridge.service.devices.soundcore.sport_x20.SoundcoreSportX20Protocol
 import java.util.regex.Pattern
 
 class SoundcoreP3Coordinator : SoundcoreEarbudsCoordinator() {
@@ -38,7 +37,4 @@ class SoundcoreP3Coordinator : SoundcoreEarbudsCoordinator() {
         Capability.FindDevice,
         Capability.NoiseControl,
     )
-
-    override fun createProtocol(device: GBDevice): SoundcoreSportX20Protocol =
-        SoundcoreSportX20Protocol(device)
 }
