@@ -2174,9 +2174,12 @@ public class GarminSupport extends AbstractBTLESingleDeviceSupport implements IC
         });
     }
 
-    private PendingItemPush pendingItemPush;
+    private PendingItemPush activeItemPush;
+    private final Queue<PendingItemPush> queuedItemPushes = new LinkedList<>();
 
     private record PendingItemPush(CommunicatorV2 communicatorV2,
+                                   GdiFileAccess.ItemReference item,
+                                   int priority,
                                    byte[] compressed,
                                    String taskName,
                                    FileTransferHandler.UploadListener listener) {
@@ -2204,24 +2207,11 @@ public class GarminSupport extends AbstractBTLESingleDeviceSupport implements IC
                                   final byte[] rawPrgBytes,
                                   final String taskName,
                                   final FileTransferHandler.UploadListener listener) {
-        final PendingItemPush pending = pendingItemPush;
-        if (pending != null) {
-            // TODO we could have a queue
-            LOG.error("Will not {}, already pending {}", taskName, pending.taskName);
-            listener.onComplete(false);
-            return;
-        }
         final FileType.FILETYPE prgFileType = GarminPrgFile.getFileType(rawPrgBytes);
         if (prgFileType == null) {
             listener.onComplete(false);
             return;
         }
-
-        final byte[] compressed = CompressionUtils.INSTANCE.deflateStored(rawPrgBytes, 1024);
-
-        LOG.info("{} via MLR transfer ({} bytes raw, {} bytes compressed)", taskName, rawPrgBytes.length, compressed.length);
-
-        pendingItemPush = new PendingItemPush(communicatorV2, compressed, taskName, listener);
 
         final GdiDataTypes.UUID fileId = GdiDataTypes.UUID.newBuilder()
                 .setMostSignificant(-1L)
@@ -2237,25 +2227,67 @@ public class GarminSupport extends AbstractBTLESingleDeviceSupport implements IC
                 .setDataSize(rawPrgBytes.length)
                 .build();
 
-        sendProtobufRequest("reserve app install slot for " + taskName,
+        pushItemViaMlr(communicatorV2, file, 37, rawPrgBytes, taskName, listener);
+    }
+
+    /**
+     * Pushes an item over a MLR file transfer. If an item is already being pushed, the new one gets queued.
+     */
+    private void pushItemViaMlr(final CommunicatorV2 communicatorV2,
+                                final GdiFileAccess.ItemReference item,
+                                final int priority,
+                                final byte[] rawBytes,
+                                final String taskName,
+                                final FileTransferHandler.UploadListener listener) {
+        final byte[] compressed = CompressionUtils.INSTANCE.deflateStored(rawBytes, 1024);
+
+        LOG.info("{} via MLR transfer ({} bytes raw, {} bytes compressed)", taskName, rawBytes.length, compressed.length);
+
+        final PendingItemPush push = new PendingItemPush(communicatorV2, item, priority, compressed, taskName, listener);
+        synchronized (queuedItemPushes) {
+            if (activeItemPush != null) {
+                LOG.debug("Queueing {}, already running {}", taskName, activeItemPush.taskName());
+                queuedItemPushes.add(push);
+                return;
+            }
+            activeItemPush = push;
+        }
+        startItemPush(push);
+    }
+
+    private void startItemPush(final PendingItemPush push) {
+        sendProtobufRequest("reserve push slot for " + push.taskName(),
                 Smart.newBuilder().setFileAccessService(
                         GdiFileAccess.Service.newBuilder().setPushItemRequest(
                                 GdiFileAccess.PushItemDataRequest.newBuilder()
-                                        .setItem(file)
-                                        .setPriority(37)
+                                        .setItem(push.item())
+                                        .setPriority(push.priority())
                                         .addSupportedTransports(MULTILINK_TRANSPORT_PIPE)
                                         .setRequestedCompressionWindow(15)
                         )
                 ).build());
     }
 
+    private void onItemPushFinished() {
+        final PendingItemPush next;
+        synchronized (queuedItemPushes) {
+            next = queuedItemPushes.poll();
+            activeItemPush = next;
+        }
+        if (next != null) {
+            startItemPush(next);
+        }
+    }
+
     public void onPushItemResponse(final GdiFileAccess.PushItemDataResponse response) {
-        final PendingItemPush pending = pendingItemPush;
+        final PendingItemPush pending;
+        synchronized (queuedItemPushes) {
+            pending = activeItemPush;
+        }
         if (pending == null) {
             LOG.warn("Got push item response, but no push is pending: {}", response);
             return;
         }
-        pendingItemPush = null;
 
         final int token = response.getTransferHandle();
         LOG.info("Got push item response token {} for {}", token, pending.taskName());
@@ -2283,7 +2315,7 @@ public class GarminSupport extends AbstractBTLESingleDeviceSupport implements IC
 
             @Override
             public void onMessage(final byte[] value) {
-                LOG.debug("PRG install transfer message ({} bytes): {}", value.length, GB.hexdump(value));
+                LOG.debug("Push transfer message for {} ({} bytes): {}", pending.taskName(), value.length, GB.hexdump(value));
                 if (dataQueued) {
                     return;
                 }
@@ -2310,8 +2342,9 @@ public class GarminSupport extends AbstractBTLESingleDeviceSupport implements IC
 
             @Override
             public void onClose() {
-                LOG.info("PRG file transfer for {} closed, fully sent = {}", pending.taskName(), fullySent);
+                LOG.info("Push transfer for {} closed, fully sent = {}", pending.taskName(), fullySent);
                 pending.listener().onComplete(fullySent);
+                onItemPushFinished();
             }
         }, true);
     }
