@@ -137,8 +137,8 @@ public class SoundcoreSleepA30Protocol extends SoundcoreProtocolImplV1 {
                 readString(payload, 14, 16));
         final GBDeviceEventUpdatePreferences preferences = new GBDeviceEventUpdatePreferences();
         decodeAutoStop(payload, 58, preferences);
-        final String audioSource = payload.length > 65 ? AudioSource.fromValue(payload[65]) : null;
-        if (audioSource != null) preferences.withPreference(PREF_SOUNDCORE_LISTENING_MODE, audioSource);
+        preferences.withPreference(PREF_SOUNDCORE_LISTENING_MODE, AudioSource.fromValue(payload[65]));
+        preferences.withPreference(PREF_SOUNDCORE_DEFAULT_LISTENING_MODE, AudioSource.fromValue(payload[66]));
         decodeBooleanPreference(payload, 69, PREF_SOUNDCORE_BATTERY_LOW_TONE, preferences);
         localAudioSelector = payload[72];
         decodeBooleanPreference(payload, 73, PREF_SOUNDCORE_LOCAL_PLAYBACK, preferences);
