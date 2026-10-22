@@ -149,7 +149,7 @@ public class SoundcoreSleepA30Protocol extends SoundcoreProtocolImplV1 {
 
     @Override
     protected GBDeviceEvent[] decodeDeviceInfo(final byte[] payload) {
-        if (payload == null || payload.length < 157) return new GBDeviceEvent[0];
+        if (payload == null || payload.length < 149) return new GBDeviceEvent[0];
         // Sleep A30's version header starts two bytes earlier than Liberty's.
         decodeTapControls(Arrays.copyOfRange(payload, 45, 51));
         final GBDeviceEvent[] batteries = handleBatteryInfo(new byte[]{payload[2], payload[3]});
@@ -173,10 +173,12 @@ public class SoundcoreSleepA30Protocol extends SoundcoreProtocolImplV1 {
         decodeBooleanPreference(payload, 141, PREF_SOUNDCORE_CALLS_ENABLED, preferences);
         decodeBooleanPreference(payload, 143, PREF_SOUNDCORE_SNORE_MASKING, preferences);
         decodeBooleanPreference(payload, 147, PREF_SOUNDCORE_ANC_TONE, preferences);
-        // keep  = 0 | 0 , local = 1 | 1 , pause = 1 | 0
-        preferences.withPreference(PREF_SOUNDCORE_SLEEP_AUDIO,
-                payload[153] == 0 ? "keep" : payload[157] == 1 ? "local" : "pause");
-        decodeBooleanPreference(payload, 155, PREF_SOUNDCORE_CONTROL_TOUCH_DISABLED, preferences);
+        if (payload.length >= 157) {
+            // keep  = 0 | 0 , local = 1 | 1 , pause = 1 | 0
+            preferences.withPreference(PREF_SOUNDCORE_SLEEP_AUDIO,
+                    payload[153] == 0 ? "keep" : payload[157] == 1 ? "local" : "pause");
+            decodeBooleanPreference(payload, 155, PREF_SOUNDCORE_CONTROL_TOUCH_DISABLED, preferences);
+        }
         return new GBDeviceEvent[]{batteries[0], batteries[1], version, preferences};
     }
 
