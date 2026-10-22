@@ -71,7 +71,7 @@ public class ProtocolBufferHandler implements MessageHandler {
     private static final Logger LOG = LoggerFactory.getLogger(ProtocolBufferHandler.class);
     private final GarminSupport deviceSupport;
     private final Map<Integer, ProtobufFragment> chunkedFragmentsMap;
-    private final int maxChunkSize = 375; //tested on Vívomove Style
+    private int maxChunkSize = 375; //tested on Vívomove Style
     private int lastProtobufRequestId;
     private final AppConfigHandler appConfigHandler;
     private HttpHandler httpHandler;
@@ -661,6 +661,12 @@ public class ProtocolBufferHandler implements MessageHandler {
             return null;
         final int requestId = getNextProtobufRequestId();
         return prepareProtobufMessage(protobufPayload.toByteArray(), GFDIMessage.GarminMessage.PROTOBUF_REQUEST, requestId);
+    }
+
+    public void setMaxPacketSize(final int maxPacketSize) {
+        // 20 = 18 bytes for ProtobufMessage header + 2 bytes for CRC
+        maxChunkSize = maxPacketSize - 20;
+        LOG.debug("Protobuf max chunk size: {}", maxChunkSize);
     }
 
     public ProtobufMessage prepareProtobufResponse(Smart protobufPayload, int requestId) {
