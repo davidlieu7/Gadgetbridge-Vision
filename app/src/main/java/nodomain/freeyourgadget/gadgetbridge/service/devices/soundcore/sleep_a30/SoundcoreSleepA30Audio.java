@@ -28,7 +28,10 @@ import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.Arrays;
 import java.util.Locale;
-import java.util.zip.CRC32;
+
+import nodomain.freeyourgadget.gadgetbridge.service.btle.BLETypeConversions;
+import nodomain.freeyourgadget.gadgetbridge.util.CheckSums;
+import nodomain.freeyourgadget.gadgetbridge.util.CryptoUtils;
 
 /** A validated native audio package, including packages generated from supported raw SBC. */
 public final class SoundcoreSleepA30Audio {
@@ -171,7 +174,7 @@ public final class SoundcoreSleepA30Audio {
 
     public byte[] sha256() {
         try {
-            return MessageDigest.getInstance("SHA-256").digest(bytes);
+            return CryptoUtils.digest(bytes);
         } catch (NoSuchAlgorithmException e) {
             throw new IllegalStateException("SHA-256 is unavailable", e);
         }
@@ -193,36 +196,27 @@ public final class SoundcoreSleepA30Audio {
     }
 
     public static int crc16(byte[] data, int offset, int length) {
-        int crc = 0;
-        for (int i = offset; i < offset + length; i++) {
-            crc ^= (data[i] & 255) << 8;
-            for (int bit = 0; bit < 8; bit++) crc = ((crc << 1) ^ ((crc & 0x8000) != 0 ? 0x1021 : 0)) & 0xffff;
-        }
-        return crc;
+        // The shared helper takes an exclusive end offset, not a byte count.
+        return CheckSums.crc16_ccitt(data, offset, offset + length, 0);
     }
 
     private static int u16(byte[] data, int offset) {
-        return (data[offset] & 255) | ((data[offset + 1] & 255) << 8);
+        return BLETypeConversions.toUint16(data, offset);
     }
 
     private static void put16(byte[] data, int offset, int value) {
-        data[offset] = (byte) value;
-        data[offset + 1] = (byte) (value >> 8);
+        BLETypeConversions.writeUint16(data, offset, value);
     }
 
     public static long crc32(byte[] data, int offset, int length) {
-        CRC32 crc = new CRC32();
-        crc.update(data, offset, length);
-        return crc.getValue();
+        return BLETypeConversions.toUnsigned(CheckSums.getCRC32(data, offset, length));
     }
 
     public static long u32(byte[] data, int offset) {
-        long value = 0;
-        for (int i = 0; i < 4; i++) value |= (long) (data[offset + i] & 255) << (i * 8);
-        return value;
+        return BLETypeConversions.toUnsigned(BLETypeConversions.toUint32(data, offset));
     }
 
     public static void put32(byte[] data, int offset, long value) {
-        for (int i = 0; i < 4; i++) data[offset + i] = (byte) (value >> (i * 8));
+        BLETypeConversions.writeUint32(data, offset, (int) value);
     }
 }
