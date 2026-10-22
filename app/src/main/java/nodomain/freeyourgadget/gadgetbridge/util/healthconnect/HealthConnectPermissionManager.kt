@@ -58,6 +58,7 @@ object HealthConnectPermissionManager {
         VO2MAX,
         HRV,
         WEIGHT,
+        BODY_COMPOSITION,
         SPO2,
         TEMPERATURE,
         RESPIRATORY_RATE,
@@ -82,6 +83,13 @@ object HealthConnectPermissionManager {
             HealthConnectDataType.VO2MAX -> setOf(HealthPermission.getWritePermission(Vo2MaxRecord::class))
             HealthConnectDataType.HRV -> setOf(HealthPermission.getWritePermission(HeartRateVariabilityRmssdRecord::class))
             HealthConnectDataType.WEIGHT -> setOf(HealthPermission.getWritePermission(WeightRecord::class))
+            HealthConnectDataType.BODY_COMPOSITION -> setOf(
+                HealthPermission.getWritePermission(BodyFatRecord::class),
+                HealthPermission.getWritePermission(BodyWaterMassRecord::class),
+                HealthPermission.getWritePermission(BoneMassRecord::class),
+                HealthPermission.getWritePermission(LeanBodyMassRecord::class),
+                HealthPermission.getWritePermission(BasalMetabolicRateRecord::class)
+            )
             HealthConnectDataType.SPO2 -> setOf(HealthPermission.getWritePermission(OxygenSaturationRecord::class))
             HealthConnectDataType.RESPIRATORY_RATE -> setOf(HealthPermission.getWritePermission(RespiratoryRateRecord::class))
             HealthConnectDataType.RESTING_HEART_RATE -> setOf(HealthPermission.getWritePermission(RestingHeartRateRecord::class))
