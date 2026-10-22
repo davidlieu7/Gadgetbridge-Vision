@@ -48,6 +48,7 @@ import nodomain.freeyourgadget.gadgetbridge.capabilities.loyaltycards.BarcodeFor
 import nodomain.freeyourgadget.gadgetbridge.capabilities.password.PasswordCapabilityImpl;
 import nodomain.freeyourgadget.gadgetbridge.capabilities.widgets.WidgetManager;
 import nodomain.freeyourgadget.gadgetbridge.devices.cards.DeviceCardItem;
+import nodomain.freeyourgadget.gadgetbridge.devices.cards.QuickControl;
 import nodomain.freeyourgadget.gadgetbridge.entities.BaseActivitySummary;
 import nodomain.freeyourgadget.gadgetbridge.entities.CyclingSample;
 import nodomain.freeyourgadget.gadgetbridge.entities.DaoSession;
@@ -177,6 +178,7 @@ public interface DeviceCoordinator {
         VACUUM,
         GAMEPAD,
         GYM_EQUIPMENT,
+        PULSE_OXIMETER,
     }
 
     /**
@@ -1221,6 +1223,11 @@ public interface DeviceCoordinator {
      * {@link #getCustomActions()}.
      */
     List<DeviceCardItem> getCardItems(@NonNull final GBDevice device);
+
+    /**
+     * Returns the quick controls of the device card, in display order.
+     */
+    List<QuickControl> getQuickControls(@NonNull final GBDevice device);
 
     DeviceKind getDeviceKind(@NonNull final GBDevice device);
 

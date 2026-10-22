@@ -59,6 +59,7 @@
     <string name="controlcenter_navigation_drawer_close">Close navigation drawer</string>
     <string name="controlcenter_snackbar_need_longpress">Long press the card to disconnect</string>
     <string name="controlcenter_snackbar_disconnecting">Disconnecting</string>
+    <string name="controlcenter_snackbar_discovering_services">Discovering services…</string>
     <string name="controlcenter_snackbar_connecting">Connecting…</string>
     <string name="controlcenter_snackbar_requested_screenshot">Taking a screenshot of the device</string>
     <string name="controlcenter_calibrate_device">Calibrate Device</string>
@@ -229,9 +230,13 @@
     <string name="pref_device_card_show_items_title">Show card items</string>
     <string name="pref_device_card_items_title">Card items</string>
     <string name="pref_device_card_items_summary">Customize the items on the device card</string>
+    <string name="pref_device_card_show_quick_controls_title">Show quick controls</string>
+    <string name="pref_device_card_quick_controls_title">Quick controls</string>
+    <string name="pref_device_card_quick_controls_summary">Customize the quick controls on the device card</string>
     <string name="device_card_add_item">Add item</string>
     <string name="device_card_more_summary">The items below this one are displayed in a popup</string>
     <string name="device_card_items_reset_confirmation">Reset the order of the device card items, and restore the removed items?</string>
+    <string name="device_card_quick_controls_reset_confirmation">Reset the order of the quick controls, and restore the removed quick controls?</string>
     <string name="pref_header_display">Display</string>
     <string name="pref_header_generic">Generic</string>
     <string name="pref_header_health">Health</string>
@@ -278,6 +283,7 @@
     <string name="pref_title_datetime_syctimeonconnect">Sync time</string>
     <string name="pref_summary_datetime_syctimeonconnect">Sync time to Gadgetbridge device(s) when connecting, when time or time zone changes on Android device, and periodically</string>
     <string name="pref_header_main_screen">Main screen</string>
+    <string name="pref_header_devices_screen">Devices screen</string>
     <string name="pref_title_theme">Theme</string>
     <string name="pref_theme_light">Light</string>
     <string name="pref_theme_dark">Dark</string>
@@ -959,6 +965,8 @@
     <string name="spo2_perc_85">85%</string>
     <string name="spo2_perc_90">90%</string>
     <string name="spo2_off">Off</string>
+    <string name="spo2_mode_sleep">During sleep</string>
+    <string name="spo2_mode_all_day">All day</string>
     <string name="interval_one_hour">once an hour</string>
     <string name="interval_1_hour">every 1 hour</string>
     <string name="interval_2_hour">every 2 hours</string>
@@ -2118,6 +2126,9 @@
     <string name="devicetype_unknown">Unknown Device</string>
     <string name="devicetype_test" translatable="false">Test Device</string>
     <string name="add_test_device">Add test device</string>
+    <string name="discovery_show_details">Show details</string>
+    <string name="title_activity_device_candidate_details">Device details</string>
+    <string name="device_candidate_details_read_gatt">Read GATT characteristics</string>
     <string name="set_device_type">Set device type</string>
     <string name="devicetype_pebble" translatable="false">Pebble</string>
     <string name="devicetype_miband" translatable="false">Mi Band</string>
@@ -2482,6 +2493,21 @@
     <string name="devicetype_soundcore_aerofit2" translatable="false">Soundcore AeroFit 2</string>
     <string name="devicetype_soundcore_sport_x20" translatable="false">Soundcore Sport X20</string>
     <string name="devicetype_soundcore_sleep_a30" translatable="false">Soundcore Sleep A30</string>
+    <string name="devicetype_soundcore_p42i" translatable="false">Soundcore P42i</string>
+    <string name="devicetype_soundcore_p41i" translatable="false">Soundcore P41i</string>
+    <string name="devicetype_soundcore_p40i" translatable="false">Soundcore P40i</string>
+    <string name="devicetype_soundcore_p31i" translatable="false">Soundcore P31i</string>
+    <string name="devicetype_soundcore_p30i" translatable="false">Soundcore P30i</string>
+    <string name="devicetype_soundcore_p20i" translatable="false">Soundcore P20i</string>
+    <string name="devicetype_soundcore_p3" translatable="false">Soundcore P3</string>
+    <string name="devicetype_soundcore_a1" translatable="false">Soundcore A1</string>
+    <string name="devicetype_soundcore_p2" translatable="false">Soundcore P2</string>
+    <string name="devicetype_soundcore_p2i" translatable="false">Soundcore P2i</string>
+    <string name="devicetype_soundcore_p2_mini" translatable="false">Soundcore P2 Mini</string>
+    <string name="devicetype_soundcore_a2_nc" translatable="false">Soundcore A2 NC</string>
+    <string name="devicetype_soundcore_a3i" translatable="false">Soundcore A3i</string>
+    <string name="devicetype_soundcore_p3i" translatable="false">Soundcore P3i</string>
+    <string name="devicetype_soundcore_k20i" translatable="false">Soundcore K20i</string>
     <string name="devicetype_soundcore_v20i" translatable="false">Soundcore V20i</string>
     <string name="devicetype_haylou_s35_anc" translatable="false">Haylou S35 ANC</string>
     <string name="devicetype_sennheiser_momentum_in_ear_wireless" translatable="false">Sennheiser MOMENTUM In-Ear Wireless</string>
@@ -3779,6 +3805,7 @@
     <string name="prefs_active_noise_cancelling_adaptive">Adaptive Noise Cancelling</string>
     <string name="prefs_active_noise_cancelling_transparency">Transparency</string>
     <string name="prefs_active_noise_cancelling_level">Active Noise Cancelling Level</string>
+    <string name="prefs_active_noise_cancelling_effective_level">Active Noise Cancelling Effective Level</string>
     <string name="prefs_active_noise_reduction_level">Active noise reduction level</string>
     <string name="prefs_active_noise_cancelling_level_high">High</string>
     <string name="prefs_active_noise_cancelling_level_low">Low</string>
@@ -3976,6 +4003,9 @@
     <string name="sony_ambient_sound_ambient_sound">Ambient Sound</string>
     <string name="sony_ambient_sound_focus_voice">Focus on Voice</string>
     <string name="sony_ambient_sound_level">Ambient Sound Level</string>
+    <string name="sony_ambient_sound_noise_cancelling_short">ANC</string>
+    <string name="sony_ambient_sound_wind_noise_reduction_short">Wind</string>
+    <string name="sony_ambient_sound_ambient_sound_short">Ambient</string>
     <string name="pref_header_sony_anc_optimizer">Noise Cancelling Optimizer</string>
     <string name="sony_anc_optimize_title">Optimize</string>
     <string name="sony_anc_optimize_description">Click to start the noise-cancelling optimizer.</string>
@@ -4614,6 +4644,7 @@
     <string name="info_fossil_rebuild_watchface_custom_menu">Please rebuild your watchface for custom menu</string>
     <string name="devicetype_miband2_hrx" translatable="false">Mi Band HRX</string>
     <string name="devicetype_p22b1" translatable="false">P22B1</string>
+    <string name="devicetype_kw19_b" translatable="false">KW19-B</string>
 
     <string name="prefs_home_icon_left_item">Left</string>
     <string name="prefs_home_icon_center_item">Center</string>
@@ -4813,6 +4844,8 @@
     <string name="pref_override_features_summary">Enable/disable specific device features. This can cause issues and/or make your device work incorrectly</string>
     <string name="pref_test_features_title">Features</string>
     <string name="pref_test_features_summary">Enabled features for this test device</string>
+    <string name="pref_override_features_default">Default features</string>
+    <string name="pref_override_features_unsupported">Unsupported features</string>
     <string name="pref_developer_add_test_activities_title">Add test activities</string>
     <string name="pref_developer_add_test_activities_summary">Populate the database with dummy test activities</string>
     <string name="device_state_waiting_scan">Waiting for device scan</string>
@@ -4846,9 +4879,8 @@
     <string name="activity_type_ccr_diving">Closed-Circuit Rebreather</string>
     <string name="dashboard_settings">Dashboard settings</string>
     <string name="bottom_nav_dashboard">Dashboard</string>
+    <string name="bottom_nav_workouts">Workouts</string>
     <string name="bottom_nav_devices">Devices</string>
-    <string name="pref_dashboard_first_title">Show dashboard first</string>
-    <string name="pref_dashboard_first_summary">Show the dashboard when Gadgetbridge starts, instead of the devices screen</string>
     <string name="pref_dashboard_cards_title">Show widgets on cards</string>
     <string name="pref_dashboard_cards_summary">Draw cards around the widgets on the dashboard</string>
     <string name="pref_dashboard_widget_settings">Widget settings</string>
@@ -5439,6 +5471,7 @@
     <string name="devicetype_sinilink" translatable="false">Sinilink</string>
     <string name="devicetype_eightbitdo_micro" translatable="false">8BitDo Micro</string>
     <string name="devicetype_onetouch" translatable="false">OneTouch Glucose Meter</string>
+    <string name="devicetype_innovo_ip900bp_b" translatable="false">Innovo iP900BP-B</string>
     <string name="eightbitdo_keyboard_mapping">Key mapping</string>
     <string name="eightbitdo_keymap_reset_title">Reset to defaults</string>
     <string name="eightbitdo_keymap_reset_confirmation">Reset the key mapping of all buttons to the factory defaults?</string>
@@ -5826,27 +5859,28 @@
     <string name="media_source_local">Local</string>
     <string name="sinilink_prompt_tone">Prompt tone</string>
     <string name="required">Required</string>
-    <string name="endurain_sso_login_failed">SSO login failed</string>
-    <string name="endurain_no_sso_providers_available">No SSO providers available</string>
+    <string name="service_sso_login_failed">SSO login failed</string>
+    <string name="service_no_sso_providers_available">No SSO providers available</string>
+    <string name="service_failed_to_open_browser">Failed to open browser: %1$s</string>
+    <string name="service_sso_login_successful">SSO login successful</string>
+    <string name="service_invalid_server_url">Invalid server URL</string>
+    <string name="service_verify_mfa">Verify MFA</string>
+    <string name="service_enter_your_mfa_code">Enter your MFA code</string>
+    <string name="service_login_successful">Login successful</string>
+    <string name="service_login_failed">Login failed</string>
+    <string name="service_mfa_verification_successful">MFA verification successful</string>
+    <string name="service_invalid_mfa_code">Invalid MFA code</string>
+    <string name="service_mfa_verification_failed">MFA verification failed</string>
+    <string name="service_select_identity_provider">Select Identity Provider</string>
+    <string name="service_invalid_oauth_callback">Invalid OAuth callback</string>
+    <string name="service_oauth_completing_login">Completing login…</string>
+    <string name="service_not_logged_in">Not logged in, integration is disabled</string>
+    <string name="service_logged_in_refresh_token">Logged in to %1$s\nRefresh token expires: %2$s</string>
+    <string name="service_server_version">\nServer version: %1$s</string>
+    <string name="service_logged_out">Logged out successfully</string>
+    <string name="service_logged_out_unconfirmed">Logged out on this phone, but %1$s did not confirm the end of the session</string>
     <string name="endurain_failed_to_open_browser">Failed to open browser: %1$s</string>
-    <string name="endurain_sso_login_successful">SSO login successful</string>
-    <string name="endurain_invalid_server_url">Invalid server URL</string>
     <string name="endurain_failed_to_connect_to_server">Failed to connect to server</string>
-    <string name="endurain_verify_mfa">Verify MFA</string>
-    <string name="endurain_enter_your_mfa_code">Enter your MFA code</string>
-    <string name="endurain_login_successful">Login successful</string>
-    <string name="endurain_login_failed">Login failed</string>
-    <string name="endurain_mfa_verification_successful">MFA verification successful</string>
-    <string name="endurain_invalid_mfa_code">Invalid MFA code</string>
-    <string name="endurain_mfa_verification_failed">MFA verification failed</string>
-    <string name="endurain_select_identity_provider">Select Identity Provider</string>
-    <string name="endurain_invalid_oauth_callback">Invalid OAuth callback</string>
-    <string name="endurain_oauth_completing_login">Completing login…</string>
-    <string name="endurain_not_logged_in_integration_disabled">Not logged in, integration is disabled</string>
-    <string name="endurain_logged_in_refresh_token">Logged in to %1$s\nRefresh token expires: %2$s</string>
-    <string name="endurain_server_version">\nServer version: %1$s</string>
-    <string name="endurain_logout_failed">Logout failed</string>
-    <string name="endurain_logged_out_successfully">Logged out successfully</string>
     <string name="prefs_online_fitness_trackers_title">Online fitness trackers</string>
     <string name="prefs_online_fitness_trackers_summary">Configure how to reach and use online fitness trackers</string>
     <string name="warning_network_required_title">Network required</string>
@@ -5860,28 +5894,28 @@
     <string name="pref_service_log_out_title">Log out of %1$s</string>
     <string name="pref_service_auto_upload_title">Auto-upload to %1$s</string>
     <string name="pref_service_auto_upload_summary">Automatically upload newly synced workouts to %1$s</string>
+    <string name="pref_service_log_out_summary">Tap here to log out, this disables the integration</string>
     <string name="pref_info_endurain_status_title">Endurain status</string>
     <string name="pref_endurain_log_in_title">Log in to Endurain</string>
     <string name="pref_endurain_log_in_summary">Tap here to enter the Endurain server and log in</string>
     <string name="pref_endurain_log_out_title">Log out of Endurain</string>
-    <string name="pref_endurain_log_out_summary">Tap here to log out, this disables the integration</string>
     <string name="no_gpx_track_in_activity_toast">No GPX track in this activity</string>
     <string name="no_activity_track_in_activity_toast">No activity track in this activity</string>
     <string name="unable_to_display_gpx_track_toast">Unable to display GPX track: %1$s</string>
     <string name="unable_to_share_gpx_track_toast">Unable to share GPX track: %1$s</string>
+    <string name="service_setup_login_type_local">Local</string>
+    <string name="service_setup_login_type_sso">SSO</string>
+    <string name="service_setup_mfa_code">MFA code</string>
+    <string name="service_setup_next">Next</string>
+    <string name="service_logged_in">Logged in</string>
+    <string name="service_logged_in_to">Logged in to %s</string>
+    <string name="service_setup_missing_information">Please fill both fields</string>
+    <string name="service_name_endurain" translatable="false">Endurain</string>
+    <string name="service_name_wanderer" translatable="false">Wanderer</string>
     <string name="endurain_uploading_started">Uploading to Endurain…</string>
     <string name="endurain_successfully_uploaded_toast">Successfully uploaded to Endurain</string>
     <string name="endurain_error_while_uploading_toast">Error while uploading to Endurain</string>
-    <string name="endurain_setup_title">Endurain setup</string>
-    <string name="endurain_setup_server">Endurain server</string>
-    <string name="endurain_setup_login_type_local">Local</string>
-    <string name="endurain_setup_login_type_sso">SSO</string>
-    <string name="endurain_setup_mfa_code">MFA code</string>
-    <string name="endurain_setup_next">Next</string>
     <string name="activity_detail_upload_to_endurain">Upload to Endurain</string>
-    <string name="wanderer_logged_in">Logged in to %s</string>
-    <string name="wanderer_setup_api_token_error">API token should start with wanderer_key_</string>
-    <string name="wanderer_setup_missing_information">Please fill both fields</string>
     <string name="wanderer_toast_successfully_uploaded">Successfully uploaded to Wanderer</string>
     <string name="wanderer_toast_upload_error">Wanderer upload error: %1$s</string>
     <string name="wanderer_unable_to_upload_gpx_file_toast">Unable to upload GPX file to Wanderer: %1$s</string>
@@ -6302,4 +6336,18 @@
     <string name="soundcore_audio_upload_summary">Replace local audio slot 2 with a native package or supported raw SBC file. Other audio formats are not converted.</string>
     <string name="soundcore_audio_upload_warning">This replaces local audio slot 2 on your earbuds. Native packages and mono 16/32 kHz raw SBC are supported, up to 960256 packaged bytes and 60 seconds. Keep the earbuds connected until verification completes.</string>
     <string name="soundcore_audio_select_one">Select one audio package.</string>
+    <string name="service_setup_api_token_prefix_error">API token should start with %1$s</string>
+    <string name="service_setup_title">%1$s setup</string>
+    <string name="service_setup_server_hostname">Server hostname</string>
+    <string name="service_setup_api_token">API token</string>
+
+    <string name="pref_itag_alert_level">Find-device alert level</string>
+    <string name="pref_itag_alert_level_high">High (0x02)</string>
+    <string name="pref_itag_alert_level_mild">Mild (0x01)</string>
+    <string name="pref_itag_beep_on_disconnect">Beep on disconnect</string>
+    <string name="pref_itag_button_press">Action on button press</string>
+    <string name="reset_fetch_timestamp_select_device">Select a single device first</string>
+    <string name="pref_main_screens_title">Main screens</string>
+    <string name="pref_main_screens_summary">Select and order the main screens of the app. Note that even when enabled, Dashboard and Workouts can remain hidden if no devices providing the necessary data are available.</string>
+    <string name="pref_default_main_screen_title">First screen on startup</string>
 </resources>

@@ -1,0 +1,125 @@
+syntax = "proto2";
+
+package GDI.Proto.AudioPrompts;
+option java_package = "nodomain.freeyourgadget.gadgetbridge.proto.garmin";
+option java_outer_classname = "GdiAudioPrompts";
+
+enum SpeechType {
+    UNKNOWN = 0;
+    NAVIGATION = 1;
+}
+
+message AudioPromptsService {
+    optional LapNotification lap_notification = 1;
+    optional AudioSettingsUpdatedNotification audio_settings_updated_notification = 2;
+    optional AudioSettingsRequest audio_settings_request = 3;
+    optional AudioSettingsResponse audio_settings_response = 4;
+    optional SpeedNotification speed_notification = 5;
+    optional PaceNotification pace_notification = 6;
+    optional HeartRateNotification heart_rate_notification = 7;
+    optional PowerNotification power_notification = 8;
+    optional SpeechNotification speech_notification = 9;
+    optional SupportedLanguagesRequest supported_languages_request = 10;
+    optional SupportedLanguagesResponse supported_languages_response = 11;
+    optional SetLanguageRequest set_language_request = 12;
+    optional SetLanguageResponse set_language_response = 13;
+    optional PhraseNotification phrase_notification = 14;
+}
+
+message AudioSettingsRequest {
+}
+
+message AudioSettingsResponse {
+    optional bool speakLaps = 1;
+    optional uint64 speedIntervalTime = 2;
+    optional uint64 hrIntervalTime = 3;
+    optional uint64 powerIntervalTime = 4;
+    optional bool speakNavigation = 5;
+}
+
+message AudioSettingsUpdatedNotification {
+}
+
+message GravelPhrase {
+    optional string phrase_template = 1;
+    optional string context_json = 2;
+}
+
+message HeartRateNotification {
+    optional uint32 bpm = 1;
+    optional float zone = 2;
+    optional uint32 percentage_max = 3;
+    optional uint32 percentage_hrr = 4;
+    optional Language audio_prompt_language = 5;
+}
+
+message Language {
+    optional string language_code = 1;
+    optional string country_code = 2;
+}
+
+message LapNotification {
+    optional uint32 lap_number = 1;
+    optional uint64 lap_time = 2;
+    optional float lap_speed = 3;
+    optional Language audio_prompt_language = 4;
+}
+
+message PaceNotification {
+    optional uint64 average_pace = 1;
+    optional uint64 current_pace = 2;
+    optional uint64 lap_pace = 3;
+    optional Language audio_prompt_language = 4;
+}
+
+message Phrase {
+    optional uint32 phrase_id = 1;
+    repeated SlotValue slot_values = 2;
+}
+
+message PhraseNotification {
+    optional uint32 priority = 1;
+    repeated Phrase phrases = 2;
+    repeated GravelPhrase gravel_phrases = 3;
+}
+
+message PowerNotification {
+    optional uint32 average_power = 1;
+    optional uint32 normalized_power = 2;
+    optional uint32 lap_power = 3;
+    optional Language audio_prompt_language = 4;
+}
+
+message SetLanguageRequest {
+    optional Language lang = 1;
+}
+
+message SetLanguageResponse {
+    optional bool success = 1;
+}
+
+message SlotValue {
+    optional sint32 int_value = 1;
+    optional float float_value = 2;
+}
+
+message SpeechNotification {
+    optional SpeechType speech_type = 1;
+    optional string text_to_speak = 2;
+}
+
+message SpeedNotification {
+    optional float average_speed = 1;
+    optional float current_speed = 2;
+    optional float lap_speed = 3;
+    optional bool device_is_displaying_metric_units = 4;
+    optional Language audio_prompt_language = 5;
+}
+
+message SupportedLanguagesRequest {
+}
+
+message SupportedLanguagesResponse {
+    repeated Language languages = 1;
+}
+

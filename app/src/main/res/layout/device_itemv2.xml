@@ -195,6 +195,17 @@
 
             </com.google.android.flexbox.FlexboxLayout>
 
+            <!-- Populated dynamically at bind time by DeviceCardItemBinder -->
+            <LinearLayout
+                android:id="@+id/device_quick_controls"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginEnd="8dp"
+                android:divider="@drawable/quick_control_spacing"
+                android:orientation="vertical"
+                android:showDividers="middle"
+                android:visibility="gone" />
+
             <LinearLayout
                 android:id="@+id/card_view_activity_card_layout"
                 android:layout_width="match_parent"

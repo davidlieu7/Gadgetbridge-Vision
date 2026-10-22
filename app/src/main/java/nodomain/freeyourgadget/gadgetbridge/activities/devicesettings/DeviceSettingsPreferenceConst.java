@@ -257,6 +257,7 @@ public class DeviceSettingsPreferenceConst {
     public static final String PREF_HEARTRATE_SLEEP_BREATHING_QUALITY_MONITORING = "heartrate_sleep_breathing_quality_monitoring";
     public static final String PREF_HEARTRATE_SLEEP_RESPIRATORY_RATE_MONITORING = "heartrate_sleep_respiratory_rate_monitoring";
     public static final String PREF_SPO2_ALL_DAY_MONITORING = "spo2_all_day_monitoring_enabled";
+    public static final String PREF_SPO2_MONITORING_MODE = "spo2_monitoring_mode";
     public static final String PREF_SPO2_MEASUREMENT_INTERVAL = "spo2_measurement_interval";
     public static final String PREF_SPO2_MEASUREMENT_TIME = "spo2_measurement_time";
     public static final String PREF_SPO2_MEASUREMENT_START = "spo2_measurement_start";
@@ -735,6 +736,8 @@ public class DeviceSettingsPreferenceConst {
     public static final String PREFS_ACTIVITY_IN_DEVICE_CARD_DISTANCE = "prefs_activity_in_device_card_distance";
     public static final String PREF_DEVICE_CARD_SHOW_ITEMS = "pref_device_card_show_items";
     public static final String PREF_DEVICE_CARD_ITEMS = "pref_device_card_items";
+    public static final String PREF_DEVICE_CARD_SHOW_QUICK_CONTROLS = "pref_device_card_show_quick_controls";
+    public static final String PREF_DEVICE_CARD_QUICK_CONTROLS = "pref_device_card_quick_controls";
     public static final String PREFS_DEVICE_CHARTS_TABS = "charts_tabs";
     public static final String PREFS_PER_APP_NOTIFICATION_SETTINGS = "pref_per_app_notification_settings";
     public static final String PREF_MULTIPOINT = "pref_multipoint";

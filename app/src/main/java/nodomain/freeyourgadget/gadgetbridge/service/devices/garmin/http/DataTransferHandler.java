@@ -16,7 +16,9 @@ import java.util.TreeMap;
 import java.util.concurrent.Callable;
 import java.util.concurrent.atomic.AtomicInteger;
 
-import nodomain.freeyourgadget.gadgetbridge.proto.garmin.GdiDataTransferService;
+import nodomain.freeyourgadget.gadgetbridge.proto.garmin.GdiDataTransfer.DataDownloadRequest;
+import nodomain.freeyourgadget.gadgetbridge.proto.garmin.GdiDataTransfer.DataDownloadResponse;
+import nodomain.freeyourgadget.gadgetbridge.proto.garmin.GdiDataTransfer.DataTransferService;
 
 public class DataTransferHandler {
     private static final Logger LOG = LoggerFactory.getLogger(DataTransferHandler.class);
@@ -24,15 +26,15 @@ public class DataTransferHandler {
     private static final Map<Integer, Data> dataById = new HashMap<>();
     private static final Map<Integer, ChunkInfo> unprocessedChunksByRequestId = new HashMap<>();
 
-    public GdiDataTransferService.DataTransferService handle(
-            final GdiDataTransferService.DataTransferService dataTransferService,
+    public DataTransferService handle(
+            final DataTransferService dataTransferService,
             final int requestId
     ) {
         if (dataTransferService.hasDataDownloadRequest()) {
-            final GdiDataTransferService.DataTransferService.DataDownloadResponse dataDownloadResponse
+            final DataDownloadResponse dataDownloadResponse
                     = handleDataDownloadRequest(dataTransferService.getDataDownloadRequest(), requestId);
             if (dataDownloadResponse != null) {
-                return GdiDataTransferService.DataTransferService.newBuilder()
+                return DataTransferService.newBuilder()
                         .setDataDownloadResponse(dataDownloadResponse)
                         .build();
             }
@@ -44,8 +46,8 @@ public class DataTransferHandler {
         return null;
     }
 
-    public GdiDataTransferService.DataTransferService.DataDownloadResponse handleDataDownloadRequest(
-            final GdiDataTransferService.DataTransferService.DataDownloadRequest dataDownloadRequest,
+    public DataDownloadResponse handleDataDownloadRequest(
+            final DataDownloadRequest dataDownloadRequest,
             final int requestId
     ) {
         final int dataId = dataDownloadRequest.getId();
@@ -54,8 +56,8 @@ public class DataTransferHandler {
         final Data data = dataById.get(dataId);
         if (data == null) {
             LOG.error("Device requested data with invalid id: {}", dataId);
-            return GdiDataTransferService.DataTransferService.DataDownloadResponse.newBuilder()
-                    .setStatus(GdiDataTransferService.DataTransferService.Status.INVALID_ID)
+            return DataDownloadResponse.newBuilder()
+                    .setStatus(DataDownloadResponse.Status.INVALID_ID)
                     .setId(dataId)
                     .setOffset(offset)
                     .build();
@@ -64,15 +66,15 @@ public class DataTransferHandler {
         final byte[] chunk = data.getDataChunk(offset, maxChunkSize);
         if (chunk == null) {
             LOG.error("Device requested data with invalid offset: {}", offset);
-            return GdiDataTransferService.DataTransferService.DataDownloadResponse.newBuilder()
-                    .setStatus(GdiDataTransferService.DataTransferService.Status.INVALID_OFFSET)
+            return DataDownloadResponse.newBuilder()
+                    .setStatus(DataDownloadResponse.Status.INVALID_OFFSET)
                     .setId(dataId)
                     .setOffset(offset)
                     .build();
         }
         unprocessedChunksByRequestId.put(requestId, new ChunkInfo(dataId, offset, offset + chunk.length));
-        return GdiDataTransferService.DataTransferService.DataDownloadResponse.newBuilder()
-                .setStatus(GdiDataTransferService.DataTransferService.Status.SUCCESS)
+        return DataDownloadResponse.newBuilder()
+                .setStatus(DataDownloadResponse.Status.SUCCESS)
                 .setId(dataId)
                 .setOffset(offset)
                 .setPayload(ByteString.copyFrom(chunk))

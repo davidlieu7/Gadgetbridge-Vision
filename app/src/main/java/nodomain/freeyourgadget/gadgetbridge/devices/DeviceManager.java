@@ -22,6 +22,8 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.os.Handler;
+import android.os.Looper;
 
 import androidx.annotation.Nullable;
 import androidx.core.content.ContextCompat;
@@ -74,6 +76,11 @@ public class DeviceManager {
     private final List<GBDevice> deviceList = new ArrayList<>();
     private List<GBDevice> selectedDevices = new ArrayList<>();
 
+    private static final long DEVICE_CHANGED_THROTTLE_MS = 250;
+    private final Handler handler = new Handler(Looper.getMainLooper());
+    private final Runnable deviceChangedRunnable = this::onDeviceChanged;
+    private boolean deviceChangedPending = false;
+
     private final BroadcastReceiver mReceiver = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
@@ -95,12 +102,14 @@ public class DeviceManager {
                     break;
                 case GBDevice.ACTION_DEVICE_CHANGED:
                     GBDevice dev = intent.getParcelableExtra(GBDevice.EXTRA_DEVICE);
+                    boolean newDevice = false;
                     if (dev != null && dev.getAddress() != null) {
                         int index = deviceList.indexOf(dev); // search by address
                         if (index >= 0) {
                             deviceList.get(index).copyFromDevice(dev);
                         } else {
                             deviceList.add(dev);
+                            newDevice = true;
                         }
                         if (dev.isInitialized()) {
                             try (DBHandler dbHandler = GBApplication.acquireDB()) {
@@ -109,8 +118,14 @@ public class DeviceManager {
                             }
                         }
                     }
-                    updateSelectedDevice(dev);
-                    refreshPairedDevices();
+                    updateSelectedDevices();
+                    if (newDevice) {
+                        GB.updateNotification(selectedDevices, context);
+                        refreshPairedDevices();
+                    } else if (!deviceChangedPending) {
+                        deviceChangedPending = true;
+                        handler.postDelayed(deviceChangedRunnable, DEVICE_CHANGED_THROTTLE_MS);
+                    }
                     break;
             }
         }
@@ -145,14 +160,20 @@ public class DeviceManager {
         }
     }
 
-    private void updateSelectedDevice(GBDevice dev) {
+    private void updateSelectedDevices() {
         selectedDevices.clear();
         for(GBDevice device : deviceList){
             if(device.isInitialized()){
                 selectedDevices.add(device);
             }
         }
+    }
+
+    private void onDeviceChanged() {
+        deviceChangedPending = false;
         GB.updateNotification(selectedDevices, context);
+        sortDevices();
+        notifyDevicesChanged();
     }
 
     private void refreshPairedDevices() {
@@ -164,6 +185,11 @@ public class DeviceManager {
             }
         }
 
+        sortDevices();
+        notifyDevicesChanged();
+    }
+
+    private void sortDevices() {
         // Snapshot the sort keys up front, instead of re-reading mutable GBDevice
         // fields on every compare() call. GBDevice state can be mutated concurrently by
         // device support threads while this sort runs, and re-reading it mid-sort can
@@ -200,7 +226,6 @@ public class DeviceManager {
             }
             return collator.compare(lhsKey.aliasOrName, rhsKey.aliasOrName);
         });
-        notifyDevicesChanged();
     }
 
     private record DeviceSortKey(int stateOrdinal,

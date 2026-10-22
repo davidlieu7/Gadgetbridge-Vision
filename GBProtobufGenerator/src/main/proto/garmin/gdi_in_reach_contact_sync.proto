@@ -1,0 +1,172 @@
+syntax = "proto2";
+
+package GDI.Proto.InReachContactSync;
+option java_package = "nodomain.freeyourgadget.gadgetbridge.proto.garmin";
+option java_outer_classname = "GdiInReachContactSync";
+
+import "garmin/gdi_data_types.proto";
+
+message InReachContactSyncService {
+    optional SyncRequest sync_request = 1;
+    optional SyncResponse sync_response = 2;
+    optional SubscribeRequest subscribe_request = 3;
+    optional SubscribeResponse subscribe_response = 4;
+    optional ContactUpdatedNotification contact_updated_notification = 5;
+    optional PresetsUpdatedNotification presets_updated_notification = 6;
+    optional QuickTextsUpdatedNotification quicktexts_updated_notification = 7;
+    optional MessengerAccountsUpdatedNotification messenger_accounts_updated_notification = 8;
+}
+
+message Contact {
+    optional GDI.Proto.DataTypes.UUID uuid = 1;
+    optional bool read_only = 2;
+    optional fixed32 name_edit_time = 3;
+    optional string first_name = 4;
+    optional string last_name = 5;
+    optional string organization = 6;
+    optional fixed32 email_edit_time = 7;
+    optional string email = 8;
+    optional fixed32 mobile_edit_time = 9;
+    optional string mobile = 10;
+    optional fixed32 inreach_edit_time = 11;
+    optional string inreach = 12;
+    optional fixed32 imei_edit_time = 13;
+    optional string imei = 14;
+}
+
+message PresetMessage {
+    enum SpecialAddress {
+        MAPSHARE = 1;
+        FACEBOOK = 2;
+        TWITTER = 3;
+    }
+    optional uint32 code = 1;
+    repeated string addresses = 2;
+    repeated SpecialAddress special_addresses = 3;
+    optional string text = 4;
+}
+
+message QuickText {
+    optional string text = 1;
+}
+
+message MessengerAccount {
+    optional string phone_number = 1;
+    optional bool is_hermes_registered = 2;
+    optional string sip_address = 3;
+    optional fixed32 modified_time = 4;
+}
+
+message SyncRequestInfo {
+    enum SyncType {
+        FULL = 1;
+        INCREMENTAL = 2;
+    }
+    enum SyncDataType {
+        CONTACT = 1;
+        PRESET_MESSAGE = 2;
+        QUICK_TEXT = 3;
+        MESSENGER_ACCOUNT = 4;
+    }
+    optional uint32 protocol_version = 1;
+    optional GDI.Proto.DataTypes.UUID app_uuid = 2;
+    optional SyncType sync_type = 3;
+    optional SyncDataType data_type = 4;
+}
+
+message SyncRequest {
+    optional SyncRequestInfo request_info = 1;
+    optional uint32 ending_transaction_id = 2;
+    optional fixed32 timestamp = 3;
+}
+
+message SyncResponse {
+    enum Status {
+        OK = 1;
+        UP_TO_DATE = 2;
+        GENERIC_ERROR = 3;
+        BUSY = 4;
+        UNSUPPORTED_PROTOCOL_VERSION = 5;
+        UNSUPPORTED_DATA_TYPE = 6;
+        MISSING_INFO = 7;
+    }
+    optional Status status = 1;
+}
+
+message SubscribeRequest {
+    optional bool want_contact_updated = 1;
+    optional bool want_presets_updated = 2;
+    optional bool want_quicktexts_updated = 3;
+    optional bool want_messenger_accounts_updated = 4;
+}
+
+message SubscribeResponse {
+    enum Status {
+        OK = 1;
+        GENERIC_ERROR = 2;
+    }
+    optional Status status = 1;
+}
+
+message ContactUpdatedNotification {
+    optional GDI.Proto.DataTypes.UUID uuid = 1;
+    optional bool deleted = 2;
+}
+
+message PresetsUpdatedNotification {
+    optional fixed32 timestamp = 1;
+}
+
+message QuickTextsUpdatedNotification {
+    optional fixed32 timestamp = 1;
+}
+
+message MessengerAccountsUpdatedNotification {
+    optional string phone_number = 1;
+}
+
+message DataTypeConfigExt {
+    optional SyncRequestInfo request_info = 1;
+    optional uint32 min_transaction_id = 2;
+    optional uint32 max_transaction_id = 3;
+    optional fixed32 low_watermark_timestamp = 4;
+    optional fixed32 high_watermark_timestamp = 5;
+}
+
+message DataTypeStatusExt {
+    enum Status {
+        UNSUPPORTED_PROTOCOL_VERSION = 1;
+        UNSUPPORTED_DATA_TYPE = 2;
+        MISSING_INFO = 3;
+        UP_TO_DATE = 4;
+    }
+    optional Status status = 1;
+    optional fixed32 timestamp = 2;
+}
+
+message GenericItemReferenceExt {
+    message ContactReference {
+        optional GDI.Proto.DataTypes.UUID uuid = 1;
+        optional bool deleted = 2;
+        optional bool read_only = 3;
+        optional fixed32 name_edit_time = 4;
+        optional fixed32 email_edit_time = 5;
+        optional fixed32 mobile_edit_time = 6;
+        optional fixed32 inreach_edit_time = 7;
+        optional fixed32 imei_edit_time = 8;
+    }
+    message MessengerAccountReference {
+        optional string phone_number = 1;
+        optional fixed32 modified_time = 2;
+    }
+    optional ContactReference contact_ref = 1;
+    optional uint32 preset_code = 2;
+    optional QuickText quick_text = 3;
+    optional MessengerAccountReference messenger_account_ref = 4;
+}
+
+message GenericItemExt {
+    optional Contact contact = 1;
+    optional PresetMessage preset_message = 2;
+    optional MessengerAccount messenger_account = 3;
+}

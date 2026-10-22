@@ -112,6 +112,7 @@ import nodomain.freeyourgadget.gadgetbridge.capabilities.HeartRateCapability;
 import nodomain.freeyourgadget.gadgetbridge.capabilities.password.PasswordCapabilityImpl;
 import nodomain.freeyourgadget.gadgetbridge.devices.DeviceCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.DeviceManager;
+import nodomain.freeyourgadget.gadgetbridge.devices.cards.DeviceCardLayout;
 import nodomain.freeyourgadget.gadgetbridge.devices.huami.HuamiConst;
 import nodomain.freeyourgadget.gadgetbridge.devices.miband.MiBandConst;
 import nodomain.freeyourgadget.gadgetbridge.externalevents.gps.GBLocationService;
@@ -376,11 +377,12 @@ public class DeviceSpecificSettingsFragment extends AbstractPreferenceFragment i
         for (final DeviceSpecificSettingsScreen value : DeviceSpecificSettingsScreen.values()) {
             final PreferenceScreen prefScreen = findPreference(value.getKey());
             if (prefScreen != null) {
-                if (modelSpec != null && modelSpec.findScreen(value.getKey()) != null) {
+                if (modelSpec != null && modelSpec.findScreen(value.getKey()) != null && prefScreen.getPreferenceCount() > 0) {
                     // This screen is a model ScreenSetting rendered in-memory by
                     // DeviceSettingRenderer; it already navigates via the default nested
                     // PreferenceScreen click handling, so wiring this listener too would push a
-                    // second, redundant navigation onto the back stack.
+                    // second, redundant navigation onto the back stack. The default handling
+                    // ignores a screen without children, such as one with only xml sub-screens.
                     continue;
                 }
                 prefScreen.setOnPreferenceClickListener(p -> {
@@ -435,7 +437,24 @@ public class DeviceSpecificSettingsFragment extends AbstractPreferenceFragment i
     private void addDynamicSettings(final String rootKey) {
         if (rootKey.equals(DeviceSpecificSettingsScreen.BATTERY.getKey())) {
             addBatterySettings();
+        } else if (rootKey.equals(DeviceSpecificSettingsScreen.DEVELOPER.getKey())) {
+            addDeveloperSettingsWarning();
         }
+    }
+
+    private void addDeveloperSettingsWarning() {
+        final PreferenceScreen developerScreen = getPreferenceScreen();
+        if (developerScreen == null) {
+            return;
+        }
+        final Preference warning = new Preference(requireContext());
+        warning.setKey("pref_developer_warning");
+        warning.setIcon(R.drawable.ic_warning);
+        warning.setSummary(R.string.developer_settings_warning_message);
+        warning.setSelectable(false);
+        // DSL screens add their children before this, keep the warning at the top
+        warning.setOrder(-1);
+        developerScreen.addPreference(warning);
     }
 
     private void addBatterySettings() {
@@ -838,6 +857,7 @@ public class DeviceSpecificSettingsFragment extends AbstractPreferenceFragment i
         addPreferenceHandlerFor(PREF_HEARTRATE_SLEEP_RESPIRATORY_RATE_MONITORING);
         addPreferenceHandlerFor(PREF_HEARTRATE_ALERT_IRREGULAR_RHYTHM);
         addPreferenceHandlerFor(PREF_SPO2_ALL_DAY_MONITORING);
+        addPreferenceHandlerFor(PREF_SPO2_MONITORING_MODE);
         addPreferenceHandlerFor(PREF_SPO2_MEASUREMENT_INTERVAL);
         addPreferenceHandlerFor(PREF_SPO2_MEASUREMENT_TIME);
         addPreferenceHandlerFor(PREF_SPO2_MEASUREMENT_START);
@@ -1682,20 +1702,32 @@ public class DeviceSpecificSettingsFragment extends AbstractPreferenceFragment i
             }
         }
 
-        final Preference deviceCardShowItems = findPreference(PREF_DEVICE_CARD_SHOW_ITEMS);
-        if (deviceCardShowItems != null) {
-            deviceCardShowItems.setOnPreferenceChangeListener((preference, newValue) -> {
-                LocalBroadcastManager.getInstance(requireContext()).sendBroadcast(new Intent(DeviceManager.ACTION_REFRESH_DEVICELIST));
-                return true;
-            });
+        final String[] deviceCardPrefKeys = {
+            PREF_DEVICE_CARD_SHOW_ITEMS,
+            PREF_DEVICE_CARD_SHOW_QUICK_CONTROLS
+        };
+        for (final String deviceCardPrefKey : deviceCardPrefKeys) {
+            final Preference deviceCardPref = findPreference(deviceCardPrefKey);
+            if (deviceCardPref != null) {
+                deviceCardPref.setOnPreferenceChangeListener((preference, newValue) -> {
+                    LocalBroadcastManager.getInstance(requireContext()).sendBroadcast(new Intent(DeviceManager.ACTION_REFRESH_DEVICELIST));
+                    return true;
+                });
+            }
         }
 
         final Preference deviceCardItems = findPreference(PREF_DEVICE_CARD_ITEMS);
         if (deviceCardItems != null) {
             deviceCardItems.setOnPreferenceClickListener(preference -> {
-                final Intent intent = new Intent(getContext(), DeviceCardItemsActivity.class);
-                intent.putExtra(GBDevice.EXTRA_DEVICE, device);
-                startActivity(intent);
+                DeviceCardItemsActivity.start(requireContext(), device, DeviceCardLayout.ITEMS);
+                return true;
+            });
+        }
+
+        final Preference deviceCardQuickControls = findPreference(PREF_DEVICE_CARD_QUICK_CONTROLS);
+        if (deviceCardQuickControls != null) {
+            deviceCardQuickControls.setOnPreferenceClickListener(preference -> {
+                DeviceCardItemsActivity.start(requireContext(), device, DeviceCardLayout.QUICK_CONTROLS);
                 return true;
             });
         }
@@ -1857,6 +1889,9 @@ public class DeviceSpecificSettingsFragment extends AbstractPreferenceFragment i
 
             final List<Integer> deviceCardSubScreens = new ArrayList<>();
             deviceCardSubScreens.add(R.xml.devicesettings_device_card);
+            if (!coordinator.getQuickControls(device).isEmpty()) {
+                deviceCardSubScreens.add(R.xml.devicesettings_device_card_quick_controls);
+            }
             if (coordinator.supportsActivityTracking(device)) {
                 deviceCardSubScreens.add(R.xml.devicesettings_device_card_activity_card_preferences);
             }

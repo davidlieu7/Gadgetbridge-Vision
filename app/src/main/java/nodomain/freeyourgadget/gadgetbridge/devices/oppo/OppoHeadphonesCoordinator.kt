@@ -20,17 +20,16 @@ package nodomain.freeyourgadget.gadgetbridge.devices.oppo
 import android.annotation.SuppressLint
 import android.bluetooth.BluetoothClass
 import android.util.Pair
-import java.util.Locale
-import java.nio.ByteOrder
 import nodomain.freeyourgadget.gadgetbridge.R
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSpecificSettingsCustomizer
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSpecificSettingsScreen
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.DeviceSettingsScope
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.DeviceSettingsSpec
+import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.components.enumInfo
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.components.enumList
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.components.multiEnumList
-import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.components.screen
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.components.multipointPairing
+import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.components.screen
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.deviceSettings
 import nodomain.freeyourgadget.gadgetbridge.devices.AbstractBLClassicDeviceCoordinator
 import nodomain.freeyourgadget.gadgetbridge.devices.DeviceCoordinator
@@ -40,12 +39,14 @@ import nodomain.freeyourgadget.gadgetbridge.model.BatteryConfig
 import nodomain.freeyourgadget.gadgetbridge.service.DeviceSupport
 import nodomain.freeyourgadget.gadgetbridge.service.devices.oppo.OppoHeadphonesSupport
 import nodomain.freeyourgadget.gadgetbridge.service.devices.oppo.OppoUuid
-import nodomain.freeyourgadget.gadgetbridge.service.devices.oppo.commands.TouchConfigSide
-import nodomain.freeyourgadget.gadgetbridge.service.devices.oppo.commands.TouchConfigType
-import nodomain.freeyourgadget.gadgetbridge.service.devices.oppo.commands.TouchConfigValue
 import nodomain.freeyourgadget.gadgetbridge.service.devices.oppo.commands.AncConfigValue
 import nodomain.freeyourgadget.gadgetbridge.service.devices.oppo.commands.EarbudsStatusSide
 import nodomain.freeyourgadget.gadgetbridge.service.devices.oppo.commands.EarbudsStatusValue
+import nodomain.freeyourgadget.gadgetbridge.service.devices.oppo.commands.TouchConfigSide
+import nodomain.freeyourgadget.gadgetbridge.service.devices.oppo.commands.TouchConfigType
+import nodomain.freeyourgadget.gadgetbridge.service.devices.oppo.commands.TouchConfigValue
+import java.nio.ByteOrder
+import java.util.Locale
 
 abstract class OppoHeadphonesCoordinator : AbstractBLClassicDeviceCoordinator() {
     override fun getManufacturer(): String = "Oppo"
@@ -73,14 +74,7 @@ abstract class OppoHeadphonesCoordinator : AbstractBLClassicDeviceCoordinator() 
     protected abstract val touchOptions: Map<Pair<TouchConfigSide, TouchConfigType>, List<TouchConfigValue>>
 
     override fun getDeviceSettings(device: GBDevice): DeviceSettingsSpec = deviceSettings {
-        if (supportsAnc(device)) {
-            enumList<AncConfigValue>(
-                key = OppoHeadphonesPreferences.ANC_SELECTOR,
-                title = R.string.prefs_noise_control,
-                icon = R.drawable.ic_surround,
-                defaultValue = AncConfigValue.OFF,
-            )
-        }
+        noiseControlOptions(device)
         if (supportsGameMode(device)) {
             switchSetting(
                 key = OppoHeadphonesPreferences.GAME_MODE,
@@ -103,6 +97,55 @@ abstract class OppoHeadphonesCoordinator : AbstractBLClassicDeviceCoordinator() 
             DeviceSpecificSettingsScreen.CALLS_AND_NOTIFICATIONS,
             R.xml.devicesettings_headphones,
         )
+    }
+
+    private fun DeviceSettingsScope.noiseControlOptions(device: GBDevice) {
+        if (!supportsAnc(device)) {
+            return
+        }
+
+        category(
+            key = OppoHeadphonesPreferences.NOISE_CONTROL_HEADER,
+            title = R.string.prefs_noise_control
+        ) {
+            enumList<AncConfigValue>(
+                key = OppoHeadphonesPreferences.ANC_SELECTOR,
+                title = R.string.prefs_noise_control,
+                icon = R.drawable.ic_surround,
+                defaultValue = AncConfigValue.OFF,
+            )
+
+            if (supportsAncLevel(device)) {
+                enumList<AncConfigValue.Level>(
+                    key = OppoHeadphonesPreferences.ANC_LEVEL_SELECTOR,
+                    title = R.string.prefs_active_noise_cancelling_level,
+                    defaultValue = AncConfigValue.Level.HIGH,
+                    dependency = OppoHeadphonesPreferences.ANC_SELECTOR,
+                    visibleWhen = { prefs ->
+                        val modePreference =
+                            prefs.getString(OppoHeadphonesPreferences.ANC_SELECTOR, null)
+                        val mode = AncConfigValue.fromPrefId(modePreference)
+                        mode == AncConfigValue.ON
+                    }
+                )
+                enumInfo<AncConfigValue.Level>(
+                    key = OppoHeadphonesPreferences.ANC_LEVEL_DYNAMIC,
+                    title = R.string.prefs_active_noise_cancelling_effective_level,
+                    dependency = OppoHeadphonesPreferences.ANC_LEVEL_SELECTOR,
+                    visibleWhen = { prefs ->
+                        val modePreference =
+                            prefs.getString(OppoHeadphonesPreferences.ANC_SELECTOR, null)
+                        val mode = AncConfigValue.fromPrefId(modePreference)
+
+                        val modeLevelPreference =
+                            prefs.getString(OppoHeadphonesPreferences.ANC_LEVEL_SELECTOR, null)
+                        val modeLevel = AncConfigValue.Level.fromPrefId(modeLevelPreference)
+
+                        mode == AncConfigValue.ON && modeLevel == AncConfigValue.Level.DYNAMIC
+                    }
+                )
+            }
+        }
     }
 
     private fun DeviceSettingsScope.touchOptions(device: GBDevice) {
@@ -152,7 +195,7 @@ abstract class OppoHeadphonesCoordinator : AbstractBLClassicDeviceCoordinator() 
             visibleWhen = { prefs ->
                 touchOptions.entries.any { (key, _) ->
                     val prefKey = OppoHeadphonesPreferences.getTouchKey(key.first, key.second)
-                    val prefValue = prefs.getString(prefKey, TouchConfigValue.OFF.getPrefId())
+                    val prefValue = prefs.getString(prefKey, TouchConfigValue.OFF.prefId)
                     val value = TouchConfigValue.fromPrefId(prefValue)
                     value == TouchConfigValue.NOISE_CONTROL
                 }
@@ -174,9 +217,11 @@ abstract class OppoHeadphonesCoordinator : AbstractBLClassicDeviceCoordinator() 
         earbudsStatus: Map<EarbudsStatusSide, EarbudsStatusValue>,
         mode: AncConfigValue
     ): Boolean = true
+
     open fun supportsLdac(device: GBDevice): Boolean = false
     open fun supportsMultipoint(device: GBDevice): Boolean = false
     open fun supportsGameMode(device: GBDevice): Boolean = false
     open fun supportsAnc(device: GBDevice): Boolean = false
+    open fun supportsAncLevel(device: GBDevice): Boolean = false
     open fun supportsFindPhone(device: GBDevice): Boolean = false
 }

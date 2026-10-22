@@ -72,13 +72,13 @@ import java.util.Locale;
 import java.util.Set;
 
 import nodomain.freeyourgadget.gadgetbridge.activities.ControlCenterv2;
-import nodomain.freeyourgadget.gadgetbridge.externalservices.endurain.EndurainPeriodicTokenRefresher;
 import nodomain.freeyourgadget.gadgetbridge.database.DBHandler;
 import nodomain.freeyourgadget.gadgetbridge.database.DBHelper;
 import nodomain.freeyourgadget.gadgetbridge.database.PeriodicDbExporter;
 import nodomain.freeyourgadget.gadgetbridge.devices.DeviceManager;
 import nodomain.freeyourgadget.gadgetbridge.externalevents.BluetoothStateChangeReceiver;
 import nodomain.freeyourgadget.gadgetbridge.externalevents.opentracks.OpenTracksContentObserver;
+import nodomain.freeyourgadget.gadgetbridge.externalservices.ExternalServiceRegistry;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDeviceService;
 import nodomain.freeyourgadget.gadgetbridge.model.DeviceService;
@@ -301,9 +301,9 @@ public class GBApplication extends Application {
         // Ensure the InternetHelper is bound, so that it works on first usage
         InternetHelperSingleton.INSTANCE.ensureInternetHelperBound();
 
-        // Refresh Endurain tokens and schedule periodic refresh
+        // Let every external service schedule its own upkeep, such as renewing a token
         if (!GBEnvironment.env().isTest()) {
-            EndurainPeriodicTokenRefresher.INSTANCE.scheduleNextExecution(context);
+            ExternalServiceRegistry.scheduleBackgroundWork(context);
         }
     }
 

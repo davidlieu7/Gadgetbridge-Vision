@@ -445,6 +445,7 @@ import nodomain.freeyourgadget.gadgetbridge.devices.igpsport.IGPSportBiNaviCoord
 import nodomain.freeyourgadget.gadgetbridge.devices.igpsport.IGPSportiGS630Coordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.igpsport.IGPSportiGS630SCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.igpsport.IGPSportiGS800Coordinator;
+import nodomain.freeyourgadget.gadgetbridge.devices.innovo.InnovoPulseOximeterCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.itag.ITagCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.jabra.JabraEvolve255Coordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.jabra.JabraEvolve265Coordinator;
@@ -469,6 +470,7 @@ import nodomain.freeyourgadget.gadgetbridge.devices.mijia_lywsd.MijiaMhoC303Coor
 import nodomain.freeyourgadget.gadgetbridge.devices.mijia_lywsd.MijiaXmwsdj04Coordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.miscale.MiCompositionScaleCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.miscale.MiSmartScaleCoordinator;
+import nodomain.freeyourgadget.gadgetbridge.devices.moyoung.KW19BCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.onebyone.OneByoneScaleCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.moondrop.MoondropSpaceTravel2Coordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.moondrop.MoondropSpaceTravel2UltraCoordinator;
@@ -574,6 +576,21 @@ import nodomain.freeyourgadget.gadgetbridge.devices.sony.reonpocket.SonyReonPock
 import nodomain.freeyourgadget.gadgetbridge.devices.sony.wena3.SonyWena3Coordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.sonyswr12.SonySWR12DeviceCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.soundbrenner.SoundbrennerCoordinator;
+import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreP42iCoordinator;
+import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreP41iCoordinator;
+import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreP40iCoordinator;
+import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreP31iCoordinator;
+import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreP3Coordinator;
+import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreA1Coordinator;
+import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreP2Coordinator;
+import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreP2iCoordinator;
+import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreP2MiniCoordinator;
+import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreA2NCCoordinator;
+import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreA3iCoordinator;
+import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreP3iCoordinator;
+import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreK20iCoordinator;
+import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreP30iCoordinator;
+import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreP20iCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreA30iCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreAeroFit2Coordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreLiberty3ProCoordinator;
@@ -1096,8 +1113,23 @@ public enum DeviceType {
     SOUNDCORE_AEROFIT2(SoundcoreAeroFit2Coordinator.class),
     SOUNDCORE_SPORT_X20(SoundcoreSportX20Coordinator.class),
     SOUNDCORE_SLEEP_A30(SoundcoreSleepA30Coordinator.class),
-    SOUNDCORE_V20I(SoundcoreV20iCoordinator.class),
+    SOUNDCORE_A1(SoundcoreA1Coordinator.class),
+    SOUNDCORE_A2_NC(SoundcoreA2NCCoordinator.class),
+    SOUNDCORE_A3I(SoundcoreA3iCoordinator.class),
     SOUNDCORE_A30I(SoundcoreA30iCoordinator.class),
+    SOUNDCORE_K20I(SoundcoreK20iCoordinator.class),
+    SOUNDCORE_P2(SoundcoreP2Coordinator.class),
+    SOUNDCORE_P2I(SoundcoreP2iCoordinator.class),
+    SOUNDCORE_P2_MINI(SoundcoreP2MiniCoordinator.class),
+    SOUNDCORE_P3(SoundcoreP3Coordinator.class),
+    SOUNDCORE_P3I(SoundcoreP3iCoordinator.class),
+    SOUNDCORE_P20I(SoundcoreP20iCoordinator.class),
+    SOUNDCORE_P30I(SoundcoreP30iCoordinator.class),
+    SOUNDCORE_P31I(SoundcoreP31iCoordinator.class),
+    SOUNDCORE_P40I(SoundcoreP40iCoordinator.class),
+    SOUNDCORE_P41I(SoundcoreP41iCoordinator.class),
+    SOUNDCORE_P42I(SoundcoreP42iCoordinator.class),
+    SOUNDCORE_V20I(SoundcoreV20iCoordinator.class),
     HAYLOU_S35_ANC(HaylouS35AncCoordinator.class),
     MOONDROP_SPACE_TRAVEL(MoondropSpaceTravelCoordinator.class),
     MOONDROP_SPACE_TRAVEL_2(MoondropSpaceTravel2Coordinator.class),
@@ -1237,6 +1269,7 @@ public enum DeviceType {
     C20PRO(C20ProCoordinator.class),
     L70(L70Coordinator.class),
     HC96(HC96Coordinator.class),
+    KW19_B(KW19BCoordinator.class),
     KT80(KT80Coordinator.class),
     ITECH_ACTIVE_3(ITechActive3Coordinator.class),
     KSIX_VENTURE(KsixVentureCoordinator.class),
@@ -1291,6 +1324,7 @@ public enum DeviceType {
     CARDO_LS24X(Ls24xDeviceCoordinator.class),
     F8SCALE(F8ScaleCoordinator.class),
     EIGHTBITDO_MICRO(EightBitDoMicroCoordinator.class),
+    INNOVO_IP900BP_B(InnovoPulseOximeterCoordinator.class),
     TEST(TestDeviceCoordinator.class);
 
     private DeviceCoordinator coordinator;

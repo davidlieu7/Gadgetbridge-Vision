@@ -238,27 +238,27 @@ class EndurainApiClient(
     }
 
     /**
-     * Logout
+     * Ends the session on the server, answering whether it confirmed. The session is named by the
+     * refresh token: the access token answers 401. The stored tokens are left to the caller.
      */
     fun logout(): Boolean {
-        try {
-            val uri = "$baseUrl/api/v1/auth/logout".toUri()
-
-            val headers = buildHeaders(EndurainAuthType.AUTH_TOKEN)
+        return try {
+            val headers = buildHeaders(EndurainAuthType.REFRESH_TOKEN)
             headers["Content-Type"] = "application/json"
-
-            InternetUtils.doStringRequest(
-                uri = uri,
+            val response = InternetUtils.doStringRequestWithStatus(
+                uri = "$baseUrl/api/v1/auth/logout".toUri(),
                 method = "POST",
                 requestHeaders = headers,
                 body = "{}"
             )
-
-            tokenManager.clearTokens()
-            return true
+            val confirmed = response.statusCode?.let { it in 200..299 } == true
+            if (!confirmed) {
+                LOG.warn("Logout answered {}", response.statusCode)
+            }
+            confirmed
         } catch (e: Exception) {
             LOG.error("Logout error", e)
-            return false
+            false
         }
     }
 
