@@ -49,6 +49,8 @@ import nodomain.freeyourgadget.gadgetbridge.webview.CurrentPosition;
 import static nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsPreferenceConst.PREF_FIND_PHONE;
 import static nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsPreferenceConst.PREF_FIND_PHONE_DURATION;
 import static nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsPreferenceConst.PREF_CASIO_COUNTDOWN_TIMER;
+import static nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsPreferenceConst.PREF_CASIO_PRESSURE_ENERGY_CALC;
+import static nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsPreferenceConst.PREF_CASIO_COMPASS_AUTO_CORRECTION;
 
 public class CasioGGB100DeviceSupport extends Casio2C2DSupport
         implements SharedPreferences.OnSharedPreferenceChangeListener {
@@ -63,8 +65,16 @@ public class CasioGGB100DeviceSupport extends Casio2C2DSupport
     @Override
     public DevicePreference[] supportedDevicePreferences() {
         return new DevicePreference[] {
+            new TimeFormatPreference(),
+            new OperatingSoundPreference(),
+            new AutoLightPreference(),
+            new LongerLightDurationPreference(),
+            new PressureEnergyCalcPreference(),
+            new CompassAutoCorrectionPreference(),
             new HourlyChimePreference(),
             new CountdownTimerPreference(),
+            new TimeSyncPreference(),
+            new ConnectionDurationPreference(),
         };
     }
 
@@ -332,6 +342,22 @@ public class CasioGGB100DeviceSupport extends Casio2C2DSupport
         }
         final int total = hours * 3600 + minutes * 60 + seconds;
         return Math.max(0, Math.min(total, 24 * 3600));
+    }
+
+    // ── Basic settings (0x13) ─────────────────────────────────────────────────
+
+    /** Pressure sensor for energy calc: byte[8] bit 0x04, clear = on */
+    public class PressureEnergyCalcPreference extends BoolDevicePreference {
+        { name = PREF_CASIO_PRESSURE_ENERGY_CALC; }
+        { feature = FEATURE_SETTING_FOR_BASIC; }
+        { index = 8; mask = 0x04; }
+    }
+
+    /** Compass auto correction: byte[8] bit 0x08, clear = on */
+    public class CompassAutoCorrectionPreference extends BoolDevicePreference {
+        { name = PREF_CASIO_COMPASS_AUTO_CORRECTION; }
+        { feature = FEATURE_SETTING_FOR_BASIC; }
+        { index = 8; mask = 0x08; }
     }
 
     // ── Characteristic change handler ─────────────────────────────────────────────────────────

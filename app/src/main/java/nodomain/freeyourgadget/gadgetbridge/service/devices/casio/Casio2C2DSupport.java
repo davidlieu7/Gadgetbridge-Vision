@@ -922,8 +922,8 @@ public abstract class Casio2C2DSupport extends CasioSupport {
     }
 
     public class BoolDevicePreference extends DevicePreference {
-        int index;
-        byte mask;
+        protected int index;
+        protected byte mask;
 
         @Override
         public void updateValue(byte[] data) {

@@ -3225,6 +3225,18 @@
         <item>255</item>
     </string-array>
 
+    <string-array name="pref_casio_ggb100_connection_duration">
+        <item>@string/minutes_3</item>
+        <item>@string/minutes_5</item>
+        <item>@string/minutes_10</item>
+    </string-array>
+
+    <string-array name="pref_casio_ggb100_connection_duration_values">
+        <item>3</item>
+        <item>5</item>
+        <item>10</item>
+    </string-array>
+
     <string-array name="notifications_timeout">
         <item>@string/no_limit</item>
         <item>@string/seconds_5</item>

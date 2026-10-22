@@ -176,12 +176,14 @@ public class CasioGGB100DeviceCoordinator extends Casio2C2DDeviceCoordinator {
             R.xml.devicesettings_timeformat,
             R.xml.devicesettings_autolight,
             R.xml.devicesettings_operating_sounds,
+            R.xml.devicesettings_light_duration_longer,
+            R.xml.devicesettings_casio_ggb100_basic_settings,
             R.xml.devicesettings_hourly_chime_enable,
-            R.xml.devicesettings_casio_connection_duration,
+            R.xml.devicesettings_time_sync,
+            R.xml.devicesettings_casio_ggb100_connection_duration,
             R.xml.devicesettings_casio_location_indicator,
             R.xml.devicesettings_casio_ggb100_countdown_timer,
             R.xml.devicesettings_workout_start_on_phone
-            // R.xml.devicesettings_casio_interval_timer
         };
     }
 
