@@ -546,7 +546,13 @@ abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator(
                             key = "pref_soundcore_local_playback_play",
                             title = R.string.soundcore_local_playback,
                             icon = R.drawable.ic_play,
-                            visibleWhen = { prefs -> !prefs.getBoolean(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_LOCAL_PLAYBACK, false) },
+                            visibleWhen = { prefs ->
+                                prefs.getString(
+                                    DeviceSettingsPreferenceConst.PREF_SOUNDCORE_LISTENING_MODE,
+                                    AudioSource.BLUETOOTH.toString(),
+                                ) == AudioSource.LOCAL.toString() &&
+                                    !prefs.getBoolean(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_LOCAL_PLAYBACK, false)
+                            },
                             onClick = { _, selectedDevice ->
                                 selectedDevice?.let {
                                     // This tracks the requested playback state, not a device readback.
@@ -562,7 +568,13 @@ abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator(
                             key = "pref_soundcore_local_playback_pause",
                             title = R.string.soundcore_local_playback_pause,
                             icon = R.drawable.ic_pause,
-                            visibleWhen = { prefs -> prefs.getBoolean(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_LOCAL_PLAYBACK, false) },
+                            visibleWhen = { prefs ->
+                                prefs.getString(
+                                    DeviceSettingsPreferenceConst.PREF_SOUNDCORE_LISTENING_MODE,
+                                    AudioSource.BLUETOOTH.toString(),
+                                ) == AudioSource.LOCAL.toString() &&
+                                    prefs.getBoolean(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_LOCAL_PLAYBACK, false)
+                            },
                             onClick = { _, selectedDevice ->
                                 selectedDevice?.let {
                                     GBApplication.getDevicePrefs(it).preferences.edit()
