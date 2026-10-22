@@ -1,12 +1,15 @@
 package nodomain.freeyourgadget.gadgetbridge.service.devices.polar;
 
 
+import androidx.annotation.Nullable;
+
 import com.google.protobuf.InvalidProtocolBufferException;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.time.LocalDate;
+import java.util.Date;
 import java.time.ZoneId;
 import java.util.ArrayList;
 import java.util.List;
@@ -19,6 +22,8 @@ import nodomain.freeyourgadget.gadgetbridge.GBApplication;
 import nodomain.freeyourgadget.gadgetbridge.database.DBHandler;
 import nodomain.freeyourgadget.gadgetbridge.database.DBHelper;
 import nodomain.freeyourgadget.gadgetbridge.devices.polar.PolarIgnite3ActivitySampleProvider;
+import nodomain.freeyourgadget.gadgetbridge.entities.BaseActivitySummary;
+import nodomain.freeyourgadget.gadgetbridge.entities.BaseActivitySummaryDao;
 import nodomain.freeyourgadget.gadgetbridge.entities.DaoSession;
 import nodomain.freeyourgadget.gadgetbridge.entities.GenericHrvValueSample;
 import nodomain.freeyourgadget.gadgetbridge.entities.GenericRespiratoryRateSample;
@@ -56,6 +61,7 @@ public class PolarHealthSync {
     private final List<PolarHealthData.Value> hrv = new ArrayList<>();
     private final List<PolarHealthData.Value> respiration = new ArrayList<>();
     private final List<PolarHealthData.Value> sleepScores = new ArrayList<>();
+    private final List<PolarWorkouts.Workout> workouts = new ArrayList<>();
     private int pending;
 
     public PolarHealthSync(final GBDevice device, final FileReader reader, final Runnable onFinished) {
@@ -107,9 +113,62 @@ public class PolarHealthSync {
                 sleepScores.addAll(PolarHealthData.sleepScore(PolarProto.PbSleepScore.parseFrom(payload))));
         read(directory + "SLEEP/SLEEPRES.BPB", payload ->
                 sleepStages.addAll(PolarHealthData.sleepStages(PolarProto.PbSleepAnalysisResult.parseFrom(payload))));
+        readWorkouts(directory + "E/");
         read(directory + "SKINTEMP/TEMPCONT.BPB", payload ->
                 temperatures.addAll(PolarHealthData.skinTemperatures(
                         PolarProto.PbSkinTemperatureContinuous.parseFrom(payload), day, zone[0])));
+    }
+
+    private static final Pattern TIME_DIRECTORY = Pattern.compile("^\\d{6}/$");
+
+    /** The sessions of a day, each in a directory named after its start time. */
+    private void readWorkouts(final String directory) {
+        pending++;
+        reader.get(directory, (path, payload) -> {
+            if (payload != null) {
+                try {
+                    for (final PolarProto.PbPFtpEntry entry : PolarProto.PbPFtpDirectory.parseFrom(payload).getEntriesList()) {
+                        if (TIME_DIRECTORY.matcher(entry.getName()).matches()) {
+                            readWorkout(directory + entry.getName());
+                        }
+                    }
+                } catch (final InvalidProtocolBufferException e) {
+                    LOG.warn("Unreadable directory listing {}", directory, e);
+                }
+            }
+            finishOne();
+        });
+    }
+
+    private void readWorkout(final String directory) {
+        final PolarProto.PbTrainingSession[] session = new PolarProto.PbTrainingSession[1];
+        final PolarProto.PbExerciseBase[] base = new PolarProto.PbExerciseBase[1];
+        read(directory + "TSESS.BPB", payload -> session[0] = PolarProto.PbTrainingSession.parseFrom(payload), null);
+        read(directory + "00/BASE.BPB", payload -> base[0] = PolarProto.PbExerciseBase.parseFrom(payload), null);
+        final byte[][] samples = new byte[1][];
+        read(directory + "00/SAMPLES.GZB", payload -> {
+            try (java.util.zip.GZIPInputStream in = new java.util.zip.GZIPInputStream(new java.io.ByteArrayInputStream(payload))) {
+                samples[0] = readAll(in);
+            } catch (final java.io.IOException e) {
+                LOG.warn("Unreadable samples of {}", directory, e);
+            }
+        }, () -> {
+            if (session[0] != null) {
+                final PolarWorkouts.Workout workout = PolarWorkouts.parse(session[0], base[0], samples[0]);
+                if (workout != null) {
+                    workouts.add(workout);
+                }
+            }
+        });
+    }
+
+    private static byte[] readAll(final java.io.InputStream in) throws java.io.IOException {
+        final java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
+        final byte[] buffer = new byte[8192];
+        for (int n; (n = in.read(buffer)) > 0; ) {
+            out.write(buffer, 0, n);
+        }
+        return out.toByteArray();
     }
 
     private interface Parser {
@@ -117,6 +176,11 @@ public class PolarHealthSync {
     }
 
     private void read(final String path, final Parser parser) {
+        read(path, parser, null);
+    }
+
+    /** {@code afterwards} runs once the answer is handled, also when the file is missing. */
+    private void read(final String path, final Parser parser, @Nullable final Runnable afterwards) {
         pending++;
         reader.get(path, (p, payload) -> {
             if (payload != null) {
@@ -125,6 +189,9 @@ public class PolarHealthSync {
                 } catch (final InvalidProtocolBufferException | RuntimeException e) {
                     LOG.warn("Unreadable {}", path, e);
                 }
+            }
+            if (afterwards != null) {
+                afterwards.run();
             }
             finishOne();
         });
@@ -135,6 +202,26 @@ public class PolarHealthSync {
             store();
             onFinished.run();
         }
+    }
+
+    private static void storeWorkout(final DaoSession session, final Long deviceId, final Long userId,
+                                     final PolarWorkouts.Workout workout) {
+        final BaseActivitySummaryDao dao = session.getBaseActivitySummaryDao();
+        BaseActivitySummary summary = dao.queryBuilder().where(
+                BaseActivitySummaryDao.Properties.DeviceId.eq(deviceId),
+                BaseActivitySummaryDao.Properties.StartTime.eq(new Date(workout.startMillis))).unique();
+        final boolean exists = summary != null;
+        if (!exists) {
+            summary = new BaseActivitySummary();
+            summary.setDeviceId(deviceId);
+            summary.setUserId(userId);
+            summary.setStartTime(new Date(workout.startMillis));
+        }
+        summary.setEndTime(new Date(workout.endMillis));
+        summary.setActivityKind(workout.kind.getCode());
+        summary.setSummaryData(workout.summaryJson);
+        summary.setRawSummaryData(workout.samples);
+        dao.insertOrReplace(summary);
     }
 
     private void store() {
@@ -215,6 +302,11 @@ public class PolarHealthSync {
             }
             session.getGenericSleepScoreSampleDao().insertOrReplaceInTx(scores);
 
+            for (final PolarWorkouts.Workout workout : workouts) {
+                storeWorkout(session, deviceId, userId, workout);
+            }
+
+            LOG.info("Stored {} workouts", workouts.size());
             LOG.info("Stored {} HRV, {} respiration, {} sleep score samples", hrvSamples.size(), breathing.size(), scores.size());
             LOG.info("Stored {} activity minutes, {} sleep stages, {} skin temperatures",
                     activity.size(), stages.size(), skin.size());

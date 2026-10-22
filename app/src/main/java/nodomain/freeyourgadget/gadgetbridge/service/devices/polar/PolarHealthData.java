@@ -87,6 +87,10 @@ public final class PolarHealthData {
         return ZoneId.systemDefault();
     }
 
+    static long epochMillis(final PolarProto.PbLocalDateTime time, final ZoneId zone) {
+        return epochSecond(time.getDate(), time.getTime(), zone) * 1000L + time.getTime().getMillis();
+    }
+
     private static long epochSecond(final PolarProto.PbDate date, final PolarProto.PbTime time, final ZoneId zone) {
         return LocalDate.of(date.getYear(), date.getMonth(), date.getDay())
                 .atTime(time.getHour(), time.getMinute(), time.getSeconds())

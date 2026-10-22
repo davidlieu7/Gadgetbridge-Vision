@@ -1306,3 +1306,643 @@ message PbRespirationRate {
   optional PbDate day = 1;
   repeated PbRespirationRateChunk chunks = 2;
 }
+
+message PbApplicationId {
+  optional uint64 value = 1;
+}
+
+
+enum PbExerciseFeedback {
+  FEEDBACK_NONE = 1;
+  FEEDBACK_1 = 2;
+  FEEDBACK_2 = 3;
+  FEEDBACK_3 = 4;
+  FEEDBACK_4 = 5;
+  FEEDBACK_5 = 6;
+  FEEDBACK_6 = 7;
+  FEEDBACK_7 = 8;
+  FEEDBACK_8 = 9;
+  FEEDBACK_9 = 10;
+  FEEDBACK_10 = 11;
+  FEEDBACK_11 = 12;
+  FEEDBACK_12 = 13;
+  FEEDBACK_13 = 14;
+  FEEDBACK_14 = 15;
+  FEEDBACK_15 = 16;
+  FEEDBACK_16 = 17;
+  FEEDBACK_17 = 18;
+}
+
+
+message PbCardioLoad {
+  optional float activity_load = 1;
+  optional float exercise_load = 2;
+}
+
+
+message PbSessionHeartRateStatistics {
+  optional uint32 average = 1;
+  optional uint32 maximum = 2;
+}
+
+
+message PbMultiLineText {
+  optional string text = 1;
+}
+
+
+enum PbSessionRPE {
+  RPE_NONE = 1;
+  RPE_EASY = 2;
+  RPE_LIGHT = 3;
+  RPE_FAIRLY_BRISK = 4;
+  RPE_BRISK = 5;
+  RPE_MODERATE = 6;
+  RPE_FAIRLY_HARD = 7;
+  RPE_HARD = 8;
+  RPE_EXHAUSTING = 9;
+  RPE_EXTREME = 10;
+}
+
+
+message PbPerceivedLoad {
+  optional PbSessionRPE session_rpe = 1;
+  optional uint32 duration = 2;
+}
+
+
+message PbOneLineText {
+  optional string text = 1;
+}
+
+
+message PbSportIdentifier {
+  optional uint64 value = 1;
+}
+
+
+message PbFuelingReminder {
+  enum PbFuelingReminderType {
+    REMINDER_TYPE_ENERGY_MANUAL = 1;
+    REMINDER_TYPE_ENERGY_SMART = 2;
+    REMINDER_TYPE_HYDRATION = 3;
+    REMINDER_TYPE_HYDRATION_AND_ENERGY_MANUAL = 4;
+    REMINDER_TYPE_HYDRATION_AND_ENERGY_SMART = 5;
+  }
+  optional PbDuration timestamp = 1;
+  optional PbFuelingReminder.PbFuelingReminderType fueling_reminder_type = 2;
+}
+
+
+message PbTrainingLoad {
+  optional uint32 training_load_val = 1;
+  optional PbDuration recovery_time = 2;
+  optional uint32 carbohydrate_consumption = 3;
+  optional uint32 protein_consumption = 4;
+  optional uint32 fat_consumption = 5;
+  optional float carbohydrate_grams = 6;
+  optional float protein_grams = 7;
+  optional float fat_grams = 8;
+  optional float meal_size = 9;
+  repeated PbFuelingReminder fueling_reminders = 10;
+}
+
+
+message PbTrainingSessionFavoriteId {
+  optional uint64 value = 1;
+  optional PbSystemDateTime last_modified = 2;
+}
+
+
+message PbTrainingSessionTargetId {
+  optional uint64 value = 1;
+  optional PbSystemDateTime last_modified = 2;
+}
+
+
+message PbTrainingSessionTrimInfo {
+  enum TrimStatus {
+    NOT_TRIMMED = 0;
+    TRIMMED = 1;
+    RESTORED = 2;
+  }
+  optional PbTrainingSessionTrimInfo.TrimStatus status = 1;
+}
+
+
+message PbTrainingSession {
+  enum PbTrainingStartTrigger {
+    MANUAL = 0;
+    AUTOMATIC_TRAINING_DETECTION = 1;
+  }
+  enum PbTransferStatus {
+    TRANSFER_STATUS_UNSPECIFIED = 0;
+    IN_PROGRESS = 1;
+    COMPLETED_PARTIALLY = 2;
+    COMPLETED_FULLY = 3;
+  }
+  optional PbLocalDateTime start = 1;
+  optional uint32 exercise_count = 2;
+  optional string device_id = 3;
+  optional string model_name = 4;
+  optional PbDuration duration = 5;
+  optional float distance = 6;
+  optional uint32 calories = 7;
+  optional PbSessionHeartRateStatistics heart_rate = 8;
+  repeated PbDuration heart_rate_zone_duration = 9;
+  optional PbTrainingLoad training_load = 10;
+  optional PbOneLineText session_name = 11;
+  optional float feeling = 12;
+  optional PbMultiLineText note = 13;
+  optional PbOneLineText place = 14;
+  optional double latitude = 15;
+  optional double longitude = 16;
+  optional PbExerciseFeedback benefit = 17;
+  optional PbSportIdentifier sport = 18;
+  optional PbTrainingSessionTargetId training_session_target_id = 19;
+  optional PbLocalDateTime end = 20;
+  optional PbTrainingSessionFavoriteId training_session_favorite_id = 21;
+  optional PbApplicationId application_id = 22;
+  optional PbCardioLoad cardio_load = 23;
+  optional uint32 cardio_load_interpretation = 24;
+  optional PbPerceivedLoad perceived_load = 25;
+  optional uint32 perceived_load_interpretation = 26;
+  optional float muscle_load = 27;
+  optional uint32 muscle_load_interpretation = 28;
+  optional bytes period_uuid = 29;
+  optional PbTrainingSession.PbTrainingStartTrigger start_trigger = 30;
+  optional PbTrainingSessionTrimInfo trim_info = 31;
+  optional PbTrainingSession.PbTransferStatus transfer_status = 32;
+}
+
+
+enum PbFeatureType {
+  FEATURE_TYPE_HEART_RATE = 1;
+  FEATURE_TYPE_RR_INTERVAL = 2;
+  FEATURE_TYPE_SPEED = 3;
+  FEATURE_TYPE_DISTANCE = 4;
+  FEATURE_TYPE_BIKE_CADENCE = 5;
+  FEATURE_TYPE_BIKE_POWER = 6;
+  FEATURE_TYPE_GPS_LOCATION = 7;
+  FEATURE_TYPE_RUNNING_CADENCE = 8;
+  FEATURE_TYPE_PRESS_TEMPERATURE = 9;
+  FEATURE_TYPE_ALTITUDE = 10;
+  FEATURE_TYPE_STEPS = 11;
+  FEATURE_TYPE_ACTIVITY = 12;
+  FEATURE_TYPE_STRIDE_LENGTH = 13;
+  FEATURE_TYPE_RSC_MOVING_TYPE = 14;
+  FEATURE_TYPE_JUMP_HEIGTH = 15;
+  FEATURE_TYPE_COMPASS_HEADING = 16;
+  FEATURE_TYPE_GPS_SPEED = 17;
+  FEATURE_TYPE_GPS_DISTANCE = 18;
+  FEATURE_TYPE_GPS_ALTITUDE = 19;
+  FEATURE_TYPE_BIKE_WHEEL_REVOLUTION = 20;
+  FEATURE_TYPE_BIKE_CRANK_REVOLUTION = 21;
+  FEATURE_TYPE_AS_SPEED = 22;
+  FEATURE_TYPE_AS_CADENCE = 23;
+  FEATURE_TYPE_AS_DISTANCE = 24;
+  FEATURE_TYPE_AS_SWR_STATE = 25;
+  FEATURE_TYPE_BATTERY_LEVEL = 26;
+  FEATURE_TYPE_FILE_TRANSFER = 27;
+  FEATURE_TYPE_PUSH_NOTIFICATIONS = 28;
+  FEATURE_TYPE_WEIGHT_SCALE = 29;
+  FEATURE_TYPE_REMOTE_BUTTONS = 30;
+  FEATURE_TYPE_GOPRO = 31;
+  FEATURE_TYPE_PP_INTERVAL = 32;
+  FEATURE_TYPE_MEDIA_CONTROL = 33;
+  FEATURE_TYPE_MOBILE_GPS = 34;
+  FEATURE_TYPE_RUNNING_POWER = 35;
+  FEATURE_TYPE_POLAR_SDK = 36;
+  FEATURE_TYPE_HEALTH_THERMOMETER_TEMPERATURE = 37;
+}
+
+
+message PbExerciseCounters {
+  optional uint32 sprint_count = 1;
+}
+
+
+message PbSampleSourceDevice {
+  optional uint32 start_index = 1;
+  optional PbSourceDevice source_device = 2;
+}
+
+
+message PbRunningIndex {
+  optional uint32 value = 1;
+  optional PbDuration calculation_time = 2;
+}
+
+
+message PbExerciseBase {
+  optional PbLocalDateTime start = 1;
+  optional PbDuration duration = 2;
+  optional PbSportIdentifier sport = 3;
+  optional float distance = 4;
+  optional uint32 calories = 5;
+  optional PbTrainingLoad training_load = 6;
+  repeated PbFeatureType available_sensor_features = 7;
+  optional PbRunningIndex running_index = 9;
+  optional float ascent = 10;
+  optional float descent = 11;
+  optional double latitude = 12;
+  optional double longitude = 13;
+  optional string place = 14;
+  optional PbExerciseCounters exercise_counters = 16;
+  optional float OBSOLETE_speed_calibration_offset = 17;
+  optional float walking_distance = 18;
+  optional PbDuration walking_duration = 19;
+  optional uint32 accumulated_torque = 20;
+  optional uint32 cycling_power_energy = 21;
+  repeated PbSensorCalibrationOffset sensor_calibration_offset = 22;
+  optional PbDeviceLocation device_location = 23;
+  repeated PbSampleSourceDevice power_sample_source_device = 24;
+  optional PbCardioLoad cardio_load = 25;
+  optional uint32 cardio_load_interpretation = 26;
+  optional PbPerceivedLoad perceived_load = 27;
+  optional uint32 perceived_load_interpretation = 28;
+  optional float muscle_load = 29;
+  optional uint32 muscle_load_interpretation = 30;
+  optional PbSystemDateTime last_modified = 100;
+}
+
+
+enum PbMovingType {
+  WALKING = 0;
+  RUNNING = 1;
+  STANDING = 2;
+}
+
+
+enum PbOperationType {
+  MULTIPLY = 1;
+  SUM = 2;
+}
+
+
+message PbCalibrationValue {
+  optional uint32 start_index = 1;
+  optional float value = 2;
+  optional PbOperationType operation = 3;
+  optional PbMovingType cause = 4;
+}
+
+
+message PbSensorOffline {
+  optional uint32 start_index = 1;
+  optional uint32 stop_index = 2;
+}
+
+
+message PbPowerMeasurements {
+  optional int32 current_power = 1;
+  optional uint32 cumulative_crank_revolutions = 2;
+  optional uint32 cumulative_timestamp = 3;
+  optional sint32 force_magnitude_min = 4;
+  optional int32 force_magnitude_max = 5;
+  optional uint32 force_magnitude_min_angle = 6;
+  optional uint32 force_magnitude_max_angle = 7;
+  optional uint32 bottom_dead_spot_angle = 8;
+  optional uint32 top_dead_spot_angle = 9;
+  optional uint32 pedal_power_balance = 10;
+  optional int32 torque_magnitude_min = 11;
+  optional int32 torque_magnitude_max = 12;
+}
+
+
+message PbRROffline {
+  optional PbDuration start_time = 1;
+  optional PbDuration time_interval = 2;
+}
+
+
+message PbExerciseRRIntervals {
+  repeated uint32 rr_intervals = 1 [packed = true];
+  repeated PbRROffline rr_sensor_offline = 2;
+}
+
+
+message PbSampleSource {
+  optional PbSampleSourceType sample_source_type = 1;
+  optional uint32 start_index = 2;
+  optional uint32 stop_index = 3;
+}
+
+
+enum PbSampleType {
+  SAMPLE_TYPE_UNDEFINED = 0;
+  SAMPLE_TYPE_HEART_RATE = 1;
+  SAMPLE_TYPE_CADENCE = 2;
+  SAMPLE_TYPE_ALTITUDE = 3;
+  SAMPLE_TYPE_ALTITUDE_CALIBRATION = 4;
+  SAMPLE_TYPE_TEMPERATURE = 5;
+  SAMPLE_TYPE_SPEED = 6;
+  SAMPLE_TYPE_DISTANCE = 7;
+  SAMPLE_TYPE_STRIDE_LENGTH = 8;
+  SAMPLE_TYPE_STRIDE_CALIBRATION = 9;
+  SAMPLE_TYPE_FORWARD_ACCELERATION = 10;
+  SAMPLE_TYPE_MOVING_TYPE = 11;
+  SAMPLE_TYPE_LEFT_PEDAL_POWER = 12;
+  SAMPLE_TYPE_RIGHT_PEDAL_POWER = 13;
+  SAMPLE_TYPE_LEFT_PEDAL_POWER_CALIBRATION = 14;
+  SAMPLE_TYPE_RIGHT_PEDAL_POWER_CALIBRATION = 15;
+  SAMPLE_TYPE_RR_INTERVAL = 16;
+  SAMPLE_TYPE_ACCELERATION_MAD = 17;
+}
+
+
+message PbExerciseIntervalledSampleList {
+  optional PbSampleType sample_type = 1;
+  optional uint32 recording_interval_ms = 2;
+  repeated PbSampleSource sample_source = 3;
+  repeated uint32 heart_rate_samples = 4 [packed = true];
+  repeated uint32 cadence_samples = 5 [packed = true];
+  repeated float speed_samples = 6 [packed = true];
+  repeated float distance_samples = 7 [packed = true];
+  repeated float forward_acceleration = 8;
+  repeated PbMovingType moving_type_samples = 9;
+  repeated float altitude_samples = 10 [packed = true];
+  repeated PbCalibrationValue altitude_calibration = 11;
+  repeated float temperature_samples = 12 [packed = true];
+  repeated uint32 stride_length_samples = 13 [packed = true];
+  repeated PbCalibrationValue stride_calibration = 14;
+  repeated PbPowerMeasurements left_pedal_power_samples = 15;
+  repeated PbPowerMeasurements right_pedal_power_samples = 16;
+  repeated PbCalibrationValue left_power_calibration = 17;
+  repeated PbCalibrationValue right_power_calibration = 18;
+  optional PbExerciseRRIntervals rr_samples = 19;
+  repeated float acceleration_mad_samples = 20;
+}
+
+
+message PbPauseTime {
+  optional PbDuration start_time = 1;
+  optional PbDuration duration = 2;
+}
+
+
+message PbExerciseSamples {
+  optional PbDuration recording_interval = 1;
+  repeated uint32 heart_rate_samples = 2 [packed = true];
+  repeated PbSensorOffline heart_rate_offline = 3;
+  repeated uint32 cadence_samples = 4 [packed = true];
+  repeated PbSensorOffline cadence_offline = 5;
+  repeated float altitude_samples = 6 [packed = true];
+  repeated PbCalibrationValue altitude_calibration = 7;
+  repeated float temperature_samples = 8 [packed = true];
+  repeated float speed_samples = 9 [packed = true];
+  repeated PbSensorOffline speed_offline = 10;
+  repeated float distance_samples = 11 [packed = true];
+  repeated PbSensorOffline distance_offline = 12;
+  repeated uint32 stride_length_samples = 13 [packed = true];
+  repeated PbSensorOffline stride_length_offline = 14;
+  repeated PbCalibrationValue stride_calibration = 15;
+  repeated float forward_acceleration = 16;
+  repeated PbMovingType moving_type_samples = 17;
+  repeated PbSensorOffline altitude_offline = 18;
+  repeated PbSensorOffline temperature_offline = 19;
+  repeated PbSensorOffline forward_acceleration_offline = 20;
+  repeated PbSensorOffline moving_type_offline = 21;
+  repeated PbPowerMeasurements left_pedal_power_samples = 22;
+  repeated PbSensorOffline left_pedal_power_offline = 23;
+  repeated PbPowerMeasurements right_pedal_power_samples = 24;
+  repeated PbSensorOffline right_pedal_power_offline = 25;
+  repeated PbCalibrationValue left_power_calibration = 26;
+  repeated PbCalibrationValue right_power_calibration = 27;
+  optional PbExerciseRRIntervals rr_samples = 28;
+  repeated PbExerciseIntervalledSampleList exercise_intervalled_sample_list = 29;
+  repeated PbPauseTime pause_times = 30;
+  repeated float body_temperature = 31;
+  repeated PbSensorOffline body_temperature_offline = 32;
+}
+
+
+message PbActivityStatistics {
+  optional float average = 1;
+}
+
+
+message PbAltitudeStatistics {
+  optional float minimum = 1;
+  optional float average = 2;
+  optional float maximum = 3;
+}
+
+
+message PbTemperatureStatistics {
+  optional float minimum = 1;
+  optional float average = 2;
+  optional float maximum = 3;
+}
+
+
+message PbCadenceStatistics {
+  optional uint32 average = 1;
+  optional uint32 maximum = 2;
+}
+
+
+message PbDeclineStatistics {
+  optional float average = 1;
+  optional float maximum = 2;
+}
+
+
+message PbHeartRateStatistics {
+  optional uint32 minimum = 1;
+  optional uint32 average = 2;
+  optional uint32 maximum = 3;
+}
+
+
+message PbInclineStatistics {
+  optional float average = 1;
+  optional float maximum = 2;
+}
+
+
+message PbLRBalanceStatistics {
+  optional float average = 1;
+}
+
+
+message PbPowerStatistics {
+  optional int32 average = 1;
+  optional int32 maximum = 2;
+}
+
+
+message PbSpeedStatistics {
+  optional float average = 1;
+  optional float maximum = 2;
+}
+
+
+message PbStrideLengthStatistics {
+  optional uint32 average = 1;
+  optional uint32 maximum = 2;
+}
+
+
+message PbSwimmingStyleStatistics {
+  optional float distance = 1;
+  optional uint32 stroke_count = 2;
+  optional PbDuration swimming_time_total = 3;
+  optional uint32 average_heartrate = 4;
+  optional uint32 maximum_heartrate = 5;
+  optional float average_swolf = 6;
+  optional PbDuration pool_time_min = 7;
+  optional float max_stroke_rate = 8;
+  optional float max_strokes_per_pool = 9;
+}
+
+
+enum PbSwimmingPoolUnits {
+  SWIMMING_POOL_METERS = 0;
+  SWIMMING_POOL_YARDS = 1;
+}
+
+
+message PbSwimmingPoolInfo {
+  optional float pool_length = 1;
+  optional PbSwimmingPoolUnits swimming_pool_type = 2;
+}
+
+
+message PbSwimmingStatistics {
+  optional float swimming_distance = 1;
+  optional PbSwimmingStyleStatistics freestyle_statistics = 2;
+  optional PbSwimmingStyleStatistics backstroke_statistics = 3;
+  optional PbSwimmingStyleStatistics breaststroke_statistics = 4;
+  optional PbSwimmingStyleStatistics butterfly_statistics = 5;
+  optional uint32 total_stroke_count = 6;
+  optional uint32 number_of_pools_swimmed = 7;
+  optional PbSwimmingPoolInfo swimming_pool = 8;
+  optional PbSwimmingStyleStatistics other_swimming_statistics = 9;
+}
+
+
+message PbTrainingPeaksStatistics {
+  optional uint32 normalized_power = 1;
+  optional float intensity_factor = 2;
+  optional float training_stress_score = 3;
+}
+
+
+message PbExerciseStatistics {
+  optional PbHeartRateStatistics heart_rate = 1;
+  optional PbSpeedStatistics speed = 2;
+  optional PbCadenceStatistics cadence = 3;
+  optional PbAltitudeStatistics altitude = 4;
+  optional PbPowerStatistics power = 5;
+  optional PbLRBalanceStatistics left_right_balance = 6;
+  optional PbTemperatureStatistics temperature = 7;
+  optional PbActivityStatistics activity = 8;
+  optional PbStrideLengthStatistics stride_length = 9;
+  optional PbInclineStatistics incline = 10;
+  optional PbDeclineStatistics decline = 11;
+  optional PbSwimmingStatistics swimming = 12;
+  optional PbTrainingPeaksStatistics training_peaks = 13;
+  optional PbTemperatureStatistics body_temperature = 14;
+}
+
+
+message PbRecordedFatFitZones {
+  optional uint32 fatfit_limit = 1;
+  optional PbDuration fat_time = 2;
+  optional PbDuration fit_time = 3;
+}
+
+
+enum PbHeartRateZoneSettingSource {
+  HEART_RATE_ZONE_SETTING_SOURCE_DEFAULT = 0;
+  HEART_RATE_ZONE_SETTING_SOURCE_THRESHOLD = 1;
+  HEART_RATE_ZONE_SETTING_SOURCE_FREE = 2;
+}
+
+
+message PbHeartRateZone {
+  optional uint32 lower_limit = 1;
+  optional uint32 higher_limit = 2;
+}
+
+
+message PbRecordedHeartRateZone {
+  optional PbHeartRateZone zone_limits = 1;
+  optional PbDuration in_zone = 2;
+}
+
+
+enum PbPowerZoneSettingSource {
+  POWER_ZONE_SETTING_SOURCE_DEFAULT = 0;
+  POWER_ZONE_SETTING_SOURCE_FREE = 1;
+}
+
+
+message PbPowerZone {
+  optional uint32 lower_limit = 1;
+  optional uint32 higher_limit = 2;
+}
+
+
+message PbRecordedPowerZone {
+  optional PbPowerZone zone_limits = 1;
+  optional PbDuration in_zone = 2;
+  optional float muscle_load = 3;
+}
+
+
+enum PbSpeedZoneSettingSource {
+  SPEED_ZONE_SETTING_SOURCE_DEFAULT = 0;
+  SPEED_ZONE_SETTING_SOURCE_FREE = 1;
+}
+
+
+message PbSpeedZone {
+  optional float lower_limit = 1;
+  optional float higher_limit = 2;
+}
+
+
+message PbRecordedSpeedZone {
+  optional PbSpeedZone zone_limits = 1;
+  optional PbDuration time_in_zone = 2;
+  optional float distance_in_zone = 3;
+}
+
+
+message PbRecordedZones {
+  repeated PbRecordedHeartRateZone heart_rate_zone = 1;
+  repeated PbRecordedPowerZone power_zone = 2;
+  optional PbRecordedFatFitZones fatfit_zones = 3;
+  repeated PbRecordedSpeedZone speed_zone = 4;
+  optional PbHeartRateZoneSettingSource heart_rate_setting_source = 10;
+  optional PbPowerZoneSettingSource power_setting_source = 11;
+  optional PbSpeedZoneSettingSource speed_setting_source = 12;
+}
+
+
+message PbStringKeyValuePair {
+  optional string key = 1;
+  optional double num_value = 2;
+  optional string short_string_value = 3;
+}
+
+
+message PbGenericSubPeriod {
+  optional string type = 1;
+  optional PbLocalDateTime start_time = 2;
+  optional PbLocalDateTime end_time = 3;
+  repeated PbStringKeyValuePair data = 4;
+  repeated PbGenericSubPeriod subperiods = 5;
+}
+
+
+message PbGenericPeriod {
+  optional string type = 1;
+  optional bytes uuid = 2;
+  optional PbLocalDateTime start_moment = 3;
+  optional PbLocalDateTime end_moment = 4;
+  repeated PbStringKeyValuePair data = 5;
+  repeated PbGenericSubPeriod subperiods = 6;
+}
