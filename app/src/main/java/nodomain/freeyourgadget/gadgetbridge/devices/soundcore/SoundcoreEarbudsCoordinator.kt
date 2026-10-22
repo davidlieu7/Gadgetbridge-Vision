@@ -919,21 +919,13 @@ abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator(
                 keepActivityDataOnDevice()
             }
 
-            if (has(arrayOf(Capability.WearingDetection, Capability.WearingTone, Capability.FitTest, Capability.AutoPowerOff, Capability.BatteryLowTone, Capability.VoicePrompts, Capability.ButtonBrightness))) {
+            if (has(arrayOf(Capability.WearingDetection, Capability.FitTest, Capability.AutoPowerOff, Capability.BatteryLowTone, Capability.VoicePrompts, Capability.ButtonBrightness))) {
                 category(key = "pref_header_soundcore_general", title = R.string.pref_header_general) {
                     if (has(Capability.WearingDetection)) {
                         switchSetting(
                             key = DeviceSettingsPreferenceConst.PREF_SOUNDCORE_WEARING_DETECTION,
                             title = R.string.nothing_prefs_inear_title,
                             summary = R.string.nothing_prefs_inear_summary,
-                            defaultValue = false,
-                        )
-                    }
-                    if (has(Capability.WearingTone)) {
-                        switchSetting(
-                            key = DeviceSettingsPreferenceConst.PREF_SOUNDCORE_WEARING_TONE,
-                            title = R.string.pref_wearing_tone,
-                            summary = R.string.pref_wearing_tone_summary,
                             defaultValue = false,
                         )
                     }
@@ -1014,21 +1006,19 @@ abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator(
                     )
                 }
             }
-            screen(
-                key = DeviceSpecificSettingsScreen.CALLS_AND_NOTIFICATIONS.key,
-                title = R.string.pref_header_calls_and_notifications,
-                icon = R.drawable.ic_notifications,
-                xmlSubScreens = listOf(R.xml.devicesettings_headphones),
-                connectedOnly = false,
-            ) {
-                if (has(arrayOf(
-                        Capability.BluetoothCalls, Capability.PowerOffTone,
-                        Capability.NoiseCancellationTone, Capability.ListeningModeTone,
-                    ))) {
-                    category(
-                        key = "pref_header_soundcore_notification_sounds",
-                        title = R.string.notification_sounds,
-                    ) {
+
+            if (has(arrayOf(
+                Capability.BluetoothCalls, Capability.PowerOffTone,
+                Capability.NoiseCancellationTone, Capability.ListeningModeTone,
+                Capability.WearingTone,
+            ))) {
+                screen(
+                    key = DeviceSpecificSettingsScreen.CALLS_AND_NOTIFICATIONS.key,
+                    title = R.string.pref_header_calls_and_notifications,
+                    icon = R.drawable.ic_notifications,
+                    xmlSubScreens = listOf(R.xml.devicesettings_headphones),
+                    connectedOnly = false,
+                ) {
                         if (has(Capability.BluetoothCalls)) {
                             switchSetting(
                                 key = DeviceSettingsPreferenceConst.PREF_SOUNDCORE_CALLS_ENABLED,
@@ -1036,6 +1026,10 @@ abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator(
                                 summary = R.string.soundcore_calls_enabled_summary,
                             )
                         }
+                        category(
+                            key = "pref_header_soundcore_notification_sounds",
+                            title = R.string.notification_sounds,
+                        ) {
                         if (has(Capability.PowerOffTone)) {
                             switchSetting(
                                 key = DeviceSettingsPreferenceConst.PREF_SOUNDCORE_POWER_OFF_TONE,
@@ -1057,9 +1051,17 @@ abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator(
                                 summary = R.string.soundcore_mode_tone_summary,
                             )
                         }
+                        if (has(Capability.WearingTone)) {
+                            switchSetting(
+                                key = DeviceSettingsPreferenceConst.PREF_SOUNDCORE_WEARING_TONE,
+                                title = R.string.pref_wearing_tone,
+                                summary = R.string.pref_wearing_tone_summary,
+                                defaultValue = false,
+                            )
+                        }
                     }
                 }
-            )
+            }
 
             screen(
                 key = DeviceSpecificSettingsScreen.DEVELOPER.key,
