@@ -161,12 +161,11 @@ object SoundcoreSleepHistory {
                     other.start <= following.timestamp && other.end >= session.end }) {
                 boundedPoints + following
             } else boundedPoints
-            // The last sleep transition precedes the terminal stage-4 record. Its timestamp is
-            // the sleep endpoint; the short tail leading to the terminal record is not sleep.
+            // The terminal marker ends the preceding measured stage; it is not itself a stage.
             val ambiguous = completeSessions.any { other -> other != session &&
                 points.any { it.timestamp in other.start..other.end } }
             if (ambiguous || points.size < 3 || points.last().stage != 4) emptyList()
-            else points.dropLast(1).zipWithNext().map { (a, b) ->
+            else points.zipWithNext().map { (a, b) ->
                 Interval(a.timestamp, b.timestamp, a.stage, a.position)
             }
         }
