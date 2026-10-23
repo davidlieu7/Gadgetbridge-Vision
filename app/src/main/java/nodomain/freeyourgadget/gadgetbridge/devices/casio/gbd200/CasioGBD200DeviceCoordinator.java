@@ -48,6 +48,11 @@ public class CasioGBD200DeviceCoordinator extends CasioGBX100DeviceCoordinator {
         return Pattern.compile("^CASIO GBD-200.*");
     }
 
+    @Override
+    public int getBatteryCount(final GBDevice device) {
+        return 0;
+    }
+
     @NonNull
     @Override
     public Class<? extends DeviceSupport> getDeviceSupportClass(final GBDevice device) {

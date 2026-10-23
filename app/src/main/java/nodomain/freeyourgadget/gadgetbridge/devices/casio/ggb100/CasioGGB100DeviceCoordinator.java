@@ -37,13 +37,18 @@ import java.util.Collections;
 import de.greenrobot.dao.AbstractDao;
 import de.greenrobot.dao.Property;
 import nodomain.freeyourgadget.gadgetbridge.R;
+import nodomain.freeyourgadget.gadgetbridge.activities.casio.CasioLocationIndicatorActivity;
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsPreferenceConst;
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSpecificSettingsCustomizer;
 import nodomain.freeyourgadget.gadgetbridge.activities.workouts.entries.ActivitySummaryTableRowEntry;
 import nodomain.freeyourgadget.gadgetbridge.activities.workouts.charts.DefaultWorkoutCharts;
+import nodomain.freeyourgadget.gadgetbridge.devices.DeviceCardAction;
 import nodomain.freeyourgadget.gadgetbridge.devices.GenericAltitudeSampleProvider;
 import nodomain.freeyourgadget.gadgetbridge.devices.SampleProvider;
 import nodomain.freeyourgadget.gadgetbridge.devices.TimeSampleProvider;
+import nodomain.freeyourgadget.gadgetbridge.devices.cards.ActionCardItem;
+import nodomain.freeyourgadget.gadgetbridge.devices.cards.DeviceCardItem;
+import nodomain.freeyourgadget.gadgetbridge.devices.cards.MoreCardItem;
 import nodomain.freeyourgadget.gadgetbridge.devices.casio.Casio2C2DDeviceCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.casio.CasioLocationIndicatorSettingsCustomizer;
 import nodomain.freeyourgadget.gadgetbridge.devices.casio.gbx100.CasioGBX100SampleProvider;
@@ -201,6 +206,28 @@ public class CasioGGB100DeviceCoordinator extends Casio2C2DDeviceCoordinator {
             R.xml.devicesettings_casio_ggb100_countdown_timer,
             R.xml.devicesettings_workout_start_on_phone
         };
+    }
+
+    @Override
+    public int getBatteryCount(final GBDevice device) {
+        return 0;
+    }
+
+    @Override
+    public List<DeviceCardItem> getCardItems(@NonNull final GBDevice device) {
+        final List<DeviceCardItem> items = new ArrayList<>(super.getCardItems(device));
+        final ActionCardItem locationIndicator = new ActionCardItem(
+                DeviceCardAction.forActivity(
+                        R.drawable.ic_gps_location,
+                        R.string.pref_casio_location_indicator_title,
+                        CasioLocationIndicatorActivity.class),
+                false,
+                "casio_location_indicator",
+                d -> true,
+                false);
+        final int moreIndex = items.indexOf(MoreCardItem.INSTANCE);
+        items.add(moreIndex >= 0 ? moreIndex : items.size(), locationIndicator);
+        return items;
     }
 
     @NonNull
