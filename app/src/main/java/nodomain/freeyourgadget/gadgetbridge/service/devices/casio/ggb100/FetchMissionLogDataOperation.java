@@ -35,6 +35,7 @@ import nodomain.freeyourgadget.gadgetbridge.entities.BaseActivitySummary;
 import nodomain.freeyourgadget.gadgetbridge.entities.BaseActivitySummaryDao;
 import nodomain.freeyourgadget.gadgetbridge.entities.DaoSession;
 import nodomain.freeyourgadget.gadgetbridge.entities.Device;
+import nodomain.freeyourgadget.gadgetbridge.entities.GenericAltitudeSample;
 import nodomain.freeyourgadget.gadgetbridge.entities.User;
 import nodomain.freeyourgadget.gadgetbridge.model.ActivityKind;
 import nodomain.freeyourgadget.gadgetbridge.model.ActivitySummaryData;
@@ -89,20 +90,43 @@ public class FetchMissionLogDataOperation extends AbstractCasioConvoyFetchOperat
             return;
         }
 
-        parseAltitudeRecords(data);
+        parseAltitudeRecords(support, data);
         parseAndSaveSeries(support, data, newDataFlags);
     }
 
-    private static void parseAltitudeRecords(byte[] data) {
-        for (int i = 0; i < RECORD_COUNT; i++) {
-            final int base = RECORDS_OFFSET + i * RECORD_STRIDE;
-            if (data[base + 2] == (byte) 0xff) continue; // empty slot
+    private static void parseAltitudeRecords(Casio2C2DSupport support, byte[] data) {
+        LOG.info("Parsing altitude records from mission log");
+        try (DBHandler dbHandler = GBApplication.acquireDB()) {
+            final DaoSession session = dbHandler.getDaoSession();
+            final Device device = DBHelper.getDevice(support.getDevice(), session);
+            final User user = DBHelper.getUser(session);
 
-            final short alt = (short) ((data[base] & 0xff) | (data[base + 1] << 8));
-            final Date ts = parseBcdUtc(data, base + 2, true);
-            LOG.info("Altitude record {}: {} m at {}", i, alt, ts);
+            int stored = 0;
+            int skipped = 0;
+            for (int i = 0; i < RECORD_COUNT; i++) {
+                final int base = RECORDS_OFFSET + i * RECORD_STRIDE;
+                if (data[base + 2] == (byte) 0xff) { skipped++; continue; } // empty slot
 
-            // TODO: we need to archive these altitue records somewhere
+                final short alt = (short) ((data[base] & 0xff) | (data[base + 1] << 8));
+                if (alt == -1) { skipped++; continue; } // measurement failed (0xffff)
+
+                final Date ts = parseBcdUtc(data, base + 2, true);
+
+                // Records are not cleared by ACK, so using insertOrReplace
+                final GenericAltitudeSample sample = new GenericAltitudeSample();
+                sample.setTimestamp(ts.getTime());
+                sample.setAltitude(alt);
+                sample.setDevice(device);
+                sample.setUser(user);
+                session.getGenericAltitudeSampleDao().insertOrReplace(sample);
+                stored++;
+                LOG.info("Altitude record {}: {} m at {}", i, alt, ts);
+            }
+            LOG.info("Altitude records: stored {}, skipped {} (empty or failed)", stored, skipped);
+        } catch (Exception e) {
+            LOG.info("Error saving altitude records: {}", e);
+            GB.toast(support.getContext(), "Error saving altitude records: " + e.getLocalizedMessage(),
+                    Toast.LENGTH_LONG, GB.ERROR, e);
         }
     }
 

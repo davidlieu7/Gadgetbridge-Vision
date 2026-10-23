@@ -120,6 +120,7 @@
     <item name="p_hydration" type="string">hydration</item>
     <item name="p_temperature" type="string">temperature</item>
     <item name="p_weight" type="string">weight</item>
+    <item name="p_altitude" type="string">altitude</item>
 
     <item name="p_message_privacy_mode_off" type="string">off</item>
     <item name="p_message_privacy_mode_complete" type="string">complete</item>

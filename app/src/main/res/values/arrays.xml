@@ -3558,6 +3558,7 @@
         <item>@string/pref_header_spo2</item>
         <item>@string/menuitem_temperature</item>
         <item>@string/menuitem_weight</item>
+        <item>@string/menuitem_altitude</item>
         <item>@string/watchface_widget_type_calories</item>
         <item>@string/pref_header_hydration</item>
         <item>@string/respiratoryrate</item>
@@ -3586,6 +3587,7 @@
         <item>@string/p_spo2</item>
         <item>@string/p_temperature</item>
         <item>@string/p_weight</item>
+        <item>@string/p_altitude</item>
         <item>@string/p_calories</item>
         <item>@string/p_hydration</item>
         <item>@string/p_respiratory_rate</item>
@@ -3614,6 +3616,7 @@
         <item>@string/p_spo2</item>
         <item>@string/p_temperature</item>
         <item>@string/p_weight</item>
+        <item>@string/p_altitude</item>
         <item>@string/p_calories</item>
         <item>@string/p_hydration</item>
         <item>@string/p_respiratory_rate</item>

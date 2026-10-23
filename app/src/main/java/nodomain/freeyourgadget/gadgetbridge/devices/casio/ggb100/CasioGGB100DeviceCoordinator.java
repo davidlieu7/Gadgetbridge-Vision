@@ -41,17 +41,21 @@ import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSett
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSpecificSettingsCustomizer;
 import nodomain.freeyourgadget.gadgetbridge.activities.workouts.entries.ActivitySummaryTableRowEntry;
 import nodomain.freeyourgadget.gadgetbridge.activities.workouts.charts.DefaultWorkoutCharts;
+import nodomain.freeyourgadget.gadgetbridge.devices.GenericAltitudeSampleProvider;
 import nodomain.freeyourgadget.gadgetbridge.devices.SampleProvider;
+import nodomain.freeyourgadget.gadgetbridge.devices.TimeSampleProvider;
 import nodomain.freeyourgadget.gadgetbridge.devices.casio.Casio2C2DDeviceCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.casio.CasioLocationIndicatorSettingsCustomizer;
 import nodomain.freeyourgadget.gadgetbridge.devices.casio.gbx100.CasioGBX100SampleProvider;
 import nodomain.freeyourgadget.gadgetbridge.entities.CasioGBX100ActivitySampleDao;
 import nodomain.freeyourgadget.gadgetbridge.entities.DaoSession;
+import nodomain.freeyourgadget.gadgetbridge.entities.GenericAltitudeSampleDao;
 import nodomain.freeyourgadget.gadgetbridge.entities.BaseActivitySummary;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
 import nodomain.freeyourgadget.gadgetbridge.model.ActivitySample;
 import nodomain.freeyourgadget.gadgetbridge.model.ActivitySummaryParser;
 import nodomain.freeyourgadget.gadgetbridge.model.ActivitySummaryData;
+import nodomain.freeyourgadget.gadgetbridge.model.AltitudeSample;
 import nodomain.freeyourgadget.gadgetbridge.model.ActivityPoint;
 import nodomain.freeyourgadget.gadgetbridge.model.ActivityKind;
 import nodomain.freeyourgadget.gadgetbridge.model.workout.Workout;
@@ -64,7 +68,7 @@ public class CasioGGB100DeviceCoordinator extends Casio2C2DDeviceCoordinator {
 
     @Override
     protected void applyDefaultPreferences(final DevicePrefs devicePreferences, final SharedPreferences.Editor editor) {
-        editor.putString(DeviceSettingsPreferenceConst.PREFS_DEVICE_CHARTS_TABS, "overview,activity,activitylist,stepsweek");
+        editor.putString(DeviceSettingsPreferenceConst.PREFS_DEVICE_CHARTS_TABS, "overview,activity,activitylist,stepsweek,altitude");
     }
 
     @Override
@@ -118,6 +122,16 @@ public class CasioGGB100DeviceCoordinator extends Casio2C2DDeviceCoordinator {
     }
 
     @Override
+    public boolean supportsPointAltitudeMeasurement(@NonNull final GBDevice device) {
+        return true;
+    }
+
+    @Override
+    public TimeSampleProvider<? extends AltitudeSample> getAltitudeSampleProvider(final GBDevice device, final DaoSession session) {
+        return new GenericAltitudeSampleProvider(device, session);
+    }
+
+    @Override
     public SampleProvider<? extends ActivitySample> getSampleProvider(GBDevice device, DaoSession session) {
         return new CasioGBX100SampleProvider(device, session);
     }
@@ -163,8 +177,9 @@ public class CasioGGB100DeviceCoordinator extends Casio2C2DDeviceCoordinator {
 
     @Override
     public Map<AbstractDao<?, ?>, Property> getAllDeviceDao(@NonNull final DaoSession session) {
-        Map<AbstractDao<?, ?>, Property> map = new HashMap<>(1);
+        Map<AbstractDao<?, ?>, Property> map = new HashMap<>(2);
         map.put(session.getCasioGBX100ActivitySampleDao(), CasioGBX100ActivitySampleDao.Properties.DeviceId);
+        map.put(session.getGenericAltitudeSampleDao(), GenericAltitudeSampleDao.Properties.DeviceId);
         return map;
     }
 
