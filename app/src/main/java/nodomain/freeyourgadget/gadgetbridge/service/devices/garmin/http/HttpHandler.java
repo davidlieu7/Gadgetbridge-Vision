@@ -333,7 +333,8 @@ public class HttpHandler {
             }
 
             final JsonElement jsonElement;
-            if ("application/json".equals(response.getHeaders().get("content-type"))) {
+            final String contentType = response.getHeader("content-type");
+            if (contentType != null && contentType.startsWith("application/json")) {
                 try (final InputStreamReader reader = new InputStreamReader(new ByteArrayInputStream(response.getBody()))) {
                     jsonElement = JsonParser.parseReader(reader);
                 } catch (IOException e) {

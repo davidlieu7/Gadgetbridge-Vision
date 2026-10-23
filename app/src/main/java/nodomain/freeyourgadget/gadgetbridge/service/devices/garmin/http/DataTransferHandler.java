@@ -1,5 +1,7 @@
 package nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.http;
 
+import androidx.annotation.Nullable;
+
 import com.google.protobuf.ByteString;
 
 import org.slf4j.Logger;
@@ -19,12 +21,16 @@ import java.util.concurrent.atomic.AtomicInteger;
 import nodomain.freeyourgadget.gadgetbridge.proto.garmin.GdiDataTransfer.DataDownloadRequest;
 import nodomain.freeyourgadget.gadgetbridge.proto.garmin.GdiDataTransfer.DataDownloadResponse;
 import nodomain.freeyourgadget.gadgetbridge.proto.garmin.GdiDataTransfer.DataTransferService;
+import nodomain.freeyourgadget.gadgetbridge.proto.garmin.GdiDataTransfer.FileAccessItemRequest;
+import nodomain.freeyourgadget.gadgetbridge.proto.garmin.GdiDataTransfer.FileAccessItemResponse;
+import nodomain.freeyourgadget.gadgetbridge.proto.garmin.GdiDataTypes;
 
 public class DataTransferHandler {
     private static final Logger LOG = LoggerFactory.getLogger(DataTransferHandler.class);
     private static final AtomicInteger idCounter = new AtomicInteger((new Random()).nextInt(Integer.MAX_VALUE / 2));
     private static final Map<Integer, Data> dataById = new HashMap<>();
     private static final Map<Integer, ChunkInfo> unprocessedChunksByRequestId = new HashMap<>();
+    private static final Random random = new Random();
 
     public DataTransferService handle(
             final DataTransferService dataTransferService,
@@ -81,6 +87,43 @@ public class DataTransferHandler {
                 .build();
     }
 
+    public FileAccessItemResponse handleFileAccessItemRequest(final FileAccessItemRequest request) {
+        final int dataId = request.getDataXferId();
+        LOG.debug("Received file access item request (id: {}, latency: {})", dataId, request.getExpectedLatency());
+        if (!dataById.containsKey(dataId)) {
+            LOG.error("Device requested file access to data with unknown id: {}", dataId);
+            return FileAccessItemResponse.newBuilder()
+                    .setStatus(FileAccessItemResponse.Status.INVALID_ID)
+                    .setDataXferId(dataId)
+                    .build();
+        }
+        return FileAccessItemResponse.newBuilder()
+                .setStatus(FileAccessItemResponse.Status.OK)
+                .setDataXferId(dataId)
+                .setFileAccessItemUid(GdiDataTypes.UUID.newBuilder()
+                        .setMostSignificant(dataId)
+                        .setLeastSignificant(random.nextLong())
+                        .build())
+                .build();
+    }
+
+    @Nullable
+    public static byte[] getData(final int dataId) {
+        final Data data = dataById.get(dataId);
+        return data != null ? data.data : null;
+    }
+
+    public static void onDataPushed(final int dataId, final boolean success) {
+        final Data data = dataById.remove(dataId);
+        if (data == null) {
+            return;
+        }
+        LOG.info("Data pushed to the device (id: {}, size: {}, success: {})", dataId, data.data.length, success);
+        if (success) {
+            notifyDataSuccessfullySent(data);
+        }
+    }
+
     public static int registerData(final byte[] data) {
         int id = idCounter.getAndIncrement();
         LOG.info("New data will be sent to the device (id: {}, size: {})", id, data.length);
@@ -101,19 +144,23 @@ public class DataTransferHandler {
         data.onDataChunkSuccessfullyReceived(chunkInfo);
         if (data.isDataSuccessfullySent()) {
             LOG.info("Data successfully sent to the device (id: {}, size: {})", chunkInfo.dataId, data.data.length);
-            for (Callable<Void> listener : data.onDataSuccessfullySentListeners) {
-                try {
-                    listener.call();
-                } catch (Exception e) {
-                    LOG.error("Data listener failed.", e);
-                }
-            }
+            notifyDataSuccessfullySent(data);
             dataById.remove(chunkInfo.dataId);
         } else {
             LOG.debug(
                     "Data chunk successfully sent to the device (dataId: {}, requestId: {}): {}-{}/{}",
                     chunkInfo.dataId, requestId, chunkInfo.start, chunkInfo.end, data.data.length
             );
+        }
+    }
+
+    private static void notifyDataSuccessfullySent(final Data data) {
+        for (Callable<Void> listener : data.onDataSuccessfullySentListeners) {
+            try {
+                listener.call();
+            } catch (Exception e) {
+                LOG.error("Data listener failed", e);
+            }
         }
     }
 

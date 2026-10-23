@@ -5761,6 +5761,9 @@
     <string name="activity_send_waypoint_no_location_details">No location information found in the received data.</string>
     <string name="activity_send_waypoint_short_plus_code_details">A short Plus Code needs a nearby position to find its place. Set your location in the Gadgetbridge settings, or use the full code (for example 8FVC9G8F+6X instead of 9G8F+6X).</string>
     <string name="activity_send_waypoint_to_device">Send</string>
+    <string name="activity_send_waypoint_center_on_location">Center current location</string>
+    <string name="activity_send_waypoint_use_location">Set waypoint at current location</string>
+    <string name="activity_send_waypoint_location_unavailable">Current location is not available</string>
 
     <!-- Export Health Connect preferences -->
     <string name="healthconnect_settings">Health Connect</string>
