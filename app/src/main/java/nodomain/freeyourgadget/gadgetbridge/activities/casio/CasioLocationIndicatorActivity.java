@@ -26,6 +26,7 @@ import android.widget.EditText;
 import android.widget.TextView;
 import android.widget.Toast;
 import android.content.Context;
+import android.content.Intent;
 import android.content.pm.PackageManager;
 import android.location.Location;
 import android.location.LocationManager;
@@ -49,6 +50,7 @@ import nodomain.freeyourgadget.gadgetbridge.service.devices.casio.CasioLocationP
 import nodomain.freeyourgadget.gadgetbridge.service.devices.casio.CasioLocationIndicatorLibrary;
 import nodomain.freeyourgadget.gadgetbridge.model.GPSCoordinate;
 import nodomain.freeyourgadget.gadgetbridge.util.DateTimeUtils;
+import nodomain.freeyourgadget.gadgetbridge.util.WaypointHelper;
 
 public class CasioLocationIndicatorActivity extends AbstractGBActivity {
     private GBDevice gbDevice;
@@ -219,6 +221,19 @@ public class CasioLocationIndicatorActivity extends AbstractGBActivity {
         openEditor(-1);
     }
 
+    private void sharePoint(final int index) {
+        if (index < 0 || index >= library.locations.size()) return;
+        final CasioLocationPoint p = library.locations.get(index);
+        final Double elevation = p.waypoint.hasAltitude() ? p.waypoint.getAltitude() : null;
+        final String geoUri = new WaypointHelper(p.label, p.waypoint.getLatitude(),
+                p.waypoint.getLongitude(), elevation).toString();
+        final Intent intent = new Intent(Intent.ACTION_SEND);
+        intent.setType("text/plain");
+        intent.putExtra(Intent.EXTRA_SUBJECT, p.label);
+        intent.putExtra(Intent.EXTRA_TEXT, geoUri);
+        startActivity(Intent.createChooser(intent, getString(R.string.share)));
+    }
+
     static String summarize(final Context context, final CasioLocationPoint p) {
         final String coords = String.format(Locale.ROOT, "%.5f, %.5f",
                 p.waypoint.getLatitude(), p.waypoint.getLongitude());
@@ -240,12 +255,14 @@ public class CasioLocationIndicatorActivity extends AbstractGBActivity {
             final android.widget.RadioButton active;
             final TextView label;
             final TextView summary;
+            final android.widget.ImageButton share;
             final android.widget.ImageButton delete;
             VH(final View v) {
                 super(v);
                 active = v.findViewById(R.id.casio_location_item_active);
                 label = v.findViewById(R.id.casio_location_item_label);
                 summary = v.findViewById(R.id.casio_location_item_summary);
+                share = v.findViewById(R.id.casio_location_item_share);
                 delete = v.findViewById(R.id.casio_location_item_delete);
             }
         }
@@ -269,6 +286,7 @@ public class CasioLocationIndicatorActivity extends AbstractGBActivity {
                 persistAndRefresh();
             });
             h.itemView.setOnClickListener(v -> openEditor(h.getBindingAdapterPosition()));
+            h.share.setOnClickListener(v -> sharePoint(h.getBindingAdapterPosition()));
             h.delete.setOnClickListener(v -> {
                 library.remove(h.getBindingAdapterPosition());
                 persistAndRefresh();

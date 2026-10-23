@@ -37,6 +37,14 @@
     </LinearLayout>
 
     <ImageButton
+        android:id="@+id/casio_location_item_share"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:background="?attr/selectableItemBackgroundBorderless"
+        android:contentDescription="@string/share"
+        android:src="@android:drawable/ic_menu_share" />
+
+    <ImageButton
         android:id="@+id/casio_location_item_delete"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
