@@ -1,0 +1,110 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.preference.PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <PreferenceCategory
+        android:key="melomania_anc_category"
+        android:title="@string/melomania_anc_category">
+
+        <ListPreference
+            android:defaultValue="off"
+            android:entries="@array/melomania_anc_mode_names"
+            android:entryValues="@array/melomania_anc_mode_values"
+            android:key="melomania_anc_mode"
+            android:summary="%s"
+            android:title="@string/melomania_anc_mode" />
+
+        <Preference
+            android:key="melomania_anc_divider"
+            android:layout="@layout/preference_divider"
+            android:selectable="false" />
+
+        <Preference
+            android:key="melomania_anc_cycle_info"
+            android:layout="@layout/preference_description"
+            android:selectable="false"
+            android:title="@string/melomania_anc_cycle_summary" />
+
+        <SwitchPreferenceCompat
+            android:defaultValue="true"
+            android:key="melomania_anc_cycle_normal"
+            android:layout="@layout/preference_checkbox"
+            android:title="@string/melomania_anc_cycle_normal" />
+
+        <SwitchPreferenceCompat
+            android:defaultValue="true"
+            android:key="melomania_anc_cycle_noise_cancelling"
+            android:layout="@layout/preference_checkbox"
+            android:title="@string/melomania_anc_cycle_noise_cancelling" />
+
+        <SwitchPreferenceCompat
+            android:defaultValue="true"
+            android:key="melomania_anc_cycle_transparency"
+            android:layout="@layout/preference_checkbox"
+            android:title="@string/melomania_anc_cycle_transparency" />
+
+    </PreferenceCategory>
+
+    <PreferenceCategory
+        android:key="melomania_audio_category"
+        android:title="@string/melomania_audio_category">
+
+        <SwitchPreferenceCompat
+            android:defaultValue="false"
+            android:key="melomania_gaming_mode"
+            android:layout="@layout/preference_checkbox"
+            android:title="@string/melomania_gaming_mode" />
+
+        <SwitchPreferenceCompat
+            android:defaultValue="true"
+            android:key="melomania_wear_detection"
+            android:layout="@layout/preference_checkbox"
+            android:title="@string/melomania_wear_detection" />
+
+        <SwitchPreferenceCompat
+            android:defaultValue="true"
+            android:key="melomania_loudness"
+            android:layout="@layout/preference_checkbox"
+            android:summary="@string/melomania_loudness_summary"
+            android:title="@string/melomania_loudness" />
+
+        <SwitchPreferenceCompat
+            android:defaultValue="true"
+            android:key="melomania_side_tone"
+            android:layout="@layout/preference_checkbox"
+            android:summary="@string/melomania_side_tone_summary"
+            android:title="@string/melomania_side_tone" />
+
+        <ListPreference
+            android:defaultValue="3600"
+            android:dialogTitle="@string/melomania_auto_power_down"
+            android:entries="@array/melomania_auto_power_down_names"
+            android:entryValues="@array/melomania_auto_power_down_values"
+            android:key="melomania_auto_power_down"
+            android:summary="%s"
+            android:title="@string/melomania_auto_power_down" />
+
+        <ListPreference
+            android:defaultValue="english"
+            android:entries="@array/melomania_language_names"
+            android:entryValues="@array/melomania_language_values"
+            android:key="melomania_language"
+            android:summary="%s"
+            android:title="@string/melomania_language" />
+
+        <Preference
+            android:key="melomania_codec"
+            android:layout="@layout/preference_checkbox"
+            android:selectable="false"
+            android:summary="@string/melomania_unknown"
+            android:title="@string/melomania_codec" />
+
+        <Preference
+            android:key="melomania_firmware"
+            android:layout="@layout/preference_checkbox"
+            android:selectable="false"
+            android:summary="@string/melomania_unknown"
+            android:title="@string/melomania_firmware" />
+
+    </PreferenceCategory>
+
+</androidx.preference.PreferenceScreen>

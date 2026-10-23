@@ -4296,6 +4296,25 @@
     <string name="devicetype_onemore_sonoflow_se" translatable="false">1MORE SonoFlow SE</string>
     <string name="devicetype_sony_wena3" translatable="false">Sony Wena 3</string>
     <string name="devicetype_withings_steel_hr" translatable="false">Withings Steel HR</string>
+    <string name="devicetype_cambridge_audio_melomania_p100_se" translatable="false">Cambridge Audio Melomania P100 SE</string>
+    <string name="melomania_anc_category">Ambient noise control</string>
+    <string name="melomania_anc_mode">Ambient noise mode</string>
+    <string name="melomania_anc_cycle_summary">Selects which modes the ANC button cycles through. This does not switch the current mode.</string>
+    <string name="melomania_anc_cycle_normal">Normal</string>
+    <string name="melomania_anc_cycle_noise_cancelling">Noise cancelling</string>
+    <string name="melomania_anc_cycle_transparency">Transparency</string>
+    <string name="melomania_audio_category">Audio</string>
+    <string name="melomania_gaming_mode">Gaming mode</string>
+    <string name="melomania_wear_detection">Wear detection</string>
+    <string name="melomania_loudness">DynamEQ©</string>
+    <string name="melomania_loudness_summary">DynamEQ© is a Cambridge Audio feature of these headphones. It adjusts bass and treble to keep a full, natural sound at low volumes.</string>
+    <string name="melomania_side_tone">Sidetone</string>
+    <string name="melomania_side_tone_summary">Hear your own voice during calls.</string>
+    <string name="melomania_auto_power_down">Auto power off</string>
+    <string name="melomania_language">Voice prompt language</string>
+    <string name="melomania_codec">Current codec</string>
+    <string name="melomania_firmware">Firmware version</string>
+    <string name="melomania_unknown">unknown</string>
     <string name="pref_button_action_disabled">Disabled</string>
     <string name="pref_media_play">Media Play</string>
     <string name="pref_media_pause">Media Pause</string>

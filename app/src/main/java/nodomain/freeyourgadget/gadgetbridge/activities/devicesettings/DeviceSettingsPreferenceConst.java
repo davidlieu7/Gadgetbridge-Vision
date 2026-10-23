@@ -1,4 +1,4 @@
-/*  Copyright (C) 2019-2024 115ek, akasaka / Genjitsu Labs, Alicia Hormann,
+/*  Copyright (C) 2019-2026 115ek, akasaka / Genjitsu Labs, Alicia Hormann,
     Andreas Böhler, Andreas Shimokawa, Arjan Schrijver, Damien Gaignon, Daniel
     Dakhno, Daniele Gobbetti, Davis Mosenkovs, foxstidious, Gordon Williams,
     José Rebelo, Lukas, LukasEdl, mamucho, narektor, NekoBox, opavlov, Petr
@@ -725,6 +725,19 @@ public class DeviceSettingsPreferenceConst {
     public static final String PREF_TEUFEL_MYND_PARTY_LINK = "teufel_mynd_party_link";
 
     public static final String PREF_DUAL_DEVICE_SUPPORT = "dual_device_support";
+
+    public static final String PREF_MELOMANIA_ANC_MODE = "melomania_anc_mode";
+    public static final String PREF_MELOMANIA_ANC_CYCLE_NORMAL = "melomania_anc_cycle_normal";
+    public static final String PREF_MELOMANIA_ANC_CYCLE_NOISE_CANCELLING = "melomania_anc_cycle_noise_cancelling";
+    public static final String PREF_MELOMANIA_ANC_CYCLE_TRANSPARENCY = "melomania_anc_cycle_transparency";
+    public static final String PREF_MELOMANIA_GAMING_MODE = "melomania_gaming_mode";
+    public static final String PREF_MELOMANIA_WEAR_DETECTION = "melomania_wear_detection";
+    public static final String PREF_MELOMANIA_LOUDNESS = "melomania_loudness";
+    public static final String PREF_MELOMANIA_SIDE_TONE = "melomania_side_tone";
+    public static final String PREF_MELOMANIA_AUTO_POWER_DOWN = "melomania_auto_power_down";
+    public static final String PREF_MELOMANIA_LANGUAGE = "melomania_language";
+    public static final String PREF_MELOMANIA_CODEC = "melomania_codec";
+    public static final String PREF_MELOMANIA_FIRMWARE = "melomania_firmware";
 
     public static final String PREFS_ACTIVITY_IN_DEVICE_CARD = "prefs_activity_in_device_card";
     public static final String PREFS_ACTIVITY_IN_DEVICE_CARD_STEPS = "prefs_activity_in_device_card_steps";

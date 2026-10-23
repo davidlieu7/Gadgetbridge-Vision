@@ -520,11 +520,12 @@ import nodomain.freeyourgadget.gadgetbridge.devices.oppo.OppoEncoBuds2Coordinato
 import nodomain.freeyourgadget.gadgetbridge.devices.overmax.OVTouch26Coordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.pebble.PebbleCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.pinetime.PineTimeJFCoordinator;
+import nodomain.freeyourgadget.gadgetbridge.devices.bose.NC700Coordinator;
+import nodomain.freeyourgadget.gadgetbridge.devices.bose.QC35Coordinator;
+import nodomain.freeyourgadget.gadgetbridge.devices.melomania.MelomaniaP100SECoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.pixel.PixelBudsACoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.polar.PolarH10DeviceCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.polar.PolarH9DeviceCoordinator;
-import nodomain.freeyourgadget.gadgetbridge.devices.bose.NC700Coordinator;
-import nodomain.freeyourgadget.gadgetbridge.devices.bose.QC35Coordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.qhybrid.QHybridCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.qnscale.QnScaleCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.realme.RealmeBudsAir5ProCoordinator;
@@ -1141,6 +1142,7 @@ public enum DeviceType {
     ONEMORE_SONOFLOW(OneMoreSonoFlowCoordinator.class),
     ONEMORE_SONOFLOW_SE(OneMoreSonoFlowSECoordinator.class),
     UGREEN_HITUNE_MAX_5C(UgreenHituneMax5cCoordinator.class),
+    CAMBRIDGE_AUDIO_MELOMANIA_P100_SE(MelomaniaP100SECoordinator.class),
     HONORBAND3(HonorBand3Coordinator.class),
     HONORBAND4(HonorBand4Coordinator.class),
     HONORBAND5(HonorBand5Coordinator.class),

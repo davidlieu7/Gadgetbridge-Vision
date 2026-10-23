@@ -5069,4 +5069,57 @@
         <item>devices</item>
     </string-array>
 
+    <string-array name="melomania_anc_mode_names">
+        <item>Off</item>
+        <item>Noise cancelling</item>
+        <item>Transparency</item>
+    </string-array>
+
+    <string-array name="melomania_anc_mode_values">
+        <item>off</item>
+        <item>anc</item>
+        <item>transparency</item>
+    </string-array>
+
+    <string-array name="melomania_language_names">
+        <item>Tones</item>
+        <item>English</item>
+        <item>German</item>
+        <item>Spanish</item>
+        <item>Italian</item>
+        <item>Japanese</item>
+        <item>Korean</item>
+        <item>Cantonese</item>
+        <item>Mandarin</item>
+        <item>French</item>
+        <item>Celebrity</item>
+        <item>Off</item>
+    </string-array>
+
+    <string-array name="melomania_language_values">
+        <item>tones</item>
+        <item>english</item>
+        <item>german</item>
+        <item>spanish</item>
+        <item>italian</item>
+        <item>japanese</item>
+        <item>korean</item>
+        <item>cantonese</item>
+        <item>mandarin</item>
+        <item>french</item>
+        <item>celebrity</item>
+        <item>off</item>
+    </string-array>
+
+    <string-array name="melomania_auto_power_down_names">
+        <item>30 minutes</item>
+        <item>1 hour</item>
+        <item>Never</item>
+    </string-array>
+
+    <string-array name="melomania_auto_power_down_values">
+        <item>1800</item>
+        <item>3600</item>
+        <item>0</item>
+    </string-array>
 </resources>
