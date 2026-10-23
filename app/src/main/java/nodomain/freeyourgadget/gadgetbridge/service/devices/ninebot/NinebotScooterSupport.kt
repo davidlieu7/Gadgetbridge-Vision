@@ -278,7 +278,7 @@ class NinebotScooterSupport : AbstractBTLESingleDeviceSupport(LOG) {
         }
         LOG.info("Paired")
         handler.removeCallbacks(pairTimeout)
-        sharedPrefs().edit().putString(PREF_APP_KEY, GB.hexdump(key).replace(" ", "")).apply()
+        sharedPrefs().edit().putString(PREF_AUTH_KEY, GB.hexdump(key).replace(" ", "")).apply()
         step = Step.READY
 
         evaluateGBDeviceEvent(
@@ -334,7 +334,7 @@ class NinebotScooterSupport : AbstractBTLESingleDeviceSupport(LOG) {
             }
             if (step == Step.PAIR) {
                 // The scooter did not accept the stored key (the original app replaced it), pair anew next time
-                sharedPrefs().edit().remove(PREF_APP_KEY).apply()
+                sharedPrefs().edit().remove(PREF_AUTH_KEY).apply()
             }
             step = Step.IDLE
             GB.toast(context, R.string.ninebot_pairing_failed, Toast.LENGTH_LONG, GB.WARN)
@@ -349,7 +349,7 @@ class NinebotScooterSupport : AbstractBTLESingleDeviceSupport(LOG) {
     }
 
     private fun storedAppKey(): ByteArray? {
-        val hex = sharedPrefs().getString(PREF_APP_KEY, null)?.trim().orEmpty()
+        val hex = sharedPrefs().getString(PREF_AUTH_KEY, null)?.trim().orEmpty()
         if (hex.length != 32) return null
         return runCatching { GB.hexStringToByteArray(hex) }.getOrNull()
     }
@@ -486,6 +486,8 @@ class NinebotScooterSupport : AbstractBTLESingleDeviceSupport(LOG) {
                     if (!unlocked && !autoUnlockDone && (sharedPrefs().getBoolean(PREF_AUTO_UNLOCK, false) || searchEnabled()) && !switchedOffRecently()) {
                         autoUnlockDone = true
                         LOG.info("Unlocking automatically")
+                        // Right after the connection the scooter ignores the first unlock, so try again like on a manual switch on
+                        powerOnRetries = POWER_ON_RETRIES
                         unlock()
                     }
                 }
@@ -538,15 +540,17 @@ class NinebotScooterSupport : AbstractBTLESingleDeviceSupport(LOG) {
             val prefs = Prefs(sharedPrefs())
             when (config) {
                 PREF_CODE_PROTECTION ->
-                    writeRegister(
-                        NinebotProtocol.ID_BLE, NinebotProtocol.BLE_CODE_PROTECTION,
-                        if (prefs.getBoolean(config, false)) 1 else 0
+                    enqueue(
+                        NinebotProtocol.write(
+                            NinebotProtocol.ID_BLE, NinebotProtocol.BLE_CODE_PROTECTION,
+                            if (prefs.getBoolean(config, false)) 1 else 0
+                        )
                     )
 
                 PREF_CODE -> {
                     val code = prefs.getString(config, "").toIntOrNull()
                     if (code != null && code in 0..9999) {
-                        writeRegister(NinebotProtocol.ID_BLE, NinebotProtocol.BLE_CODE, code)
+                        enqueue(NinebotProtocol.write(NinebotProtocol.ID_BLE, NinebotProtocol.BLE_CODE, code))
                     } else {
                         LOG.warn("Ignoring invalid security code")
                     }
@@ -559,38 +563,42 @@ class NinebotScooterSupport : AbstractBTLESingleDeviceSupport(LOG) {
                 }
 
                 PREF_KERS -> NinebotKers.entries.find { it.name.lowercase() == prefs.getString(config, "") }?.let {
-                    writeRegister(NinebotProtocol.ID_CTRL, NinebotProtocol.CTRL_KERS, it.code)
+                    enqueue(NinebotProtocol.write(NinebotProtocol.ID_CTRL, NinebotProtocol.CTRL_KERS, it.code))
                 }
 
                 PREF_CHARGE_LIMIT ->
                     NinebotChargeLimit.entries.find { it.name.lowercase() == prefs.getString(config, "") }?.let {
-                        writeRegister(NinebotProtocol.ID_BATT, NinebotProtocol.BATT_CHARGE_LIMIT, it.percent)
+                        enqueue(NinebotProtocol.write(NinebotProtocol.ID_BATT, NinebotProtocol.BATT_CHARGE_LIMIT, it.percent))
                     }
 
                 PREF_UNLOCK, PREF_POWER_ON -> unlock()
 
-                PREF_POWER_OFF -> {
-                    // The scooter drops the connection when switching off, the reconnect must not switch it on again
-                    autoUnlockDone = true
-                    sharedPrefs().edit().putLong(PREF_POWER_OFF_AT, System.currentTimeMillis()).apply()
-                    writeRegister(NinebotProtocol.ID_CTRL, NinebotProtocol.CTRL_POWER_OFF, 1)
-                }
+                PREF_POWER_OFF -> powerOff()
 
                 else -> super.onSendConfiguration(config)
             }
         }
     }
 
+    override fun onPowerOff() {
+        synchronized(lock) {
+            if (step == Step.READY) powerOff()
+        }
+    }
+
+    private fun powerOff() {
+        // The scooter drops the connection when switching off, the reconnect must not switch it on again
+        autoUnlockDone = true
+        sharedPrefs().edit().putLong(PREF_POWER_OFF_AT, System.currentTimeMillis()).apply()
+        enqueue(NinebotProtocol.write(NinebotProtocol.ID_CTRL, NinebotProtocol.CTRL_POWER_OFF, 1))
+    }
+
     private fun switchedOffRecently(): Boolean =
         System.currentTimeMillis() - sharedPrefs().getLong(PREF_POWER_OFF_AT, 0) < POWER_OFF_SUPPRESS_AUTO_UNLOCK_MS
 
     private fun unlock() {
-        writeRegister(NinebotProtocol.ID_BLE, NinebotProtocol.BLE_UNLOCK, 1)
+        enqueue(NinebotProtocol.write(NinebotProtocol.ID_BLE, NinebotProtocol.BLE_UNLOCK, 1))
         enqueue(NinebotProtocol.read(NinebotProtocol.ID_BLE, NinebotProtocol.BLE_LOCK_STATE, 2))
-    }
-
-    private fun writeRegister(dst: Int, register: Int, value: Int) {
-        enqueue(NinebotProtocol.write(dst, register, value))
     }
 
     private enum class Step { IDLE, INIT, PING, PAIR, READY }
@@ -612,16 +620,16 @@ class NinebotScooterSupport : AbstractBTLESingleDeviceSupport(LOG) {
         private const val FAST_POLL_INTERVAL_MS = 5000L
         private const val SEARCH_INTERVAL_MS = 3000L
 
-        const val PREF_APP_KEY = "ninebot_app_key"
+        const val PREF_AUTH_KEY = DeviceSettingsPreferenceConst.PREF_AUTH_KEY
         const val PREF_POWER_ON_PENDING = "ninebot_power_on_pending"
         private const val POWER_ON_REQUEST_MAX_AGE_MS = 120_000L
-        private const val POWER_ON_RETRIES = 2
-        private const val POWER_ON_RETRY_DELAY_MS = 2000L
+        private const val POWER_ON_RETRIES = 4
+        private const val POWER_ON_RETRY_DELAY_MS = 3000L
         private const val PREF_POWER_OFF_AT = "ninebot_power_off_at"
         private const val POWER_OFF_SUPPRESS_AUTO_UNLOCK_MS = 300_000L
 
-        const val PREF_CODE_PROTECTION = DeviceSettingsPreferenceConst.PREF_NINEBOT_CODE_PROTECTION
-        const val PREF_CODE = DeviceSettingsPreferenceConst.PREF_NINEBOT_CODE
+        const val PREF_CODE_PROTECTION = DeviceSettingsPreferenceConst.PREF_PASSWORD_ENABLED
+        const val PREF_CODE = DeviceSettingsPreferenceConst.PREF_PASSWORD
         const val PREF_UNLOCK = DeviceSettingsPreferenceConst.PREF_NINEBOT_UNLOCK
         const val PREF_AUTO_UNLOCK = DeviceSettingsPreferenceConst.PREF_NINEBOT_AUTO_UNLOCK
         const val PREF_LOCK_STATE = DeviceSettingsPreferenceConst.PREF_NINEBOT_LOCK_STATE
