@@ -200,6 +200,24 @@ public final class SoundcoreEqualizer {
         );
     }
 
+    /**
+     * Builds the compact payload for command 0x8302, not the full payload's 0x8703.
+     * Gains are signed dB and tails are explicit signed wire offsets; missing values
+     * are padded with zero. Compact custom tails must not use the full payload's
+     * per-band approximation, since they can depend on neighboring bands.
+     */
+    public static byte[] buildPayloadCompact(final int presetId, final int[] bands, final int[] tails) {
+        final boolean custom = (presetId & 0xff) == SoundcoreEqualizerPresets.CUSTOM.getIndex();
+        return StringUtils.hexToBytes(
+                toHexByte(presetId)
+                        + (custom ? "fe" : "00")
+                        + StringUtils.bytesToHex(encodeBands(bands))
+                        + (custom ? "78" : "00")
+                        + StringUtils.bytesToHex(encodeValues(tails, 1))
+                        + "00"
+        );
+    }
+
     private static int clamp(final int value, final int min, final int max) {
         return Math.max(min, Math.min(max, value));
     }
