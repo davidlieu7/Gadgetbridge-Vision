@@ -28,25 +28,25 @@
             android:defaultValue="true"
             android:key="melomania_anc_cycle_normal"
             android:layout="@layout/preference_checkbox"
-            android:title="@string/melomania_anc_cycle_normal" />
+            android:title="@string/normal" />
 
         <SwitchPreferenceCompat
             android:defaultValue="true"
             android:key="melomania_anc_cycle_noise_cancelling"
             android:layout="@layout/preference_checkbox"
-            android:title="@string/melomania_anc_cycle_noise_cancelling" />
+            android:title="@string/prefs_active_noise_cancelling" />
 
         <SwitchPreferenceCompat
             android:defaultValue="true"
             android:key="melomania_anc_cycle_transparency"
             android:layout="@layout/preference_checkbox"
-            android:title="@string/melomania_anc_cycle_transparency" />
+            android:title="@string/prefs_active_noise_cancelling_transparency" />
 
     </PreferenceCategory>
 
     <PreferenceCategory
         android:key="melomania_audio_category"
-        android:title="@string/melomania_audio_category">
+        android:title="@string/pref_header_audio">
 
         <SwitchPreferenceCompat
             android:defaultValue="false"
@@ -71,17 +71,17 @@
             android:defaultValue="true"
             android:key="melomania_side_tone"
             android:layout="@layout/preference_checkbox"
-            android:summary="@string/melomania_side_tone_summary"
-            android:title="@string/melomania_side_tone" />
+            android:summary="@string/prefs_jabra_sidetone_summary"
+            android:title="@string/prefs_jabra_sidetone" />
 
         <ListPreference
             android:defaultValue="3600"
-            android:dialogTitle="@string/melomania_auto_power_down"
+            android:dialogTitle="@string/soundcore_auto_power_off_title"
             android:entries="@array/melomania_auto_power_down_names"
             android:entryValues="@array/melomania_auto_power_down_values"
             android:key="melomania_auto_power_down"
             android:summary="%s"
-            android:title="@string/melomania_auto_power_down" />
+            android:title="@string/soundcore_auto_power_off_title" />
 
         <ListPreference
             android:defaultValue="english"
@@ -89,7 +89,7 @@
             android:entryValues="@array/melomania_language_values"
             android:key="melomania_language"
             android:summary="%s"
-            android:title="@string/melomania_language" />
+            android:title="@string/prefs_voice_prompts_language" />
 
         <Preference
             android:key="melomania_codec"
@@ -97,13 +97,6 @@
             android:selectable="false"
             android:summary="@string/melomania_unknown"
             android:title="@string/melomania_codec" />
-
-        <Preference
-            android:key="melomania_firmware"
-            android:layout="@layout/preference_checkbox"
-            android:selectable="false"
-            android:summary="@string/melomania_unknown"
-            android:title="@string/melomania_firmware" />
 
     </PreferenceCategory>
 

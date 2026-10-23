@@ -43,9 +43,10 @@ import nodomain.freeyourgadget.gadgetbridge.model.BatteryState;
 /**
  * Cambridge Audio custom API over Qualcomm GAIA v3 RFCOMM framing.
  *
- * Frame: FF &lt;version=3&gt; &lt;flags=0&gt; &lt;payload length&gt;
+ * Frame: FF <version=3> <flags=0> <payload length>
  *        vendor(2, BE) command(2, BE) payload
- * command word = feature &lt;&lt; 9 | type &lt;&lt; 7 | command id
+ * command word = feature << 9 | type << 7 | command id
+ *
  */
 public class MelomaniaP100SEProtocol {
     private static final Logger LOG = LoggerFactory.getLogger(MelomaniaP100SEProtocol.class);
@@ -419,9 +420,6 @@ public class MelomaniaP100SEProtocol {
                     }
                     info.hwVersion = model;
                     events.add(info);
-                    prefUpdates.put(DeviceSettingsPreferenceConst.PREF_MELOMANIA_FIRMWARE,
-                            info.fwVersion2 == null ? info.fwVersion
-                                    : info.fwVersion + " / " + info.fwVersion2);
                 }
                 break;
             case MISC_GET_BLUETOOTH_ADDRESSES:

@@ -80,9 +80,6 @@ public final class MelomaniaP100SEConstants {
         if (id >= 0 && id < LANGUAGE_NAMES.length) {
             return LANGUAGE_NAMES[id];
         }
-        if (id == 255) {
-            return LANGUAGE_OFF;
-        }
         return "unknown(" + id + ")";
     }
 

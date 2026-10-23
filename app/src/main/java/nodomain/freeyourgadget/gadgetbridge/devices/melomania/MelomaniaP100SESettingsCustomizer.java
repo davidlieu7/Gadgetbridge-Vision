@@ -20,7 +20,6 @@ import android.content.SharedPreferences;
 import android.os.Parcel;
 import android.os.Parcelable;
 
-import androidx.preference.ListPreference;
 import androidx.preference.Preference;
 
 import java.util.Collections;
@@ -53,8 +52,6 @@ public class MelomaniaP100SESettingsCustomizer implements DeviceSpecificSettings
                                    final DeviceSpecificSettingsHandler handler) {
         if (DeviceSettingsPreferenceConst.PREF_MELOMANIA_CODEC.equals(preference.getKey())) {
             updateCodecSummary(preference, handler);
-        } else if (DeviceSettingsPreferenceConst.PREF_MELOMANIA_FIRMWARE.equals(preference.getKey())) {
-            updateFirmwareSummary(preference, handler);
         }
     }
 
@@ -66,36 +63,9 @@ public class MelomaniaP100SESettingsCustomizer implements DeviceSpecificSettings
             handler.addPreferenceHandlerFor(key);
         }
 
-        final Preference autoPowerDown = handler.findPreference(
-                DeviceSettingsPreferenceConst.PREF_MELOMANIA_AUTO_POWER_DOWN);
-        if (autoPowerDown instanceof ListPreference) {
-            final String value = prefs.getString(
-                    DeviceSettingsPreferenceConst.PREF_MELOMANIA_AUTO_POWER_DOWN, "3600");
-            if (value != null && value.contains(":")) {
-                // Migrate the old HH:MM:SS representation to seconds.
-                final String[] parts = value.split(":");
-                if (parts.length == 3) {
-                    try {
-                        final int seconds = Integer.parseInt(parts[0]) * 3600
-                                + Integer.parseInt(parts[1]) * 60
-                                + Integer.parseInt(parts[2]);
-                        ((ListPreference) autoPowerDown).setValue(String.valueOf(seconds));
-                    } catch (final NumberFormatException ignored) {
-                        // keep existing value
-                    }
-                }
-            }
-        }
-
         final Preference codec = handler.findPreference(DeviceSettingsPreferenceConst.PREF_MELOMANIA_CODEC);
         if (codec != null) {
             updateCodecSummary(codec, handler);
-        }
-
-        final Preference firmware = handler.findPreference(
-                DeviceSettingsPreferenceConst.PREF_MELOMANIA_FIRMWARE);
-        if (firmware != null) {
-            updateFirmwareSummary(firmware, handler);
         }
     }
 
@@ -105,20 +75,6 @@ public class MelomaniaP100SESettingsCustomizer implements DeviceSpecificSettings
                 handler.getDevice().getAddress());
         preference.setSummary(prefs.getString(DeviceSettingsPreferenceConst.PREF_MELOMANIA_CODEC,
                 handler.getContext().getString(R.string.melomania_unknown)));
-    }
-
-    private void updateFirmwareSummary(final Preference preference,
-                                       final DeviceSpecificSettingsHandler handler) {
-        final SharedPreferences prefs = GBApplication.getDeviceSpecificSharedPrefs(
-                handler.getDevice().getAddress());
-        String firmware = prefs.getString(DeviceSettingsPreferenceConst.PREF_MELOMANIA_FIRMWARE, null);
-        if (firmware == null || firmware.isEmpty()) {
-            firmware = handler.getDevice().getFirmwareVersion();
-        }
-        if (firmware == null || firmware.isEmpty()) {
-            firmware = handler.getContext().getString(R.string.melomania_unknown);
-        }
-        preference.setSummary(firmware);
     }
 
     @Override

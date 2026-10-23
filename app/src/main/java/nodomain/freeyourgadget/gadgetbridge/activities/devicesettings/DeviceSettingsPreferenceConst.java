@@ -737,7 +737,6 @@ public class DeviceSettingsPreferenceConst {
     public static final String PREF_MELOMANIA_AUTO_POWER_DOWN = "melomania_auto_power_down";
     public static final String PREF_MELOMANIA_LANGUAGE = "melomania_language";
     public static final String PREF_MELOMANIA_CODEC = "melomania_codec";
-    public static final String PREF_MELOMANIA_FIRMWARE = "melomania_firmware";
 
     public static final String PREFS_ACTIVITY_IN_DEVICE_CARD = "prefs_activity_in_device_card";
     public static final String PREFS_ACTIVITY_IN_DEVICE_CARD_STEPS = "prefs_activity_in_device_card_steps";

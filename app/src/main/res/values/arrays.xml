@@ -5070,9 +5070,9 @@
     </string-array>
 
     <string-array name="melomania_anc_mode_names">
-        <item>Off</item>
-        <item>Noise cancelling</item>
-        <item>Transparency</item>
+        <item>@string/off</item>
+        <item>@string/prefs_active_noise_cancelling</item>
+        <item>@string/prefs_active_noise_cancelling_transparency</item>
     </string-array>
 
     <string-array name="melomania_anc_mode_values">
@@ -5082,18 +5082,18 @@
     </string-array>
 
     <string-array name="melomania_language_names">
-        <item>Tones</item>
-        <item>English</item>
-        <item>German</item>
-        <item>Spanish</item>
-        <item>Italian</item>
-        <item>Japanese</item>
-        <item>Korean</item>
-        <item>Cantonese</item>
-        <item>Mandarin</item>
-        <item>French</item>
-        <item>Celebrity</item>
-        <item>Off</item>
+        <item>@string/melomania_language_tones</item>
+        <item>@string/english</item>
+        <item>@string/german</item>
+        <item>@string/spanish</item>
+        <item>@string/italian</item>
+        <item>@string/japanese</item>
+        <item>@string/korean</item>
+        <item>@string/cantonese</item>
+        <item>@string/mandarin</item>
+        <item>@string/french</item>
+        <item>@string/melomania_language_celebrity</item>
+        <item>@string/off</item>
     </string-array>
 
     <string-array name="melomania_language_values">
@@ -5112,9 +5112,9 @@
     </string-array>
 
     <string-array name="melomania_auto_power_down_names">
-        <item>30 minutes</item>
-        <item>1 hour</item>
-        <item>Never</item>
+        <item>@string/minutes_30</item>
+        <item>@string/sony_automatic_power_off_1_hour</item>
+        <item>@string/never</item>
     </string-array>
 
     <string-array name="melomania_auto_power_down_values">
