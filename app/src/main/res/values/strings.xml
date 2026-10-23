@@ -5322,6 +5322,9 @@
     <string name="canned_replies_not_empty">There should be at least one canned reply.</string>
     <string name="permission_disable_doze_title">Ignore battery optimizations</string>
     <string name="permission_disable_doze_summary">Allows running in the background unhindered by Android\'s battery optimizations</string>
+    <string name="permission_autostart_title">Autostart</string>
+    <string name="permission_autostart_summary">Allows starting in the background, on phones that block this by default</string>
+    <string name="permission_autostart">%1$s needs autostart permission to start in the background and to stay connected to your devices. If this permission is off, the system can stop %1$s.\n\nPlease tap \"%2$s\" and enable autostart for %1$s, then tap \"Back\" to return to %1$s.</string>
     <string name="update_firmware_operation_check_in_progress">Checking firmware</string>
     <string name="update_firmware_operation_check_failed">Firmware check failed</string>
     <string name="pref_garmin_fake_oauth_warning">Do not enable this if you plan to use the official app or connect the watch to the internet. After enabling this setting, you may need to factory reset the watch to authenticate again.</string>
