@@ -41,8 +41,7 @@ import nodomain.freeyourgadget.gadgetbridge.webview.CurrentPosition;
 
 /**
  * GG-B100 sync handshake, run after the APP_INFO / BLE_FEAT exchange (handled in
- * CasioGGB100DeviceSupport, which passes the BLE_FEAT connection reason here).
- * Flow per PROTOCOL-GGB100.md, "Connection reasons":
+ * CasioGGB100DeviceSupport, which passes the BLE_FEAT connection reason here)
  *
  * Reasons 00 (pairing) / 01 (app session) / 08 (mission log):
  *   1. request_echo BLE_SETTINGS (0x11)

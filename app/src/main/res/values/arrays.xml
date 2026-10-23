@@ -3260,14 +3260,14 @@
     </string-array>
 
     <string-array name="pref_casio_mode_carousel">
-        <item>Barometer</item>
-        <item>Temperature</item>
-        <item>Data recall</item>
-        <item>Sunrise/sunset</item>
-        <item>Stopwatch</item>
-        <item>Timer</item>
-        <item>Alarm</item>
-        <item>World time</item>
+        <item>@string/pref_casio_mode_carousel_barometer</item>
+        <item>@string/pref_casio_mode_carousel_temperature</item>
+        <item>@string/pref_casio_mode_carousel_data_recall</item>
+        <item>@string/pref_casio_mode_carousel_sunrise_sunset</item>
+        <item>@string/pref_casio_mode_carousel_stopwatch</item>
+        <item>@string/pref_casio_mode_carousel_timer</item>
+        <item>@string/pref_casio_mode_carousel_alarm</item>
+        <item>@string/pref_casio_mode_carousel_world_time</item>
     </string-array>
 
     <string-array name="pref_casio_mode_carousel_values">
@@ -3293,14 +3293,14 @@
     </string-array>
 
     <string-array name="pref_casio_display_screens">
-        <item>Day and date</item>
-        <item>Pressure graph + date</item>
-        <item>Hours/min/sec</item>
-        <item>Steps (today)</item>
-        <item>Year date</item>
-        <item>Pressure graph</item>
-        <item>World time (HH:MM)</item>
-        <item>Sunrise/sunset (today)</item>
+        <item>@string/pref_casio_display_screens_day_date</item>
+        <item>@string/pref_casio_display_screens_pressure_graph_date</item>
+        <item>@string/pref_casio_display_screens_hours_min_sec</item>
+        <item>@string/pref_casio_display_screens_steps_today</item>
+        <item>@string/pref_casio_display_screens_year_date</item>
+        <item>@string/pref_casio_display_screens_pressure_graph</item>
+        <item>@string/pref_casio_display_screens_world_time</item>
+        <item>@string/pref_casio_display_screens_sunrise_sunset_today</item>
     </string-array>
 
     <string-array name="pref_casio_display_screens_values">
