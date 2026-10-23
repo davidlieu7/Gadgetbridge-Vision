@@ -56,6 +56,8 @@ import static nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.Dev
 import static nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsPreferenceConst.PREF_CASIO_ALTITUDE_MEASUREMENT_INTERVAL;
 import static nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsPreferenceConst.PREF_CASIO_ALTIMETER_DISPLAY;
 import static nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsPreferenceConst.PREF_CASIO_PRESSURE_GRAPH;
+import static nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsPreferenceConst.PREF_CASIO_MODE_CAROUSEL;
+import static nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsPreferenceConst.PREF_CASIO_DISPLAY_SCREENS;
 
 public class CasioGGB100DeviceSupport extends Casio2C2DSupport
         implements SharedPreferences.OnSharedPreferenceChangeListener {
@@ -79,6 +81,8 @@ public class CasioGGB100DeviceSupport extends Casio2C2DSupport
             new AltitudeMeasurementIntervalPreference(),
             new AltimeterDisplayPreference(),
             new PressureGraphPreference(),
+            new ModeCarouselPreference(),
+            new DisplayScreensPreference(),
             new HourlyChimePreference(),
             new CountdownTimerPreference(),
             new TimeSyncPreference(),
@@ -505,6 +509,112 @@ public class CasioGGB100DeviceSupport extends Casio2C2DSupport
         { name = PREF_CASIO_PRESSURE_GRAPH; }
         { feature = FEATURE_FEAT_2F; }
         { index = 2; mask = 0x04; }
+    }
+
+    // ── Mode & display customization (0x38) ───────────────────────────────────
+
+    private static final String DEFAULT_MODE_CAROUSEL = "1,2,3,4,5,6,7,8";
+    private static final String DEFAULT_DISPLAY_SCREENS = "1,3,5,7";
+
+    /**
+     * Mode carousel: bytes[1:9], enabled mode ids in carousel order
+     * 1=BAROMETER 2=TEMPERATURE 3=RECALL 4=SUNRISE 5=STOPWATCH
+     * 6=TIMER 7=ALARM 8=WORLD TIME
+     */
+    public class ModeCarouselPreference extends DevicePreference {
+        { name = PREF_CASIO_MODE_CAROUSEL; }
+        { feature = FEATURE_MODE_DISPLAY_CUSTOMIZATION; }
+
+        @Override
+        public void updateValue(byte[] data) {
+            if (data.length < 17) {
+                LOG.warn("mode display data too small: {}", Arrays.toString(data));
+                return;
+            }
+            writeIds(data, 1, getDevicePrefs().getString(name, DEFAULT_MODE_CAROUSEL));
+        }
+
+        @Override
+        public boolean readValue(byte[] data, SharedPreferences.Editor editor) {
+            if (data.length < 17) {
+                LOG.warn("mode display data too small: {}", Arrays.toString(data));
+                return false;
+            }
+            final String value = readIds(data, 1);
+            if (!value.equals(getDevicePrefs().getString(name, DEFAULT_MODE_CAROUSEL))) {
+                editor.putString(name, value);
+            }
+            return false;
+        }
+    }
+
+    /**
+     * Timekeeping display screens: bytes[9:17], enabled screen ids in order
+     */
+    public class DisplayScreensPreference extends DevicePreference {
+        { name = PREF_CASIO_DISPLAY_SCREENS; }
+        { feature = FEATURE_MODE_DISPLAY_CUSTOMIZATION; }
+
+        @Override
+        public void updateValue(byte[] data) {
+            if (data.length < 17) {
+                LOG.warn("mode display data too small: {}", Arrays.toString(data));
+                return;
+            }
+            writeIds(data, 9, getDevicePrefs().getString(name, DEFAULT_DISPLAY_SCREENS));
+        }
+
+        @Override
+        public boolean readValue(byte[] data, SharedPreferences.Editor editor) {
+            if (data.length < 17) {
+                LOG.warn("mode display data too small: {}", Arrays.toString(data));
+                return false;
+            }
+            final String value = readIds(data, 9);
+            if (!value.equals(getDevicePrefs().getString(name, DEFAULT_DISPLAY_SCREENS))) {
+                editor.putString(name, value);
+            }
+            return false;
+        }
+    }
+
+    /** Writes up to 8 ids from a comma-separated string at offset, ff-padding the rest */
+    private static void writeIds(final byte[] data, final int offset, final String csv) {
+        for (int i = 0; i < 8; i++) {
+            data[offset + i] = (byte) 0xff;
+        }
+        if (csv == null) {
+            return;
+        }
+        int i = 0;
+        for (final String part : csv.split(",")) {
+            if (i >= 8) {
+                break;
+            }
+            try {
+                final int id = Integer.parseInt(part.trim());
+                if (id >= 1 && id <= 8) {
+                    data[offset + i++] = (byte) id;
+                }
+            } catch (NumberFormatException e) {
+                LOG.warn("Invalid id '{}' in '{}'", part, csv);
+            }
+        }
+    }
+
+    /** Reads the non-ff ids at offset as a comma-separated string, in order */
+    private static String readIds(final byte[] data, final int offset) {
+        final StringBuilder sb = new StringBuilder();
+        for (int i = 0; i < 8; i++) {
+            final int id = data[offset + i] & 0xff;
+            if (id >= 1 && id <= 8) {
+                if (sb.length() > 0) {
+                    sb.append(',');
+                }
+                sb.append(id);
+            }
+        }
+        return sb.toString();
     }
 
     // ── Characteristic change handler ─────────────────────────────────────────────────────────

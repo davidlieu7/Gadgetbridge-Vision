@@ -336,6 +336,8 @@ public class DeviceSettingsPreferenceConst {
     public static final String PREF_CASIO_ALTITUDE_MEASUREMENT_INTERVAL = "casio_altitude_measurement_interval";
     public static final String PREF_CASIO_ALTIMETER_DISPLAY = "casio_altimeter_display";
     public static final String PREF_CASIO_PRESSURE_GRAPH = "casio_pressure_graph";
+    public static final String PREF_CASIO_MODE_CAROUSEL = "casio_mode_carousel";
+    public static final String PREF_CASIO_DISPLAY_SCREENS = "casio_display_screens";
 
     public static final String PREF_LIGHT_DURATION_LONGER = "light_duration_longer";
     public static final String PREF_AUTOREMOVE_MESSAGE = "autoremove_message";

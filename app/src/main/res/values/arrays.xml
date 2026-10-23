@@ -3259,6 +3259,68 @@
         <item>2</item>
     </string-array>
 
+    <string-array name="pref_casio_mode_carousel">
+        <item>Barometer</item>
+        <item>Temperature</item>
+        <item>Data recall</item>
+        <item>Sunrise/sunset</item>
+        <item>Stopwatch</item>
+        <item>Timer</item>
+        <item>Alarm</item>
+        <item>World time</item>
+    </string-array>
+
+    <string-array name="pref_casio_mode_carousel_values">
+        <item>1</item>
+        <item>2</item>
+        <item>3</item>
+        <item>4</item>
+        <item>5</item>
+        <item>6</item>
+        <item>7</item>
+        <item>8</item>
+    </string-array>
+
+    <string-array name="pref_casio_mode_carousel_default">
+        <item>1</item>
+        <item>2</item>
+        <item>3</item>
+        <item>4</item>
+        <item>5</item>
+        <item>6</item>
+        <item>7</item>
+        <item>8</item>
+    </string-array>
+
+    <string-array name="pref_casio_display_screens">
+        <item>Day and date</item>
+        <item>Pressure graph + date</item>
+        <item>Hours/min/sec</item>
+        <item>Steps (today)</item>
+        <item>Year date</item>
+        <item>Pressure graph</item>
+        <item>World time (HH:MM)</item>
+        <item>Sunrise/sunset (today)</item>
+    </string-array>
+
+    <string-array name="pref_casio_display_screens_values">
+        <item>1</item>
+        <item>3</item>
+        <item>5</item>
+        <item>7</item>
+        <item>2</item>
+        <item>4</item>
+        <item>6</item>
+        <item>8</item>
+    </string-array>
+
+    <string-array name="pref_casio_display_screens_default">
+        <item>1</item>
+        <item>3</item>
+        <item>5</item>
+        <item>7</item>
+    </string-array>
+
     <string-array name="notifications_timeout">
         <item>@string/no_limit</item>
         <item>@string/seconds_5</item>

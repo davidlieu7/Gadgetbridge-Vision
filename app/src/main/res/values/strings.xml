@@ -490,6 +490,10 @@
     <string name="pref_casio_compass_auto_correction_title">Compass auto-correction</string>
     <string name="pref_casio_altitude_interval_title">Altitude auto-measurement interval</string>
     <string name="pref_casio_altimeter_display_title">Altimeter display</string>
+    <string name="pref_casio_mode_carousel_title">Mode carousel</string>
+    <string name="pref_casio_mode_carousel_summary">Enable and reorder the watch modes</string>
+    <string name="pref_casio_display_screens_title">Display screens</string>
+    <string name="pref_casio_display_screens_summary">Enable and reorder the timekeeping screens</string>
     <string name="pref_casio_altimeter_display_plain">Altitude</string>
     <string name="pref_casio_altimeter_display_100">Altitude ±100 m</string>
     <string name="pref_casio_altimeter_display_1000">Altitude ±1000 m</string>
