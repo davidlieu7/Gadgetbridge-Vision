@@ -333,6 +333,9 @@ public class DeviceSettingsPreferenceConst {
     public static final String PREF_CASIO_PRESSURE_ENERGY_CALC = "casio_pressure_energy_calc";
     public static final String PREF_CASIO_COMPASS_AUTO_CORRECTION = "casio_compass_auto_correction";
     public static final String PREF_CASIO_USER_PROFILE = "casio_user_profile";
+    public static final String PREF_CASIO_ALTITUDE_MEASUREMENT_INTERVAL = "casio_altitude_measurement_interval";
+    public static final String PREF_CASIO_ALTIMETER_DISPLAY = "casio_altimeter_display";
+    public static final String PREF_CASIO_PRESSURE_GRAPH = "casio_pressure_graph";
 
     public static final String PREF_LIGHT_DURATION_LONGER = "light_duration_longer";
     public static final String PREF_AUTOREMOVE_MESSAGE = "autoremove_message";

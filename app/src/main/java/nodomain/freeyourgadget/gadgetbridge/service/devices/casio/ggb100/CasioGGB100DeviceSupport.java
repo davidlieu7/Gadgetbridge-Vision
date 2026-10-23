@@ -53,6 +53,9 @@ import static nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.Dev
 import static nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsPreferenceConst.PREF_CASIO_PRESSURE_ENERGY_CALC;
 import static nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsPreferenceConst.PREF_CASIO_COMPASS_AUTO_CORRECTION;
 import static nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsPreferenceConst.PREF_CASIO_USER_PROFILE;
+import static nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsPreferenceConst.PREF_CASIO_ALTITUDE_MEASUREMENT_INTERVAL;
+import static nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsPreferenceConst.PREF_CASIO_ALTIMETER_DISPLAY;
+import static nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsPreferenceConst.PREF_CASIO_PRESSURE_GRAPH;
 
 public class CasioGGB100DeviceSupport extends Casio2C2DSupport
         implements SharedPreferences.OnSharedPreferenceChangeListener {
@@ -73,6 +76,9 @@ public class CasioGGB100DeviceSupport extends Casio2C2DSupport
             new LongerLightDurationPreference(),
             new PressureEnergyCalcPreference(),
             new CompassAutoCorrectionPreference(),
+            new AltitudeMeasurementIntervalPreference(),
+            new AltimeterDisplayPreference(),
+            new PressureGraphPreference(),
             new HourlyChimePreference(),
             new CountdownTimerPreference(),
             new TimeSyncPreference(),
@@ -414,6 +420,91 @@ public class CasioGGB100DeviceSupport extends Casio2C2DSupport
         { name = PREF_CASIO_COMPASS_AUTO_CORRECTION; }
         { feature = FEATURE_SETTING_FOR_BASIC; }
         { index = 8; mask = 0x08; }
+    }
+
+    // ── Sensor/display config (0x2f) ──────────────────────────────────────────
+
+    /** Altitude auto-measurement interval: byte[1] bit 0x04, set = 2 min, clear = 5 s */
+    public class AltitudeMeasurementIntervalPreference extends DevicePreference {
+        { name = PREF_CASIO_ALTITUDE_MEASUREMENT_INTERVAL; }
+        { feature = FEATURE_FEAT_2F; }
+
+        @Override
+        public void updateValue(byte[] data) {
+            if (data.length < 2) {
+                LOG.warn("sensor config data too small: {}", Arrays.toString(data));
+                return;
+            }
+            if (getMode() == 1) {
+                data[1] |= 0x04;
+            } else {
+                data[1] &= ~0x04;
+            }
+        }
+
+        @Override
+        public boolean readValue(byte[] data, SharedPreferences.Editor editor) {
+            if (data.length < 2) {
+                LOG.warn("sensor config data too small: {}", Arrays.toString(data));
+                return false;
+            }
+            final String value = (data[1] & 0x04) != 0 ? "1" : "0";
+            if (!value.equals(getDevicePrefs().getString(name, "1"))) {
+                editor.putString(name, value);
+            }
+            return false;
+        }
+
+        private int getMode() {
+            return "1".equals(getDevicePrefs().getString(name, "1")) ? 1 : 0;
+        }
+    }
+
+    /** Altimeter display: byte[1] bits 0x08|0x10, 0x10 = plain, 0x08 = ±100 m, 0x18 = ±1000 m, 0x00 = plain */
+    public class AltimeterDisplayPreference extends DevicePreference {
+        { name = PREF_CASIO_ALTIMETER_DISPLAY; }
+        { feature = FEATURE_FEAT_2F; }
+
+        private static final int[] MODE_BITS = { 0x10, 0x08, 0x18 };
+
+        @Override
+        public void updateValue(byte[] data) {
+            if (data.length < 2) {
+                LOG.warn("sensor config data too small: {}", Arrays.toString(data));
+                return;
+            }
+            data[1] = (byte) ((data[1] & ~0x18) | MODE_BITS[getMode()]);
+        }
+
+        @Override
+        public boolean readValue(byte[] data, SharedPreferences.Editor editor) {
+            if (data.length < 2) {
+                LOG.warn("sensor config data too small: {}", Arrays.toString(data));
+                return false;
+            }
+            final int bits = data[1] & 0x18;
+            final int mode = bits == 0x08 ? 1 : (bits == 0x18 ? 2 : 0);
+            final String value = Integer.toString(mode);
+            if (!value.equals(getDevicePrefs().getString(name, "0"))) {
+                editor.putString(name, value);
+            }
+            return false;
+        }
+
+        private int getMode() {
+            try {
+                return Math.max(0, Math.min(Integer.parseInt(getDevicePrefs().getString(name, "0")), 2));
+            } catch (NumberFormatException e) {
+                return 0;
+            }
+        }
+    }
+
+    /** Pressure graph: byte[2] bit 0x04, set = pressure-change graph */
+    public class PressureGraphPreference extends InvertedBoolDevicePreference {
+        { name = PREF_CASIO_PRESSURE_GRAPH; }
+        { feature = FEATURE_FEAT_2F; }
+        { index = 2; mask = 0x04; }
     }
 
     // ── Characteristic change handler ─────────────────────────────────────────────────────────
