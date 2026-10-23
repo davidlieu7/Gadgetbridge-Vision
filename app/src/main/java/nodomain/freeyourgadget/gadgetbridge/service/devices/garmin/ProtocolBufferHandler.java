@@ -50,6 +50,7 @@ import nodomain.freeyourgadget.gadgetbridge.proto.garmin.GdiFindMyWatch;
 import nodomain.freeyourgadget.gadgetbridge.proto.garmin.GdiGncs;
 import nodomain.freeyourgadget.gadgetbridge.proto.garmin.GdiHttp;
 import nodomain.freeyourgadget.gadgetbridge.proto.garmin.GdiInstalledApps;
+import nodomain.freeyourgadget.gadgetbridge.proto.garmin.GdiLiveTrack;
 import nodomain.freeyourgadget.gadgetbridge.proto.garmin.GdiRealtimeSettings;
 import nodomain.freeyourgadget.gadgetbridge.proto.garmin.GdiSmartProto.Smart;
 import nodomain.freeyourgadget.gadgetbridge.proto.garmin.GdiSmsNotification;
@@ -247,6 +248,21 @@ public class ProtocolBufferHandler implements MessageHandler {
             }
             if (smart.hasDeviceMessageService()) {
                 processed = pushNotificationHandler.handle(smart.getDeviceMessageService());
+            }
+            if (smart.hasLiveTrackService()) {
+                processed = true;
+                final GdiLiveTrack.LiveTrackService liveTrack = smart.getLiveTrackService();
+                LOG.debug("LiveTrack service message from the watch: {}", liveTrack);
+                if (liveTrack.hasStartRequest()) {
+                    // Garmin Connect answers a watch-driven LiveTrack start with SUCCESS; the
+                    // watch then shows "Live Track started".
+                    return prepareProtobufResponse(Smart.newBuilder().setLiveTrackService(
+                            GdiLiveTrack.LiveTrackService.newBuilder().setStartResponse(
+                                    GdiLiveTrack.StartResponse.newBuilder()
+                                            .setStartStatus(GdiLiveTrack.StartResponse.Status.SUCCESS)
+                            )
+                    ).build(), message.getRequestId());
+                }
             }
             if (smart.hasExploreSyncService()) {
                 if (deviceSupport.getDevicePrefs().getBoolean("garmin_exploresync", false)) {

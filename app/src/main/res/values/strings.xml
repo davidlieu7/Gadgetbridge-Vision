@@ -5554,6 +5554,8 @@
     <string name="garmin_legacy_sync_flush_summary" translatable="false">Use the legacy sync protocol to flush data before sync. Disable this if your watch freezes when syncing. Might result in delayed data.</string>
     <string name="feature_exploresync_title">ExploreSync Protocol</string>
     <string name="feature_exploresync_summary">Sync activity GPS tracks using the ExploreSync protocol. Should only be used if the device does not provide FIT files.</string>
+    <string name="garmin_advertise_livetrack_title">Advertise LiveTrack</string>
+    <string name="garmin_advertise_livetrack_summary">Tell the watch this phone supports LiveTrack, so it offers its LiveTrack sessions and streams its position, speed and heart rate to Gadgetbridge. Takes effect on the next connection</string>
     <string name="feature_experimental_unstable">Experimental, might be unstable</string>
     <string name="heart_rate_settings">Heart rate settings</string>
     <string name="heart_rate_settings_summary">View current workout heart rate settings and zones</string>

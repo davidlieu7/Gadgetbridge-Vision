@@ -18,6 +18,8 @@ public class GarminPreferences {
     public static final String PREF_GARMIN_MLR = "garmin_mlr";
     public static final String PREF_GARMIN_PRG_TRANSFER_MLR = "garmin_prg_transfer_mlr";
     public static final String PREF_GARMIN_EXPLORE_SYNC = "garmin_exploresync";
+    /** Tell the watch the phone supports LiveTrack, so it offers its LiveTrack sessions and streams its data. */
+    public static final String PREF_GARMIN_ADVERTISE_LIVETRACK = "garmin_advertise_livetrack";
     public static final String PREF_GARMIN_LEGACY_SYNC_FLUSH = "garmin_legacy_sync_flush";
     public static final String PREF_GARMIN_HYDRATION_SUPPORTED = "garmin_hydration_supported";
 

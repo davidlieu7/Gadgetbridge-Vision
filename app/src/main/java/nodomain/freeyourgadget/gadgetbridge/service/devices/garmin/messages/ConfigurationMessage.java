@@ -10,7 +10,7 @@ import nodomain.freeyourgadget.gadgetbridge.devices.garmin.GarminCapability;
 public class ConfigurationMessage extends GFDIMessage {
     private final byte[] incomingConfigurationPayload;
     private final Set<GarminCapability> capabilities;
-    private final byte[] ourConfigurationPayload = GarminCapability.setToBinary(GarminCapability.OUR_CAPABILITIES);
+    private final byte[] ourConfigurationPayload = GarminCapability.setToBinary(GarminCapability.getOurCapabilities());
 
     public ConfigurationMessage(GarminMessage garminMessage, byte[] configurationPayload) {
         this.garminMessage = garminMessage;

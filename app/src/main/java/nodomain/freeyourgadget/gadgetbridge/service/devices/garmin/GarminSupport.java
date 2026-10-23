@@ -156,6 +156,9 @@ import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.workouts.
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.messages.CurrentTimeRequestMessage;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.messages.DeviceInformationMessage;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.messages.DownloadRequestMessage;
+import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.messages.LiveTrackMessage;
+import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.messages.LiveTrackStartMessage;
+import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.messages.LiveTrackStopMessage;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.messages.GFDIMessage;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.messages.MusicControlEntityUpdateMessage;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.messages.SetDeviceSettingsMessage;
@@ -193,6 +196,11 @@ public class GarminSupport extends AbstractBTLESingleDeviceSupport implements IC
     private final Queue<FileToDownload> filesToDownload;
     private FileToDownload currentlyDownloading;
     private final List<MessageHandler> messageHandlers;
+    /** Seconds between the Unix epoch and the Garmin epoch (1989-12-31). */
+    private static final long GARMIN_EPOCH_OFFSET_SECONDS = 631065600L;
+    /** Whether the watch was asked to stream its LiveTrack data, and the handler decoding it. */
+    private volatile boolean watchLiveTrackStreaming = false;
+    private FitLocalMessageHandler liveTrackFitHandler;
     private final List<FileType> supportedFileTypeList = new ArrayList<>();
     private ICommunicator communicator;
     private GarminWatchAppCommunicator watchAppCommunicator;
@@ -232,6 +240,11 @@ public class GarminSupport extends AbstractBTLESingleDeviceSupport implements IC
                 case ACTION_APP_IS_IN_BACKGROUND:
                     sendOutgoingMessage("set background", new SystemEventMessage(SystemEventMessage.GarminSystemEventType.HOST_DID_ENTER_BACKGROUND, 0));
                     break;
+                case GarminLiveTrack.ACTION_END:
+                    if (getDevice().getAddress().equals(intent.getStringExtra(GarminLiveTrack.EXTRA_ADDRESS))) {
+                        endWatchLiveTrackStream(true);
+                    }
+                    break;
             }
         }
     };
@@ -254,6 +267,7 @@ public class GarminSupport extends AbstractBTLESingleDeviceSupport implements IC
         IntentFilter filterLocal = new IntentFilter();
         filterLocal.addAction(ACTION_APP_IS_IN_FOREGROUND);
         filterLocal.addAction(ACTION_APP_IS_IN_BACKGROUND);
+        filterLocal.addAction(GarminLiveTrack.ACTION_END);
         LocalBroadcastManager.getInstance(GBApplication.getContext()).registerReceiver(broadcastReceiver, filterLocal);
     }
 
@@ -297,6 +311,7 @@ public class GarminSupport extends AbstractBTLESingleDeviceSupport implements IC
                 protocolBufferHandler.getExploreSyncHandler().onDisconnected();
             }
             GBLocationService.stop(getContext(), getDevice());
+            endWatchLiveTrackStream(false);
             try {
                 LocalBroadcastManager.getInstance(GBApplication.getContext()).unregisterReceiver(broadcastReceiver);
             } catch (final Exception e) {
@@ -351,6 +366,7 @@ public class GarminSupport extends AbstractBTLESingleDeviceSupport implements IC
     @NonNull
     @Override
     protected TransactionBuilder initializeDevice(final TransactionBuilder builder) {
+        GarminCapability.setAdvertiseLiveTrack(getDevicePrefs().getBoolean(GarminPreferences.PREF_GARMIN_ADVERTISE_LIVETRACK, false));
         builder.setDeviceState(GBDevice.State.INITIALIZING);
 
         resetFileSyncState();
@@ -491,6 +507,15 @@ public class GarminSupport extends AbstractBTLESingleDeviceSupport implements IC
         }
 
         sendAck("send status", parsedMessage); //send status message
+
+        if (parsedMessage instanceof LiveTrackMessage) {
+            switch (parsedMessage.getGarminMessage()) {
+                case LIVE_TRACK_AUTO_START -> startWatchLiveTrackStream();
+                case LIVE_TRACK_AUTO_START_CANCEL, LIVE_TRACK_STOP_TRACKING -> endWatchLiveTrackStream(false);
+                default -> {
+                }
+            }
+        }
 
         if (parsedMessage instanceof DeviceInformationMessage deviceInformation && !isRfcommThread()) {
             classicAddress = deviceInformation.getClassicAddress();
@@ -650,6 +675,14 @@ public class GarminSupport extends AbstractBTLESingleDeviceSupport implements IC
             currentlyDownloading = null;
         } else if (deviceEvent instanceof IncomingFitDefinitionDeviceEvent) {
             final FitLocalMessageHandler fitLocalMessageHandler = new FitLocalMessageHandler(this, ((IncomingFitDefinitionDeviceEvent) deviceEvent).getRecordDefinitions(), maxPacketSize);
+            if (watchLiveTrackStreaming) {
+                // The watch's stream: its definitions replace the previous ones, and the handler stays on.
+                if (liveTrackFitHandler != null) {
+                    messageHandlers.remove(liveTrackFitHandler);
+                }
+                fitLocalMessageHandler.setLiveRecordListener(record -> GarminLiveTrack.dispatchRecord(getDevice(), record));
+                liveTrackFitHandler = fitLocalMessageHandler;
+            }
             messageHandlers.add(fitLocalMessageHandler);
         } else {
             super.evaluateGBDeviceEvent(deviceEvent);
@@ -1297,6 +1330,46 @@ public class GarminSupport extends AbstractBTLESingleDeviceSupport implements IC
                 protocolBufferHandler.getExploreSyncHandler().startSession();
             }
         }
+    }
+
+    /**
+     * Garmin Connect answers a watch's LiveTrack auto start by asking it to start streaming its data
+     * (a LIVE_TRACK_TRACKING_REQUEST); the watch then sends its position, speed and heart rate as FIT
+     * records. Only done when the phone advertises LiveTrack, which is the only way the watch sends an
+     * auto start in the first place.
+     */
+    private void startWatchLiveTrackStream() {
+        if (!getDevicePrefs().getBoolean(GarminPreferences.PREF_GARMIN_ADVERTISE_LIVETRACK, false)) {
+            return;
+        }
+        watchLiveTrackStreaming = true;
+        final int garminNow = (int) (System.currentTimeMillis() / 1000L - GARMIN_EPOCH_OFFSET_SECONDS);
+        LOG.info("Asking the watch to stream its LiveTrack data");
+        sendOutgoingMessage("start live track on the watch", new LiveTrackStartMessage(garminNow));
+        GarminLiveTrack.dispatchStarted(getDevice());
+    }
+
+    /**
+     * Ends the watch's LiveTrack stream: forgets the stream handler and, when the phone is the one
+     * that ended it, tells the watch so it stops streaming and drops its "stop live track" option.
+     *
+     * @param tellWatch whether the watch has to be told (not when it was the one that stopped)
+     */
+    private void endWatchLiveTrackStream(final boolean tellWatch) {
+        final boolean wasStreaming = watchLiveTrackStreaming;
+        watchLiveTrackStreaming = false;
+        if (liveTrackFitHandler != null) {
+            messageHandlers.remove(liveTrackFitHandler);
+            liveTrackFitHandler = null;
+        }
+        if (!wasStreaming) {
+            return;
+        }
+        if (tellWatch) {
+            LOG.info("The live track ended on the phone, telling the watch");
+            sendOutgoingMessage("stop live track on the watch", new LiveTrackStopMessage());
+        }
+        GarminLiveTrack.dispatchStopped(getDevice());
     }
 
     private void requestBatteryUpdate() {

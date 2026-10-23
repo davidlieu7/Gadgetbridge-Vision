@@ -184,6 +184,24 @@ public enum GarminCapability {
         OUR_CAPABILITIES.remove(UNK_119);
     }
 
+    private static volatile boolean advertiseLiveTrack = false;
+
+    /** Whether the capabilities sent to the watch include LiveTrack (an experiment, off by default). */
+    public static void setAdvertiseLiveTrack(final boolean advertise) {
+        advertiseLiveTrack = advertise;
+    }
+
+    /** The capabilities to tell the watch we support. */
+    public static Set<GarminCapability> getOurCapabilities() {
+        if (!advertiseLiveTrack) {
+            return OUR_CAPABILITIES;
+        }
+        final Set<GarminCapability> capabilities = new HashSet<>(OUR_CAPABILITIES);
+        capabilities.add(LIVETRACK);
+        capabilities.add(LIVETRACK_AUTO_START);
+        return capabilities;
+    }
+
     public static Set<GarminCapability> setFromBinary(final byte[] bytes) {
         final Set<GarminCapability> result = new HashSet<>(GarminCapability.values().length);
         int current = 0;

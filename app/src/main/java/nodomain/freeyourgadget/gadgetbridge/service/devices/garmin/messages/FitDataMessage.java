@@ -6,6 +6,7 @@ import java.util.Objects;
 
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.GarminByteBufferReader;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.RecordData;
+import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.messages.FitRecordDataFactory;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.RecordDefinition;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.RecordHeader;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.messages.status.FitDataStatusMessage;
@@ -36,6 +37,14 @@ public class FitDataMessage extends GFDIMessage {
     }
 
     public List<RecordData> applyDefinitions(List<RecordDefinition> recordDefinitions) {
+        return applyDefinitions(recordDefinitions, false);
+    }
+
+    /**
+     * @param typed whether to create the typed subclasses (FitRecord and so on), which let callers
+     *              read the fields by name, instead of plain {@link RecordData}
+     */
+    public List<RecordData> applyDefinitions(List<RecordDefinition> recordDefinitions, boolean typed) {
         final List<RecordData> recordDataList = new ArrayList<>();;
         Objects.requireNonNull(reader, "reader cannot be null");
         try {
@@ -53,10 +62,9 @@ public class FitDataMessage extends GFDIMessage {
                     LOG.warn("Cannot find a local message definition for type: {}", recordHeader.getLocalMessageType());
                     return null;
                 }
-                RecordData recordData = new RecordData(
-                        localMessageDefinition,
-                        localMessageDefinition.getRecordHeader()
-                );
+                RecordData recordData = typed
+                        ? FitRecordDataFactory.create(localMessageDefinition, localMessageDefinition.getRecordHeader())
+                        : new RecordData(localMessageDefinition, localMessageDefinition.getRecordHeader());
                 recordData.parseDataMessage(reader, null);
                 recordDataList.add(recordData);
             }

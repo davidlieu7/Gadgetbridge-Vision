@@ -5,6 +5,7 @@ import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.function.Consumer;
 
 import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEvent;
 import nodomain.freeyourgadget.gadgetbridge.devices.garmin.GarminCapability;
@@ -13,6 +14,7 @@ import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.NativeFIT
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.RecordData;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.RecordDefinition;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.messages.FitDataMessage;
+import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.messages.FitRecord;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.messages.FitDefinitionMessage;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.messages.GFDIMessage;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.messages.status.FitDataStatusMessage;
@@ -29,6 +31,9 @@ public class FitLocalMessageHandler implements MessageHandler {
     private final int maxPacketSize;
     private List<RecordData> recordDataList;
 
+    /** Receives every FIT record from the watch, and keeps this handler registered for as long as the stream lasts. */
+    private Consumer<FitRecord> liveRecordListener;
+
     // Chunk the outgoing record data
     private int outgoingIndex = 0;
 
@@ -44,6 +49,14 @@ public class FitLocalMessageHandler implements MessageHandler {
         this.recordDefinitionList = recordDefinitionList;
         this.recordDataList = new ArrayList<>();
         this.maxPacketSize = maxPacketSize;
+    }
+
+    /**
+     * Makes this handler a stream: it stays registered after the first data message and passes every
+     * record on to {@code listener}, as the watch does for LiveTrack.
+     */
+    public void setLiveRecordListener(final Consumer<FitRecord> listener) {
+        this.liveRecordListener = listener;
     }
 
     public FitDefinitionMessage init() {
@@ -74,13 +87,26 @@ public class FitLocalMessageHandler implements MessageHandler {
 
     private void parseIncomingFitDataMessage(FitDataMessage incoming) {
         final List<GBDeviceEvent> deviceEventList = new ArrayList<>();
-        recordDataList = (incoming).applyDefinitions(recordDefinitionList);
+        recordDataList = incoming.applyDefinitions(recordDefinitionList, liveRecordListener != null);
+        if (recordDataList == null) {
+            recordDataList = new ArrayList<>();
+        }
         for (RecordData d : recordDataList) {
+            if (liveRecordListener != null) {
+                if (d instanceof FitRecord record) {
+                    LOG.debug("Live track record from the watch: {}", d);
+                    liveRecordListener.accept(record);
+                }
+                continue;
+            }
             LOG.info("Incoming FitDataMessage: {}", d);
             List<GBDeviceEvent> processed = processRecordData(d);
             if (processed != null) {
                 deviceEventList.addAll(processed);
             }
+        }
+        if (liveRecordListener != null) {
+            return;
         }
         LOG.info("Some incoming FitDataMessages are not processed any further, just logged.");
         for (final GBDeviceEvent event : deviceEventList) {

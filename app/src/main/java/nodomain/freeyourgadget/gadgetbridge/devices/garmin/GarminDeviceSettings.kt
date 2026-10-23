@@ -204,6 +204,15 @@ fun garminDeviceSettings(
             defaultValue = false,
             connectedOnly = false,
         )
+
+        switchSetting(
+            key = GarminPreferences.PREF_GARMIN_ADVERTISE_LIVETRACK,
+            title = R.string.garmin_advertise_livetrack_title,
+            summary = R.string.garmin_advertise_livetrack_summary,
+            icon = R.drawable.ic_bolt,
+            defaultValue = false,
+            connectedOnly = false,
+        )
     }
 }
 

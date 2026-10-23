@@ -77,6 +77,9 @@ public abstract class GFDIMessage {
                 case CONFIGURATION -> ConfigurationMessage.parseIncoming(messageReader, garminMessage);
                 case CURRENT_TIME_REQUEST -> CurrentTimeRequestMessage.parseIncoming(messageReader, garminMessage);
                 case AUTH_NEGOTIATION -> AuthNegotiationMessage.parseIncoming(messageReader, garminMessage);
+                case LIVE_TRACK_TRACKING_REQUEST, LIVE_TRACK_STOP_TRACKING, LIVE_TRACK_AUTO_START,
+                     LIVE_TRACK_AUTO_START_CANCEL, LIVE_TRACK_AUTO_START_FAILURE ->
+                        LiveTrackMessage.parseIncoming(messageReader, garminMessage);
                 default -> {
                     supportedType = false;
                     yield new UnhandledMessage(garminMessage);
