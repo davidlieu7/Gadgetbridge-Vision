@@ -22,6 +22,7 @@ import android.content.IntentFilter
 import android.net.Uri
 import android.os.Bundle
 import android.view.View
+import android.view.ViewGroup
 import android.webkit.PermissionRequest
 import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
@@ -98,10 +99,13 @@ class RebbleAppStoreActivity : AbstractGBActivity()  {
     }
 
     override fun onDestroy() {
-        webView!!.destroy()
+        webView?.let {
+            (it.parent as? ViewGroup)?.removeView(it)
+            it.stopLoading()
+            it.destroy()
+        }
         webView = null
         super.onDestroy()
-        finish()
     }
 
     private fun isDownloadableWatchapp(url: String): Boolean {
@@ -213,6 +217,7 @@ class RebbleAppStoreActivity : AbstractGBActivity()  {
         applyWebViewInsets()
         val settings = webView!!.settings
         settings.javaScriptEnabled = true
+        settings.domStorageEnabled = true
         settings.loadWithOverviewMode = true
         settings.useWideViewPort = true
 
@@ -246,9 +251,11 @@ class RebbleAppStoreActivity : AbstractGBActivity()  {
                 request: WebResourceRequest,
                 error: WebResourceError,
             ) {
-                LOG.error("Got webview error for {}: {}", request.url, error.description)
                 if (request.isForMainFrame) {
-                    view.loadUrl("about:blank")
+                    LOG.error("Got webview error in main frame for {}: {} ({})", request.url, error.description, error.errorCode)
+                    view.postDelayed({ view.loadUrl(url) }, 1500)
+                } else {
+                    LOG.error("Got webview error for {}: {} ({})", request.url, error.description, error.errorCode)
                 }
             }
         }

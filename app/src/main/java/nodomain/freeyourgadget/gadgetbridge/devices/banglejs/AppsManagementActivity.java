@@ -27,6 +27,7 @@ import android.net.Uri;
 import android.os.Bundle;
 import android.util.Base64;
 import android.view.View;
+import android.view.ViewGroup;
 import android.webkit.DownloadListener;
 import android.webkit.JavascriptInterface;
 import android.webkit.PermissionRequest;
@@ -135,12 +136,15 @@ public class AppsManagementActivity extends AbstractGBActivity {
     @Override
     protected void onDestroy() {
         if (webView != null) {
+            if (webView.getParent() != null) {
+                ((ViewGroup) webView.getParent()).removeView(webView);
+            }
+            webView.stopLoading();
             webView.destroy();
-            webView = null;
         }
+        webView = null;
         LocalBroadcastManager.getInstance(this).unregisterReceiver(deviceUpdateReceiver);
         super.onDestroy();
-        finish();
     }
 
     BroadcastReceiver deviceUpdateReceiver = new BroadcastReceiver() {

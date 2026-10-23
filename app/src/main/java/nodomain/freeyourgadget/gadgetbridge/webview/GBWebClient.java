@@ -38,6 +38,7 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.ByteArrayInputStream;
+import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.time.ZonedDateTime;
 import java.util.ArrayList;
@@ -172,12 +173,23 @@ public class GBWebClient extends WebViewClient {
                         LOG.debug("WEBVIEW POSTing with body: {}", body);
                     }
                     WebResourceResponse wrr = InternetHelperSingleton.INSTANCE.send(requestedUri, requestMethod, requestHeaders, body != null ? body.getBytes(StandardCharsets.UTF_8) : null, false);
-                    if (wrr != null && wrr.getStatusCode() < 400)
+                    if (wrr != null && wrr.getStatusCode() < 400) {
                         return wrr;
-                    else
-                        return null;
+                    }
+                    if (wrr != null && wrr.getData() != null) {
+                        try {
+                            wrr.getData().close();
+                        } catch (IOException ignored) {}
+                    }
+                    LOG.warn("WEBVIEW internet helper gave no usable response for {} (status: {})",
+                        requestedUri, wrr == null ? "none" : wrr.getStatusCode());
+                    return null;
                 } catch (RemoteException | InterruptedException e) {
+                    if (e instanceof InterruptedException) {
+                        Thread.currentThread().interrupt();
+                    }
                     LOG.warn("Error downloading data from {}", requestedUri, e);
+                    return null;
                 }
             } else {
                 if (StringUtils.endsWith(requestedUri.getHost(), "openweathermap.org")){
