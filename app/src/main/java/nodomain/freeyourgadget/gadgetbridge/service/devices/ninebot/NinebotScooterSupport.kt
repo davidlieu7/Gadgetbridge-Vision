@@ -486,6 +486,8 @@ class NinebotScooterSupport : AbstractBTLESingleDeviceSupport(LOG) {
                     if (!unlocked && !autoUnlockDone && (sharedPrefs().getBoolean(PREF_AUTO_UNLOCK, false) || searchEnabled()) && !switchedOffRecently()) {
                         autoUnlockDone = true
                         LOG.info("Unlocking automatically")
+                        // Right after the connection the scooter ignores the first unlock, so try again like on a manual switch on
+                        powerOnRetries = POWER_ON_RETRIES
                         unlock()
                     }
                 }
@@ -621,8 +623,8 @@ class NinebotScooterSupport : AbstractBTLESingleDeviceSupport(LOG) {
         const val PREF_AUTH_KEY = DeviceSettingsPreferenceConst.PREF_AUTH_KEY
         const val PREF_POWER_ON_PENDING = "ninebot_power_on_pending"
         private const val POWER_ON_REQUEST_MAX_AGE_MS = 120_000L
-        private const val POWER_ON_RETRIES = 2
-        private const val POWER_ON_RETRY_DELAY_MS = 2000L
+        private const val POWER_ON_RETRIES = 4
+        private const val POWER_ON_RETRY_DELAY_MS = 3000L
         private const val PREF_POWER_OFF_AT = "ninebot_power_off_at"
         private const val POWER_OFF_SUPPRESS_AUTO_UNLOCK_MS = 300_000L
 
