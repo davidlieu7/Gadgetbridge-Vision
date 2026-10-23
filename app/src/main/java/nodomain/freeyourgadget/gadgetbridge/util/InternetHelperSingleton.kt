@@ -38,11 +38,16 @@ import java.io.IOException
 import java.nio.charset.Charset
 import java.util.concurrent.CountDownLatch
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicReference
 
 object InternetHelperSingleton {
     private val LOG: Logger = LoggerFactory.getLogger(InternetHelperSingleton::class.java)
-    private var internetHelperBound = false
-    private var internetHelper: IHttpService? = null
+    @Volatile private var internetHelperBound = false
+    @Volatile private var internetHelper: IHttpService? = null
+    @Volatile private var lastBindFailure = 0L
+    private const val BIND_RETRY_BACKOFF_MS = 5_000L
+    private const val RESPONSE_TIMEOUT_S = 30L
 
     // Signalled when the (asynchronous) service connection completes, so callers can wait for it.
     @Volatile
@@ -51,8 +56,9 @@ object InternetHelperSingleton {
     private val internetHelperConnection: ServiceConnection = object : ServiceConnection {
         override fun onServiceConnected(className: ComponentName?, service: IBinder?) {
             LOG.info("Internet helper service successfully bound")
-            internetHelperBound = true
             internetHelper = IHttpService.Stub.asInterface(service)
+            internetHelperBound = true
+            lastBindFailure = 0L
             bindLatch?.countDown()
         }
 
@@ -60,6 +66,16 @@ object InternetHelperSingleton {
             LOG.info("Internet helper service unbound")
             internetHelper = null
             internetHelperBound = false
+        }
+
+        override fun onBindingDied(name: ComponentName?) {
+            LOG.warn("Internet helper binding died, resetting")
+            internetHelper = null
+            internetHelperBound = false
+            try {
+                GBApplication.getContext().unbindService(this)
+            } catch (_: IllegalArgumentException) {
+            }
         }
     }
 
@@ -95,21 +111,29 @@ object InternetHelperSingleton {
      * connection to complete. Without this, the first request after process start races the bind
      * and fails even though the helper is installed and permitted. Returns true once usable.
      */
+    @Synchronized
     fun ensureInternetHelperBoundBlocking(timeoutMs: Long = 3000): Boolean {
         if (internetHelper != null) return true
+        if (System.currentTimeMillis() - lastBindFailure < BIND_RETRY_BACKOFF_MS) return false
         if (!AndroidUtils.isPackageInstalled(PermissionsUtils.PACKAGE_INTERNET_HELPER)
             || !PermissionsUtils.checkPermission(GBApplication.getContext(), PermissionsUtils.CUSTOM_PERM_INTERNET_HELPER)
         ) return false
+
         val latch = CountDownLatch(1)
         bindLatch = latch
         ensureInternetHelperBound()
-        if (internetHelper != null) return true
-        try {
-            latch.await(timeoutMs, TimeUnit.MILLISECONDS)
-        } catch (_: InterruptedException) {
-            Thread.currentThread().interrupt()
+        if (internetHelper == null) {
+            try {
+                latch.await(timeoutMs, TimeUnit.MILLISECONDS)
+            } catch (_: InterruptedException) {
+                Thread.currentThread().interrupt()
+            }
         }
-        return internetHelper != null
+        if (internetHelper == null) {
+            lastBindFailure = System.currentTimeMillis()
+            return false
+        }
+        return true
     }
 
     @Throws(RemoteException::class, InterruptedException::class)
@@ -121,16 +145,17 @@ object InternetHelperSingleton {
         allowInsecure: Boolean = false,
     ): WebResourceResponse? {
         if (internetHelper == null) {
-            // The bind is asynchronous — give it a moment to connect before giving up.
             ensureInternetHelperBoundBlocking()
         }
-        if (internetHelper == null) {
+        val helper = internetHelper
+        if (helper == null) {
             LOG.error("Internet helper is not available")
             return null
         }
 
         val latch = CountDownLatch(1)
-        var result: WebResourceResponse? = null
+        val responseRef = AtomicReference<HttpResponse?>(null)
+        val abandoned = AtomicBoolean(false)
 
         // Create pipe to stream request body
         val pipeRead: ParcelFileDescriptor?
@@ -144,87 +169,94 @@ object InternetHelperSingleton {
             pipeWrite = null
         }
 
-        val request = HttpRequest(
-            webRequest.toString(),
-            method,
-            requestHeaders,
-            pipeRead,
-            allowInsecure,
-        )
-
+        val request = HttpRequest(webRequest.toString(), method, requestHeaders, pipeRead, allowInsecure)
         LOG.debug("Forwarding {} request to {} to internet helper app", method.name, webRequest)
 
         try {
-            internetHelper?.send(request, object : IHttpCallback.Stub() {
+            helper.send(request, object : IHttpCallback.Stub() {
                 override fun onResponse(response: HttpResponse) {
-                    try {
-                        result = toWebResourceResponse(response)
-                    } catch (e: Exception) {
-                        LOG.error("Error processing HTTP response", e)
-                    } finally {
-                        latch.countDown()
+                    responseRef.set(response)
+                    // If the caller already gave up, nobody will read this pipe: close it ourselves.
+                    if (abandoned.get()) {
+                        responseRef.getAndSet(null)?.let { closeQuietly(it.body) }
                     }
+                    latch.countDown()
                 }
 
                 override fun onException(message: String?) {
-                    LOG.error("Request failed: $message")
-                    result = null
+                    LOG.error("Request to {} failed: {}", webRequest, message)
                     latch.countDown()
                 }
             })
 
-            // Write the body to the pipe, if any
             if (pipeWrite != null) {
-                ParcelFileDescriptor.AutoCloseOutputStream(pipeWrite).use { outputStream ->
-                    outputStream.write(body)
-                }
+                ParcelFileDescriptor.AutoCloseOutputStream(pipeWrite).use { it.write(body) }
             }
         } catch (e: RemoteException) {
             LOG.error("Error sending request to InternetHelper", e)
-            latch.countDown()
             return null
         } finally {
-            try {
-                pipeRead?.close()
-                pipeWrite?.close()
-            } catch (e: IOException) {
-                LOG.error("Failed to close pipe", e)
-            }
+            closeQuietly(pipeRead)
+            closeQuietly(pipeWrite)
         }
 
-        latch.await()
-        return result
+        if (!latch.await(RESPONSE_TIMEOUT_S, TimeUnit.SECONDS)) {
+            LOG.error("Timed out after {}s waiting for internet helper response for {}", RESPONSE_TIMEOUT_S, webRequest)
+            abandoned.set(true)
+            responseRef.getAndSet(null)?.let { closeQuietly(it.body) }
+            return null
+        }
+
+        val response = responseRef.get() ?: return null
+        return try {
+            toWebResourceResponse(response)
+        } catch (e: Exception) {
+            LOG.error("Error processing HTTP response for {}", webRequest, e)
+            closeQuietly(response.body)
+            null
+        }
     }
 
-    private fun toWebResourceResponse(response: HttpResponse): WebResourceResponse {
+    private fun closeQuietly(pfd: ParcelFileDescriptor?) {
+        try {
+            pfd?.close()
+        } catch (e: IOException) {
+            LOG.debug("Failed to close file descriptor", e)
+        }
+    }
+
+    private fun toWebResourceResponse(response: HttpResponse): WebResourceResponse? {
+        val status = response.status
+        if (status !in 100..599 || status in 300..399) {
+            LOG.error("Cannot represent HTTP status {} as a WebResourceResponse", status)
+            closeQuietly(response.body)
+            return null
+        }
+
         val headers = response.headers.toMap()
-        val contentType = response.headers["content-type"]
-            ?.substringBefore(";")
-            ?.trim()
+        val lower = headers.entries.associate { it.key.lowercase() to it.value }
+        val contentTypeHeader = lower["content-type"]
+        val mimeType = contentTypeHeader?.substringBefore(";")?.trim()?.ifEmpty { null }
             ?: "application/octet-stream"
-        val encoding = response.headers["content-encoding"] ?: "UTF-8"
+        val charsetName = contentTypeHeader
+            ?.let { Regex("charset=\\s*\"?([^;\"\\s]+)", RegexOption.IGNORE_CASE).find(it)?.groupValues?.get(1) }
+            ?: "UTF-8"
+        val charset = try { Charset.forName(charsetName) } catch (_: Exception) { Charsets.UTF_8 }
+        val reason = if (status in 200..299) "OK" else "Error"
         val inputStream = ParcelFileDescriptor.AutoCloseInputStream(response.body)
 
-        return if (contentType.equals("text/html", ignoreCase = true)) {
-            val rawHtml = inputStream.bufferedReader(Charset.forName(encoding)).use { it.readText() }
+        return if (mimeType.equals("text/html", ignoreCase = true)) {
+            val rawHtml = inputStream.bufferedReader(charset).use { it.readText() }
             val cleanedHtml = Jsoup.parse(rawHtml).html()
-            WebResourceResponse(
-                contentType,
-                encoding,
-                response.status,
-                "OK",
-                headers,
-                cleanedHtml.byteInputStream()
-            )
+            val htmlHeaders = headers.filterKeys {
+                !it.equals("content-length", true) && !it.equals("content-encoding", true)
+            }
+            WebResourceResponse(mimeType, "UTF-8", status, reason, htmlHeaders,
+                cleanedHtml.byteInputStream(Charsets.UTF_8))
         } else {
-            WebResourceResponse(
-                contentType,
-                encoding,
-                response.status,
-                "OK",
-                headers,
-                inputStream
-            )
+            val bytes = inputStream.use { it.readBytes() }   // always drains and closes the pipe
+            WebResourceResponse(mimeType, charset.name(), status, reason, headers,
+                java.io.ByteArrayInputStream(bytes))
         }
     }
 }
