@@ -37,6 +37,7 @@ import nodomain.freeyourgadget.gadgetbridge.GBApplication;
 import nodomain.freeyourgadget.gadgetbridge.R;
 import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEventFindPhone;
 import nodomain.freeyourgadget.gadgetbridge.devices.casio.CasioConstants;
+import nodomain.freeyourgadget.gadgetbridge.model.ActivityUser;
 import nodomain.freeyourgadget.gadgetbridge.model.GPSCoordinate;
 import nodomain.freeyourgadget.gadgetbridge.service.btle.TransactionBuilder;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.casio.Casio2C2DSupport;
@@ -51,6 +52,7 @@ import static nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.Dev
 import static nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsPreferenceConst.PREF_CASIO_COUNTDOWN_TIMER;
 import static nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsPreferenceConst.PREF_CASIO_PRESSURE_ENERGY_CALC;
 import static nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsPreferenceConst.PREF_CASIO_COMPASS_AUTO_CORRECTION;
+import static nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsPreferenceConst.PREF_CASIO_USER_PROFILE;
 
 public class CasioGGB100DeviceSupport extends Casio2C2DSupport
         implements SharedPreferences.OnSharedPreferenceChangeListener {
@@ -75,6 +77,7 @@ public class CasioGGB100DeviceSupport extends Casio2C2DSupport
             new CountdownTimerPreference(),
             new TimeSyncPreference(),
             new ConnectionDurationPreference(),
+            new UserProfilePreference(),
         };
     }
 
@@ -108,6 +111,8 @@ public class CasioGGB100DeviceSupport extends Casio2C2DSupport
 
         getDevice().setFirmwareVersion("N/A");
         getDevice().setFirmwareVersion2("N/A");
+
+        GBApplication.getPrefs().getPreferences().registerOnSharedPreferenceChangeListener(this);
 
         return builder;
     }
@@ -344,6 +349,57 @@ public class CasioGGB100DeviceSupport extends Casio2C2DSupport
         return Math.max(0, Math.min(total, 24 * 3600));
     }
 
+    // ── User profile (0x2d) ───────────────────────────────────────────────────
+
+    /**
+     * Step goal, height and weight
+     * byte[2] = step goal × 16 / 1000 (0x80 = 8000 steps)
+     * byte[6] = 313 − height in cm (0x8f = 170 cm)
+     * byte[8] = 219 − weight in kg (0x9a = 65 kg)
+     */
+    public class UserProfilePreference extends DevicePreference {
+        { name = PREF_CASIO_USER_PROFILE; }
+        { feature = FEATURE_USER_PROFILE; }
+
+        @Override
+        public void updateValue(byte[] data) {
+            if (data.length < 9) {
+                LOG.warn("user profile data too small: {}", Arrays.toString(data));
+                return;
+            }
+            final ActivityUser user = new ActivityUser();
+            data[2] = encodeStepGoal(user.getStepsGoal());
+            data[6] = encodeHeight(user.getHeightCm());
+            data[8] = encodeWeight(user.getWeightKg());
+        }
+
+        @Override
+        public boolean readValue(byte[] data, SharedPreferences.Editor editor) {
+            if (data.length < 9) {
+                LOG.warn("user profile data too small: {}", Arrays.toString(data));
+                return false;
+            }
+            LOG.debug("user profile on watch: {} steps, {} cm, {} kg",
+                    (data[2] & 0xff) * 1000 / 16, 313 - (data[6] & 0xff), 219 - (data[8] & 0xff));
+            final ActivityUser user = new ActivityUser();
+            return data[2] != encodeStepGoal(user.getStepsGoal())
+                || data[6] != encodeHeight(user.getHeightCm())
+                || data[8] != encodeWeight(user.getWeightKg());
+        }
+
+        private static byte encodeStepGoal(final int stepsGoal) {
+            return (byte) Math.min(0xff, Math.max(0, stepsGoal) * 16 / 1000);
+        }
+
+        private static byte encodeHeight(final int heightCm) {
+            return (byte) (313 - Math.max(58, Math.min(heightCm, 313)));
+        }
+
+        private static byte encodeWeight(final int weightKg) {
+            return (byte) (219 - Math.max(-36, Math.min(weightKg, 219)));
+        }
+    }
+
     // ── Basic settings (0x13) ─────────────────────────────────────────────────
 
     /** Pressure sensor for energy calc: byte[8] bit 0x04, clear = on */
@@ -441,5 +497,14 @@ public class CasioGGB100DeviceSupport extends Casio2C2DSupport
     public void onSharedPreferenceChanged(SharedPreferences prefs, String key) {
         if (!isConnected()) return;
         if (key == null) return;
+
+        switch (key) {
+            case ActivityUser.PREF_USER_HEIGHT_CM:
+            case ActivityUser.PREF_USER_WEIGHT_KG:
+            case ActivityUser.PREF_USER_STEPS_GOAL:
+                LOG.debug("user profile changed ({}), pushing to watch", key);
+                onSendConfiguration(PREF_CASIO_USER_PROFILE);
+                break;
+        }
     }
 }

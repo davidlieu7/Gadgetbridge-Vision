@@ -329,9 +329,10 @@ public class DeviceSettingsPreferenceConst {
     public static final String PREF_CASIO_ALERT_EMAIL = "casio_alert_email";
     public static final String PREF_CASIO_ALERT_OTHER = "casio_alert_other";
     public static final String PREF_CASIO_ALERT_SMS = "casio_alert_sms";
-    public static final String PREF_CASIO_COUNTDOWN_TIMER = "casio_ggb100_countdown_timer";
-    public static final String PREF_CASIO_PRESSURE_ENERGY_CALC = "casio_ggb100_pressure_energy_calc";
-    public static final String PREF_CASIO_COMPASS_AUTO_CORRECTION = "casio_ggb100_compass_auto_correction";
+    public static final String PREF_CASIO_COUNTDOWN_TIMER = "casio_countdown_timer";
+    public static final String PREF_CASIO_PRESSURE_ENERGY_CALC = "casio_pressure_energy_calc";
+    public static final String PREF_CASIO_COMPASS_AUTO_CORRECTION = "casio_compass_auto_correction";
+    public static final String PREF_CASIO_USER_PROFILE = "casio_user_profile";
 
     public static final String PREF_LIGHT_DURATION_LONGER = "light_duration_longer";
     public static final String PREF_AUTOREMOVE_MESSAGE = "autoremove_message";
