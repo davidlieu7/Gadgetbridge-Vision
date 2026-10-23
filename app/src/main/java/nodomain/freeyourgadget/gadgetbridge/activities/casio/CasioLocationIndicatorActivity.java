@@ -17,8 +17,11 @@
 package nodomain.freeyourgadget.gadgetbridge.activities.casio;
 
 import android.Manifest;
+import android.net.Uri;
 import android.os.Bundle;
+import android.util.Xml;
 import android.view.LayoutInflater;
+import android.view.Menu;
 import android.view.MenuItem;
 import android.view.View;
 import android.view.ViewGroup;
@@ -31,6 +34,8 @@ import android.content.pm.PackageManager;
 import android.location.Location;
 import android.location.LocationManager;
 
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.core.app.ActivityCompat;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
@@ -39,6 +44,16 @@ import androidx.recyclerview.widget.RecyclerView;
 
 import com.google.android.material.floatingactionbutton.FloatingActionButton;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.xmlpull.v1.XmlSerializer;
+
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.nio.charset.StandardCharsets;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Locale;
 import java.util.Date;
 
@@ -51,13 +66,31 @@ import nodomain.freeyourgadget.gadgetbridge.service.devices.casio.CasioLocationI
 import nodomain.freeyourgadget.gadgetbridge.model.GPSCoordinate;
 import nodomain.freeyourgadget.gadgetbridge.util.DateTimeUtils;
 import nodomain.freeyourgadget.gadgetbridge.util.WaypointHelper;
+import nodomain.freeyourgadget.gadgetbridge.util.gpx.GpxParser;
+import nodomain.freeyourgadget.gadgetbridge.util.gpx.model.GpxFile;
+import nodomain.freeyourgadget.gadgetbridge.util.gpx.model.GpxWaypoint;
 
 public class CasioLocationIndicatorActivity extends AbstractGBActivity {
+    private static final Logger LOG = LoggerFactory.getLogger(CasioLocationIndicatorActivity.class);
+    private static final String NS_GPX_URI = "http://www.topografix.com/GPX/1/1";
+
     private GBDevice gbDevice;
     protected CasioLocationIndicatorLibrary library;
     protected LocationAdapter adapter;
     private TextView emptyView;
     private FloatingActionButton addButton;
+
+    private final ActivityResultLauncher<String[]> importGpxLauncher = registerForActivityResult(
+            new ActivityResultContracts.OpenDocument(),
+            uri -> {
+                if (uri != null) importGpx(uri);
+            });
+
+    private final ActivityResultLauncher<String> exportGpxLauncher = registerForActivityResult(
+            new ActivityResultContracts.CreateDocument("application/gpx+xml"),
+            uri -> {
+                if (uri != null) exportGpx(uri);
+            });
 
     @Override
     protected void onCreate(@Nullable final Bundle savedInstanceState) {
@@ -242,9 +275,102 @@ public class CasioLocationIndicatorActivity extends AbstractGBActivity {
     }
 
     @Override
+    public boolean onCreateOptionsMenu(final Menu menu) {
+        getMenuInflater().inflate(R.menu.menu_casio_location_indicator, menu);
+        return true;
+    }
+
+    private void importGpx(final Uri uri) {
+        final List<CasioLocationPoint> imported = new ArrayList<>();
+        try (InputStream in = getContentResolver().openInputStream(uri)) {
+            final GpxFile gpx = new GpxParser(in).getGpxFile();
+            for (final GpxWaypoint wpt : gpx.getWaypoints()) {
+                final CasioLocationPoint p = new CasioLocationPoint();
+                final String name = wpt.getName();
+                p.label = name != null && !name.isEmpty() ? name
+                        : getString(R.string.casio_location_indicator_default_label,
+                                library.locations.size() + imported.size() + 1);
+                p.timestamp = wpt.getTime() != null ? wpt.getTime().getTime() : System.currentTimeMillis();
+                p.waypoint = new GPSCoordinate(wpt.getLongitude(), wpt.getLatitude(),
+                        wpt.hasAltitude() ? wpt.getAltitude() : GPSCoordinate.UNKNOWN_ALTITUDE);
+                imported.add(p);
+            }
+        } catch (final Exception e) {
+            LOG.error("Failed to import GPX", e);
+            Toast.makeText(this, R.string.casio_location_indicator_import_failed, Toast.LENGTH_SHORT).show();
+            return;
+        }
+        if (imported.isEmpty()) {
+            Toast.makeText(this, R.string.casio_location_indicator_import_no_waypoints, Toast.LENGTH_SHORT).show();
+            return;
+        }
+        final boolean hadActive = library.activeIndex >= 0;
+        library.locations.addAll(imported);
+        if (!hadActive) {
+            library.activeIndex = 0;
+        }
+        persistAndRefresh();
+        Toast.makeText(this, getString(R.string.casio_location_indicator_imported, imported.size()),
+                Toast.LENGTH_SHORT).show();
+    }
+
+    private void exportGpx(final Uri uri) {
+        if (library.locations.isEmpty()) {
+            Toast.makeText(this, R.string.casio_location_indicator_empty_export, Toast.LENGTH_SHORT).show();
+            return;
+        }
+        try (OutputStream out = getContentResolver().openOutputStream(uri)) {
+            writeGpx(out);
+            Toast.makeText(this, R.string.casio_location_indicator_exported, Toast.LENGTH_SHORT).show();
+        } catch (final Exception e) {
+            LOG.error("Failed to export GPX", e);
+            Toast.makeText(this, R.string.casio_location_indicator_export_failed, Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    private void writeGpx(final OutputStream out) throws IOException {
+        final XmlSerializer ser = Xml.newSerializer();
+        ser.setOutput(out, StandardCharsets.UTF_8.name());
+        ser.startDocument(StandardCharsets.UTF_8.name(), true);
+        ser.setPrefix("", NS_GPX_URI);
+        ser.startTag(NS_GPX_URI, "gpx");
+        ser.attribute(null, "version", "1.1");
+        ser.attribute(null, "creator", GBApplication.app().getNameAndVersion());
+        for (final CasioLocationPoint p : library.locations) {
+            ser.startTag(NS_GPX_URI, "wpt");
+            ser.attribute(null, "lat", String.format(Locale.ROOT, "%.6f", p.waypoint.getLatitude()));
+            ser.attribute(null, "lon", String.format(Locale.ROOT, "%.6f", p.waypoint.getLongitude()));
+            if (p.waypoint.hasAltitude()) {
+                ser.startTag(NS_GPX_URI, "ele")
+                        .text(String.format(Locale.ROOT, "%.1f", p.waypoint.getAltitude()))
+                        .endTag(NS_GPX_URI, "ele");
+            }
+            if (!p.label.isEmpty()) {
+                ser.startTag(NS_GPX_URI, "name").text(p.label).endTag(NS_GPX_URI, "name");
+            }
+            if (p.timestamp > 0) {
+                ser.startTag(NS_GPX_URI, "time")
+                        .text(DateTimeUtils.formatIso8601UTC(new Date(p.timestamp)))
+                        .endTag(NS_GPX_URI, "time");
+            }
+            ser.endTag(NS_GPX_URI, "wpt");
+        }
+        ser.endTag(NS_GPX_URI, "gpx");
+        ser.endDocument();
+    }
+
+    @Override
     public boolean onOptionsItemSelected(final MenuItem item) {
         if (item.getItemId() == android.R.id.home) {
             finish();
+            return true;
+        }
+        if (item.getItemId() == R.id.casio_location_import_gpx) {
+            importGpxLauncher.launch(new String[]{"application/gpx+xml", "text/xml", "application/xml", "*/*"});
+            return true;
+        }
+        if (item.getItemId() == R.id.casio_location_export_gpx) {
+            exportGpxLauncher.launch("casio_location_points.gpx");
             return true;
         }
         return super.onOptionsItemSelected(item);

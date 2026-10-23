@@ -477,6 +477,14 @@
     <string name="casio_location_indicator_no_fix">No GPS fix</string>
     <string name="casio_location_indicator_invalid_coordinates">Invalid coordiantes</string>
     <string name="casio_location_indicator_use_current">Use current location</string>
+    <string name="casio_location_indicator_import_gpx">Import GPX</string>
+    <string name="casio_location_indicator_export_gpx">Export GPX</string>
+    <string name="casio_location_indicator_imported">Imported %1$d waypoints</string>
+    <string name="casio_location_indicator_import_no_waypoints">No waypoints found in file</string>
+    <string name="casio_location_indicator_import_failed">Could not import GPX file</string>
+    <string name="casio_location_indicator_exported">GPX exported</string>
+    <string name="casio_location_indicator_empty_export">No waypoints to export</string>
+    <string name="casio_location_indicator_export_failed">Could not export GPX file</string>
     <string name="pref_casio_countdown_timer_title">Countdown timer (HH:MM:SS)</string>
     <string name="pref_casio_pressure_energy_calc_title">Use pressure data for energy calculation</string>
     <string name="pref_casio_compass_auto_correction_title">Compass auto-correction</string>
