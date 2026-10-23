@@ -25,6 +25,7 @@ import com.google.protobuf.ByteString;
 
 import org.junit.Test;
 
+import nodomain.freeyourgadget.gadgetbridge.devices.xiaomi.watches.MiBand4CCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.proto.xiaomi.Account;
 import nodomain.freeyourgadget.gadgetbridge.proto.xiaomi.Auth;
 import nodomain.freeyourgadget.gadgetbridge.proto.xiaomi.XiaomiProto;
@@ -69,5 +70,27 @@ public class XiaomiAuthServiceTest {
             assertFalse(cmd.getAuth().getAppVerify().hasDeviceId());
             assertArrayEquals(expected, cmd.toByteArray());
         }
+    }
+
+    @Test
+    public void testUserIdAcceptsHexPrefix() {
+        assertEquals("1234567890", XiaomiAuthService.parseUserId("1234567890"));
+        assertEquals("1234567890", XiaomiAuthService.parseUserId("0x1234567890"));
+        assertEquals("1234567890", XiaomiAuthService.parseUserId(" 0x1234567890 "));
+    }
+
+    @Test
+    public void testUserIdDefaultsWhenMissing() {
+        for (final String missing : new String[]{null, "", "  ", "0x"}) {
+            assertEquals("0000000000", XiaomiAuthService.parseUserId(missing));
+        }
+    }
+
+    @Test
+    public void testValidateAuthKeyAcceptsUserIdWithHexPrefix() {
+        final MiBand4CCoordinator coordinator = new MiBand4CCoordinator();
+        assertTrue(coordinator.validateAuthKey("1234567890"));
+        assertTrue(coordinator.validateAuthKey("0x1234567890"));
+        assertFalse(coordinator.validateAuthKey("0x12345678ab"));
     }
 }

@@ -102,8 +102,8 @@ import nodomain.freeyourgadget.gadgetbridge.util.FileUtils;
 import nodomain.freeyourgadget.gadgetbridge.util.Prefs;
 
 public abstract class XiaomiCoordinator extends AbstractBLEDeviceCoordinator {
-    // On plaintext devices, user id is used as auth key - numeric
-    private static final Pattern AUTH_KEY_PATTERN = Pattern.compile("^[0-9]+$");
+    // On plaintext devices, user id is used as auth key - numeric, optionally prefixed with 0x
+    private static final Pattern AUTH_KEY_PATTERN = Pattern.compile("^(0x)?[0-9]+$");
 
     @NonNull
     @Override

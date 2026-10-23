@@ -322,12 +322,17 @@ public class XiaomiAuthService extends AbstractXiaomiService {
     protected static String getUserId(final GBDevice device) {
         final SharedPreferences sharedPrefs = GBApplication.getDeviceSpecificSharedPrefs(device.getAddress());
 
-        final String authKey = sharedPrefs.getString("authkey", null);
-        if (StringUtils.isNotBlank(authKey)) {
-            return authKey;
-        }
+        return parseUserId(sharedPrefs.getString("authkey", null));
+    }
 
-        return "0000000000";
+    /// Plaintext devices take the numeric account id from the auth key field. Strip the 0x
+    /// prefix that the pairing instructions ask for on every key.
+    public static String parseUserId(@Nullable final String authKey) {
+        String userId = StringUtils.trimToEmpty(authKey);
+        if (userId.startsWith("0x")) {
+            userId = userId.substring(2);
+        }
+        return userId.isEmpty() ? "0000000000" : userId;
     }
 
     protected static byte[] hmacSHA256(final byte[] key, final byte[] input) {
