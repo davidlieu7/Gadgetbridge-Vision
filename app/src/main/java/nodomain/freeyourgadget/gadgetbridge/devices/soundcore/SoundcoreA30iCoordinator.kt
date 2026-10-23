@@ -43,7 +43,28 @@ class SoundcoreA30iCoordinator : SoundcoreEarbudsCoordinator() {
         Capability.SurroundSound,
         Capability.AutoPowerOff,
         Capability.TouchTone,
+        Capability.Multipoint,
+        Capability.FitTest,
+        // Capability.TouchControls,
     )
+
+    /*override val supportedButtonActions: List<ButtonAction> = listOf(
+        ButtonAction.SINGLE_TAP,
+        ButtonAction.DOUBLE_TAP,
+        ButtonAction.TRIPLE_TAP,
+        ButtonAction.LONG_PRESS,
+    )
+
+    override val supportedTapFunctions: List<TapFunction> = listOf(
+        TapFunction.VOLUME_DOWN,
+        TapFunction.VOLUME_UP,
+        TapFunction.MEDIA_NEXT,
+        TapFunction.MEDIA_PREV,
+        TapFunction.PLAYPAUSE,
+        TapFunction.VOICE_ASSISTANT,
+        TapFunction.AMBIENT_SOUND_CONTROL,
+        TapFunction.NONE,
+    )*/
 
     override fun getNoiseCancellationLevelRange(): ByteArray = byteArrayOf(0x00, 0x15, 0x25, 0x35, 0x45, 0x51)
 

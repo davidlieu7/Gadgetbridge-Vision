@@ -48,7 +48,8 @@ public class SoundcoreProtocolImplV1 extends AbstractSoundcoreProtocol {
     public static final short CMD_SESSION_INIT = (short) 0x8105;
 
     public static final short CMD_NOTIFY_BATTERY_INFO = (short) 0x0301;
-    public static final short CMD_NOTIFY_CHARGING_INFO = (short) 0x0401;
+    public static final short CMD_NOTIFY_CHARGING_INFO_V1 = (short) 0x0201;
+    public static final short CMD_NOTIFY_CHARGING_INFO_V2 = (short) 0x0401;
     public static final short CMD_NOTIFY_AUDIO_MODE = (short) 0x0106;
 
     // Unsolicited notifications from the device on connection
@@ -257,8 +258,10 @@ public class SoundcoreProtocolImplV1 extends AbstractSoundcoreProtocol {
                 return decodeExtendedInfo(payload);
             case CMD_NOTIFY_BATTERY_INFO:
                 return decodeBatteryInfo(payload);
-            case CMD_NOTIFY_CHARGING_INFO:
-                return decodeChargingInfo(payload);
+            case CMD_NOTIFY_CHARGING_INFO_V1:
+                return decodeChargingInfoV1(payload);
+            case CMD_NOTIFY_CHARGING_INFO_V2:
+                return decodeChargingInfoV2(payload);
             case CMD_NOTIFY_AUDIO_MODE:
                 decodeAudioMode(payload);
                 return new GBDeviceEvent[0];
@@ -359,9 +362,15 @@ public class SoundcoreProtocolImplV1 extends AbstractSoundcoreProtocol {
         final int[] batteryIndexes = getBatteryIndexes(payload.length);
         final GBDeviceEvent[] events = new GBDeviceEvent[batteryIndexes.length];
         for (int index = 0; index < batteryIndexes.length; index++) {
-            events[index] = buildBatteryInfo(batteryIndexes[index], decodeBatteryLevel(payload[index]));
+            if(payload[index] != (byte) 0xFF) {
+                events[index] = buildBatteryInfo(batteryIndexes[index], decodeBatteryLevel(payload[index]));
+            }
         }
-        return events;
+        if(events.length > 0) {
+            return events;
+        }else{
+            return new GBDeviceEvent[0];
+        }
     }
 
     /** Maps the available battery bytes to device slots, ignoring unrelated trailing data. */
@@ -372,7 +381,29 @@ public class SoundcoreProtocolImplV1 extends AbstractSoundcoreProtocol {
     }
 
     /** Decodes the two earbud flags; trailing bytes do not describe a case battery here. */
-    protected GBDeviceEvent[] decodeChargingInfo(final byte[] payload) {
+    protected GBDeviceEvent[] decodeChargingInfoV1(final byte[] payload){
+        final List<GBDeviceEvent> events = new ArrayList<>(2);
+        GBDeviceEventBatteryInfo batteryInfo = null;
+        if(payload[0] == 0x00){
+            LOG.info("Right Earbud in Charging Case: {}", payload[1] == 0x00);
+            batteryInfo = buildChargingInfo(1, payload[1] == 0x00);
+        }else if(payload[0] == 0x01){
+            LOG.info("Left Earbud in Charging Case: {}", payload[1] == 0x00);
+            batteryInfo = buildChargingInfo(0, payload[1] == 0x00);
+        }
+
+        if(batteryInfo != null){
+            //The device won't update the battery state during charging (Tested for the A30i earbuds)
+            batteryInfo.level = GBDevice.BATTERY_UNKNOWN;
+            events.add(batteryInfo);
+            return events.toArray(new GBDeviceEvent[0]);
+        }else {
+            return new GBDeviceEvent[0];
+        }
+    }
+
+    /** Decodes the two earbud flags; trailing bytes do not describe a case battery here. */
+    protected GBDeviceEvent[] decodeChargingInfoV2(final byte[] payload) {
         if (payload == null || payload.length < 2) {
             LOG.warn("CMD_NOTIFY_CHARGING_INFO payload too short: {} bytes", payload == null ? 0 : payload.length);
             return new GBDeviceEvent[0];
@@ -381,23 +412,31 @@ public class SoundcoreProtocolImplV1 extends AbstractSoundcoreProtocol {
         LOG.info("Left Earbud in Charging Case: {}, Right Earbud in Charging Case: {}",
                 payload[0] == 0x01, payload[1] == 0x01);
 
-        final int[] batteryIndexes = getBatteryIndexes(2);
         final List<GBDeviceEvent> events = new ArrayList<>(2);
         for (int index = 0; index < 2; index++) {
             if (payload[index] != 0x00 && payload[index] != 0x01) {
                 LOG.warn("Unknown charging flag for earbud {}: {}", index, payload[index] & 0xff);
                 continue;
             }
-
-            final int batteryIndex = batteryIndexes[index];
-            final GBDeviceEventBatteryInfo batteryInfo = buildBatteryInfo(
-                    batteryIndex, getDevice().getBatteryLevel(batteryIndex));
-            batteryInfo.voltage = getDevice().getBatteryVoltage(batteryIndex);
-            batteryInfo.state = payload[index] == 0x01
-                    ? BatteryState.BATTERY_CHARGING : BatteryState.BATTERY_NORMAL;
-            events.add(batteryInfo);
+            events.add(buildChargingInfo(index, payload[index] == 0x01));
         }
         return events.toArray(new GBDeviceEvent[0]);
+    }
+
+    /**
+     * It builds the charging info of the earbuds
+     * @param index 0 = left; 1 = right
+     * @param is_charging if the earbud is charging
+     */
+    private GBDeviceEventBatteryInfo buildChargingInfo(int index, boolean is_charging){
+        final int[] batteryIndexes = getBatteryIndexes(2);
+        final int batteryIndex = batteryIndexes[index];
+        final GBDeviceEventBatteryInfo batteryInfo = buildBatteryInfo(
+            batteryIndex, getDevice().getBatteryLevel(batteryIndex));
+        batteryInfo.voltage = getDevice().getBatteryVoltage(batteryIndex);
+        batteryInfo.state = is_charging
+            ? BatteryState.BATTERY_CHARGING : BatteryState.BATTERY_NORMAL;
+        return batteryInfo;
     }
 
     /**
@@ -447,7 +486,7 @@ public class SoundcoreProtocolImplV1 extends AbstractSoundcoreProtocol {
     /** Decodes the active source address from CMD_NOTIFY_CONNECTION_STATUS payload. */
     protected GBDeviceEvent[] decodeConnectionStatus(final byte[] payload) {
         if (payload.length != 7 || (payload[0] != 0x00 && payload[0] != 0x01)) {
-            LOG.warn("Invalid connection status payload");
+            broadcastPairedDevices(pairedDevices, "none_playing");
             return new GBDeviceEvent[0];
         }
         activeSourceAddress = payload[0] == 0x01 ? formatMacAddress(payload, 1) : null;

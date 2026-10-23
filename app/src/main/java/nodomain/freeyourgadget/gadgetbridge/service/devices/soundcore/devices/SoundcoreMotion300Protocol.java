@@ -112,7 +112,7 @@ public class SoundcoreMotion300Protocol extends SoundcoreProtocolImplV1 {
                 return handlePacketAdaptiveDirection(payload);
             case CMD_NOTIFY_BATTERY_INFO:
                 return handlePacketBatteryInfo(payload);
-            case CMD_NOTIFY_CHARGING_INFO:
+            case CMD_NOTIFY_CHARGING_INFO_V2:
                 return handlePacketChargingInfo(payload);
         }
 
