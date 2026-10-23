@@ -16,17 +16,17 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 package nodomain.freeyourgadget.gadgetbridge.devices.ninebot
 
-import android.text.InputType
 import nodomain.freeyourgadget.gadgetbridge.GBApplication
 import nodomain.freeyourgadget.gadgetbridge.R
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsPreferenceConst
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.DeviceSettingsSpec
+import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.components.PasswordMode
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.components.enumList
+import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.components.passwordScreen
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.deviceSettings
 import nodomain.freeyourgadget.gadgetbridge.devices.AbstractBLEDeviceCoordinator
 import android.content.Context
 import android.graphics.Color
-import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import android.content.SharedPreferences
 import com.google.android.material.color.MaterialColors
 import nodomain.freeyourgadget.gadgetbridge.devices.DeviceCardAction
@@ -46,7 +46,7 @@ import java.util.regex.Pattern
  * more characters).
  */
 class NinebotScooterCoordinator : AbstractBLEDeviceCoordinator() {
-    override fun getSupportedDeviceName(): Pattern = Pattern.compile("^NAGV\\w{10}$")
+    override fun getSupportedDeviceName(): Pattern = Pattern.compile("^NAGV[0-9A-F]{10}$")
 
     override fun getManufacturer(): String = "Segway-Ninebot"
 
@@ -56,6 +56,9 @@ class NinebotScooterCoordinator : AbstractBLEDeviceCoordinator() {
         NinebotScooterSupport::class.java
 
     override fun isExperimental(): Boolean = true
+
+    // The default device card switches the scooter off via [NinebotScooterSupport.onPowerOff]
+    override fun supportsPowerOff(device: GBDevice): Boolean = true
 
     // The app pairs with the scooter by itself in the protocol, there is no Bluetooth bonding
     override fun getBondingStyle(): Int = BONDING_STYLE_NONE
@@ -76,7 +79,6 @@ class NinebotScooterCoordinator : AbstractBLEDeviceCoordinator() {
             ActionCardItem(ModeAction(), visible = { it.isInitialized }),
             ActionCardItem(SearchAction(), visible = { true }),
             ActionCardItem(PowerOnAction()),
-            ActionCardItem(PowerOffAction(), visible = { it.isInitialized }),
         )
 
     /** The current riding mode as text (Eco, D, S). A click switches to the next one. */
@@ -97,12 +99,7 @@ class NinebotScooterCoordinator : AbstractBLEDeviceCoordinator() {
             context.getString(R.string.ninebot_mode_title) +
                 (current(device)?.let { ": " + context.getString(it.label) } ?: "")
 
-        override fun getText(device: GBDevice, context: Context): String = when (current(device)) {
-            NinebotRideMode.ECO -> "Eco"
-            NinebotRideMode.DYNAMIC -> "D"
-            NinebotRideMode.SPORT -> "S"
-            null -> "–"
-        }
+        override fun getText(device: GBDevice, context: Context): String = current(device)?.shortName ?: "–"
 
         override fun isVisible(device: GBDevice) = device.isInitialized
 
@@ -198,31 +195,6 @@ class NinebotScooterCoordinator : AbstractBLEDeviceCoordinator() {
         }
     }
 
-    /** Switches the scooter off after a confirmation. */
-    private class PowerOffAction : DeviceCardAction {
-        override fun getId(): String = DeviceSettingsPreferenceConst.PREF_NINEBOT_POWER_OFF
-
-        override fun getIcon(device: GBDevice) = R.drawable.ic_power_settings_new
-
-        override fun getDescription(device: GBDevice, context: Context): String =
-            context.getString(R.string.ninebot_power_off_title)
-
-        override fun getIconTint(device: GBDevice, context: Context): Int? = COLOR_OFF
-
-        override fun isVisible(device: GBDevice) = device.isInitialized
-
-        override fun onClick(device: GBDevice, context: Context) {
-            MaterialAlertDialogBuilder(context)
-                .setTitle(R.string.ninebot_power_off_title)
-                .setMessage(R.string.ninebot_power_off_summary)
-                .setPositiveButton(android.R.string.ok) { _, _ ->
-                    GBApplication.deviceService(device).onSendConfiguration(DeviceSettingsPreferenceConst.PREF_NINEBOT_POWER_OFF)
-                }
-                .setNegativeButton(android.R.string.cancel, null)
-                .show()
-        }
-    }
-
     override fun getDeviceSettings(device: GBDevice): DeviceSettingsSpec = deviceSettings {
         screen(
             key = "ninebot_lock",
@@ -258,21 +230,9 @@ class NinebotScooterCoordinator : AbstractBLEDeviceCoordinator() {
                 icon = R.drawable.ic_bluetooth_searching,
                 connectedOnly = false,
             )
-            switchSetting(
-                key = DeviceSettingsPreferenceConst.PREF_NINEBOT_CODE_PROTECTION,
-                title = R.string.ninebot_code_protection_title,
-                summary = R.string.ninebot_code_protection_summary,
-                icon = R.drawable.ic_lock_open,
-            )
-            text(
-                key = DeviceSettingsPreferenceConst.PREF_NINEBOT_CODE,
-                title = R.string.ninebot_code_title,
-                summary = R.string.ninebot_code_summary,
-                icon = R.drawable.ic_lock_open,
-                maxLength = 4,
-                inputType = InputType.TYPE_CLASS_NUMBER,
-            )
         }
+
+        passwordScreen(PasswordMode.NUMBERS_4_DIGITS_0_TO_9)
 
         enumList<NinebotKers>(
             key = DeviceSettingsPreferenceConst.PREF_NINEBOT_KERS,
@@ -334,6 +294,5 @@ class NinebotScooterCoordinator : AbstractBLEDeviceCoordinator() {
 
     private companion object {
         val COLOR_ON = Color.parseColor("#43A047")
-        val COLOR_OFF = Color.parseColor("#E53935")
     }
 }

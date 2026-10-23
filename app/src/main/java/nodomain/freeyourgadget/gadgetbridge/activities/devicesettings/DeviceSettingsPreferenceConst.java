@@ -845,8 +845,6 @@ public class DeviceSettingsPreferenceConst {
     public static final String PREF_ATC_BLE_OEPL_BLE_ADV_INTERVAL = "pref_atc_ble_oepl_ble_adv_interval";
     public static final String PREF_ATC_BLE_OEPL_OEPL_PROTOCOL_ENABLE = "pref_atc_ble_oepl_oepl_protocol_enable";
 
-    public static final String PREF_NINEBOT_CODE_PROTECTION = "ninebot_code_protection";
-    public static final String PREF_NINEBOT_CODE = "ninebot_code";
     public static final String PREF_NINEBOT_UNLOCK = "ninebot_unlock";
     public static final String PREF_NINEBOT_AUTO_UNLOCK = "ninebot_auto_unlock";
     public static final String PREF_NINEBOT_LOCK_STATE = "ninebot_lock_state";

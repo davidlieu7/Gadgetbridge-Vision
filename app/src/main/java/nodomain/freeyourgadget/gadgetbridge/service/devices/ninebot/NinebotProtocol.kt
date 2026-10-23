@@ -160,10 +160,10 @@ enum class NinebotKers(val code: Int, override val label: Int) : LabeledEntry {
 }
 
 /** Riding mode of the scooter (`CTRL 0x75`). */
-enum class NinebotRideMode(val code: Int, override val label: Int) : LabeledEntry {
-    DYNAMIC(0, R.string.ninebot_mode_dynamic),
-    ECO(1, R.string.ninebot_mode_eco),
-    SPORT(2, R.string.ninebot_mode_sport),
+enum class NinebotRideMode(val code: Int, override val label: Int, val shortName: String) : LabeledEntry {
+    DYNAMIC(0, R.string.ninebot_mode_dynamic, "D"),
+    ECO(1, R.string.ninebot_mode_eco, "Eco"),
+    SPORT(2, R.string.ninebot_mode_sport, "S"),
     ;
 
     companion object {
