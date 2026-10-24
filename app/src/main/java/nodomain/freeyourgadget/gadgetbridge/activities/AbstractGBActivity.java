@@ -25,9 +25,11 @@ import android.content.Intent;
 import android.content.IntentFilter;
 import android.content.res.Resources;
 import android.os.Bundle;
+import android.view.Menu;
 import android.view.View;
 import android.view.ViewGroup;
 
+import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.annotation.StyleRes;
 import androidx.appcompat.app.AppCompatActivity;
@@ -42,6 +44,7 @@ import nodomain.freeyourgadget.gadgetbridge.GBApplication;
 import nodomain.freeyourgadget.gadgetbridge.R;
 import nodomain.freeyourgadget.gadgetbridge.util.AndroidUtils;
 import nodomain.freeyourgadget.gadgetbridge.util.BarShade;
+import nodomain.freeyourgadget.gadgetbridge.util.ToolbarIcons;
 
 
 public abstract class AbstractGBActivity extends AppCompatActivity implements GBActivity {
@@ -174,6 +177,13 @@ public abstract class AbstractGBActivity extends AppCompatActivity implements GB
     protected void onDestroy() {
         LocalBroadcastManager.getInstance(this).unregisterReceiver(mReceiver);
         super.onDestroy();
+    }
+
+    @Override
+    public boolean onPreparePanel(final int featureId, @Nullable final View view, @NonNull final Menu menu) {
+        final boolean show = super.onPreparePanel(featureId, view, menu);
+        ToolbarIcons.resize(this, menu);
+        return show;
     }
 
     @Override

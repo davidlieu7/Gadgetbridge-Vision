@@ -34,6 +34,12 @@
         <item name="actionModeStyle">@style/GadgetbridgeTheme.ActionMode</item>
         <item name="windowActionModeOverlay">true</item>
         <item name="actionModeCloseButtonStyle">@style/GadgetbridgeTheme.ActionModeCloseButton</item>
+        <item name="toolbarStyle">@style/GadgetbridgeTheme.Toolbar</item>
+        <item name="toolbarNavigationButtonStyle">@style/GadgetbridgeTheme.ToolbarNavigationButton</item>
+        <item name="drawerArrowStyle">@style/GadgetbridgeTheme.DrawerArrow</item>
+        <item name="homeAsUpIndicator">@drawable/ic_toolbar_back</item>
+        <item name="actionOverflowButtonStyle">@style/GadgetbridgeTheme.OverflowButton</item>
+        <item name="actionBarItemBackground">@drawable/bg_toolbar_icon</item>
         <item name="preferenceTheme">@style/AppPreferenceThemeOverlay</item>
 
         <item name="drawer_header_color">?attr/toolbar_bg</item>
@@ -83,7 +89,7 @@
         <item name="bar_shade">@drawable/bar_shade_light</item>
         <item name="toolbar_title">?attr/colorOnSurface</item>
         <item name="toolbar_subtitle">?attr/colorOnSurfaceVariant</item>
-        <item name="toolbar_icon">?attr/colorOnSurfaceVariant</item>
+        <item name="toolbar_icon">?attr/toolbar_title</item>
         <item name="main_bar_bg">?attr/toolbar_bg</item>
         <item name="summary_tile_label">?attr/subtab_active</item>
         <item name="accent_color">?attr/subtab_active</item>
@@ -145,6 +151,12 @@
         <item name="actionModeStyle">@style/GadgetbridgeTheme.ActionMode</item>
         <item name="windowActionModeOverlay">true</item>
         <item name="actionModeCloseButtonStyle">@style/GadgetbridgeTheme.ActionModeCloseButton</item>
+        <item name="toolbarStyle">@style/GadgetbridgeTheme.Toolbar</item>
+        <item name="toolbarNavigationButtonStyle">@style/GadgetbridgeTheme.ToolbarNavigationButton</item>
+        <item name="drawerArrowStyle">@style/GadgetbridgeTheme.DrawerArrow</item>
+        <item name="homeAsUpIndicator">@drawable/ic_toolbar_back</item>
+        <item name="actionOverflowButtonStyle">@style/GadgetbridgeTheme.OverflowButton</item>
+        <item name="actionBarItemBackground">@drawable/bg_toolbar_icon</item>
         <item name="preferenceTheme">@style/AppPreferenceThemeOverlay</item>
 
         <item name="drawer_header_color">?attr/toolbar_bg</item>
@@ -194,7 +206,7 @@
         <item name="bar_shade">@drawable/bar_shade_dark</item>
         <item name="toolbar_title">?attr/colorOnSurface</item>
         <item name="toolbar_subtitle">?attr/colorOnSurfaceVariant</item>
-        <item name="toolbar_icon">?attr/colorOnSurfaceVariant</item>
+        <item name="toolbar_icon">?attr/toolbar_title</item>
         <item name="main_bar_bg">?attr/toolbar_bg</item>
         <!-- subtab_active, not tab_pill: the White preset's pill color has no contrast against
              the background, and the preset gives subtab_active a readable color instead -->
@@ -241,6 +253,12 @@
         <item name="actionModeStyle">@style/GadgetbridgeTheme.ActionMode</item>
         <item name="windowActionModeOverlay">true</item>
         <item name="actionModeCloseButtonStyle">@style/GadgetbridgeTheme.ActionModeCloseButton</item>
+        <item name="toolbarStyle">@style/GadgetbridgeTheme.Toolbar</item>
+        <item name="toolbarNavigationButtonStyle">@style/GadgetbridgeTheme.ToolbarNavigationButton</item>
+        <item name="drawerArrowStyle">@style/GadgetbridgeTheme.DrawerArrow</item>
+        <item name="homeAsUpIndicator">@drawable/ic_toolbar_back</item>
+        <item name="actionOverflowButtonStyle">@style/GadgetbridgeTheme.OverflowButton</item>
+        <item name="actionBarItemBackground">@drawable/bg_toolbar_icon</item>
         <item name="android:statusBarColor">?attr/toolbar_bg</item>
         <item name="android:windowLightStatusBar" tools:targetApi="23">true</item>
         <item name="android:colorControlHighlight">?attr/colorPrimary</item>
@@ -297,7 +315,7 @@
         <item name="bar_shade">@drawable/bar_shade_light</item>
         <item name="toolbar_title">?attr/colorOnSurface</item>
         <item name="toolbar_subtitle">?attr/colorOnSurfaceVariant</item>
-        <item name="toolbar_icon">?attr/colorOnSurfaceVariant</item>
+        <item name="toolbar_icon">?attr/toolbar_title</item>
         <item name="main_bar_bg">?attr/toolbar_bg</item>
         <item name="summary_tile_label">?attr/colorPrimary</item>
         <item name="accent_color">?attr/colorPrimary</item>
@@ -313,6 +331,12 @@
         <item name="actionModeStyle">@style/GadgetbridgeTheme.ActionMode</item>
         <item name="windowActionModeOverlay">true</item>
         <item name="actionModeCloseButtonStyle">@style/GadgetbridgeTheme.ActionModeCloseButton</item>
+        <item name="toolbarStyle">@style/GadgetbridgeTheme.Toolbar</item>
+        <item name="toolbarNavigationButtonStyle">@style/GadgetbridgeTheme.ToolbarNavigationButton</item>
+        <item name="drawerArrowStyle">@style/GadgetbridgeTheme.DrawerArrow</item>
+        <item name="homeAsUpIndicator">@drawable/ic_toolbar_back</item>
+        <item name="actionOverflowButtonStyle">@style/GadgetbridgeTheme.OverflowButton</item>
+        <item name="actionBarItemBackground">@drawable/bg_toolbar_icon</item>
         <item name="android:statusBarColor">?attr/toolbar_bg</item>
         <item name="android:windowLightStatusBar" tools:targetApi="23">false</item>
         <item name="android:colorControlHighlight">?attr/colorPrimary</item>
@@ -368,7 +392,7 @@
         <item name="bar_shade">@drawable/bar_shade_dark</item>
         <item name="toolbar_title">?attr/colorOnSurface</item>
         <item name="toolbar_subtitle">?attr/colorOnSurfaceVariant</item>
-        <item name="toolbar_icon">?attr/colorOnSurfaceVariant</item>
+        <item name="toolbar_icon">?attr/toolbar_title</item>
         <item name="main_bar_bg">?attr/toolbar_bg</item>
         <item name="summary_tile_label">?attr/colorPrimary</item>
         <item name="accent_color">?attr/colorPrimary</item>
@@ -415,10 +439,9 @@
 
     <!-- action bar styles -->
     <style name="TextAppearance.App.ToolbarTitle" parent="TextAppearance.Material3.TitleLarge">
-        <item name="android:textSize">20sp</item>
+        <item name="android:textSize">18sp</item>
         <item name="android:textStyle">normal</item>
-        <item name="android:fontFamily">sans-serif-medium</item>
-        <item name="android:letterSpacing">-0.01</item>
+        <item name="android:fontFamily">sans-serif</item>
         <item name="android:textColor">?attr/toolbar_title</item>
     </style>
     <style name="TextAppearance.App.ToolbarSubtitle" parent="TextAppearance.Material3.BodySmall">
@@ -490,7 +513,8 @@
 
     <style name="GadgetbridgeTheme.ActionBar" parent="Widget.Material3.ActionBar.Solid">
         <item name="background">?attr/toolbar_bg</item>
-        <item name="android:height">52dp</item>
+        <item name="android:height">@dimen/toolbar_height</item>
+        <item name="contentInsetStartWithNavigation">0dp</item>
         <item name="titleTextStyle">@style/GadgetbridgeTheme.ToolbarTitleStyle</item>
         <item name="subtitleTextStyle">@style/GadgetbridgeTheme.ToolbarSubtitleStyle</item>
         <!-- No shadow under the bar: it showed as a gradient on the tab row below -->
@@ -499,8 +523,9 @@
     </style>
     <style name="GadgetbridgeTheme.ActionMode" parent="Widget.AppCompat.ActionMode">
         <item name="background">?attr/toolbar_bg</item>
-        <item name="titleTextStyle">@style/GadgetbridgeTheme.ActionModeTitleStyle</item>
-        <item name="subtitleTextStyle">@style/GadgetbridgeTheme.ActionModeTitleStyle</item>
+        <item name="height">@dimen/toolbar_height</item>
+        <item name="titleTextStyle">@style/GadgetbridgeTheme.ToolbarTitleStyle</item>
+        <item name="subtitleTextStyle">@style/GadgetbridgeTheme.ToolbarSubtitleStyle</item>
         <item name="android:theme">@style/GadgetbridgeTheme.ActionModeOverlay</item>
     </style>
     <style name="GadgetbridgeTheme.ActionModeOverlay" parent="">
@@ -509,9 +534,33 @@
     </style>
     <style name="GadgetbridgeTheme.ActionModeCloseButton" parent="Widget.AppCompat.ActionButton">
         <item name="android:tint">?attr/toolbar_icon</item>
+        <item name="android:background">@drawable/bg_toolbar_icon</item>
     </style>
-    <style name="GadgetbridgeTheme.ActionModeTitleStyle" parent="TextAppearance.Material3.ActionBar.Title">
-        <item name="android:textColor">?attr/toolbar_title</item>
+    <style name="GadgetbridgeTheme.Toolbar" parent="Widget.Material3.Toolbar">
+        <item name="android:paddingStart">4dp</item>
+        <item name="android:paddingEnd">4dp</item>
+        <item name="contentInsetStartWithNavigation">0dp</item>
+        <item name="titleMarginStart">4dp</item>
+    </style>
+    <style name="GadgetbridgeTheme.ToolbarNavigationButton" parent="Widget.AppCompat.Toolbar.Button.Navigation">
+        <item name="android:minWidth">48dp</item>
+        <item name="android:minHeight">48dp</item>
+        <item name="android:background">@drawable/bg_toolbar_icon</item>
+    </style>
+    <style name="GadgetbridgeTheme.DrawerArrow" parent="Widget.AppCompat.DrawerArrowToggle">
+        <item name="color">?attr/toolbar_icon</item>
+        <item name="drawableSize">@dimen/toolbar_icon_size</item>
+        <item name="barLength">15dp</item>
+        <item name="thickness">1.67dp</item>
+        <item name="gapBetweenBars">2.5dp</item>
+        <item name="arrowHeadLength">6.67dp</item>
+        <item name="arrowShaftLength">13.33dp</item>
+    </style>
+    <style name="GadgetbridgeTheme.OverflowButton" parent="Widget.AppCompat.ActionButton.Overflow">
+        <item name="srcCompat">@drawable/ic_toolbar_more_vert</item>
+        <item name="android:src">@drawable/ic_toolbar_more_vert</item>
+        <item name="android:background">@drawable/bg_toolbar_icon</item>
+        <item name="android:minWidth">48dp</item>
     </style>
     <style name="GadgetbridgeTheme.OverflowMenuStyle" parent="Widget.Material3.PopupMenu.Overflow" />
 

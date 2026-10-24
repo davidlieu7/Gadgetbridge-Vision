@@ -20,7 +20,11 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:background="?attr/main_bar_bg"
-            android:minHeight="?attr/actionBarSize" />
+            android:minHeight="@dimen/toolbar_height"
+            android:theme="@style/GadgetbridgeTheme.ToolbarIconOverlay"
+            app:buttonGravity="center_vertical"
+            app:subtitleTextAppearance="@style/TextAppearance.App.ToolbarSubtitle"
+            app:titleTextAppearance="@style/TextAppearance.App.ToolbarTitle" />
 
     </com.google.android.material.appbar.AppBarLayout>
 
