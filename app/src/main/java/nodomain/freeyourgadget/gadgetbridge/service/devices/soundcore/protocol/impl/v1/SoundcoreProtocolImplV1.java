@@ -16,6 +16,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Set;
 
+import kotlin.ranges.IntRange;
+
 import nodomain.freeyourgadget.gadgetbridge.GBApplication;
 import nodomain.freeyourgadget.gadgetbridge.R;
 import nodomain.freeyourgadget.gadgetbridge.activities.multipoint.MultipointDevice;
@@ -510,14 +512,14 @@ public class SoundcoreProtocolImplV1 extends AbstractSoundcoreProtocol {
 
     private byte[] encodeEqualizer() {
         final Prefs prefs = getDevicePrefs();
+        final SoundcoreEarbudsCoordinator coordinator = (SoundcoreEarbudsCoordinator) getDevice().getDeviceCoordinator();
         final int preset = Integer.parseInt(prefs.getString(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_EQUALIZER_PRESET, "0"));
 
-        final SoundcoreEarbudsCoordinator coordinator = (SoundcoreEarbudsCoordinator) getDevice().getDeviceCoordinator();
         final boolean compact = "compact".equals(prefs.getString(
                 DeviceSettingsPreferenceConst.PREF_SOUNDCORE_EQUALIZER_COMMAND,
                 coordinator.getDefaultEqualizerCommand()));
         final SoundcoreEqualizer equalizerPreset = SoundcoreEqualizerPresets.fromIndex(preset);
-        if (equalizerPreset != null) {
+        if (equalizerPreset != null && equalizerPreset != SoundcoreEqualizerPresets.CUSTOM) {
             if (compact) {
                 return encodeCommand(CMD_SET_EQUALIZER_COMPACT, equalizerPreset.getPayloadCompact());
             } else {
@@ -526,8 +528,13 @@ public class SoundcoreProtocolImplV1 extends AbstractSoundcoreProtocol {
         }
 
         final int[] bands = new int[coordinator.getSupportedEqualizerBands().length];
+        final IntRange volumeRange = coordinator.getEqualizerVolumeRange();
+
         for (int i = 0; i < bands.length; i++) {
-            bands[i] = clamp(prefs.getInt(SoundcoreEqualizer.EQUALIZER_PREFS_VALUE[i], 0), -6, 6);
+            bands[i] = clamp(
+                prefs.getInt(SoundcoreEqualizer.EQUALIZER_PREFS_VALUE[i], 0),
+                volumeRange.getFirst(), volumeRange.getLast()
+            );
         }
 
         return encodeCommand(CMD_SET_EQUALIZER, SoundcoreEqualizer.buildCustomPayload(bands));
