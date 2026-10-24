@@ -112,6 +112,14 @@ public final class SoundcoreEqualizer {
         return buildPayload(index, bands, tails);
     }
 
+    @Nullable
+    public byte[] getPayloadCompact() {
+        if (bands == null || tails == null) {
+            return null;
+        }
+        return buildPayloadCompact(index, bands, tails);
+    }
+
     /** Encodes up to nine signed dB gains, defaulting missing bands to 0 dB. */
     public static byte[] encodeBands(final int[] bands) {
         return encodeValues(bands, 10);

@@ -512,15 +512,19 @@ public class SoundcoreProtocolImplV1 extends AbstractSoundcoreProtocol {
         final Prefs prefs = getDevicePrefs();
         final int preset = Integer.parseInt(prefs.getString(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_EQUALIZER_PRESET, "0"));
 
+        final SoundcoreEarbudsCoordinator coordinator = (SoundcoreEarbudsCoordinator) getDevice().getDeviceCoordinator();
+        final boolean compact = "compact".equals(prefs.getString(
+                DeviceSettingsPreferenceConst.PREF_SOUNDCORE_EQUALIZER_COMMAND,
+                coordinator.getDefaultEqualizerCommand()));
         final SoundcoreEqualizer equalizerPreset = SoundcoreEqualizerPresets.fromIndex(preset);
         if (equalizerPreset != null) {
-            final byte[] presetPayload = equalizerPreset.getPayload();
-            if (presetPayload != null) {
-                return encodeCommand(CMD_SET_EQUALIZER, presetPayload);
+            if (compact) {
+                return encodeCommand(CMD_SET_EQUALIZER_COMPACT, equalizerPreset.getPayloadCompact());
+            } else {
+                return encodeCommand(CMD_SET_EQUALIZER, equalizerPreset.getPayload());
             }
         }
 
-        final SoundcoreEarbudsCoordinator coordinator = (SoundcoreEarbudsCoordinator) getDevice().getDeviceCoordinator();
         final int[] bands = new int[coordinator.getSupportedEqualizerBands().length];
         for (int i = 0; i < bands.length; i++) {
             bands[i] = clamp(prefs.getInt(SoundcoreEqualizer.EQUALIZER_PREFS_VALUE[i], 0), -6, 6);

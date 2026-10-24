@@ -297,6 +297,8 @@ abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator(
 
     open fun getAutoPowerOffMinutes(): Array<Int> = arrayOf(10, 20, 30, 60)
 
+    open fun getDefaultEqualizerCommand(): String = "default"
+
     open fun getEqualizerVolumeRange(): IntRange = -6..6
 
     open fun getSupportedEqualizerBands(): IntArray = intArrayOf(
@@ -503,6 +505,20 @@ abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator(
                     if (has(Capability.AudioEqualizer)) {
                         val equalizerPresetEntries = getEqualizerPresetEntries()
                         category(key = "pref_header_soundcore_equalizer", title = R.string.pref_header_equalizer) {
+                            if (GBApplication.getPrefs().experimentalSettings()) {
+                                list(
+                                    key = DeviceSettingsPreferenceConst.PREF_SOUNDCORE_EQUALIZER_COMMAND,
+                                    title = R.string.soundcore_equalizer_command,
+                                    // summary = R.string.pref_experimental_settings_summary,
+                                    icon = R.drawable.ic_science,
+                                    entries = listOf(
+                                        ListEntry.Res("default", R.string.pref_default),
+                                        ListEntry.Res("compact", R.string.soundcore_equalizer_command_compact),
+                                    ),
+                                    defaultValue = getDefaultEqualizerCommand(),
+                                    connectedOnly = false,
+                                )
+                            }
                             if (has(Capability.AdaptiveDirection)) {
                                 switchSetting(
                                     key = DeviceSettingsPreferenceConst.PREF_SOUNDCORE_ADAPTIVE_DIRECTION,

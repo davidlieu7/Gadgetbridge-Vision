@@ -68,6 +68,8 @@ class SoundcoreV20iCoordinator : SoundcoreEarbudsCoordinator() {
         TapFunction.NONE,
     )
 
+    override fun getDefaultEqualizerCommand(): String = "compact"
+
     override fun createProtocol(device: GBDevice): SoundcoreV20iProtocol =
         SoundcoreV20iProtocol(device)
 
