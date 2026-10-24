@@ -221,7 +221,7 @@ public abstract class GarminCoordinator extends AbstractBLEDeviceCoordinator {
     @Nullable
     @Override
     public ActivitySummaryParser getActivitySummaryParser(final GBDevice device, final Context context) {
-        return new GarminWorkoutParser(context);
+        return new GarminWorkoutParser(context, device);
     }
 
     @Override

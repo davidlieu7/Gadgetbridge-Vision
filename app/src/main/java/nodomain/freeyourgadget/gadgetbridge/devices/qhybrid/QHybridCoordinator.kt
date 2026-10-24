@@ -124,6 +124,7 @@ class QHybridCoordinator : AbstractBLEDeviceCoordinator() {
         return HybridHRSpo2SampleProvider(device, session)
     }
 
+    @Suppress("DEPRECATION")
     override fun findInstallHandler(uri: Uri, options: Bundle, context: Context): InstallHandler? {
         if (this.isHybridHR) {
             val installHandler = FossilHRInstallHandler(uri, context)
@@ -248,6 +249,7 @@ class QHybridCoordinator : AbstractBLEDeviceCoordinator() {
         return QHybridSupport::class.java
     }
 
+    @Suppress("DEPRECATION")
     override fun getSupportedDeviceSpecificAuthenticationSettings(): IntArray {
         return if (this.isHybridHR) {
             intArrayOf(

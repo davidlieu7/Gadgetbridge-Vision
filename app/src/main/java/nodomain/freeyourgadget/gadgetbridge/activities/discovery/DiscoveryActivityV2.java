@@ -76,6 +76,7 @@ import org.slf4j.LoggerFactory;
 
 import java.lang.reflect.Method;
 import java.util.ArrayList;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
@@ -98,7 +99,6 @@ import nodomain.freeyourgadget.gadgetbridge.util.AndroidUtils;
 import nodomain.freeyourgadget.gadgetbridge.util.DeviceHelper;
 import nodomain.freeyourgadget.gadgetbridge.util.GB;
 import nodomain.freeyourgadget.gadgetbridge.util.Prefs;
-import nodomain.freeyourgadget.gadgetbridge.util.DeviceTypeDialog;
 
 
 public class DiscoveryActivityV2 extends AbstractGBActivity implements AdapterView.OnItemClickListener,
@@ -127,6 +127,7 @@ public class DiscoveryActivityV2 extends AbstractGBActivity implements AdapterVi
     private boolean scanning;
 
     private ActivityResultLauncher<Intent> authKeyLauncher;
+    private ActivityResultLauncher<PickDeviceType.Input> forceDeviceTypeLauncher;
 
     private final Runnable stopRunnable = () -> {
         stopDiscovery();
@@ -202,6 +203,21 @@ public class DiscoveryActivityV2 extends AbstractGBActivity implements AdapterVi
                         startPair(deviceCandidate, deviceType.getDeviceCoordinator());
                     }
                 });
+
+        forceDeviceTypeLauncher = registerForActivityResult(new PickDeviceType(), selection -> {
+            if (selection == null) {
+                return;
+            }
+            for (final GBDeviceCandidate deviceCandidate : deviceCandidates) {
+                if (deviceCandidate.getMacAddress().equals(selection.getAddress())) {
+                    LOG.debug("Force-pairing {} as {}", deviceCandidate, selection.getDeviceType());
+                    DeviceHelper.getInstance().setForcedDeviceType(deviceCandidate.getMacAddress().toLowerCase(), selection.getDeviceType());
+                    preparePair(deviceCandidate);
+                    return;
+                }
+            }
+            LOG.warn("No device candidate for {}", selection.getAddress());
+        });
 
         if (!startDiscovery()) {
             /* if we couldn't start scanning, go back to the main page.
@@ -758,7 +774,7 @@ public class DiscoveryActivityV2 extends AbstractGBActivity implements AdapterVi
             longClickItems.add(new RunnableListIconItem(
                     getString(R.string.add_test_device),
                     R.drawable.ic_warning,
-                    () -> showUnsupportedDeviceDialog(deviceCandidate)
+                    () -> pickUnsupportedDeviceType(deviceCandidate)
             ));
         }
 
@@ -803,20 +819,14 @@ public class DiscoveryActivityV2 extends AbstractGBActivity implements AdapterVi
                 .show();
     }
 
-    private void showUnsupportedDeviceDialog(final GBDeviceCandidate deviceCandidate) {
+    private void pickUnsupportedDeviceType(final GBDeviceCandidate deviceCandidate) {
         LOG.info("Unsupported device candidate selected: {}", deviceCandidate);
 
-        new DeviceTypeDialog(
-                this,
+        forceDeviceTypeLauncher.launch(new PickDeviceType.Input(
                 R.string.add_test_device,
                 deviceCandidate.getMacAddress(),
-                d -> d.getDeviceCoordinator().getConnectionType() != DeviceCoordinator.ConnectionType.USB
-        ).show(null, (macAddress, deviceType) -> {
-            LOG.debug("Force-pairing {} as {}", deviceCandidate, deviceType);
-            DeviceHelper.getInstance().setForcedDeviceType(deviceCandidate.getMacAddress().toLowerCase(), deviceType);
-            preparePair(deviceCandidate);
-            return kotlin.Unit.INSTANCE;
-        });
+                EnumSet.complementOf(EnumSet.of(DeviceCoordinator.ConnectionType.USB))
+        ));
     }
 
     private void registerBroadcastReceivers() {

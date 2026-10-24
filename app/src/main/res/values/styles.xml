@@ -32,6 +32,7 @@
         <item name="actionBarStyle">@style/GadgetbridgeTheme.ActionBar</item>
         <item name="actionOverflowMenuStyle">@style/GadgetbridgeTheme.OverflowMenuStyle</item>
         <item name="actionModeStyle">@style/GadgetbridgeTheme.ActionMode</item>
+        <item name="windowActionModeOverlay">true</item>
         <item name="actionModeCloseButtonStyle">@style/GadgetbridgeTheme.ActionModeCloseButton</item>
         <item name="preferenceTheme">@style/AppPreferenceThemeOverlay</item>
 
@@ -142,6 +143,7 @@
         <item name="actionBarStyle">@style/GadgetbridgeTheme.ActionBar</item>
         <item name="actionOverflowMenuStyle">@style/GadgetbridgeTheme.OverflowMenuStyle</item>
         <item name="actionModeStyle">@style/GadgetbridgeTheme.ActionMode</item>
+        <item name="windowActionModeOverlay">true</item>
         <item name="actionModeCloseButtonStyle">@style/GadgetbridgeTheme.ActionModeCloseButton</item>
         <item name="preferenceTheme">@style/AppPreferenceThemeOverlay</item>
 
@@ -233,8 +235,12 @@
     <style name="GadgetbridgeThemeDynamicLight" parent="Theme.Material3.DynamicColors.Light">
         <item name="textColorPrimary">?attr/colorOnSurface</item>
         <item name="textColorSecondary">?attr/colorOnSurfaceVariant</item>
+        <item name="elevationOverlayEnabled">false</item>
         <item name="actionBarStyle">@style/GadgetbridgeTheme.ActionBar</item>
         <item name="actionOverflowMenuStyle">@style/GadgetbridgeTheme.OverflowMenuStyle</item>
+        <item name="actionModeStyle">@style/GadgetbridgeTheme.ActionMode</item>
+        <item name="windowActionModeOverlay">true</item>
+        <item name="actionModeCloseButtonStyle">@style/GadgetbridgeTheme.ActionModeCloseButton</item>
         <item name="android:statusBarColor">?attr/toolbar_bg</item>
         <item name="android:windowLightStatusBar" tools:targetApi="23">true</item>
         <item name="android:colorControlHighlight">?attr/colorPrimary</item>
@@ -246,7 +252,7 @@
         <item name="row_separator">@color/row_separator_light</item>
         <item name="stat_tile_bg">?attr/colorSurface</item>
         <item name="grid_tile_bg">?android:attr/windowBackground</item>
-        <item name="device_card_bg">?attr/colorSurfaceContainer</item>
+        <item name="device_card_bg">?attr/stat_tile_bg</item>
         <item name="bottom_bar_divider">@null</item>
         <item name="stat_tile_border">?attr/colorOutlineVariant</item>
         <item name="chart_marker_bg">?attr/colorSurfaceContainerHigh</item>
@@ -301,8 +307,12 @@
     <style name="GadgetbridgeThemeDynamicDark" parent="Theme.Material3.DynamicColors.Dark">
         <item name="textColorPrimary">?attr/colorOnSurface</item>
         <item name="textColorSecondary">?attr/colorOnSurfaceVariant</item>
+        <item name="elevationOverlayEnabled">false</item>
         <item name="actionBarStyle">@style/GadgetbridgeTheme.ActionBar</item>
         <item name="actionOverflowMenuStyle">@style/GadgetbridgeTheme.OverflowMenuStyle</item>
+        <item name="actionModeStyle">@style/GadgetbridgeTheme.ActionMode</item>
+        <item name="windowActionModeOverlay">true</item>
+        <item name="actionModeCloseButtonStyle">@style/GadgetbridgeTheme.ActionModeCloseButton</item>
         <item name="android:statusBarColor">?attr/toolbar_bg</item>
         <item name="android:windowLightStatusBar" tools:targetApi="23">false</item>
         <item name="android:colorControlHighlight">?attr/colorPrimary</item>
@@ -314,7 +324,7 @@
         <item name="row_separator">@color/row_separator_dark</item>
         <item name="stat_tile_bg">?attr/colorSurface</item>
         <item name="grid_tile_bg">?android:attr/windowBackground</item>
-        <item name="device_card_bg">?attr/colorSurfaceContainer</item>
+        <item name="device_card_bg">?attr/stat_tile_bg</item>
         <item name="bottom_bar_divider">@null</item>
         <item name="stat_tile_border">?attr/colorOutlineVariant</item>
         <item name="chart_marker_bg">?attr/colorSurfaceContainerHigh</item>
@@ -488,20 +498,20 @@
         <item name="android:theme">@style/GadgetbridgeTheme.ToolbarIconOverlay</item>
     </style>
     <style name="GadgetbridgeTheme.ActionMode" parent="Widget.AppCompat.ActionMode">
-        <item name="background">?attr/colorPrimary</item>
+        <item name="background">?attr/toolbar_bg</item>
         <item name="titleTextStyle">@style/GadgetbridgeTheme.ActionModeTitleStyle</item>
         <item name="subtitleTextStyle">@style/GadgetbridgeTheme.ActionModeTitleStyle</item>
         <item name="android:theme">@style/GadgetbridgeTheme.ActionModeOverlay</item>
     </style>
     <style name="GadgetbridgeTheme.ActionModeOverlay" parent="">
-        <item name="colorControlNormal">?attr/colorOnPrimary</item>
-        <item name="actionmenu_icon_color">?attr/colorOnPrimary</item>
+        <item name="colorControlNormal">?attr/toolbar_icon</item>
+        <item name="actionmenu_icon_color">?attr/toolbar_icon</item>
     </style>
     <style name="GadgetbridgeTheme.ActionModeCloseButton" parent="Widget.AppCompat.ActionButton">
-        <item name="android:tint">?attr/colorOnPrimary</item>
+        <item name="android:tint">?attr/toolbar_icon</item>
     </style>
     <style name="GadgetbridgeTheme.ActionModeTitleStyle" parent="TextAppearance.Material3.ActionBar.Title">
-        <item name="android:textColor">?attr/colorOnPrimary</item>
+        <item name="android:textColor">?attr/toolbar_title</item>
     </style>
     <style name="GadgetbridgeTheme.OverflowMenuStyle" parent="Widget.Material3.PopupMenu.Overflow" />
 
@@ -665,6 +675,36 @@
     <style name="Widget.App.PeriodStep" parent="Widget.Material3.Button.IconButton">
         <item name="iconSize">24dp</item>
         <item name="iconTint">@color/period_step_icon</item>
+    </style>
+
+    <!-- A 32dp circle in a 48dp touch area -->
+    <style name="Widget.App.WidgetEditButton" parent="Widget.Material3.Button.IconButton.Filled.Tonal">
+        <item name="android:minWidth">0dp</item>
+        <item name="android:minHeight">0dp</item>
+        <item name="android:insetLeft">8dp</item>
+        <item name="android:insetTop">8dp</item>
+        <item name="android:insetRight">8dp</item>
+        <item name="android:insetBottom">8dp</item>
+        <item name="android:padding">0dp</item>
+        <item name="iconPadding">0dp</item>
+        <item name="iconGravity">textStart</item>
+        <item name="iconSize">18dp</item>
+        <item name="cornerRadius">16dp</item>
+    </style>
+
+    <!-- Bottom bar actions with an icon above the label -->
+    <style name="Widget.App.EditBarItem" parent="Widget.Material3.Button.TextButton.Icon">
+        <item name="android:minWidth">0dp</item>
+        <item name="android:insetTop">0dp</item>
+        <item name="android:insetBottom">0dp</item>
+        <item name="android:maxLines">2</item>
+        <item name="cornerRadius">0dp</item>
+        <item name="iconGravity">top</item>
+        <item name="iconPadding">4dp</item>
+        <item name="iconSize">24dp</item>
+        <item name="iconTint">@color/period_step_icon</item>
+        <item name="android:textColor">@color/period_step_icon</item>
+        <item name="android:textAppearance">?attr/textAppearanceLabelMedium</item>
     </style>
 
     <!-- Date-step pill buttons (charts date bar, dashboard day arrows) -->
@@ -911,6 +951,13 @@
         <item name="grid_tile_bg">@color/stat_tile_bg_amoled</item>
         <item name="bar_shade">@drawable/bar_shade_amoled</item>
     </style>
+    <style name="ThemeOverlay.App.ContrastingSurfaces.Dynamic" parent="">
+        <item name="stat_tile_bg">?attr/colorSurfaceContainer</item>
+        <item name="grid_tile_bg">?attr/colorSurfaceContainer</item>
+    </style>
+    <style name="ThemeOverlay.App.ContrastingSurfaces.Dynamic.Black" parent="">
+        <item name="grid_tile_bg">@color/stat_tile_bg_amoled</item>
+    </style>
 
     <style name="ThemeOverlay.App.MaterialAlertDialog.WindowBackground" parent="ThemeOverlay.Material3.MaterialAlertDialog">
         <item name="alertDialogStyle">@style/MaterialAlertDialog.App.WindowBackground</item>
@@ -937,5 +984,21 @@
         <item name="iconGravity">top</item>
         <item name="iconPadding">4dp</item>
         <item name="iconTint">@color/gallery_viewer_action</item>
+    </style>
+
+    <style name="Theme.App.Translucent" parent="Theme.AppCompat.NoActionBar">
+        <item name="android:windowIsTranslucent">true</item>
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:windowAnimationStyle">@null</item>
+        <item name="android:backgroundDimEnabled">false</item>
+    </style>
+
+    <style name="ThemeOverlay.App.Translucent" parent="">
+        <item name="windowActionBar">false</item>
+        <item name="windowNoTitle">true</item>
+        <item name="android:windowIsTranslucent">true</item>
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:windowAnimationStyle">@null</item>
+        <item name="android:backgroundDimEnabled">false</item>
     </style>
 </resources>

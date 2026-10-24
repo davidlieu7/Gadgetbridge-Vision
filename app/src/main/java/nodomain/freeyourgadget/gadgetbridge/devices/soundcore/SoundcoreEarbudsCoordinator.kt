@@ -23,7 +23,9 @@ import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSett
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSpecificSettingsScreen
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.DeviceSettingsSpec
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.ListEntry
+import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.components.getOverriddenFeatures
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.components.multipointPairing
+import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.components.overrideFeatures
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.deviceSettings
 import nodomain.freeyourgadget.gadgetbridge.activities.multipoint.MultipointPairingActivity
 import nodomain.freeyourgadget.gadgetbridge.devices.AbstractBLClassicDeviceCoordinator
@@ -276,17 +278,8 @@ abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator(
 
     open fun getDefaultCapabilities(): Set<Capability> = emptySet()
 
-    open fun getCapabilities(device: GBDevice): Set<Capability> {
-        val devicePrefs = GBApplication.getDevicePrefs(device)
-        if (devicePrefs.getBoolean(DeviceSettingsPreferenceConst.PREF_OVERRIDE_FEATURES_ENABLED, false)) {
-            return devicePrefs.getStringSet(
-                DeviceSettingsPreferenceConst.PREF_OVERRIDE_FEATURES_LIST,
-                emptySet(),
-            ).mapNotNullTo(mutableSetOf()) { name -> Capability.values().firstOrNull { it.name == name } }
-        }
-
-        return getDefaultCapabilities()
-    }
+    open fun getCapabilities(device: GBDevice): Set<Capability> =
+        getOverriddenFeatures(device, getDefaultCapabilities())
 
     fun supports(device: GBDevice, capability: Capability): Boolean =
         getCapabilities(device).contains(capability)
@@ -842,6 +835,14 @@ abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator(
                 R.xml.devicesettings_headphones,
                 connectedOnly = false,
             )
+
+            screen(
+                key = DeviceSpecificSettingsScreen.DEVELOPER.key,
+                title = DeviceSpecificSettingsScreen.DEVELOPER.title,
+                icon = R.drawable.ic_developer_mode,
+            ) {
+                overrideFeatures(device, getDefaultCapabilities())
+            }
         }
     }
 

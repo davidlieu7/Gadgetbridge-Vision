@@ -2102,7 +2102,7 @@ public abstract class HuamiSupport extends AbstractBTLESingleDeviceSupport
         } else if (MiBandService.UUID_CHARACTERISTIC_REALTIME_STEPS.equals(characteristicUUID)) {
             handleRealtimeSteps(value);
             return true;
-        } else if (GattCharacteristic.CHARACTERISTIC_HEART_RATE_MEASUREMENT.equals(characteristicUUID)) {
+        } else if (GattCharacteristic.CHARACTERISTIC_HEART_RATE_MEASUREMENT.uuid.equals(characteristicUUID)) {
             handleHeartrate(value);
             return true;
         } else if (HuamiService.UUID_CHARACTERISTIC_AUTH.equals(characteristicUUID)) {
@@ -2151,13 +2151,13 @@ public abstract class HuamiSupport extends AbstractBTLESingleDeviceSupport
         }
 
         UUID characteristicUUID = characteristic.getUuid();
-        if (GattCharacteristic.CHARACTERISTIC_DEVICE_NAME.equals(characteristicUUID)) {
+        if (GattCharacteristic.CHARACTERISTIC_DEVICE_NAME.uuid.equals(characteristicUUID)) {
             handleDeviceName(value, status);
             return true;
         } else if (HuamiService.UUID_CHARACTERISTIC_6_BATTERY_INFO.equals(characteristicUUID)) {
             handleBatteryInfo(value, status);
             return true;
-        } else if (GattCharacteristic.CHARACTERISTIC_HEART_RATE_MEASUREMENT.equals(characteristicUUID)) {
+        } else if (GattCharacteristic.CHARACTERISTIC_HEART_RATE_MEASUREMENT.uuid.equals(characteristicUUID)) {
             logHeartrate(value, status);
             return true;
         } else if (HuamiService.UUID_CHARACTERISTIC_7_REALTIME_STEPS.equals(characteristicUUID)) {

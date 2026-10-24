@@ -46,6 +46,7 @@ import nodomain.freeyourgadget.gadgetbridge.entities.Device;
 import nodomain.freeyourgadget.gadgetbridge.util.FileUtils;
 import nodomain.freeyourgadget.gadgetbridge.widgets.WidgetInstance;
 import nodomain.freeyourgadget.gadgetbridge.widgets.WidgetLayoutStore;
+import nodomain.freeyourgadget.gadgetbridge.widgets.launcher.LauncherWidgetStore;
 
 public class ZipBackupImportJob extends AbstractZipBackupJob {
     private static final Logger LOG = LoggerFactory.getLogger(ZipBackupImportJob.class);
@@ -162,6 +163,9 @@ public class ZipBackupImportJob extends AbstractZipBackupJob {
             try (InputStream globalPrefsInputStream = zipFile.getInputStream(zipFile.getEntry(PREFS_GLOBAL_FILENAME))) {
                 final SharedPreferences globalPreferences = GBApplication.getPrefs().getPreferences();
 
+                // Keep existing local launcher widgets, since the IDs are local to the launcher anyway
+                final String launcherWidgets = globalPreferences.getString(LauncherWidgetStore.PREF_LAUNCHER_WIDGETS, null);
+
                 final JsonBackupPreferences jsonBackupPreferences = JsonBackupPreferences.fromJson(globalPrefsInputStream);
                 if (!jsonBackupPreferences.importInto(globalPreferences)) {
                     LOG.warn("Global preferences were not commited");
@@ -170,6 +174,7 @@ public class ZipBackupImportJob extends AbstractZipBackupJob {
                 // We may be restoring from different versions - reset the changelog version
                 globalPreferences.edit()
                         .putInt("ckChangeLog_last_version_code", BuildConfig.VERSION_CODE)
+                        .putString(LauncherWidgetStore.PREF_LAUNCHER_WIDGETS, launcherWidgets)
                         .apply();
             }
 
@@ -198,10 +203,11 @@ public class ZipBackupImportJob extends AbstractZipBackupJob {
 
             if (isAborted()) return;
 
-            // At this point global preferences (which includes pref_dashboard_layout) are
-            // already restored, so WidgetLayoutStore.load() reflects the imported layout.
+            // At this point global preferences (which includes the dashboard layouts) are
+            // already restored, so the widget stores reflect the imported instances.
             LOG.debug("Importing widget preferences");
-            for (final WidgetInstance widgetInstance : WidgetLayoutStore.INSTANCE.load()) {
+            final List<WidgetInstance> widgetInstances = WidgetLayoutStore.INSTANCE.instances();
+            for (final WidgetInstance widgetInstance : widgetInstances) {
                 if (isAborted()) break;
 
                 LOG.debug("Importing widget preferences for {}", widgetInstance.getInstanceId());

@@ -46,7 +46,7 @@ mockito = "5.24.0"
 mpandroidchart = "v4.0.1"
 zxing = "3.5.4"
 msgpack = "0.9.12"
-okhttp = "5.5.0"
+okhttp = "5.5.1"
 protobuf = "4.36.2"
 protobuf-plugin = "0.10.0"
 kaitai-plugin = "0.2.0"
@@ -54,11 +54,12 @@ robolectric = "4.17"
 searchpreference = "2.7.3"
 slf4j = "2.0.20"
 snakeyaml = "2.7"
-solarpositioning = "3.0.2"
+solarpositioning = "3.0.3"
 security-crypto = "1.1.0"
 browser = "1.10.0"
 exifinterface = "1.4.2"
 kaitai-struct-runtime = "0.11"
+kotlinx-coroutines = "1.10.2"
 
 [libraries]
 ahocorasick = { group = "org.ahocorasick", name = "ahocorasick", version.ref = "ahocorasick" }
@@ -129,6 +130,7 @@ androidx-security-crypto = { group = "androidx.security", name = "security-crypt
 androidx-browser = { group = "androidx.browser", name = "browser", version.ref = "browser" }
 androidx-exifinterface = { group = "androidx.exifinterface", name = "exifinterface", version.ref = "exifinterface" }
 kaitai-struct-runtime = { group = "io.kaitai", name = "kaitai-struct-runtime", version.ref = "kaitai-struct-runtime" }
+kotlinx-coroutines-test = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-test", version.ref = "kotlinx-coroutines" }
 zxing-core = { group = "com.google.zxing", name = "core", version.ref = "zxing" }
 
 [bundles]

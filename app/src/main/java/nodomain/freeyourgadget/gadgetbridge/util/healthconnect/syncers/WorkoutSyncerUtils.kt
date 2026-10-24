@@ -125,7 +125,8 @@ internal object WorkoutSyncerUtils {
             ActivityKind.AMERICAN_FOOTBALL -> ExerciseSessionRecord.EXERCISE_TYPE_FOOTBALL_AMERICAN
             ActivityKind.AUSTRALIAN_FOOTBALL -> ExerciseSessionRecord.EXERCISE_TYPE_FOOTBALL_AUSTRALIAN
             ActivityKind.RUGBY -> ExerciseSessionRecord.EXERCISE_TYPE_RUGBY
-            ActivityKind.CARDIO, ActivityKind.AEROBICS, ActivityKind.AEROBIC_EXERCISE, ActivityKind.AEROBIC_COMBO, ActivityKind.STEP_AEROBICS -> ExerciseSessionRecord.EXERCISE_TYPE_DANCING
+            ActivityKind.CARDIO -> ExerciseSessionRecord.EXERCISE_TYPE_DANCING
+            ActivityKind.AEROBICS, ActivityKind.AEROBIC_EXERCISE, ActivityKind.AEROBIC_COMBO, ActivityKind.STEP_AEROBICS -> ExerciseSessionRecord.EXERCISE_TYPE_EXERCISE_CLASS
             ActivityKind.BREATHWORK -> ExerciseSessionRecord.EXERCISE_TYPE_GUIDED_BREATHING
             ActivityKind.MEDITATION, ActivityKind.MIND_AND_BODY -> ExerciseSessionRecord.EXERCISE_TYPE_GUIDED_BREATHING
             ActivityKind.INDOOR_WALKING -> ExerciseSessionRecord.EXERCISE_TYPE_WALKING
@@ -153,8 +154,9 @@ internal object WorkoutSyncerUtils {
             ActivityKind.MIXED_MARTIAL_ARTS, ActivityKind.FREE_SPARRING, ActivityKind.BODY_COMBAT, ActivityKind.CARDIO_COMBAT, ActivityKind.MMA_HIIT -> ExerciseSessionRecord.EXERCISE_TYPE_MARTIAL_ARTS
             ActivityKind.DANCE, ActivityKind.BELLY_DANCE, ActivityKind.JAZZ_DANCE, ActivityKind.LATIN_DANCE, ActivityKind.BALLET, ActivityKind.STREET_DANCE, ActivityKind.ZUMBA, ActivityKind.BALLROOM_DANCE, ActivityKind.BREAKING, ActivityKind.FOLK_DANCE, ActivityKind.HIP_HOP, ActivityKind.MODERN_DANCE, ActivityKind.POLE_DANCE, ActivityKind.SQUARE_DANCE, ActivityKind.PLAZA_DANCING -> ExerciseSessionRecord.EXERCISE_TYPE_DANCING
             ActivityKind.KICKBOXING, ActivityKind.TAE_BO -> ExerciseSessionRecord.EXERCISE_TYPE_BOXING
-            ActivityKind.CROSSFIT, ActivityKind.FUNCTIONAL_TRAINING, ActivityKind.PHYSICAL_TRAINING, ActivityKind.FREE_TRAINING, ActivityKind.FITNESS_EXERCISES -> ExerciseSessionRecord.EXERCISE_TYPE_STRENGTH_TRAINING
+            ActivityKind.FUNCTIONAL_TRAINING, ActivityKind.PHYSICAL_TRAINING, ActivityKind.FREE_TRAINING, ActivityKind.FITNESS_EXERCISES -> ExerciseSessionRecord.EXERCISE_TYPE_STRENGTH_TRAINING
             ActivityKind.TAEKWONDO, ActivityKind.KARATE, ActivityKind.JUDO, ActivityKind.JUJITSU, ActivityKind.KENDO, ActivityKind.MUAY_THAI, ActivityKind.MARTIAL_ARTS -> ExerciseSessionRecord.EXERCISE_TYPE_MARTIAL_ARTS
+            ActivityKind.CROSSFIT -> ExerciseSessionRecord.EXERCISE_TYPE_BOOT_CAMP
             ActivityKind.FENCING -> ExerciseSessionRecord.EXERCISE_TYPE_FENCING
             ActivityKind.CORE_TRAINING -> ExerciseSessionRecord.EXERCISE_TYPE_STRENGTH_TRAINING
             ActivityKind.HORIZONTAL_BAR, ActivityKind.PARALLEL_BAR, ActivityKind.PARALLEL_BARS, ActivityKind.MASS_GYMNASTICS -> ExerciseSessionRecord.EXERCISE_TYPE_GYMNASTICS

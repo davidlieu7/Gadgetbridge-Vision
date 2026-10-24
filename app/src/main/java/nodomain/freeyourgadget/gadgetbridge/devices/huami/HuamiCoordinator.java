@@ -273,7 +273,7 @@ public abstract class HuamiCoordinator extends AbstractBLEDeviceCoordinator {
 
     @Override
     public ActivitySummaryParser getActivitySummaryParser(final GBDevice device, final Context context) {
-        return new HuamiActivitySummaryParser();
+        return new HuamiActivitySummaryParser(device);
     }
 
     @Override

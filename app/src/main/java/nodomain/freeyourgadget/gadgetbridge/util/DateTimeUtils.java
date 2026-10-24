@@ -250,6 +250,16 @@ public class DateTimeUtils {
         return String.format(Locale.US, "%02d", hours) + ":" + String.format(Locale.US, "%02d", minutes);
     }
 
+    /**
+     * Returns the offset of the time zone from UTC at the timestamp, for example "UTC+05:30".
+     */
+    public static String formatUtcOffset(final TimeZone timeZone, final long timestamp) {
+        final int offsetMinutes = timeZone.getOffset(timestamp) / 60000;
+        final char sign = offsetMinutes < 0 ? '-' : '+';
+        final int absMinutes = Math.abs(offsetMinutes);
+        return String.format(Locale.ROOT, "UTC%c%02d:%02d", sign, absMinutes / 60, absMinutes % 60);
+    }
+
 
     public static Date todayUTC() {
         Calendar cal = getCalendarUTC();

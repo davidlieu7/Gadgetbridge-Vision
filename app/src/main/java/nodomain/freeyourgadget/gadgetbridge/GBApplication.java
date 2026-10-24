@@ -97,6 +97,7 @@ import nodomain.freeyourgadget.gadgetbridge.util.Prefs;
 import nodomain.freeyourgadget.gadgetbridge.util.backup.PeriodicZipExporter;
 import nodomain.freeyourgadget.gadgetbridge.util.healthconnect.HealthConnectPermissionManager;
 import nodomain.freeyourgadget.gadgetbridge.util.preferences.DevicePrefs;
+import nodomain.freeyourgadget.gadgetbridge.widgets.launcher.LauncherWidgets;
 
 /**
  * Main Application class that initializes and provides access to certain things like
@@ -300,6 +301,8 @@ public class GBApplication extends Application {
 
         // Ensure the InternetHelper is bound, so that it works on first usage
         InternetHelperSingleton.INSTANCE.ensureInternetHelperBound();
+
+        LauncherWidgets.registerUpdateTriggers(context);
 
         // Let every external service schedule its own upkeep, such as renewing a token
         if (!GBEnvironment.env().isTest()) {
@@ -740,9 +743,8 @@ public class GBApplication extends Application {
      * applying it in that case, since Dynamic Color already ties these colors to the wallpaper.
      */
     @StyleRes
-    public static int getAccentColorOverlay() {
+    public static int getAccentColorOverlay(final boolean dark) {
         final String accent = prefs.getString(PREF_ACCENT_COLOR, PREF_ACCENT_COLOR_DEFAULT);
-        final boolean dark = isDarkThemeEnabled();
         switch (accent) {
             case "coral":
                 return dark ? R.style.ThemeOverlay_App_Accent_Coral_Dark : R.style.ThemeOverlay_App_Accent_Coral_Light;
@@ -776,13 +778,19 @@ public class GBApplication extends Application {
 
     public static final String PREF_CONTRASTING_SURFACES = "pref_key_contrasting_surfaces";
 
-    public static boolean areContrastingSurfacesEnabled() {
-        return prefs.getBoolean(PREF_CONTRASTING_SURFACES, isDarkThemeEnabled());
+    public static boolean areContrastingSurfacesEnabled(final boolean dark) {
+        return prefs.getBoolean(PREF_CONTRASTING_SURFACES, dark);
     }
 
     @StyleRes
-    public static int getContrastingSurfacesOverlay() {
-        if (!isDarkThemeEnabled()) {
+    public static int getContrastingSurfacesOverlay(final boolean dark) {
+        if (areDynamicColorsEnabled()) {
+            if (dark && isAmoledBlackEnabled()) {
+                return R.style.ThemeOverlay_App_ContrastingSurfaces_Dynamic_Black;
+            }
+            return R.style.ThemeOverlay_App_ContrastingSurfaces_Dynamic;
+        }
+        if (!dark) {
             return R.style.ThemeOverlay_App_ContrastingSurfaces_Light;
         }
         return isAmoledBlackEnabled() ? R.style.ThemeOverlay_App_ContrastingSurfaces_Black : R.style.ThemeOverlay_App_ContrastingSurfaces_Dark;

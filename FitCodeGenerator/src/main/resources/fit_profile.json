@@ -2444,7 +2444,7 @@
         {"num":6,"name":"sport","base":"ENUM"},
         {"num":7,"name":"unk_7","base":"ENUM"},
         {"num":8,"name":"activity_profile_index","base":"UINT8"},
-        {"num":9,"name":"unk_9","base":"ENUM"},
+        {"num":9,"name":"type_of_change","base":"ENUM"},
         {"num":10,"name":"unk_10","base":"UINT32"},
         {"num":11,"name":"unk_11","base":"UINT32"},
         {"num":251,"name":"pad","base":"BYTE","arrayLen":0},
@@ -2466,6 +2466,8 @@
         {"num":8,"name":"label","base":"ENUM","type":"AlarmLabel"},
         {"num":11,"name":"time_updated","base":"UINT32","type":"DateTime","UOM":"SECONDS"},
         {"num":12,"name":"smart_wake","base":"ENUM","type":"Bool"},
+        {"num":18,"name":"quiet_start","base":"ENUM","type":"Bool"},
+        {"num":20,"name":"vibration_pattern","base":"ENUM"},
         {"num":254,"name":"message_index","base":"UINT16"}
       ]
     },
@@ -3946,15 +3948,15 @@
       "fields": [
         {"num":0,"name":"recording_timestamp","base":"UINT32","type":"DateTime","UOM":"SECONDS"},
         {"num":1,"name":"overall_sleep_score","base":"UINT8"},
-        {"num":2,"name":"unk_2","base":"UINT32"},
+        {"num":2,"name":"rmssd_hrv","base":"UINT32","scale":65536},
         {"num":3,"name":"sleep_start_time","base":"UINT32","type":"LocalDateTime","UOM":"SECONDS"},
         {"num":4,"name":"sleep_start_timezone_offset","base":"SINT16","UOM":"MINUTES"},
         {"num":5,"name":"sleep_end_time","base":"UINT32","type":"LocalDateTime","UOM":"SECONDS"},
         {"num":6,"name":"sleep_end_timezone_offset","base":"SINT16","UOM":"MINUTES"},
         {"num":7,"name":"unk_7","base":"SINT8"},
-        {"num":8,"name":"unk_8","base":"UINT16"},
-        {"num":9,"name":"unk_9","base":"UINT16"},
-        {"num":10,"name":"unk_10","base":"UINT16"},
+        {"num":8,"name":"spo2","base":"UINT16","scale":100,"UOM":"PERCENT"},
+        {"num":9,"name":"respiration_rate","base":"UINT16","scale":100,"UOM":"BREATH_PER_MINUTE"},
+        {"num":10,"name":"heart_rate","base":"UINT16","scale":100,"UOM":"BEATS_PER_MINUTE"},
         {"num":11,"name":"unk_11","base":"ENUM"},
         {"num":253,"name":"timestamp","base":"UINT32","type":"DateTime","UOM":"SECONDS"}
       ]

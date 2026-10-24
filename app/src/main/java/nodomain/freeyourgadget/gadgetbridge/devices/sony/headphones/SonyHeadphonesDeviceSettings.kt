@@ -11,6 +11,7 @@ import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSett
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSpecificSettingsScreen
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.DeviceSettingsSpec
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.components.enumList
+import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.components.overrideFeatures
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.deviceSettings
 import nodomain.freeyourgadget.gadgetbridge.devices.sony.headphones.prefs.AmbientSoundControl
 import nodomain.freeyourgadget.gadgetbridge.devices.sony.headphones.prefs.AmbientSoundControlButtonMode
@@ -30,6 +31,7 @@ import nodomain.freeyourgadget.gadgetbridge.util.Prefs
 fun sonyHeadphonesDeviceSettings(
     device: GBDevice,
     capabilities: Set<SonyHeadphonesCapabilities>,
+    defaultCapabilities: Set<SonyHeadphonesCapabilities>,
 ): DeviceSettingsSpec = deviceSettings {
 
     //
@@ -627,12 +629,17 @@ fun sonyHeadphonesDeviceSettings(
     // Developer settings
     //
 
-    xmlScreen(
-        DeviceSpecificSettingsScreen.DEVELOPER,
-        R.xml.devicesettings_override_features,
-        R.xml.devicesettings_sony_headphones_protocol_version,
-        R.xml.devicesettings_sony_headphones_device_info,
-    )
+    screen(
+        key = DeviceSpecificSettingsScreen.DEVELOPER.key,
+        title = DeviceSpecificSettingsScreen.DEVELOPER.title,
+        icon = R.drawable.ic_developer_mode,
+        xmlSubScreens = listOf(
+            R.xml.devicesettings_sony_headphones_protocol_version,
+            R.xml.devicesettings_sony_headphones_device_info,
+        ),
+    ) {
+        overrideFeatures(device, defaultCapabilities)
+    }
 }
 
 internal fun sonyDefaultAmbientSoundMode(capabilities: Set<SonyHeadphonesCapabilities>): AmbientSoundControl.Mode =

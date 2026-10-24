@@ -48,6 +48,7 @@ import kotlin.jvm.functions.Function1;
 import nodomain.freeyourgadget.gadgetbridge.GBApplication;
 import nodomain.freeyourgadget.gadgetbridge.R;
 import nodomain.freeyourgadget.gadgetbridge.activities.HeartRateUtils;
+import nodomain.freeyourgadget.gadgetbridge.activities.charts.mpchart.ChartDataBuilder;
 import nodomain.freeyourgadget.gadgetbridge.activities.charts.mpchart.ChartSelection;
 import nodomain.freeyourgadget.gadgetbridge.activities.charts.sleep.SleepStagesChartData;
 import nodomain.freeyourgadget.gadgetbridge.activities.charts.spec.ChartSpec;
@@ -128,7 +129,7 @@ public abstract class AbstractActivityChartFragment<D extends ChartsData> extend
         BACKGROUND_COLOR = GBApplication.getBackgroundColor(getContext());
         DESCRIPTION_COLOR = GBApplication.getTextColor(getContext());
         CHART_TEXT_COLOR = GBApplication.getSecondaryTextColor(getContext());
-        if (prefs.getBoolean("chart_heartrate_color", false)) {
+        if (prefs.getBoolean("chart_heartrate_color", true)) {
             HEARTRATE_COLOR = ContextCompat.getColor(getContext(), R.color.chart_heartrate_alternative);
         } else {
             HEARTRATE_COLOR = ContextCompat.getColor(getContext(), R.color.chart_heartrate);
@@ -387,7 +388,7 @@ public abstract class AbstractActivityChartFragment<D extends ChartsData> extend
 
     protected LineDataSet createHeartrateSet(List<Entry> values, String label) {
         LineDataSet set1 = new LineDataSet(values, label);
-        set1.setLineWidth(2.2f);
+        set1.setLineWidth(ChartDataBuilder.LINE_WIDTH_DP);
         set1.setColor(HEARTRATE_COLOR);
         set1.setMode(LineDataSet.Mode.HORIZONTAL_BEZIER);
         set1.setCubicIntensity(0.1f);

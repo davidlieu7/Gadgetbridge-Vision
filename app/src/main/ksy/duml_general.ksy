@@ -100,18 +100,18 @@ types:
     meta:
       -duml-cmd: 0x28
     seq:
-      - id: num_files
+      - id: num_file_ids
         type: u1
       - id: file_ids
         type: u4
         repeat: expr
-        repeat-expr: num_files
+        repeat-expr: num_file_ids
       - id: request_counter
         doc: Incremented for each favorite and delete command.
         type: u4
       - id: reserved
         type: u1
-      - id: num_files_again
+      - id: num_file_ids_again
         type: u4
 
   file_transfer_delete_response:

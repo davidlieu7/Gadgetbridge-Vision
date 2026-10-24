@@ -8,6 +8,10 @@
 
     <color name="accent" type="color">#0091ea</color>
 
+    <color name="last_activity_running" type="color">#FB923C</color>
+    <color name="last_activity_cycling" type="color">#38BDF8</color>
+    <color name="last_activity_cardio" type="color">#E879F9</color>
+
     <color name="primarytext_light" type="color">#000000</color>
     <color name="primarytext_dark" type="color">#ffffff</color>
 
@@ -54,7 +58,7 @@
     <color name="outline_variant_dark" type="color">#303030</color>
 
     <color name="chart_heartrate" type="color">#ffab40</color>
-    <color name="chart_heartrate_alternative" type="color">#8B0000</color>
+    <color name="chart_heartrate_alternative" type="color">#EF4444</color>
     <color name="chart_heartrate_fill" type="color">#fadab1</color>
     <color name="chart_heartrate_minimum" type="color">#3F84E5</color>
     <color name="chart_heartrate_resting" type="color">#01796F</color>
@@ -94,6 +98,7 @@
     <color name="hrv_status_char_line_color" type="color">#d12a2a</color>
     <color name="hrv_status_range_color" type="color">#99d12a2a</color>
     <color name="hrv_status_last_night_color" type="color">#3f7dff</color>
+    <color name="hrv_status_weekly_avg_color" type="color">#00a3a3</color>
     <color name="hrv_status_baseline_color" type="color">#0c8a03</color>
     <color name="hrv_status_baseline_fill_color" type="color">#660c8a03</color>
     <color name="training_load_dark" type="color">#FFF</color>
@@ -155,7 +160,7 @@
     <color name="chart_cadence_circle" type="color">#FF7043</color>
     <color name="chart_line_speed" type="color">#80D8FF</color>
     <color name="chart_line_elevation" type="color">#66BB6A</color>
-    <color name="chart_line_heart_rate" type="color">#F44336</color>
+    <color name="chart_line_heart_rate" type="color">#EF4444</color>
     <color name="chart_line_power" type="color">#6A0DAD</color>
     <color name="chart_line_swolf" type="color">#F9DB22</color>
     <color name="chart_line_stroke_rate" type="color">#6495ED</color>

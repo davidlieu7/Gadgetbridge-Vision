@@ -36,6 +36,7 @@ import java.text.Collator;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
@@ -48,6 +49,7 @@ import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
 import nodomain.freeyourgadget.gadgetbridge.util.DeviceHelper;
 import nodomain.freeyourgadget.gadgetbridge.util.GB;
 import nodomain.freeyourgadget.gadgetbridge.util.GBPrefs;
+import nodomain.freeyourgadget.gadgetbridge.widgets.DashboardDefaults;
 
 /**
  * Provides access to the list of devices managed by Gadgetbridge.
@@ -75,6 +77,12 @@ public class DeviceManager {
      */
     private final List<GBDevice> deviceList = new ArrayList<>();
     private List<GBDevice> selectedDevices = new ArrayList<>();
+
+    /**
+     * The addresses of the devices in the database at the last refresh, or null before the first refresh.
+     */
+    @Nullable
+    private Set<String> knownAddresses;
 
     private static final long DEVICE_CHANGED_THROTTLE_MS = 250;
     private final Handler handler = new Handler(Looper.getMainLooper());
@@ -178,15 +186,36 @@ public class DeviceManager {
 
     private void refreshPairedDevices() {
         final Set<GBDevice> availableDevices = DeviceHelper.getInstance().getAvailableDevices();
+        final List<GBDevice> addedDevices = new ArrayList<>();
+        if (knownAddresses != null) {
+            for (final GBDevice availableDevice : availableDevices) {
+                if (!knownAddresses.contains(availableDevice.getAddress())) {
+                    LOG.info("Device {} was added", availableDevice.getAddress());
+                    addedDevices.add(availableDevice);
+                }
+            }
+        }
+        knownAddresses = addressesOf(availableDevices);
         deviceList.retainAll(availableDevices);
         for (GBDevice availableDevice : availableDevices) {
             if (!deviceList.contains(availableDevice)) {
                 deviceList.add(availableDevice);
             }
         }
+        for (final GBDevice addedDevice : addedDevices) {
+            DashboardDefaults.INSTANCE.onDeviceAdded(addedDevice);
+        }
 
         sortDevices();
         notifyDevicesChanged();
+    }
+
+    private static Set<String> addressesOf(final Set<GBDevice> devices) {
+        final Set<String> addresses = new HashSet<>();
+        for (final GBDevice device : devices) {
+            addresses.add(device.getAddress());
+        }
+        return addresses;
     }
 
     private void sortDevices() {
