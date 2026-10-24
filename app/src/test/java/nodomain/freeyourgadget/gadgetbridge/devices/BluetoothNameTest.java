@@ -46,6 +46,7 @@ public class BluetoothNameTest extends TestBase {
             put("HC96", DeviceType.HC96);
             put("KW19-B", DeviceType.KW19_B); // #7092
             put("FireBoltt 069", DeviceType.FIREBOLTT_069);
+            put("FB BGS001", DeviceType.FIREBOLTT_NINJA_PHANTOM);
             put("soundcore A1", DeviceType.SOUNDCORE_A1); // #7006
             put("soundcore A2 NC", DeviceType.SOUNDCORE_A2_NC); // #7006
             put("soundcore A3i", DeviceType.SOUNDCORE_A3I); // #7006

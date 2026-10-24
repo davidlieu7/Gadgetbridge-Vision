@@ -300,6 +300,7 @@ import nodomain.freeyourgadget.gadgetbridge.devices.huawei.huaweiwatchgt7.Huawei
 import nodomain.freeyourgadget.gadgetbridge.devices.moyoung.C20ProCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.moyoung.ColmiP81Coordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.moyoung.FireBoltt069Coordinator;
+import nodomain.freeyourgadget.gadgetbridge.devices.moyoung.FireBolttNinjaPhantomCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.moyoung.GarettEvaCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.haylou.HaylouS35AncCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.hplus.EXRIZUK8Coordinator;
@@ -1275,6 +1276,7 @@ public enum DeviceType {
     KSIX_VENTURE(KsixVentureCoordinator.class),
     FIREBOLTT_069(FireBoltt069Coordinator.class),
     FIREBOLTT_TALK(FireBolttTalkCoordinator.class),
+    FIREBOLTT_NINJA_PHANTOM(FireBolttNinjaPhantomCoordinator.class),
     VIRAN_C29(ViranC29Coordinator.class),
     ZL02D(ZL02DCoordinator.class),
     R50PRO(R50ProCoordinator.class),
