@@ -243,7 +243,7 @@ object LastActivityWidget : GBWidget<LastActivityWidget.Data> {
         val workout = view.tag as? Workout
         val device = workout?.let { GBApplication.app().deviceManager.getDeviceByAddress(it.deviceAddress) }
         if (workout != null && device != null) {
-            context.startActivity(WorkoutDetailsActivity.createSingleWorkoutIntent(context, workout.id, device))
+            context.startActivity(WorkoutDetailsActivity.createSingleWorkoutIntent(context, workout.id, device, WorkoutDetailsActivity.label(context, workout.name, workout.kind.code)))
             return
         }
         WidgetActions.chooseDevice(context, config, this) { chosen ->

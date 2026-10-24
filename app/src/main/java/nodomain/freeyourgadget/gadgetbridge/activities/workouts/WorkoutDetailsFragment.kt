@@ -153,8 +153,7 @@ class WorkoutDetailsFragment : Fragment(), MenuProvider {
     /** The workout's custom label, falling back to its sport/activity kind name. */
     private fun workoutLabel(): String? {
         val summary = currentWorkout?.summary ?: return null
-        return summary.name?.takeIf { it.isNotBlank() }
-            ?: summary.activityKind.let { ActivityKind.fromCode(it).getLabel(requireContext()) }
+        return WorkoutDetailsActivity.label(requireContext(), summary.name, summary.activityKind)
     }
 
     private fun loadWorkoutData() {

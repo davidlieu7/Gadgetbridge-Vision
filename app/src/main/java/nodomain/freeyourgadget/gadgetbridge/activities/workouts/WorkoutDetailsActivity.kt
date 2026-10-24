@@ -11,6 +11,7 @@ import nodomain.freeyourgadget.gadgetbridge.R
 import nodomain.freeyourgadget.gadgetbridge.activities.AbstractGBActivity
 import nodomain.freeyourgadget.gadgetbridge.databinding.ActivityWorkoutDetailsBinding
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice
+import nodomain.freeyourgadget.gadgetbridge.model.ActivityKind
 import nodomain.freeyourgadget.gadgetbridge.util.kotlin.getParcelableCompat
 import nodomain.freeyourgadget.gadgetbridge.util.kotlin.getSerializableCompat
 
@@ -22,6 +23,7 @@ class WorkoutDetailsActivity : AbstractGBActivity() {
         super.onCreate(savedInstanceState)
         binding = ActivityWorkoutDetailsBinding.inflate(layoutInflater)
         setContentView(binding.root)
+        intent.getStringExtra(EXTRA_TITLE)?.let { title = it }
 
         setupViewModel()
 
@@ -100,16 +102,25 @@ class WorkoutDetailsActivity : AbstractGBActivity() {
 
     companion object {
         const val EXTRA_WORKOUT_ID = "workout_id"
+        const val EXTRA_TITLE = "workout_title"
         const val RESULT_WORKOUT_CHANGED = 2
 
+        /** The workout's custom name, falling back to its activity kind. */
+        @JvmStatic
+        fun label(context: Context, name: String?, activityKind: Int): String =
+            name?.takeIf { it.isNotBlank() } ?: ActivityKind.fromCode(activityKind).getLabel(context)
+
+        @JvmOverloads
         fun createSingleWorkoutIntent(
             context: Context,
             workoutId: Long,
-            gbDevice: GBDevice
+            gbDevice: GBDevice,
+            title: String? = null
         ): Intent {
             return Intent(context, WorkoutDetailsActivity::class.java).apply {
                 putExtra(EXTRA_WORKOUT_ID, workoutId)
                 putExtra(GBDevice.EXTRA_DEVICE, gbDevice)
+                title?.let { putExtra(EXTRA_TITLE, it) }
             }
         }
 
@@ -121,7 +132,8 @@ class WorkoutDetailsActivity : AbstractGBActivity() {
             dateToFilter: Long = 0,
             nameContainsFilter: String? = null,
             deviceFilter: Long = 0,
-            itemsFilter: List<Long>? = null
+            itemsFilter: List<Long>? = null,
+            title: String? = null
         ): Intent {
             return Intent(context, WorkoutDetailsActivity::class.java).apply {
                 putExtra("position", position)
@@ -131,6 +143,7 @@ class WorkoutDetailsActivity : AbstractGBActivity() {
                 nameContainsFilter?.let { putExtra("nameContainsFilter", it) }
                 putExtra("deviceFilter", deviceFilter)
                 itemsFilter?.let { putExtra("itemsFilter", ArrayList(it)) }
+                title?.let { putExtra(EXTRA_TITLE, it) }
             }
         }
     }

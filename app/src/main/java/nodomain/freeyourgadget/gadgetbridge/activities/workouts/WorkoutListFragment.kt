@@ -259,7 +259,7 @@ class WorkoutListFragment : Fragment() {
             val summary = workoutSummariesAdapter.getItem(position)
             if (summary != null) {
                 try {
-                    showActivityDetail(position - 1)
+                    showActivityDetail(position - 1, WorkoutDetailsActivity.label(requireContext(), summary.name, summary.activityKind))
                 } catch (e: Exception) {
                     GB.toast(
                         requireContext().applicationContext,
@@ -637,7 +637,7 @@ class WorkoutListFragment : Fragment() {
         }
     }
 
-    private fun showActivityDetail(position: Int) {
+    private fun showActivityDetail(position: Int, title: String) {
         val intent = WorkoutDetailsActivity.createFilteredListIntent(
             requireContext(),
             position,
@@ -646,7 +646,8 @@ class WorkoutListFragment : Fragment() {
             dateToFilter,
             nameContainsFilter,
             deviceFilter,
-            itemsFilter
+            itemsFilter,
+            title
         )
         activityDetailLauncher.launch(intent)
     }
