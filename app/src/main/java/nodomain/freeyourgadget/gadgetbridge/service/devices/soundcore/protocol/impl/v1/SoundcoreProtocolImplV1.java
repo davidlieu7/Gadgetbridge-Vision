@@ -80,6 +80,7 @@ public class SoundcoreProtocolImplV1 extends AbstractSoundcoreProtocol {
     public static final short CMD_SET_BATTERY_LOW_TONE = (short) 0x8210;
 
     public static final short CMD_SET_GAMING_MODE = (short) 0x8701;
+    public static final short CMD_SET_EQUALIZER_COMPACT = (short) 0x8302;
     public static final short CMD_SET_EQUALIZER = (short) 0x8703;
     public static final short CMD_SET_FIT_TEST = (short) 0x0109;
 
@@ -490,6 +491,11 @@ public class SoundcoreProtocolImplV1 extends AbstractSoundcoreProtocol {
             return new GBDeviceEvent[0];
         }
 
+        if (command == CMD_SET_EQUALIZER_COMPACT) {
+            decodeEqualizerCompact(payload);
+            return new GBDeviceEvent[0];
+        }
+
         if (command == CMD_SET_FIT_TEST) {
             if (payload.length >= 2) {
                 decodeFitTestResult(payload);
@@ -524,11 +530,19 @@ public class SoundcoreProtocolImplV1 extends AbstractSoundcoreProtocol {
     }
 
     private void decodeEqualizer(final byte[] payload) {
-        if (payload.length < 90) {
+        decodeEqualizer(payload, 90, 4);
+    }
+
+    private void decodeEqualizerCompact(final byte[] payload) {
+        decodeEqualizer(payload, 22, 2);
+    }
+
+    private void decodeEqualizer(final byte[] payload, final int minimumLength, final int bandsOffset) {
+        if (payload.length < minimumLength) {
             return;
         }
 
-        final SoundcoreEqualizer equalizer = SoundcoreEqualizer.fromPayload(payload);
+        final SoundcoreEqualizer equalizer = SoundcoreEqualizer.fromPayload(payload, 0, bandsOffset);
         if (equalizer != null) {
             storeEqualizer(equalizer);
         }
