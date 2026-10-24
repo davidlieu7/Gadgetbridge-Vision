@@ -25,5 +25,5 @@ http://developer.android.com/guide/topics/appwidgets/index.html#CreatingLayout
     <dimen name="debug_device_icon_inset">2dp</dimen>
     <dimen name="dashboard_grid_spacing">6dp</dimen>
     <dimen name="toolbar_height">64dp</dimen>
-    <dimen name="toolbar_icon_size">20dp</dimen>
+    <dimen name="toolbar_icon_size">24dp</dimen>
 </resources>

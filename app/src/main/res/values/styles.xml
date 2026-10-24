@@ -439,13 +439,9 @@
 
     <!-- action bar styles -->
     <style name="TextAppearance.App.ToolbarTitle" parent="TextAppearance.Material3.TitleLarge">
-        <item name="android:textSize">18sp</item>
-        <item name="android:textStyle">normal</item>
-        <item name="android:fontFamily">sans-serif</item>
         <item name="android:textColor">?attr/toolbar_title</item>
     </style>
-    <style name="TextAppearance.App.ToolbarSubtitle" parent="TextAppearance.Material3.BodySmall">
-        <item name="android:textSize">12sp</item>
+    <style name="TextAppearance.App.ToolbarSubtitle" parent="TextAppearance.Material3.LabelMedium">
         <item name="android:textColor">?attr/toolbar_subtitle</item>
     </style>
     <style name="GadgetbridgeTheme.ToolbarTitleStyle" parent="TextAppearance.App.ToolbarTitle" />
@@ -550,11 +546,6 @@
     <style name="GadgetbridgeTheme.DrawerArrow" parent="Widget.AppCompat.DrawerArrowToggle">
         <item name="color">?attr/toolbar_icon</item>
         <item name="drawableSize">@dimen/toolbar_icon_size</item>
-        <item name="barLength">15dp</item>
-        <item name="thickness">1.67dp</item>
-        <item name="gapBetweenBars">2.5dp</item>
-        <item name="arrowHeadLength">6.67dp</item>
-        <item name="arrowShaftLength">13.33dp</item>
     </style>
     <style name="GadgetbridgeTheme.OverflowButton" parent="Widget.AppCompat.ActionButton.Overflow">
         <item name="srcCompat">@drawable/ic_toolbar_more_vert</item>
