@@ -79,12 +79,12 @@ object DjiFileCommands {
      */
     fun setFavorite(fileIds: List<Long>, favorite: Boolean, requestCounter: Long): ByteArray {
         return DumlCamera.FileStarFlagSetRequest().apply {
-            setNumFiles(fileIds.size)
+            setNumFileIds(fileIds.size)
             setFavorite(if (favorite) 1 else 0)
             setFileIds(ArrayList(fileIds))
             setRequestCounter(requestCounter)
             setReserved(0)
-            setNumFilesAgain(fileIds.size.toLong())
+            setNumFileIdsAgain(fileIds.size.toLong())
         }.encodeToBytes()
     }
 
@@ -93,11 +93,11 @@ object DjiFileCommands {
      */
     fun delete(fileIds: List<Long>, requestCounter: Long): ByteArray {
         return DumlGeneral.FileTransferDeleteRequest().apply {
-            setNumFiles(fileIds.size)
+            setNumFileIds(fileIds.size)
             setFileIds(ArrayList(fileIds))
             setRequestCounter(requestCounter)
             setReserved(0)
-            setNumFilesAgain(fileIds.size.toLong())
+            setNumFileIdsAgain(fileIds.size.toLong())
         }.encodeToBytes()
     }
 }

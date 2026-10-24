@@ -17,7 +17,6 @@
 package nodomain.freeyourgadget.gadgetbridge.activities.charts;
 
 import android.content.Context;
-import android.graphics.Color;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -27,13 +26,14 @@ import android.widget.TextView;
 import androidx.annotation.DrawableRes;
 import androidx.annotation.NonNull;
 
-import com.google.android.material.color.MaterialColors;
 import com.google.android.material.progressindicator.LinearProgressIndicator;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import nodomain.freeyourgadget.gadgetbridge.R;
+import nodomain.freeyourgadget.gadgetbridge.activities.workouts.ActivityIconView;
+import nodomain.freeyourgadget.gadgetbridge.activities.workouts.RowSelection;
 import nodomain.freeyourgadget.gadgetbridge.activities.workouts.StatTileGridUtilKt;
 import nodomain.freeyourgadget.gadgetbridge.adapter.AbstractActivityListingAdapter;
 import nodomain.freeyourgadget.gadgetbridge.model.ActivitySession;
@@ -69,12 +69,13 @@ public class ActivityListingAdapter extends AbstractActivityListingAdapter<Activ
     }
 
     public class ActivityItemViewHolder extends AbstractActivityListingViewHolder<ActivitySession> {
-        final ImageView iconView;
+        final ActivityIconView iconView;
         final TextView nameView;
         final TextView metaView;
         final TextView statsTopView;
         final TextView statsBottomView;
         final View separatorView;
+        final RowSelection selection;
 
         public ActivityItemViewHolder(@NonNull final View itemView) {
             super(itemView);
@@ -84,6 +85,7 @@ public class ActivityListingAdapter extends AbstractActivityListingAdapter<Activ
             statsTopView = itemView.findViewById(R.id.activity_row_stats_top);
             statsBottomView = itemView.findViewById(R.id.activity_row_stats_bottom);
             separatorView = itemView.findViewById(R.id.activity_row_separator);
+            selection = new RowSelection(itemView, iconView);
         }
 
         @Override
@@ -118,7 +120,7 @@ public class ActivityListingAdapter extends AbstractActivityListingAdapter<Activ
                 description.append(", ").append(statsBottom);
             }
             itemView.setContentDescription(description);
-            itemView.setBackgroundColor(selected ? MaterialColors.getColor(itemView, R.attr.accent_color) : Color.TRANSPARENT);
+            selection.bind(position, selected, !getSelectedItems().isEmpty());
             // The last activity is followed by the end spacer, and gets no separator.
             separatorView.setVisibility(position == getItemCount() - 2 ? View.GONE : View.VISIBLE);
         }

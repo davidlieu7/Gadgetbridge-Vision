@@ -1127,7 +1127,7 @@ public class ZeppOsSupport extends AbstractBluetoothDeviceSupport
         } else if (HuamiService.UUID_CHARACTERISTIC_ZEPP_OS_FILE_TRANSFER_V3_RECEIVE.equals(characteristicUUID)) {
             fileTransferService.onCharacteristicChanged(characteristicUUID, value);
             return true;
-        } else if (GattCharacteristic.CHARACTERISTIC_HEART_RATE_MEASUREMENT.equals(characteristicUUID)) {
+        } else if (GattCharacteristic.CHARACTERISTIC_HEART_RATE_MEASUREMENT.uuid.equals(characteristicUUID)) {
             heartRateService.handleHeartRate(value);
             return true;
         } else if (HuamiService.UUID_CHARACTERISTIC_RAW_SENSOR_DATA.equals(characteristicUUID)) {

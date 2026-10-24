@@ -377,11 +377,12 @@ public class DeviceSpecificSettingsFragment extends AbstractPreferenceFragment i
         for (final DeviceSpecificSettingsScreen value : DeviceSpecificSettingsScreen.values()) {
             final PreferenceScreen prefScreen = findPreference(value.getKey());
             if (prefScreen != null) {
-                if (modelSpec != null && modelSpec.findScreen(value.getKey()) != null) {
+                if (modelSpec != null && modelSpec.findScreen(value.getKey()) != null && prefScreen.getPreferenceCount() > 0) {
                     // This screen is a model ScreenSetting rendered in-memory by
                     // DeviceSettingRenderer; it already navigates via the default nested
                     // PreferenceScreen click handling, so wiring this listener too would push a
-                    // second, redundant navigation onto the back stack.
+                    // second, redundant navigation onto the back stack. The default handling
+                    // ignores a screen without children, such as one with only xml sub-screens.
                     continue;
                 }
                 prefScreen.setOnPreferenceClickListener(p -> {
@@ -436,7 +437,24 @@ public class DeviceSpecificSettingsFragment extends AbstractPreferenceFragment i
     private void addDynamicSettings(final String rootKey) {
         if (rootKey.equals(DeviceSpecificSettingsScreen.BATTERY.getKey())) {
             addBatterySettings();
+        } else if (rootKey.equals(DeviceSpecificSettingsScreen.DEVELOPER.getKey())) {
+            addDeveloperSettingsWarning();
         }
+    }
+
+    private void addDeveloperSettingsWarning() {
+        final PreferenceScreen developerScreen = getPreferenceScreen();
+        if (developerScreen == null) {
+            return;
+        }
+        final Preference warning = new Preference(requireContext());
+        warning.setKey("pref_developer_warning");
+        warning.setIcon(R.drawable.ic_warning);
+        warning.setSummary(R.string.developer_settings_warning_message);
+        warning.setSelectable(false);
+        // DSL screens add their children before this, keep the warning at the top
+        warning.setOrder(-1);
+        developerScreen.addPreference(warning);
     }
 
     private void addBatterySettings() {
@@ -839,6 +857,7 @@ public class DeviceSpecificSettingsFragment extends AbstractPreferenceFragment i
         addPreferenceHandlerFor(PREF_HEARTRATE_SLEEP_RESPIRATORY_RATE_MONITORING);
         addPreferenceHandlerFor(PREF_HEARTRATE_ALERT_IRREGULAR_RHYTHM);
         addPreferenceHandlerFor(PREF_SPO2_ALL_DAY_MONITORING);
+        addPreferenceHandlerFor(PREF_SPO2_MONITORING_MODE);
         addPreferenceHandlerFor(PREF_SPO2_MEASUREMENT_INTERVAL);
         addPreferenceHandlerFor(PREF_SPO2_MEASUREMENT_TIME);
         addPreferenceHandlerFor(PREF_SPO2_MEASUREMENT_START);
@@ -1865,6 +1884,13 @@ public class DeviceSpecificSettingsFragment extends AbstractPreferenceFragment i
                 deviceSpecificSettings.addRootScreen(
                         DeviceSpecificSettingsScreen.ACTIVITY_INFO,
                         R.xml.devicesettings_chartstabs
+                );
+            }
+
+            if (coordinator.supportsRecordedActivities(device)) {
+                deviceSpecificSettings.addRootScreen(
+                        DeviceSpecificSettingsScreen.WORKOUT,
+                        R.xml.devicesettings_elevation_correction
                 );
             }
 

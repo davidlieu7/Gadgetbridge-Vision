@@ -130,7 +130,7 @@ class WorkoutSyncerUtilsTest {
             WorkoutSyncerUtils.mapActivityKindToExerciseType(ActivityKind.WEIGHTLIFTING)
         )
         assertEquals(
-            ExerciseSessionRecord.EXERCISE_TYPE_STRENGTH_TRAINING,
+            ExerciseSessionRecord.EXERCISE_TYPE_BOOT_CAMP,
             WorkoutSyncerUtils.mapActivityKindToExerciseType(ActivityKind.CROSSFIT)
         )
     }

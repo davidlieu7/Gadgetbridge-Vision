@@ -45,6 +45,7 @@ import nodomain.freeyourgadget.gadgetbridge.util.UriUtils
 import nodomain.freeyourgadget.gadgetbridge.util.XDatePreference
 import nodomain.freeyourgadget.gadgetbridge.util.XTimePreference
 import nodomain.freeyourgadget.gadgetbridge.util.preferences.GBSimpleSummaryProvider
+import nodomain.freeyourgadget.gadgetbridge.util.preferences.GroupedMultiSelectListPreference
 import org.slf4j.Logger
 import org.slf4j.LoggerFactory
 import kotlin.math.roundToInt
@@ -333,6 +334,17 @@ object DeviceSettingRenderer {
                                 true
                             }
                         }
+                        if (setting.onSharedPreferenceChanged != null) {
+                            val listener =
+                                SharedPreferences.OnSharedPreferenceChangeListener { sharedPrefs, changedKey ->
+                                    if (changedKey == setting.key) {
+                                        val newValue = sharedPrefs.getBoolean(changedKey, setting.defaultValue)
+                                        mainHandler.post { setting.onSharedPreferenceChanged.invoke(newValue) }
+                                    }
+                                }
+                            spListeners.add(listener)
+                            sp.registerOnSharedPreferenceChangeListener(listener)
+                        }
                     }
                 }
 
@@ -375,7 +387,12 @@ object DeviceSettingRenderer {
                 }
 
                 is MultiSelectSetting -> {
-                    MultiSelectListPreference(context).apply {
+                    val preference = if (setting.entryGroups.isEmpty()) {
+                        MultiSelectListPreference(context)
+                    } else {
+                        GroupedMultiSelectListPreference(context)
+                    }
+                    preference.apply {
                         key = setting.key
                         setTitle(setting.title)
                         setDialogTitle(setting.title)
@@ -383,6 +400,14 @@ object DeviceSettingRenderer {
                         if (setting.entriesProvider != null) {
                             applyEntries(this, setting.entriesProvider.invoke(prefs), context)
                             dynamicMultiEntryPairs.add(this to setting.entriesProvider)
+                        } else if (this is GroupedMultiSelectListPreference) {
+                            var groupStart = setting.entries.size
+                            groupTitles = setting.entryGroups.filter { it.entries.isNotEmpty() }.associate { group ->
+                                val title = groupStart to context.getString(group.title)
+                                groupStart += group.entries.size
+                                title
+                            }
+                            applyEntries(this, setting.entries + setting.entryGroups.flatMap { it.entries }, context)
                         } else {
                             applyEntries(this, setting.entries, context)
                         }
@@ -396,6 +421,18 @@ object DeviceSettingRenderer {
                             handler.notifyPreferenceChanged(setting.key)
                             postRefresh()
                             true
+                        }
+                        if (setting.onSharedPreferenceChanged != null) {
+                            val listener =
+                                SharedPreferences.OnSharedPreferenceChangeListener { sharedPrefs, changedKey ->
+                                    if (changedKey == setting.key) {
+                                        val newValue = sharedPrefs.getStringSet(changedKey, setting.defaultValue)
+                                            ?: setting.defaultValue
+                                        mainHandler.post { setting.onSharedPreferenceChanged.invoke(newValue) }
+                                    }
+                                }
+                            spListeners.add(listener)
+                            sp.registerOnSharedPreferenceChangeListener(listener)
                         }
                     }
                 }

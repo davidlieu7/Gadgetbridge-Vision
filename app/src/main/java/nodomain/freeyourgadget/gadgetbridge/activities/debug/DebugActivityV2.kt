@@ -78,6 +78,11 @@ class DebugActivityV2 : AbstractSettingsActivityV2(), PreferenceFragmentCompat.O
                     ::PreferencesDebugFragment
                 ),
                 SearchableScreen(
+                    R.xml.debug_preferences_dashboard,
+                    R.string.bottom_nav_dashboard,
+                    ::DashboardDebugFragment
+                ),
+                SearchableScreen(
                     R.xml.debug_preferences_widgets,
                     R.string.menuitem_widgets,
                     ::WidgetsDebugFragment

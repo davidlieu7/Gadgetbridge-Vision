@@ -41,7 +41,7 @@ data class ChartTheme(
             }
 
             val useAlternativeHeartRateColor = GBApplication.getPrefs()
-                .getBoolean(PREF_HEARTRATE_ALTERNATIVE_COLOR, false)
+                .getBoolean(PREF_HEARTRATE_ALTERNATIVE_COLOR, true)
             val surface = MaterialColors.getColor(context, com.google.android.material.R.attr.colorSurface, Color.WHITE)
 
             return ChartTheme(

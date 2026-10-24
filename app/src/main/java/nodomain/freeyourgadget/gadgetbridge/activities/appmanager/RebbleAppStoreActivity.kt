@@ -21,12 +21,17 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.net.Uri
 import android.os.Bundle
+import android.view.View
 import android.webkit.PermissionRequest
 import android.webkit.WebResourceError
 import android.webkit.WebResourceRequest
 import android.webkit.WebView
 import android.widget.Toast
+import androidx.activity.OnBackPressedCallback
+import androidx.core.graphics.Insets
 import androidx.core.net.toUri
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import nodomain.freeyourgadget.gadgetbridge.R
 import nodomain.freeyourgadget.gadgetbridge.activities.AbstractGBActivity
 import nodomain.freeyourgadget.gadgetbridge.database.DBHelper
@@ -56,12 +61,32 @@ class RebbleAppStoreActivity : AbstractGBActivity()  {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_banglejs_apps_management)
+        applyContentInsets()
 
         val gbDevice: GBDevice? = intent?.extras?.getParcelableCompat(GBDevice.EXTRA_DEVICE)
         requireNotNull(gbDevice) { "Must provide a device when invoking this activity" }
         mGBDevice = gbDevice
         url = intent?.extras?.getString(DeviceService.EXTRA_URI, url)!!
         initViews()
+
+        // Let the back gesture/button walk the app loader WebView history first
+        // (which closes in-app dialogs and navigates back within the SPA) and
+        // only leave the activity once there is no WebView history left.
+        // Without this the system back finishes the activity immediately,
+        // closing the whole app instead of the WebView's current view.
+        onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
+            override fun handleOnBackPressed() {
+                if (webView?.canGoBack() == true) {
+                    webView?.goBack()
+                    return
+                }
+
+                // Nothing to go back to in the WebView—use the default
+                // behavior (finish the activity).
+                isEnabled = false
+                onBackPressedDispatcher.onBackPressed()
+            }
+        })
     }
 
     override fun onResume() {
@@ -116,6 +141,7 @@ class RebbleAppStoreActivity : AbstractGBActivity()  {
     }
 
     fun installFile(file: File) {
+        @Suppress("DEPRECATION")
         val installHandler: InstallHandler? = mGBDevice.deviceCoordinator.findInstallHandler(file.toUri(), Bundle.EMPTY, applicationContext)
         if (installHandler == null) {
             GB.toast(getString(R.string.fwinstaller_file_not_compatible_to_device), Toast.LENGTH_LONG, GB.ERROR)
@@ -129,9 +155,62 @@ class RebbleAppStoreActivity : AbstractGBActivity()  {
         startActivity(startIntent)
     }
 
+    /**
+     * {@link AbstractGBActivity} pads the content view by the system-bar insets, but the
+     * WebView still reports them to the page, so a page that respects
+     * env(safe-area-inset-*) pads a second time. Zero those two types before they reach
+     * the WebView.
+     *
+     * <p>{@code ime()} is deliberately left alone. The WebView makes room for the
+     * keyboard itself, by shrinking the page's visual viewport, and that is the only
+     * place the keyboard should be accounted for.
+     */
+    private fun applyWebViewInsets() {
+        val webView = webView ?: return
+        val container = webView.parent as View
+
+        ViewCompat.setOnApplyWindowInsetsListener(container) { _, windowInsets ->
+            WindowInsetsCompat.Builder(windowInsets)
+                .setInsets(WindowInsetsCompat.Type.systemBars(), Insets.NONE)
+                .setInsets(WindowInsetsCompat.Type.displayCutout(), Insets.NONE)
+                .build()
+        }
+    }
+
+    /**
+     * {@link AbstractGBActivity} pads the content view by the system-bar insets, but the
+     * bottom edge needs one more correction. While the keyboard is up,
+     * {@code navigationBars()} reports the keyboard's height (so {@code systemBars()}
+     * grows from the navigation bar's height to the keyboard's), and padding by that would
+     * shorten the content view by the keyboard - while the WebView already makes room for
+     * it by shrinking the page's visual viewport. Pad by the part of the bottom the
+     * keyboard does not cover.
+     */
+    private fun applyContentInsets() {
+        val content = findViewById<View>(android.R.id.content)
+
+        ViewCompat.setOnApplyWindowInsetsListener(content) { view, windowInsets ->
+            val bars = windowInsets.getInsets(
+                WindowInsetsCompat.Type.systemBars() or
+                    WindowInsetsCompat.Type.displayCutout()
+            )
+            val ime = windowInsets.getInsets(WindowInsetsCompat.Type.ime())
+
+            view.setPadding(
+                bars.left,
+                bars.top,
+                bars.right,
+                maxOf(0, bars.bottom - ime.bottom)
+            )
+
+            windowInsets
+        }
+    }
+
     @SuppressLint("SetJavaScriptEnabled")
     private fun initViews() {
         webView = findViewById(R.id.webview)
+        applyWebViewInsets()
         val settings = webView!!.settings
         settings.javaScriptEnabled = true
         settings.loadWithOverviewMode = true

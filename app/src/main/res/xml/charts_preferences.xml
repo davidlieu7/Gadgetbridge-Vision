@@ -38,7 +38,7 @@
             app:useSimpleSummaryProvider="true" />
 
         <SwitchPreferenceCompat
-            android:defaultValue="false"
+            android:defaultValue="true"
             android:key="chart_heartrate_color"
             android:layout="@layout/preference_checkbox"
             android:summaryOff="@string/pref_chart_heartrate_color_orange"

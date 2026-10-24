@@ -436,6 +436,7 @@ import nodomain.freeyourgadget.gadgetbridge.devices.huawei.huaweiwatchultimate.H
 import nodomain.freeyourgadget.gadgetbridge.devices.huawei.huaweiwatchultimate2.HuaweiWatchUltimate2Coordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.id115.ID115Coordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.idasen.IdasenCoordinator;
+import nodomain.freeyourgadget.gadgetbridge.devices.igpsport.IGPSportBSC100MaxCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.igpsport.IGPSportBSC200Coordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.igpsport.IGPSportBSC200SCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.igpsport.IGPSportBSC300Coordinator;
@@ -471,6 +472,7 @@ import nodomain.freeyourgadget.gadgetbridge.devices.mijia_lywsd.MijiaXmwsdj04Coo
 import nodomain.freeyourgadget.gadgetbridge.devices.miscale.MiCompositionScaleCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.miscale.MiSmartScaleCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.ninebot.NinebotScooterCoordinator;
+import nodomain.freeyourgadget.gadgetbridge.devices.moyoung.KW19BCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.onebyone.OneByoneScaleCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.moondrop.MoondropSpaceTravel2Coordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.moondrop.MoondropSpaceTravel2UltraCoordinator;
@@ -576,6 +578,21 @@ import nodomain.freeyourgadget.gadgetbridge.devices.sony.reonpocket.SonyReonPock
 import nodomain.freeyourgadget.gadgetbridge.devices.sony.wena3.SonyWena3Coordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.sonyswr12.SonySWR12DeviceCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.soundbrenner.SoundbrennerCoordinator;
+import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreP42iCoordinator;
+import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreP41iCoordinator;
+import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreP40iCoordinator;
+import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreP31iCoordinator;
+import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreP3Coordinator;
+import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreA1Coordinator;
+import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreP2Coordinator;
+import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreP2iCoordinator;
+import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreP2MiniCoordinator;
+import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreA2NCCoordinator;
+import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreA3iCoordinator;
+import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreP3iCoordinator;
+import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreK20iCoordinator;
+import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreP30iCoordinator;
+import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreP20iCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreA30iCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreAeroFit2Coordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreLiberty3ProCoordinator;
@@ -588,6 +605,7 @@ import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreSportX20C
 import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreV20iCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.supercars.SuperCarsCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.test.TestDeviceCoordinator;
+import nodomain.freeyourgadget.gadgetbridge.devices.teufel.TeufelMyndCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.thermalprinter.ThermalPrinterCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.tlw64.TLW64Coordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.ultrahuman.UltrahumanDeviceCoordinator;
@@ -1096,8 +1114,23 @@ public enum DeviceType {
     SOUNDCORE_LIFE_TUNE_XR(SoundcoreLifeTuneXRCoordinator.class),
     SOUNDCORE_AEROFIT2(SoundcoreAeroFit2Coordinator.class),
     SOUNDCORE_SPORT_X20(SoundcoreSportX20Coordinator.class),
-    SOUNDCORE_V20I(SoundcoreV20iCoordinator.class),
+    SOUNDCORE_A1(SoundcoreA1Coordinator.class),
+    SOUNDCORE_A2_NC(SoundcoreA2NCCoordinator.class),
+    SOUNDCORE_A3I(SoundcoreA3iCoordinator.class),
     SOUNDCORE_A30I(SoundcoreA30iCoordinator.class),
+    SOUNDCORE_K20I(SoundcoreK20iCoordinator.class),
+    SOUNDCORE_P2(SoundcoreP2Coordinator.class),
+    SOUNDCORE_P2I(SoundcoreP2iCoordinator.class),
+    SOUNDCORE_P2_MINI(SoundcoreP2MiniCoordinator.class),
+    SOUNDCORE_P3(SoundcoreP3Coordinator.class),
+    SOUNDCORE_P3I(SoundcoreP3iCoordinator.class),
+    SOUNDCORE_P20I(SoundcoreP20iCoordinator.class),
+    SOUNDCORE_P30I(SoundcoreP30iCoordinator.class),
+    SOUNDCORE_P31I(SoundcoreP31iCoordinator.class),
+    SOUNDCORE_P40I(SoundcoreP40iCoordinator.class),
+    SOUNDCORE_P41I(SoundcoreP41iCoordinator.class),
+    SOUNDCORE_P42I(SoundcoreP42iCoordinator.class),
+    SOUNDCORE_V20I(SoundcoreV20iCoordinator.class),
     HAYLOU_S35_ANC(HaylouS35AncCoordinator.class),
     MOONDROP_SPACE_TRAVEL(MoondropSpaceTravelCoordinator.class),
     MOONDROP_SPACE_TRAVEL_2(MoondropSpaceTravel2Coordinator.class),
@@ -1238,6 +1271,7 @@ public enum DeviceType {
     C20PRO(C20ProCoordinator.class),
     L70(L70Coordinator.class),
     HC96(HC96Coordinator.class),
+    KW19_B(KW19BCoordinator.class),
     KT80(KT80Coordinator.class),
     ITECH_ACTIVE_3(ITechActive3Coordinator.class),
     KSIX_VENTURE(KsixVentureCoordinator.class),
@@ -1275,6 +1309,8 @@ public enum DeviceType {
     SILVERCREST_SBM_67(SilverCrestSBM67Coordinator.class),
     BEURER_BM_69(BeurerBm69Coordinator.class),
     BRAUN_BPW4500(BraunBPW4500DeviceCoordinator.class),
+    TEUFEL_MYND(TeufelMyndCoordinator.class),
+    IGPSPORT_BSC100MAX(IGPSportBSC100MaxCoordinator.class),
     IGPSPORT_BSC200(IGPSportBSC200Coordinator.class),
     IGPSPORT_BSC200S(IGPSportBSC200SCoordinator.class),
     IGPSPORT_BSC300(IGPSportBSC300Coordinator.class),
