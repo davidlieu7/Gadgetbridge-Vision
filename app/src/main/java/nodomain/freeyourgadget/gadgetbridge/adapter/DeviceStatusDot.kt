@@ -8,19 +8,35 @@ import nodomain.freeyourgadget.gadgetbridge.R
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice
 
 /**
- * Tints a connection status dot: red while busy, green when initialized, yellow while connecting, grey otherwise.
+ * Tints a connection status dot:
+ * - red while busy
+ * - green when initialized
+ * - yellow while connecting
+ * - blue while waiting for a reconnect or scal
+ * - gray otherwise
  */
 object DeviceStatusDot {
     @JvmStatic
     fun apply(dot: View, device: GBDevice) {
-        val color = when {
-            device.isBusy -> ContextCompat.getColor(dot.context, R.color.device_status_busy)
-            device.isInitialized -> ContextCompat.getColor(dot.context, R.color.device_status_connected)
-            device.state.equalsOrHigherThan(GBDevice.State.CONNECTING) ->
-                ContextCompat.getColor(dot.context, R.color.device_status_connecting)
-            else -> MaterialColors.getColor(dot, R.attr.textColorSecondary)
-        }
-        dot.backgroundTintList = ColorStateList.valueOf(color)
+        dot.backgroundTintList = ColorStateList.valueOf(color(dot, device))
+    }
+
+    @JvmStatic
+    fun color(view: View, device: GBDevice): Int = when (rank(device)) {
+        4 -> ContextCompat.getColor(view.context, R.color.device_status_busy)
+        3 -> ContextCompat.getColor(view.context, R.color.device_status_connected)
+        2 -> ContextCompat.getColor(view.context, R.color.device_status_connecting)
+        1 -> ContextCompat.getColor(view.context, R.color.device_status_waiting)
+        else -> MaterialColors.getColor(view, R.attr.textColorSecondary)
+    }
+
+    @JvmStatic
+    fun rank(device: GBDevice): Int = when {
+        device.isBusy -> 4
+        device.isInitialized -> 3
+        device.state.equalsOrHigherThan(GBDevice.State.CONNECTING) -> 2
+        device.state == GBDevice.State.WAITING_FOR_RECONNECT || device.state == GBDevice.State.WAITING_FOR_SCAN -> 1
+        else -> 0
     }
 
     @JvmStatic

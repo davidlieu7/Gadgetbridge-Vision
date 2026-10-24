@@ -111,6 +111,7 @@
     <color name="device_status_connected" type="color">#4ADE80</color>
     <color name="device_status_connecting" type="color">#FACC15</color>
     <color name="device_status_busy" type="color">#F87171</color>
+    <color name="device_status_waiting" type="color">#60A5FA</color>
     <color name="vo2max_running_char_line_color" type="color">#46acea</color>
     <color name="vo2max_cycling_char_line_color" type="color">#59b22c</color>
     <color name="vo2max_value_poor_color" type="color">#d93832</color>

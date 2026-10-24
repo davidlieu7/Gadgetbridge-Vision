@@ -108,6 +108,7 @@ public class ControlCenterv2 extends AppCompatActivity
     private AlertDialog clDialog;
     private BarShade.ScrollListener barShades;
     private View toolbarShade;
+    private MaterialToolbar toolbar;
     private View mainContent;
     private BottomNavigationView navigationView;
     private boolean bottomNavigationEnabled;
@@ -165,12 +166,14 @@ public class ControlCenterv2 extends AppCompatActivity
                     if (dev != null && !dev.isBusy()) {
                         swipeLayout.setRefreshing(false);
                     }
+                    updateConnectionSubtitle();
                     break;
                 case DeviceManager.ACTION_DEVICES_CHANGED:
                     LOG.debug("Devices changed, {} devices", GBApplication.app().getDeviceManager().getDevices().size());
                     if (rebuildBottomNav()) {
                         updateBottomNavigationVisibility();
                     }
+                    updateConnectionSubtitle();
                     break;
             }
         }
@@ -360,7 +363,7 @@ public class ControlCenterv2 extends AppCompatActivity
         prefs.getPreferences().registerOnSharedPreferenceChangeListener(prefListener);
 
         // Initialize actionbar
-        MaterialToolbar toolbar = findViewById(R.id.toolbar);
+        toolbar = findViewById(R.id.toolbar);
         // targetSdk 35 forces edge-to-edge. We intercept the insets on the ConstraintLayout
         // itself (main_content) and apply them directly to the toolbar. The drawer header is
         // padded here too.
@@ -528,6 +531,13 @@ public class ControlCenterv2 extends AppCompatActivity
         GBApplication.deviceService().requestDeviceInfo();
     }
 
+    private void updateConnectionSubtitle() {
+        toolbar.setSubtitle(ConnectionStatusSubtitle.build(
+            toolbar,
+            GBApplication.app().getDeviceManager().getDevices()
+        ));
+    }
+
     /**
      * Requests the layout again for each view that waits for a layout, but whose parent does not.
      */
@@ -588,6 +598,7 @@ public class ControlCenterv2 extends AppCompatActivity
     protected void onResume() {
         super.onResume();
         handleShortcut(getIntent());
+        updateConnectionSubtitle();
         if (isLanguageInvalid || isThemeInvalid) {
             isLanguageInvalid = false;
             isThemeInvalid = false;
