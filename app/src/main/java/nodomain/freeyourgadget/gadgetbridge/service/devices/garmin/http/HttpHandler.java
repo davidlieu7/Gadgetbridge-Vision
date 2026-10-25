@@ -45,7 +45,9 @@ import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.GarminSupport
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.http.interceptors.AgpsInterceptor;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.http.interceptors.ContactsInterceptor;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.http.interceptors.FirewallInterceptor;
+import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.http.interceptors.HealthConnectInterceptor;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.http.interceptors.HttpInterceptor;
+import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.http.interceptors.JugglucoInterceptor;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.http.interceptors.HydrationInterceptor;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.http.interceptors.ImageServiceInterceptor;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.http.interceptors.OauthInterceptor;
@@ -65,6 +67,8 @@ public class HttpHandler {
                 new ContactsInterceptor(deviceSupport),
                 new OauthInterceptor(deviceSupport),
                 new HydrationInterceptor(deviceSupport),
+                new HealthConnectInterceptor(deviceSupport),
+                new JugglucoInterceptor(deviceSupport),
                 // Should always be the last one
                 new FirewallInterceptor(deviceSupport)
         );
@@ -230,7 +234,10 @@ public class HttpHandler {
 
     public GdiHttp.ConnectIQHTTPResponse handleWebRequest(final GdiHttp.ConnectIQHTTPRequest webRequest,
                                                                    final int messageRequestId) {
-        LOG.debug("Got webRequest {}: {} {}", messageRequestId, webRequest.getHttpMethod(), webRequest.getUrl());
+        LOG.info("Got webRequest {}: {} {} maxResponseLength={} responseType={} includeHeaders={}",
+                messageRequestId, webRequest.getHttpMethod(), webRequest.getUrl(),
+                webRequest.getMaxResponseLength(), webRequest.getResponseType(),
+                webRequest.getIncludeHttpHeaderFieldsInResponse());
 
         try {
             final GarminHttpRequest request = new GarminHttpRequest(webRequest, messageRequestId);
@@ -326,6 +333,8 @@ public class HttpHandler {
 
             if (response.getBody().length > webRequest.getMaxResponseLength()) {
                 // TODO figure out the compression algorithm
+                LOG.info("WebResponse TOO_LARGE: body={} max={}",
+                        response.getBody().length, webRequest.getMaxResponseLength());
                 return GdiHttp.ConnectIQHTTPResponse.newBuilder()
                         .setStatus(GdiHttp.ConnectIQHTTPResponse.ResponseStatus.NETWORK_RESPONSE_TOO_LARGE)
                         .setHttpStatusCode(0)
@@ -365,6 +374,8 @@ public class HttpHandler {
                 builder.setHttpHeaderFields(ByteString.copyFrom(headers));
             }
 
+            LOG.info("WebResponse OK: httpStatus={} bodyBytes={}",
+                    response.getStatus(), body.length);
             return builder.build();
         } catch (final GarminJsonException e) {
             LOG.error("Garmin JSON error (?)", e);

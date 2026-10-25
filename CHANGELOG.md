@@ -73,6 +73,7 @@
 * Fix some settings in subscreens not working
 * Fossil: Add quick settings
 * Garmin: Add card item to send waypoints
+* Garmin: Add nDrip+ Health Connect Proxy: opt-in experimental setting serving Juggluco/nDrip+ CGM data (sgv.json) to CGM watch apps from any device that can write blood glucose values to Health Connect
 * Garmin: Add notification for app and watch crashes on debug builds
 * Garmin: Add support for custom apps for navigation and loyalty cards
 * Garmin: Add workout templates extra reps, load category

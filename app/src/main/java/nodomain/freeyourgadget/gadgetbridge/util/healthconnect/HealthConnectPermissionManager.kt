@@ -73,24 +73,61 @@ object HealthConnectPermissionManager {
         return when (dataType) {
             HealthConnectDataType.ACTIVITY -> setOf(
                 HealthPermission.getWritePermission(StepsRecord::class),
+                HealthPermission.getReadPermission(StepsRecord::class),
                 HealthPermission.getWritePermission(HeartRateRecord::class),
+                HealthPermission.getReadPermission(HeartRateRecord::class),
                 HealthPermission.getWritePermission(ExerciseSessionRecord::class),
                 HealthPermission.getWritePermission(TotalCaloriesBurnedRecord::class),
-                HealthPermission.getWritePermission(DistanceRecord::class)
+                HealthPermission.getReadPermission(TotalCaloriesBurnedRecord::class),
+                HealthPermission.getWritePermission(DistanceRecord::class),
+                HealthPermission.getReadPermission(DistanceRecord::class)
             )
             HealthConnectDataType.SLEEP -> setOf(HealthPermission.getWritePermission(SleepSessionRecord::class))
-            HealthConnectDataType.VO2MAX -> setOf(HealthPermission.getWritePermission(Vo2MaxRecord::class))
-            HealthConnectDataType.HRV -> setOf(HealthPermission.getWritePermission(HeartRateVariabilityRmssdRecord::class))
-            HealthConnectDataType.WEIGHT -> setOf(HealthPermission.getWritePermission(WeightRecord::class))
-            HealthConnectDataType.SPO2 -> setOf(HealthPermission.getWritePermission(OxygenSaturationRecord::class))
-            HealthConnectDataType.RESPIRATORY_RATE -> setOf(HealthPermission.getWritePermission(RespiratoryRateRecord::class))
-            HealthConnectDataType.RESTING_HEART_RATE -> setOf(HealthPermission.getWritePermission(RestingHeartRateRecord::class))
-            HealthConnectDataType.BLOOD_GLUCOSE -> setOf(HealthPermission.getWritePermission(BloodGlucoseRecord::class))
-            HealthConnectDataType.BLOOD_PRESSURE -> setOf(HealthPermission.getWritePermission(BloodPressureRecord::class))
-            HealthConnectDataType.HYDRATION -> setOf(HealthPermission.getWritePermission(HydrationRecord::class))
+            HealthConnectDataType.VO2MAX -> setOf(
+                HealthPermission.getWritePermission(Vo2MaxRecord::class),
+                HealthPermission.getReadPermission(Vo2MaxRecord::class)
+            )
+            HealthConnectDataType.HRV -> setOf(
+                HealthPermission.getWritePermission(HeartRateVariabilityRmssdRecord::class),
+                HealthPermission.getReadPermission(HeartRateVariabilityRmssdRecord::class)
+            )
+            HealthConnectDataType.WEIGHT -> setOf(
+                HealthPermission.getWritePermission(WeightRecord::class),
+                HealthPermission.getReadPermission(WeightRecord::class)
+            )
+            HealthConnectDataType.SPO2 -> setOf(
+                HealthPermission.getWritePermission(OxygenSaturationRecord::class),
+                HealthPermission.getReadPermission(OxygenSaturationRecord::class)
+            )
+            HealthConnectDataType.RESPIRATORY_RATE -> setOf(
+                HealthPermission.getWritePermission(RespiratoryRateRecord::class),
+                HealthPermission.getReadPermission(RespiratoryRateRecord::class)
+            )
+            HealthConnectDataType.RESTING_HEART_RATE -> setOf(
+                HealthPermission.getWritePermission(RestingHeartRateRecord::class),
+                HealthPermission.getReadPermission(RestingHeartRateRecord::class)
+            )
+            HealthConnectDataType.BLOOD_GLUCOSE -> setOf(
+                HealthPermission.getWritePermission(BloodGlucoseRecord::class),
+                HealthPermission.getReadPermission(BloodGlucoseRecord::class),
+                // Carb treatments for the nDrip+ Health Connect Proxy
+                // (JugglucoInterceptor serves /treatments.json from NutritionRecord).
+                // Read-only: Gadgetbridge only reads HC; the CGM source writes it.
+                HealthPermission.getReadPermission(NutritionRecord::class)
+            )
+            HealthConnectDataType.BLOOD_PRESSURE -> setOf(
+                HealthPermission.getWritePermission(BloodPressureRecord::class),
+                HealthPermission.getReadPermission(BloodPressureRecord::class)
+            )
+            HealthConnectDataType.HYDRATION -> setOf(
+                HealthPermission.getWritePermission(HydrationRecord::class),
+                HealthPermission.getReadPermission(HydrationRecord::class)
+            )
             HealthConnectDataType.TEMPERATURE -> setOf(
                 HealthPermission.getWritePermission(BodyTemperatureRecord::class),
-                HealthPermission.getWritePermission(SkinTemperatureRecord::class)
+                HealthPermission.getReadPermission(BodyTemperatureRecord::class),
+                HealthPermission.getWritePermission(SkinTemperatureRecord::class),
+                HealthPermission.getReadPermission(SkinTemperatureRecord::class)
             )
             HealthConnectDataType.WORKOUTS -> setOf(
                 HealthPermission.getWritePermission(ExerciseSessionRecord::class),

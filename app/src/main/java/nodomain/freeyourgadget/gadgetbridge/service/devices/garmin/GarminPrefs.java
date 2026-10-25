@@ -9,6 +9,7 @@ public class GarminPrefs extends DevicePrefs {
     public static final String PREF_FAKE_OAUTH_WARNING = "garmin_fake_oauth_warning";
     public static final String PREF_FAKE_OAUTH_ENABLED = "garmin_fake_oauth_enabled";
     public static final String PREF_AUTH_EXPIRED_NOTIFICATION_ENABLED = "garmin_auth_expired_notification_enabled";
+    public static final String PREF_CGM_HC_PROXY = "garmin_experimental_cgm_hc_proxy";
 
     public GarminPrefs(final SharedPreferences preferences, final GBDevice gbDevice) {
         super(preferences, gbDevice);
@@ -21,5 +22,9 @@ public class GarminPrefs extends DevicePrefs {
 
     public boolean authExpiredNotificationEnabled() {
         return getBoolean(PREF_AUTH_EXPIRED_NOTIFICATION_ENABLED, true);
+    }
+
+    public boolean cgmHcProxyEnabled() {
+        return getBoolean(PREF_CGM_HC_PROXY, false);
     }
 }
