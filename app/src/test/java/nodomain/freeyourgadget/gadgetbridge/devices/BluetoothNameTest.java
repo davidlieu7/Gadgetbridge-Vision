@@ -66,6 +66,7 @@ public class BluetoothNameTest extends TestBase {
             put("Soundcore Q30", DeviceType.SOUNDCORE_Q30); // #4316
             put("soundcore Q30", DeviceType.SOUNDCORE_Q30); // #6371
             put("soundcore  Q30", DeviceType.SOUNDCORE_Q30); // #6371 - unsure
+            put("soundcore Space One", DeviceType.SOUNDCORE_SPACE_ONE); // #7176
             put("Alt Vibe", DeviceType.ALT_VIBE); // #6575
             put("P8", DeviceType.WASPOS); // from wasp-os source
             put("P8DFU", DeviceType.WASPOS); // from wasp-os source
