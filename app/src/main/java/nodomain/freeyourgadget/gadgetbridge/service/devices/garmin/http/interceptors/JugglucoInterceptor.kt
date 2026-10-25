@@ -40,10 +40,6 @@ import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.http.GarminHt
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.http.HttpHandler
 import nodomain.freeyourgadget.gadgetbridge.util.healthconnect.HealthConnectClientProvider
 import org.slf4j.LoggerFactory
-import java.io.ByteArrayOutputStream
-import java.io.InputStream
-import java.net.HttpURLConnection
-import java.net.URL
 import java.time.Duration
 import java.time.Instant
 import java.time.ZoneId
@@ -60,8 +56,8 @@ import java.time.format.DateTimeFormatter
  * interceptor matches requests to the xDrip/Juggluco server ports (17580 and
  * 7147) and answers them locally on the phone — no internet access required.
  *
- * Primary source (opt-in, off by default): Health Connect, enabled by the
- * "xDrip+ Health Connect Proxy" switch in the Garmin experimental settings
+ * Opt-in (off by default): Health Connect, enabled by the "xDrip+ Health
+ * Connect Proxy" switch in the Garmin experimental settings
  * (key [GarminPrefs.PREF_CGM_HC_PROXY]). Any xDrip+ compatible CGM source
  * (e.g. Juggluco) writes its readings to Health Connect, so the watch app's
  * xDrip+ endpoints are rendered directly from the [BloodGlucoseRecord] and
@@ -77,11 +73,11 @@ import java.time.format.DateTimeFormatter
  * carb treatments are emitted with "insulin":null, exactly as Juggluco marks
  * a carb-only entry.
  *
- * Fallback: with the switch off (the default), or when Health Connect is
- * unavailable, lacks the read permission, or has no fresh data, the request
- * is proxied to the local xDrip+ server (Juggluco on 17580, xDrip+ on 7147)
- * at the port the watch requested. Other xDrip+ endpoints always go to the
- * proxy.
+ * There is no proxy fallback: with the switch off (the default), or when
+ * Health Connect is unavailable, lacks the read permission, or has no fresh
+ * data, the request is not handled by this interceptor (it falls through to
+ * the firewall, which blocks the loopback and returns a clean "no data"
+ * response). No internet permission is required for the served endpoints.
  *
  * Medical disclaimer: the values served are for personal information only.
  * This is not a medical device and is not intended for medical treatment,
@@ -94,6 +90,11 @@ import java.time.format.DateTimeFormatter
 class JugglucoInterceptor(private val deviceSupport: GarminSupport) : HttpInterceptor {
 
     override fun supports(request: GarminHttpRequest): Boolean {
+        // Opt-in: only claim the request when the xDrip+ Health Connect Proxy
+        // is enabled for this device. With it off the request falls through to
+        // the firewall, which blocks the loopback and returns a clean "no data"
+        // response (no data served, no socket opened).
+        if (!hcProxyEnabled()) return false
         // Ports 17580 (Juggluco) and 7147 (xDrip+) are the xDrip/Nightscout
         // web-server ports and are not used by anything else on the phone, so
         // match any host on either port. The CGM+ datafield may be pointed at
@@ -106,9 +107,20 @@ class JugglucoInterceptor(private val deviceSupport: GarminSupport) : HttpInterc
         SCOPE.launch {
             try {
                 val response = withContext(Dispatchers.IO) {
-                    // xDrip+ Health Connect Proxy (opt-in, off by default) first;
-                    // the Juggluco proxy is the default path and the fallback.
-                    (if (hcProxyEnabled()) serveFromHealthConnect(request) else null) ?: fetchLocally(request)
+                    // Health Connect is the only source. serveFromHealthConnect
+                    // returns null when there is no fresh data to serve (no HC
+                    // client, permission not granted, no records, stale, or an
+                    // unknown path); map that to a 502 so the watch gets a JSON
+                    // body instead of a bare "no response".
+                    serveFromHealthConnect(request)
+                        ?: jsonResponse(
+                            502,
+                            JsonObject().apply {
+                                addProperty("ok", false)
+                                addProperty("error", "hc_no_data")
+                                addProperty("message", "no fresh data in Health Connect")
+                            }.toString().toByteArray(Charsets.UTF_8)
+                        )
                 }
                 sendResponseOnMain(request, response)
             } catch (t: Throwable) {
@@ -429,69 +441,12 @@ class JugglucoInterceptor(private val deviceSupport: GarminSupport) : HttpInterc
         return deviceSupport.getCoordinator().experimentalSettingEnabled(device, GarminPrefs.PREF_CGM_HC_PROXY)
     }
 
-    private fun fetchLocally(request: GarminHttpRequest): GarminHttpResponse {
-        val uri = request.uri
-        var target = "http://127.0.0.1:${uri.port}${uri.path}"
-        val query = uri.encodedQuery
-        if (!query.isNullOrEmpty()) {
-            target += "?" + query
-        }
-
-        LOG.debug("Proxying CGM request to Juggluco: {}", target)
-
-        val connection = URL(target).openConnection() as HttpURLConnection
-        connection.connectTimeout = CONNECT_TIMEOUT_MS
-        connection.readTimeout = READ_TIMEOUT_MS
-        connection.requestMethod = request.method
-
-        request.headers.forEach { (name, value) ->
-            if (name.lowercase() in SKIP_HEADERS) return@forEach
-            try {
-                connection.setRequestProperty(name, value)
-            } catch (e: IllegalArgumentException) {
-                LOG.debug("Skipping header {} with value {}", name, value, e)
-            }
-        }
-
-        val body = request.bodyToSend
-        if (body != null && body.isNotEmpty()) {
-            connection.doOutput = true
-            connection.outputStream.use { it.write(body) }
-        }
-
-        val status = connection.responseCode
-        val response = GarminHttpResponse()
-        response.status = status
-        response.headers["content-type"] = connection.contentType ?: "application/json"
-
-        val stream = if (status in 200..299) connection.inputStream else connection.errorStream
-        response.body = stream?.use { readAllBytes(it) } ?: ByteArray(0)
-
-        if (response.body.size > MAX_LOG_BODY) {
-            LOG.info("Juggluco response: status={} bytes={}", status, response.body.size)
-        }
-
-        connection.disconnect()
-        return response
-    }
-
     private fun jsonResponse(status: Int, body: ByteArray): GarminHttpResponse {
         val response = GarminHttpResponse()
         response.status = status
         response.headers["content-type"] = "application/json"
         response.body = body
         return response
-    }
-
-    private fun readAllBytes(input: InputStream): ByteArray {
-        val out = ByteArrayOutputStream()
-        val buffer = ByteArray(8192)
-        while (true) {
-            val read = input.read(buffer)
-            if (read == -1) break
-            out.write(buffer, 0, read)
-        }
-        return out.toByteArray()
     }
 
     companion object {
@@ -502,9 +457,6 @@ class JugglucoInterceptor(private val deviceSupport: GarminSupport) : HttpInterc
         private const val JUGGLUCO_PORT = 17580
         /** xDrip+ web server port (same protocol, different default port). */
         private const val XDRIp_PORT = 7147
-        private const val CONNECT_TIMEOUT_MS = 5000
-        private const val READ_TIMEOUT_MS = 10000
-        private const val MAX_LOG_BODY = 2048
 
         private const val PATH_SGV_JSON = "/sgv.json"
         private const val PATH_TREATMENTS = "/treatments"
@@ -518,7 +470,7 @@ class JugglucoInterceptor(private val deviceSupport: GarminSupport) : HttpInterc
         private const val MAX_TREATMENTS = 100
         /** Slacked window so a few entries fit even with polling gaps. */
         private const val REFRESH_SLACK_SEC = 3600L
-        /** If the newest HC record is older than this, the sensor is off — use the proxy. */
+        /** If the newest HC record is older than this, the sensor is off — serve 502. */
         private const val MAX_STALE_SEC = 900L
         /** Ignore delta references farther apart than this (45 min). */
         private const val MAX_DELTA_WINDOW_MS = 45L * 60L * 1000L
@@ -532,10 +484,6 @@ class JugglucoInterceptor(private val deviceSupport: GarminSupport) : HttpInterc
         /** UTC ISO-8601 with a fixed ".000Z", matching Juggluco's gmtime_r() treatment timestamps. */
         private val TREATMENT_DATE_FORMAT: DateTimeFormatter =
             DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.000'Z'")
-
-        // Headers that must not be forwarded verbatim to the local server.
-        // accept-encoding is dropped so the response is always plain (identity).
-        private val SKIP_HEADERS = setOf("host", "connection", "accept-encoding", "content-length")
 
         @Volatile
         private var cachedHcClient: HealthConnectClient? = null
