@@ -73,11 +73,22 @@ import java.time.format.DateTimeFormatter
  * carb treatments are emitted with "insulin":null, exactly as Juggluco marks
  * a carb-only entry.
  *
- * There is no proxy fallback: with the switch off (the default), or when
- * Health Connect is unavailable, lacks the read permission, or has no fresh
- * data, the request is not handled by this interceptor (it falls through to
- * the firewall, which blocks the loopback and returns a clean "no data"
- * response). No internet permission is required for the served endpoints.
+ * There is no proxy fallback. With the switch off (the default),
+ * [supports] returns false and the request falls through to the firewall,
+ * which blocks the loopback and returns a clean "no data" response. With
+ * the switch on but Health Connect unavailable, the read permission not
+ * granted, no fresh data, or an unknown path, [handle] answers with a 502
+ * whose body names the reason (hc_no_data). No internet permission is
+ * required for the served endpoints.
+ *
+ * Troubleshooting: the watch app surfaces any 502 as "invalid data format",
+ * so a 502 usually means the Health Connect read produced no servable data
+ * — most commonly the read permission is not granted. Grant it in
+ * Gadgetbridge (Settings → Health Connect → enable blood glucose sync, and
+ * carb/nutrition for treatments) and make sure the CGM source (e.g.
+ * Juggluco) is running and writing fresh records to Health Connect. The
+ * exact cause is logged on the line just before the 502 and carried in the
+ * 502 body's "message" field.
  *
  * Medical disclaimer: the values served are for personal information only.
  * This is not a medical device and is not intended for medical treatment,
@@ -108,25 +119,26 @@ class JugglucoInterceptor(private val deviceSupport: GarminSupport) : HttpInterc
             try {
                 val response = withContext(Dispatchers.IO) {
                     // Health Connect is the only source. serveFromHealthConnect
-                    // returns null when there is no fresh data to serve (no HC
-                    // client, permission not granted, no records, stale, or an
-                    // unknown path); map that to a 502 so the watch gets a JSON
-                    // body instead of a bare "no response".
-                    serveFromHealthConnect(request)
-                        ?: jsonResponse(
-                            502,
-                            JsonObject().apply {
-                                addProperty("ok", false)
-                                addProperty("error", "hc_no_data")
-                                addProperty("message", "no fresh data in Health Connect")
-                            }.toString().toByteArray(Charsets.UTF_8)
-                        )
+                    // returns an HcResult whose response is null when there is
+                    // nothing to serve (no HC client, permission not granted, no
+                    // records, stale, or an unknown path); the reason names the
+                    // cause so the 502 body is self-documenting (the watch app
+                    // surfaces any 502 as "invalid data format").
+                    val result = serveFromHealthConnect(request)
+                    result.response ?: jsonResponse(
+                        502,
+                        JsonObject().apply {
+                            addProperty("ok", false)
+                            addProperty("error", "hc_no_data")
+                            addProperty("message", "no data served from Health Connect: " + (result.reason ?: "unknown"))
+                        }.toString().toByteArray(Charsets.UTF_8)
+                    )
                 }
                 sendResponseOnMain(request, response)
             } catch (t: Throwable) {
                 // Catch Throwable (not just Exception): an uncaught Error here
                 // would kill the whole Gadgetbridge process.
-                LOG.error("Juggluco proxy request failed: {}", request.uri, t)
+                LOG.error("CGM request failed: {}", request.uri, t)
                 sendResponseOnMain(
                     request,
                     jsonResponse(
@@ -163,44 +175,58 @@ class JugglucoInterceptor(private val deviceSupport: GarminSupport) : HttpInterc
         }
 
     /**
-     * Serve the requested xDrip+ endpoint from Health Connect, or return null
-     * to fall through to the local xDrip+ proxy.
+     * Outcome of serving an xDrip+ endpoint from Health Connect. [response] is
+     * the rendered 200 body, or null when there is nothing to serve; when
+     * null, [reason] carries a human-readable cause (unavailable, permission
+     * not granted, no records, stale, unknown path) so the caller can surface
+     * a self-documenting 502.
+     */
+    private data class HcResult(
+        val response: GarminHttpResponse?,
+        val reason: String? = null
+    )
+
+    /**
+     * Serve the requested xDrip+ endpoint from Health Connect, or return a
+     * null [HcResult.response] (with a [HcResult.reason]) so the caller
+     * responds with a self-documenting 502 (hc_no_data).
      *
      * Dispatches by path: /sgv.json (glucose) and the treatments endpoints
-     * (carbs). Unknown paths, a missing Health Connect client, and an ungranted
-     * read permission all fall through to the proxy.
+     * (carbs). Unknown paths, a missing Health Connect client, an ungranted
+     * read permission, and no fresh data all yield a 502; the reason names
+     * which, so logcat and the 502 body both say why.
      */
-    private suspend fun serveFromHealthConnect(request: GarminHttpRequest): GarminHttpResponse? {
+    private suspend fun serveFromHealthConnect(request: GarminHttpRequest): HcResult {
         val client = getHcClient()
         if (client == null) {
-            LOG.debug("Health Connect unavailable, falling back to xDrip+ proxy")
-            return null
+            LOG.debug("Serving 502 (hc_no_data): Health Connect unavailable")
+            return HcResult(null, "Health Connect unavailable")
         }
         return when (request.path) {
             PATH_SGV_JSON -> serveSgv(client, request)
             PATH_TREATMENTS_JSON, PATH_TREATMENTS -> serveTreatments(client, request, v3 = false)
             PATH_API_TREATMENTS_JSON, PATH_API_TREATMENTS -> serveTreatments(client, request, v3 = true)
-            else -> null
+            else -> HcResult(null, "unknown path ${request.path}")
         }
     }
 
     /**
      * Render /sgv.json from Health Connect glucose records.
      *
-     * Returns null when the request should fall through to the proxy: read
+     * Returns a null [HcResult.response] (mapped to a 502) when: read
      * permission not granted, no records in the window, or the newest record
-     * is too old (sensor off).
+     * is too old (sensor off); the [HcResult.reason] names which.
      *
      * The JSON mirrors Juggluco's watchserver /sgv.json output exactly:
      * newest-first, entries at least [interval] seconds apart, "sgv" in mg/dL,
      * "delta" the 5-minute change, "direction" from the mg/dL-per-minute rate,
      * and "units_hint" on the first (newest) entry.
      */
-    private suspend fun serveSgv(client: HealthConnectClient, request: GarminHttpRequest): GarminHttpResponse? {
+    private suspend fun serveSgv(client: HealthConnectClient, request: GarminHttpRequest): HcResult {
         val readPermission = HealthPermission.getReadPermission(BloodGlucoseRecord::class)
         if (readPermission !in client.permissionController.getGrantedPermissions()) {
-            LOG.info("Health Connect permission {} not granted, falling back to xDrip+ proxy", readPermission)
-            return null
+            LOG.info("Serving 502 (hc_no_data): Health Connect permission {} not granted", readPermission)
+            return HcResult(null, "Health Connect permission $readPermission not granted")
         }
 
         val count = request.query["count"]?.toIntOrNull()?.coerceIn(1, MAX_COUNT) ?: 1
@@ -219,15 +245,15 @@ class JugglucoInterceptor(private val deviceSupport: GarminSupport) : HttpInterc
         )
         val records = result.records.filterIsInstance<BloodGlucoseRecord>()
         if (records.isEmpty()) {
-            LOG.info("No glucose records in Health Connect, falling back to xDrip+ proxy")
-            return null
+            LOG.info("Serving 502 (hc_no_data): no glucose records in Health Connect")
+            return HcResult(null, "no glucose records in Health Connect")
         }
 
         val newestAgeSec = Duration.between(records.first().time, now).toSeconds()
         if (newestAgeSec > MAX_STALE_SEC) {
-            LOG.info("Newest glucose record is {}s old (> {}s), falling back to xDrip+ proxy",
+            LOG.info("Serving 502 (hc_no_data): newest glucose record is {}s old (> {}s)",
                 newestAgeSec, MAX_STALE_SEC)
-            return null
+            return HcResult(null, "newest glucose record is ${newestAgeSec}s old (> ${MAX_STALE_SEC}s)")
         }
 
         // Mirror Juggluco's getitems(): newest first, each entry at least
@@ -246,7 +272,7 @@ class JugglucoInterceptor(private val deviceSupport: GarminSupport) : HttpInterc
         val body = renderSgvJson(records, kept, brief)
         LOG.info("Serving sgv.json from Health Connect: {} entries, newest {}s old, brief={}",
             kept.size, newestAgeSec, brief)
-        return jsonResponse(200, body)
+        return HcResult(jsonResponse(200, body))
     }
 
     /**
@@ -255,20 +281,20 @@ class JugglucoInterceptor(private val deviceSupport: GarminSupport) : HttpInterc
      * Health Connect has no insulin record type in any SDK version, so only
      * carb treatments can be reconstructed; they are emitted with "insulin":
      * null (v2) or simply "carbs" (v3), exactly as Juggluco marks a carb-only
-     * entry. When the read permission is not granted the request falls through
-     * to the proxy (so Juggluco's own treatments, including insulin, can still
-     * be served). Once granted, an empty carb history yields a valid empty
-     * treatments response rather than a 502, keeping the HC proxy authoritative.
+     * entry. When the read permission is not granted the request is answered
+     * with a 502. Once granted, an empty carb history yields a valid empty
+     * treatments response rather than a 502, keeping the Health Connect source
+     * authoritative.
      */
     private suspend fun serveTreatments(
         client: HealthConnectClient,
         request: GarminHttpRequest,
         v3: Boolean
-    ): GarminHttpResponse? {
+    ): HcResult {
         val readPermission = HealthPermission.getReadPermission(NutritionRecord::class)
         if (readPermission !in client.permissionController.getGrantedPermissions()) {
-            LOG.info("Health Connect permission {} not granted, falling back to xDrip+ proxy", readPermission)
-            return null
+            LOG.info("Serving 502 (hc_no_data): Health Connect permission {} not granted", readPermission)
+            return HcResult(null, "Health Connect permission $readPermission not granted")
         }
 
         val now = Instant.now()
@@ -292,7 +318,7 @@ class JugglucoInterceptor(private val deviceSupport: GarminSupport) : HttpInterc
             "Serving {} from Health Connect: {} carb entries (insulin not an HC type)",
             if (v3) "/api/treatments.json" else "/treatments.json", carbRecords.size
         )
-        return jsonResponse(200, body)
+        return HcResult(jsonResponse(200, body))
     }
 
     /**
