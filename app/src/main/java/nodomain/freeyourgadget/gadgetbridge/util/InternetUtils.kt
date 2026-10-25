@@ -41,6 +41,7 @@ import java.net.SocketTimeoutException
 import java.net.UnknownHostException
 import java.security.SecureRandom
 import java.security.cert.X509Certificate
+import java.util.concurrent.TimeUnit
 import javax.net.ssl.SSLContext
 import javax.net.ssl.SSLException
 import javax.net.ssl.TrustManager
@@ -57,6 +58,10 @@ class InternetUtils {
     companion object {
         private val LOG: Logger = LoggerFactory.getLogger(InternetUtils::class.java)
         private val defaultClient = OkHttpClient()
+        // Servers may process an uploaded file before they answer (Wanderer reverse-geocodes the
+        // track, 10 to 20 s on a small server), longer than OkHttp's default 10 s read timeout.
+        private const val UPLOAD_TIMEOUT_MS = 120_000L
+
         private const val USER_AGENT = "Gadgetbridge/${BuildConfig.VERSION_NAME} (${BuildConfig.GIT_HASH_SHORT}${BuildConfig.GIT_DIRTY_STATUS})"
 
         /**
@@ -259,7 +264,8 @@ class InternetUtils {
                             method = method,
                             requestHeaders = headers,
                             body = multipartBodyBytes,
-                            allowInsecure = allowInsecure
+                            allowInsecure = allowInsecure,
+                            timeoutMs = UPLOAD_TIMEOUT_MS,
                         )
                     } else {
                         InternetHelperSingleton.send(
@@ -267,7 +273,8 @@ class InternetUtils {
                             HttpRequest.Method.valueOf(method),
                             headers,
                             multipartBodyBytes,
-                            allowInsecure
+                            allowInsecure,
+                            UPLOAD_TIMEOUT_MS,
                         )
                     }
 
@@ -385,9 +392,13 @@ class InternetUtils {
             method: String,
             requestHeaders: Map<String, String>,
             body: ByteArray,
-            allowInsecure: Boolean
+            allowInsecure: Boolean,
+            timeoutMs: Long,
         ): WebResourceResponse {
-            val client = if (allowInsecure) createInsecureClient() else defaultClient
+            val client = (if (allowInsecure) createInsecureClient() else defaultClient).newBuilder()
+                .readTimeout(timeoutMs, TimeUnit.MILLISECONDS)
+                .writeTimeout(timeoutMs, TimeUnit.MILLISECONDS)
+                .build()
             val builder = Request.Builder().url(uri.toString())
 
             for ((key, value) in headersWithUserAgent(requestHeaders)) {

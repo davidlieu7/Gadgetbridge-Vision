@@ -44,6 +44,9 @@ object InternetHelperSingleton {
     private var internetHelperBound = false
     private var internetHelper: IHttpService? = null
 
+    // First Internet Helper version with IHttpService.sendWithTimeout
+    private const val MIN_VERSION_TIMEOUT = 3
+
     // Signalled when the (asynchronous) service connection completes, so callers can wait for it.
     @Volatile
     private var bindLatch: CountDownLatch? = null
@@ -112,6 +115,7 @@ object InternetHelperSingleton {
         return internetHelper != null
     }
 
+    @JvmOverloads
     @Throws(RemoteException::class, InterruptedException::class)
     fun send(
         webRequest: Uri,
@@ -119,6 +123,7 @@ object InternetHelperSingleton {
         requestHeaders: Map<String, String> = emptyMap(),
         body: ByteArray?,
         allowInsecure: Boolean = false,
+        timeoutMs: Long? = null,
     ): WebResourceResponse? {
         if (internetHelper == null) {
             // The bind is asynchronous — give it a moment to connect before giving up.
@@ -155,7 +160,7 @@ object InternetHelperSingleton {
         LOG.debug("Forwarding {} request to {} to internet helper app", method.name, webRequest)
 
         try {
-            internetHelper?.send(request, object : IHttpCallback.Stub() {
+            val callback = object : IHttpCallback.Stub() {
                 override fun onResponse(response: HttpResponse) {
                     try {
                         result = toWebResourceResponse(response)
@@ -171,7 +176,13 @@ object InternetHelperSingleton {
                     result = null
                     latch.countDown()
                 }
-            })
+            }
+            val helper = internetHelper
+            if (timeoutMs != null && helper != null && helper.version() >= MIN_VERSION_TIMEOUT) {
+                helper.sendWithTimeout(request, null, timeoutMs, callback)
+            } else {
+                helper?.send(request, callback)
+            }
 
             // Write the body to the pipe, if any
             if (pipeWrite != null) {
