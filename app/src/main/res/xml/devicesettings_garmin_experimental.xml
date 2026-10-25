@@ -62,7 +62,7 @@
             android:icon="@drawable/ic_monitor_weight"
             android:key="garmin_experimental_cgm_hc_proxy"
             android:layout="@layout/preference_checkbox"
-            android:summary="Serve /sgv.json for CGM+ watch apps directly from Health Connect (values written by any xDrip+ compatible CGM source, e.g. Juggluco) instead of proxying to Juggluco's local web server. Avoids cross-app loopback socket failures (EPERM). Requires the Health Connect permission to read glucose; falls back to the Juggluco proxy when Health Connect has no fresh data. For personal information only — not intended for medical treatment."
+            android:summary="Serve /sgv.json and the xDrip+ treatments endpoints for CGM+ watch apps directly from Health Connect (values written by any xDrip+ compatible CGM source, e.g. Juggluco), with no loopback socket and no internet permission — avoiding the cross-app socket failures (EPERM) a Juggluco proxy hits. Requires the Health Connect permission to read glucose (and carbs, for treatments). For personal information only — not intended for medical treatment."
             android:title="xDrip+ Health Connect Proxy" />
     </PreferenceCategory>
 </androidx.preference.PreferenceScreen>
