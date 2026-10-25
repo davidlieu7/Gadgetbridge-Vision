@@ -110,7 +110,7 @@ object HealthConnectPermissionManager {
             HealthConnectDataType.BLOOD_GLUCOSE -> setOf(
                 HealthPermission.getWritePermission(BloodGlucoseRecord::class),
                 HealthPermission.getReadPermission(BloodGlucoseRecord::class),
-                // Carb treatments for the nDrip+ Health Connect Proxy
+                // Carb treatments for the xDrip+ Health Connect Proxy
                 // (JugglucoInterceptor serves /treatments.json from NutritionRecord).
                 // Read-only: Gadgetbridge only reads HC; the CGM source writes it.
                 HealthPermission.getReadPermission(NutritionRecord::class)

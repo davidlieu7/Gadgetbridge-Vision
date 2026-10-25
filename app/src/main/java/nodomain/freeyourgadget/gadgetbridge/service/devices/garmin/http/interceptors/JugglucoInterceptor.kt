@@ -51,7 +51,7 @@ import java.time.ZoneOffset
 import java.time.format.DateTimeFormatter
 
 /**
- * Serves CGM data to Connect IQ apps (CGM+, its datafield, or any nDrip+
+ * Serves CGM data to Connect IQ apps (CGM+, its datafield, or any xDrip+
  * watch companion) that fetch the xDrip+/Juggluco web-server URL, e.g.
  * http://127.0.0.1:17580/sgv.json or http://127.0.0.1:7147/sgv.json.
  *
@@ -61,10 +61,10 @@ import java.time.format.DateTimeFormatter
  * 7147) and answers them locally on the phone — no internet access required.
  *
  * Primary source (opt-in, off by default): Health Connect, enabled by the
- * "nDrip+ Health Connect Proxy" switch in the Garmin experimental settings
- * (key [GarminPrefs.PREF_CGM_HC_PROXY]). Any nDrip+ compatible CGM source
+ * "xDrip+ Health Connect Proxy" switch in the Garmin experimental settings
+ * (key [GarminPrefs.PREF_CGM_HC_PROXY]). Any xDrip+ compatible CGM source
  * (e.g. Juggluco) writes its readings to Health Connect, so the watch app's
- * nDrip+ endpoints are rendered directly from the [BloodGlucoseRecord] and
+ * xDrip+ endpoints are rendered directly from the [BloodGlucoseRecord] and
  * [NutritionRecord] entries — the same xDrip/Nightscout JSON the watch app
  * already parses, with no socket to the Juggluco process. This sidesteps the
  * cross-app loopback problem (socket failed: EPERM) that a direct proxy to
@@ -79,8 +79,8 @@ import java.time.format.DateTimeFormatter
  *
  * Fallback: with the switch off (the default), or when Health Connect is
  * unavailable, lacks the read permission, or has no fresh data, the request
- * is proxied to the local nDrip+ server (Juggluco on 17580, xDrip+ on 7147)
- * at the port the watch requested. Other nDrip endpoints always go to the
+ * is proxied to the local xDrip+ server (Juggluco on 17580, xDrip+ on 7147)
+ * at the port the watch requested. Other xDrip+ endpoints always go to the
  * proxy.
  *
  * Medical disclaimer: the values served are for personal information only.
@@ -106,7 +106,7 @@ class JugglucoInterceptor(private val deviceSupport: GarminSupport) : HttpInterc
         SCOPE.launch {
             try {
                 val response = withContext(Dispatchers.IO) {
-                    // nDrip+ Health Connect Proxy (opt-in, off by default) first;
+                    // xDrip+ Health Connect Proxy (opt-in, off by default) first;
                     // the Juggluco proxy is the default path and the fallback.
                     (if (hcProxyEnabled()) serveFromHealthConnect(request) else null) ?: fetchLocally(request)
                 }
@@ -151,8 +151,8 @@ class JugglucoInterceptor(private val deviceSupport: GarminSupport) : HttpInterc
         }
 
     /**
-     * Serve the requested nDrip+ endpoint from Health Connect, or return null
-     * to fall through to the local nDrip+ proxy.
+     * Serve the requested xDrip+ endpoint from Health Connect, or return null
+     * to fall through to the local xDrip+ proxy.
      *
      * Dispatches by path: /sgv.json (glucose) and the treatments endpoints
      * (carbs). Unknown paths, a missing Health Connect client, and an ungranted
@@ -161,7 +161,7 @@ class JugglucoInterceptor(private val deviceSupport: GarminSupport) : HttpInterc
     private suspend fun serveFromHealthConnect(request: GarminHttpRequest): GarminHttpResponse? {
         val client = getHcClient()
         if (client == null) {
-            LOG.debug("Health Connect unavailable, falling back to nDrip proxy")
+            LOG.debug("Health Connect unavailable, falling back to xDrip+ proxy")
             return null
         }
         return when (request.path) {
@@ -187,7 +187,7 @@ class JugglucoInterceptor(private val deviceSupport: GarminSupport) : HttpInterc
     private suspend fun serveSgv(client: HealthConnectClient, request: GarminHttpRequest): GarminHttpResponse? {
         val readPermission = HealthPermission.getReadPermission(BloodGlucoseRecord::class)
         if (readPermission !in client.permissionController.getGrantedPermissions()) {
-            LOG.info("Health Connect permission {} not granted, falling back to nDrip proxy", readPermission)
+            LOG.info("Health Connect permission {} not granted, falling back to xDrip+ proxy", readPermission)
             return null
         }
 
@@ -207,13 +207,13 @@ class JugglucoInterceptor(private val deviceSupport: GarminSupport) : HttpInterc
         )
         val records = result.records.filterIsInstance<BloodGlucoseRecord>()
         if (records.isEmpty()) {
-            LOG.info("No glucose records in Health Connect, falling back to nDrip proxy")
+            LOG.info("No glucose records in Health Connect, falling back to xDrip+ proxy")
             return null
         }
 
         val newestAgeSec = Duration.between(records.first().time, now).toSeconds()
         if (newestAgeSec > MAX_STALE_SEC) {
-            LOG.info("Newest glucose record is {}s old (> {}s), falling back to nDrip proxy",
+            LOG.info("Newest glucose record is {}s old (> {}s), falling back to xDrip+ proxy",
                 newestAgeSec, MAX_STALE_SEC)
             return null
         }
@@ -238,7 +238,7 @@ class JugglucoInterceptor(private val deviceSupport: GarminSupport) : HttpInterc
     }
 
     /**
-     * Render the nDrip+ treatments endpoint from Health Connect carb records.
+     * Render the xDrip+ treatments endpoint from Health Connect carb records.
      *
      * Health Connect has no insulin record type in any SDK version, so only
      * carb treatments can be reconstructed; they are emitted with "insulin":
@@ -255,7 +255,7 @@ class JugglucoInterceptor(private val deviceSupport: GarminSupport) : HttpInterc
     ): GarminHttpResponse? {
         val readPermission = HealthPermission.getReadPermission(NutritionRecord::class)
         if (readPermission !in client.permissionController.getGrantedPermissions()) {
-            LOG.info("Health Connect permission {} not granted, falling back to nDrip proxy", readPermission)
+            LOG.info("Health Connect permission {} not granted, falling back to xDrip+ proxy", readPermission)
             return null
         }
 
@@ -418,7 +418,7 @@ class JugglucoInterceptor(private val deviceSupport: GarminSupport) : HttpInterc
     }
 
     /**
-     * Whether the opt-in "nDrip+ Health Connect Proxy" is enabled for this device.
+     * Whether the opt-in "xDrip+ Health Connect Proxy" is enabled for this device.
      * Read live on every request so the toggle takes effect without a
      * reconnect; goes through [experimentalSettingEnabled], so it also
      * respects the global experimental-settings master switch, like the rest
