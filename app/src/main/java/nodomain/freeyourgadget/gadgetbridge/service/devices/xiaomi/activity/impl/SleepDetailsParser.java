@@ -540,11 +540,18 @@ public class SleepDetailsParser extends XiaomiActivityParser {
 
     // Xiaomi SpO2 sensor cause spike in RR so this is to cut the overlapping RR out
     private static Long findLatestSpo2TimestampMs(final GBDevice gbDevice) {
-        try (DBHandler handler = GBApplication.acquireDB()) {
+        try (DBHandler handler = GBApplication.acquireDbReadOnly()) {
             final DaoSession session = handler.getDaoSession();
 
-            final long deviceId = DBHelper.getDevice(gbDevice, session).getId();
-            final long userId = DBHelper.getUser(session).getId();
+            final Device device = DBHelper.findDevice(gbDevice, session);
+            final User user = DBHelper.findUser(session);
+
+            if (device == null || user == null) {
+                return null;
+            }
+
+            final long deviceId = device.getId();
+            final long userId = user.getId();
 
             final List<XiaomiActivitySample> samples =
                 session.getXiaomiActivitySampleDao()
