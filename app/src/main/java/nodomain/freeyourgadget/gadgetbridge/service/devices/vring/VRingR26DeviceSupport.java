@@ -163,6 +163,7 @@ public class VRingR26DeviceSupport extends AbstractBTLESingleDeviceSupport {
             return;
         }
         builder.write(chr, pkt.encode());
+        builder.sleep(100);
     }
 
     // -------------------------------------------------------------------------

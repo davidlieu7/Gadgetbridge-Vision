@@ -83,7 +83,7 @@ public class VRingR26Coordinator extends AbstractBLEDeviceCoordinator {
 
     @Override
     public String getManufacturer() {
-        return "MO YOUNG";
+        return "Mo Young / Da Fit";
     }
 
     @Override
