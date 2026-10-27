@@ -121,6 +121,12 @@ object SoundcoreSleepHistory {
         val sessions = rawSessions.map {
             Session(timestamp(it, 0), timestamp(it, 4), it[8].toInt() and 255, it[9].toInt() and 255,
                 it[10].toInt() and 255, BLETypeConversions.toUint16(it, 11), it[13].toInt() and 255)
+        }.filterNot {
+            // Empty type-1 summaries use an unknown duration sentinel. They contain no sleep
+            // interval or score and must not invalidate the other sessions in the snapshot.
+            it.start in 1..Int.MAX_VALUE.toLong() && it.end == it.start &&
+                it.type == 1 && it.score == 0 && it.unknownCount == 0 &&
+                it.durationMinutes == 0xffff && it.unknown == 0
         }
         if (sessions.any { it.start < 1 || it.end > Int.MAX_VALUE || it.end <= it.start ||
                 it.end - it.start > MAX_SESSION_SECONDS || it.score > 100 }) return null
