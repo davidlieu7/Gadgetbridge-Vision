@@ -154,12 +154,12 @@ public class SoundcoreSportX20Protocol extends SoundcoreProtocolImplV1 {
         }
 
         // Button-control functions at offsets 110–115.
-        final TapFunction lSingle = functionFromCode(payload[DEVICE_INFO_CONTROL_OFFSET]     & 0x0f);
-        final TapFunction rSingle = functionFromCode(payload[DEVICE_INFO_CONTROL_OFFSET + 1] & 0x0f);
-        final TapFunction lDouble = functionFromCode(payload[DEVICE_INFO_CONTROL_OFFSET + 2] & 0x0f);
-        final TapFunction rDouble = functionFromCode(payload[DEVICE_INFO_CONTROL_OFFSET + 3] & 0x0f);
-        final TapFunction lLong   = functionFromCode(payload[DEVICE_INFO_CONTROL_OFFSET + 4] & 0x0f);
-        final TapFunction rLong   = functionFromCode(payload[DEVICE_INFO_CONTROL_OFFSET + 5] & 0x0f);
+        final TapFunction lSingle = decodeConfiguredTapFunction(payload[DEVICE_INFO_CONTROL_OFFSET]     & 0x0f);
+        final TapFunction rSingle = decodeConfiguredTapFunction(payload[DEVICE_INFO_CONTROL_OFFSET + 1] & 0x0f);
+        final TapFunction lDouble = decodeConfiguredTapFunction(payload[DEVICE_INFO_CONTROL_OFFSET + 2] & 0x0f);
+        final TapFunction rDouble = decodeConfiguredTapFunction(payload[DEVICE_INFO_CONTROL_OFFSET + 3] & 0x0f);
+        final TapFunction lLong   = decodeConfiguredTapFunction(payload[DEVICE_INFO_CONTROL_OFFSET + 4] & 0x0f);
+        final TapFunction rLong   = decodeConfiguredTapFunction(payload[DEVICE_INFO_CONTROL_OFFSET + 5] & 0x0f);
 
         LOG.debug("Control functions from device info: L_single={} R_single={} L_double={} R_double={} L_long={} R_long={}",
                 lSingle, rSingle, lDouble, rDouble, lLong, rLong);
@@ -203,16 +203,6 @@ public class SoundcoreSportX20Protocol extends SoundcoreProtocolImplV1 {
                 .putBoolean(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_TOUCH_TONE, touchTone)
                 .putString(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_AUTO_POWER_OFF, String.valueOf(autoPowerDuration))
                 .apply();
-    }
-
-    /** Maps a low-nibble TapFunction code (0–15) back to the TapFunction enum. */
-    private static TapFunction functionFromCode(final int code) {
-        for (final TapFunction f : TapFunction.values()) {
-            if (f.getCode() == code) {
-                return f;
-            }
-        }
-        return TapFunction.NONE;
     }
 
     @Override

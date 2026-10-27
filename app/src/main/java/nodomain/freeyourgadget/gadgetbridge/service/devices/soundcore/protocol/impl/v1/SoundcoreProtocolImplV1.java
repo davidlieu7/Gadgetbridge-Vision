@@ -186,6 +186,16 @@ public class SoundcoreProtocolImplV1 extends AbstractSoundcoreProtocol {
         throw new IllegalArgumentException("Unknown tap function preference: " + config);
     }
 
+    /** Maps a low-nibble TapFunction code (0–15) back to the TapFunction enum. */
+    protected static TapFunction decodeConfiguredTapFunction(final int code) {
+        for (final TapFunction f : TapFunction.values()) {
+            if (f.getCode() == code) {
+                return f;
+            }
+        }
+        return TapFunction.NONE;
+    }
+
     private byte[] encodeConfiguredTapLock(final String config, final Prefs prefs) {
         for (final ButtonAction buttonAction : ButtonAction.values()) {
             if (!config.equals(buttonAction.getDisabledPreference())) {
@@ -706,7 +716,24 @@ public class SoundcoreProtocolImplV1 extends AbstractSoundcoreProtocol {
             (anc          ? 1      : 0)   // 1
         );
 
-        return encodeCommand(CMD_SET_AMBIENT_SOUND_CONTROL_BUTTON_MODE, new byte[]{ambientModes});
+        final byte functionByte = (byte) ((getAmbientFunctionGroup() << 4) | ambientModes);
+
+        return encodeCommand(CMD_SET_AMBIENT_SOUND_CONTROL_BUTTON_MODE, new byte[]{functionByte});
+    }
+
+    /** Returns the model-specific high nibble of the function byte, not the ambient action byte. */
+    protected int getAmbientFunctionGroup(){
+        return 0;
+    }
+
+    protected AmbientSoundControlButtonMode decodeControlAmbientMode(int value){
+        return switch (value) {
+            case 7 -> AmbientSoundControlButtonMode.NC_AS_OFF;
+            case 3 -> AmbientSoundControlButtonMode.NC_AS;
+            case 5 -> AmbientSoundControlButtonMode.NC_OFF;
+            case 6 -> AmbientSoundControlButtonMode.AS_OFF;
+            default -> null;
+        };
     }
 
     /**

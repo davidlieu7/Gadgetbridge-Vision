@@ -3,8 +3,11 @@ package nodomain.freeyourgadget.gadgetbridge.service.devices.soundcore.devices;
 import androidx.annotation.Nullable;
 
 import java.nio.ByteBuffer;
+import java.util.Locale;
 
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsPreferenceConst;
+import nodomain.freeyourgadget.gadgetbridge.devices.sony.headphones.prefs.AmbientSoundControlButtonMode;
+import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreEarbudsCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreEarbudsCoordinator.AncMode;
 import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreEarbudsCoordinator.AmbientSoundMode;
 import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEvent;
@@ -23,7 +26,7 @@ public class SoundcoreA30iProtocol extends SoundcoreProtocolImplV1 {
 
     @Override
     protected void decodeAudioMode(final byte[] payload) {
-        // A30i audio settings use a separate seven-byte layout in device info.
+        decodeAmbientSoundControl(payload, 0);
     }
 
     @Override
@@ -32,12 +35,23 @@ public class SoundcoreA30iProtocol extends SoundcoreProtocolImplV1 {
             return new GBDeviceEvent[0];
         }
 
+        int DEVICE_INFO_CONTROL_OFFSET = 55;
+        final SoundcoreEarbudsCoordinator.TapFunction lSingle = decodeConfiguredTapFunction(payload[DEVICE_INFO_CONTROL_OFFSET]     & 0x0f);
+        final SoundcoreEarbudsCoordinator.TapFunction rSingle = decodeConfiguredTapFunction(payload[DEVICE_INFO_CONTROL_OFFSET + 1] & 0x0f);
+        final SoundcoreEarbudsCoordinator.TapFunction lDouble = decodeConfiguredTapFunction(payload[DEVICE_INFO_CONTROL_OFFSET + 2] & 0x0f);
+        final SoundcoreEarbudsCoordinator.TapFunction rDouble = decodeConfiguredTapFunction(payload[DEVICE_INFO_CONTROL_OFFSET + 3] & 0x0f);
+        final SoundcoreEarbudsCoordinator.TapFunction lTriple = decodeConfiguredTapFunction(payload[DEVICE_INFO_CONTROL_OFFSET + 4] & 0x0f);
+        final SoundcoreEarbudsCoordinator.TapFunction rTriple = decodeConfiguredTapFunction(payload[DEVICE_INFO_CONTROL_OFFSET + 5] & 0x0f);
+        final SoundcoreEarbudsCoordinator.TapFunction lLong   = decodeConfiguredTapFunction(payload[DEVICE_INFO_CONTROL_OFFSET + 6] & 0x0f);
+        final SoundcoreEarbudsCoordinator.TapFunction rLong   = decodeConfiguredTapFunction(payload[DEVICE_INFO_CONTROL_OFFSET + 7] & 0x0f);
+
+        final AmbientSoundControlButtonMode controlButtonMode = decodeControlAmbientMode(payload[DEVICE_INFO_CONTROL_OFFSET + 8] & 0x0f);
+
+        String controlButtonModeString = controlButtonMode.name().toLowerCase(Locale.ROOT);
+
         //-------------------------------------------------------------------------
-        // Active Noise Cancelling [63 to 70 (7 bytes)]
-        final AmbientSoundMode ambientSoundControl = getAmbientSoundControl(payload[64], payload[67]);
-        final AncMode ancMode = AncMode.fromByte(payload[70]);
-        int noiseCancellingLevel = decodeNoiseCancellationLevel(payload[65]);
-        boolean wind_noise_reduction = payload[68] == 0x01;
+        // Active Noise Cancelling [64 to 70 (7 bytes)]
+        decodeAmbientSoundControl(payload, 64);
         //-------------------------------------------------------------------------
         boolean touchTone = payload[72] == 0x01;
         boolean surround3d = payload[74] == 0x01;
@@ -47,18 +61,54 @@ public class SoundcoreA30iProtocol extends SoundcoreProtocolImplV1 {
         final int autoPowerDuration = autoPowerEnabled ? (payload[76] & 0xFF) + 1 : 0;
 
         getDevicePrefs().getPreferences().edit()
-                .putString(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_AMBIENT_SOUND_CONTROL, ambientSoundControl != null ? ambientSoundControl.toString() : "Unknown Mode")
-                .putString(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_ANC_MODE, ancMode != null ? ancMode.toString() : "Unknown Mode")
-                .putInt(DeviceSettingsPreferenceConst.PREF_SONY_AMBIENT_SOUND_LEVEL, noiseCancellingLevel)
-                .putBoolean(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_WIND_NOISE_REDUCTION, wind_noise_reduction)
+            .putString(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_CONTROL_SINGLE_TAP_ACTION_LEFT,  lSingle.name())
+            .putString(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_CONTROL_SINGLE_TAP_ACTION_RIGHT, rSingle.name())
+            .putString(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_CONTROL_DOUBLE_TAP_ACTION_LEFT,  lDouble.name())
+            .putString(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_CONTROL_DOUBLE_TAP_ACTION_RIGHT, rDouble.name())
+            .putString(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_CONTROL_TRIPLE_TAP_ACTION_LEFT,  lTriple.name())
+            .putString(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_CONTROL_TRIPLE_TAP_ACTION_RIGHT, rTriple.name())
+            .putString(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_CONTROL_LONG_PRESS_ACTION_LEFT,  lLong.name())
+            .putString(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_CONTROL_LONG_PRESS_ACTION_RIGHT, rLong.name())
+            .putString(DeviceSettingsPreferenceConst.PREF_SONY_AMBIENT_SOUND_CONTROL_BUTTON_MODE, controlButtonModeString)
 
-                .putBoolean(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_3D_SURROUND, surround3d)
-                .putBoolean(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_BATTERY_LOW_TONE, low_battery)
-                .putBoolean(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_TOUCH_TONE, touchTone)
-                .putString(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_AUTO_POWER_OFF, String.valueOf(autoPowerDuration))
-                .apply();
+            .putBoolean(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_3D_SURROUND, surround3d)
+            .putBoolean(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_BATTERY_LOW_TONE, low_battery)
+            .putBoolean(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_TOUCH_TONE, touchTone)
+            .putString(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_AUTO_POWER_OFF, String.valueOf(autoPowerDuration))
+            .apply();
 
         return decodeStandardEarbudDeviceInfo(payload);
+    }
+
+    private void decodeAmbientSoundControl(byte[] payload, int offset){
+        final AmbientSoundMode ambientSoundControl = getAmbientSoundControl(payload[offset], payload[offset + 3]);
+        final AncMode ancMode = AncMode.fromByte(payload[offset + 6]);
+        int noiseCancellingLevel = decodeNoiseCancellationLevel(payload[offset + 1]);
+        boolean wind_noise_reduction = payload[offset + 4] == 0x01;
+
+        getDevicePrefs().getPreferences().edit()
+            .putString(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_AMBIENT_SOUND_CONTROL, ambientSoundControl != null ? ambientSoundControl.toString() : "Unknown Mode")
+            .putString(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_ANC_MODE, ancMode != null ? ancMode.toString() : "Unknown Mode")
+            .putInt(DeviceSettingsPreferenceConst.PREF_SONY_AMBIENT_SOUND_LEVEL, noiseCancellingLevel)
+            .putBoolean(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_WIND_NOISE_REDUCTION, wind_noise_reduction)
+            .apply();
+    }
+
+    @Override
+    protected int getAmbientFunctionGroup(){
+        return 3;
+    }
+
+    @Override
+    protected int getTapFunctionGroup(final SoundcoreEarbudsCoordinator.ButtonAction buttonAction) {
+        switch (buttonAction) {
+            case SINGLE_TAP: return 15;
+            case TRIPLE_TAP: //Only the device specific part is identical with DOUBLE_TAP, the second half of the
+                             //byte is not model specific and will be set in SoundcoreProtocolImplV1
+            case DOUBLE_TAP: return 6;
+            case LONG_PRESS: return 4;
+            default: throw new IllegalArgumentException("Unknown button action: " + buttonAction);
+        }
     }
 
     @Override
