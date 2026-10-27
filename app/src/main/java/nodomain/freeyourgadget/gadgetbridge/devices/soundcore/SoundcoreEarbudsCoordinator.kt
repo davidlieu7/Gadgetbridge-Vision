@@ -26,6 +26,7 @@ import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.ListEn
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.components.getOverriddenFeatures
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.components.multipointPairing
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.components.overrideFeatures
+import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.components.volume
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.deviceSettings
 import nodomain.freeyourgadget.gadgetbridge.activities.multipoint.MultipointPairingActivity
 import nodomain.freeyourgadget.gadgetbridge.devices.AbstractBLClassicDeviceCoordinator
@@ -62,6 +63,7 @@ abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator(
         GamingMode,
         VoicePrompts,
         AudioBalance,
+        Volume,
         ColorfulLights,
         ButtonBrightness,
         LDAC,
@@ -294,6 +296,10 @@ abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator(
 
     open fun getAutoPowerOffMinutes(): Array<Int> = arrayOf(10, 20, 30, 60)
 
+    open fun getVolumeMax(): Int = 100
+
+    open fun supportsCustomEqualizerConfiguration(): Boolean = true
+
     open fun getEqualizerVolumeRange(): IntRange = -6..6
 
     open fun getSupportedEqualizerBands(): IntArray = intArrayOf(
@@ -491,12 +497,15 @@ abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator(
                 }
             }
 
-            if (has(arrayOf(Capability.AudioEqualizer, Capability.SurroundSound, Capability.GamingMode, Capability.LDAC, Capability.AudioBalance))) {
+            if (has(arrayOf(Capability.AudioEqualizer, Capability.SurroundSound, Capability.GamingMode, Capability.LDAC, Capability.AudioBalance, Capability.Volume))) {
                 screen(
                     key = "pref_soundcore_audio",
                     title = R.string.pref_header_audio,
                     icon = R.drawable.ic_music_note,
                 ) {
+                    if (has(Capability.Volume)) {
+                        volume(max = getVolumeMax(), defaultValue = (getVolumeMax() / 2).toInt())
+                    }
                     if (has(Capability.AudioBalance)) {
                         seekbar(
                             key = DeviceSettingsPreferenceConst.PREF_SOUNDCORE_AUDIO_BALANCE,
@@ -552,6 +561,7 @@ abstract class SoundcoreEarbudsCoordinator : AbstractBLClassicDeviceCoordinator(
                             )
                             screen(
                                 key = DeviceSettingsPreferenceConst.PREF_SOUNDCORE_EQUALIZER_CUSTOM,
+                                visibleWhen = { supportsCustomEqualizerConfiguration() },
                                 title = R.string.soundcore_equalizer_custom_title,
                                 summary = R.string.soundcore_equalizer_custom_summary,
                                 icon = R.drawable.ic_graphic_eq,

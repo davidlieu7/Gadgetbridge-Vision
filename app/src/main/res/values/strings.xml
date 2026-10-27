@@ -4287,6 +4287,10 @@
     <string name="haylou_s35_anc_eq_classic">Classic</string>
     <string name="haylou_s35_anc_eq_bass">Bass</string>
     <string name="soundcore_equalizer_preset">Preset</string>
+    <string name="soundcore_equalizer_preset_bass_off">Bass Off</string>
+    <string name="soundcore_equalizer_preset_heavy">Heavy</string>
+    <string name="soundcore_equalizer_preset_classic">Classic</string>
+    <string name="soundcore_equalizer_preset_original">Original</string>
     <string name="soundcore_equalizer_preset_signature">soundcore Signature</string>
     <string name="soundcore_equalizer_preset_xtra_bass">Xtra Bass</string>
     <string name="soundcore_equalizer_preset_voice">Voice</string>

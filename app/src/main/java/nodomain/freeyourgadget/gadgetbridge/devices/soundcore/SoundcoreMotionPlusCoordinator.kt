@@ -44,7 +44,24 @@ class SoundcoreMotionPlusCoordinator : SoundcoreEarbudsCoordinator() {
         Capability.VoicePrompts,
         Capability.AutoPowerOff,
         Capability.AudioEqualizer,
+        Capability.Volume,
     )
+
+    override fun getVolumeMax(): Int = 16
+
+    override fun getSupportedEqualizerBands(): IntArray = intArrayOf(
+        80, 150, 300, 500, 700, 1000, 5000, 8000, 12000,
+    )
+
+    override fun getCustomEqualizerPresetNames(): Array<Int> = arrayOf(
+        R.string.soundcore_equalizer_preset_bass_off,
+        R.string.soundcore_equalizer_preset_voice,
+        R.string.soundcore_equalizer_preset_heavy,
+        R.string.soundcore_equalizer_preset_classic,
+        R.string.soundcore_equalizer_preset_original,
+    )
+
+    override fun supportsCustomEqualizerConfiguration(): Boolean = false
 
     override fun createProtocol(device: GBDevice): SoundcoreMotionPlusProtocol =
         SoundcoreMotionPlusProtocol(device)
