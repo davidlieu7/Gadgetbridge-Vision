@@ -88,6 +88,7 @@ import nodomain.freeyourgadget.gadgetbridge.util.GBPrefs;
  */
 class DeviceReceiversManager {
     enum Feature {
+        PHONE_CALLS,
         WEATHER,
         DATA_FETCHING,
         CALENDAR,
@@ -104,6 +105,9 @@ class DeviceReceiversManager {
         }
 
         public void logicalOr(final DeviceCoordinator operand, final GBDevice device) {
+            if (operand.supportsPhoneCalls(device)) {
+                features.add(Feature.PHONE_CALLS);
+            }
             if (operand.supportsCalendarEvents(device)) {
                 features.add(Feature.CALENDAR);
             }
@@ -249,7 +253,7 @@ class DeviceReceiversManager {
         }
 
         if (enable) {
-            if (mPhoneCallReceiver == null) {
+            if (mPhoneCallReceiver == null && features.supports(Feature.PHONE_CALLS)) {
                 mPhoneCallReceiver = new PhoneCallReceiver();
                 IntentFilter filter = new IntentFilter();
                 filter.addAction("android.intent.action.PHONE_STATE");

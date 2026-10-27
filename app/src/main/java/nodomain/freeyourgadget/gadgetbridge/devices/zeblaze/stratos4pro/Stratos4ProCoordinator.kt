@@ -19,8 +19,6 @@ package nodomain.freeyourgadget.gadgetbridge.devices.zeblaze.stratos4pro
 import android.content.Context
 import android.net.Uri
 import android.os.Bundle
-import de.greenrobot.dao.AbstractDao
-import de.greenrobot.dao.Property
 import nodomain.freeyourgadget.gadgetbridge.R
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.DeviceSettingsSpec
 import nodomain.freeyourgadget.gadgetbridge.capabilities.HeartRateCapability
@@ -35,14 +33,7 @@ import nodomain.freeyourgadget.gadgetbridge.devices.TimeSampleProvider
 import nodomain.freeyourgadget.gadgetbridge.devices.cards.ActionCardItem
 import nodomain.freeyourgadget.gadgetbridge.devices.cards.DeviceCardItem
 import nodomain.freeyourgadget.gadgetbridge.entities.AbstractActivitySample
-import nodomain.freeyourgadget.gadgetbridge.entities.BaseActivitySummaryDao
 import nodomain.freeyourgadget.gadgetbridge.entities.DaoSession
-import nodomain.freeyourgadget.gadgetbridge.entities.GenericHeartRateSampleDao
-import nodomain.freeyourgadget.gadgetbridge.entities.GenericHrvValueSampleDao
-import nodomain.freeyourgadget.gadgetbridge.entities.GenericSleepStageSampleDao
-import nodomain.freeyourgadget.gadgetbridge.entities.GenericSpo2SampleDao
-import nodomain.freeyourgadget.gadgetbridge.entities.GenericStressSampleDao
-import nodomain.freeyourgadget.gadgetbridge.entities.Stratos4ProStepsSampleDao
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice
 import nodomain.freeyourgadget.gadgetbridge.model.HrvValueSample
 import nodomain.freeyourgadget.gadgetbridge.model.Spo2Sample
@@ -130,6 +121,12 @@ class Stratos4ProCoordinator : AbstractBLEDeviceCoordinator() {
     override fun supportsWeather(device: GBDevice): Boolean {
         return true
     }
+
+    override fun supportsAppNotifications(device: GBDevice): Boolean = true
+
+    override fun supportsPhoneCalls(device: GBDevice): Boolean = true
+
+    override fun supportsCallControl(device: GBDevice): Boolean = true
 
     override fun supportsDataFetching(device: GBDevice): Boolean {
         return true
@@ -245,20 +242,6 @@ class Stratos4ProCoordinator : AbstractBLEDeviceCoordinator() {
 
     override fun getCannedRepliesSlotCount(device: GBDevice): Int {
         return Stratos4ProSupport.CANNED_REPLY_SLOTS
-    }
-
-    override fun getAllDeviceDao(session: DaoSession): MutableMap<AbstractDao<*, *>, Property> {
-        return object : HashMap<AbstractDao<*, *>, Property>() {
-            init {
-                put(session.stratos4ProStepsSampleDao, Stratos4ProStepsSampleDao.Properties.DeviceId)
-                put(session.genericHeartRateSampleDao, GenericHeartRateSampleDao.Properties.DeviceId)
-                put(session.genericSleepStageSampleDao, GenericSleepStageSampleDao.Properties.DeviceId)
-                put(session.genericSpo2SampleDao, GenericSpo2SampleDao.Properties.DeviceId)
-                put(session.genericStressSampleDao, GenericStressSampleDao.Properties.DeviceId)
-                put(session.genericHrvValueSampleDao, GenericHrvValueSampleDao.Properties.DeviceId)
-                put(session.baseActivitySummaryDao, BaseActivitySummaryDao.Properties.DeviceId)
-            }
-        }
     }
 
     /**

@@ -419,7 +419,7 @@ public class SleepPeriodFragment extends SleepFragment<SleepPeriodFragment.MyCha
 
     @Override
     public String getTitle() {
-        if (GBApplication.getPrefs().getBoolean("charts_range", true)) {
+        if (GBApplication.getPrefs().getChartsRange() == ChartsRange.MONTH) {
             return getString(R.string.weeksleepchart_sleep_a_month);
         } else {
             return getString(R.string.weeksleepchart_sleep_a_week);
@@ -568,11 +568,7 @@ public class SleepPeriodFragment extends SleepFragment<SleepPeriodFragment.MyCha
     }
 
     private int getRangeDays() {
-        if (GBApplication.getPrefs().getBoolean("charts_range", true)) {
-            return 30;
-        } else {
-            return 7;
-        }
+        return GBApplication.getPrefs().getChartsRange().getDays();
     }
 
     protected static class WeekChartsData {

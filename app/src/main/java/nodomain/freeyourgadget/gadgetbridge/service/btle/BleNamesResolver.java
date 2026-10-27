@@ -252,6 +252,43 @@ public class BleNamesResolver {
         }
     }
 
+    /// Name for the status of {@code onConnectionStateChange}. For a disconnect
+    /// that is a link-layer reason (tGATT_DISCONN_REASON in gatt_api.h), not a
+    /// GATT operation status: 8 is a supervision timeout here, while
+    /// {@link #getStatusString} would call it GATT_INSUFFICIENT_AUTHORIZATION.
+    public static String getConnectionStatusString(int status) {
+        switch (status) {
+            case 0x00:
+                return "GATT_SUCCESS";
+            case 0x01:
+                return "GATT_CONN_L2C_FAILURE";
+            case 0x05:
+                return "GATT_CONN_AUTH_FAILURE";
+            case 0x06:
+                return "GATT_CONN_KEY_MISSING";
+            case 0x08:
+                return "GATT_CONN_TIMEOUT";
+            case 0x13:
+                return "GATT_CONN_TERMINATE_PEER_USER";
+            case 0x16:
+                return "GATT_CONN_TERMINATE_LOCAL_HOST";
+            case 0x22:
+                return "GATT_CONN_LMP_TIMEOUT";
+            case 0x3D:
+                return "GATT_CONN_MIC_FAILURE";
+            case 0x3E:
+                return "GATT_CONN_FAILED_ESTABLISHMENT";
+            case 0x85:
+                return "GATT_ERROR";
+            case 0x93:
+                return "GATT_CONNECTION_TIMEOUT";
+            case 0x100:
+                return "GATT_CONN_CANCEL";
+            default:
+                return "conn_status_" + status;
+        }
+    }
+
     /// lookup description for numeric {@link android.bluetooth.BluetoothStatusCodes}
     public static String getBluetoothStatusString(int status) {
         // many of the values in BluetoothStatusCodes aren't accessible due to @SystemApi

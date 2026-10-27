@@ -70,6 +70,7 @@ import androidx.preference.SwitchPreferenceCompat;
 
 import com.bytehamster.lib.preferencesearch.SearchConfiguration;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
+import com.mobeta.android.dslv.DragSortListPreference;
 
 import org.apache.commons.lang3.ArrayUtils;
 import org.slf4j.Logger;
@@ -94,6 +95,7 @@ import nodomain.freeyourgadget.gadgetbridge.activities.workouts.templates.Workou
 import nodomain.freeyourgadget.gadgetbridge.activities.NotificationsAppIconUploadActivity;
 import nodomain.freeyourgadget.gadgetbridge.activities.app_specific_notifications.AppSpecificNotificationSettingsActivity;
 import nodomain.freeyourgadget.gadgetbridge.activities.audiorecordings.AudioRecordingsActivity;
+import nodomain.freeyourgadget.gadgetbridge.activities.charts.ChartsTabsPreference;
 import nodomain.freeyourgadget.gadgetbridge.activities.files.FtpFileBrowserActivity;
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.DeviceSetting;
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.DeviceSettingRenderer;
@@ -377,11 +379,12 @@ public class DeviceSpecificSettingsFragment extends AbstractPreferenceFragment i
         for (final DeviceSpecificSettingsScreen value : DeviceSpecificSettingsScreen.values()) {
             final PreferenceScreen prefScreen = findPreference(value.getKey());
             if (prefScreen != null) {
-                if (modelSpec != null && modelSpec.findScreen(value.getKey()) != null) {
+                if (modelSpec != null && modelSpec.findScreen(value.getKey()) != null && prefScreen.getPreferenceCount() > 0) {
                     // This screen is a model ScreenSetting rendered in-memory by
                     // DeviceSettingRenderer; it already navigates via the default nested
                     // PreferenceScreen click handling, so wiring this listener too would push a
-                    // second, redundant navigation onto the back stack.
+                    // second, redundant navigation onto the back stack. The default handling
+                    // ignores a screen without children, such as one with only xml sub-screens.
                     continue;
                 }
                 prefScreen.setOnPreferenceClickListener(p -> {
@@ -856,6 +859,7 @@ public class DeviceSpecificSettingsFragment extends AbstractPreferenceFragment i
         addPreferenceHandlerFor(PREF_HEARTRATE_SLEEP_RESPIRATORY_RATE_MONITORING);
         addPreferenceHandlerFor(PREF_HEARTRATE_ALERT_IRREGULAR_RHYTHM);
         addPreferenceHandlerFor(PREF_SPO2_ALL_DAY_MONITORING);
+        addPreferenceHandlerFor(PREF_SPO2_MONITORING_MODE);
         addPreferenceHandlerFor(PREF_SPO2_MEASUREMENT_INTERVAL);
         addPreferenceHandlerFor(PREF_SPO2_MEASUREMENT_TIME);
         addPreferenceHandlerFor(PREF_SPO2_MEASUREMENT_START);
@@ -1675,7 +1679,10 @@ public class DeviceSpecificSettingsFragment extends AbstractPreferenceFragment i
         final Preference activityInDeviceSteps = findPreference(PREFS_ACTIVITY_IN_DEVICE_CARD_STEPS);
         final Preference activityInDeviceSleep = findPreference(PREFS_ACTIVITY_IN_DEVICE_CARD_SLEEP);
         final Preference activityInDeviceDistance = findPreference(PREFS_ACTIVITY_IN_DEVICE_CARD_DISTANCE);
-        final Preference chartsTabsOrderSelection = findPreference(PREFS_DEVICE_CHARTS_TABS);
+        final DragSortListPreference chartsTabsOrderSelection = findPreference(PREFS_DEVICE_CHARTS_TABS);
+        if (chartsTabsOrderSelection != null) {
+            ChartsTabsPreference.setup(chartsTabsOrderSelection, device);
+        }
 
         Preference.OnPreferenceClickListener sendIntentRefreshDeviceListListener = new Preference.OnPreferenceClickListener() {
             @Override
@@ -1691,7 +1698,6 @@ public class DeviceSpecificSettingsFragment extends AbstractPreferenceFragment i
                 activityInDeviceSteps,
                 activityInDeviceSleep,
                 activityInDeviceDistance,
-                chartsTabsOrderSelection,
         };
 
         for (Preference preferenceInControlCenter : preferencesInControlCenter) {
@@ -1882,6 +1888,13 @@ public class DeviceSpecificSettingsFragment extends AbstractPreferenceFragment i
                 deviceSpecificSettings.addRootScreen(
                         DeviceSpecificSettingsScreen.ACTIVITY_INFO,
                         R.xml.devicesettings_chartstabs
+                );
+            }
+
+            if (coordinator.supportsRecordedActivities(device)) {
+                deviceSpecificSettings.addRootScreen(
+                        DeviceSpecificSettingsScreen.WORKOUT,
+                        R.xml.devicesettings_elevation_correction
                 );
             }
 

@@ -280,6 +280,7 @@ import nodomain.freeyourgadget.gadgetbridge.devices.gloryfit.watches.D3Coordinat
 import nodomain.freeyourgadget.gadgetbridge.devices.gloryfit.watches.DotnP66DCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.gloryfit.watches.GrvFc1Coordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.gloryfit.watches.HaylouWatch2ProCoordinator;
+import nodomain.freeyourgadget.gadgetbridge.devices.gloryfit.watches.HiFutureZone2Coordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.gloryfit.watches.ImikiFrame2Coordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.gloryfit.watches.KieslectCallingSmartwatchKrProCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.gloryfit.watches.OukitelBT103Coordinator;
@@ -300,6 +301,7 @@ import nodomain.freeyourgadget.gadgetbridge.devices.huawei.huaweiwatchgt7.Huawei
 import nodomain.freeyourgadget.gadgetbridge.devices.moyoung.C20ProCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.moyoung.ColmiP81Coordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.moyoung.FireBoltt069Coordinator;
+import nodomain.freeyourgadget.gadgetbridge.devices.moyoung.FireBolttNinjaPhantomCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.moyoung.GarettEvaCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.haylou.HaylouS35AncCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.hplus.EXRIZUK8Coordinator;
@@ -416,6 +418,7 @@ import nodomain.freeyourgadget.gadgetbridge.devices.huawei.huaweiwatch3.HuaweiWa
 import nodomain.freeyourgadget.gadgetbridge.devices.huawei.huaweiwatch4pro.HuaweiWatch4ProCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.huawei.huaweiwatch5.HuaweiWatch5Coordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.huawei.huaweiwatchd2.HuaweiWatchD2Coordinator;
+import nodomain.freeyourgadget.gadgetbridge.devices.huawei.huaweiwatchd3.HuaweiWatchD3Coordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.huawei.huaweiwatchfit.HuaweiWatchFitCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.huawei.huaweiwatchfit2.HuaweiWatchFit2Coordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.huawei.huaweiwatchfit3.HuaweiWatchFit3Coordinator;
@@ -436,6 +439,7 @@ import nodomain.freeyourgadget.gadgetbridge.devices.huawei.huaweiwatchultimate.H
 import nodomain.freeyourgadget.gadgetbridge.devices.huawei.huaweiwatchultimate2.HuaweiWatchUltimate2Coordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.id115.ID115Coordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.idasen.IdasenCoordinator;
+import nodomain.freeyourgadget.gadgetbridge.devices.igpsport.IGPSportBSC100MaxCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.igpsport.IGPSportBSC200Coordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.igpsport.IGPSportBSC200SCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.igpsport.IGPSportBSC300Coordinator;
@@ -470,6 +474,7 @@ import nodomain.freeyourgadget.gadgetbridge.devices.mijia_lywsd.MijiaMhoC303Coor
 import nodomain.freeyourgadget.gadgetbridge.devices.mijia_lywsd.MijiaXmwsdj04Coordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.miscale.MiCompositionScaleCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.miscale.MiSmartScaleCoordinator;
+import nodomain.freeyourgadget.gadgetbridge.devices.moyoung.KW19BCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.onebyone.OneByoneScaleCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.moondrop.MoondropSpaceTravel2Coordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.moondrop.MoondropSpaceTravel2UltraCoordinator;
@@ -576,6 +581,21 @@ import nodomain.freeyourgadget.gadgetbridge.devices.sony.reonpocket.SonyReonPock
 import nodomain.freeyourgadget.gadgetbridge.devices.sony.wena3.SonyWena3Coordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.sonyswr12.SonySWR12DeviceCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.soundbrenner.SoundbrennerCoordinator;
+import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreP42iCoordinator;
+import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreP41iCoordinator;
+import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreP40iCoordinator;
+import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreP31iCoordinator;
+import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreP3Coordinator;
+import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreA1Coordinator;
+import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreP2Coordinator;
+import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreP2iCoordinator;
+import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreP2MiniCoordinator;
+import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreA2NCCoordinator;
+import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreA3iCoordinator;
+import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreP3iCoordinator;
+import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreK20iCoordinator;
+import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreP30iCoordinator;
+import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreP20iCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreA30iCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreAeroFit2Coordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreLiberty3ProCoordinator;
@@ -584,10 +604,12 @@ import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreLifeTuneC
 import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreLifeTuneXRCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreMotion300Coordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreQ30Coordinator;
+import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreSpaceOneCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreSportX20Coordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.soundcore.SoundcoreV20iCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.supercars.SuperCarsCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.test.TestDeviceCoordinator;
+import nodomain.freeyourgadget.gadgetbridge.devices.teufel.TeufelMyndCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.thermalprinter.ThermalPrinterCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.tlw64.TLW64Coordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.ultrahuman.UltrahumanDeviceCoordinator;
@@ -633,6 +655,7 @@ import nodomain.freeyourgadget.gadgetbridge.devices.xiaomi.watches.XiaomiWatchS1
 import nodomain.freeyourgadget.gadgetbridge.devices.xiaomi.watches.XiaomiWatchS1ProCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.xiaomi.watches.XiaomiWatchS3Coordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.xiaomi.watches.XiaomiWatchS4Coordinator;
+import nodomain.freeyourgadget.gadgetbridge.devices.xiaomi.watches.XiaomiWatchS5Coordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.xiaomi_hipee.XiaomiHipeeP1Coordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.xiaomi_scooters.XiaomiScooter5MaxCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.zeblaze.Beyond3ProCoordinator;
@@ -743,6 +766,7 @@ public enum DeviceType {
     XIAOMI_WATCH_S1(XiaomiWatchS1Coordinator.class),
     XIAOMI_WATCH_S3(XiaomiWatchS3Coordinator.class),
     XIAOMI_WATCH_S4(XiaomiWatchS4Coordinator.class),
+    XIAOMI_WATCH_S5(XiaomiWatchS5Coordinator.class),
     XIAOMI_WATCH_5(XiaomiWatch5Coordinator.class),
     AMAZFITGTS3(AmazfitGTS3Coordinator.class),
     AMAZFITGTR3(AmazfitGTR3Coordinator.class),
@@ -1093,12 +1117,28 @@ public enum DeviceType {
     SOUNDCORE_LIBERTY4_NC(SoundcoreLiberty4NCCoordinator.class),
     SOUNDCORE_MOTION300(SoundcoreMotion300Coordinator.class),
     SOUNDCORE_Q30(SoundcoreQ30Coordinator.class),
+    SOUNDCORE_SPACE_ONE(SoundcoreSpaceOneCoordinator.class),
     SOUNDCORE_LIFE_TUNE(SoundcoreLifeTuneCoordinator.class),
     SOUNDCORE_LIFE_TUNE_XR(SoundcoreLifeTuneXRCoordinator.class),
     SOUNDCORE_AEROFIT2(SoundcoreAeroFit2Coordinator.class),
     SOUNDCORE_SPORT_X20(SoundcoreSportX20Coordinator.class),
-    SOUNDCORE_V20I(SoundcoreV20iCoordinator.class),
+    SOUNDCORE_A1(SoundcoreA1Coordinator.class),
+    SOUNDCORE_A2_NC(SoundcoreA2NCCoordinator.class),
+    SOUNDCORE_A3I(SoundcoreA3iCoordinator.class),
     SOUNDCORE_A30I(SoundcoreA30iCoordinator.class),
+    SOUNDCORE_K20I(SoundcoreK20iCoordinator.class),
+    SOUNDCORE_P2(SoundcoreP2Coordinator.class),
+    SOUNDCORE_P2I(SoundcoreP2iCoordinator.class),
+    SOUNDCORE_P2_MINI(SoundcoreP2MiniCoordinator.class),
+    SOUNDCORE_P3(SoundcoreP3Coordinator.class),
+    SOUNDCORE_P3I(SoundcoreP3iCoordinator.class),
+    SOUNDCORE_P20I(SoundcoreP20iCoordinator.class),
+    SOUNDCORE_P30I(SoundcoreP30iCoordinator.class),
+    SOUNDCORE_P31I(SoundcoreP31iCoordinator.class),
+    SOUNDCORE_P40I(SoundcoreP40iCoordinator.class),
+    SOUNDCORE_P41I(SoundcoreP41iCoordinator.class),
+    SOUNDCORE_P42I(SoundcoreP42iCoordinator.class),
+    SOUNDCORE_V20I(SoundcoreV20iCoordinator.class),
     HAYLOU_S35_ANC(HaylouS35AncCoordinator.class),
     MOONDROP_SPACE_TRAVEL(MoondropSpaceTravelCoordinator.class),
     MOONDROP_SPACE_TRAVEL_2(MoondropSpaceTravel2Coordinator.class),
@@ -1137,6 +1177,7 @@ public enum DeviceType {
     HONORWATCHGS3(HonorWatchGS3Coordinator.class),
     HONORWATCHGSPRO(HonorWatchGSProCoordinator.class),
     HUAWEIWATCHD2(HuaweiWatchD2Coordinator.class),
+    HUAWEIWATCHD3(HuaweiWatchD3Coordinator.class),
     HUAWEIWATCHGT3(HuaweiWatchGT3Coordinator.class),
     HUAWEIWATCHGT4(HuaweiWatchGT4Coordinator.class),
     HUAWEIWATCHGT5(HuaweiWatchGT5Coordinator.class),
@@ -1188,6 +1229,7 @@ public enum DeviceType {
     KIESLECT_CALLING_SMARTWATCH_KR_PRO(KieslectCallingSmartwatchKrProCoordinator.class),
     HAYLOU_WATCH_2_PRO(HaylouWatch2ProCoordinator.class),
     S52(S52Coordinator.class),
+    HIFUTURE_ZONE2(HiFutureZone2Coordinator.class),
     D3(D3Coordinator.class),
     Y6(Y6Coordinator.class),
     Y66(Y66Coordinator.class),
@@ -1238,11 +1280,13 @@ public enum DeviceType {
     C20PRO(C20ProCoordinator.class),
     L70(L70Coordinator.class),
     HC96(HC96Coordinator.class),
+    KW19_B(KW19BCoordinator.class),
     KT80(KT80Coordinator.class),
     ITECH_ACTIVE_3(ITechActive3Coordinator.class),
     KSIX_VENTURE(KsixVentureCoordinator.class),
     FIREBOLTT_069(FireBoltt069Coordinator.class),
     FIREBOLTT_TALK(FireBolttTalkCoordinator.class),
+    FIREBOLTT_NINJA_PHANTOM(FireBolttNinjaPhantomCoordinator.class),
     VIRAN_C29(ViranC29Coordinator.class),
     ZL02D(ZL02DCoordinator.class),
     R50PRO(R50ProCoordinator.class),
@@ -1275,6 +1319,8 @@ public enum DeviceType {
     SILVERCREST_SBM_67(SilverCrestSBM67Coordinator.class),
     BEURER_BM_69(BeurerBm69Coordinator.class),
     BRAUN_BPW4500(BraunBPW4500DeviceCoordinator.class),
+    TEUFEL_MYND(TeufelMyndCoordinator.class),
+    IGPSPORT_BSC100MAX(IGPSportBSC100MaxCoordinator.class),
     IGPSPORT_BSC200(IGPSportBSC200Coordinator.class),
     IGPSPORT_BSC200S(IGPSportBSC200SCoordinator.class),
     IGPSPORT_BSC300(IGPSportBSC300Coordinator.class),

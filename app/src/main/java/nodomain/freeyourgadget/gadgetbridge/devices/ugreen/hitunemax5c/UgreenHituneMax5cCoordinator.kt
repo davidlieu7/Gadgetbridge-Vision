@@ -144,6 +144,12 @@ open class UgreenHituneMax5cCoordinator : AbstractBLClassicDeviceCoordinator() {
         return listOf(DEVICE_CARD_ACTION_ANC, DEVICE_CARD_ACTION_EQ)
     }
 
+    override fun supportsAppNotifications(device: GBDevice): Boolean = true
+
+    override fun supportsPhoneCalls(device: GBDevice): Boolean = true
+
+    override fun supportsCallControl(device: GBDevice): Boolean = true
+
     companion object {
         private val DEVICE_CARD_ACTION_ANC = deviceCardAction {
             id = "ugreen_anc"

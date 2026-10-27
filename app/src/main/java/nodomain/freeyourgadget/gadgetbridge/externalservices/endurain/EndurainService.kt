@@ -39,11 +39,12 @@ object EndurainService : ExternalService {
     override val authStyle = AuthStyle.LOGIN
 
     /**
-     * Version the server reported when it was last asked, for the settings summary. Kept here
-     * rather than on a screen so it survives the screen being closed and reopened.
+     * Version the server reported when it was last asked, and that server's address, for the
+     * settings summary. Kept here rather than on a screen so it survives the screen being closed
+     * and reopened.
      */
     @Volatile
-    var serverVersion: String? = null
+    private var serverVersion: Pair<String, String>? = null
 
     override fun isLoggedIn(context: Context) =
         serverUrl() != null && EndurainTokenManager(context).isLoggedIn()
@@ -60,7 +61,9 @@ object EndurainService : ExternalService {
         } else {
             context.getString(R.string.service_not_logged_in)
         }
-        serverVersion?.let { summary += context.getString(R.string.service_server_version, it) }
+        serverVersion?.takeIf { it.first == server }?.let {
+            summary += context.getString(R.string.service_server_version, it.second)
+        }
         return summary
     }
 
@@ -73,7 +76,7 @@ object EndurainService : ExternalService {
         }
         Thread {
             serverVersion = try {
-                EndurainApiClient(server, tokenManager).fetchVersion()
+                EndurainApiClient(server, tokenManager).fetchVersion()?.let { server to it }
             } catch (e: Exception) {
                 LOG.error("Fetching the Endurain server version failed", e)
                 null

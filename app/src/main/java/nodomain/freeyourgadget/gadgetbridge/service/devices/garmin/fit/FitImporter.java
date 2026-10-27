@@ -175,7 +175,7 @@ public class FitImporter {
     public FitImporter(final Context context, final GBDevice gbDevice) {
         this.context = context;
         this.gbDevice = gbDevice;
-        this.workoutParser = new GarminWorkoutParser(context);
+        this.workoutParser = new GarminWorkoutParser(context, gbDevice);
     }
 
     /**

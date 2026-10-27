@@ -22,6 +22,7 @@ public class BluetoothNameTest extends TestBase {
             put("AndroidAuto-AAW12345abc", DeviceType.AAWIRELESS);
             put("1MORE SonoFlow", DeviceType.ONEMORE_SONOFLOW); // #6803
             put("1MORE SonoFlow SE", DeviceType.ONEMORE_SONOFLOW_SE); // #6803
+            put("BSC 100Max", DeviceType.IGPSPORT_BSC100MAX); // #7168
             put("UGREEN HiTune Max5c", DeviceType.UGREEN_HITUNE_MAX_5C);
             put("UGREEN HiTune Max 5c", DeviceType.UGREEN_HITUNE_MAX_5C);
             put("Active 2 NFC (Round)", DeviceType.AMAZFITACTIVE2NFC);
@@ -43,11 +44,29 @@ public class BluetoothNameTest extends TestBase {
             put("CMF Buds 2", DeviceType.NOTHING_CMF_BUDS_2); // #5579
             put("CMF Buds 2a", DeviceType.NOTHING_CMF_BUDS_2A); // #6028
             put("HC96", DeviceType.HC96);
+            put("KW19-B", DeviceType.KW19_B); // #7092
             put("FireBoltt 069", DeviceType.FIREBOLTT_069);
+            put("FB BGS001", DeviceType.FIREBOLTT_NINJA_PHANTOM);
+            put("soundcore A1", DeviceType.SOUNDCORE_A1); // #7006
+            put("soundcore A2 NC", DeviceType.SOUNDCORE_A2_NC); // #7006
+            put("soundcore A3i", DeviceType.SOUNDCORE_A3I); // #7006
+            put("soundcore K20i", DeviceType.SOUNDCORE_K20I); // #7006
+            put("soundcore P42i", DeviceType.SOUNDCORE_P42I); // #7006
+            put("soundcore P41i", DeviceType.SOUNDCORE_P41I); // #7006
+            put("soundcore P40i", DeviceType.SOUNDCORE_P40I); // #7006
+            put("soundcore P31i", DeviceType.SOUNDCORE_P31I); // #7006
+            put("soundcore P3i", DeviceType.SOUNDCORE_P3I); // #7006
+            put("soundcore P30i", DeviceType.SOUNDCORE_P30I); // #7006
+            put("soundcore P20i", DeviceType.SOUNDCORE_P20I); // #7006
+            put("soundcore P3", DeviceType.SOUNDCORE_P3); // #7006
+            put("soundcore P2", DeviceType.SOUNDCORE_P2); // #7006
+            put("soundcore P2i", DeviceType.SOUNDCORE_P2I); // #7006
+            put("soundcore P2 Mini", DeviceType.SOUNDCORE_P2_MINI); // #7006
             put("soundcore V20i", DeviceType.SOUNDCORE_V20I); // #4644
             put("Soundcore Q30", DeviceType.SOUNDCORE_Q30); // #4316
             put("soundcore Q30", DeviceType.SOUNDCORE_Q30); // #6371
             put("soundcore  Q30", DeviceType.SOUNDCORE_Q30); // #6371 - unsure
+            put("soundcore Space One", DeviceType.SOUNDCORE_SPACE_ONE); // #7176
             put("Alt Vibe", DeviceType.ALT_VIBE); // #6575
             put("P8", DeviceType.WASPOS); // from wasp-os source
             put("P8DFU", DeviceType.WASPOS); // from wasp-os source
@@ -69,11 +88,16 @@ public class BluetoothNameTest extends TestBase {
             put("IMIKI FRAME 2", DeviceType.IMIKI_FRAME_2);
             put("Watch Kr Pro-4DBC", DeviceType.KIESLECT_CALLING_SMARTWATCH_KR_PRO);
             put("HAYLOU Watch 2 Pro", DeviceType.HAYLOU_WATCH_2_PRO);
+            put("MYND", DeviceType.TEUFEL_MYND); // #5743 docs
             put("Y6(ID-28A8)", DeviceType.Y6); // #3949
             put("Y66(ID-AB01)", DeviceType.Y66);
             put("T70(ID-AB01)", DeviceType.T70); // #7070
             put("T70 (ID-AB01)", DeviceType.T70); // #7070
             put("D3(ID-417F)", DeviceType.D3);
+            put("Zone 2 (ID-1361)", DeviceType.HIFUTURE_ZONE2); // #7182
+            put("ZONE 2 (ID-1361)", DeviceType.HIFUTURE_ZONE2); // #7182
+            put("Zone 2(ID-1361)", DeviceType.HIFUTURE_ZONE2); // #7182
+            put("ZONE 2(ID-1361)", DeviceType.HIFUTURE_ZONE2); // #7182
             put("R3Max(ID-FC45)", DeviceType.BLACKVIEW_R3MAX); // matrix
             put("S10", DeviceType.QECNATO_S10);
             put("S52", DeviceType.S52);
@@ -112,6 +136,7 @@ public class BluetoothNameTest extends TestBase {
             put("Active 2 NFC (Round)-4B84", DeviceType.AMAZFITACTIVE2NFC);
             put("Redmi Buds 6", DeviceType.REDMIBUDS6); // #6061
             put("Redmi Buds 6 Pro", DeviceType.REDMIBUDS6PRO);
+            put("Xiaomi Watch S5 46mm AB01", DeviceType.XIAOMI_WATCH_S5); // #7197
             put("Xiaomi Watch S4 AB01", DeviceType.XIAOMI_WATCH_S4);
             put("Xiaomi Watch 5 AB01", DeviceType.XIAOMI_WATCH_5); // #6614
             put("Xiaomi Watch 5 belonging to Owner", DeviceType.XIAOMI_WATCH_5); // #6614, Wear OS renames it

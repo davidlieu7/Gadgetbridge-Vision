@@ -64,7 +64,7 @@ internal data class BarLayout(val width: Float, val gap: Float) {
  * Builds MPAndroidChart data from a [ChartSpec]. Entry data holds the original x, since grouped bars are offset.
  */
 internal object ChartDataBuilder {
-    const val LINE_WIDTH_DP = 2f
+    const val LINE_WIDTH_DP = 1.75f
     private const val POINT_RADIUS_DP = 3.5f
     private const val AREA_FILL_ALPHA = 0.45f
     private const val MAX_CANDLE_SPACE = 0.45f
