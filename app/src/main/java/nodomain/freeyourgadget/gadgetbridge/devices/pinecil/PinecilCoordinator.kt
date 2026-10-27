@@ -45,7 +45,7 @@ class PinecilCoordinator : AbstractBLEDeviceCoordinator() {
 
     override fun getDeviceNameResource(): Int = R.string.devicetype_pinecil
 
-    override fun getDefaultIconResource(): Int = R.drawable.ic_device_unknown
+    override fun getDefaultIconResource(): Int = R.drawable.ic_device_pinecilv2
 
     override fun getDeviceKind(device: GBDevice): DeviceCoordinator.DeviceKind =
         DeviceCoordinator.DeviceKind.UNKNOWN
