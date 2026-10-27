@@ -9,7 +9,6 @@ import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSpec
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.DeviceSettingsSpec
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.Language
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.components.languages
-import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.components.screen
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.deviceSettings
 import nodomain.freeyourgadget.gadgetbridge.activities.loyaltycards.LoyaltyCardsSettingsActivity
 import nodomain.freeyourgadget.gadgetbridge.activities.loyaltycards.LoyaltyCardsSettingsConst
@@ -45,17 +44,13 @@ fun testDeviceSettings(device: GBDevice, coordinator: TestDeviceCoordinator): De
     languages(Language.AUTO, Language.EN_US)
 
     if (coordinator.worldClocksSlotCount > 0) {
-        screen(
-            DeviceSpecificSettingsScreen.DATE_TIME,
-            icon = R.drawable.ic_timer,
+        DeviceSpecificSettingsScreen.DATE_TIME.screen(
             xmlSubScreens = listOf(R.xml.devicesettings_world_clocks),
         ) {}
     }
 
     if (coordinator.getContactsSlotCount(device) > 0) {
-        screen(
-            DeviceSpecificSettingsScreen.CALLS_AND_NOTIFICATIONS,
-            icon = R.drawable.ic_notifications,
+        DeviceSpecificSettingsScreen.CALLS_AND_NOTIFICATIONS.screen (
             xmlSubScreens = listOf(R.xml.devicesettings_contacts),
         ) {}
     }
@@ -69,7 +64,7 @@ fun testDeviceSettings(device: GBDevice, coordinator: TestDeviceCoordinator): De
         )
     }
 
-    screen(DeviceSpecificSettingsScreen.DEVELOPER, icon = R.drawable.ic_developer_mode) {
+    DeviceSpecificSettingsScreen.DEVELOPER.screen {
         action(
             key = "pref_developer_add_test_activities",
             title = R.string.pref_developer_add_test_activities_title,

@@ -86,6 +86,7 @@ import nodomain.freeyourgadget.gadgetbridge.model.WorkoutLoadSample;
 import nodomain.freeyourgadget.gadgetbridge.model.heartratezones.HeartRateZonesSpec;
 import nodomain.freeyourgadget.gadgetbridge.service.DeviceSupport;
 import nodomain.freeyourgadget.gadgetbridge.service.ServiceDeviceSupport;
+import nodomain.freeyourgadget.gadgetbridge.vendorimport.VendorDataImporter;
 import nodomain.freeyourgadget.gadgetbridge.widgets.DeviceWidgetsProvider;
 
 /**
@@ -237,7 +238,9 @@ public interface DeviceCoordinator {
      * given device.
      * @throws GBException
      */
-    void deleteDevice(@NonNull final GBDevice device, boolean deleteFiles) throws GBException;
+    void deleteDevice(@NonNull final GBDevice device,
+                      boolean deleteFiles,
+                      @Nullable final DeviceDeletionProgress progress) throws GBException;
 
     /**
      * Returns the Activity class to be started in order to perform a pairing of a
@@ -1063,6 +1066,14 @@ public interface DeviceCoordinator {
     }
 
     /**
+     * An importer for data exports of the vendor app, null if not supported for this device.
+     */
+    @Nullable
+    default VendorDataImporter getVendorDataImporter(@NonNull final GBDevice device) {
+        return null;
+    }
+
+    /**
      * The workout template capabilities of this device: sports, step types, durations, targets
      * and fields.
      */
@@ -1139,7 +1150,22 @@ public interface DeviceCoordinator {
 
     boolean supportsNavigation(@NonNull final GBDevice device);
 
-    boolean supportsNotifications(@NonNull final GBDevice device);
+    boolean supportsAppNotifications(@NonNull final GBDevice device);
+
+    /**
+     * Returns true if the device supports receiving phone call notifications.
+     */
+    boolean supportsPhoneCalls(@NonNull final GBDevice device);
+
+    /**
+     * Returns true if the device supports controlling calls on the phone (accept/reject/end).
+     */
+    boolean supportsCallControl(@NonNull final GBDevice device);
+
+    /**
+     * Returns true if the device has features that need network access from the phone.
+     */
+    boolean supportsInternetAccess(@NonNull final GBDevice device);
 
     int getOrderPriority();
 

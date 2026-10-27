@@ -94,7 +94,7 @@ object WorkoutBatchExporter {
                 if (Part.GPX in parts && WorkoutUploader.summaryHasTrack(summary)) {
                     add("$base.gpx") {
                         val provider = gbDevice.deviceCoordinator.getActivityTrackProvider(gbDevice, context)
-                        ActivitySummaryUtils.getShareableGpxFile(provider, summary)
+                        ActivitySummaryUtils.getShareableGpxFile(provider, gbDevice, summary)
                     }
                 }
                 if (Part.RAW in parts) {

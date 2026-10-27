@@ -1,6 +1,7 @@
 package nodomain.freeyourgadget.gadgetbridge.service.devices.garmin;
 
 import static nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsPreferenceConst.PREF_SYNC_CALENDAR;
+import static nodomain.freeyourgadget.gadgetbridge.devices.garmin.GarminPreferences.PREF_GARMIN_EXPLORE_SYNC;
 
 import android.bluetooth.BluetoothAdapter;
 import android.content.Context;
@@ -71,7 +72,8 @@ public class ProtocolBufferHandler implements MessageHandler {
     private static final Logger LOG = LoggerFactory.getLogger(ProtocolBufferHandler.class);
     private final GarminSupport deviceSupport;
     private final Map<Integer, ProtobufFragment> chunkedFragmentsMap;
-    private final int maxChunkSize = 375; //tested on Vívomove Style
+    private final Map<Integer, GdiDataTransfer.FileAccessItemResponse> fileAccessResponsesByRequestId = new HashMap<>();
+    private int maxChunkSize = 375; //tested on Vívomove Style
     private int lastProtobufRequestId;
     private final AppConfigHandler appConfigHandler;
     private HttpHandler httpHandler;
@@ -145,6 +147,18 @@ public class ProtocolBufferHandler implements MessageHandler {
                 }
                 processed = true;
                 // Response will be async
+            }
+            if (smart.hasDataTransferService() && smart.getDataTransferService().hasFileAccessItemRequest()) {
+                final GdiDataTransfer.FileAccessItemResponse response = dataTransferHandler.handleFileAccessItemRequest(
+                        smart.getDataTransferService().getFileAccessItemRequest()
+                );
+                if (response.getStatus() == GdiDataTransfer.FileAccessItemResponse.Status.OK) {
+                    // The data will be pushed after the watch acknowledges this response
+                    fileAccessResponsesByRequestId.put(message.getRequestId(), response);
+                }
+                return prepareProtobufResponse(Smart.newBuilder().setDataTransferService(
+                        GdiDataTransfer.DataTransferService.newBuilder().setFileAccessItemResponse(response)
+                ).build(), message.getRequestId());
             }
             if (smart.hasDataTransferService()) {
                 final GdiDataTransfer.DataTransferService response = dataTransferHandler.handle(smart.getDataTransferService(), message.getRequestId());
@@ -249,7 +263,7 @@ public class ProtocolBufferHandler implements MessageHandler {
                 processed = pushNotificationHandler.handle(smart.getDeviceMessageService());
             }
             if (smart.hasExploreSyncService()) {
-                if (deviceSupport.getDevicePrefs().getBoolean("garmin_exploresync", false)) {
+                if (deviceSupport.getDevicePrefs().getBoolean(PREF_GARMIN_EXPLORE_SYNC, false)) {
                     processed = true;
                     final GdiExploreSync.ExploreSyncService response = exploreSyncHandler.handle(smart.getExploreSyncService());
                     if (response != null) {
@@ -287,6 +301,11 @@ public class ProtocolBufferHandler implements MessageHandler {
         //TODO: check status and react accordingly, right now we blindly proceed to next chunk
         if (statusMessage.isOK()) {
             DataTransferHandler.onDataChunkSuccessfullyReceived(statusMessage.getRequestId());
+
+            final GdiDataTransfer.FileAccessItemResponse fileAccess = fileAccessResponsesByRequestId.remove(statusMessage.getRequestId());
+            if (fileAccess != null) {
+                deviceSupport.pushDataXferItem(fileAccess);
+            }
 
             if (chunkedFragmentsMap.containsKey(statusMessage.getRequestId())) {
                 final ProtobufFragment protobufFragment = chunkedFragmentsMap.get(statusMessage.getRequestId());
@@ -661,6 +680,12 @@ public class ProtocolBufferHandler implements MessageHandler {
             return null;
         final int requestId = getNextProtobufRequestId();
         return prepareProtobufMessage(protobufPayload.toByteArray(), GFDIMessage.GarminMessage.PROTOBUF_REQUEST, requestId);
+    }
+
+    public void setMaxPacketSize(final int maxPacketSize) {
+        // 20 = 18 bytes for ProtobufMessage header + 2 bytes for CRC
+        maxChunkSize = maxPacketSize - 20;
+        LOG.debug("Protobuf max chunk size: {}", maxChunkSize);
     }
 
     public ProtobufMessage prepareProtobufResponse(Smart protobufPayload, int requestId) {

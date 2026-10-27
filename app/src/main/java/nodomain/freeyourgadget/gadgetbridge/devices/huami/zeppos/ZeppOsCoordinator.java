@@ -307,7 +307,7 @@ public abstract class ZeppOsCoordinator extends HuamiCoordinator {
 
     @Override
     public ActivitySummaryParser getActivitySummaryParser(final GBDevice device, final Context context) {
-        return new ZeppOsActivitySummaryParser(context);
+        return new ZeppOsActivitySummaryParser(context, device);
     }
 
     @Override
@@ -712,6 +712,11 @@ public abstract class ZeppOsCoordinator extends HuamiCoordinator {
         return hasDisplay();
     }
 
+    @Override
+    public boolean supportsCallControl(@NonNull final GBDevice device) {
+        return supportsPhoneCalls(device) && hasDisplay();
+    }
+
     public boolean supportsMusicUpload(final GBDevice device) {
         return supportsDisplayItem(device, "music") &&
             (supportsBleFileTransfer(device, "music") || supportsWifiFtp(device));
@@ -747,5 +752,10 @@ public abstract class ZeppOsCoordinator extends HuamiCoordinator {
                 .stream()
                 .map(BarcodeFormat::valueOf)
                 .collect(Collectors.toSet());
+    }
+
+    @Override
+    public boolean supportsInternetAccess(@NonNull final GBDevice device) {
+        return supportsWifiHotspot(device);
     }
 }

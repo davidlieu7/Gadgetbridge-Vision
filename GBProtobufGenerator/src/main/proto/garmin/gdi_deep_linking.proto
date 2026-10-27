@@ -10,7 +10,7 @@ message DeepLinkingService {
 }
 
 message OpenDeepLinkingRequest {
-    repeated string schemas = 1;
+    repeated string schemas = 1 [packed = false];
 }
 
 message OpenDeepLinkingResponse {
@@ -19,6 +19,7 @@ message OpenDeepLinkingResponse {
         UNHANDLED = 2;
         UNKNOWN_ERROR = 3;
     }
+
     optional GDI.Proto.DeepLinking.OpenDeepLinkingResponse.ResponseStatus status = 1;
     optional int32 used_schema_index = 2;
 }

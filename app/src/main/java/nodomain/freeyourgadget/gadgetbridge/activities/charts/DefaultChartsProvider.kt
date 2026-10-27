@@ -447,6 +447,7 @@ open class DefaultChartsProvider : DeviceChartsProvider {
                         db, device, MetricSample.Metric.GENERIC_TRAINING_LOAD_ACUTE, end
                     )?.metricScore?.roundToInt()
                 } else {
+                    @Suppress("DEPRECATION")
                     coordinator.getTrainingAcuteLoadSampleProvider(device, session)
                         ?.getLatestSample(end)
                         ?.value

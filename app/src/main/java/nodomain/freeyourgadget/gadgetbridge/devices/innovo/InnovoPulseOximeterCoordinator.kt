@@ -1,7 +1,5 @@
 package nodomain.freeyourgadget.gadgetbridge.devices.innovo
 
-import de.greenrobot.dao.AbstractDao
-import de.greenrobot.dao.Property
 import nodomain.freeyourgadget.gadgetbridge.R
 import nodomain.freeyourgadget.gadgetbridge.devices.AbstractBLEDeviceCoordinator
 import nodomain.freeyourgadget.gadgetbridge.devices.DeviceCoordinator
@@ -12,9 +10,6 @@ import nodomain.freeyourgadget.gadgetbridge.devices.TimeSampleProvider
 import nodomain.freeyourgadget.gadgetbridge.devices.generic_hr.GenericHeartRateActivitySampleProvider
 import nodomain.freeyourgadget.gadgetbridge.entities.AbstractActivitySample
 import nodomain.freeyourgadget.gadgetbridge.entities.DaoSession
-import nodomain.freeyourgadget.gadgetbridge.entities.GenericHeartRateSampleDao
-import nodomain.freeyourgadget.gadgetbridge.entities.GenericRespiratoryRateSampleDao
-import nodomain.freeyourgadget.gadgetbridge.entities.GenericSpo2SampleDao
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice
 import nodomain.freeyourgadget.gadgetbridge.model.RespiratoryRateSample
 import nodomain.freeyourgadget.gadgetbridge.model.Spo2Sample
@@ -94,13 +89,5 @@ class InnovoPulseOximeterCoordinator : AbstractBLEDeviceCoordinator() {
         session: DaoSession
     ): TimeSampleProvider<out RespiratoryRateSample> {
         return GenericRespiratoryRateSampleProvider(device, session)
-    }
-
-    override fun getAllDeviceDao(session: DaoSession): MutableMap<AbstractDao<*, *>, Property> {
-        return mutableMapOf(
-            session.genericHeartRateSampleDao to GenericHeartRateSampleDao.Properties.DeviceId,
-            session.genericSpo2SampleDao to GenericSpo2SampleDao.Properties.DeviceId,
-            session.genericRespiratoryRateSampleDao to GenericRespiratoryRateSampleDao.Properties.DeviceId,
-        )
     }
 }

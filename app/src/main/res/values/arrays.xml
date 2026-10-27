@@ -3289,17 +3289,6 @@
         <item>@string/reminder_every_year</item>
     </string-array>
 
-    <string-array name="notification_filter_modes_entries">
-        <item>@string/filter_mode_none</item>
-        <item>@string/filter_mode_whitelist</item>
-        <item>@string/filter_mode_blacklist</item>
-    </string-array>
-
-    <string-array name="notification_filter_submodes_entries">
-        <item>@string/filter_submode_at_least_one</item>
-        <item>@string/filter_submode_all</item>
-    </string-array>
-
     <!-- Note: ZeTime preferences -->
     <string-array name="zetime_analog_mode">
         <item name="0">@string/zetime_analog_mode_hands</item>
@@ -3524,90 +3513,6 @@
         <item>60</item>
     </string-array>
 
-    <string-array name="pref_charts_tabs_items">
-        <item>@string/workout_tab_overview</item>
-        <item>@string/activity_sleepchart_activity_and_sleep</item>
-        <item>@string/charts_activity_list</item>
-        <item>@string/sleepchart_your_sleep</item>
-        <item>@string/weekstepschart_steps_a_week_or_month</item>
-        <item>@string/pref_header_hrv_status</item>
-        <item>@string/body_energy</item>
-        <item>@string/menuitem_vo2_max</item>
-        <item>@string/pref_header_training_load</item>
-        <item>@string/menuitem_race_predictor</item>
-        <item>@string/metric_garmin_training_readiness</item>
-        <item>@string/menuitem_solar_charging</item>
-        <item>@string/generic_metrics</item>
-        <item>@string/menuitem_hr</item>
-        <item>@string/menuitem_stress</item>
-        <item>@string/menuitem_pai</item>
-        <item>@string/stats_title</item>
-        <item>@string/liveactivity_live_activity</item>
-        <item>@string/pref_header_spo2</item>
-        <item>@string/menuitem_temperature</item>
-        <item>@string/menuitem_weight</item>
-        <item>@string/watchface_widget_type_calories</item>
-        <item>@string/pref_header_hydration</item>
-        <item>@string/respiratoryrate</item>
-        <item>@string/blood_pressure</item>
-    </string-array>
-
-    <string-array name="pref_charts_tabs_values">
-        <item>@string/p_overview</item>
-        <item>@string/p_activity</item>
-        <item>@string/p_activity_list</item>
-        <item>@string/p_sleep</item>
-        <item>@string/p_steps_week</item>
-        <item>@string/p_hrv_status</item>
-        <item>@string/p_body_energy</item>
-        <item>@string/p_vo2max</item>
-        <item>@string/p_load</item>
-        <item>@string/p_raceprediction</item>
-        <item>@string/p_trainingreadiness</item>
-        <item>@string/p_solar_charging</item>
-        <item>@string/p_generic_metrics</item>
-        <item>@string/p_heartrate</item>
-        <item>@string/p_stress</item>
-        <item>@string/p_pai</item>
-        <item>@string/p_speed_zones</item>
-        <item>@string/p_live_stats</item>
-        <item>@string/p_spo2</item>
-        <item>@string/p_temperature</item>
-        <item>@string/p_weight</item>
-        <item>@string/p_calories</item>
-        <item>@string/p_hydration</item>
-        <item>@string/p_respiratory_rate</item>
-        <item>@string/p_bloodpressure</item>
-    </string-array>
-
-    <string-array name="pref_charts_tabs_items_default">
-        <item>@string/p_cycling</item>
-        <item>@string/p_activity</item>
-        <item>@string/p_activity_list</item>
-        <item>@string/p_sleep</item>
-        <item>@string/p_hrv_status</item>
-        <item>@string/p_body_energy</item>
-        <item>@string/p_vo2max</item>
-        <item>@string/p_load</item>
-        <item>@string/p_raceprediction</item>
-        <item>@string/p_trainingreadiness</item>
-        <item>@string/p_solar_charging</item>
-        <item>@string/p_generic_metrics</item>
-        <item>@string/p_heartrate</item>
-        <item>@string/p_steps_week</item>
-        <item>@string/p_stress</item>
-        <item>@string/p_pai</item>
-        <item>@string/p_speed_zones</item>
-        <item>@string/p_live_stats</item>
-        <item>@string/p_spo2</item>
-        <item>@string/p_temperature</item>
-        <item>@string/p_weight</item>
-        <item>@string/p_calories</item>
-        <item>@string/p_hydration</item>
-        <item>@string/p_respiratory_rate</item>
-        <item>@string/p_bloodpressure</item>
-    </string-array>
-
     <string-array name="pref_amazfitneo_sounds">
         <item>@string/prefs_operating_sounds</item>
         <item>@string/pref_title_notifications_call</item>
@@ -3662,16 +3567,6 @@
         <item>1</item>
         <item>2</item>
         <item>3</item>
-    </string-array>
-
-    <string-array name="notification_list_is_blacklist_names">
-        <item>@string/pref_title_notification_use_as_deny</item>
-        <item>@string/pref_title_notification_use_as_allow</item>
-    </string-array>
-
-    <string-array name="notification_list_is_blacklist_values">
-        <item>true</item>
-        <item>false</item>
     </string-array>
 
     <string-array name="galaxy_eqalizer_modes">
@@ -4554,6 +4449,22 @@
         <item>hypnogram</item>
         <item>legacy</item>
     </string-array>
+    <string-array name="pref_chart_heartrate_color_entries">
+        <item>@string/pref_chart_heartrate_color_orange</item>
+        <item>@string/pref_chart_heartrate_color_red</item>
+    </string-array>
+    <string-array name="pref_chart_heartrate_color_values">
+        <item>orange</item>
+        <item>red</item>
+    </string-array>
+    <string-array name="pref_charts_range_entries">
+        <item>@string/calendar_week</item>
+        <item>@string/calendar_month</item>
+    </string-array>
+    <string-array name="pref_charts_range_values">
+        <item>week</item>
+        <item>month</item>
+    </string-array>
     <string-array name="sleep_range_entries">
         <item>@string/pref_chart_sleep_range_rolling_24h</item>
         <item>@string/pref_chart_sleep_range_noon</item>
@@ -5067,6 +4978,15 @@
         <item>dashboard</item>
         <item>workouts</item>
         <item>devices</item>
+    </string-array>
+
+    <string-array name="prefs_pebble_app_stores">
+        <item>@string/prefs_pebble_appstore_rebble</item>
+        <item>@string/prefs_pebble_appstore_repebble</item>
+    </string-array>
+    <string-array name="prefs_pebble_app_stores_values">
+        <item>rebble</item>
+        <item>repebble</item>
     </string-array>
 
 </resources>

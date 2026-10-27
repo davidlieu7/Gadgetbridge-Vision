@@ -68,6 +68,27 @@ class DeviceSettingsScope {
         )
     }
 
+    /**
+     * A [ScreenSetting] for one of the standard [DeviceSpecificSettingsScreen] entries.
+     */
+    fun DeviceSpecificSettingsScreen.screen(
+        @DrawableRes icon: Int = this.icon,
+        xmlSubScreens: List<Int> = emptyList(),
+        connectedOnly: Boolean = false,
+        visibleWhen: ((Prefs) -> Boolean)? = null,
+        block: DeviceSettingsScope.() -> Unit,
+    ) {
+        this@DeviceSettingsScope.screen(
+            key = key,
+            title = title,
+            icon = icon,
+            xmlSubScreens = xmlSubScreens,
+            connectedOnly = connectedOnly,
+            visibleWhen = visibleWhen,
+            block = block,
+        )
+    }
+
     fun switchSetting(
         key: String,
         @StringRes title: Int,

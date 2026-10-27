@@ -10,17 +10,24 @@ enum CannedListType {
     GROUP_TRACK_RESPONSE = 2;
 }
 
+message CapabilitiesRequest {
+}
+
+message CapabilitiesResponse {
+    repeated GDI.Proto.SmsNotification.CannedListType type = 1 [packed = false];
+}
+
 message SmsCannedList {
-    optional CannedListType type = 1;
-    repeated string responses = 2;
+    optional GDI.Proto.SmsNotification.CannedListType type = 1;
+    repeated string responses = 2 [packed = false];
 }
 
 message SmsCannedListChangedNotification {
-    repeated CannedListType changed_types = 1;
+    repeated GDI.Proto.SmsNotification.CannedListType changed_types = 1 [packed = false];
 }
 
 message SmsCannedListRequest {
-    repeated CannedListType requested_types = 1;
+    repeated GDI.Proto.SmsNotification.CannedListType requested_types = 1 [packed = false];
 }
 
 message SmsCannedListResponse {
@@ -28,16 +35,17 @@ message SmsCannedListResponse {
         SUCCESS = 0;
         GENERIC_ERROR = 1;
     }
-    optional ResponseStatus status = 1;
-    repeated SmsCannedList lists = 2;
+
+    optional GDI.Proto.SmsNotification.SmsCannedListResponse.ResponseStatus status = 1;
+    repeated GDI.Proto.SmsNotification.SmsCannedList lists = 2 [packed = false];
 }
 
 message SmsNotificationService {
-    optional SmsSendMessageRequest sms_send_message_request = 1;
-    optional SmsSendMessageResponse sms_send_message_response = 2;
-    optional SmsCannedListChangedNotification sms_canned_list_changed_notification = 3;
-    optional SmsCannedListRequest sms_canned_list_request = 4;
-    optional SmsCannedListResponse sms_canned_list_response = 5;
+    optional GDI.Proto.SmsNotification.SmsSendMessageRequest sms_send_message_request = 1;
+    optional GDI.Proto.SmsNotification.SmsSendMessageResponse sms_send_message_response = 2;
+    optional GDI.Proto.SmsNotification.SmsCannedListChangedNotification sms_canned_list_changed_notification = 3;
+    optional GDI.Proto.SmsNotification.SmsCannedListRequest sms_canned_list_request = 4;
+    optional GDI.Proto.SmsNotification.SmsCannedListResponse sms_canned_list_response = 5;
 }
 
 message SmsSendMessageRequest {
@@ -50,5 +58,6 @@ message SmsSendMessageResponse {
         SUCCESS = 0;
         GENERIC_ERROR = 1;
     }
-    optional ResponseStatus status = 1;
+
+    optional GDI.Proto.SmsNotification.SmsSendMessageResponse.ResponseStatus status = 1;
 }

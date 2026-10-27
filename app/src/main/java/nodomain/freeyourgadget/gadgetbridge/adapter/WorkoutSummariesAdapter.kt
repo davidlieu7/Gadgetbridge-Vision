@@ -1,7 +1,6 @@
 package nodomain.freeyourgadget.gadgetbridge.adapter
 
 import android.content.Context
-import android.graphics.Color
 import android.graphics.RenderEffect
 import android.graphics.Shader
 import android.os.Build
@@ -13,10 +12,11 @@ import android.widget.LinearLayout
 import android.widget.ProgressBar
 import android.widget.Space
 import android.widget.TextView
-import com.google.android.material.color.MaterialColors
 import nodomain.freeyourgadget.gadgetbridge.GBApplication
 
 import nodomain.freeyourgadget.gadgetbridge.R
+import nodomain.freeyourgadget.gadgetbridge.activities.workouts.ActivityIconView
+import nodomain.freeyourgadget.gadgetbridge.activities.workouts.RowSelection
 import nodomain.freeyourgadget.gadgetbridge.activities.workouts.StatTileData
 import nodomain.freeyourgadget.gadgetbridge.activities.workouts.WorkoutListViewModel
 import nodomain.freeyourgadget.gadgetbridge.activities.workouts.WorkoutUploadStatus
@@ -107,7 +107,7 @@ class WorkoutSummariesAdapter(
     }
 
     inner class ActivityItemViewHolder(itemView: View) : AbstractActivityListingViewHolder<BaseActivitySummary>(itemView) {
-        private val iconView: ImageView = itemView.findViewById(R.id.workout_row_icon)
+        private val iconView: ActivityIconView = itemView.findViewById(R.id.workout_row_icon)
         private val nameView: TextView = itemView.findViewById(R.id.workout_row_name)
         private val subtitleView: TextView = itemView.findViewById(R.id.workout_row_subtitle)
         private val photoView: ImageView = itemView.findViewById(R.id.workout_row_photo)
@@ -117,6 +117,7 @@ class WorkoutSummariesAdapter(
         private val dateView: TextView = itemView.findViewById(R.id.workout_row_date)
         private val timeView: TextView = itemView.findViewById(R.id.workout_row_time)
         private val separatorView: View = itemView.findViewById(R.id.workout_row_separator)
+        private val selection = RowSelection(itemView, iconView)
 
         override fun fill(position: Int, summary: BaseActivitySummary, selected: Boolean) {
             val activityKind = ActivityKind.fromCode(summary.activityKind)
@@ -166,7 +167,7 @@ class WorkoutSummariesAdapter(
             // The last activity is followed by the end spacer, and gets no separator.
             separatorView.visibility = if (position == itemCount - 2) View.GONE else View.VISIBLE
 
-            itemView.setBackgroundColor(if (selected) MaterialColors.getColor(itemView, R.attr.accent_color) else Color.TRANSPARENT)
+            selection.bind(position, selected, !selectedItems.isEmpty)
         }
     }
 

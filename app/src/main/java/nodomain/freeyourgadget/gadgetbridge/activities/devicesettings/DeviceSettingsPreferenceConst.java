@@ -304,6 +304,7 @@ public class DeviceSettingsPreferenceConst {
 
     public static final String PREF_WORKOUT_START_ON_PHONE = "workout_start_on_phone";
     public static final String PREF_WORKOUT_SEND_GPS_TO_BAND = "workout_send_gps_to_band";
+    public static final String PREF_ELEVATION_CORRECTION = "elevation_correction";
     public static final String PREF_WORKOUT_SEND_GPS_TO_BAND_TIMEOUT = "workout_send_gps_to_band_timeout";
     public static final String PREF_WORKOUT_DETECTION_CATEGORIES = "workout_detection_categories";
     public static final String PREF_WORKOUT_DETECTION_ALERT = "workout_detection_alert";
@@ -727,6 +728,17 @@ public class DeviceSettingsPreferenceConst {
     public static final String PREF_BOSE_MEDIA_NEXT = "bose_media_next";
     public static final String PREF_BOSE_MEDIA_PREVIOUS = "bose_media_previous";
     public static final String PREF_BOSE_MEDIA_SUPPORTED = "bose_media_supported";
+
+    public static final String PREF_TEUFEL_MYND_MUTE = "teufel_mynd_mute";
+    public static final String PREF_TEUFEL_MYND_EQ_BASS = "teufel_mynd_eq_bass";
+    public static final String PREF_TEUFEL_MYND_EQ_TREBLE = "teufel_mynd_eq_treble";
+    public static final String PREF_TEUFEL_MYND_ECO_MODE = "teufel_mynd_eco_mode";
+    public static final String PREF_TEUFEL_MYND_SOUND_ICONS = "teufel_mynd_sound_icons";
+    public static final String PREF_TEUFEL_MYND_BATTERY_FRIENDLY_CHARGING = "teufel_mynd_battery_friendly_charging";
+    public static final String PREF_TEUFEL_MYND_MULTIPOINT = "teufel_mynd_multipoint";
+    public static final String PREF_TEUFEL_MYND_LED_BRIGHTNESS = "teufel_mynd_led_brightness";
+    public static final String PREF_TEUFEL_MYND_AUTO_OFF = "teufel_mynd_auto_off";
+    public static final String PREF_TEUFEL_MYND_PARTY_LINK = "teufel_mynd_party_link";
 
     public static final String PREF_DUAL_DEVICE_SUPPORT = "dual_device_support";
 

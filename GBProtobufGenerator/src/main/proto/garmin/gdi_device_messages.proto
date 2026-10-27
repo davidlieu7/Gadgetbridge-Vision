@@ -4,7 +4,7 @@ package GDI.Proto.DeviceMessages;
 option java_package = "nodomain.freeyourgadget.gadgetbridge.proto.garmin";
 option java_outer_classname = "GdiDeviceMessages";
 
-message CIQMessageRequest {;
+message CIQMessageRequest {
     optional string event_id = 1;
     optional string app_id = 2;
     optional string payload = 3;
@@ -15,8 +15,9 @@ message CIQMessageResponse {
         SUCCESS = 0;
         FAILURE = 1;
     }
+
     optional string event_id = 1;
-    optional CIQMessageResponse.Status status = 2;
+    optional GDI.Proto.DeviceMessages.CIQMessageResponse.Status status = 2;
 }
 
 message CIQMessageSubscribeNotification {
@@ -27,8 +28,8 @@ message CIQMessageUnsubscribeNotification {
 }
 
 message DeviceMessageService {
-    optional CIQMessageSubscribeNotification message_subscribe = 1;
-    optional CIQMessageUnsubscribeNotification message_unsubscribe = 2;
-    optional CIQMessageRequest message_request = 3;
-    optional CIQMessageResponse message_response = 4;
+    optional GDI.Proto.DeviceMessages.CIQMessageSubscribeNotification message_subscribe = 1;
+    optional GDI.Proto.DeviceMessages.CIQMessageUnsubscribeNotification message_unsubscribe = 2;
+    optional GDI.Proto.DeviceMessages.CIQMessageRequest message_request = 3;
+    optional GDI.Proto.DeviceMessages.CIQMessageResponse message_response = 4;
 }

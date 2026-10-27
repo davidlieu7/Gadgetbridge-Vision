@@ -4,14 +4,54 @@ package GDI.Proto.EventSharing;
 option java_package = "nodomain.freeyourgadget.gadgetbridge.proto.garmin";
 option java_outer_classname = "GdiEventSharing";
 
+import "garmin/gdi_accessory_utilities.proto";
+import "garmin/gdi_heart_rate.proto";
 import "garmin/gdi_launch_monitor.proto";
+import "garmin/gdi_live_session.proto";
+import "garmin/gdi_running.proto";
 
-message EventSharing {
-    optional SubscribeRequest subscribe_request = 1;
-    optional SubscribeResponse subscribe_response = 2;
-    optional AlertNotification alert_notification = 3;
-    optional AlertSupportRequest support_request = 4;
-    optional AlertSupportResponse support_response = 5;
+message ActivityAlertDetails {
+    optional uint32 total_distance = 1;
+    optional uint32 total_time = 2;
+    optional uint32 lap_time = 3;
+    optional uint32 average_pace = 4;
+    optional GDI.Proto.EventSharing.Sport sport_type = 5;
+    optional uint32 est_finish_time = 6;
+    optional uint32 lap_number = 7;
+    optional uint32 session_dist = 8;
+    optional uint32 session_time = 9;
+    optional uint32 local_time = 10;
+    optional GDI.Proto.EventSharing.Sport last_sport_type = 11;
+    optional uint32 interval_dist = 12;
+    optional uint32 interval_time = 13;
+}
+
+message AlertMessage {
+    optional GDI.Proto.EventSharing.AlertType type = 1;
+    optional uint32 interval = 2;
+}
+
+message AlertNotification {
+    repeated GDI.Proto.EventSharing.AlertType alert_type = 1 [packed = false];
+    optional GDI.Proto.EventSharing.ActivityAlertDetails activity_details = 2;
+
+    extensions 1000;
+    optional GDI.Proto.LaunchMonitor.AlertDetails launch_monitor = 1001;
+    extensions 1002 to 1011;
+    optional GDI.Proto.LiveSession.LiveSessionEventNotification live_session = 1012;
+    optional GDI.Proto.HeartRate.MeasurementNotification heart_rate = 1013;
+    optional GDI.Proto.Running.MeasurementNotification running_measurement = 1014;
+    optional GDI.Proto.AccessoryUtilities.ActivityStateNotification accessory_utilities = 1015;
+    optional GDI.Proto.Running.AlgorithmInputNotification running_algorithm = 1016;
+    extensions 1017 to max;
+}
+
+message AlertSupportRequest {
+}
+
+message AlertSupportResponse {
+    repeated GDI.Proto.EventSharing.AlertType supported_alerts = 1 [packed = false];
+    repeated uint32 version_num = 2 [packed = false];
 }
 
 enum AlertType {
@@ -42,77 +82,44 @@ enum AlertType {
     BIKE_POWER_MEASUREMENT = 24;
     DEVELOPMENT_TESTING = 25;
     PSA_SAMPLE = 26;
-    UNK_27 = 27;
-    BUTTON_CHANGE = 28;
-    UNK_29 = 29;
-    UNK_30 = 30;
-    UNK_31 = 31;
-    UNK_32 = 32;
+    VARIA_DEVICE_STATUS = 27;
+    BUTTON_EVENT = 28;
+    CYCLING_TORSO_SENSOR_MEASUREMENT = 29;
+    XCEL_STRENGTH = 30;
+    CONTROLLING_DEVICE_STATUS_CHANGE = 31;
+    XCEL_SPRINT = 32;
     XERO_RANGEFINDER = 33;
-    UNK_34 = 34;
-    UNK_35 = 35;
-    UNK_36 = 36;
-    UNK_37 = 37;
-    UNK_38 = 38;
-    UNK_39 = 39;
+    XCEL_SPRINT_SENSOR_STATE = 34;
 }
 
-message AlertMessage {
-    optional AlertType type = 1;
-    optional uint32 interval = 2;
-}
-
-message SubscribeRequest {
-    repeated AlertMessage alerts = 1;
-    optional uint32 target_distance = 2;
-}
-
-message AlertStatusMessage {
-    optional Status subscribe_status = 1;
-    optional AlertMessage type = 2;
-
-    enum Status {
-        SUCCESS = 0;
-        FAIL = 1;
-    }
-}
-
-message SubscribeResponse {
-    repeated AlertStatusMessage alert_status = 1;
-}
-
-
-message AlertSupportRequest {
-}
-
-message AlertSupportResponse {
-    repeated AlertType supported_alerts = 1;
-    repeated uint32 version_number = 2;
+message EventSharingService {
+    optional GDI.Proto.EventSharing.SubscribeRequest subscribe_request = 1;
+    optional GDI.Proto.EventSharing.SubscribeResponse subscribe_response = 2;
+    optional GDI.Proto.EventSharing.AlertNotification alert_notification = 3;
+    optional GDI.Proto.EventSharing.AlertSupportRequest support_request = 4;
+    optional GDI.Proto.EventSharing.AlertSupportResponse support_response = 5;
 }
 
 message Sport {
-    optional uint32 sport_fit_type = 1;
-    optional uint32 sport_fit_sub_type = 2;
+    required uint32 sport_fit_type = 1;
+    required uint32 sport_fit_sub_type = 2;
 }
 
-message ActivityAlertDetails {
-    optional uint32 total_distance = 1;
-    optional uint32 total_time = 2;
-    optional uint32 lap_time = 3;
-    optional uint32 average_pace = 4;
-    optional Sport sport_type = 5;
-    optional uint32 est_finish_time = 6;
-    optional uint32 lap_number = 7;
-    optional uint32 session_dist = 8;
-    optional uint32 session_time = 9;
-    optional uint32 local_time = 10;
-    optional Sport last_sport_type = 11;
-    optional uint32 interval_dist = 12;
-    optional uint32 interval_time = 13;
+message SubscribeRequest {
+    repeated GDI.Proto.EventSharing.AlertMessage alerts = 1 [packed = false];
+    optional uint32 target_distance = 2;
 }
 
-message AlertNotification {
-    optional AlertType type = 1;
-    optional ActivityAlertDetails activity_details = 2;
-    optional GDI.Proto.LaunchMonitor.LaunchAlertDetails launch_alert_details = 1001;
+message SubscribeResponse {
+    message AlertStatusMessage {
+        enum Status {
+            SUCCESS = 0;
+            FAIL = 1;
+        }
+
+        required GDI.Proto.EventSharing.SubscribeResponse.AlertStatusMessage.Status subscribe_status = 1;
+        optional GDI.Proto.EventSharing.AlertMessage type = 2;
+    }
+
+    repeated GDI.Proto.EventSharing.SubscribeResponse.AlertStatusMessage alert_status = 1 [packed = false];
 }

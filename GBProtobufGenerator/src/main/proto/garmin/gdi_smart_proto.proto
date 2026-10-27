@@ -5,12 +5,14 @@ package garmin_vivomovehr;
 option java_package = "nodomain.freeyourgadget.gadgetbridge.proto.garmin.GdiSmartProto";
 option java_multiple_files = true;
 
+import "garmin/gdi_accessory_utilities.proto";
 import "garmin/gdi_app_settings.proto";
 import "garmin/gdi_audio_prompts.proto";
 import "garmin/gdi_calendar.proto";
 import "garmin/gdi_core.proto";
 import "garmin/gdi_credentials.proto";
 import "garmin/gdi_data_transfer.proto";
+import "garmin/gdi_data_types.proto";
 import "garmin/gdi_deep_linking.proto";
 import "garmin/gdi_device_messages.proto";
 import "garmin/gdi_device_status.proto";
@@ -23,6 +25,7 @@ import "garmin/gdi_garmin_connect.proto";
 import "garmin/gdi_generic_item_transfer.proto";
 import "garmin/gdi_gncs.proto";
 import "garmin/gdi_group_live_track.proto";
+import "garmin/gdi_heart_rate.proto";
 import "garmin/gdi_http.proto";
 import "garmin/gdi_incident_detection.proto";
 import "garmin/gdi_in_reach_contact_sync.proto";
@@ -33,6 +36,8 @@ import "garmin/gdi_launch_monitor.proto";
 import "garmin/gdi_live_session.proto";
 import "garmin/gdi_live_track.proto";
 import "garmin/gdi_realtime_settings.proto";
+import "garmin/gdi_running.proto";
+import "garmin/gdi_simple_setup.proto";
 import "garmin/gdi_sms_notification.proto";
 import "garmin/gdi_waypoint_transfer.proto";
 import "garmin/gdi_wifi_setup.proto";
@@ -42,6 +47,8 @@ message Smart {
     optional GDI.Proto.ConnectIQHTTP.ConnectIQHTTPService connect_iq_http_service = 2;
     optional GDI.Proto.ConnectIQInstalledApps.ConnectIQInstalledAppsService connect_iq_installed_apps_service = 3;
     optional GDI.Proto.ConnectIQAppSettings.ConnectIQAppSettingsService connect_iq_app_settings_service = 4;
+    optional InternationalGolfService international_golf_service = 5;
+    optional SwingSensorService swing_sensor_service = 6;
     optional GDI.Proto.DataTransfer.DataTransferService data_transfer_service = 7;
     optional GDI.Proto.DeviceStatus.DeviceStatusService device_status_service = 8;
     optional GDI.Proto.IncidentDetection.IncidentDetectionService incident_detection_service = 9;
@@ -50,32 +57,104 @@ message Smart {
     optional GDI.Proto.FindMyWatch.FindMyWatchService find_my_watch_service = 12;
     optional GDI.Proto.Core.CoreService core_service = 13;
     optional GDI.Proto.GroupLiveTrack.GroupLiveTrackService group_live_track_service = 14;
+    optional ExpresspayCommandService expresspay_command_service = 15;
     optional GDI.Proto.SmsNotification.SmsNotificationService sms_notification_service = 16;
+    optional LiveTrackMessagingService live_track_messaging_service = 17;
     optional GDI.Proto.InstantInput.InstantInputService instant_input_service = 18;
+    optional SportProfileSetupService sport_profile_setup_service = 19;
+    optional HSADataService hsa_data_service = 20;
     optional GDI.Proto.LiveTrack.LiveTrackService live_track_service = 21;
     optional ExploreSyncService explore_sync_service = 22;
     optional GDI.Proto.WaypointTransfer.WaypointTransferService way_point_transfer_service = 23;
     optional GDI.Proto.DeviceMessages.DeviceMessageService device_message_service = 24;
+    optional LTEService lte_service = 25;
+    optional AntiTheftAlarmService anti_theft_alarm_service = 26;
     optional GDI.Proto.Credentials.CredentialsService credentials_service = 27;
     optional GDI.Proto.InReachTracking.InReachTrackingService inreach_tracking_service = 28;
     optional InReachMessagingService inreach_messaging_service = 29;
-    optional GDI.Proto.EventSharing.EventSharing event_sharing = 30;
+    optional GDI.Proto.EventSharing.EventSharingService event_sharing = 30;
     optional GDI.Proto.GenericItemTransfer.GenericItemTransferService generic_item_transfer_service = 31;
     optional GDI.Proto.InReachContactSync.InReachContactSyncService inreach_contact_sync_service = 32;
-    optional GDI.Proto.LaunchMonitor.LaunchMonitorService launch_monitor_service = 38;
+    optional HandCalibrationService hand_calibration_service = 33;
+    optional InReachWeatherService inreach_weather_service = 34;
+    optional WindService wind_service = 35;
+    optional GDI.Proto.SimpleSetup.SimpleSetupService simple_setup_service = 36;
+    optional SwitcherService switcher_service = 37;
+    optional GDI.Proto.LaunchMonitor.Service launch_monitor_service = 38;
     optional EcgService samd_service = 39;
+    optional NavigationSyncService navigation_sync_service = 40;
+    optional KidDeviceService kid_device_service = 41;
     optional RealtimeSettingsService realtime_settings_service = 42;
     optional GDI.Proto.FileAccess.Service file_access_service = 43;
     optional Service44 service44 = 44;
+    optional DezlService dezl_service = 45;
     optional GDI.Proto.DeepLinking.DeepLinkingService deeplinking_service = 46;
     optional GDI.Proto.GarminConnect.Service garmin_connect_service = 47;
+    optional XeroChronographService xero_chronograph_service = 48;
     optional GDI.Proto.GNCS.Service gncs_service = 49;
+    optional InReachConfigurationService inreach_configuration_service = 50;
+    optional DiveService dive_service = 52;
+    optional MessengerOnDeviceService messenger_on_device_service = 53;
+    optional CompanionRangefinderService companion_rangefinder_service = 54;
+    optional DogService dog_service = 55;
     optional GDI.Proto.LiveSession.LiveSessionService live_session_service = 56;
+    optional RadarService radar_service = 57;
+    optional TopsideBuoyService topside_buoy_service = 58;
+    optional IopMessageService iop_message_service = 59;
+    optional StoreAndForwardService store_and_forward_service = 60;
+    optional GDI.Proto.HeartRate.Service heart_rate_service = 61;
+    optional GDI.Proto.Running.Service running_service = 62;
+    optional GDI.Proto.AccessoryUtilities.Service accessory_utilities_service = 63;
+    optional BikePowerService bike_power_service = 64;
+    optional DevelopmentTestingService development_testing_service = 65;
+    optional XeroGameCamService xero_game_cam_service = 66;
+    optional ConnectionManagementService connection_management_service = 67;
+    optional InReachCallsService inreach_calls_service = 68;
+    optional LiveSyncService live_sync_service = 69;
+    optional PSASampleService psa_sample_service = 70;
+    optional SubscriptionService subscription_service = 71;
 }
 
-message UUID {
-    required fixed64 upper = 1;
-    required fixed64 lower = 2;
+message AntiTheftAlarmService {
+}
+
+message BikePowerService {
+}
+
+message CompanionRangefinderService {
+}
+
+message ConnectionManagementService {
+}
+
+message DevelopmentTestingService {
+}
+
+message DezlService {
+}
+
+message DiveService {
+}
+
+message DogService {
+}
+
+message ExpresspayCommandService {
+}
+
+message KidDeviceService {
+}
+
+message HSADataService {
+}
+
+message HandCalibrationService {
+}
+
+message InReachCallsService {
+}
+
+message InReachConfigurationService {
 }
 
 message InReachMessagingService {
@@ -102,8 +181,8 @@ message InReachMessagingService {
         optional uint32 unk9 = 9;
         optional uint32 unk10 = 10;
         optional string unk11 = 11;
-        optional UUID unk12 = 12;
-        optional UUID unk13 = 13;
+        optional GDI.Proto.DataTypes.UUID unk12 = 12;
+        optional GDI.Proto.DataTypes.UUID unk13 = 13;
         optional uint32 unk14 = 14;
         optional uint32 unk15 = 15;
         optional string unk17 = 17; // model?
@@ -145,4 +224,61 @@ message Service44 {
         optional uint32 unk1 = 1;
     }
     optional Message2 unk2 = 2;
+}
+
+message InReachWeatherService {
+}
+
+message InternationalGolfService {
+}
+
+message IopMessageService {
+}
+
+message LTEService {
+}
+
+message LiveSyncService {
+}
+
+message LiveTrackMessagingService {
+}
+
+message MessengerOnDeviceService {
+}
+
+message NavigationSyncService {
+}
+
+message PSASampleService {
+}
+
+message RadarService {
+}
+
+message SportProfileSetupService {
+}
+
+message StoreAndForwardService {
+}
+
+message SubscriptionService {
+}
+
+message SwingSensorService {
+}
+
+message SwitcherService {
+}
+
+message TopsideBuoyService {
+}
+
+message WindService {
+}
+
+message XeroChronographService {
+}
+
+message XeroGameCamService {
 }

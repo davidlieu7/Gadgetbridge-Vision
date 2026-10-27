@@ -16,6 +16,8 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 package nodomain.freeyourgadget.gadgetbridge.service.devices.garmin;
 
+import static nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.messages.FilterMessage.FilterType.ONLY_NEW_3;
+
 import android.content.Intent;
 
 import androidx.annotation.NonNull;
@@ -130,9 +132,9 @@ public class FileTransferHandler implements MessageHandler {
         if (!message.shouldProceed())
             return null;
         if (upload.isIdle())
-            return new FilterMessage();
+            return new FilterMessage(ONLY_NEW_3);
         // defer reply until upload idle
-        runWhenUploadIdle(() -> deviceSupport.sendOutgoingMessage("send filter (deferred)", new FilterMessage()));
+        runWhenUploadIdle(() -> deviceSupport.sendOutgoingMessage("send filter (deferred)", new FilterMessage(ONLY_NEW_3)));
         return null;
     }
 

@@ -23,7 +23,6 @@ import nodomain.freeyourgadget.gadgetbridge.GBApplication
 import nodomain.freeyourgadget.gadgetbridge.R
 import nodomain.freeyourgadget.gadgetbridge.activities.ConfigureWorldClocks
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsPreferenceConst
-import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSpecificSettingsScreen
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.DeviceSettingsScope
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.InfoSetting
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.LabeledEntry
@@ -162,29 +161,6 @@ inline fun <reified T> DeviceSettingsScope.enumInfo(
             connectedOnly = connectedOnly,
             visibleWhen = visibleWhen,
         )
-    )
-}
-
-/**
- * A [nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.ScreenSetting] for one
- * of the standard [DeviceSpecificSettingsScreen] entries.
- */
-fun DeviceSettingsScope.screen(
-    screen: DeviceSpecificSettingsScreen,
-    @DrawableRes icon: Int,
-    xmlSubScreens: List<Int> = emptyList(),
-    connectedOnly: Boolean = false,
-    visibleWhen: ((Prefs) -> Boolean)? = null,
-    block: DeviceSettingsScope.() -> Unit,
-) {
-    screen(
-        key = screen.key,
-        title = screen.title,
-        icon = icon,
-        xmlSubScreens = xmlSubScreens,
-        connectedOnly = connectedOnly,
-        visibleWhen = visibleWhen,
-        block = block,
     )
 }
 

@@ -686,6 +686,10 @@ public class WorkoutSummaryParser extends XiaomiActivityParser implements Activi
         final int headerSize;
         switch (version) {
             case 5:
+            case 6:
+                // v6 (e.g. Smart Band 10): identical layout to v5, headerSize 4.
+                // Verified against a captured ~57-min HIIT: start/end give a 3408 s
+                // duration matching ACTIVE_SECONDS, calories 286, HR 126/153/78 avg/max/min.
                 headerSize = 4;
                 break;
             default:

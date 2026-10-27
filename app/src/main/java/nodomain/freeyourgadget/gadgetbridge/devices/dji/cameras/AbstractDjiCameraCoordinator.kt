@@ -41,4 +41,6 @@ abstract class AbstractDjiCameraCoordinator : AbstractBLEDeviceCoordinator() {
     override fun getDeviceSettings(device: GBDevice): DeviceSettingsSpec = deviceSettings {
 
     }
+
+    override fun supportsInternetAccess(device: GBDevice): Boolean = true
 }

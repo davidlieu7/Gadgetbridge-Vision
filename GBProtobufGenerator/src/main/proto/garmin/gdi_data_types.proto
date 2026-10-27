@@ -28,6 +28,11 @@ enum CoordinateSystem {
     GCJ02 = 1;
 }
 
+message DataTransferItem {
+    required uint32 id = 1;
+    required uint32 size = 2;
+}
+
 enum GPSFixType {
     FORCE_NO_SOLUTION = 1;
     NO_SOLUTION = 2;
@@ -117,19 +122,14 @@ enum Languages {
     ENGLISH_AUSTRALIA = 75;
 }
 
-enum MeasurementUnit {
-    METRIC = 0;
-    STATUTE = 1;
-}
-
-message DataTransferItem {
-    required uint32 id = 1;
-    required uint32 size = 2;
-}
-
 message Locale {
     required string language_code = 1;
     optional string country_code = 2;
+}
+
+enum MeasurementUnit {
+    METRIC = 0;
+    STATUTE = 1;
 }
 
 message ScPoint {

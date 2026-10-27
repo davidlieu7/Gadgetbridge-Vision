@@ -18,7 +18,6 @@ import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AlertDialog
 import androidx.core.os.BundleCompat
-import androidx.core.os.bundleOf
 import androidx.core.view.MenuProvider
 import androidx.core.view.get
 import androidx.core.view.size
@@ -719,7 +718,9 @@ class WorkoutListFragment : Fragment() {
         @JvmStatic
         fun newInstance(device: GBDevice): WorkoutListFragment {
             return WorkoutListFragment().apply {
-                arguments = bundleOf(GBDevice.EXTRA_DEVICE to device)
+                arguments = Bundle().apply {
+                    putParcelable(GBDevice.EXTRA_DEVICE, device)
+                }
             }
         }
     }

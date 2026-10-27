@@ -4,20 +4,15 @@ package GDI.Proto.WifiSetup;
 option java_package = "nodomain.freeyourgadget.gadgetbridge.proto.garmin";
 option java_outer_classname = "GdiWifiSetup";
 
-enum WifiBand {
-    WIFI_BAND_5_GHZ = 0;
-    WIFI_BAND_2P4_GHZ = 1;
-}
-
 message AccessPointScanCompleteNotification {
-    optional bytes encrypted_wifi_protobuf = 1;
+    required bytes encrypted_wifi_protobuf = 1;
 }
 
 message AccessPointScanRequest {
 }
 
 message AccessPointScanResponse {
-    optional bytes encrypted_wifi_protobuf = 1;
+    required bytes encrypted_wifi_protobuf = 1;
 }
 
 message AccessPointStartScanNotification {
@@ -31,7 +26,7 @@ message CapabilitiesResponse {
 }
 
 message ConnectionVerificationStatusNotification {
-    optional bytes encrypted_wifi_protobuf = 1;
+    required bytes encrypted_wifi_protobuf = 1;
 }
 
 message GetNetworkCredentialsRequest {
@@ -47,30 +42,30 @@ message MobileCarrierInfoRequest {
 }
 
 message MobileCarrierInfoResponse {
-    repeated string mobile_country_code = 1;
-    repeated string iso_country_code = 2;
+    repeated string mobile_country_code = 1 [packed = false];
+    repeated string iso_country_code = 2 [packed = false];
 }
 
 message OAuthCredentialsRequest {
 }
 
 message OAuthCredentialsResponse {
-    optional bytes encrypted_wifi_protobuf = 1;
+    required bytes encrypted_wifi_protobuf = 1;
 }
 
 message StoreAccessPointNotification {
-    optional bytes encrypted_wifi_protobuf = 1;
+    required bytes encrypted_wifi_protobuf = 1;
 }
 
 message StoredAccessPointRequest {
 }
 
 message StoredAccessPointResponse {
-    optional bytes encrypted_wifi_protobuf = 1;
+    required bytes encrypted_wifi_protobuf = 1;
 }
 
 message SwitchToApModeRequest {
-    optional WifiBand requested_band = 1;
+    optional GDI.Proto.WifiSetup.WifiBand requested_band = 1;
 }
 
 message SwitchToApModeResponse {
@@ -79,51 +74,57 @@ message SwitchToApModeResponse {
         FAIL = 1;
         SUCCESS = 2;
     }
-    optional Status status = 1;
-    optional WifiBand band_enabled = 2;
+
+    optional GDI.Proto.WifiSetup.SwitchToApModeResponse.Status status = 1;
+    optional GDI.Proto.WifiSetup.WifiBand band_enabled = 2;
 }
 
 message UpdateAccessPointRequest {
-    optional bytes encrypted_wifi_protobuf = 1;
+    required bytes encrypted_wifi_protobuf = 1;
 }
 
 message UpdateAccessPointResponse {
-    optional bytes encrypted_wifi_protobuf = 1;
+    required bytes encrypted_wifi_protobuf = 1;
 }
 
 message VerifyConnectionNotification {
-    optional bytes encrypted_wifi_protobuf = 1;
+    required bytes encrypted_wifi_protobuf = 1;
 }
 
 message VerifyConnectionRequest {
 }
 
 message VerifyConnectionResponse {
-    optional bytes encrypted_wifi_protobuf = 1;
+    required bytes encrypted_wifi_protobuf = 1;
+}
+
+enum WifiBand {
+    WIFI_BAND_5_GHZ = 0;
+    WIFI_BAND_2P4_GHZ = 1;
 }
 
 message WifiSetupService {
-    optional AccessPointScanRequest access_point_scan_request = 1;
-    optional AccessPointScanResponse access_point_scan_response = 2;
-    optional StoreAccessPointNotification store_access_point_notification = 3;
-    optional VerifyConnectionRequest verify_connection_request = 4;
-    optional VerifyConnectionResponse verify_connection_response = 5;
-    optional OAuthCredentialsRequest oauth_credentials_request = 6;
-    optional OAuthCredentialsResponse oauth_credentials_response = 7;
-    optional StoredAccessPointRequest access_point_request = 8;
-    optional StoredAccessPointResponse access_point_response = 9;
-    optional AccessPointStartScanNotification access_point_start_scan_notification = 10;
-    optional AccessPointScanCompleteNotification access_point_scan_complete_notification = 11;
-    optional VerifyConnectionNotification verify_connection_notification = 12;
-    optional ConnectionVerificationStatusNotification connection_verification_status_notification = 13;
-    optional UpdateAccessPointRequest update_access_point_request = 14;
-    optional UpdateAccessPointResponse update_access_point_response = 15;
-    optional OAuthCredentialsRequest oauth_credentials_request_with_agent_msg = 16;
-    optional OAuthCredentialsResponse oauth_credentials_response_with_agent_msg = 17;
-    optional MobileCarrierInfoRequest mobile_carrier_info_request = 18;
-    optional MobileCarrierInfoResponse mobile_carrier_info_response = 19;
-    optional SwitchToApModeRequest switch_to_ap_request = 20;
-    optional SwitchToApModeResponse switch_to_ap_response = 21;
-    optional GetNetworkCredentialsRequest get_network_credentials_request = 22;
-    optional GetNetworkCredentialsResponse get_network_credentials_response = 23;
+    optional GDI.Proto.WifiSetup.AccessPointScanRequest access_point_scan_request = 1;
+    optional GDI.Proto.WifiSetup.AccessPointScanResponse access_point_scan_response = 2;
+    optional GDI.Proto.WifiSetup.StoreAccessPointNotification store_access_point_notification = 3;
+    optional GDI.Proto.WifiSetup.VerifyConnectionRequest verify_connection_request = 4;
+    optional GDI.Proto.WifiSetup.VerifyConnectionResponse verify_connection_response = 5;
+    optional GDI.Proto.WifiSetup.OAuthCredentialsRequest oauth_credentials_request = 6;
+    optional GDI.Proto.WifiSetup.OAuthCredentialsResponse oauth_credentials_response = 7;
+    optional GDI.Proto.WifiSetup.StoredAccessPointRequest access_point_request = 8;
+    optional GDI.Proto.WifiSetup.StoredAccessPointResponse access_point_response = 9;
+    optional GDI.Proto.WifiSetup.AccessPointStartScanNotification access_point_start_scan_notification = 10;
+    optional GDI.Proto.WifiSetup.AccessPointScanCompleteNotification access_point_scan_complete_notification = 11;
+    optional GDI.Proto.WifiSetup.VerifyConnectionNotification verify_connection_notification = 12;
+    optional GDI.Proto.WifiSetup.ConnectionVerificationStatusNotification connection_verification_status_notification = 13;
+    optional GDI.Proto.WifiSetup.UpdateAccessPointRequest update_access_point_request = 14;
+    optional GDI.Proto.WifiSetup.UpdateAccessPointResponse update_access_point_response = 15;
+    optional GDI.Proto.WifiSetup.OAuthCredentialsRequest oauth_credentials_request_with_agent_msg = 16;
+    optional GDI.Proto.WifiSetup.OAuthCredentialsResponse oauth_credentials_response_with_agent_msg = 17;
+    optional GDI.Proto.WifiSetup.MobileCarrierInfoRequest mobile_carrier_info_request = 18;
+    optional GDI.Proto.WifiSetup.MobileCarrierInfoResponse mobile_carrier_info_response = 19;
+    optional GDI.Proto.WifiSetup.SwitchToApModeRequest switch_to_ap_request = 20;
+    optional GDI.Proto.WifiSetup.SwitchToApModeResponse switch_to_ap_response = 21;
+    optional GDI.Proto.WifiSetup.GetNetworkCredentialsRequest get_network_credentials_request = 22;
+    optional GDI.Proto.WifiSetup.GetNetworkCredentialsResponse get_network_credentials_response = 23;
 }

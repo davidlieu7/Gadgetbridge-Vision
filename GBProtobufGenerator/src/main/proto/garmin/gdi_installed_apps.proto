@@ -15,26 +15,36 @@ enum AppType {
     ACTIVITY = 8;
 }
 
+message CapabilitiesRequest {
+}
+
+message CapabilitiesResponse {
+    optional bool support_faceit_slot_1 = 1;
+    optional bool support_faceit_slot_2 = 2;
+    optional bool support_faceit_slot_3 = 3;
+    optional uint32 service_revision = 4;
+}
+
 message ConnectIQInstalledAppsService {
-    optional GetInstalledAppsRequest get_installed_apps_request = 1;
-    optional GetInstalledAppsResponse get_installed_apps_response = 2;
-    optional DeleteAppRequest delete_app_request = 3;
-    optional DeleteAppResponse delete_app_response = 4;
-    optional UpdateInstalledAppsRequest update_installed_app_request = 5;
-    optional UpdateInstalledAppsResponse update_installed_app_response = 6;
-    optional EnableNativeAppRequest enable_native_app_request = 7;
-    optional EnableNativeAppResponse enable_native_app_response = 8;
-    optional LaunchAppRequest launch_app_request = 9;
-    optional LaunchAppResponse launch_app_response = 10;
-    optional UpdateFaceItProjectIdMappingsRequest update_faceit_project_id_mappings_request = 11;
-    optional UpdateFaceItProjectIdMappingsResponse update_faceit_project_id_mappings_response = 12;
-    optional PendingAppInstallRequest pending_app_install_request = 13;
-    optional PendingAppInstallResponse pending_app_install_response = 14;
+    optional GDI.Proto.ConnectIQInstalledApps.GetInstalledAppsRequest get_installed_apps_request = 1;
+    optional GDI.Proto.ConnectIQInstalledApps.GetInstalledAppsResponse get_installed_apps_response = 2;
+    optional GDI.Proto.ConnectIQInstalledApps.DeleteAppRequest delete_app_request = 3;
+    optional GDI.Proto.ConnectIQInstalledApps.DeleteAppResponse delete_app_response = 4;
+    optional GDI.Proto.ConnectIQInstalledApps.UpdateInstalledAppsRequest update_installed_app_request = 5;
+    optional GDI.Proto.ConnectIQInstalledApps.UpdateInstalledAppsResponse update_installed_app_response = 6;
+    optional GDI.Proto.ConnectIQInstalledApps.EnableNativeAppRequest enable_native_app_request = 7;
+    optional GDI.Proto.ConnectIQInstalledApps.EnableNativeAppResponse enable_native_app_response = 8;
+    optional GDI.Proto.ConnectIQInstalledApps.LaunchAppRequest launch_app_request = 9;
+    optional GDI.Proto.ConnectIQInstalledApps.LaunchAppResponse launch_app_response = 10;
+    optional GDI.Proto.ConnectIQInstalledApps.UpdateFaceItProjectIdMappingsRequest update_faceit_project_id_mappings_request = 11;
+    optional GDI.Proto.ConnectIQInstalledApps.UpdateFaceItProjectIdMappingsResponse update_faceit_project_id_mappings_response = 12;
+    optional GDI.Proto.ConnectIQInstalledApps.PendingAppInstallRequest pending_app_install_request = 13;
+    optional GDI.Proto.ConnectIQInstalledApps.PendingAppInstallResponse pending_app_install_response = 14;
 }
 
 message DeleteAppRequest {
-    optional bytes store_app_id = 1;
-    optional AppType app_type = 2;
+    required bytes store_app_id = 1;
+    required GDI.Proto.ConnectIQInstalledApps.AppType app_type = 2;
 }
 
 message DeleteAppResponse {
@@ -43,12 +53,13 @@ message DeleteAppResponse {
         OK = 1;
         FAILED_TO_DELETE = 2;
     }
-    optional Status status = 1;
+
+    required GDI.Proto.ConnectIQInstalledApps.DeleteAppResponse.Status status = 1;
 }
 
 message EnableNativeAppRequest {
-    optional uint32 native_app_id = 1;
-    optional AppType app_type = 2;
+    required uint32 native_app_id = 1;
+    required GDI.Proto.ConnectIQInstalledApps.AppType app_type = 2;
     optional bytes app_id = 3;
 }
 
@@ -58,19 +69,20 @@ message EnableNativeAppResponse {
         OK = 1;
         INVALID_NATIVE_APP = 2;
     }
-    optional Status status = 1;
+
+    required GDI.Proto.ConnectIQInstalledApps.EnableNativeAppResponse.Status status = 1;
 }
 
 message GetInstalledAppsRequest {
-    optional AppType app_type = 1;
+    required GDI.Proto.ConnectIQInstalledApps.AppType app_type = 1;
 }
 
 message GetInstalledAppsResponse {
     message InstalledApp {
-        optional bytes store_app_id = 1;
-        optional AppType app_type = 2;
-        optional string name = 3;
-        optional bool disabled = 4;
+        required bytes store_app_id = 1;
+        required GDI.Proto.ConnectIQInstalledApps.AppType app_type = 2;
+        required string name = 3;
+        required bool disabled = 4;
         optional uint32 version = 5;
         optional string filename = 6;
         optional uint64 filesize = 7;
@@ -78,9 +90,10 @@ message GetInstalledAppsResponse {
         optional bool favorite = 9;
         optional string faceit_project_id = 10;
     }
-    optional uint64 available_space = 1;
-    optional uint32 available_slots = 2;
-    repeated InstalledApp installed_app = 3;
+
+    required uint64 available_space = 1;
+    required uint32 available_slots = 2;
+    repeated GDI.Proto.ConnectIQInstalledApps.GetInstalledAppsResponse.InstalledApp installed_app = 3 [packed = false];
 }
 
 message LaunchAppRequest {
@@ -90,8 +103,9 @@ message LaunchAppRequest {
         APP_STARTUP_MODE_MEDIA_SYNC_CONFIGURATION = 2;
         APP_STARTUP_MODE_NO_UI = 3;
     }
-    optional bytes app_uuid = 1;
-    optional StartUpMode app_startup_mode = 2;
+
+    required bytes app_uuid = 1;
+    required GDI.Proto.ConnectIQInstalledApps.LaunchAppRequest.StartUpMode app_startup_mode = 2;
 }
 
 message LaunchAppResponse {
@@ -101,11 +115,12 @@ message LaunchAppResponse {
         LAUNCH_STATUS_APP_NOT_INSTALLED = 2;
         LAUNCH_STATUS_UNKNOWN_ERROR = 3;
     }
-    optional Status status = 1;
+
+    required GDI.Proto.ConnectIQInstalledApps.LaunchAppResponse.Status status = 1;
 }
 
 message PendingAppInstallRequest {
-    optional AppType app_type = 1;
+    optional GDI.Proto.ConnectIQInstalledApps.AppType app_type = 1;
     optional bytes store_app_id = 2;
     optional bytes app_uuid = 3;
     optional string name = 4;
@@ -119,7 +134,8 @@ message PendingAppInstallResponse {
         ALREADY_INSTALLED = 3;
         NO_SPACE = 4;
     }
-    optional Status status = 1;
+
+    optional GDI.Proto.ConnectIQInstalledApps.PendingAppInstallResponse.Status status = 1;
 }
 
 message UpdateFaceItProjectIdMappingsRequest {
@@ -134,19 +150,21 @@ message UpdateFaceItProjectIdMappingsResponse {
         NO_CHANGE = 1;
         FAIL = 2;
     }
-    optional Status slot_1_status = 1;
-    optional Status slot_2_status = 2;
-    optional Status slot_3_status = 3;
+
+    optional GDI.Proto.ConnectIQInstalledApps.UpdateFaceItProjectIdMappingsResponse.Status slot_1_status = 1;
+    optional GDI.Proto.ConnectIQInstalledApps.UpdateFaceItProjectIdMappingsResponse.Status slot_2_status = 2;
+    optional GDI.Proto.ConnectIQInstalledApps.UpdateFaceItProjectIdMappingsResponse.Status slot_3_status = 3;
 }
 
 message UpdateInstalledAppsRequest {
     message InstalledApp {
-        optional bytes app_id = 1;
-        optional AppType app_type = 2;
-        optional bool disabled = 3;
+        required bytes app_id = 1;
+        required GDI.Proto.ConnectIQInstalledApps.AppType app_type = 2;
+        required bool disabled = 3;
         optional bool favorite = 4;
     }
-    repeated InstalledApp installed_app = 1;
+
+    repeated GDI.Proto.ConnectIQInstalledApps.UpdateInstalledAppsRequest.InstalledApp installed_app = 1 [packed = false];
 }
 
 message UpdateInstalledAppsResponse {
@@ -155,5 +173,6 @@ message UpdateInstalledAppsResponse {
         OK = 1;
         FAILED_TO_UPDATE = 2;
     }
-    optional Status status = 1;
+
+    required GDI.Proto.ConnectIQInstalledApps.UpdateInstalledAppsResponse.Status status = 1;
 }

@@ -313,6 +313,11 @@ public abstract class AbstractPreferenceFragment extends PreferenceFragmentCompa
                 return;
             }
 
+            if (preference.getPreferenceDataStore() != null) {
+                LOG.trace("Preference {} is not stored in these shared preferences, ignoring", key);
+                return;
+            }
+
             if (preference instanceof SeekBarPreference seekBarPreference) {
                 seekBarPreference.setValue(prefs.getInt(key, seekBarPreference.getValue()));
             } else if (preference instanceof SwitchPreferenceCompat switchPreference) {

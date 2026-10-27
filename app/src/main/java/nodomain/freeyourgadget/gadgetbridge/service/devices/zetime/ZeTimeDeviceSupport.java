@@ -510,18 +510,20 @@ public class ZeTimeDeviceSupport extends AbstractBTLESingleDeviceSupport {
         }
     }
 
-    @Override
-    public void onAddCalendarEvent(CalendarEventSpec calendarEventSpec) {
-        // This is not used currently since we cannot add and remove calendar event one by one pebble style.
-        byte[] calendarEvent = encodeCalendarEvent(calendarEventSpec.getTitle(), calendarEventSpec.getTimestamp(), (byte) (calendarEventSpec.getType() + 1)); // HACK)
-        try {
-            TransactionBuilder builder = performInitialized("sendCalendarEvent");
-            sendMsgToWatch(builder, calendarEvent);
-            builder.queue();
-        } catch (IOException e) {
-            GB.toast(getContext(), "Error sending calendar event: " + e.getLocalizedMessage(), Toast.LENGTH_LONG, GB.ERROR, e);
-        }
-    }
+    // FIXME: This is disabled since we enabled supportsCalendarEvents, which would call it,
+    //  but it is was not used before / untested.
+    //@Override
+    //public void onAddCalendarEvent(CalendarEventSpec calendarEventSpec) {
+    //    // This is not used currently since we cannot add and remove calendar event one by one pebble style.
+    //    byte[] calendarEvent = encodeCalendarEvent(calendarEventSpec.getTitle(), calendarEventSpec.getTimestamp(), (byte) (calendarEventSpec.getType() + 1)); // HACK)
+    //    try {
+    //        TransactionBuilder builder = performInitialized("sendCalendarEvent");
+    //        sendMsgToWatch(builder, calendarEvent);
+    //        builder.queue();
+    //    } catch (IOException e) {
+    //        GB.toast(getContext(), "Error sending calendar event: " + e.getLocalizedMessage(), Toast.LENGTH_LONG, GB.ERROR, e);
+    //    }
+    //}
 
     private byte[] encodeCalendarEvent(String title, int timestamp, byte opcode) {
         Calendar time = GregorianCalendar.getInstance();

@@ -30,8 +30,6 @@ data class ChartTheme(
     val markerDotGapColor: Int,
 ) {
     companion object {
-        private const val PREF_HEARTRATE_ALTERNATIVE_COLOR = "chart_heartrate_color"
-
         fun from(context: Context): ChartTheme {
             val theme = context.theme
             fun attrColor(attrRes: Int): Int {
@@ -40,18 +38,13 @@ data class ChartTheme(
                 return value.data
             }
 
-            val useAlternativeHeartRateColor = GBApplication.getPrefs()
-                .getBoolean(PREF_HEARTRATE_ALTERNATIVE_COLOR, false)
             val surface = MaterialColors.getColor(context, com.google.android.material.R.attr.colorSurface, Color.WHITE)
 
             return ChartTheme(
                 textColor = GBApplication.getTextColor(context),
                 secondaryTextColor = GBApplication.getSecondaryTextColor(context),
                 backgroundColor = GBApplication.getBackgroundColor(context),
-                heartRateColor = ContextCompat.getColor(
-                    context,
-                    if (useAlternativeHeartRateColor) R.color.chart_heartrate_alternative else R.color.chart_heartrate,
-                ),
+                heartRateColor = ContextCompat.getColor(context, GBApplication.getPrefs().chartsHeartRateColor.colorRes),
                 heartRateFillColor = ContextCompat.getColor(context, R.color.chart_heartrate_fill),
                 activityColor = attrColor(R.attr.chart_activity),
                 deepSleepColor = attrColor(R.attr.chart_deep_sleep),

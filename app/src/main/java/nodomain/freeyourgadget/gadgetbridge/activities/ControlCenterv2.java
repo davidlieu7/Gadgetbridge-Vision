@@ -33,6 +33,7 @@ import android.view.Menu;
 import android.view.MenuItem;
 import android.view.MotionEvent;
 import android.view.View;
+import android.view.ViewGroup;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
@@ -42,7 +43,6 @@ import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.graphics.Insets;
 import androidx.core.splashscreen.SplashScreen;
 import androidx.core.view.GravityCompat;
-import androidx.core.view.MenuProvider;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowInsetsCompat;
 import androidx.drawerlayout.widget.DrawerLayout;
@@ -78,6 +78,8 @@ import nodomain.freeyourgadget.gadgetbridge.R;
 import nodomain.freeyourgadget.gadgetbridge.activities.debug.DebugActivityV2;
 import nodomain.freeyourgadget.gadgetbridge.activities.discovery.DiscoveryActivityV2;
 import nodomain.freeyourgadget.gadgetbridge.activities.welcome.WelcomeActivity;
+import nodomain.freeyourgadget.gadgetbridge.activities.workouts.WorkoutListFragment;
+import nodomain.freeyourgadget.gadgetbridge.devices.DeviceManager;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
 import nodomain.freeyourgadget.gadgetbridge.model.ActivitySample;
 import nodomain.freeyourgadget.gadgetbridge.model.DeviceService;
@@ -92,7 +94,7 @@ import nodomain.freeyourgadget.gadgetbridge.util.PermissionsUtils;
 
 //TODO: extend AbstractGBActivity, but it requires actionbar that is not available
 public class ControlCenterv2 extends AppCompatActivity
-        implements NavigationView.OnNavigationItemSelectedListener, GBActivity {
+        implements NavigationView.OnNavigationItemSelectedListener, GBActivity, DashboardHost {
     private static final Logger LOG = LoggerFactory.getLogger(ControlCenterv2.class);
     public static final long REALTIME_HR_SAMPLE_TTL_MS = 5_000L;
     public static final int MENU_REFRESH_CODE = 1;
@@ -104,6 +106,10 @@ public class ControlCenterv2 extends AppCompatActivity
     private AlertDialog clDialog;
     private BarShade.ScrollListener barShades;
     private View toolbarShade;
+    private View mainContent;
+    private BottomNavigationView navigationView;
+    private boolean bottomNavigationEnabled;
+    private boolean pageBottomBarShown;
 
     enum NavTab {
         DASHBOARD("dashboard", R.id.bottom_nav_dashboard, R.string.bottom_nav_dashboard, R.drawable.ic_dashboard),
@@ -128,8 +134,9 @@ public class ControlCenterv2 extends AppCompatActivity
 
     private final SharedPreferences.OnSharedPreferenceChangeListener prefListener = (p, key) -> {
         if ("main_screens".equals(key)) {
-            rebuildBottomNav();
-            pagerAdapter.notifyDataSetChanged();
+            if (rebuildBottomNav()) {
+                updateBottomNavigationVisibility();
+            }
         }
     };
 
@@ -155,6 +162,12 @@ public class ControlCenterv2 extends AppCompatActivity
                     GBDevice dev = intent.getParcelableExtra(GBDevice.EXTRA_DEVICE);
                     if (dev != null && !dev.isBusy()) {
                         swipeLayout.setRefreshing(false);
+                    }
+                    break;
+                case DeviceManager.ACTION_DEVICES_CHANGED:
+                    LOG.debug("Devices changed, {} devices", GBApplication.app().getDeviceManager().getDevices().size());
+                    if (rebuildBottomNav()) {
+                        updateBottomNavigationVisibility();
                     }
                     break;
             }
@@ -200,7 +213,12 @@ public class ControlCenterv2 extends AppCompatActivity
         }
     }
 
-    private void rebuildBottomNav() {
+    /**
+     * Rebuilds the bottom navigation tabs from the preferences and the paired devices.
+     *
+     * @return true if the visible tabs have changed
+     */
+    private boolean rebuildBottomNav() {
         boolean supportsActivityTracking = false;
         boolean supportsRecordedActivities = false;
 
@@ -216,31 +234,38 @@ public class ControlCenterv2 extends AppCompatActivity
             if (supportsActivityTracking && supportsRecordedActivities) break;
         }
 
+        GBPrefs prefs = GBApplication.getPrefs();
+        List<String> mainScreensPref = prefs.getList("main_screens", Arrays.asList("dashboard", "workouts", "devices"));
+        final List<NavTab> tabs = new ArrayList<>();
+        Set<NavTab> seen = EnumSet.noneOf(NavTab.class);
+        for (String token : mainScreensPref) {
+            NavTab tab = NavTab.fromKey(token.trim());
+            if (tab == null || !seen.add(tab)) continue;
+            if (tab == NavTab.DASHBOARD && !supportsActivityTracking) continue;
+            if (tab == NavTab.WORKOUTS && !supportsRecordedActivities) continue;
+            tabs.add(tab);
+        }
+
+        // Fallback: Devices is always available, so the bar is never empty
+        if (tabs.isEmpty()) {
+            tabs.add(NavTab.DEVICES);
+        }
+
+        if (tabs.equals(visibleTabs)) {
+            // If nothing changed, don't do anything
+            return false;
+        }
+
         BottomNavigationView nav = findViewById(R.id.bottom_nav_bar);
         int selectedId = nav.getSelectedItemId();
         Menu menu = nav.getMenu();
         rebuildingNav = true;
         menu.clear();
         visibleTabs.clear();
-
-        GBPrefs prefs = GBApplication.getPrefs();
-        List<String> mainScreensPref = prefs.getList("main_screens", Arrays.asList("dashboard", "workouts", "devices"));
-        Set<NavTab> seen = EnumSet.noneOf(NavTab.class);
-        int order = 0;
-        for (String token : mainScreensPref) {
-            NavTab tab = NavTab.fromKey(token.trim());
-            if (tab == null || !seen.add(tab)) continue;
-            if (tab == NavTab.DASHBOARD && !supportsActivityTracking) continue;
-            if (tab == NavTab.WORKOUTS && !supportsRecordedActivities) continue;
-            menu.add(Menu.NONE, tab.itemId, order++, tab.titleRes).setIcon(tab.iconRes);
-            visibleTabs.add(tab);
-        }
-
-        // Fallback: Devices is always available, so the bar is never empty
-        if (visibleTabs.isEmpty()) {
-            NavTab d = NavTab.DEVICES;
-            menu.add(Menu.NONE, d.itemId, 0, d.titleRes).setIcon(d.iconRes);
-            visibleTabs.add(d);
+        visibleTabs.addAll(tabs);
+        for (int i = 0; i < tabs.size(); i++) {
+            final NavTab tab = tabs.get(i);
+            menu.add(Menu.NONE, tab.itemId, i, tab.titleRes).setIcon(tab.iconRes);
         }
 
         pagerAdapter.notifyDataSetChanged();   // adapter reads visibleTabs
@@ -250,6 +275,15 @@ public class ControlCenterv2 extends AppCompatActivity
         nav.setSelectedItemId(target.itemId);
         viewPager.setCurrentItem(visibleTabs.indexOf(target), false);
         rebuildingNav = false;
+        return true;
+    }
+
+    private void updateBottomNavigationVisibility() {
+        bottomNavigationEnabled = visibleTabs.size() > 1 && GBApplication.getPrefs().getBoolean("display_bottom_navigation_bar", true);
+        LOG.debug("Bottom navigation: tabs={}, enabled={}, pageBottomBarShown={}", visibleTabs, bottomNavigationEnabled, pageBottomBarShown);
+        navigationView.setVisibility(bottomNavigationEnabled && !pageBottomBarShown ? View.VISIBLE : View.GONE);
+        barShades.setBottomShade(bottomNavigationEnabled || pageBottomBarShown ? findViewById(R.id.bottom_nav_shade) : null);
+        ViewCompat.requestApplyInsets(mainContent);
     }
 
     private void selectDefaultTab() {
@@ -304,12 +338,7 @@ public class ControlCenterv2 extends AppCompatActivity
 
         // Initialize bottom navigation
         rebuildBottomNav();
-        BottomNavigationView navigationView = findViewById(R.id.bottom_nav_bar);
-        if (visibleTabs.size() > 1 && prefs.getBoolean("display_bottom_navigation_bar", true)) {
-            navigationView.setVisibility(View.VISIBLE);
-        } else {
-            navigationView.setVisibility(View.GONE);
-        }
+        navigationView = findViewById(R.id.bottom_nav_bar);
         navigationView.setOnItemSelectedListener(menuItem -> {
             NavTab tab = NavTab.fromItemId(menuItem.getItemId());
             int index = visibleTabs.indexOf(tab);
@@ -325,7 +354,7 @@ public class ControlCenterv2 extends AppCompatActivity
         // targetSdk 35 forces edge-to-edge. We intercept the insets on the ConstraintLayout
         // itself (main_content) and apply them directly to the toolbar. The drawer header is
         // padded here too.
-        final View mainContent = findViewById(R.id.main_content);
+        mainContent = findViewById(R.id.main_content);
         final int toolbarPaddingLeft = toolbar.getPaddingLeft();
         final int toolbarPaddingRight = toolbar.getPaddingRight();
         final int toolbarPaddingBottom = toolbar.getPaddingBottom();
@@ -338,7 +367,8 @@ public class ControlCenterv2 extends AppCompatActivity
             toolbar.setPadding(toolbarPaddingLeft, insets.top, toolbarPaddingRight, toolbarPaddingBottom);
             navigationView.setPadding(bottomNavPaddingLeft, bottomNavPaddingTop, bottomNavPaddingRight, insets.bottom);
             // #6894 - when the bottom nav is not visible, the FAB would show up behind the system navbar
-            final int contentPaddingBottom = navigationView.getVisibility() == View.VISIBLE ? 0 : insets.bottom;
+            // A bottom bar of the page applies the system navbar inset itself
+            final int contentPaddingBottom = navigationView.getVisibility() == View.VISIBLE || pageBottomBarShown ? 0 : insets.bottom;
             swipeLayout.setPadding(swipeLayout.getPaddingLeft(), swipeLayout.getPaddingTop(), swipeLayout.getPaddingRight(), contentPaddingBottom);
             navigationHeaderView.setPadding(headerPaddingLeft, insets.top, headerPaddingRight, headerPaddingBottom);
             return windowInsets;
@@ -357,9 +387,7 @@ public class ControlCenterv2 extends AppCompatActivity
         navigationView.setBackgroundColor(MaterialColors.getColor(navigationView, R.attr.main_bar_bg));
         toolbarShade = findViewById(R.id.toolbar_shade);
         barShades = new BarShade.ScrollListener(findViewById(R.id.main_content));
-        if (navigationView.getVisibility() == View.VISIBLE) {
-            barShades.setBottomShade(findViewById(R.id.bottom_nav_shade));
-        }
+        updateBottomNavigationVisibility();
 
         // A page's fragment, and its view, are created after the page is selected
         getSupportFragmentManager().registerFragmentLifecycleCallbacks(new FragmentManager.FragmentLifecycleCallbacks() {
@@ -381,8 +409,6 @@ public class ControlCenterv2 extends AppCompatActivity
 
         // Sync ViewPager changes with BottomNavigationView
         viewPager.registerOnPageChangeCallback(new ViewPager2.OnPageChangeCallback() {
-            private MenuProvider existingMenuProvider = null;
-
             @Override
             public void onPageSelected(int position) {
                 if (rebuildingNav || position >= visibleTabs.size()) return;
@@ -392,15 +418,12 @@ public class ControlCenterv2 extends AppCompatActivity
                 }
 
                 bindTopShade();
+            }
 
-                // Ensure the menu provider is set to the current fragment
-                if (existingMenuProvider != null) {
-                    ControlCenterv2.this.removeMenuProvider(existingMenuProvider);
-                }
-                final Fragment fragment = getSupportFragmentManager().findFragmentByTag("f" + position);
-                if (fragment instanceof MenuProvider) {
-                    existingMenuProvider = (MenuProvider) fragment;
-                    ControlCenterv2.this.addMenuProvider(existingMenuProvider);
+            @Override
+            public void onPageScrollStateChanged(final int state) {
+                if (state == ViewPager2.SCROLL_STATE_IDLE) {
+                    requestLostLayouts(viewPager.getChildAt(0));
                 }
             }
         });
@@ -454,6 +477,7 @@ public class ControlCenterv2 extends AppCompatActivity
         filterLocal.addAction(GBApplication.ACTION_QUIT);
         filterLocal.addAction(DeviceService.ACTION_REALTIME_SAMPLES);
         filterLocal.addAction(GBDevice.ACTION_DEVICE_CHANGED);
+        filterLocal.addAction(DeviceManager.ACTION_DEVICES_CHANGED);
         LocalBroadcastManager.getInstance(this).registerReceiver(mReceiver, filterLocal);
 
         // Open the Welcome flow on first run, only check permissions on next runs
@@ -483,14 +507,51 @@ public class ControlCenterv2 extends AppCompatActivity
     }
 
     /**
+     * Requests the layout again for each view that waits for a layout, but whose parent does not.
+     */
+    private static void requestLostLayouts(final View view) {
+        if (view.getVisibility() == View.GONE) {
+            return;
+        }
+        // The pager detaches and attaches a page again while it scrolls. After that, a view can
+        // wait for a layout that its parents do not request, so it does not get one.
+        if (view.isLayoutRequested() && view.getParent() instanceof View && !((View) view.getParent()).isLayoutRequested()) {
+            view.requestLayout();
+        }
+        if (view instanceof ViewGroup) {
+            final ViewGroup group = (ViewGroup) view;
+            for (int i = 0; i < group.getChildCount(); i++) {
+                requestLostLayouts(group.getChildAt(i));
+            }
+        }
+    }
+
+    /**
      * Uses the shade of the visible page, if it has one of its own, instead of the shade below
      * the toolbar.
      */
     private void bindTopShade() {
-        final Fragment fragment = getSupportFragmentManager().findFragmentByTag("f" + viewPager.getCurrentItem());
+        final Fragment fragment = getSupportFragmentManager().findFragmentByTag("f" + pagerAdapter.getItemId(viewPager.getCurrentItem()));
         final View headerShade = fragment instanceof HeaderShadePage
                 ? ((HeaderShadePage) fragment).getHeaderShade() : null;
         barShades.setTopShade(headerShade != null ? headerShade : toolbarShade);
+    }
+
+    /**
+     * Shows or hides the bottom bar of the current page. The bottom navigation is hidden while the bar shows.
+     */
+    public void setPageBottomBarShown(final boolean shown) {
+        if (shown == pageBottomBarShown) {
+            return;
+        }
+        pageBottomBarShown = shown;
+        updateBottomNavigationVisibility();
+    }
+
+    @Override
+    public void onDashboardEditingChanged(final boolean editing) {
+        setPageBottomBarShown(editing);
+        viewPager.setUserInputEnabled(!editing);
     }
 
     @Override
@@ -609,7 +670,7 @@ public class ControlCenterv2 extends AppCompatActivity
         public Fragment createFragment(int position) {
             return switch (visibleTabs.get(position)) {
                 case DASHBOARD -> new DashboardFragment();
-                case WORKOUTS -> new WorkoutsFragment();
+                case WORKOUTS -> new WorkoutListFragment();
                 default -> new DevicesFragment();
             };
         }

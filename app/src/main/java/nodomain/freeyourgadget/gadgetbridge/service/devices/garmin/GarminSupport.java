@@ -115,6 +115,7 @@ import nodomain.freeyourgadget.gadgetbridge.model.workouts.WorkoutTemplate;
 import nodomain.freeyourgadget.gadgetbridge.proto.garmin.GdiCore;
 import nodomain.freeyourgadget.gadgetbridge.proto.garmin.GdiDataTypes;
 import nodomain.freeyourgadget.gadgetbridge.proto.garmin.GdiDeviceStatus;
+import nodomain.freeyourgadget.gadgetbridge.proto.garmin.GdiDataTransfer;
 import nodomain.freeyourgadget.gadgetbridge.proto.garmin.GdiFileAccess;
 import nodomain.freeyourgadget.gadgetbridge.proto.garmin.GdiFindMyWatch;
 import nodomain.freeyourgadget.gadgetbridge.proto.garmin.GdiInstalledApps;
@@ -139,6 +140,7 @@ import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.deviceevents.
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.deviceevents.SupportedFileTypesDeviceEvent;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.deviceevents.WeatherRequestDeviceEvent;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.FitAsyncProcessor;
+import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.http.DataTransferHandler;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.FitFile;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.FitImporter;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.garmin.fit.FitLocalMessageBuilder;
@@ -179,8 +181,13 @@ import static nodomain.freeyourgadget.gadgetbridge.GBApplication.ACTION_APP_IS_I
 import static nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsPreferenceConst.PREF_ALLOW_HIGH_MTU;
 import static nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsPreferenceConst.PREF_HYDRATION_SEND_TODAY;
 import static nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsPreferenceConst.PREF_HYDRATION_UNIT;
+import static nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsPreferenceConst.PREF_KEEP_ACTIVITY_DATA_ON_DEVICE;
+import static nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsPreferenceConst.PREF_NEW_SYNC_PROTOCOL;
 import static nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsPreferenceConst.PREF_SEND_APP_NOTIFICATIONS;
 import static nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsPreferenceConst.PREF_TIME_SYNC;
+import static nodomain.freeyourgadget.gadgetbridge.devices.garmin.GarminPreferences.PREF_GARMIN_EXPLORE_SYNC;
+import static nodomain.freeyourgadget.gadgetbridge.devices.garmin.GarminPreferences.PREF_GARMIN_LEGACY_SYNC_FLUSH;
+import static nodomain.freeyourgadget.gadgetbridge.devices.garmin.GarminPreferences.PREF_GARMIN_MLR;
 import static nodomain.freeyourgadget.gadgetbridge.model.ActivityUser.PREF_USER_GOAL_HYDRATION_ML;
 import static nodomain.freeyourgadget.gadgetbridge.proto.garmin.GdiFileAccess.TransportProtocol.MULTILINK_TRANSPORT_PIPE;
 
@@ -474,7 +481,7 @@ public class GarminSupport extends AbstractBTLESingleDeviceSupport implements IC
             return;
         }
 
-        LOG.debug("INCOMING message: {}/{}: {}", parsedMessage, parsedMessage.getGarminMessage(), GB.lazyHexdump(message));
+        LOG.debug("INCOMING message {}/{}: {}", parsedMessage.getClass().getSimpleName(), parsedMessage.getGarminMessage(), GB.lazyHexdump(message));
         /*
         the handler elaborates the followup message but might change the status message since it does
         check the integrity of the incoming message payload. Hence we let the handlers elaborate the
@@ -597,6 +604,7 @@ public class GarminSupport extends AbstractBTLESingleDeviceSupport implements IC
             LOG.debug("Got new max packet size of {}", maxPacketSizeDeviceEvent.getMaxPacketSize());
             maxPacketSize = maxPacketSizeDeviceEvent.getMaxPacketSize();
             fileTransferHandler.setMaxPacketSize(maxPacketSizeDeviceEvent.getMaxPacketSize());
+            protocolBufferHandler.setMaxPacketSize(maxPacketSizeDeviceEvent.getMaxPacketSize());
         } else if (deviceEvent instanceof SupportedFileTypesDeviceEvent) {
             this.supportedFileTypeList.clear();
             this.supportedFileTypeList.addAll(((SupportedFileTypesDeviceEvent) deviceEvent).getSupportedFileTypes());
@@ -660,7 +668,7 @@ public class GarminSupport extends AbstractBTLESingleDeviceSupport implements IC
      * @noinspection BooleanMethodIsAlwaysInverted
      */
     private boolean getKeepActivityDataOnDevice() {
-        return getDevicePrefs().getBoolean("keep_activity_data_on_device", false);
+        return getDevicePrefs().getBoolean(PREF_KEEP_ACTIVITY_DATA_ON_DEVICE, false);
     }
 
     @Override
@@ -675,7 +683,7 @@ public class GarminSupport extends AbstractBTLESingleDeviceSupport implements IC
             requestBatteryUpdate();
         }
 
-        if (newSyncProtocol() && !getDevicePrefs().getBoolean("garmin_legacy_sync_flush", true)) {
+        if (newSyncProtocol() && !getDevicePrefs().getBoolean(PREF_GARMIN_LEGACY_SYNC_FLUSH, true)) {
             // #6700 - Some firmwares will freeze on the legacy sync request
             LOG.warn("Legacy sync flush is disabled - requesting file list directly");
             sendProtobufRequest("directly request file list",
@@ -712,11 +720,11 @@ public class GarminSupport extends AbstractBTLESingleDeviceSupport implements IC
     }
 
     public boolean newSyncProtocol() {
-        return getDevicePrefs().getBoolean("new_sync_protocol", false);
+        return getDevicePrefs().getBoolean(PREF_NEW_SYNC_PROTOCOL, false);
     }
 
     public boolean mlrEnabled() {
-        return getDevicePrefs().getBoolean("garmin_mlr", true);
+        return getDevicePrefs().getBoolean(PREF_GARMIN_MLR, true);
     }
 
     @Override
@@ -879,8 +887,9 @@ public class GarminSupport extends AbstractBTLESingleDeviceSupport implements IC
         if (message == null)
             return;
         byte[] out = message.getOutgoingMessage();
-        if (out != null && LOG.isDebugEnabled())
-            LOG.debug("OUTGOING message {}: {}", message, GB.lazyHexdump(out));
+        if (out != null && LOG.isDebugEnabled()) {
+            LOG.debug("OUTGOING message {}: {}", message.getClass().getSimpleName(), GB.lazyHexdump(out));
+        }
         if (isRfcommThread()) {
             rfcommListener.sendMessage(out);
             return;
@@ -896,8 +905,9 @@ public class GarminSupport extends AbstractBTLESingleDeviceSupport implements IC
         if (message == null)
             return;
         byte[] ack = message.getAckBytestream();
-        if (ack != null && LOG.isDebugEnabled())
-            LOG.debug("OUTGOING ACK {}: {}", message, GB.lazyHexdump(ack));
+        if (ack != null && LOG.isDebugEnabled()) {
+            LOG.debug("OUTGOING ACK {}: {}", message.getClass().getSimpleName(), GB.lazyHexdump(ack));
+        }
         if (isRfcommThread()) {
             rfcommListener.sendMessage(ack);
             return;
@@ -1293,7 +1303,7 @@ public class GarminSupport extends AbstractBTLESingleDeviceSupport implements IC
         getDevice().sendDeviceUpdateIntent(getContext());
 
         if (getCoordinator().supports(getDevice(), GarminCapability.EXPLORE_SYNC)) {
-            if (getDevicePrefs().getBoolean("garmin_exploresync", false)) {
+            if (getDevicePrefs().getBoolean(PREF_GARMIN_EXPLORE_SYNC, false)) {
                 protocolBufferHandler.getExploreSyncHandler().startSession();
             }
         }
@@ -1942,6 +1952,10 @@ public class GarminSupport extends AbstractBTLESingleDeviceSupport implements IC
             error = file.getName();
         }
 
+        notifyWatchError(file, getContext().getString(R.string.garmin_connect_iq_error_report), error);
+    }
+
+    private void notifyWatchError(final File file, final String title, final String content) {
         final Intent viewIntent = new Intent(getContext(), TextFileViewerActivity.class);
         viewIntent.putExtra(TextFileViewerActivity.EXTRA_PATH, file.getAbsolutePath());
         final PendingIntent viewPendingIntent = PendingIntent.getActivity(
@@ -1953,8 +1967,8 @@ public class GarminSupport extends AbstractBTLESingleDeviceSupport implements IC
 
         final Notification notification = new NotificationCompat.Builder(getContext(), GB.NOTIFICATION_CHANNEL_ID_DEVICE_WARNINGS)
                 .setSmallIcon(R.drawable.ic_warning)
-                .setContentTitle(getContext().getString(R.string.garmin_connect_iq_error_report))
-                .setContentText(error)
+                .setContentTitle(title)
+                .setContentText(content)
                 .setOnlyAlertOnce(true)
                 .setAutoCancel(true)
                 .setContentIntent(viewPendingIntent)
@@ -2116,6 +2130,13 @@ public class GarminSupport extends AbstractBTLESingleDeviceSupport implements IC
                         if (BuildConfig.DEBUG && "IQErrorReports".equals(typeName)) {
                             notifyConnectIqErrorReport(outputFile, inflated);
                         }
+                        if (BuildConfig.DEBUG && "ErrorShutdownReports".equals(typeName)) {
+                            notifyWatchError(
+                                outputFile,
+                                getContext().getString(R.string.app_crash_notification_title, getDevice().getAliasOrName()),
+                                "Received ErrorShutdownReports"
+                            );
+                        }
                     } catch (final IOException e) {
                         LOG.error("Failed to save file", e);
                         if (currentlyDownloading != null && currentlyDownloading.getSyncFile() != null) {
@@ -2162,9 +2183,12 @@ public class GarminSupport extends AbstractBTLESingleDeviceSupport implements IC
         });
     }
 
-    private PendingItemPush pendingItemPush;
+    private PendingItemPush activeItemPush;
+    private final Queue<PendingItemPush> queuedItemPushes = new LinkedList<>();
 
     private record PendingItemPush(CommunicatorV2 communicatorV2,
+                                   GdiFileAccess.ItemReference item,
+                                   int priority,
                                    byte[] compressed,
                                    String taskName,
                                    FileTransferHandler.UploadListener listener) {
@@ -2192,24 +2216,11 @@ public class GarminSupport extends AbstractBTLESingleDeviceSupport implements IC
                                   final byte[] rawPrgBytes,
                                   final String taskName,
                                   final FileTransferHandler.UploadListener listener) {
-        final PendingItemPush pending = pendingItemPush;
-        if (pending != null) {
-            // TODO we could have a queue
-            LOG.error("Will not {}, already pending {}", taskName, pending.taskName);
-            listener.onComplete(false);
-            return;
-        }
         final FileType.FILETYPE prgFileType = GarminPrgFile.getFileType(rawPrgBytes);
         if (prgFileType == null) {
             listener.onComplete(false);
             return;
         }
-
-        final byte[] compressed = CompressionUtils.INSTANCE.deflateStored(rawPrgBytes, 1024);
-
-        LOG.info("{} via MLR transfer ({} bytes raw, {} bytes compressed)", taskName, rawPrgBytes.length, compressed.length);
-
-        pendingItemPush = new PendingItemPush(communicatorV2, compressed, taskName, listener);
 
         final GdiDataTypes.UUID fileId = GdiDataTypes.UUID.newBuilder()
                 .setMostSignificant(-1L)
@@ -2225,25 +2236,101 @@ public class GarminSupport extends AbstractBTLESingleDeviceSupport implements IC
                 .setDataSize(rawPrgBytes.length)
                 .build();
 
-        sendProtobufRequest("reserve app install slot for " + taskName,
+        pushItemViaMlr(communicatorV2, file, 37, rawPrgBytes, taskName, listener);
+    }
+
+    /**
+     * Sends a data_xfer item over a MLR file transfer, after the watch requested access to it.
+     */
+    public void pushDataXferItem(final GdiDataTransfer.FileAccessItemResponse fileAccessItem) {
+        final int dataId = fileAccessItem.getDataXferId();
+        final byte[] data = DataTransferHandler.getData(dataId);
+        if (data == null) {
+            LOG.error("No data to push for data_xfer id {}", dataId);
+            return;
+        }
+        if (!(communicator instanceof CommunicatorV2 communicatorV2) || !mlrEnabled()) {
+            LOG.error("Unable to push data_xfer id {} without MLR", dataId);
+            DataTransferHandler.onDataPushed(dataId, false);
+            return;
+        }
+
+        final GdiFileAccess.ItemReference item = GdiFileAccess.ItemReference.newBuilder()
+            .setUid(fileAccessItem.getFileAccessItemUid())
+            .setDataType(GdiFileAccess.DataType.newBuilder().setFormat(GdiFileAccess.DataType.Format.DATA_XFER))
+            .setDataSize(data.length)
+            .build();
+
+        pushItemViaMlr(communicatorV2, item, 34, data, "push data_xfer " + dataId, new FileTransferHandler.UploadListener() {
+            @Override
+            public void onProgress(final int percentage) {
+            }
+
+            @Override
+            public void onComplete(final boolean success) {
+                DataTransferHandler.onDataPushed(dataId, success);
+            }
+        });
+    }
+
+    /**
+     * Pushes an item over a MLR file transfer. If an item is already being pushed, the new one gets queued.
+     */
+    private void pushItemViaMlr(final CommunicatorV2 communicatorV2,
+                                final GdiFileAccess.ItemReference item,
+                                final int priority,
+                                final byte[] rawBytes,
+                                final String taskName,
+                                final FileTransferHandler.UploadListener listener) {
+        final byte[] compressed = CompressionUtils.INSTANCE.deflateStored(rawBytes, 1024);
+
+        LOG.info("{} via MLR transfer ({} bytes raw, {} bytes compressed)", taskName, rawBytes.length, compressed.length);
+
+        final PendingItemPush push = new PendingItemPush(communicatorV2, item, priority, compressed, taskName, listener);
+        synchronized (queuedItemPushes) {
+            if (activeItemPush != null) {
+                LOG.debug("Queueing {}, already running {}", taskName, activeItemPush.taskName());
+                queuedItemPushes.add(push);
+                return;
+            }
+            activeItemPush = push;
+        }
+        startItemPush(push);
+    }
+
+    private void startItemPush(final PendingItemPush push) {
+        sendProtobufRequest("reserve push slot for " + push.taskName(),
                 Smart.newBuilder().setFileAccessService(
                         GdiFileAccess.Service.newBuilder().setPushItemRequest(
                                 GdiFileAccess.PushItemDataRequest.newBuilder()
-                                        .setItem(file)
-                                        .setPriority(37)
+                                        .setItem(push.item())
+                                        .setPriority(push.priority())
                                         .addSupportedTransports(MULTILINK_TRANSPORT_PIPE)
                                         .setRequestedCompressionWindow(15)
                         )
                 ).build());
     }
 
+    private void onItemPushFinished() {
+        final PendingItemPush next;
+        synchronized (queuedItemPushes) {
+            next = queuedItemPushes.poll();
+            activeItemPush = next;
+        }
+        if (next != null) {
+            startItemPush(next);
+        }
+    }
+
     public void onPushItemResponse(final GdiFileAccess.PushItemDataResponse response) {
-        final PendingItemPush pending = pendingItemPush;
+        final PendingItemPush pending;
+        synchronized (queuedItemPushes) {
+            pending = activeItemPush;
+        }
         if (pending == null) {
             LOG.warn("Got push item response, but no push is pending: {}", response);
             return;
         }
-        pendingItemPush = null;
 
         final int token = response.getTransferHandle();
         LOG.info("Got push item response token {} for {}", token, pending.taskName());
@@ -2271,7 +2358,7 @@ public class GarminSupport extends AbstractBTLESingleDeviceSupport implements IC
 
             @Override
             public void onMessage(final byte[] value) {
-                LOG.debug("PRG install transfer message ({} bytes): {}", value.length, GB.hexdump(value));
+                LOG.debug("Push transfer message for {} ({} bytes): {}", pending.taskName(), value.length, GB.hexdump(value));
                 if (dataQueued) {
                     return;
                 }
@@ -2298,8 +2385,9 @@ public class GarminSupport extends AbstractBTLESingleDeviceSupport implements IC
 
             @Override
             public void onClose() {
-                LOG.info("PRG file transfer for {} closed, fully sent = {}", pending.taskName(), fullySent);
+                LOG.info("Push transfer for {} closed, fully sent = {}", pending.taskName(), fullySent);
                 pending.listener().onComplete(fullySent);
+                onItemPushFinished();
             }
         }, true);
     }

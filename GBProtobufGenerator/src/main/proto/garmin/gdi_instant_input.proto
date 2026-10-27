@@ -4,7 +4,7 @@ package GDI.Proto.InstantInput;
 option java_package = "nodomain.freeyourgadget.gadgetbridge.proto.garmin";
 option java_outer_classname = "GdiInstantInput";
 
-enum CommandResult {;
+enum CommandResult {
     UNKNOWN = 0;
     SUCCESS = 1;
     FAILURE = 2;
@@ -16,11 +16,12 @@ message InstantInputEndRequest {
         CANCEL = 1;
         CONFIRM = 2;
     }
-    optional Command command = 1;
+
+    optional GDI.Proto.InstantInput.InstantInputEndRequest.Command command = 1;
 }
 
 message InstantInputEndResponse {
-    optional CommandResult result = 1;
+    optional GDI.Proto.InstantInput.CommandResult result = 1;
 }
 
 message InstantInputMessage {
@@ -32,13 +33,13 @@ message InstantInputRestartRequest {
 }
 
 message InstantInputService {
-    optional InstantInputMessage input_content = 1;
-    optional InstantInputStartRequest start_request = 2;
-    optional InstantInputStartResponse start_response = 3;
-    optional InstantInputEndRequest end_request = 4;
-    optional InstantInputEndResponse end_response = 5;
-    optional InstantInputRestartRequest restart_request = 6;
-    optional InstantInputSyncRequest sync_request = 7;
+    optional GDI.Proto.InstantInput.InstantInputMessage input_content = 1;
+    optional GDI.Proto.InstantInput.InstantInputStartRequest start_request = 2;
+    optional GDI.Proto.InstantInput.InstantInputStartResponse start_response = 3;
+    optional GDI.Proto.InstantInput.InstantInputEndRequest end_request = 4;
+    optional GDI.Proto.InstantInput.InstantInputEndResponse end_response = 5;
+    optional GDI.Proto.InstantInput.InstantInputRestartRequest restart_request = 6;
+    optional GDI.Proto.InstantInput.InstantInputSyncRequest sync_request = 7;
 }
 
 message InstantInputStartRequest {
@@ -47,15 +48,16 @@ message InstantInputStartRequest {
         RENAME = 1;
         POI_SEARCH = 2;
     }
+
     optional uint32 code_page = 1;
     optional uint32 max_size = 2;
     optional string content = 3;
     optional uint32 content_size = 4;
-    optional Command command = 5;
+    optional GDI.Proto.InstantInput.InstantInputStartRequest.Command command = 5;
 }
 
 message InstantInputStartResponse {
-    optional CommandResult result = 1;
+    optional GDI.Proto.InstantInput.CommandResult result = 1;
 }
 
 message InstantInputSyncRequest {

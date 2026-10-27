@@ -4,13 +4,8 @@ package GDI.Proto.GarminConnect;
 option java_package = "nodomain.freeyourgadget.gadgetbridge.proto.garmin.GdiLaunchMonitorService";
 option java_outer_classname = "GdiGarminConnect";
 
-enum Priority {
-    STANDARD = 0;
-    USER_INITIATED = 1;
-}
-
 message CheckDownloadQueueRequest {
-    optional Priority priority = 1;
+    optional GDI.Proto.GarminConnect.Priority priority = 1;
     optional bool force_beta_software_update_check = 2;
 }
 
@@ -19,7 +14,8 @@ message CheckDownloadQueueResponse {
         SUCCESS = 0;
         FAIL_NO_CONNECTIVITY = 1;
     }
-    optional Status status = 1;
+
+    optional GDI.Proto.GarminConnect.CheckDownloadQueueResponse.Status status = 1;
 }
 
 message ClientFeatureCapabilities {
@@ -31,7 +27,7 @@ message ContactsUpdateRequestNotification {
 }
 
 message CutWellnessFilesRequest {
-    optional Priority priority = 1;
+    optional GDI.Proto.GarminConnect.Priority priority = 1;
 }
 
 message CutWellnessFilesResponse {
@@ -40,10 +36,16 @@ message CutWellnessFilesResponse {
         IGNORED = 1;
         NOT_SUPPORTED = 2;
     }
-    optional Status status = 1;
+
+    optional GDI.Proto.GarminConnect.CutWellnessFilesResponse.Status status = 1;
 }
 
 message LifestyleLoggingUpdateRequestNotification {
+}
+
+enum Priority {
+    STANDARD = 0;
+    USER_INITIATED = 1;
 }
 
 message ServerFeatureCapabilities {
@@ -52,13 +54,13 @@ message ServerFeatureCapabilities {
 }
 
 message Service {
-    optional CheckDownloadQueueRequest check_download_queue_request = 1;
-    optional CheckDownloadQueueResponse check_download_queue_response = 2;
-    optional CutWellnessFilesRequest cut_wellness_files_request = 3;
-    optional CutWellnessFilesResponse cut_wellness_files_response = 4;
-    optional WellnessThresholdMetNotification wellness_threshold_met_notification = 5;
-    optional ContactsUpdateRequestNotification contacts_update_request_notification = 6;
-    optional LifestyleLoggingUpdateRequestNotification lifestyle_logging_update_request_notification = 7;
+    optional GDI.Proto.GarminConnect.CheckDownloadQueueRequest check_download_queue_request = 1;
+    optional GDI.Proto.GarminConnect.CheckDownloadQueueResponse check_download_queue_response = 2;
+    optional GDI.Proto.GarminConnect.CutWellnessFilesRequest cut_wellness_files_request = 3;
+    optional GDI.Proto.GarminConnect.CutWellnessFilesResponse cut_wellness_files_response = 4;
+    optional GDI.Proto.GarminConnect.WellnessThresholdMetNotification wellness_threshold_met_notification = 5;
+    optional GDI.Proto.GarminConnect.ContactsUpdateRequestNotification contacts_update_request_notification = 6;
+    optional GDI.Proto.GarminConnect.LifestyleLoggingUpdateRequestNotification lifestyle_logging_update_request_notification = 7;
 }
 
 message WellnessThresholdMetNotification {

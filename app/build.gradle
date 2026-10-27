@@ -309,6 +309,7 @@ dependencies {
     testImplementation libs.mockito
     testImplementation libs.robolectric
     testImplementation libs.hamcrest
+    testImplementation libs.kotlinx.coroutines.test
 
     implementation libs.androidx.core.ktx
     implementation libs.androidx.core.splashscreen

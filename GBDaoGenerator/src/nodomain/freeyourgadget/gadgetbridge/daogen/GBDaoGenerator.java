@@ -110,7 +110,7 @@ public class GBDaoGenerator {
             outputDir.mkdirs();
         }
 
-        final Schema schema = new Schema(158, MAIN_PACKAGE + ".entities");
+        final Schema schema = new Schema(160, MAIN_PACKAGE + ".entities");
 
         final List<Entity> sampleProvidersToGenerate = new LinkedList<>();
         final List<Entity> batterySampleProvidersToGenerate = new LinkedList<>();
@@ -290,8 +290,12 @@ public class GBDaoGenerator {
 
         addNotificationFilterEntry(schema, notificationFilter);
 
-        addActivitySummary(schema, user, device);
-        addWorkoutUpload(schema);
+        final Entity notificationAppConfigEntry = addNotificationAppConfigEntry(schema);
+        addNotificationAppFilterEntry(schema, notificationAppConfigEntry);
+        addNotificationAppReplacementEntry(schema, notificationAppConfigEntry);
+
+        final Entity activitySummary = addActivitySummary(schema, user, device);
+        addWorkoutUpload(schema, activitySummary);
         final Entity workoutTemplate = addWorkoutTemplate(schema, device);
         addWorkoutTemplateStep(schema, workoutTemplate);
         // FIXME: BatteryLevel timestamp is in seconds, maybe migrate it once #6177 is merged
@@ -321,10 +325,14 @@ public class GBDaoGenerator {
         addGenericDurationSample(schema, user, device);
 
         validateSerializableEntities(schema);
+        final DeviceDataTablesGenerator deviceDataTablesGenerator = new DeviceDataTablesGenerator(schema, device);
+        deviceDataTablesGenerator.validate();
 
         deleteOldFiles();
 
         new DaoGenerator().generateAll(schema, OUTPUT_DIR);
+
+        deviceDataTablesGenerator.generate(loadTemplate("gadgetbridge/device-data-tables.ftl"), OUTPUT_DIR);
 
         final long start = System.currentTimeMillis();
 
@@ -749,6 +757,7 @@ public class GBDaoGenerator {
         sample.addIntProperty("lightSleepDuration");
         sample.addIntProperty("remSleepDuration");
         sample.addIntProperty("awakeDuration");
+        sample.addLongProperty("intoBedTime");
         return sample;
     }
 
@@ -1835,6 +1844,60 @@ public class GBDaoGenerator {
         notificationFilterEntry.addToOne(notificationFilterEntity, notificationFilterId);
     }
 
+    private static Entity addNotificationAppConfigEntry(final Schema schema) {
+        final Entity config = addEntity(schema, "NotificationAppConfigEntry");
+        config.setJavaDoc("The notification config for one app, global for all devices.");
+        config.addIdProperty().autoincrement();
+        final Property packageName = config.addStringProperty("packageName").notNull()
+                .javaDocGetterAndSetter("The app's package name, or the reserved value '*' if it applies to all apps.")
+                .getProperty();
+        final Index indexUnique = new Index();
+        indexUnique.addProperty(packageName);
+        indexUnique.makeUnique();
+        config.addIndex(indexUnique);
+
+        config.addStringProperty("sendState").notNull();
+        config.addStringProperty("pebbleState").notNull();
+
+        config.addStringProperty("filterMode").notNull();
+        config.addStringProperty("filterMatch").notNull();
+        config.addStringProperty("filterSyntax").notNull();
+        config.addBooleanProperty("filterIgnoreCase").notNull();
+
+        config.addStringProperty("privacyMode").notNull();
+        config.addStringProperty("whenScreenOn").notNull();
+        config.addStringProperty("preferLongText").notNull();
+        config.addStringProperty("blockIfOutOfNotificationTimes").notNull();
+        config.addStringProperty("ignoreLowPriority").notNull();
+        config.addBooleanProperty("forwardLocalOnly").notNull();
+
+        return config;
+    }
+
+    private static void addNotificationAppFilterEntry(final Schema schema, final Entity config) {
+        final Entity entry = addEntity(schema, "NotificationAppFilterEntry");
+        entry.setJavaDoc("One word or regular expression, for a NotificationAppConfigEntry filter.");
+        entry.addIdProperty().autoincrement();
+        final Property configId = entry.addLongProperty("configId").notNull().getProperty();
+        entry.addToOne(config, configId);
+        entry.addIntProperty("position").notNull();
+        entry.addStringProperty("content").notNull();
+    }
+
+    private static void addNotificationAppReplacementEntry(final Schema schema, final Entity config) {
+        final Entity replacement = addEntity(schema, "NotificationAppReplacementEntry");
+        replacement.setJavaDoc("One text replacement rule of a NotificationAppConfigEntry.");
+        replacement.addIdProperty().autoincrement();
+        final Property configId = replacement.addLongProperty("configId").notNull().getProperty();
+        replacement.addToOne(config, configId);
+        replacement.addIntProperty("position").notNull();
+        replacement.addStringProperty("pattern").notNull();
+        replacement.addStringProperty("replacement").notNull();
+        replacement.addStringProperty("target").notNull();
+        replacement.addBooleanProperty("ignoreCase").notNull();
+        replacement.addBooleanProperty("enabled").notNull();
+    }
+
     private static Entity addNotificationFilters(Schema schema) {
         Entity notificationFilter = addEntity(schema, "NotificationFilter");
         Property appIdentifier = notificationFilter.addStringProperty("appIdentifier").notNull().getProperty();
@@ -1864,7 +1927,7 @@ public class GBDaoGenerator {
         pebbleAppstoreIdEntry.addIndex(indexUnique);
     }
 
-    private static void addActivitySummary(Schema schema, Entity user, Entity device) {
+    private static Entity addActivitySummary(Schema schema, Entity user, Entity device) {
         Entity summary = addEntity(schema, "BaseActivitySummary");
         summary.implementsInterface(ACTIVITY_SUMMARY);
         summary.addIdProperty();
@@ -1892,16 +1955,18 @@ public class GBDaoGenerator {
         summary.addToOne(user, userId);
         summary.addStringProperty("summaryData").codeBeforeGetter(OVERRIDE);
         summary.addByteArrayProperty("rawSummaryData");
+        return summary;
     }
 
-    private static void addWorkoutUpload(Schema schema) {
+    private static void addWorkoutUpload(Schema schema, Entity activitySummary) {
         Entity upload = addEntity(schema, "WorkoutUpload");
         upload.implementsSerializable();
         upload.setJavaDoc(
                 "Tracks the upload of a workout summary to an external service (Endurain, Wanderer).\n"
                 + "Keyed by (summaryId, service). Stores the remote activity id and status so a workout\n"
                 + "is never uploaded twice and later edits can be re-synced.");
-        upload.addLongProperty("summaryId").primaryKey().notNull();
+        final Property summaryId = upload.addLongProperty("summaryId").primaryKey().notNull().getProperty();
+        activitySummary.addToMany(upload, summaryId);
         upload.addIntProperty("service").primaryKey().notNull();
         upload.addStringProperty("remoteActivityId");
         upload.addIntProperty("status").notNull();
@@ -2752,6 +2817,7 @@ public class GBDaoGenerator {
         Entity reading = addEntity(schema, "XiaomiHipeeP1Reading");
         reading.addIdProperty().autoincrement();
         Property deviceId = reading.addLongProperty("deviceId").notNull().getProperty();
+        reading.addToOne(device, deviceId);
         Property recordType = reading.addIntProperty("recordType").notNull().getProperty();
         Property dataNum = reading.addIntProperty("dataNum").notNull().getProperty();
         Property dataCount = reading.addIntProperty("dataCount").notNull().getProperty();

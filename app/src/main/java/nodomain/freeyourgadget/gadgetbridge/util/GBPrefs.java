@@ -39,6 +39,8 @@ import java.util.Locale;
 
 import nodomain.freeyourgadget.gadgetbridge.GBApplication;
 import nodomain.freeyourgadget.gadgetbridge.activities.SettingsActivity;
+import nodomain.freeyourgadget.gadgetbridge.activities.charts.ChartsHeartRateColor;
+import nodomain.freeyourgadget.gadgetbridge.activities.charts.ChartsRange;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
 import nodomain.freeyourgadget.gadgetbridge.model.DistanceUnit;
 import nodomain.freeyourgadget.gadgetbridge.model.TemperatureUnit;
@@ -116,6 +118,8 @@ public class GBPrefs extends Prefs {
 
     public static final String CHART_MAX_HEART_RATE = "chart_max_heart_rate";
     public static final String CHART_MIN_HEART_RATE = "chart_min_heart_rate";
+    public static final String CHARTS_HEART_RATE_COLOR = "chart_heartrate_color_mode";
+    public static final String CHARTS_RANGE = "charts_range_period";
 
     public static final String LAST_DEVICE_ADDRESSES = "last_device_addresses";
     public static final String LAST_CONNECTED_TS = "last_connected_ts";
@@ -252,6 +256,24 @@ public class GBPrefs extends Prefs {
             LOG.error("Error reading distance unit preference", e);
         }
         return DistanceUnit.METRIC;
+    }
+
+    public ChartsHeartRateColor getChartsHeartRateColor() {
+        try {
+            return ChartsHeartRateColor.valueOf(getString(CHARTS_HEART_RATE_COLOR, "red").toUpperCase(Locale.ROOT));
+        } catch (final Exception e) {
+            LOG.error("Error reading charts heart rate color preference", e);
+        }
+        return ChartsHeartRateColor.RED;
+    }
+
+    public ChartsRange getChartsRange() {
+        try {
+            return ChartsRange.valueOf(getString(CHARTS_RANGE, "month").toUpperCase(Locale.ROOT));
+        } catch (final Exception e) {
+            LOG.error("Error reading charts range preference", e);
+        }
+        return ChartsRange.MONTH;
     }
 
     public boolean syncTime() {

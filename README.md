@@ -46,11 +46,17 @@ Please see the [Gadgets](https://gadgetbridge.org/gadgets/) page on the website 
 Please see the [Features](https://gadgetbridge.org/basics/features/) page on the website.
 
 ## Authors
+
 ### Core Team (in order of first code contribution)
 
 * Andreas Shimokawa
-* Carsten Pfeiffer
 * Daniele Gobbetti
+* José Rebelo
+* Arjan Schrijver
+
+### Former Core Contributors (currently inactive)
+
+* Carsten Pfeiffer
 * Petr Vaněk
 
 ### Additional contributors
@@ -72,8 +78,6 @@ Please see the [Features](https://gadgetbridge.org/basics/features/) page on the
 * Taavi Eomäe (iTag)
 * Erik Bloß (TLW64)
 * Yukai Li (Lefun)
-* José Rebelo (Roidmi, Sony Headphones, Miband 7)
-* Arjan Schrijver (Fossil Hybrid HR watchfaces)
 
 ## Contribute
 

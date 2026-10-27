@@ -845,6 +845,11 @@ public class TestDeviceCoordinator extends AbstractDeviceCoordinator {
     }
 
     @Override
+    public boolean supportsAppNotifications(@NonNull final GBDevice device) {
+        return supports(device, TestFeature.APP_NOTIFICATIONS);
+    }
+
+    @Override
     public boolean supportsNavigation(@NonNull final GBDevice device) {
         return supports(device, TestFeature.NAVIGATION);
     }

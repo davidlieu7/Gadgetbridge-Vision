@@ -5,50 +5,9 @@ option java_package = "nodomain.freeyourgadget.gadgetbridge.proto.garmin";
 option java_outer_classname = "GdiGenericItemTransfer";
 
 import "garmin/gdi_data_types.proto";
-import "garmin/gdi_in_reach_tracking.proto";
-
-message GenericItemTransferService {
-    optional ArbitraryItemRequest arbitrary_item_request = 1;
-    optional ArbitraryItemResponse arbitrary_item_response = 2;
-    optional ItemListRequest item_list_request = 3;
-    optional ItemListResponse item_list_response = 4;
-    optional ItemRequest item_data_request = 5;
-    optional ItemResponse item_data_response = 6;
-    optional CancelSessionRequest cancel_session_request = 9;
-    optional CancelSessionResponse cancel_session_response = 10;
-    optional SessionCompletedNotification session_completed_notification = 11;
-}
-
-enum SessionEndReason {
-    COMPLETE = 1;
-    ERROR = 2;
-    TIMEOUT = 3;
-    USER_CANCEL = 4;
-    SHUTDOWN = 5;
-    RESTART = 6;
-    APP_RESTRICTION = 7;
-    APP_CLOSE = 8;
-}
-
-message DataTypeConfig {
-    optional GDI.Proto.InReachTracking.DataTypeConfigExt config_ext = 101;
-}
-
-message DataTypeStatus {
-}
-
-message GenericItem {
-    optional uint32 data_transfer_id = 1;
-    optional uint32 data_transfer_size = 2;
-}
-
-message GenericItemReference {
-    optional GDI.Proto.DataTypes.UUID uuid = 1;
-    optional GDI.Proto.InReachTracking.GenericItemReferenceExt reference_ext = 101;
-}
 
 message ArbitraryItemRequest {
-    optional DataTypeConfig config = 1;
+    optional GDI.Proto.GenericItemTransfer.DataTypeConfig config = 1;
     optional uint32 item_request_count = 2;
 }
 
@@ -63,15 +22,63 @@ message ArbitraryItemResponse {
         SYSTEM_IS_BUSY = 7;
         TRANSFER_LIMIT = 8;
     }
-    optional Status status = 1;
-    optional DataTypeStatus data_type_status = 2;
+
+    required GDI.Proto.GenericItemTransfer.ArbitraryItemResponse.Status status = 1;
+    optional GDI.Proto.GenericItemTransfer.DataTypeStatus data_type_status = 2;
     optional uint32 session_id = 3;
     optional uint32 max_request_count = 4;
 }
 
+message CancelSessionRequest {
+    required uint32 session_id = 1;
+    optional GDI.Proto.GenericItemTransfer.SessionEndReason reason = 2;
+    optional GDI.Proto.GenericItemTransfer.DataTypeStatus data_type_status = 3;
+}
+
+message CancelSessionResponse {
+    enum Status {
+        SUCCESS = 1;
+        ERROR = 2;
+        INVALID_SESSION_ID = 3;
+    }
+
+    required GDI.Proto.GenericItemTransfer.CancelSessionResponse.Status status = 1;
+}
+
+message DataTypeConfig {
+    extensions 100 to max;
+}
+
+message DataTypeStatus {
+    extensions 100 to max;
+}
+
+message GenericItem {
+    extensions 100 to max;
+    optional uint32 data_transfer_id = 1;
+    optional uint32 data_transfer_size = 2;
+}
+
+message GenericItemReference {
+    extensions 100 to max;
+    optional GDI.Proto.DataTypes.UUID uuid = 1;
+}
+
+message GenericItemTransferService {
+    optional GDI.Proto.GenericItemTransfer.ArbitraryItemRequest arbitrary_item_request = 1;
+    optional GDI.Proto.GenericItemTransfer.ArbitraryItemResponse arbitrary_item_response = 2;
+    optional GDI.Proto.GenericItemTransfer.ItemListRequest item_list_request = 3;
+    optional GDI.Proto.GenericItemTransfer.ItemListResponse item_list_response = 4;
+    optional GDI.Proto.GenericItemTransfer.ItemRequest item_data_request = 5;
+    optional GDI.Proto.GenericItemTransfer.ItemResponse item_data_response = 6;
+    optional GDI.Proto.GenericItemTransfer.CancelSessionRequest cancel_session_request = 9;
+    optional GDI.Proto.GenericItemTransfer.CancelSessionResponse cancel_session_response = 10;
+    optional GDI.Proto.GenericItemTransfer.SessionCompletedNotification session_completed_notification = 11;
+}
+
 message ItemListRequest {
     optional uint32 session_id = 1;
-    optional DataTypeConfig config = 2;
+    optional GDI.Proto.GenericItemTransfer.DataTypeConfig config = 2;
     optional uint32 list_offset = 3;
     optional uint32 max_item_ref_count = 4;
 }
@@ -91,17 +98,18 @@ message ItemListResponse {
         SYSTEM_IS_BUSY = 11;
         TRANSFER_LIMIT = 12;
     }
-    optional Status status = 1;
-    optional DataTypeStatus data_type_status = 2;
+
+    required GDI.Proto.GenericItemTransfer.ItemListResponse.Status status = 1;
+    optional GDI.Proto.GenericItemTransfer.DataTypeStatus data_type_status = 2;
     optional uint32 session_id = 3;
-    repeated GenericItemReference items = 4;
+    repeated GDI.Proto.GenericItemTransfer.GenericItemReference items = 4 [packed = false];
     optional uint32 max_request_count = 5;
     optional uint32 next_list_offset = 6;
 }
 
 message ItemRequest {
     optional uint32 session_id = 1;
-    repeated GenericItemReference items = 6;
+    repeated GDI.Proto.GenericItemTransfer.GenericItemReference items = 6 [packed = false];
 }
 
 message ItemResponse {
@@ -114,31 +122,28 @@ message ItemResponse {
         UNSUPPORTED_REQUEST_TYPE = 6;
         REQUEST_TOO_LARGE = 7;
     }
-    optional Status status = 1;
-    optional DataTypeStatus data_type_status = 2;
+
+    required GDI.Proto.GenericItemTransfer.ItemResponse.Status status = 1;
+    optional GDI.Proto.GenericItemTransfer.DataTypeStatus data_type_status = 2;
     optional uint32 session_id = 3;
-    repeated GenericItem items = 4;
-    repeated GenericItemReference invalid_items = 5;
+    repeated GDI.Proto.GenericItemTransfer.GenericItem items = 4 [packed = false];
+    repeated GDI.Proto.GenericItemTransfer.GenericItemReference invalid_items = 5 [packed = false];
     optional uint32 max_request_count = 6;
 }
 
 message SessionCompletedNotification {
-    optional uint32 session_id = 1;
-    optional SessionEndReason reason = 2;
-    optional DataTypeStatus data_type_status = 3;
+    required uint32 session_id = 1;
+    required GDI.Proto.GenericItemTransfer.SessionEndReason reason = 2;
+    optional GDI.Proto.GenericItemTransfer.DataTypeStatus data_type_status = 3;
 }
 
-message CancelSessionRequest {
-    optional uint32 session_id = 1;
-    optional SessionEndReason reason = 2;
-    optional DataTypeStatus data_type_status = 3;
-}
-
-message CancelSessionResponse {
-    enum Status {
-        SUCCESS = 1;
-        ERROR = 2;
-        INVALID_SESSION_ID = 3;
-    }
-    optional Status status = 1;
+enum SessionEndReason {
+    COMPLETE = 1;
+    ERROR = 2;
+    TIMEOUT = 3;
+    USER_CANCEL = 4;
+    SHUTDOWN = 5;
+    RESTART = 6;
+    APP_RESTRICTION = 7;
+    APP_CLOSE = 8;
 }
