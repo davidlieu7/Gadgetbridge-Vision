@@ -266,6 +266,12 @@ public class DeviceSettingsPreferenceConst {
     public static final String PREF_TEMPERATURE_ALL_DAY_MONITORING = "continuous_skin_temperature_measurement";
     public static final String PREF_GLUCOSE_THRESHOLD_HIGH = "glucose_threshold_high";
     public static final String PREF_GLUCOSE_THRESHOLD_LOW = "glucose_threshold_low";
+    public static final String PREF_CGM_PREFIX = "cgm_watch_app_";
+    public static final String PREF_CGM_WATCH_APP_ENABLED = PREF_CGM_PREFIX + "enabled";
+    public static final String PREF_CGM_WATCH_APP_ID = PREF_CGM_PREFIX + "app_id";
+    public static final String PREF_CGM_GRAPH_HOURS = PREF_CGM_PREFIX + "graph_hours";
+    /** Units last reported by the CGM app, not shown in the settings */
+    public static final String PREF_CGM_UNITS_MGDL = PREF_CGM_PREFIX + "units_mgdl";
 
     public static final String PREF_AUTOHEARTRATE_SWITCH = "pref_autoheartrate_switch";
     public static final String PREF_AUTOHEARTRATE_SLEEP = "pref_autoheartrate_sleep";

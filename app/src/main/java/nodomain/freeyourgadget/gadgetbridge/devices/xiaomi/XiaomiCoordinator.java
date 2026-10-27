@@ -675,6 +675,11 @@ public abstract class XiaomiCoordinator extends AbstractBLEDeviceCoordinator {
     }
 
     @Override
+    public int[] getSupportedDeviceSpecificExperimentalSettings(@NonNull final GBDevice device) {
+        return new int[]{R.xml.devicesettings_cgm_watch_app, R.xml.devicesettings_glucose_limits};
+    }
+
+    @Override
     public int[] getSupportedDeviceSpecificAuthenticationSettings() {
         return new int[]{R.xml.devicesettings_pairingkey};
     }

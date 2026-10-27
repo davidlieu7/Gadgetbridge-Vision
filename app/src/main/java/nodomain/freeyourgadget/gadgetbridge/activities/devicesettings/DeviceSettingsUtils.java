@@ -284,6 +284,14 @@ public final class DeviceSettingsUtils {
         });
     }
 
+    /**
+     * Fill the choices of devicesettings_glucose_limits.xml, in mg/dL.
+     */
+    public static void populateGlucoseLimits(final DeviceSpecificSettingsHandler handler) {
+        populateWithRange(DeviceSettingsPreferenceConst.PREF_GLUCOSE_THRESHOLD_LOW, handler, 60, 110, R.string.glucose_value_mg_dl, false);
+        populateWithRange(DeviceSettingsPreferenceConst.PREF_GLUCOSE_THRESHOLD_HIGH, handler, 90, 300, R.string.glucose_value_mg_dl, false);
+    }
+
     public static void populateWithRange(final CharSequence prefKey,
                                          final DeviceSpecificSettingsHandler handler,
                                          final int rangeMin,

@@ -39,6 +39,7 @@ import java.util.Map;
 import java.util.UUID;
 
 import nodomain.freeyourgadget.gadgetbridge.GBApplication;
+import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsPreferenceConst;
 import nodomain.freeyourgadget.gadgetbridge.deviceevents.GBDeviceEventUpdatePreferences;
 import nodomain.freeyourgadget.gadgetbridge.devices.DeviceCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.SleepAsAndroidFeature;
@@ -91,6 +92,7 @@ public class XiaomiSupport extends AbstractBluetoothDeviceSupport {
     private final XiaomiDataUploadService dataUploadService = new XiaomiDataUploadService(this);
     private final XiaomiPhonebookService phonebookService = new XiaomiPhonebookService(this);
     private final XiaomiRpkService rpkService = new XiaomiRpkService(this);
+    private final XiaomiCgmSender cgmSender = new XiaomiCgmSender(this);
 
 
     private String cachedFirmwareVersion = null;
@@ -175,6 +177,7 @@ public class XiaomiSupport extends AbstractBluetoothDeviceSupport {
     @Override
     public void dispose() {
         saaAlarms.cancel();
+        cgmSender.dispose();
 
         for (final AbstractXiaomiService service : mServiceMap.values()) {
             service.dispose();
@@ -233,6 +236,7 @@ public class XiaomiSupport extends AbstractBluetoothDeviceSupport {
     }
 
     public void onDisconnect() {
+        cgmSender.stop();
         // propagate disconnection to services
         for (AbstractXiaomiService service : mServiceMap.values()) {
             service.onDisconnect();
@@ -262,6 +266,16 @@ public class XiaomiSupport extends AbstractBluetoothDeviceSupport {
     @Override
     public void onSendConfiguration(final String config) {
         final Prefs prefs = getDevicePrefs();
+
+        if (config.startsWith(DeviceSettingsPreferenceConst.PREF_CGM_PREFIX)) {
+            cgmSender.start(getContext());
+            return;
+        }
+        if (config.equals(DeviceSettingsPreferenceConst.PREF_GLUCOSE_THRESHOLD_LOW)
+                || config.equals(DeviceSettingsPreferenceConst.PREF_GLUCOSE_THRESHOLD_HIGH)) {
+            // read by cgmSender with every reading
+            return;
+        }
 
         // Check if any of the services handles this config
         for (final AbstractXiaomiService service : mServiceMap.values()) {
@@ -467,6 +481,8 @@ public class XiaomiSupport extends AbstractBluetoothDeviceSupport {
         for (final AbstractXiaomiService service : mServiceMap.values()) {
             service.initialize();
         }
+
+        cgmSender.start(getContext());
     }
 
     public void sendCommand(final String taskName, final XiaomiProto.Command command) {

@@ -4524,6 +4524,11 @@
     <string name="intent_api_watch_app_messages_title">Watch app messages</string>
     <string name="intent_api_allow_watch_app_messages_title">Allow messages to watch apps</string>
     <string name="intent_api_allow_watch_app_messages_summary">Allow other apps to send messages to apps installed on the watch via Intent API</string>
+    <string name="pref_cgm_watch_app_title">Glucose on a watch app</string>
+    <string name="pref_cgm_watch_app_enabled_summary">Store readings broadcast by xDrip+ and send them with a graph to an app on the watch, in the format of WatchDrip+. In xDrip+, enable Inter-app settings → Broadcast locally and Compatible Broadcast.</string>
+    <string name="pref_cgm_watch_app_id_title">Watch app id</string>
+    <string name="pref_cgm_graph_hours_title">Graph length in hours</string>
+    <string name="pref_cgm_default_graph_hours" translatable="false">4</string>
     <string name="intent_api_allow_debug_commands_title">Allow Debug Commands</string>
     <string name="intent_api_allow_debug_commands_summary">Allow triggering debug menu commands via Intent API</string>
     <string name="intent_api_allow_global_settings_summary">Allow 3rd party apps to set global Gadgetbridge settings through intents. Please restart Gadgetbridge in order to take effect.</string>

@@ -45,6 +45,7 @@ import java.util.Set;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsPreferenceConst;
+import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsUtils;
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSpecificSettingsCustomizer;
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSpecificSettingsHandler;
 import nodomain.freeyourgadget.gadgetbridge.activities.xiaomi.XiaomiVibrationPatternsActivity;
@@ -106,6 +107,16 @@ public class XiaomiSettingsCustomizer implements DeviceSpecificSettingsCustomize
             sleepRespiratoryRatePref.setVisible(prefs.getBoolean(XiaomiPreferences.FEAT_SLEEP_RESPIRATORY_RATE, false));
         }
         customizeSpo2Mode(handler, prefs);
+
+        DeviceSettingsUtils.populateGlucoseLimits(handler);
+        for (final String key : new String[]{
+                DeviceSettingsPreferenceConst.PREF_CGM_WATCH_APP_ENABLED,
+                DeviceSettingsPreferenceConst.PREF_CGM_WATCH_APP_ID,
+                DeviceSettingsPreferenceConst.PREF_CGM_GRAPH_HOURS,
+                DeviceSettingsPreferenceConst.PREF_GLUCOSE_THRESHOLD_LOW,
+                DeviceSettingsPreferenceConst.PREF_GLUCOSE_THRESHOLD_HIGH}) {
+            handler.addPreferenceHandlerFor(key);
+        }
 
         populateOrHideListPreference(HuamiConst.PREF_DISPLAY_ITEMS_SORTABLE, handler, prefs);
 

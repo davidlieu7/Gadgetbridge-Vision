@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.preference.PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+    <PreferenceCategory
+        android:title="@string/pref_cgm_watch_app_title"
+        app:iconSpaceReserved="false">
+        <SwitchPreferenceCompat
+            android:defaultValue="false"
+            android:icon="@drawable/ic_glucose"
+            android:key="cgm_watch_app_enabled"
+            android:layout="@layout/preference_checkbox"
+            android:summary="@string/pref_cgm_watch_app_enabled_summary"
+            android:title="@string/pref_cgm_watch_app_title" />
+        <EditTextPreference
+            android:dependency="cgm_watch_app_enabled"
+            android:icon="@drawable/ic_deployed_code"
+            android:key="cgm_watch_app_app_id"
+            android:title="@string/pref_cgm_watch_app_id_title"
+            app:useSimpleSummaryProvider="true" />
+        <EditTextPreference
+            android:defaultValue="@string/pref_cgm_default_graph_hours"
+            android:dependency="cgm_watch_app_enabled"
+            android:icon="@drawable/ic_timer"
+            android:inputType="numberDecimal"
+            android:key="cgm_watch_app_graph_hours"
+            android:title="@string/pref_cgm_graph_hours_title"
+            app:useSimpleSummaryProvider="true" />
+    </PreferenceCategory>
+</androidx.preference.PreferenceScreen>
