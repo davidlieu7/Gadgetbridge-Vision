@@ -518,6 +518,7 @@ import nodomain.freeyourgadget.gadgetbridge.devices.oppo.OppoEncoAirCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.oppo.OppoEncoBuds2Coordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.overmax.OVTouch26Coordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.pebble.PebbleCoordinator;
+import nodomain.freeyourgadget.gadgetbridge.devices.pinecil.PinecilCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.pinetime.PineTimeJFCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.pixel.PixelBudsACoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.polar.PolarH10DeviceCoordinator;
@@ -817,6 +818,7 @@ public enum DeviceType {
     BANGLEJS(BangleJSCoordinator.class),
     FOSSILQHYBRID(QHybridCoordinator.class),
     TLW64(TLW64Coordinator.class),
+    PINECIL(PinecilCoordinator.class),
     PINETIME_JF(PineTimeJFCoordinator.class),
     POLARH9(PolarH9DeviceCoordinator.class),
     POLARH10(PolarH10DeviceCoordinator.class),
