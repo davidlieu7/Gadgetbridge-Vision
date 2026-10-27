@@ -537,7 +537,8 @@ public class SoundcoreProtocolImplV1 extends AbstractSoundcoreProtocol {
             );
         }
 
-        return encodeCommand(CMD_SET_EQUALIZER, SoundcoreEqualizer.buildCustomPayload(bands));
+        final short command = compact ? CMD_SET_EQUALIZER_COMPACT : CMD_SET_EQUALIZER;
+        return encodeCommand(command, SoundcoreEqualizer.buildCustomPayload(bands, compact));
     }
 
     private void decodeEqualizer(final byte[] payload) {

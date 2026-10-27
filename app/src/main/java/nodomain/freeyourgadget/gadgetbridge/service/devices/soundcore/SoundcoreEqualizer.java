@@ -170,8 +170,12 @@ public final class SoundcoreEqualizer {
         return new SoundcoreEqualizer(preset, label, bands, null);
     }
 
-    /** Builds a custom payload from up to nine signed dB gains, padding missing bands with zero. */
     public static byte[] buildCustomPayload(final int[] bands) {
+        return buildCustomPayload(bands, false);
+    }
+
+    /** Builds a custom payload from up to nine signed dB gains, padding missing bands with zero. */
+    public static byte[] buildCustomPayload(final int[] bands, final boolean compact) {
         final int[] normalizedBands = normalizeBands(bands);
 
         // Preserve the custom tail approximation; named presets use their explicit tails.
@@ -180,7 +184,11 @@ public final class SoundcoreEqualizer {
         for (int i = 0; i < CUSTOM_TAIL_SCALE.length; i++) {
             tails[i] = Math.round((float) (normalizedBands[i] * CUSTOM_TAIL_SCALE[i]) / CUSTOM_TAIL_DIVISOR);
         }
-        return buildPayload(SoundcoreEqualizerPresets.CUSTOM.getIndex(), normalizedBands, tails);
+
+        if (!compact) {
+            return buildPayload(SoundcoreEqualizerPresets.CUSTOM.getIndex(), normalizedBands, tails);
+        }
+        return buildPayloadCompact(SoundcoreEqualizerPresets.CUSTOM.getIndex(), normalizedBands, tails);
     }
 
     /**
