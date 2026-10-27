@@ -79,6 +79,7 @@ import nodomain.freeyourgadget.gadgetbridge.R;
 import nodomain.freeyourgadget.gadgetbridge.activities.HeartRateUtils;
 import nodomain.freeyourgadget.gadgetbridge.devices.DeviceCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.externalevents.BluetoothConnectReceiver;
+import nodomain.freeyourgadget.gadgetbridge.externalevents.CalendarReceiver;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
 import nodomain.freeyourgadget.gadgetbridge.service.btle.BLEScanService;
 import nodomain.freeyourgadget.gadgetbridge.service.receivers.AutoConnectIntervalReceiver;
@@ -284,6 +285,11 @@ public class DeviceCommunicationService extends Service implements SharedPrefere
                 } else if (subject == GBDevice.DeviceUpdateSubject.DEVICE_STATE && (device.getState() == GBDevice.State.SCANNED)) {
                     sendDeviceAPIBroadcast(device.getAddress(), API_LEGACY_ACTION_DEVICE_SCANNED);
                 }
+            } else if (GBPermission.ACTION_PERMISSIONS_GRANTED.equals(action)) {
+                final List<String> permissions = intent.getStringArrayListExtra(GBPermission.EXTRA_PERMISSIONS);
+                if (permissions != null) {
+                    onPermissionsGranted(permissions);
+                }
             } else if (BLEScanService.EVENT_DEVICE_FOUND.equals(action)) {
                 String deviceAddress = intent.getStringExtra(BLEScanService.EXTRA_DEVICE_ADDRESS);
 
@@ -338,6 +344,20 @@ public class DeviceCommunicationService extends Service implements SharedPrefere
         }
     };
 
+    private void onPermissionsGranted(final List<String> permissions) {
+        LOG.info("Permissions granted: {}", permissions);
+        // Some permissions are checked when registering the receivers
+        updateReceiversState();
+        if (permissions.contains(GBPermission.GADGETBRIDGE_NOTIFICATIONS.name())) {
+            // Show the service notification right away
+            GB.updateNotification(GBApplication.app().getDeviceManager().getSelectedDevices(), this);
+        }
+        if (permissions.contains(GBPermission.BLUETOOTH.name())) {
+            // Without the Bluetooth permission, the service did not start in the foreground
+            startForeground();
+        }
+    }
+
     private void updateReceiversState() {
         boolean enableReceivers = false;
         boolean anyDeviceInitialized = false;
@@ -370,6 +390,7 @@ public class DeviceCommunicationService extends Service implements SharedPrefere
         IntentFilter localFilter = new IntentFilter();
         localFilter.addAction(GBDevice.ACTION_DEVICE_CHANGED);
         localFilter.addAction(BLEScanService.EVENT_DEVICE_FOUND);
+        localFilter.addAction(GBPermission.ACTION_PERMISSIONS_GRANTED);
         //noinspection deprecation
         LocalBroadcastManager.getInstance(this).registerReceiver(mReceiver, localFilter);
     }
