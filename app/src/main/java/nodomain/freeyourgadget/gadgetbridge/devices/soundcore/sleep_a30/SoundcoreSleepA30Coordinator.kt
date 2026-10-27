@@ -115,19 +115,6 @@ class SoundcoreSleepA30Coordinator : SoundcoreEarbudsCoordinator() {
     override fun getSleepScoreProvider(device: GBDevice, session: DaoSession) =
         nodomain.freeyourgadget.gadgetbridge.devices.GenericSleepScoreSampleProvider(device, session)
 
-    override fun getAllDeviceDao(session: DaoSession):
-        MutableMap<de.greenrobot.dao.AbstractDao<*, *>, de.greenrobot.dao.Property> =
-        super.getAllDeviceDao(session).toMutableMap().apply {
-            put(session.genericSleepScoreSampleDao,
-                nodomain.freeyourgadget.gadgetbridge.entities.GenericSleepScoreSampleDao.Properties.DeviceId)
-            put(session.soundcoreSnoreSampleDao,
-                nodomain.freeyourgadget.gadgetbridge.entities.SoundcoreSnoreSampleDao.Properties.DeviceId)
-            put(session.soundcoreSleepStageSampleDao,
-                nodomain.freeyourgadget.gadgetbridge.entities.SoundcoreSleepStageSampleDao.Properties.DeviceId)
-            put(session.soundcoreSleepSessionSampleDao,
-                nodomain.freeyourgadget.gadgetbridge.entities.SoundcoreSleepSessionSampleDao.Properties.DeviceId)
-        }
-
     override fun getQuickControls(device: GBDevice): List<QuickControl> {
         val playing = GBApplication.getDevicePrefs(device)
             .getBoolean(DeviceSettingsPreferenceConst.PREF_SOUNDCORE_LOCAL_PLAYBACK, false)
