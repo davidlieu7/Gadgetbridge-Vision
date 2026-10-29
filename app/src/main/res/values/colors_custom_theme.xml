@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Colors of ThemeOverlay.App.CustomTheme, replaced at runtime by the colors of the imported
+     theme (see CustomThemes). The values here are only placeholders. -->
+<resources>
+    <color name="custom_theme_background">@color/window_background_light</color>
+    <color name="custom_theme_surface">@color/window_background_light</color>
+    <color name="custom_theme_surface_container_lowest">@color/surface_container_lowest_light</color>
+    <color name="custom_theme_surface_container_low">@color/surface_container_low_light</color>
+    <color name="custom_theme_surface_container">@color/surface_container_light</color>
+    <color name="custom_theme_surface_container_high">@color/surface_container_high_light</color>
+    <color name="custom_theme_surface_container_highest">@color/surface_container_highest_light</color>
+    <color name="custom_theme_on_surface">@color/primarytext_light</color>
+    <color name="custom_theme_on_surface_variant">@color/on_surface_variant_light</color>
+    <color name="custom_theme_outline">@color/outline_light</color>
+    <color name="custom_theme_outline_variant">@color/outline_variant_light</color>
+    <color name="custom_theme_primary">#E02F00</color>
+    <color name="custom_theme_on_primary">#FFFFFF</color>
+    <color name="custom_theme_primary_container">#FFE3DC</color>
+    <color name="custom_theme_on_primary_container">#B32400</color>
+    <color name="custom_theme_toolbar">@color/window_background_light</color>
+</resources>

@@ -16,32 +16,24 @@
     along with this program.  If not, see <https://www.gnu.org/licenses/>. */
 package nodomain.freeyourgadget.gadgetbridge.activities.charts;
 
+import android.content.Context;
+import android.graphics.Bitmap;
 import android.graphics.Color;
 import android.os.Bundle;
-import android.text.Spannable;
-import android.text.SpannableString;
-import android.text.Spanned;
 import android.text.format.DateFormat;
-import android.text.style.ForegroundColorSpan;
-import android.text.style.RelativeSizeSpan;
+import android.util.TypedValue;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.TextView;
 
 import com.github.mikephil.charting.charts.Chart;
-import com.github.mikephil.charting.charts.PieChart;
-import com.github.mikephil.charting.data.Entry;
-import com.github.mikephil.charting.data.PieData;
-import com.github.mikephil.charting.data.PieDataSet;
-import com.github.mikephil.charting.data.PieEntry;
-import com.github.mikephil.charting.utils.ViewPortHandler;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Collections;
@@ -61,6 +53,7 @@ import nodomain.freeyourgadget.gadgetbridge.activities.charts.spec.ChartPoint;
 import nodomain.freeyourgadget.gadgetbridge.activities.charts.spec.ChartSeries;
 import nodomain.freeyourgadget.gadgetbridge.activities.charts.spec.ChartSpec;
 import nodomain.freeyourgadget.gadgetbridge.activities.charts.stress.StressChartData;
+import nodomain.freeyourgadget.gadgetbridge.activities.dashboard.GaugeDrawer;
 import nodomain.freeyourgadget.gadgetbridge.activities.workouts.StatTileData;
 import nodomain.freeyourgadget.gadgetbridge.activities.workouts.StatTileGridUtilKt;
 import nodomain.freeyourgadget.gadgetbridge.database.DBHandler;
@@ -74,7 +67,7 @@ public class StressDailyFragment extends StressFragment<StressDailyFragment.Stre
 
     private GbChartView mStressChart;
     private ChartLegendView mStressLegend;
-    private PieChart mStressLevelsPieChart;
+    private ImageView mStressLevelsGauge;
     private LinearLayout mStatsContainer;
     private TextView stressDate;
 
@@ -137,10 +130,8 @@ public class StressDailyFragment extends StressFragment<StressDailyFragment.Stre
 
     @Override
     protected void updateChartsnUIThread(final StressChartsData stressData) {
-        final PieData pieData = stressData.getPieData();
-
         Date date = new Date((long) this.getTSEnd() * 1000);
-        String formattedDate = new SimpleDateFormat("E, MMM dd").format(date);
+        String formattedDate = DateTimeUtils.formatChartDate(date);
         stressDate.setText(formattedDate);
 
         Map<StressType, Integer> stressZoneTimes = stressData.getStressZoneTimes();
@@ -152,21 +143,12 @@ public class StressDailyFragment extends StressFragment<StressDailyFragment.Stre
         mStatsContainer.removeAllViews();
         StatTileGridUtilKt.addStatTileGrid(mStatsContainer, requireContext(), stats, 0);
 
-        if (stressData.getAverage() > 0) {
-            int noc = String.valueOf(stressData.getAverage()).length();
-            SpannableString pieChartCenterText = new SpannableString(stressData.getAverage() + "\n" + requireContext().getString(R.string.stress_average));
-            pieChartCenterText.setSpan(new RelativeSizeSpan(1.75f), 0, noc, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-            pieChartCenterText.setSpan(new RelativeSizeSpan(0.72f), noc, pieChartCenterText.length(), Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
-            pieChartCenterText.setSpan(new ForegroundColorSpan(SUB_TEXT_COLOR), noc, pieChartCenterText.length(), Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
-            mStressLevelsPieChart.setCenterText(pieChartCenterText);
-        } else {
-            SpannableString pieChartCenterText = new SpannableString("-\n" + requireContext().getString(R.string.stress_average));
-            pieChartCenterText.setSpan(new RelativeSizeSpan(1.25f), 0, 1, Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-            pieChartCenterText.setSpan(new RelativeSizeSpan(0.72f), 2, pieChartCenterText.length(), Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
-            pieChartCenterText.setSpan(new ForegroundColorSpan(SUB_TEXT_COLOR), 2, pieChartCenterText.length(), Spannable.SPAN_EXCLUSIVE_EXCLUSIVE);
-            mStressLevelsPieChart.setCenterText(pieChartCenterText);
-        }
-        mStressLevelsPieChart.setData(pieData);
+        mStressLevelsGauge.setImageBitmap(drawStressRing(requireContext(), new long[]{
+                zoneTime(stressZoneTimes, StressType.RELAXED),
+                zoneTime(stressZoneTimes, StressType.MILD),
+                zoneTime(stressZoneTimes, StressType.MODERATE),
+                zoneTime(stressZoneTimes, StressType.HIGH),
+        }, stressData.getAverage()));
 
         final StressType[] types = StressType.values();
         final String[] labels = new String[types.length];
@@ -232,11 +214,10 @@ public class StressDailyFragment extends StressFragment<StressDailyFragment.Stre
         mStressChart.setZoomable(true);
         mStressChart.dismissSelectionOnTapOutside(rootView);
         mStressLegend = rootView.findViewById(R.id.stress_chart_legend);
-        mStressLevelsPieChart = rootView.findViewById(R.id.stress_pie_chart);
+        mStressLevelsGauge = rootView.findViewById(R.id.stress_gauge);
         mStatsContainer = rootView.findViewById(R.id.stress_stats_container);
         stressDate = rootView.findViewById(R.id.stress_date);
 
-        setupPieChart();
 
         // refresh immediately instead of use refreshIfVisible(), for perceived performance
         refresh();
@@ -244,20 +225,38 @@ public class StressDailyFragment extends StressFragment<StressDailyFragment.Stre
         return rootView;
     }
 
-    private void setupPieChart() {
-        mStressLevelsPieChart.setBackgroundColor(BACKGROUND_COLOR);
-        mStressLevelsPieChart.getDescription().setTextColor(DESCRIPTION_COLOR);
-        mStressLevelsPieChart.setEntryLabelColor(DESCRIPTION_COLOR);
-        mStressLevelsPieChart.getDescription().setText("");
-        mStressLevelsPieChart.setNoDataText("");
-        mStressLevelsPieChart.setNoDataIconEnabled(false);
-        mStressLevelsPieChart.setTouchEnabled(false);
-        mStressLevelsPieChart.setCenterTextColor(GBApplication.getTextColor(getContext()));
-        mStressLevelsPieChart.setCenterTextSize(18f);
-        mStressLevelsPieChart.setHoleColor(requireContext().getResources().getColor(R.color.transparent));
-        mStressLevelsPieChart.setHoleRadius(87);
-        mStressLevelsPieChart.setDrawEntryLabelsEnabled(false);
-        mStressLevelsPieChart.getLegend().setEnabled(false);
+    private static long zoneTime(final Map<StressType, Integer> times, final StressType type) {
+        final Integer time = times.get(type);
+        return time != null ? time : 0;
+    }
+
+    /**
+     * The time in each stress zone (relaxed, mild, moderate, high) as a ring of rounded segments like the sleep
+     * stages, with the average stress level in the middle.
+     */
+    static Bitmap drawStressRing(final Context context, final long[] zoneTimes, final int average) {
+        final StressType[] types = {StressType.RELAXED, StressType.MILD, StressType.MODERATE, StressType.HIGH};
+        long total = 0;
+        for (final long time : zoneTimes) {
+            total += Math.max(time, 0);
+        }
+        final int[] colors = new int[types.length];
+        final float[] segments = new float[types.length];
+        for (int i = 0; i < types.length; i++) {
+            colors[i] = types[i].getColor(context);
+            segments[i] = total > 0 ? Math.max(zoneTimes[i], 0) / (float) total : 0;
+        }
+        final int width = (int) TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_DIP, 300, context.getResources().getDisplayMetrics());
+        return GaugeDrawer.drawCircleGaugeSegmented(
+                width,
+                width / 15,
+                colors,
+                segments,
+                true,
+                average > 0 ? String.valueOf(average) : "-",
+                context.getString(R.string.stress_average),
+                context
+        );
     }
 
     @Override
@@ -266,7 +265,6 @@ public class StressDailyFragment extends StressFragment<StressDailyFragment.Stre
 
     @Override
     protected void renderCharts() {
-        mStressLevelsPieChart.invalidate();
     }
 
     protected class StressChartsDataBuilder {
@@ -398,8 +396,6 @@ public class StressDailyFragment extends StressFragment<StressDailyFragment.Stre
             processSamples();
 
             final List<List<ChartPoint>> levels = new ArrayList<>();
-            final List<PieEntry> pieEntries = new ArrayList<>();
-            final List<Integer> pieColors = new ArrayList<>();
             final Map<StressType, Integer> stressZoneTimes = new HashMap<>();
 
             long totalStressTime = 0;
@@ -411,38 +407,14 @@ public class StressDailyFragment extends StressFragment<StressDailyFragment.Stre
 
                 if (stressType != StressType.UNKNOWN && stressTime != null && stressTime != 0) {
                     totalStressTime += stressTime;
-                    pieEntries.add(new PieEntry<>(stressTime, stressType.getLabel(requireContext()), null, null));
-                    pieColors.add(stressType.getColor(requireContext()));
                 }
             }
 
-            if (pieEntries.isEmpty()) {
-                pieEntries.add(new PieEntry<>(1, null, null, null));
-                pieColors.add(getResources().getColor(R.color.gauge_line_color));
-            }
-
-            final PieDataSet pieDataSet = new PieDataSet(pieEntries, "");
-            pieDataSet.setValueFormatter(new DataSetValueFormatter() {
-                @Override
-                public String getFormattedValue(final float value, final Entry<?> entry, final int dataSetIndex, final ViewPortHandler viewPortHandler) {
-                    return DateTimeUtils.formatDurationHoursMinutes((long) value, TimeUnit.SECONDS);
-                }
-            });
-            pieDataSet.setColors(pieColors);
-            pieDataSet.setValueTextColor(DESCRIPTION_COLOR);
-            pieDataSet.setValueTextSize(13f);
-            pieDataSet.setXValuePosition(PieDataSet.ValuePosition.OUTSIDE_SLICE);
-            pieDataSet.setYValuePosition(PieDataSet.ValuePosition.OUTSIDE_SLICE);
-            pieDataSet.setDrawValuesEnabled(false);
-            pieDataSet.setSliceSpace(2f);
-            final PieData pieData = new PieData(pieDataSet);
-
-            return new StressChartsData(pieData, levels, samples, stressRanges, Math.round((float) averageSum / averageNumSamples), stressZoneTimes, totalStressTime);
+            return new StressChartsData(levels, samples, stressRanges, Math.round((float) averageSum / averageNumSamples), stressZoneTimes, totalStressTime);
         }
     }
 
     protected static class StressChartsData extends ChartsData {
-        private final PieData pieData;
         private final List<List<ChartPoint>> levels;
         private final List<? extends StressSample> samples;
         private final int[] stressRanges;
@@ -450,9 +422,8 @@ public class StressDailyFragment extends StressFragment<StressDailyFragment.Stre
         private final Map<StressType, Integer> stressZoneTimes;
         private final long totalStressTime;
 
-        public StressChartsData(final PieData pieData, final List<List<ChartPoint>> levels, final List<? extends StressSample> samples,
+        public StressChartsData(final List<List<ChartPoint>> levels, final List<? extends StressSample> samples,
                                 final int[] stressRanges, final int average, Map<StressType, Integer> stressZoneTimes, long totalStressTime) {
-            this.pieData = pieData;
             this.levels = levels;
             this.samples = samples;
             this.stressRanges = stressRanges;
@@ -463,10 +434,6 @@ public class StressDailyFragment extends StressFragment<StressDailyFragment.Stre
 
         public Map<StressType, Integer> getStressZoneTimes() {
             return stressZoneTimes;
-        }
-
-        public PieData getPieData() {
-            return pieData;
         }
 
         public List<List<ChartPoint>> getLevels() {

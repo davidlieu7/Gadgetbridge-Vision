@@ -42,6 +42,7 @@ import nodomain.freeyourgadget.gadgetbridge.GBApplication;
 import nodomain.freeyourgadget.gadgetbridge.R;
 import nodomain.freeyourgadget.gadgetbridge.util.AndroidUtils;
 import nodomain.freeyourgadget.gadgetbridge.util.BarShade;
+import nodomain.freeyourgadget.gadgetbridge.util.theme.CustomThemes;
 
 
 public abstract class AbstractGBActivity extends AppCompatActivity implements GBActivity {
@@ -129,6 +130,13 @@ public abstract class AbstractGBActivity extends AppCompatActivity implements GB
     }
 
     public static void applyThemeOverlays(final Resources.Theme theme, final boolean dark) {
+        // Installs the colors of the imported theme, or removes them if it was disabled
+        CustomThemes.applyToResources(theme.getResources());
+        // An imported theme replaces the accent color and the contrasting surfaces
+        if (CustomThemes.isActive() && CustomThemes.isDark() == dark) {
+            theme.applyStyle(R.style.ThemeOverlay_App_CustomTheme, true);
+            return;
+        }
         // Dynamic Color already ties tab/button/chip colors to the wallpaper palette, so the
         // user's chosen accent preset only applies to the static Light/Dark themes.
         if (!GBApplication.areDynamicColorsEnabled()) {
@@ -144,6 +152,7 @@ public abstract class AbstractGBActivity extends AppCompatActivity implements GB
         activity.setTheme(getThemeResource(flags, dark));
         if (activity instanceof Activity) {
             applyThemeOverlays(((Activity) activity).getTheme(), dark);
+            CustomThemes.applyWindowBackground((Activity) activity);
         }
 
         activity.setLanguage(GBApplication.getLanguage(), false);

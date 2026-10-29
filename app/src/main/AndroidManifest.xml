@@ -360,6 +360,14 @@
             android:label="@string/activity_summaries"
             android:parentActivityName=".activities.ControlCenterv2" />
         <activity
+            android:name=".activities.workouts.plans.PlansActivity"
+            android:label="@string/plans_title"
+            android:parentActivityName=".activities.workouts.WorkoutListActivity" />
+        <activity
+            android:name=".activities.ThemeEditorActivity"
+            android:label="@string/theme_editor_title"
+            android:parentActivityName=".activities.SettingsActivity" />
+        <activity
             android:name=".activities.workouts.statistics.WorkoutStatisticsActivity"
             android:label="@string/activity_summaries_statistics"
             android:parentActivityName=".activities.workouts.WorkoutListActivity" />

@@ -6,6 +6,7 @@ import androidx.core.content.ContextCompat
 import nodomain.freeyourgadget.gadgetbridge.R
 import nodomain.freeyourgadget.gadgetbridge.activities.charts.StressFragment
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice
+import nodomain.freeyourgadget.gadgetbridge.util.DateTimeUtils
 import nodomain.freeyourgadget.gadgetbridge.widgets.GaugeSpec
 import nodomain.freeyourgadget.gadgetbridge.widgets.LegendRow
 import nodomain.freeyourgadget.gadgetbridge.widgets.MiniChart
@@ -213,11 +214,7 @@ internal fun stressTimeInZones(
         LegendRow(
             colors[zone],
             context.getString(labels[zone]),
-            context.getString(
-                R.string.widget_duration_hours_minutes,
-                minutes[zone].toInt() / 60,
-                minutes[zone].toInt() % 60
-            ),
+            DateTimeUtils.formatMinutes(minutes[zone].toLong()),
         )
     }
     return MiniChart.Composition(colors, minutes) to legend

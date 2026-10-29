@@ -64,12 +64,22 @@ internal data class BarLayout(val width: Float, val gap: Float) {
  * Builds MPAndroidChart data from a [ChartSpec]. Entry data holds the original x, since grouped bars are offset.
  */
 internal object ChartDataBuilder {
-    const val LINE_WIDTH_DP = 1.75f
+    const val LINE_WIDTH_DP = 2.25f
     private const val POINT_RADIUS_DP = 3.5f
-    private const val AREA_FILL_ALPHA = 0.45f
+    private const val AREA_FILL_ALPHA = 0.55f
     private const val MAX_CANDLE_SPACE = 0.45f
-    private const val SOLID_FILL_ALPHA = 255
     private const val BAND_FILL_ALPHA = 0x40
+
+    /**
+     * A solid fill fades from this alpha at the top of the chart to [SOLID_FILL_BOTTOM_ALPHA] at the bottom.
+     */
+    private const val SOLID_FILL_TOP_ALPHA = 0xE6
+    private const val SOLID_FILL_BOTTOM_ALPHA = 0x59
+
+    /**
+     * Columns fade from their color at the top to this alpha at the bottom.
+     */
+    private const val COLUMN_BOTTOM_ALPHA = 0x8C
 
     fun columns(spec: ChartSpec) = spec.series.filter { it.style is SeriesStyle.Column && it.points.isNotEmpty() }
 
@@ -243,8 +253,13 @@ internal object ChartDataBuilder {
                 fillAlpha = BAND_FILL_ALPHA
                 fillFormatter = IFillFormatter { _, _ -> fillBase.toFloat() }
             } else if (style.filled && style.solidFill) {
-                fillColor = style.color
-                fillAlpha = SOLID_FILL_ALPHA
+                fillDrawable = GradientDrawable(
+                    GradientDrawable.Orientation.TOP_BOTTOM,
+                    intArrayOf(
+                        ColorUtils.setAlphaComponent(style.color, SOLID_FILL_TOP_ALPHA),
+                        ColorUtils.setAlphaComponent(style.color, SOLID_FILL_BOTTOM_ALPHA),
+                    ),
+                )
             } else if (style.filled) {
                 fillDrawable = GradientDrawable(
                     GradientDrawable.Orientation.TOP_BOTTOM,
@@ -261,8 +276,10 @@ internal object ChartDataBuilder {
     private fun axisDependency(series: ChartSeries) =
         if (series.axis == AxisSide.END) AxisDependency.RIGHT else AxisDependency.LEFT
 
-    private fun topRounded(color: Int, radiusPx: Float) = GradientDrawable().apply {
-        setColor(color)
+    private fun topRounded(color: Int, radiusPx: Float) = GradientDrawable(
+        GradientDrawable.Orientation.TOP_BOTTOM,
+        intArrayOf(color, ColorUtils.setAlphaComponent(color, minOf(Color.alpha(color), COLUMN_BOTTOM_ALPHA))),
+    ).apply {
         cornerRadii = floatArrayOf(radiusPx, radiusPx, radiusPx, radiusPx, 0f, 0f, 0f, 0f)
     }
 }

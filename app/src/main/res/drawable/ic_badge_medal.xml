@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Badge icon: a medal on a ribbon. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:tint="?attr/colorControlNormal"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <path
+        android:fillColor="@android:color/white"
+        android:fillType="evenOdd"
+        android:pathData="M7,2h3.5l1.5,4l1.5,-4H17l-2.6,6.3A6.5,6.5 0,1 1,9.6 8.3z M12,9.3a5,5 0,1 0,0.01 0z M12.00,10.90L12.85,13.13L15.23,13.25L13.38,14.75L14.00,17.05L12.00,15.75L10.00,17.05L10.62,14.75L8.77,13.25L11.15,13.13z" />
+</vector>

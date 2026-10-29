@@ -114,7 +114,7 @@ public class HuamiActivityDetailsParser extends AbstractHuamiActivityDetailsPars
                         i += consumeSpeed6(bytes, i);
                         break;
                     case TYPE_SWIMMING:
-                        i += consumeSwimming(bytes, i);
+                        i += consumeSwimming(bytes, i, totalTimeOffset);
                         break;
                     default:
                         LOG.warn("unknown packet type" + type);
@@ -287,8 +287,15 @@ public class HuamiActivityDetailsParser extends AbstractHuamiActivityDetailsPars
         return 6;
     }
 
-    private int consumeSwimming(byte[] bytes, int offset) {
-        LOG.debug("got packet type 8 (swimming?): {}", GB.lazyHexdump(bytes, offset, 6));
+    private int consumeSwimming(byte[] bytes, int offset, long timeOffsetSeconds) {
+        LOG.debug("got packet type 8 (swimming): {}", GB.lazyHexdump(bytes, offset, 6));
+        // stroke rate in 1/1000 strokes per second, as decoded by Zepp Life
+        int strokeRate = BLETypeConversions.toUint16(bytes, offset);
+        if (strokeRate > 0) {
+            ActivityPoint ap = getActivityPointFor(timeOffsetSeconds);
+            ap.setCadence(Math.round(strokeRate * 60 / 1000f)); // strokes per minute
+            add(ap);
+        }
         return 6;
     }
 }

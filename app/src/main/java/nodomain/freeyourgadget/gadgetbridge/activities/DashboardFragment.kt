@@ -30,6 +30,8 @@ import android.view.MenuInflater
 import android.view.MenuItem
 import android.view.View
 import android.view.ViewGroup
+import nodomain.freeyourgadget.gadgetbridge.util.theme.CustomTheme
+import nodomain.freeyourgadget.gadgetbridge.util.theme.CustomThemes
 import android.widget.TextView
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
@@ -135,6 +137,14 @@ class DashboardFragment : Fragment(), MenuProvider, HeaderShadePage, DashboardGr
         val binding = FragmentDashboardBinding.inflate(inflater, container, false)
         _binding = binding
         lastItems = emptyList()
+
+        // Themed hero banner, only when the active theme fills the dashboardHero slot
+        if (CustomThemes.isSlotFilled(CustomTheme.SLOT_DASHBOARD_HERO)) {
+            binding.dashboardHero.visibility = View.VISIBLE
+            CustomThemes.applySlot(binding.dashboardHero, CustomTheme.SLOT_DASHBOARD_HERO)
+        } else {
+            binding.dashboardHero.visibility = View.GONE
+        }
 
         editModeController = DashboardEditModeController(
             requireActivity() as AppCompatActivity,

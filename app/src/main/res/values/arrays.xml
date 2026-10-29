@@ -713,6 +713,24 @@
         <item>@string/p_heart_rate</item>
     </string-array>
 
+    <string-array name="pref_cycle_tracking_reminder_days">
+        <item>@string/pref_cycle_tracking_reminder_off</item>
+        <item>1</item>
+        <item>2</item>
+        <item>3</item>
+        <item>4</item>
+        <item>5</item>
+    </string-array>
+
+    <string-array name="pref_cycle_tracking_reminder_days_values">
+        <item>0</item>
+        <item>1</item>
+        <item>2</item>
+        <item>3</item>
+        <item>4</item>
+        <item>5</item>
+    </string-array>
+
     <string-array name="pref_miband5_display_items">
         <item>@string/menuitem_status</item>
         <item>@string/menuitem_pai</item>

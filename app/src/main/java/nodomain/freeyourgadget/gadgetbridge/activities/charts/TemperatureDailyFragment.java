@@ -32,7 +32,6 @@ import com.github.mikephil.charting.charts.Chart;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
@@ -131,7 +130,7 @@ public class TemperatureDailyFragment extends AbstractChartFragment<TemperatureD
     @Override
     protected void updateChartsnUIThread(TemperatureDailyFragment.TemperatureChartData data) {
         Date date = new Date(getTSEnd() * 1000L);
-        String formattedDate = new SimpleDateFormat("E, MMM dd").format(date);
+        String formattedDate = DateTimeUtils.formatChartDate(date);
         dateView.setText(formattedDate);
 
         final List<? extends TemperatureSample> samples = data.samples;

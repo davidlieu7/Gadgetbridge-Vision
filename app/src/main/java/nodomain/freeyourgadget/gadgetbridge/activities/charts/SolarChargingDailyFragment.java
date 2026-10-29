@@ -35,7 +35,6 @@ import com.github.mikephil.charting.charts.Chart;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Collections;
@@ -55,6 +54,7 @@ import nodomain.freeyourgadget.gadgetbridge.devices.DeviceCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.TimeSampleProvider;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
 import nodomain.freeyourgadget.gadgetbridge.model.SolarChargeSample;
+import nodomain.freeyourgadget.gadgetbridge.util.DateTimeUtils;
 
 public class SolarChargingDailyFragment extends AbstractChartFragment<SolarChargingDailyFragment.SolarChargingData> {
     protected static final Logger LOG = LoggerFactory.getLogger(SolarChargingDailyFragment.class);
@@ -109,7 +109,7 @@ public class SolarChargingDailyFragment extends AbstractChartFragment<SolarCharg
 
     @Override
     protected void updateChartsnUIThread(SolarChargingData solarChargingData) {
-        String formattedDate = new SimpleDateFormat("E, MMM dd").format(getEndDate());
+        String formattedDate = DateTimeUtils.formatChartDate(getEndDate());
         mDateView.setText(formattedDate);
 
         double totalLuxHours = 0;

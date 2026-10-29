@@ -22,7 +22,6 @@ import com.github.mikephil.charting.charts.Chart;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Date;
@@ -45,6 +44,7 @@ import nodomain.freeyourgadget.gadgetbridge.devices.DeviceCoordinator;
 import nodomain.freeyourgadget.gadgetbridge.devices.TimeSampleProvider;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
 import nodomain.freeyourgadget.gadgetbridge.model.BodyEnergySample;
+import nodomain.freeyourgadget.gadgetbridge.util.DateTimeUtils;
 
 
 public class BodyEnergyFragment extends AbstractChartFragment<BodyEnergyFragment.BodyEnergyData> {
@@ -106,7 +106,7 @@ public class BodyEnergyFragment extends AbstractChartFragment<BodyEnergyFragment
 
     @Override
     protected void updateChartsnUIThread(BodyEnergyData bodyEnergyData) {
-        String formattedDate = new SimpleDateFormat("E, MMM dd").format(getEndDate());
+        String formattedDate = DateTimeUtils.formatChartDate(getEndDate());
         mDateView.setText(formattedDate);
 
         final List<? extends BodyEnergySample> samples = bodyEnergyData.todaySamples;

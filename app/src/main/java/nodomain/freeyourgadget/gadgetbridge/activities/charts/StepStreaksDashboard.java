@@ -48,11 +48,17 @@ import org.slf4j.LoggerFactory;
 import java.io.File;
 import java.io.FileOutputStream;
 import java.io.IOException;
+import java.time.LocalDate;
+import java.time.ZoneId;
 import java.util.Calendar;
 import java.util.Date;
+import java.util.HashMap;
+import java.util.Map;
 
 import nodomain.freeyourgadget.gadgetbridge.GBApplication;
 import nodomain.freeyourgadget.gadgetbridge.R;
+import nodomain.freeyourgadget.gadgetbridge.activities.charts.badges.BadgeDay;
+import nodomain.freeyourgadget.gadgetbridge.activities.charts.badges.BadgeHistory;
 import nodomain.freeyourgadget.gadgetbridge.database.DBAccess;
 import nodomain.freeyourgadget.gadgetbridge.database.DBHandler;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
@@ -281,6 +287,10 @@ public class StepStreaksDashboard extends MaterialDialogFragment {
         }
     }
 
+    private static LocalDate localDateOf(final Calendar calendar) {
+        return LocalDate.of(calendar.get(Calendar.YEAR), calendar.get(Calendar.MONTH) + 1, calendar.get(Calendar.DAY_OF_MONTH));
+    }
+
     private void calculateStreakData(DBHandler db, String period, GBDevice device, int goal) {
         Calendar day = Calendar.getInstance();
         int streak_steps = 0;
@@ -300,14 +310,21 @@ public class StepStreaksDashboard extends MaterialDialogFragment {
         firstDate.setTime(DateTimeUtils.shiftByDays(new Date(firstSample.getTimestamp() * 1000L), -1));
         //go one day back, to ensure we are before the first day, to calculate first day data as well
 
+        // Steps per day from the cached, chunked history instead of one database query per day: the
+        // whole archive is read in a single pass (and reused on the next open) rather than re-scanned here.
+        final Map<LocalDate, Long> stepsByDay = new HashMap<>();
+        for (final BadgeDay badgeDay : BadgeHistory.INSTANCE.days(db, device, ZoneId.systemDefault())) {
+            stepsByDay.put(badgeDay.getDate(), badgeDay.getSteps());
+        }
+
         while (true) {
             if (cancelTasks) {
                 GB.toast("Cancelling background jobs", Toast.LENGTH_SHORT, GB.INFO);
                 break;
             }
 
-            DailyTotals daily_data = DailyTotals.getDailyTotalsForDevice(device, day, db);
-            int steps_this_day = (int) daily_data.getSteps();
+            final Long cachedSteps = stepsByDay.get(localDateOf(day));
+            int steps_this_day = cachedSteps != null ? cachedSteps.intValue() : 0;
 
             if (steps_this_day > 0) {
                 all_step_days++;

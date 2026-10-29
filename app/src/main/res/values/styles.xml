@@ -1017,4 +1017,30 @@
         <item name="android:windowAnimationStyle">@null</item>
         <item name="android:backgroundDimEnabled">false</item>
     </style>
+
+    <!-- Imported user theme, the custom_theme_* colors are replaced at runtime (see CustomThemes).
+         Applied on top of the light or dark theme, instead of the accent color. -->
+    <style name="ThemeOverlay.App.CustomTheme" parent="">
+        <item name="android:windowBackground">@color/custom_theme_background</item>
+        <item name="android:colorBackground">@color/custom_theme_background</item>
+        <item name="colorSurface">@color/custom_theme_background</item>
+        <item name="colorSurfaceContainerLowest">@color/custom_theme_surface_container_lowest</item>
+        <item name="colorSurfaceContainerLow">@color/custom_theme_surface_container_low</item>
+        <item name="colorSurfaceContainer">@color/custom_theme_surface_container</item>
+        <item name="colorSurfaceContainerHigh">@color/custom_theme_surface_container_high</item>
+        <item name="colorSurfaceContainerHighest">@color/custom_theme_surface_container_highest</item>
+        <item name="colorSurfaceVariant">@color/custom_theme_surface_container_high</item>
+        <item name="colorOnSurface">@color/custom_theme_on_surface</item>
+        <item name="colorOnSurfaceVariant">@color/custom_theme_on_surface_variant</item>
+        <item name="colorOutline">@color/custom_theme_outline</item>
+        <item name="colorOutlineVariant">@color/custom_theme_outline_variant</item>
+        <item name="tab_pill">@color/custom_theme_primary</item>
+        <item name="tab_pill_on">@color/custom_theme_on_primary</item>
+        <item name="subtab_pill">@color/custom_theme_primary_container</item>
+        <item name="subtab_pill_on">@color/custom_theme_on_primary_container</item>
+        <item name="toolbar_bg">@color/custom_theme_toolbar</item>
+        <item name="stat_tile_bg">@color/custom_theme_surface</item>
+        <item name="grid_tile_bg">@color/custom_theme_surface</item>
+        <item name="cardview_background_color">@color/custom_theme_surface</item>
+    </style>
 </resources>

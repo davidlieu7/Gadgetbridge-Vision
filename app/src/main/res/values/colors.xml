@@ -212,4 +212,16 @@
 
     <drawable name="selected">@color/accent</drawable>
 
+    <!-- Sleep quality levels and badge tiers -->
+    <color name="sleep_quality_excellent">#2DBE60</color>
+    <color name="sleep_quality_good">#7CC243</color>
+    <color name="sleep_quality_fair">#F5A623</color>
+    <color name="sleep_quality_poor">#E5484D</color>
+    <color name="badge_tier_bronze">#CD7F32</color>
+    <color name="badge_tier_silver">#9EA9B4</color>
+    <color name="badge_tier_gold">#E8A900</color>
+    <color name="badge_tier_platinum">#2FB3C9</color>
+    <color name="badge_tier_diamond">#8A6CFF</color>
+    <color name="badge_tier_legend">#F0445A</color>
+    <color name="badge_locked">#8C8C8C</color>
 </resources>

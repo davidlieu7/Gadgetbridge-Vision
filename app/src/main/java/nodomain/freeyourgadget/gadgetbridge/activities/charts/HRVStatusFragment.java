@@ -35,7 +35,6 @@ import com.google.android.material.chip.ChipGroup;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.text.SimpleDateFormat;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -486,7 +485,7 @@ public class HRVStatusFragment extends AbstractChartFragment<HRVStatusFragment.H
     }
 
     private void updateLastNightChart(final HRVStatusWeeklyData weeklyData) {
-        final String formattedDate = new SimpleDateFormat("E, MMM dd", Locale.getDefault()).format(getEndDate());
+        final String formattedDate = DateTimeUtils.formatChartDate(getEndDate());
         mDateView.setText(formattedDate);
 
         final List<? extends HrvValueSample> samples = weeklyData.lastNightSamples;

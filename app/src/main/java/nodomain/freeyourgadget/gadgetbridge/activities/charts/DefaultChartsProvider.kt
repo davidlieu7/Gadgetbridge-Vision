@@ -4,6 +4,9 @@ import android.content.Context
 import android.text.format.DateUtils
 import androidx.fragment.app.Fragment
 import lineageos.weather.util.TemperatureUtils
+import nodomain.freeyourgadget.gadgetbridge.activities.charts.badges.BadgesFragment
+import nodomain.freeyourgadget.gadgetbridge.activities.charts.goals.GoalsFragment
+import nodomain.freeyourgadget.gadgetbridge.activities.charts.report.ReportFragment
 import nodomain.freeyourgadget.gadgetbridge.GBApplication
 import nodomain.freeyourgadget.gadgetbridge.R
 import nodomain.freeyourgadget.gadgetbridge.activities.HeartRateUtils
@@ -118,6 +121,13 @@ open class DefaultChartsProvider : DeviceChartsProvider {
         if (coordinator.supportsRespiratoryRate(device)) {
             supportedCharts.add("respiratoryrate")
         }
+        if (coordinator.supportsStepCounter(device)) {
+            supportedCharts.add("goals")
+        }
+        if (coordinator.supportsStepCounter(device) || coordinator.supportsSleepMeasurement(device)) {
+            supportedCharts.add("report")
+            supportedCharts.add("badges")
+        }
 
         if (supportedCharts.size > 3) {
             supportedCharts.add(0, OVERVIEW)
@@ -175,6 +185,9 @@ open class DefaultChartsProvider : DeviceChartsProvider {
             "trainingreadiness" -> context.getString(R.string.metric_garmin_training_readiness)
             "solarcharging" -> context.getString(R.string.menuitem_solar_charging)
             "genericmetrics" -> context.getString(R.string.generic_metrics)
+            "goals" -> context.getString(R.string.goals_title)
+            "report" -> context.getString(R.string.report_title)
+            "badges" -> context.getString(R.string.badges_title)
             else -> String.format(Locale.getDefault(), "Unknown %s", chartName)
         }
     }
@@ -211,6 +224,9 @@ open class DefaultChartsProvider : DeviceChartsProvider {
             "calories" -> CaloriesCollectionFragment.newInstance(allowSwipe)
             "hydration" -> HydrationCollectionFragment.newInstance(allowSwipe)
             "respiratoryrate" -> RespiratoryRateCollectionFragment.newInstance(allowSwipe)
+            "goals" -> GoalsFragment()
+            "report" -> ReportFragment()
+            "badges" -> BadgesFragment()
             else -> UnknownFragment()
         }
     }
@@ -243,6 +259,9 @@ open class DefaultChartsProvider : DeviceChartsProvider {
             "trainingreadiness" -> R.drawable.ic_insights
             "solarcharging" -> R.drawable.ic_wb_sunny
             "genericmetrics" -> R.drawable.ic_bar_chart
+            "goals" -> R.drawable.ic_done_all
+            "report" -> R.drawable.ic_calendar_month
+            "badges" -> R.drawable.ic_badge_medal
             else -> R.drawable.ic_help_outline
         }
     }
@@ -479,8 +498,15 @@ open class DefaultChartsProvider : DeviceChartsProvider {
                 ?.takeIf { it > 0 }
                 ?.let { "+" + context.getString(R.string.num_min, it.toInt()) }
 
-            // Activity List, Speed Zones, Live Activity - no actual subtitle
-            "activitylist", "speedzones", "livestats" -> ""
+            // Badges - earned of all, as of the last time the badges were shown
+            "badges" -> {
+                val prefs = GBApplication.getDeviceSpecificSharedPrefs(device.address)
+                val total = prefs.getInt(BadgesFragment.PREF_TOTAL, 0)
+                if (total > 0) "${prefs.getInt(BadgesFragment.PREF_EARNED, 0)} / $total" else ""
+            }
+
+            // Activity List, Speed Zones, Live Activity, Goals, Report - no actual subtitle
+            "activitylist", "speedzones", "livestats", "goals", "report" -> ""
 
             else -> null
         }

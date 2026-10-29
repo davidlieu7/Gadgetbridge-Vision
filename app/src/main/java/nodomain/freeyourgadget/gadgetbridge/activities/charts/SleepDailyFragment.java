@@ -23,29 +23,43 @@ import static nodomain.freeyourgadget.gadgetbridge.model.ActivitySummaryEntries.
 import static nodomain.freeyourgadget.gadgetbridge.model.ActivitySummaryEntries.UNIT_PERCENTAGE;
 
 import android.content.Context;
+import android.content.res.ColorStateList;
 import android.content.Intent;
 import android.graphics.Color;
+import android.graphics.drawable.Drawable;
 import android.os.Bundle;
+import android.text.format.DateFormat;
 import android.text.method.ScrollingMovementMethod;
 import android.util.TypedValue;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 
+import android.widget.LinearLayout;
+import android.widget.TextView;
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.core.content.ContextCompat;
 
 import com.github.mikephil.charting.charts.Chart;
+import com.google.android.material.card.MaterialCardView;
 import com.google.android.material.chip.Chip;
 import com.google.android.material.chip.ChipGroup;
 
+import com.google.android.material.color.MaterialColors;
+import java.time.ZoneId;
+import nodomain.freeyourgadget.gadgetbridge.activities.charts.sleep.SleepAdvice;
+import nodomain.freeyourgadget.gadgetbridge.activities.charts.sleep.SleepDetails;
+import nodomain.freeyourgadget.gadgetbridge.activities.charts.sleep.SleepInsights;
+import nodomain.freeyourgadget.gadgetbridge.activities.workouts.SectionHeaderView;
+import nodomain.freeyourgadget.gadgetbridge.devices.SleepSessionProvider;
 import org.apache.commons.lang3.tuple.Triple;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.text.DecimalFormat;
-import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Calendar;
 import java.util.Date;
 import java.util.List;
 import java.util.Map;
@@ -56,9 +70,12 @@ import kotlin.jvm.functions.Function1;
 import nodomain.freeyourgadget.gadgetbridge.GBApplication;
 import nodomain.freeyourgadget.gadgetbridge.R;
 import nodomain.freeyourgadget.gadgetbridge.activities.HeartRateUtils;
+import nodomain.freeyourgadget.gadgetbridge.model.ActivityUser;
 import nodomain.freeyourgadget.gadgetbridge.model.SleepSession;
 import nodomain.freeyourgadget.gadgetbridge.activities.charts.mpchart.ChartLegendView;
 import nodomain.freeyourgadget.gadgetbridge.activities.charts.sleep.SleepStagesChartData;
+import nodomain.freeyourgadget.gadgetbridge.activities.charts.sleep.SleepQuality;
+import nodomain.freeyourgadget.gadgetbridge.activities.charts.sleep.SleepQualityLevel;
 import nodomain.freeyourgadget.gadgetbridge.activities.charts.spec.ChartPoint;
 import nodomain.freeyourgadget.gadgetbridge.activities.charts.spec.ChartSeries;
 import nodomain.freeyourgadget.gadgetbridge.activities.charts.spec.ChartSpec;
@@ -92,6 +109,11 @@ public class SleepDailyFragment extends SleepFragment<SleepDailyFragment.MyChart
     private static final String DAY_CHART_LEGACY = "legacy";
 
     private FragmentSleepchartBinding binding;
+
+    /**
+     * Nights before the shown one used for the bedtime regularity.
+     */
+    private static final int BEDTIME_NIGHTS = 7;
 
     Prefs prefs = GBApplication.getPrefs();
     private final boolean SHOW_CHARTS_AVERAGE = prefs.getBoolean("charts_show_average", true);
@@ -132,6 +154,7 @@ public class SleepDailyFragment extends SleepFragment<SleepDailyFragment.MyChart
             sleepScoreSamples = getSleepScoreSamples(db, device, getTSStart(), getTSEnd());
         }
         MySleepChartsData mySleepChartsData = buildSleepChartsData(sleepSessions, sleepScoreSamples);
+        mySleepChartsData.setPreviousBedtimes(previousBedtimes(db, device, rangeMode));
 
         final StageSamples stageSamples = stageSamples(device, samples, samples);
         Triple<Float, Integer, Integer> hrData = calculateHrData(samples);
@@ -257,6 +280,113 @@ public class SleepDailyFragment extends SleepFragment<SleepDailyFragment.MyChart
         return new MySleepChartsData(sleepSessions, totalSeconds, awakeSleepDuration, remSleepDuration, deepSleepDuration, lightSleepDuration, sleepScore);
     }
 
+    /**
+     * Start of the main sleep of each of the {@link #BEDTIME_NIGHTS} nights before this one, epoch milliseconds. Steps
+     * back by calendar days, so that a daylight saving change doesn't land on the same night twice.
+     */
+    private List<Long> previousBedtimes(final DBHandler db, final GBDevice device, final SleepRangeUtils.SleepRangeMode rangeMode) {
+        final List<Long> bedtimes = new ArrayList<>();
+        final SleepSessionProvider provider = device.getDeviceCoordinator().getSleepSessionProvider(device, db.getDaoSession());
+        final Calendar day = Calendar.getInstance();
+        day.setTimeInMillis(getTSEnd() * 1000L);
+        final List<int[]> ranges = new ArrayList<>();
+        for (int night = 1; night <= BEDTIME_NIGHTS; night++) {
+            day.add(Calendar.DATE, -1);
+            ranges.add(SleepRangeUtils.getSleepRange((int) (day.getTimeInMillis() / 1000), rangeMode));
+        }
+        // One query for all the nights, split by night like SleepPeriodFragment
+        final List<SleepSession> allSessions = provider.getSleepSessionsEndingIn(
+                ranges.get(ranges.size() - 1)[0], ranges.get(0)[1]);
+        for (final int[] range : ranges) {
+            final List<SleepSession> nightSessions = new ArrayList<>();
+            for (final SleepSession session : allSessions) {
+                final long endSeconds = session.getEndTime() / 1000L;
+                if (endSeconds > range[0] && endSeconds <= range[1]) {
+                    nightSessions.add(session);
+                }
+            }
+            final List<SleepSession> sessions = SleepInsights.mainSleep(nightSessions);
+            if (!sessions.isEmpty()) {
+                bedtimes.add(sessions.get(0).getStartTime());
+            }
+        }
+        return bedtimes;
+    }
+
+    /**
+     * Time in bed, bedtime and wake-up time, wake-ups and bedtime regularity, then tips for the weak parts of the night.
+     */
+    private void updateSleepDetails(final MySleepChartsData pieData) {
+        binding.sleepDetailsContainer.removeAllViews();
+        final ZoneId zone = ZoneId.systemDefault();
+        final SleepDetails details = SleepInsights.details(pieData.getSleepSessions(), pieData.getPreviousBedtimes(), zone);
+        if (details == null) {
+            return;
+        }
+        final java.text.DateFormat timeFormat = DateFormat.getTimeFormat(requireContext());
+        final List<StatTileData> stats = new ArrayList<>();
+        stats.add(new StatTileData(timeStringFormat(details.getInBedSeconds()), getString(R.string.sleep_details_in_bed)));
+        stats.add(new StatTileData(String.valueOf(details.getWakeUps()), getString(R.string.sleep_details_wake_ups)));
+        stats.add(new StatTileData(timeFormat.format(new Date(details.getFellAsleep())), getString(R.string.sleep_details_fell_asleep)));
+        stats.add(new StatTileData(timeFormat.format(new Date(details.getWokeUp())), getString(R.string.sleep_details_woke_up)));
+        if (details.getBedtimeSpreadMinutes() != null) {
+            stats.add(new StatTileData(getString(R.string.sleep_details_bedtime_spread, details.getBedtimeSpreadMinutes()),
+                    getString(R.string.sleep_details_bedtime_regularity)));
+        }
+        binding.sleepDetailsContainer.addView(sectionHeader(R.string.sleep_details_title));
+        StatTileGridUtilKt.addStatTileGrid(binding.sleepDetailsContainer, requireContext(), stats, 0);
+
+        final List<SleepAdvice> advice = SleepInsights.advice(
+                pieData.getTotalSleep() / 60.0,
+                pieData.getTotalDeep() / 60.0,
+                pieData.getTotalAwake() / 60.0,
+                new ActivityUser().getSleepDurationGoal(),
+                details,
+                zone
+        );
+        if (advice.isEmpty()) {
+            return;
+        }
+        binding.sleepDetailsContainer.addView(sectionHeader(R.string.sleep_tips_title));
+        for (final SleepAdvice tip : advice) {
+            binding.sleepDetailsContainer.addView(tipCard(tip));
+        }
+    }
+
+    private View sectionHeader(final int title) {
+        final SectionHeaderView header = new SectionHeaderView(requireContext());
+        header.setTitle(getString(title));
+        return header;
+    }
+
+    private View tipCard(final SleepAdvice tip) {
+        final Context context = requireContext();
+        final float density = getResources().getDisplayMetrics().density;
+        final MaterialCardView card = new MaterialCardView(context);
+        StatTileGridUtilKt.applyStatTileStyle(card, null);
+        final LinearLayout.LayoutParams cardParams = new LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        cardParams.bottomMargin = (int) (8 * density);
+        card.setLayoutParams(cardParams);
+
+        final TextView text = new TextView(context);
+        final int padding = (int) (14 * density);
+        text.setPadding(padding, padding, padding, padding);
+        text.setText(tip.getText());
+        text.setTextSize(14);
+        text.setTextColor(MaterialColors.getColor(context, R.attr.textColorPrimary, "SleepTip"));
+        final Drawable icon = ContextCompat.getDrawable(context, tip == SleepAdvice.KEEP_IT_UP ? R.drawable.ic_sleep_face_excellent : R.drawable.ic_lightbulb);
+        if (icon != null) {
+            final int size = (int) (24 * density);
+            icon.setBounds(0, 0, size, size);
+            icon.setTint(ContextCompat.getColor(context, tip == SleepAdvice.KEEP_IT_UP ? R.color.sleep_quality_excellent : R.color.sleep_quality_fair));
+            text.setCompoundDrawablesRelative(icon, null, null, null);
+            text.setCompoundDrawablePadding(padding);
+        }
+        card.addView(text);
+        return card;
+    }
+
     protected void sleepStagesGaugeUpdate(MySleepChartsData pieData) {
         int[] colors = new int[]{
                 ContextCompat.getColor(GBApplication.getContext(), R.color.chart_light_sleep_light),
@@ -276,10 +406,9 @@ public class SleepDailyFragment extends SleepFragment<SleepDailyFragment.MyChart
                 300,
                 GBApplication.getContext().getResources().getDisplayMetrics()
         );
-        String lowerText = "";
-        if (supportsSleepScore()) {
-            lowerText = GBApplication.getContext().getString(R.string.sleep_score_value, pieData.getSleepScore());
-        }
+        final Integer score = sleepScore(pieData);
+        final String lowerText = score != null ? GBApplication.getContext().getString(R.string.sleep_score_value, score) : "";
+        updateSleepQuality(score);
         binding.sleepStagesGauge.setImageBitmap(GaugeDrawer.drawCircleGaugeSegmented(
                 width,
                 width / 15,
@@ -290,6 +419,41 @@ public class SleepDailyFragment extends SleepFragment<SleepDailyFragment.MyChart
                 lowerText,
                 getContext()
         ));
+    }
+
+    /**
+     * The score of the device, or {@link SleepQuality} for devices without one. Null without sleep.
+     */
+    @Nullable
+    private Integer sleepScore(final MySleepChartsData pieData) {
+        if (supportsSleepScore() && pieData.getSleepScore() > 0) {
+            return pieData.getSleepScore();
+        }
+        return SleepQuality.score(
+                pieData.getTotalSleep() / 60.0,
+                pieData.getTotalDeep() / 60.0,
+                pieData.getTotalRem() / 60.0,
+                pieData.getTotalAwake() / 60.0,
+                new ActivityUser().getSleepDurationGoal()
+        );
+    }
+
+    /**
+     * Shows the face, level and summary of the sleep score.
+     */
+    private void updateSleepQuality(@Nullable final Integer score) {
+        if (score == null) {
+            binding.sleepQualityRow.setVisibility(View.GONE);
+            return;
+        }
+        final SleepQualityLevel level = SleepQualityLevel.of(score);
+        final int color = ContextCompat.getColor(requireContext(), level.getColor());
+        binding.sleepQualityFace.setImageResource(level.getFace());
+        binding.sleepQualityFace.setImageTintList(ColorStateList.valueOf(color));
+        binding.sleepQualityLevel.setText(level.getLabel());
+        binding.sleepQualityLevel.setTextColor(color);
+        binding.sleepQualitySummary.setText(level.getSummary());
+        binding.sleepQualityRow.setVisibility(View.VISIBLE);
     }
 
     private String timeStringFormat(long seconds) {
@@ -305,10 +469,11 @@ public class SleepDailyFragment extends SleepFragment<SleepDailyFragment.MyChart
         MySleepChartsData pieData = mcd.getPieData();
 
         Date date = new Date((long) this.getTSEnd() * 1000);
-        String formattedDate = new SimpleDateFormat("E, MMM dd").format(date);
+        String formattedDate = DateTimeUtils.formatChartDate(date);
         binding.sleepDate.setText(formattedDate);
 
         sleepStagesGaugeUpdate(pieData);
+        updateSleepDetails(pieData);
 
         final boolean hasSleepSessions = !pieData.sleepSessions.isEmpty();
         final List<StatTileData> legendStats = new ArrayList<>();
@@ -591,6 +756,15 @@ public class SleepDailyFragment extends SleepFragment<SleepDailyFragment.MyChart
         private final long totalLight;
         private final int sleepScore;
         private final List<SleepSession> sleepSessions;
+        private List<Long> previousBedtimes = new ArrayList<>();
+
+        public List<Long> getPreviousBedtimes() {
+            return previousBedtimes;
+        }
+
+        public void setPreviousBedtimes(final List<Long> previousBedtimes) {
+            this.previousBedtimes = previousBedtimes;
+        }
 
         public MySleepChartsData(List<SleepSession> sleepSessions, long totalSleep, long totalAwake, long totalRem, long totalDeep, long totalLight, int sleepScore) {
             this.sleepSessions = sleepSessions;

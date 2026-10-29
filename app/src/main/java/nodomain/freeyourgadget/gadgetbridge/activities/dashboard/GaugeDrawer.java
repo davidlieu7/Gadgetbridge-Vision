@@ -8,6 +8,7 @@ import android.graphics.Paint;
 import android.graphics.PorterDuff;
 import android.graphics.PorterDuffXfermode;
 import android.graphics.RectF;
+import android.graphics.Typeface;
 import android.graphics.drawable.BitmapDrawable;
 import android.util.TypedValue;
 import android.view.ViewGroup;
@@ -268,86 +269,36 @@ public class GaugeDrawer {
                                                   String text,
                                                   String lowerText,
                                                   Context context) {
-        int TEXT_COLOR = GBApplication.getTextColor(context);
-        int SUBTEXT_COLOR = GBApplication.getSecondaryTextColor(context);
-        int height = width;
-        int barMargin = (int) Math.ceil(barWidth / 2f);
+        final Bitmap bitmap = Bitmap.createBitmap(width, width, Bitmap.Config.ARGB_8888);
+        final Canvas canvas = new Canvas(bitmap);
+        final CircleGauge gauge = new CircleGauge(width, barWidth);
+        gauge.drawTrack(canvas, MaterialColors.getColor(context, R.attr.gauge_track, context.getResources().getColor(R.color.gauge_line_color)));
 
-        Bitmap bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
-        Canvas canvas = new Canvas(bitmap);
-        Paint paint = new Paint();
-        paint.setAntiAlias(true);
-        paint.setStyle(Paint.Style.STROKE);
-        paint.setStrokeCap(Paint.Cap.BUTT);
-        paint.setStrokeWidth(barWidth);
-        paint.setColor(MaterialColors.getColor(context, R.attr.gauge_track, context.getResources().getColor(R.color.gauge_line_color)));
-        canvas.drawArc(
-            barMargin,
-            barMargin,
-            width - barMargin,
-            width - barMargin,
-            90,
-            360,
-            false,
-            paint);
-        paint.setStrokeWidth(barWidth);
+        int validSegments = 0;
+        for (final float segment : segments) {
+            if (segment > 0) {
+                validSegments++;
+            }
+        }
+        // With gaps, the segments get rounded ends: the gap is what is left between the round caps
+        final float gapDegrees = gapBetweenSegments ? CIRCLE_SEGMENT_GAP_DEGREES : 0;
+        final float remainingAngle = 360 - validSegments * gapDegrees;
 
-        float remainingAngle = 360;
-        float gapDegree = 1f;
         if (gapBetweenSegments) {
-            int validSegments = segments.length;
+            float angle = 270;
             for (int i = 0; i < segments.length; i++) {
-                if (segments[i] == 0) {
-                    validSegments--;
+                if (segments[i] <= 0) {
+                    continue;
                 }
+                final float sweep = segments[i] * remainingAngle;
+                gauge.drawRoundedArc(canvas, angle + gapDegrees / 2, sweep, colors[i]);
+                angle += sweep + gapDegrees;
             }
-
-            remainingAngle = 360 - (validSegments * gapDegree);
+        } else {
+            gauge.drawJoinedSegments(canvas, colors, segments);
         }
 
-        float angleSum = 0;
-        for (int i = 0; i < segments.length; i++) {
-            if (segments[i] == 0) {
-                continue;
-            }
-
-            paint.setColor(colors[i]);
-            paint.setStrokeWidth(barWidth);
-
-            float startAngleDegrees = 270 + (angleSum * remainingAngle);
-            float sweepAngleDegrees = segments[i] * remainingAngle;
-
-            canvas.drawArc(
-                barMargin,
-                barMargin,
-                width - barMargin,
-                height - barMargin,
-                startAngleDegrees,
-                sweepAngleDegrees,
-                false,
-                paint
-            );
-            angleSum += segments[i];
-            if (gapBetweenSegments) {
-                angleSum += (gapDegree / 360f);
-            }
-        }
-
-        Paint textPaint = new Paint();
-        textPaint.setColor(TEXT_COLOR);
-        float textPixels = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, width * 0.06f, context.getResources().getDisplayMetrics());
-        textPaint.setTextSize(textPixels);
-        textPaint.setTextAlign(Paint.Align.CENTER);
-        int yPos = (int) ((float) height / 2 - ((textPaint.descent() + textPaint.ascent()) / 2));
-        canvas.drawText(String.valueOf(text), width / 2f, yPos, textPaint);
-        Paint textLowerPaint = new Paint();
-        textLowerPaint.setColor(SUBTEXT_COLOR);
-        textLowerPaint.setTextAlign(Paint.Align.CENTER);
-        float textLowerPixels = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, width * 0.025f, context.getResources().getDisplayMetrics());
-        textLowerPaint.setTextSize(textLowerPixels);
-        int yPosLowerText = (int) ((float) height / 2 - textPaint.ascent());
-        canvas.drawText(String.valueOf(lowerText), width / 2f, yPosLowerText, textLowerPaint);
-
+        gauge.drawTexts(canvas, context, text, lowerText);
         return bitmap;
     }
 
@@ -357,58 +308,154 @@ public class GaugeDrawer {
                                          int value,
                                          int maxValue,
                                          Context context) {
-        int TEXT_COLOR = GBApplication.getTextColor(context);
-        int SUB_TEXT_COLOR = GBApplication.getSecondaryTextColor(context);
-        int height = width;
-        int barMargin = (int) Math.ceil(barWidth / 2f);
-        float filledFactor = (float) value / maxValue;
+        final float filledFactor = maxValue > 0 ? Math.max(0f, (float) value / maxValue) : 0f;
 
-        Bitmap bitmap = Bitmap.createBitmap(width, height, Bitmap.Config.ARGB_8888);
-        Canvas canvas = new Canvas(bitmap);
-        Paint paint = new Paint();
-        paint.setAntiAlias(true);
-        paint.setStyle(Paint.Style.STROKE);
-        paint.setStrokeCap(Paint.Cap.ROUND);
-        paint.setStrokeWidth(barWidth);
-        paint.setColor(MaterialColors.getColor(context, R.attr.gauge_track, context.getResources().getColor(R.color.gauge_line_color)));
-        canvas.drawArc(
-            barMargin,
-            barMargin,
-            width - barMargin,
-            width - barMargin,
-            90,
-            360,
-            false,
-            paint);
-        paint.setStrokeWidth(barWidth);
-        paint.setColor(filledColor);
-        canvas.drawArc(
-            barMargin,
-            barMargin,
-            width - barMargin,
-            height - barMargin,
-            270,
-            360 * filledFactor,
-            false,
-            paint
-        );
+        final Bitmap bitmap = Bitmap.createBitmap(width, width, Bitmap.Config.ARGB_8888);
+        final Canvas canvas = new Canvas(bitmap);
+        final CircleGauge gauge = new CircleGauge(width, barWidth);
+        // Like the goal rings: a neutral track, the filled part in the gauge color with round ends
+        gauge.drawTrack(canvas, MaterialColors.getColor(context, R.attr.gauge_track, context.getResources().getColor(R.color.gauge_line_color)));
+        if (filledFactor >= 1) {
+            gauge.drawArc(canvas, 0, 360, filledColor);
+        } else if (filledFactor > 0) {
+            gauge.drawRoundedArc(canvas, 270, 360 * filledFactor, filledColor);
+        }
 
-        Paint textPaint = new Paint();
-        textPaint.setColor(TEXT_COLOR);
-        float textPixels = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, width * 0.06f, context.getResources().getDisplayMetrics());
-        textPaint.setTextSize(textPixels);
-        textPaint.setTextAlign(Paint.Align.CENTER);
-        int yPos = (int) ((float) height / 2 - ((textPaint.descent() + textPaint.ascent()) / 2));
-        canvas.drawText(NumberFormat.getInstance().format(value), width / 2f, yPos, textPaint);
-        Paint textLowerPaint = new Paint();
-        textLowerPaint.setColor(SUB_TEXT_COLOR);
-        textLowerPaint.setTextAlign(Paint.Align.CENTER);
-        float textLowerPixels = TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, width * 0.025f, context.getResources().getDisplayMetrics());
-        textLowerPaint.setTextSize(textLowerPixels);
-        int yPosLowerText = (int) ((float) height / 2 - textPaint.ascent());
-        canvas.drawText(NumberFormat.getInstance().format(maxValue), width / 2f, yPosLowerText, textLowerPaint);
-
+        final NumberFormat format = NumberFormat.getInstance();
+        gauge.drawTexts(canvas, context, format.format(value), format.format(maxValue));
         return bitmap;
+    }
+
+    private static final float CIRCLE_SEGMENT_GAP_DEGREES = 6f;
+
+    /**
+     * A full circle gauge of {@link #drawCircleGauge} and {@link #drawCircleGaugeSegmented}, starting at the top.
+     */
+    private static class CircleGauge {
+        private final float width;
+        private final float barWidth;
+        private final RectF oval;
+        /**
+         * The angle covered by a round cap, half the bar width along the circle.
+         */
+        private final float capDegrees;
+
+        CircleGauge(final int width, final int barWidth) {
+            this.width = width;
+            this.barWidth = barWidth;
+            final float margin = barWidth / 2f;
+            oval = new RectF(margin, margin, width - margin, width - margin);
+            final float radius = (width - barWidth) / 2f;
+            capDegrees = radius > 0 ? (float) Math.toDegrees(margin / radius) : 0;
+        }
+
+        private Paint stroke(final Paint.Cap cap) {
+            final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
+            paint.setStyle(Paint.Style.STROKE);
+            paint.setStrokeCap(cap);
+            paint.setStrokeWidth(barWidth);
+            return paint;
+        }
+
+        void drawTrack(final Canvas canvas, @ColorInt final int color) {
+            final Paint paint = stroke(Paint.Cap.BUTT);
+            paint.setColor(color);
+            canvas.drawArc(oval, 0, 360, false, paint);
+        }
+
+        void drawArc(final Canvas canvas, final float start, final float sweep, @ColorInt final int color) {
+            final Paint paint = stroke(Paint.Cap.BUTT);
+            paint.setColor(color);
+            canvas.drawArc(oval, start, sweep, false, paint);
+        }
+
+        /**
+         * An arc whose round caps stay within [start, start + sweep]; a segment too short for both caps is a dot.
+         */
+        void drawRoundedArc(final Canvas canvas, final float start, final float sweep, @ColorInt final int color) {
+            final Paint paint = stroke(Paint.Cap.ROUND);
+            paint.setColor(color);
+            if (sweep > 2 * capDegrees) {
+                canvas.drawArc(oval, start + capDegrees, sweep - 2 * capDegrees, false, paint);
+            } else {
+                drawDot(canvas, start + sweep / 2, color);
+            }
+        }
+
+        /**
+         * Segments one after the other from the top, like {@link #drawRoundedArc} as a whole: round where the filled
+         * part starts and ends, square where two segments meet. A full circle has no ends.
+         */
+        void drawJoinedSegments(final Canvas canvas, final int[] colors, final float[] segments) {
+            float total = 0;
+            int first = -1;
+            int last = -1;
+            for (int i = 0; i < segments.length; i++) {
+                if (segments[i] > 0) {
+                    total += segments[i];
+                    if (first < 0) {
+                        first = i;
+                    }
+                    last = i;
+                }
+            }
+            if (first < 0) {
+                return;
+            }
+            final float totalSweep = 360 * Math.min(total, 1f);
+            // Sums just under 1 are rounding errors: still a full circle
+            final boolean full = totalSweep >= 359.5f;
+            if (!full && totalSweep <= 2 * capDegrees) {
+                drawDot(canvas, 270 + totalSweep / 2, colors[first]);
+                return;
+            }
+            final float from = full ? 270 : 270 + capDegrees;
+            final float to = full ? 270 + 360 : 270 + totalSweep - capDegrees;
+            float angle = 270;
+            for (int i = 0; i < segments.length; i++) {
+                if (segments[i] <= 0) {
+                    continue;
+                }
+                final float end = i == last && full ? to : angle + segments[i] * 360;
+                final float start = Math.max(angle, from);
+                final float clippedEnd = Math.min(end, to);
+                if (clippedEnd > start) {
+                    drawArc(canvas, start, clippedEnd - start, colors[i]);
+                }
+                angle = end;
+            }
+            if (!full) {
+                drawDot(canvas, from, colors[first]);
+                drawDot(canvas, to, colors[last]);
+            }
+        }
+
+        private void drawDot(final Canvas canvas, final float angle, @ColorInt final int color) {
+            final double radians = Math.toRadians(angle);
+            final Paint paint = new Paint(Paint.ANTI_ALIAS_FLAG);
+            paint.setColor(color);
+            canvas.drawCircle(
+                oval.centerX() + oval.width() / 2 * (float) Math.cos(radians),
+                oval.centerY() + oval.height() / 2 * (float) Math.sin(radians),
+                barWidth / 2f, paint);
+        }
+
+        void drawTexts(final Canvas canvas, final Context context, final String text, final String lowerText) {
+            final float center = width / 2f;
+            final Paint textPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+            textPaint.setColor(GBApplication.getTextColor(context));
+            textPaint.setTypeface(Typeface.create("sans-serif-medium", Typeface.BOLD));
+            textPaint.setTextSize(TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, width * 0.06f, context.getResources().getDisplayMetrics()));
+            textPaint.setTextAlign(Paint.Align.CENTER);
+            final float yPos = center - (textPaint.descent() + textPaint.ascent()) / 2;
+            canvas.drawText(String.valueOf(text), center, yPos, textPaint);
+
+            final Paint textLowerPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+            textLowerPaint.setColor(GBApplication.getSecondaryTextColor(context));
+            textLowerPaint.setTextAlign(Paint.Align.CENTER);
+            textLowerPaint.setTextSize(TypedValue.applyDimension(TypedValue.COMPLEX_UNIT_SP, width * 0.025f, context.getResources().getDisplayMetrics()));
+            canvas.drawText(String.valueOf(lowerText), center, center - textPaint.ascent(), textLowerPaint);
+        }
     }
 
     public static double normalize(final double value, final double min, final double max) {

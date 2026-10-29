@@ -31,6 +31,7 @@ import nodomain.freeyourgadget.gadgetbridge.R;
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSpecificSettings;
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSpecificSettingsScreen;
 import nodomain.freeyourgadget.gadgetbridge.capabilities.HeartRateCapability;
+import nodomain.freeyourgadget.gadgetbridge.capabilities.password.PasswordCapabilityImpl;
 import nodomain.freeyourgadget.gadgetbridge.devices.InstallHandler;
 import nodomain.freeyourgadget.gadgetbridge.devices.huami.HuamiConst;
 import nodomain.freeyourgadget.gadgetbridge.devices.huami.HuamiCoordinator;
@@ -102,6 +103,12 @@ public class MiBand5Coordinator extends HuamiCoordinator {
     }
 
     @Override
+    public PasswordCapabilityImpl.Mode getPasswordCapability() {
+        // 6 digits from 0 to 9, same as Mi Band 6 (SUPPORT_SIX_OFF_WIST_PWD in Zepp Life)
+        return PasswordCapabilityImpl.Mode.NUMBERS_6;
+    }
+
+    @Override
     public boolean supportsPhoneSilentMode(@NonNull final GBDevice device) {
         return true;
     }
@@ -127,10 +134,12 @@ public class MiBand5Coordinator extends HuamiCoordinator {
         display.add(R.xml.devicesettings_nightmode);
         display.add(R.xml.devicesettings_liftwrist_display_sensitivity);
         display.add(R.xml.devicesettings_swipeunlock);
+        display.add(R.xml.devicesettings_password);
         final List<Integer> health = deviceSpecificSettings.addRootScreen(DeviceSpecificSettingsScreen.HEALTH);
         health.add(R.xml.devicesettings_heartrate_sleep_alert_activity_stress);
         health.add(R.xml.devicesettings_inactivity_dnd);
         health.add(R.xml.devicesettings_goal_notification);
+        health.add(R.xml.devicesettings_cycle_tracking);
         final List<Integer> workout = deviceSpecificSettings.addRootScreen(DeviceSpecificSettingsScreen.WORKOUT);
         workout.add(R.xml.devicesettings_workout_start_on_phone);
         workout.add(R.xml.devicesettings_workout_send_gps_to_band);
@@ -145,10 +154,12 @@ public class MiBand5Coordinator extends HuamiCoordinator {
         final List<Integer> connection = deviceSpecificSettings.addRootScreen(DeviceSpecificSettingsScreen.CONNECTION);
         connection.add(R.xml.devicesettings_expose_hr_thirdparty);
         connection.add(R.xml.devicesettings_bt_connected_advertisement);
+        connection.add(R.xml.devicesettings_camera_remote_hid);
         connection.add(R.xml.devicesettings_high_mtu);
         connection.add(R.xml.devicesettings_overwrite_settings_on_connection);
         final List<Integer> developer = deviceSpecificSettings.addRootScreen(DeviceSpecificSettingsScreen.DEVELOPER);
         developer.add(R.xml.devicesettings_huami2021_fetch_operation_time_unit);
+        developer.add(R.xml.devicesettings_huami_import_history);
 
         return deviceSpecificSettings;
     }

@@ -24,13 +24,14 @@ import androidx.localbroadcastmanager.content.LocalBroadcastManager;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 
 import java.time.LocalDate;
-import java.time.format.DateTimeFormatter;
+import java.time.ZoneId;
 import java.util.Arrays;
+import java.util.Date;
 import java.util.List;
-import java.util.Locale;
 
 import nodomain.freeyourgadget.gadgetbridge.GBApplication;
 import nodomain.freeyourgadget.gadgetbridge.R;
+import nodomain.freeyourgadget.gadgetbridge.util.DateTimeUtils;
 import nodomain.freeyourgadget.gadgetbridge.activities.dashboard.GaugeDrawer;
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsPreferenceConst;
 import nodomain.freeyourgadget.gadgetbridge.activities.workouts.StatTileData;
@@ -100,7 +101,7 @@ public class HydrationDailyFragment extends HydrationFragment<HydrationDailyFrag
         final Context context = requireContext();
         final HydrationUnit unit = data.unit;
 
-        dateView.setText(data.date.format(DateTimeFormatter.ofPattern("E, MMM dd", Locale.getDefault())));
+        dateView.setText(DateTimeUtils.formatChartDate(Date.from(data.date.atStartOfDay(ZoneId.systemDefault()).toInstant())));
         final List<StatTileData> stats = Arrays.asList(
                 new StatTileData(unit.format(context, data.totalMl), getString(R.string.hydration_total)),
                 new StatTileData(unit.format(context, data.goalMl), getString(R.string.hydration_goal))

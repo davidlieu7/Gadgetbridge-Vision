@@ -236,6 +236,32 @@
             android:summary="@string/pref_summary_contrasting_surfaces"
             android:title="@string/pref_title_contrasting_surfaces" />
 
+        <ListPreference
+            android:defaultValue=""
+            android:icon="@drawable/ic_paint"
+            android:key="pref_key_custom_theme"
+            android:title="@string/pref_title_custom_theme" />
+
+        <Preference
+            android:icon="@drawable/ic_paint"
+            android:key="pref_key_custom_theme_create"
+            android:persistent="false"
+            android:summary="@string/pref_summary_custom_theme_create"
+            android:title="@string/pref_title_custom_theme_create" />
+
+        <Preference
+            android:icon="@drawable/ic_file_upload"
+            android:key="pref_key_custom_theme_import"
+            android:persistent="false"
+            android:summary="@string/pref_summary_custom_theme_import"
+            android:title="@string/pref_title_custom_theme_import" />
+
+        <Preference
+            android:icon="@drawable/ic_delete"
+            android:key="pref_key_custom_theme_delete"
+            android:persistent="false"
+            android:title="@string/pref_title_custom_theme_delete" />
+
         <SwitchPreferenceCompat
             android:defaultValue="false"
             android:icon="@drawable/ic_visibility_lock"

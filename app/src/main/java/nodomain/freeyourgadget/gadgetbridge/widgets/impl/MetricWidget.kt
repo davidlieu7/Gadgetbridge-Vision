@@ -14,6 +14,7 @@ import nodomain.freeyourgadget.gadgetbridge.activities.dashboard.NumberTileRende
 import nodomain.freeyourgadget.gadgetbridge.activities.dashboard.TallTileRenderer
 import nodomain.freeyourgadget.gadgetbridge.activities.dashboard.TileRenderer
 import nodomain.freeyourgadget.gadgetbridge.activities.dashboard.WideTileRenderer
+import nodomain.freeyourgadget.gadgetbridge.util.DateTimeUtils
 import nodomain.freeyourgadget.gadgetbridge.widgets.GBWidget
 import nodomain.freeyourgadget.gadgetbridge.widgets.GaugeSpec
 import nodomain.freeyourgadget.gadgetbridge.widgets.MiniChart
@@ -25,7 +26,6 @@ import nodomain.freeyourgadget.gadgetbridge.widgets.WidgetActions
 import nodomain.freeyourgadget.gadgetbridge.widgets.WidgetConfig
 import nodomain.freeyourgadget.gadgetbridge.widgets.WidgetVariant
 import java.text.NumberFormat
-import java.util.Locale
 import kotlin.math.max
 import kotlin.math.min
 
@@ -182,15 +182,15 @@ abstract class MetricWidget<D> : GBWidget<D> {
     }
 
     /**
-     * [minutes] as "1:05".
+     * [minutes] as "1h 5min", like the charts.
      */
-    protected fun clock(minutes: Long): String = String.format(Locale.ROOT, "%d:%02d", minutes / 60, minutes % 60)
+    protected fun clock(minutes: Long): String = DateTimeUtils.formatMinutes(minutes)
 
     /**
-     * [minutes] as "1h 05m".
+     * Same as [clock].
      */
-    protected fun hoursMinutes(context: Context, minutes: Long): String =
-        context.getString(R.string.widget_duration_hours_minutes, minutes / 60, minutes % 60)
+    @Suppress("UNUSED_PARAMETER")
+    protected fun hoursMinutes(context: Context, minutes: Long): String = DateTimeUtils.formatMinutes(minutes)
 
     /**
      * The tile layout of [variant]. Variants that are only a gauge, such as the stress looks, get the gauge tile.

@@ -301,6 +301,15 @@ public class DeviceSettingsPreferenceConst {
 
     public static final String PREF_CAMERA_REMOTE = "camera_remote";
 
+    public static final String PREF_CYCLE_TRACKING_ENABLED = "cycle_tracking_enabled";
+    public static final String PREF_CYCLE_TRACKING_LAST_PERIOD_START = "cycle_tracking_last_period_start";
+    public static final String PREF_CYCLE_TRACKING_CYCLE_LENGTH = "cycle_tracking_cycle_length";
+    public static final String PREF_CYCLE_TRACKING_PERIOD_LENGTH = "cycle_tracking_period_length";
+    public static final String PREF_CYCLE_TRACKING_PERIOD_REMINDER = "cycle_tracking_period_reminder";
+    public static final String PREF_CYCLE_TRACKING_OVULATION_REMINDER = "cycle_tracking_ovulation_reminder";
+
+    public static final String PREF_HUAMI_IMPORT_HISTORY = "huami_import_history";
+
     public static final String PREF_WORKOUT_START_ON_PHONE = "workout_start_on_phone";
     public static final String PREF_WORKOUT_SEND_GPS_TO_BAND = "workout_send_gps_to_band";
     public static final String PREF_ELEVATION_CORRECTION = "elevation_correction";

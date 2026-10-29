@@ -103,6 +103,23 @@ public class DateTimeUtils {
         return DateUtils.formatDateTime(GBApplication.getContext(), date.getTime(), DateUtils.FORMAT_SHOW_DATE | DateUtils.FORMAT_ABBREV_ALL);
     }
 
+    /**
+     * The day shown at the top of the charts, like the date bar: weekday, day and month in the order and
+     * abbreviations of the locale, e.g. "ven. 16 oct." or "Fri, Oct 16".
+     */
+    public static String formatChartDate(Date date) {
+        final Locale locale = Locale.getDefault();
+        return new SimpleDateFormat(android.text.format.DateFormat.getBestDateTimePattern(locale, "EEEMMMd"), locale).format(date);
+    }
+
+    /**
+     * Same as {@link #formatChartDate(Date)} without the weekday, e.g. "16 oct.", for date ranges.
+     */
+    public static String formatChartDay(Date date) {
+        final Locale locale = Locale.getDefault();
+        return new SimpleDateFormat(android.text.format.DateFormat.getBestDateTimePattern(locale, "MMMd"), locale).format(date);
+    }
+
     public static String formatDate(Date date, int extraFlags) {
         return DateUtils.formatDateTime(GBApplication.getContext(), date.getTime(), DateUtils.FORMAT_SHOW_DATE | DateUtils.FORMAT_ABBREV_ALL | extraFlags);
     }
@@ -115,6 +132,20 @@ public class DateTimeUtils {
             .maximumAmountOfUnitsToShow(2)
             .build();
         return df.format(duration, unit);
+    }
+
+    /**
+     * Minutes like {@link #formatDurationHoursMinutes}, e.g. "7h 32min", "24min" or "0min": the one duration format of
+     * the dashboard and the charts.
+     */
+    public static String formatMinutes(long minutes) {
+        DurationFormatter df = DurationFormatter.Builder.SYMBOLS
+            .maximum(TimeUnit.DAYS)
+            .minimum(TimeUnit.MINUTES)
+            .suppressZeros(DurationFormatter.SuppressZeros.LEADING, DurationFormatter.SuppressZeros.TRAILING)
+            .maximumAmountOfUnitsToShow(2)
+            .build();
+        return df.format(Math.max(minutes, 0), TimeUnit.MINUTES);
     }
 
     public static String formatDateRange(Date from, Date to) {

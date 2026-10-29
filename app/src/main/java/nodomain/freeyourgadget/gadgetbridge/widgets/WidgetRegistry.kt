@@ -19,6 +19,7 @@ import nodomain.freeyourgadget.gadgetbridge.widgets.impl.SleepScoreWidget
 import nodomain.freeyourgadget.gadgetbridge.widgets.impl.SleepWidget
 import nodomain.freeyourgadget.gadgetbridge.widgets.impl.Spo2Widget
 import nodomain.freeyourgadget.gadgetbridge.widgets.impl.StepsWidget
+import nodomain.freeyourgadget.gadgetbridge.widgets.impl.StreakWidget
 import nodomain.freeyourgadget.gadgetbridge.widgets.impl.StressWidget
 import nodomain.freeyourgadget.gadgetbridge.widgets.impl.TodayWidget
 import nodomain.freeyourgadget.gadgetbridge.widgets.impl.TrainingLoadWidget
@@ -60,6 +61,7 @@ object WidgetRegistry {
         SleepWidget,
         Spo2Widget,
         StepsWidget,
+        StreakWidget,
         StressWidget,
         TodayWidget,
         TrainingLoadWidget,

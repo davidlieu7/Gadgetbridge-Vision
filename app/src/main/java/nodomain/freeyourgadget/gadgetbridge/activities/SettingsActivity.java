@@ -32,12 +32,15 @@ import android.location.LocationManager;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
+import android.util.Pair;
 import android.text.InputType;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.core.app.ActivityCompat;
 import androidx.localbroadcastmanager.content.LocalBroadcastManager;
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.preference.ListPreference;
 import androidx.preference.Preference;
 import androidx.preference.PreferenceFragmentCompat;
@@ -82,6 +85,8 @@ import nodomain.freeyourgadget.gadgetbridge.util.GBPrefs;
 import nodomain.freeyourgadget.gadgetbridge.util.NotificationUtils;
 import nodomain.freeyourgadget.gadgetbridge.util.Prefs;
 import nodomain.freeyourgadget.gadgetbridge.util.preferences.SubtitleListPreference;
+import nodomain.freeyourgadget.gadgetbridge.util.theme.CustomTheme;
+import nodomain.freeyourgadget.gadgetbridge.util.theme.CustomThemes;
 
 public class SettingsActivity extends AbstractSettingsActivityV2 implements ActivityCompat.OnRequestPermissionsResultCallback {
     public static final String PREF_LANGUAGE = "language";
@@ -620,6 +625,8 @@ public class SettingsActivity extends AbstractSettingsActivityV2 implements Acti
                 });
             }
 
+            setupCustomThemePreferences();
+
             pref = findPreference("pref_discovery_pairing");
             if (pref != null) {
                 pref.setOnPreferenceClickListener(preference -> {
@@ -723,6 +730,118 @@ public class SettingsActivity extends AbstractSettingsActivityV2 implements Acti
         /**
          * Signal running activities that the theme has changed
          */
+        /**
+         * Must be called from onCreatePreferences, the file picker is registered before the
+         * fragment is started.
+         */
+        private void setupCustomThemePreferences() {
+            final ListPreference customTheme = findPreference(CustomThemes.PREF_CUSTOM_THEME);
+            final Preference customThemeImport = findPreference("pref_key_custom_theme_import");
+            final Preference customThemeDelete = findPreference("pref_key_custom_theme_delete");
+            if (customTheme == null || customThemeImport == null || customThemeDelete == null) {
+                return;
+            }
+
+            if (!CustomThemes.isSupported()) {
+                customTheme.setEnabled(false);
+                customTheme.setSummary(R.string.pref_custom_theme_not_supported);
+                customThemeImport.setEnabled(false);
+                customThemeDelete.setEnabled(false);
+                return;
+            }
+
+            updateCustomThemeEntries(customTheme, customThemeDelete);
+            customTheme.setOnPreferenceChangeListener((preference, newVal) -> {
+                // the value is persisted after this listener, the summary is updated on recreate
+                sendThemeChangeIntent();
+                return true;
+            });
+
+            final Preference customThemeCreate = findPreference("pref_key_custom_theme_create");
+            if (customThemeCreate != null) {
+                customThemeCreate.setOnPreferenceClickListener(preference -> {
+                    final Intent intent = new Intent(requireContext(), ThemeEditorActivity.class);
+                    // Edit the selected custom theme if there is one, otherwise create a new theme
+                    final String current = GBApplication.getPrefs().getString(CustomThemes.PREF_CUSTOM_THEME, "");
+                    if (!current.isEmpty()) {
+                        intent.putExtra(ThemeEditorActivity.EXTRA_THEME_ID, current);
+                    }
+                    startActivity(intent);
+                    return true;
+                });
+            }
+
+            final ActivityResultLauncher<String[]> importLauncher = registerForActivityResult(
+                    new ActivityResultContracts.OpenDocument(),
+                    uri -> {
+                        if (uri == null) {
+                            return;
+                        }
+                        try {
+                            final CustomTheme theme = CustomThemes.importTheme(requireContext(), uri);
+                            customTheme.setValue(theme.getId());
+                            updateCustomThemeEntries(customTheme, customThemeDelete);
+                            GB.toast(getString(R.string.pref_custom_theme_imported, theme.getName()), Toast.LENGTH_SHORT, GB.INFO);
+                            sendThemeChangeIntent();
+                        } catch (final IOException | CustomTheme.InvalidThemeException e) {
+                            LOG.error("Failed to import theme", e);
+                            GB.toast(getString(R.string.pref_custom_theme_import_failed, e.getMessage()), Toast.LENGTH_LONG, GB.ERROR);
+                        }
+                    }
+            );
+            customThemeImport.setOnPreferenceClickListener(preference -> {
+                importLauncher.launch(new String[]{"*/*"});
+                return true;
+            });
+
+            customThemeDelete.setOnPreferenceClickListener(preference -> {
+                final String id = customTheme.getValue();
+                if (id == null || id.isEmpty()) {
+                    return true;
+                }
+                new MaterialAlertDialogBuilder(requireContext())
+                        .setTitle(R.string.pref_title_custom_theme_delete)
+                        .setMessage(getString(R.string.pref_custom_theme_delete_confirm, customTheme.getEntry()))
+                        .setIcon(R.drawable.ic_delete)
+                        .setPositiveButton(R.string.delete, (dialog, which) -> {
+                            CustomThemes.delete(requireContext(), id);
+                            customTheme.setValue("");
+                            updateCustomThemeEntries(customTheme, customThemeDelete);
+                            sendThemeChangeIntent();
+                        })
+                        .setNegativeButton(R.string.cancel, null)
+                        .show();
+                return true;
+            });
+        }
+
+        private void updateCustomThemeEntries(final ListPreference customTheme, final Preference customThemeDelete) {
+            final List<Pair<String, String>> themes = CustomThemes.list(requireContext());
+            final CharSequence[] entries = new CharSequence[themes.size() + 1];
+            final CharSequence[] values = new CharSequence[themes.size() + 1];
+            entries[0] = getString(R.string.none);
+            values[0] = "";
+            for (int i = 0; i < themes.size(); i++) {
+                values[i + 1] = themes.get(i).first;
+                entries[i + 1] = themes.get(i).second;
+            }
+            customTheme.setEntries(entries);
+            customTheme.setEntryValues(values);
+
+            // the selected theme may have been deleted
+            final String value = customTheme.getValue();
+            if (value != null && !value.isEmpty() && customTheme.findIndexOfValue(value) < 0) {
+                customTheme.setValue("");
+            }
+            final CustomTheme active = CustomThemes.getActive();
+            if (active != null) {
+                customTheme.setSummary(getString(R.string.pref_summary_custom_theme_active, active.getName()));
+            } else {
+                customTheme.setSummary(R.string.none);
+            }
+            customThemeDelete.setEnabled(value != null && !value.isEmpty());
+        }
+
         private void sendThemeChangeIntent() {
             Intent intent = new Intent();
             intent.setAction(GBApplication.ACTION_THEME_CHANGE);

@@ -95,6 +95,8 @@ import nodomain.freeyourgadget.gadgetbridge.util.PermissionsUtils;
 import nodomain.freeyourgadget.gadgetbridge.util.backup.PeriodicZipExporter;
 import nodomain.freeyourgadget.gadgetbridge.util.healthconnect.HealthConnectPermissionManager;
 import nodomain.freeyourgadget.gadgetbridge.util.preferences.DevicePrefs;
+import nodomain.freeyourgadget.gadgetbridge.util.theme.CustomTheme;
+import nodomain.freeyourgadget.gadgetbridge.util.theme.CustomThemes;
 import nodomain.freeyourgadget.gadgetbridge.widgets.launcher.LauncherWidgets;
 
 /**
@@ -565,6 +567,9 @@ public class GBApplication extends Application {
     }
 
     public static boolean isDarkThemeEnabled() {
+        if (CustomThemes.isActive()) {
+            return CustomThemes.isDark();
+        }
         String selectedTheme = prefs.getString("pref_key_theme", context.getString(R.string.pref_theme_value_system));
         Resources resources = context.getResources();
 
@@ -599,10 +604,16 @@ public class GBApplication extends Application {
     }
 
     public static boolean isAmoledBlackEnabled() {
+        if (CustomThemes.isActive()) {
+            return false;
+        }
         return prefs.getBoolean("pref_key_theme_amoled_black", false);
     }
 
     public static boolean areDynamicColorsEnabled() {
+        if (CustomThemes.isActive()) {
+            return false;
+        }
         String selectedTheme = prefs.getString("pref_key_theme", context.getString(R.string.pref_theme_value_system));
         return selectedTheme.equals(context.getString(R.string.pref_theme_value_dynamic));
     }
@@ -652,6 +663,9 @@ public class GBApplication extends Application {
     public static final String PREF_CONTRASTING_SURFACES = "pref_key_contrasting_surfaces";
 
     public static boolean areContrastingSurfacesEnabled(final boolean dark) {
+        if (CustomThemes.isActive()) {
+            return false;
+        }
         return prefs.getBoolean(PREF_CONTRASTING_SURFACES, dark);
     }
 
@@ -670,7 +684,9 @@ public class GBApplication extends Application {
     }
 
     public static int getTextColor(Context context) {
-        if (AndroidUtils.isDynamicColorActive()) {
+        if (CustomThemes.isActive()) {
+            return CustomThemes.getColor(CustomTheme.COLOR_ON_SURFACE);
+        } else if (AndroidUtils.isDynamicColorActive()) {
             return AndroidUtils.getDynamicColor(context, com.google.android.material.R.attr.colorOnSurface);
         } else if (GBApplication.isDarkThemeEnabled()) {
             return context.getResources().getColor(R.color.primarytext_dark);
@@ -680,7 +696,9 @@ public class GBApplication extends Application {
     }
 
     public static int getSecondaryTextColor(Context context) {
-        if (AndroidUtils.isDynamicColorActive()) {
+        if (CustomThemes.isActive()) {
+            return CustomThemes.getColor(CustomTheme.COLOR_ON_SURFACE_VARIANT);
+        } else if (AndroidUtils.isDynamicColorActive()) {
             return AndroidUtils.getDynamicColor(context, com.google.android.material.R.attr.colorOnSurfaceVariant);
         } else if (isDarkThemeEnabled()) {
             return context.getResources().getColor(R.color.on_surface_variant_dark);

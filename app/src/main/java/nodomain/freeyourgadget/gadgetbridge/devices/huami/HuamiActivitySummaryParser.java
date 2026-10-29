@@ -200,9 +200,13 @@ public class HuamiActivitySummaryParser implements ActivitySummaryParser {
         // Swimming
         float averageStrokeDistance = 0;
         float averageStrokesPerSecond = 0;
+        float maxStrokesPerSecond = 0;
+        float minStrokesPerSecond = 0;
         float averageLapPace = 0;
         short strokes = 0;
         short swolfIndex = 0; // this is called SWOLF score on bip s, SWOLF index on mi band 4
+        short maxSwolf = 0;
+        short minSwolf = 0;
         byte swimStyle = 0;
         byte laps = 0;
 
@@ -283,21 +287,22 @@ public class HuamiActivitySummaryParser implements ActivitySummaryParser {
                     max stroke rate 39
                  */
 
+                // 36 bytes, same layout for v512+, v516 and v519 (as decoded by Zepp Life)
+                buffer.getFloat(); // realtime distance per stroke, last value during the workout
                 averageStrokeDistance = buffer.getFloat();
-                buffer.getInt(); // unknown
-                buffer.getInt(); // unknown
-                buffer.getInt(); // unknown
-                buffer.getInt(); // unknown
-                buffer.getInt(); // unknown
+                buffer.getFloat(); // realtime stroke rate, last value during the workout
+                maxStrokesPerSecond = buffer.getFloat();
+                minStrokesPerSecond = buffer.getFloat();
                 averageStrokesPerSecond = buffer.getFloat();
-                averageLapPace = buffer.getFloat();
-                buffer.getInt(); // unknown
                 strokes = buffer.getShort();
+                buffer.getShort(); // realtime swolf, last value during the workout
+                maxSwolf = buffer.getShort();
+                minSwolf = buffer.getShort();
                 swolfIndex = buffer.getShort();
                 swimStyle = buffer.get();
                 laps = buffer.get();
-                buffer.getInt(); // unknown
-                buffer.getInt(); // unknown
+                // the average lap pace is not stored separately, the official app uses the average pace
+                averageLapPace = averagePace;
             }
         } else {
             distanceMeters = buffer.getFloat();
@@ -432,9 +437,25 @@ public class HuamiActivitySummaryParser implements ActivitySummaryParser {
         if (activityKind == ActivityKind.SWIMMING || activityKind == ActivityKind.SWIMMING_OPENWATER) {
             summaryData.add(STROKE_DISTANCE_AVG, averageStrokeDistance, UNIT_METERS);
             summaryData.add(STROKE_AVG_PER_SECOND, averageStrokesPerSecond, UNIT_STROKES_PER_SECOND);
-            summaryData.add(LAP_PACE_AVERAGE, averageLapPace, "second");
+            // in strokes per minute, as for Zepp OS
+            if (maxStrokesPerSecond > 0) {
+                summaryData.add(STROKE_RATE_MAX, Math.round(maxStrokesPerSecond * 60), UNIT_STROKES_PER_MINUTE);
+            }
+            if (minStrokesPerSecond > 0) {
+                summaryData.add(STROKE_RATE_MIN, Math.round(minStrokesPerSecond * 60), UNIT_STROKES_PER_MINUTE);
+            }
+            if (averageLapPace > 0) {
+                // in seconds per meter, as decoded by Zepp Life
+                summaryData.add(LAP_PACE_AVERAGE, averageLapPace * 100, UNIT_SECONDS_PER_100_METERS);
+            }
             summaryData.add(STROKES, strokes, "strokes");
             summaryData.add(SWOLF_INDEX, swolfIndex, "swolf_index");
+            if (maxSwolf > 0) {
+                summaryData.add(SWOLF_MAX, maxSwolf, "swolf_index");
+            }
+            if (minSwolf > 0) {
+                summaryData.add(SWOLF_MIN, minSwolf, "swolf_index");
+            }
             String swimStyleName = switch (swimStyle) {
                 case 1 -> "breaststroke";
                 case 2 -> "freestyle";

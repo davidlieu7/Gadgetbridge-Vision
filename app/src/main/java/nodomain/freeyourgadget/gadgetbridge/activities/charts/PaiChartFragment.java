@@ -66,6 +66,7 @@ public class PaiChartFragment extends AbstractChartFragment<PaiChartFragment.Pai
     protected final int TOTAL_DAYS = getRangeDays();
 
     protected ImageView mGoalMinutesGauge;
+    private TextView mGoalStatus;
     protected GbChartView mWeekChart;
     protected ChartLegendView mWeekLegend;
     protected TextView mDateView;
@@ -100,6 +101,7 @@ public class PaiChartFragment extends AbstractChartFragment<PaiChartFragment.Pai
         });
 
         mGoalMinutesGauge = rootView.findViewById(R.id.goal_minutes_gauge);
+        mGoalStatus = rootView.findViewById(R.id.pai_goal_status);
         mWeekChart = rootView.findViewById(R.id.pai_chart_week);
         mWeekLegend = rootView.findViewById(R.id.pai_chart_legend);
         mDateView = rootView.findViewById(R.id.pai_date_view);
@@ -182,6 +184,7 @@ public class PaiChartFragment extends AbstractChartFragment<PaiChartFragment.Pai
                 getContext()
         ));
 
+        updateGoalStatus(pcd.getDayData().getTotal());
         updateWeekChart(pcd.getWeekBeforeData());
 
         mDateView.setText(DateTimeUtils.formatDate(pcd.getDayData().day.getTime()));
@@ -208,6 +211,20 @@ public class PaiChartFragment extends AbstractChartFragment<PaiChartFragment.Pai
         mLineModerateTime.setText(requireContext().getString(R.string.num_min, pcd.getDayData().minutesModerate));
         mLineHighInc.setText(String.valueOf(pcd.getDayData().paiHigh));
         mLineHighTime.setText(requireContext().getString(R.string.num_min, pcd.getDayData().minutesHigh));
+    }
+
+    /**
+     * The 7-day PAI against its goal, like the weekly vitality goal of the vendor apps.
+     */
+    private void updateGoalStatus(final int total) {
+        final int target = getPaiTarget();
+        if (total >= target) {
+            mGoalStatus.setText(getString(R.string.pai_goal_reached, target));
+            mGoalStatus.setTextColor(ContextCompat.getColor(requireContext(), R.color.sleep_quality_excellent));
+        } else {
+            mGoalStatus.setText(getString(R.string.pai_goal_to_go, target - total, target));
+            mGoalStatus.setTextColor(PAI_TOTAL_COLOR);
+        }
     }
 
     private void updateWeekChart(final WeekData week) {

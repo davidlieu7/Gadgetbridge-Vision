@@ -38,7 +38,6 @@ import com.github.mikephil.charting.charts.Chart;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Collections;
@@ -65,6 +64,7 @@ import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
 import nodomain.freeyourgadget.gadgetbridge.model.BloodPressureSample;
 import nodomain.freeyourgadget.gadgetbridge.util.Accumulator;
 import nodomain.freeyourgadget.gadgetbridge.util.BloodPressureExportHelper;
+import nodomain.freeyourgadget.gadgetbridge.util.DateTimeUtils;
 
 public class BloodPressureChartFragment extends AbstractChartFragment<BloodPressureChartFragment.BloodPressureChartsData> {
     protected static final Logger LOG = LoggerFactory.getLogger(BloodPressureChartFragment.class);
@@ -153,7 +153,7 @@ public class BloodPressureChartFragment extends AbstractChartFragment<BloodPress
         StatTileGridUtilKt.addStatTileGrid(mStatsContainer, requireContext(), stats, 0);
 
         Date date = new Date((long) getTSEnd() * 1000);
-        String formattedDate = new SimpleDateFormat("E, MMM dd", Locale.getDefault()).format(date);
+        String formattedDate = DateTimeUtils.formatChartDate(date);
         mDateView.setText(formattedDate);
 
         final int systolicColor = ContextCompat.getColor(requireContext(), R.color.blood_pressure_systolic_color);

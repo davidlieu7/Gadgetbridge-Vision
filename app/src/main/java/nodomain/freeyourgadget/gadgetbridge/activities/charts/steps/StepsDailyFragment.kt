@@ -25,8 +25,8 @@ import nodomain.freeyourgadget.gadgetbridge.databinding.FragmentStepsBinding
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice
 import nodomain.freeyourgadget.gadgetbridge.model.ActivitySummaryEntries
 import nodomain.freeyourgadget.gadgetbridge.model.ActivityUser
+import nodomain.freeyourgadget.gadgetbridge.util.DateTimeUtils
 import java.text.NumberFormat
-import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
 import java.util.Locale
@@ -117,7 +117,7 @@ class StepsDailyFragment : AbstractCoroutineChartFragment<StepsDailyFragment.Scr
     }
 
     private fun showTotals(totals: StepsDailyChartData.DailyTotals) {
-        binding.stepsDateView.text = SimpleDateFormat("E, MMM dd", Locale.getDefault()).format(chartsHost().endDate)
+        binding.stepsDateView.text = DateTimeUtils.formatChartDate(chartsHost().endDate)
 
         val width = TypedValue.applyDimension(
             TypedValue.COMPLEX_UNIT_DIP,

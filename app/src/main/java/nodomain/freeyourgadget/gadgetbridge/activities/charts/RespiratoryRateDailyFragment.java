@@ -15,7 +15,6 @@ import com.github.mikephil.charting.charts.Chart;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Collections;
@@ -83,7 +82,7 @@ public class RespiratoryRateDailyFragment extends RespiratoryRateFragment<Respir
 
     @Override
     protected void updateChartsnUIThread(RespiratoryRateFragment.RespiratoryRateDay respiratoryRateDay) {
-        String formattedDate = new SimpleDateFormat("E, MMM dd").format(respiratoryRateDay.day.getTime());
+        String formattedDate = DateTimeUtils.formatChartDate(respiratoryRateDay.day.getTime());
         mDateView.setText(formattedDate);
         final String emptyValue = requireContext().getString(R.string.stats_empty_value);
         final List<StatTileData> stats = new ArrayList<>();

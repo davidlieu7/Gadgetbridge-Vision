@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.preference.PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android">
+    <Preference
+        android:icon="@drawable/ic_file_upload"
+        android:key="huami_import_history"
+        android:persistent="false"
+        android:summary="@string/huami_import_history_summary"
+        android:title="@string/huami_import_history_title" />
+</androidx.preference.PreferenceScreen>

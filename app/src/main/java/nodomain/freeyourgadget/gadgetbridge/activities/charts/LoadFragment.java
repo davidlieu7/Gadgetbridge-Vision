@@ -42,7 +42,6 @@ import com.google.android.material.chip.ChipGroup;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.text.SimpleDateFormat;
 import java.time.DayOfWeek;
 import java.time.LocalDate;
 import java.time.LocalTime;
@@ -289,7 +288,7 @@ public class LoadFragment extends AbstractChartFragment<LoadFragment.LoadsData> 
         if (data == null) {
             return;
         }
-        String formattedDate = new SimpleDateFormat("E, MMM dd").format(getEndDate());
+        String formattedDate = DateTimeUtils.formatChartDate(getEndDate());
         dateHeader.setText(formattedDate);
         weeklyLoadStatsContainer.removeAllViews();
         final List<StatTileData> weeklyLoadStats = new ArrayList<>();

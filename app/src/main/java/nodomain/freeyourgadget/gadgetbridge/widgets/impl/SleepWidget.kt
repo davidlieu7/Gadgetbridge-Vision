@@ -16,7 +16,6 @@ import nodomain.freeyourgadget.gadgetbridge.widgets.WidgetDataScope
 import nodomain.freeyourgadget.gadgetbridge.widgets.WidgetConfig
 import java.time.LocalDate
 import java.time.ZoneId
-import java.util.Locale
 
 /**
  * Sleep duration for the day against the user's sleep goal.
@@ -115,7 +114,7 @@ object SleepWidget : MetricWidget<SleepWidget.Data>() {
         val times = night?.let { TileAxis.timeRange(it.first().start, it.last().end, ZoneId.systemDefault()) }
         if (config.isLargeStyle) {
             return TileModel(
-                value = String.format(Locale.ROOT, "%d:%02d", data.total / 60, data.total % 60),
+                value = clock(data.total),
                 gauge = GaugeSpec.Progress(WidgetColors.lightSleep, data.goalFactor),
                 status = if (data.score > 0) {
                     StatusLine.Chip(WidgetColors.lightSleep, context.getString(R.string.sleep_score_value, data.score))
@@ -128,7 +127,7 @@ object SleepWidget : MetricWidget<SleepWidget.Data>() {
             )
         }
         return TileModel(
-            value = String.format(Locale.ROOT, "%d:%02d", data.total / 60, data.total % 60),
+            value = clock(data.total),
             gauge = GaugeSpec.Progress(WidgetColors.lightSleep, data.goalFactor),
             status = if (data.score > 0) {
                 StatusLine.Chip(WidgetColors.lightSleep, context.getString(R.string.sleep_score_value, data.score))

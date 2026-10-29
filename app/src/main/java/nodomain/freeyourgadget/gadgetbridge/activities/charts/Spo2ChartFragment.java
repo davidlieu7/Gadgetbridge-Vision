@@ -31,7 +31,6 @@ import com.github.mikephil.charting.charts.Chart;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Collections;
@@ -55,6 +54,7 @@ import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
 import nodomain.freeyourgadget.gadgetbridge.model.Spo2ManualMeasurement;
 import nodomain.freeyourgadget.gadgetbridge.model.Spo2Sample;
 import nodomain.freeyourgadget.gadgetbridge.util.Accumulator;
+import nodomain.freeyourgadget.gadgetbridge.util.DateTimeUtils;
 
 // Based on StressDailyFragment
 
@@ -92,7 +92,7 @@ public class Spo2ChartFragment extends AbstractChartFragment<Spo2ChartFragment.S
         day.add(Calendar.HOUR, 0);
         int startTs = (int) (day.getTimeInMillis() / 1000);
         int endTs = startTs + 24 * 60 * 60 - 1;
-        final String formattedDate = new SimpleDateFormat("E, MMM dd").format(chartsHost.getEndDate());
+        final String formattedDate = DateTimeUtils.formatChartDate(chartsHost.getEndDate());
         return fetchSpo2Data(db, device, startTs, endTs, formattedDate);
     }
 

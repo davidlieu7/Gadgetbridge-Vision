@@ -10,6 +10,13 @@
         app:showAsAction="ifRoom" />
 
     <item
+        android:id="@+id/activity_action_plans"
+        android:icon="@drawable/ic_badge_flag"
+        android:title="@string/plans_title"
+        app:iconTint="?attr/actionmenu_icon_color"
+        app:showAsAction="ifRoom" />
+
+    <item
         android:id="@+id/activity_action_filter"
         android:icon="@drawable/ic_filter_alt"
         android:title="@string/pref_header_filter"

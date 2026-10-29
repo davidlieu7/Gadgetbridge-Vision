@@ -3,6 +3,7 @@ package nodomain.freeyourgadget.gadgetbridge.activities.workouts
 import android.content.Context
 import android.content.res.ColorStateList
 import android.graphics.Typeface
+import android.graphics.drawable.GradientDrawable
 import android.view.Gravity
 import android.view.View
 import android.widget.FrameLayout
@@ -12,6 +13,7 @@ import android.widget.TextView
 import androidx.annotation.ColorInt
 import androidx.annotation.DrawableRes
 import androidx.core.content.res.ResourcesCompat
+import androidx.core.graphics.ColorUtils
 import androidx.core.widget.TextViewCompat
 import com.google.android.material.card.MaterialCardView
 import com.google.android.material.color.MaterialColors
@@ -24,19 +26,23 @@ private const val TILE_GAP_DP = 12
 private const val TILE_PADDING_HORIZONTAL_DP = 12
 private const val TILE_PADDING_VERTICAL_DP = 16
 private const val SUBTEXT_TOP_MARGIN_DP = 2
+private const val SPARKLINE_TOP_MARGIN_DP = 6
 private const val SUBTEXT_DRAWABLE_PADDING_DP = 4
 private const val ICON_TILE_ICON_SIZE_DP = 22
 private const val ICON_TILE_GAP_DP = 12
 private const val ICON_TILE_PADDING_HORIZONTAL_DP = 12
 private const val ICON_TILE_PADDING_VERTICAL_DP = 14
 private const val ICON_TILE_LABEL_TOP_MARGIN_DP = 3
+private const val ACCENT_TINT = 0.16f
+private const val ACCENT_DOT_DP = 8
+private const val ACCENT_DOT_PADDING_DP = 6
 
 /**
  * [subtext] is an optional line rendered between [value] and [label] (e.g. a trend indicator),
  * shown with a leading [subtextIcon] tinted and colored with [subtextColor]. Omitted entirely
- * (no reserved space) when [subtext] is null. [borderColor], when set, replaces the tile's
- * neutral border with that color (e.g. to identify one series/zone among several tiles) in place
- * of a separate colored swatch. [icon], when set, switches to the horizontal variant: the icon on
+ * (no reserved space) when [subtext] is null. [borderColor], when set, identifies one series/zone
+ * among several tiles: the tile gets a faint tint of that color and a dot of it before the label,
+ * instead of the neutral border. [icon], when set, switches to the horizontal variant: the icon on
  * the left, then the value and label start-aligned next to it, instead of the centered layout.
  */
 data class StatTileData @JvmOverloads constructor(
@@ -48,6 +54,11 @@ data class StatTileData @JvmOverloads constructor(
     val subtextColor: Int? = null,
     val borderColor: Int? = null,
     @DrawableRes val icon: Int? = null,
+    /** A one-word qualitative verdict (e.g. "Optimal"), shown below the value and tinted with [statusColor]. */
+    val status: String? = null,
+    val statusColor: Int? = null,
+    /** A few values to draw as a small trend line under the value; ignored by the icon (horizontal) variant. */
+    val sparkline: FloatArray? = null,
 )
 
 /**
@@ -117,16 +128,34 @@ fun applyStatTileStyle(card: MaterialCardView, @ColorInt borderColor: Int? = nul
     val context = card.context
     card.radius = dpToPx(context, CARD_CORNER_RADIUS_DP).toFloat()
     card.cardElevation = 0f
-    // A colored border identifies one series/zone among several tiles, so it stays thicker
-    // to remain visible; the neutral border is a thin outline.
-    card.strokeWidth = dpToPx(context, if (borderColor != null) 2 else 1)
-    card.strokeColor = borderColor ?: MaterialColors.getColor(context, R.attr.stat_tile_border, "StatTile")
-    card.setCardBackgroundColor(
-        ElevationOverlayProvider(context).compositeOverlayIfNeeded(
-            MaterialColors.getColor(context, R.attr.stat_tile_bg, "StatTile"),
-            3 * context.resources.displayMetrics.density
-        )
+    val background = ElevationOverlayProvider(context).compositeOverlayIfNeeded(
+        MaterialColors.getColor(context, R.attr.stat_tile_bg, "StatTile"),
+        3 * context.resources.displayMetrics.density
     )
+    if (borderColor != null) {
+        // A tile of one series/zone: tinted with its color, without border (the label has a dot)
+        card.strokeWidth = 0
+        card.setCardBackgroundColor(ColorUtils.blendARGB(background, ColorUtils.setAlphaComponent(borderColor, 0xFF), ACCENT_TINT))
+    } else {
+        card.strokeWidth = dpToPx(context, 1)
+        card.strokeColor = MaterialColors.getColor(context, R.attr.stat_tile_border, "StatTile")
+        card.setCardBackgroundColor(background)
+    }
+}
+
+/**
+ * Puts a dot of [color] before the text of [label], the marker of a tile's series/zone.
+ */
+private fun addAccentDot(label: TextView, @ColorInt color: Int) {
+    val context = label.context
+    val size = dpToPx(context, ACCENT_DOT_DP)
+    val dot = GradientDrawable().apply {
+        shape = GradientDrawable.OVAL
+        setColor(ColorUtils.setAlphaComponent(color, 0xFF))
+        setSize(size, size)
+    }
+    label.setCompoundDrawablesRelativeWithIntrinsicBounds(dot, null, null, null)
+    label.compoundDrawablePadding = dpToPx(context, ACCENT_DOT_PADDING_DP)
 }
 
 private fun buildStatTile(context: Context, stat: StatTileData): MaterialCardView {
@@ -193,6 +222,7 @@ private fun buildIconTileContent(context: Context, stat: StatTileData, @Drawable
                 textSize = 12f
                 maxLines = 2
                 setTextColor(mutedColor)
+                stat.borderColor?.let { addAccentDot(this, it) }
                 layoutParams = LinearLayout.LayoutParams(
                     LinearLayout.LayoutParams.WRAP_CONTENT,
                     LinearLayout.LayoutParams.WRAP_CONTENT
@@ -229,6 +259,29 @@ private fun buildCenteredTileContent(context: Context, stat: StatTileData): Line
                 LinearLayout.LayoutParams.WRAP_CONTENT
             )
         })
+        if (stat.status != null) {
+            addView(TextView(context).apply {
+                text = stat.status
+                textSize = 12f
+                gravity = Gravity.CENTER
+                typeface = Typeface.create("sans-serif-medium", Typeface.NORMAL)
+                includeFontPadding = false
+                setTextColor(stat.statusColor ?: MaterialColors.getColor(context, R.attr.textColorPrimary, "StatTile"))
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    LinearLayout.LayoutParams.WRAP_CONTENT
+                ).apply { topMargin = dpToPx(context, SUBTEXT_TOP_MARGIN_DP) }
+            })
+        }
+        stat.sparkline?.takeIf { it.size >= 2 }?.let { series ->
+            addView(nodomain.freeyourgadget.gadgetbridge.activities.charts.SparklineView(context).apply {
+                setValues(series, stat.statusColor ?: MaterialColors.getColor(context, androidx.appcompat.R.attr.colorPrimary, "StatTile"))
+                layoutParams = LinearLayout.LayoutParams(
+                    LinearLayout.LayoutParams.MATCH_PARENT,
+                    dpToPx(context, 22)
+                ).apply { topMargin = dpToPx(context, SPARKLINE_TOP_MARGIN_DP) }
+            })
+        }
         if (stat.subtext != null) {
             addView(TextView(context).apply {
                 text = stat.subtext
@@ -261,7 +314,8 @@ private fun buildCenteredTileContent(context: Context, stat: StatTileData): Line
             text = stat.label
             textSize = 12f
             maxLines = 2
-            gravity = Gravity.CENTER_HORIZONTAL
+            gravity = Gravity.CENTER
+            stat.borderColor?.let { addAccentDot(this, it) }
             setTextColor(
                 MaterialColors.getColor(
                     context,

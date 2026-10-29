@@ -915,6 +915,12 @@ public class DeviceSpecificSettingsFragment extends AbstractPreferenceFragment i
         addPreferenceHandlerFor(PREF_AMPM_ENABLED);
         addPreferenceHandlerFor(PREF_SOUNDS);
         addPreferenceHandlerFor(PREF_CAMERA_REMOTE);
+        addPreferenceHandlerFor(PREF_CYCLE_TRACKING_ENABLED);
+        addPreferenceHandlerFor(PREF_CYCLE_TRACKING_LAST_PERIOD_START);
+        addPreferenceHandlerFor(PREF_CYCLE_TRACKING_CYCLE_LENGTH);
+        addPreferenceHandlerFor(PREF_CYCLE_TRACKING_PERIOD_LENGTH);
+        addPreferenceHandlerFor(PREF_CYCLE_TRACKING_PERIOD_REMINDER);
+        addPreferenceHandlerFor(PREF_CYCLE_TRACKING_OVULATION_REMINDER);
         addPreferenceHandlerFor(PREF_SCREEN_LIFT_WRIST);
 
         final Preference sendGpsToBandPref = findPreference(PREF_WORKOUT_SEND_GPS_TO_BAND);

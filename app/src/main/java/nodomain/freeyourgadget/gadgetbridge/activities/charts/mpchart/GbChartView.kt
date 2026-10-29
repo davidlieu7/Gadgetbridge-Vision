@@ -1,5 +1,6 @@
 package nodomain.freeyourgadget.gadgetbridge.activities.charts.mpchart
 
+import android.animation.ValueAnimator
 import android.annotation.SuppressLint
 import android.content.Context
 import android.graphics.Bitmap
@@ -20,6 +21,7 @@ import android.widget.ScrollView
 import androidx.core.graphics.ColorUtils
 import androidx.core.view.ViewCompat
 import androidx.core.widget.NestedScrollView
+import com.github.mikephil.charting.animation.Easing
 import com.github.mikephil.charting.charts.CombinedChart
 import com.github.mikephil.charting.components.LimitLine
 import com.github.mikephil.charting.components.XAxis.XAxisPosition
@@ -131,16 +133,21 @@ class GbChartView @JvmOverloads constructor(
         noDataTextColor = theme.secondaryTextColor
         drawOrder = listOf(CombinedChart.DrawOrder.BAR, CombinedChart.DrawOrder.CANDLE, CombinedChart.DrawOrder.LINE)
 
+        // Only faint dashed horizontal guides: no vertical grid lines and no axis lines
         val gridColor = ColorUtils.setAlphaComponent(theme.secondaryTextColor, GRID_ALPHA)
         xAxis.position = XAxisPosition.BOTTOM
-        xAxis.textColor = theme.textColor
+        xAxis.textColor = theme.secondaryTextColor
+        xAxis.textSize = AXIS_TEXT_SP
         xAxis.gridColor = gridColor
-        xAxis.axisLineColor = theme.secondaryTextColor
+        xAxis.isDrawGridLinesEnabled = false
+        xAxis.isDrawAxisLineEnabled = false
         xAxis.isDrawLimitLinesBehindDataEnabled = true
         for (axis in listOf(axisLeft, axisRight)) {
-            axis.textColor = theme.textColor
+            axis.textColor = theme.secondaryTextColor
+            axis.textSize = AXIS_TEXT_SP
             axis.gridColor = gridColor
             axis.isDrawAxisLineEnabled = false
+            axis.enableGridDashedLine(Utils.convertDpToPixel(GRID_DASH_DP), Utils.convertDpToPixel(GRID_GAP_DP), 0f)
         }
         axisRight.isDrawGridLinesEnabled = false
 
@@ -163,6 +170,10 @@ class GbChartView @JvmOverloads constructor(
         barLayout = barLayoutFor(spec, 0f)
         data = ChartDataBuilder.build(spec, barLayout!!, BAR_CORNER_DP, xOrigin)
         updateBarLayout(spec)
+        // Grows in, unless animations are off in the system settings
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.O || ValueAnimator.areAnimatorsEnabled()) {
+            animateY(ENTER_ANIMATION_MS, Easing.EaseOutCubic)
+        }
         accessibility.invalidateRoot()
     }
 
@@ -587,9 +598,13 @@ class GbChartView @JvmOverloads constructor(
     private companion object {
         private val tapOutsideListeners = WeakHashMap<View, TapOutsideListener>()
 
-        const val BAR_CORNER_DP = 4f
+        const val BAR_CORNER_DP = 6f
         const val PERIOD_X_PADDING = 0.5
-        const val GRID_ALPHA = 0x40
+        const val GRID_ALPHA = 0x30
+        const val GRID_DASH_DP = 3f
+        const val GRID_GAP_DP = 3f
+        const val AXIS_TEXT_SP = 10f
+        const val ENTER_ANIMATION_MS = 450
         const val GUIDE_WIDTH_DP = 1f
         const val GUIDE_DASH_DP = 3f
         const val TOOLTIP_GAP_DP = 10f

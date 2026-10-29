@@ -177,6 +177,13 @@ import nodomain.freeyourgadget.gadgetbridge.util.Version;
 
 import static nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsPreferenceConst.PREF_ACTIVATE_DISPLAY_ON_LIFT;
 import static nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsPreferenceConst.PREF_BT_CONNECTED_ADVERTISEMENT;
+import static nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsPreferenceConst.PREF_CAMERA_REMOTE;
+import static nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsPreferenceConst.PREF_CYCLE_TRACKING_CYCLE_LENGTH;
+import static nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsPreferenceConst.PREF_CYCLE_TRACKING_ENABLED;
+import static nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsPreferenceConst.PREF_CYCLE_TRACKING_LAST_PERIOD_START;
+import static nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsPreferenceConst.PREF_CYCLE_TRACKING_OVULATION_REMINDER;
+import static nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsPreferenceConst.PREF_CYCLE_TRACKING_PERIOD_LENGTH;
+import static nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsPreferenceConst.PREF_CYCLE_TRACKING_PERIOD_REMINDER;
 import static nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsPreferenceConst.PREF_DATEFORMAT;
 import static nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsPreferenceConst.PREF_DISPLAY_ON_LIFT_SENSITIVITY;
 import static nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSettingsPreferenceConst.PREF_DISPLAY_ON_LIFT_START;
@@ -2745,6 +2752,17 @@ public abstract class HuamiSupport extends AbstractBTLESingleDeviceSupport
                 case PREF_BT_CONNECTED_ADVERTISEMENT:
                     setBtConnectedAdvertising(builder);
                     break;
+                case PREF_CAMERA_REMOTE:
+                    setCameraRemote(builder);
+                    break;
+                case PREF_CYCLE_TRACKING_ENABLED:
+                case PREF_CYCLE_TRACKING_LAST_PERIOD_START:
+                case PREF_CYCLE_TRACKING_CYCLE_LENGTH:
+                case PREF_CYCLE_TRACKING_PERIOD_LENGTH:
+                case PREF_CYCLE_TRACKING_PERIOD_REMINDER:
+                case PREF_CYCLE_TRACKING_OVULATION_REMINDER:
+                    setCycleTracking(builder);
+                    break;
                 case PREF_WEARLOCATION:
                     setWearLocation(builder);
                     break;
@@ -3770,6 +3788,82 @@ public abstract class HuamiSupport extends AbstractBTLESingleDeviceSupport
         }
     }
 
+    protected void setCameraRemote(TransactionBuilder builder) {
+        boolean enable = HuamiCoordinator.getCameraRemote(gbDevice.getAddress());
+        LOG.info("Setting HID camera remote to: " + enable);
+
+        if (enable) {
+            writeToConfiguration(builder,  HuamiService.COMMAND_ENABLE_HID_CAMERA);
+        } else {
+            writeToConfiguration(builder,  HuamiService.COMMAND_DISABLE_HID_CAMERA);
+        }
+    }
+
+    protected void setCycleTracking(TransactionBuilder builder) {
+        if (huami2021ChunkedEncoder == null) {
+            LOG.warn("Cycle tracking requires the chunked 2021 characteristics");
+            return;
+        }
+
+        final Prefs prefs = getDevicePrefs();
+        final boolean enable = prefs.getBoolean(PREF_CYCLE_TRACKING_ENABLED, false);
+        LOG.info("Setting cycle tracking to: " + enable);
+
+        writeToChunked2021(builder, HuamiCycleTracking.ENDPOINT, HuamiCycleTracking.encodeSwitch(HuamiCycleTracking.SWITCH_DEVICE_NOTIFY, enable), false);
+        if (!enable) {
+            return;
+        }
+
+        final int periodReminder = prefs.getInt(PREF_CYCLE_TRACKING_PERIOD_REMINDER, 0);
+        final int ovulationReminder = prefs.getInt(PREF_CYCLE_TRACKING_OVULATION_REMINDER, 0);
+        writeToChunked2021(builder, HuamiCycleTracking.ENDPOINT, HuamiCycleTracking.encodeReminder(HuamiCycleTracking.SWITCH_PERIOD_REMINDER, periodReminder), false);
+        writeToChunked2021(builder, HuamiCycleTracking.ENDPOINT, HuamiCycleTracking.encodeReminder(HuamiCycleTracking.SWITCH_OVULATION_REMINDER, ovulationReminder), false);
+
+        // the band replies with its data format version, the cycle data is sent from handleCycleTrackingPayload
+        writeToChunked2021(builder, HuamiCycleTracking.ENDPOINT, HuamiCycleTracking.encodeTotalRecordRequest(), false);
+    }
+
+    private void handleCycleTrackingPayload(final byte[] payload) {
+        if (payload.length == 0 || payload[0] != HuamiCycleTracking.CMD_TOTAL_RECORD_RET) {
+            LOG.debug("Got cycle tracking payload: {}", GB.hexdump(payload));
+            return;
+        }
+
+        final Byte version = HuamiCycleTracking.decodeVersion(payload);
+        if (version == null) {
+            return;
+        }
+
+        final Prefs prefs = getDevicePrefs();
+        if (!prefs.getBoolean(PREF_CYCLE_TRACKING_ENABLED, false)) {
+            LOG.debug("Cycle tracking is disabled, not sending the cycle data");
+            return;
+        }
+        final String lastPeriodStart = prefs.getString(PREF_CYCLE_TRACKING_LAST_PERIOD_START, "");
+        final int cycleLength = prefs.getInt(PREF_CYCLE_TRACKING_CYCLE_LENGTH, 28);
+        final int periodLength = prefs.getInt(PREF_CYCLE_TRACKING_PERIOD_LENGTH, 5);
+        if (lastPeriodStart.isEmpty() || cycleLength < 15 || cycleLength > 99 || periodLength < 1 || periodLength > 15) {
+            LOG.warn("Invalid cycle tracking settings: {}, {}, {}", lastPeriodStart, cycleLength, periodLength);
+            return;
+        }
+
+        final LocalDate start;
+        try {
+            start = LocalDate.parse(lastPeriodStart);
+        } catch (final Exception e) {
+            LOG.error("Failed to parse last period start {}", lastPeriodStart, e);
+            return;
+        }
+
+        LOG.info("Sending cycle tracking data, version {}", version);
+        writeToChunked2021(
+                "send cycle tracking data",
+                HuamiCycleTracking.ENDPOINT,
+                HuamiCycleTracking.encodeTotalRecord(version, cycleLength, periodLength, start),
+                false
+        );
+    }
+
     protected void writeToChunked(TransactionBuilder builder, int type, byte[] data) {
         if (force2021Protocol() && type > 0) {
             boolean encrypt = true;
@@ -3994,6 +4088,11 @@ public abstract class HuamiSupport extends AbstractBTLESingleDeviceSupport
             LOG.info("got configuration data");
             type = 0;
             handleConfigurationInfo(ArrayUtils.remove(payload, 0));
+            return;
+        }
+
+        if (type == HuamiCycleTracking.ENDPOINT) {
+            handleCycleTrackingPayload(payload);
             return;
         }
 

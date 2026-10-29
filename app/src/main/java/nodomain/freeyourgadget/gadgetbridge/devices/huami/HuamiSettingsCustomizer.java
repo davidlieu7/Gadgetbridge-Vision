@@ -19,6 +19,8 @@ package nodomain.freeyourgadget.gadgetbridge.devices.huami;
 import android.os.Parcel;
 import android.text.InputType;
 
+import androidx.activity.result.ActivityResultLauncher;
+import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.preference.Preference;
 
 import java.util.ArrayList;
@@ -33,6 +35,7 @@ import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSpec
 import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.DeviceSpecificSettingsHandler;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
 import nodomain.freeyourgadget.gadgetbridge.service.devices.huami.HuamiVibrationPatternNotificationType;
+import nodomain.freeyourgadget.gadgetbridge.service.devices.huami.importer.MiFitnessHistoryImporter;
 import nodomain.freeyourgadget.gadgetbridge.util.Prefs;
 
 public class HuamiSettingsCustomizer implements DeviceSpecificSettingsCustomizer {
@@ -55,6 +58,23 @@ public class HuamiSettingsCustomizer implements DeviceSpecificSettingsCustomizer
         final Preference hrAlertActivePref = handler.findPreference(DeviceSettingsPreferenceConst.PREF_HEARTRATE_ALERT_ACTIVE_HIGH_THRESHOLD);
         if (hrAlertActivePref != null) {
             hrAlertActivePref.setVisible(false);
+        }
+
+        final Preference importHistoryPref = handler.findPreference(DeviceSettingsPreferenceConst.PREF_HUAMI_IMPORT_HISTORY);
+        if (importHistoryPref != null) {
+            // The launcher must be registered before the fragment is started
+            final ActivityResultLauncher<String[]> launcher = handler.registerForActivityResult(
+                    new ActivityResultContracts.OpenMultipleDocuments(),
+                    uris -> {
+                        if (!uris.isEmpty()) {
+                            new MiFitnessHistoryImporter(handler.getContext(), device).importAsync(uris);
+                        }
+                    }
+            );
+            importHistoryPref.setOnPreferenceClickListener(preference -> {
+                launcher.launch(new String[]{"*/*"});
+                return true;
+            });
         }
 
         // Setup the vibration patterns for all supported notification types

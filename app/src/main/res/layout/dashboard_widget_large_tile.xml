@@ -30,7 +30,10 @@
             android:includeFontPadding="false"
             android:maxLines="1"
             android:textColor="?attr/colorOnSurface"
-            android:textSize="30sp" />
+            android:textSize="30sp"
+            app:autoSizeMaxTextSize="30sp"
+            app:autoSizeMinTextSize="16sp"
+            app:autoSizeTextType="uniform" />
 
         <TextView
             android:id="@+id/tile_value_suffix"
@@ -117,8 +120,12 @@
                 android:fontFeatureSettings="tnum"
                 android:gravity="center_horizontal"
                 android:importantForAccessibility="no"
+                android:maxLines="1"
                 android:textColor="?attr/colorOnSurface"
-                android:textSize="26sp" />
+                android:textSize="26sp"
+                app:autoSizeMaxTextSize="26sp"
+                app:autoSizeMinTextSize="14sp"
+                app:autoSizeTextType="uniform" />
 
         </nodomain.freeyourgadget.gadgetbridge.activities.dashboard.ArcGaugeView>
 

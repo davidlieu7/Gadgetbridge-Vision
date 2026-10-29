@@ -91,6 +91,8 @@ import nodomain.freeyourgadget.gadgetbridge.util.GB;
 import nodomain.freeyourgadget.gadgetbridge.util.GBChangeLog;
 import nodomain.freeyourgadget.gadgetbridge.util.GBPrefs;
 import nodomain.freeyourgadget.gadgetbridge.util.PermissionsUtils;
+import nodomain.freeyourgadget.gadgetbridge.util.theme.CustomTheme;
+import nodomain.freeyourgadget.gadgetbridge.util.theme.CustomThemes;
 
 //TODO: extend AbstractGBActivity, but it requires actionbar that is not available
 public class ControlCenterv2 extends AppCompatActivity
@@ -327,6 +329,7 @@ public class ControlCenterv2 extends AppCompatActivity
         drawerNavigationView.setNavigationItemSelectedListener(this);
 
         View navigationHeaderView = drawerNavigationView.getHeaderView(0).findViewById(R.id.drawer_header);
+        CustomThemes.applySlot(navigationHeaderView, CustomTheme.SLOT_DRAWER_HEADER);
         final int headerPaddingLeft = navigationHeaderView.getPaddingLeft();
         final int headerPaddingRight = navigationHeaderView.getPaddingRight();
         final int headerPaddingBottom = navigationHeaderView.getPaddingBottom();

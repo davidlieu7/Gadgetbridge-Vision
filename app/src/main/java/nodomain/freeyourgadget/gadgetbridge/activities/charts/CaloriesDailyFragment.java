@@ -38,7 +38,6 @@ import org.apache.commons.lang3.EnumUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.Collections;
@@ -65,6 +64,7 @@ import nodomain.freeyourgadget.gadgetbridge.model.ActivitySample;
 import nodomain.freeyourgadget.gadgetbridge.model.ActivityUser;
 import nodomain.freeyourgadget.gadgetbridge.model.MetricSample;
 import nodomain.freeyourgadget.gadgetbridge.model.RestingMetabolicRateSample;
+import nodomain.freeyourgadget.gadgetbridge.util.DateTimeUtils;
 
 public class CaloriesDailyFragment extends AbstractChartFragment<CaloriesDailyFragment.CaloriesData> {
     private static final Logger LOG = LoggerFactory.getLogger(CaloriesDailyFragment.class);
@@ -184,7 +184,7 @@ public class CaloriesDailyFragment extends AbstractChartFragment<CaloriesDailyFr
         int startTs = (int) (day.getTimeInMillis() / 1000);
         int endTs = startTs + 24 * 60 * 60 - 1;
         Date date = new Date((long) endTs * 1000);
-        final String formattedDate = new SimpleDateFormat("E, MMM dd").format(date);
+        final String formattedDate = DateTimeUtils.formatChartDate(date);
         List<? extends ActivitySample> samples = getActivitySamples(db, device, startTs, endTs);
         final ActiveCaloriesDailyData activeCaloriesData = createActiveCaloriesDailyData(samples, startTs);
         final Integer restingMetabolicRate;

@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="utf-8"?>
+<androidx.preference.PreferenceScreen xmlns:android="http://schemas.android.com/apk/res/android">
+    <PreferenceScreen
+        android:icon="@drawable/ic_cycle"
+        android:key="screen_cycle_tracking"
+        android:persistent="false"
+        android:summary="@string/pref_cycle_tracking_summary"
+        android:title="@string/pref_cycle_tracking_title">
+
+        <SwitchPreferenceCompat
+            android:defaultValue="false"
+            android:icon="@drawable/ic_cycle"
+            android:key="cycle_tracking_enabled"
+            android:layout="@layout/preference_checkbox"
+            android:summary="@string/pref_cycle_tracking_summary"
+            android:title="@string/pref_cycle_tracking_title" />
+
+        <nodomain.freeyourgadget.gadgetbridge.util.XDatePreference
+            android:dependency="cycle_tracking_enabled"
+            android:icon="@drawable/ic_calendar_month"
+            android:key="cycle_tracking_last_period_start"
+            android:title="@string/pref_cycle_tracking_last_period_start" />
+
+        <EditTextPreference
+            android:defaultValue="28"
+            android:dependency="cycle_tracking_enabled"
+            android:inputType="number"
+            android:key="cycle_tracking_cycle_length"
+            android:maxLength="2"
+            android:title="@string/pref_cycle_tracking_cycle_length" />
+
+        <EditTextPreference
+            android:defaultValue="5"
+            android:dependency="cycle_tracking_enabled"
+            android:inputType="number"
+            android:key="cycle_tracking_period_length"
+            android:maxLength="2"
+            android:title="@string/pref_cycle_tracking_period_length" />
+
+        <ListPreference
+            android:defaultValue="0"
+            android:dependency="cycle_tracking_enabled"
+            android:entries="@array/pref_cycle_tracking_reminder_days"
+            android:entryValues="@array/pref_cycle_tracking_reminder_days_values"
+            android:key="cycle_tracking_period_reminder"
+            android:summary="%s"
+            android:title="@string/pref_cycle_tracking_period_reminder" />
+
+        <ListPreference
+            android:defaultValue="0"
+            android:dependency="cycle_tracking_enabled"
+            android:entries="@array/pref_cycle_tracking_reminder_days"
+            android:entryValues="@array/pref_cycle_tracking_reminder_days_values"
+            android:key="cycle_tracking_ovulation_reminder"
+            android:summary="%s"
+            android:title="@string/pref_cycle_tracking_ovulation_reminder" />
+    </PreferenceScreen>
+</androidx.preference.PreferenceScreen>

@@ -39,6 +39,7 @@ import kotlinx.coroutines.withContext
 import nodomain.freeyourgadget.gadgetbridge.GBApplication
 import nodomain.freeyourgadget.gadgetbridge.R
 import nodomain.freeyourgadget.gadgetbridge.activities.ActivitySummariesFilter
+import nodomain.freeyourgadget.gadgetbridge.activities.workouts.plans.PlansActivity
 import nodomain.freeyourgadget.gadgetbridge.activities.workouts.statistics.WorkoutStatisticsActivity
 import nodomain.freeyourgadget.gadgetbridge.adapter.WorkoutSummariesAdapter
 import nodomain.freeyourgadget.gadgetbridge.database.DBHelper
@@ -158,6 +159,11 @@ class WorkoutListFragment : Fragment() {
                         intent.putExtra(GBDevice.EXTRA_DEVICE, device)
                     }
                     startActivity(intent)
+                    true
+                }
+
+                R.id.activity_action_plans -> {
+                    startActivity(Intent(requireContext(), PlansActivity::class.java))
                     true
                 }
 

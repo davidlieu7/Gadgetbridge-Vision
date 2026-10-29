@@ -47,6 +47,10 @@ public enum HuamiSportsActivityType {
         this.code = code;
     }
 
+    public int getCode() {
+        return code;
+    }
+
     public ActivityKind toActivityKind() {
         switch (this) {
             case OutdoorRunning:

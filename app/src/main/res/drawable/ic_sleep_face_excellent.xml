@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Sleep quality face: excellent. Tinted with the color of the level. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="48dp"
+    android:height="48dp"
+    android:viewportWidth="48"
+    android:viewportHeight="48">
+    <path
+        android:pathData="M4,24 a20,20 0 1,0 40,0 a20,20 0 1,0 -40,0"
+        android:strokeWidth="3"
+        android:strokeColor="#FFFFFFFF" />
+    <path
+        android:pathData="M13.5,21 q3.5,-5 7,0 M27.5,21 q3.5,-5 7,0"
+        android:strokeWidth="3"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeLineCap="round" />
+    <path
+        android:pathData="M14,27 h20 a10,10 0 0,1 -20,0 z"
+        android:fillColor="#FFFFFFFF" />
+</vector>

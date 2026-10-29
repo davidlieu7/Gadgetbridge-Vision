@@ -59,6 +59,13 @@
                 android:layout_height="wrap_content"
                 android:orientation="vertical">
 
+                <!-- Themed hero banner (dashboardHero slot); only shown when the active theme fills it -->
+                <View
+                    android:id="@+id/dashboard_hero"
+                    android:layout_width="match_parent"
+                    android:layout_height="140dp"
+                    android:visibility="gone" />
+
                 <LinearLayout
                     android:id="@+id/dashboard_notices"
                     android:layout_width="match_parent"

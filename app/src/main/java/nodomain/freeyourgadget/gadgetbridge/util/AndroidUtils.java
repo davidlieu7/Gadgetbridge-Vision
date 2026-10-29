@@ -61,6 +61,8 @@ import java.util.Locale;
 
 import nodomain.freeyourgadget.gadgetbridge.GBApplication;
 import nodomain.freeyourgadget.gadgetbridge.R;
+import nodomain.freeyourgadget.gadgetbridge.util.theme.CustomTheme;
+import nodomain.freeyourgadget.gadgetbridge.util.theme.CustomThemes;
 
 public class AndroidUtils {
     private static final Logger LOG = LoggerFactory.getLogger(AndroidUtils.class);
@@ -127,7 +129,9 @@ public class AndroidUtils {
      */
     public static String getTextColorHex(Context context) {
         int color;
-        if (isDynamicColorActive()) {
+        if (CustomThemes.isActive()) {
+            color = CustomThemes.getColor(CustomTheme.COLOR_ON_SURFACE);
+        } else if (isDynamicColorActive()) {
             color = getDynamicColor(context, com.google.android.material.R.attr.colorOnSurface);
         } else if (GBApplication.isDarkThemeEnabled()) {
             color = ContextCompat.getColor(context, R.color.primarytext_dark);
@@ -143,7 +147,9 @@ public class AndroidUtils {
      */
     public static String getBackgroundColorHex(Context context) {
         int color;
-        if (isDynamicColorActive()) {
+        if (CustomThemes.isActive()) {
+            color = CustomThemes.getColor(CustomTheme.COLOR_SURFACE);
+        } else if (isDynamicColorActive()) {
             color = getDynamicColor(context, com.google.android.material.R.attr.colorSurface);
         } else if (GBApplication.isDarkThemeEnabled()) {
             color = ContextCompat.getColor(context, androidx.cardview.R.color.cardview_dark_background);
@@ -177,10 +183,8 @@ public class AndroidUtils {
 
 
     private static String colorToHex(int color) {
-        return "#"
-                + Integer.toHexString(Color.red(color))
-                + Integer.toHexString(Color.green(color))
-                + Integer.toHexString(Color.blue(color));
+        // zero padded, a channel below 0x10 must still give two digits
+        return String.format(Locale.ROOT, "#%02x%02x%02x", Color.red(color), Color.green(color), Color.blue(color));
     }
 
     /**

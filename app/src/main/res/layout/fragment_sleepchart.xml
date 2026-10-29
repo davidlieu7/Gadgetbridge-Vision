@@ -36,6 +36,48 @@
             android:layout_gravity="center"
             android:scaleType="fitStart" />
 
+        <!-- Sleep quality: a face for the level of the sleep score, the level and a sentence -->
+        <LinearLayout
+            android:id="@+id/sleep_quality_row"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_gravity="center_horizontal"
+            android:layout_marginStart="15dp"
+            android:layout_marginEnd="15dp"
+            android:layout_marginBottom="15dp"
+            android:gravity="center_vertical"
+            android:orientation="horizontal"
+            android:visibility="gone">
+
+            <ImageView
+                android:id="@+id/sleep_quality_face"
+                android:layout_width="44dp"
+                android:layout_height="44dp"
+                android:importantForAccessibility="no" />
+
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="12dp"
+                android:orientation="vertical">
+
+                <TextView
+                    android:id="@+id/sleep_quality_level"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:fontFamily="sans-serif-medium"
+                    android:textSize="18sp"
+                    android:textStyle="bold" />
+
+                <TextView
+                    android:id="@+id/sleep_quality_summary"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:textColor="?attr/textColorSecondary"
+                    android:textSize="13sp" />
+            </LinearLayout>
+        </LinearLayout>
+
         <LinearLayout
             android:id="@+id/sleep_legend_stats_container"
             android:layout_width="match_parent"
@@ -83,6 +125,16 @@
 
         <LinearLayout
             android:id="@+id/sleep_stats_container"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="15dp"
+            android:layout_marginEnd="15dp"
+            android:layout_marginBottom="25dp"
+            android:orientation="vertical"/>
+
+        <!-- Sleep details and tips, filled by SleepDailyFragment -->
+        <LinearLayout
+            android:id="@+id/sleep_details_container"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginStart="15dp"

@@ -20,7 +20,6 @@ import org.apache.commons.lang3.tuple.Pair;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-import java.text.SimpleDateFormat;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.util.ArrayList;
@@ -248,7 +247,7 @@ public class HeartRatePeriodFragment extends AbstractChartFragment<HeartRatePeri
 
     private void setOneDayData(HeartRateData data, int startTs, int endTs) {
         Date date = new Date((long) endTs * 1000);
-        String formattedDate = new SimpleDateFormat("E, MMM dd").format(date);
+        String formattedDate = DateTimeUtils.formatChartDate(date);
         mDateView.setText(formattedDate);
 
         final HeartRateUtils heartRateUtilsInstance = HeartRateUtils.getInstance();

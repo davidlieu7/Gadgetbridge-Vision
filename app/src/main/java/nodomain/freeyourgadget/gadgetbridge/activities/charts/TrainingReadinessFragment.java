@@ -43,6 +43,7 @@ import nodomain.freeyourgadget.gadgetbridge.activities.workouts.StatTileGridUtil
 import nodomain.freeyourgadget.gadgetbridge.database.DBHandler;
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice;
 import nodomain.freeyourgadget.gadgetbridge.model.HrvSummarySample;
+import nodomain.freeyourgadget.gadgetbridge.util.DateTimeUtils;
 
 public class TrainingReadinessFragment extends AbstractChartFragment<TrainingReadinessFragment.TrainingReadinessData> {
     private static final int[] ZONE_COLOR_RES = TrainingReadinessReport.ZONE_COLOR_RES;
@@ -101,7 +102,7 @@ public class TrainingReadinessFragment extends AbstractChartFragment<TrainingRea
 
     @Override
     protected void updateChartsnUIThread(final TrainingReadinessData data) {
-        dateView.setText(new SimpleDateFormat("E, MMM dd", Locale.getDefault()).format(getEndDate()));
+        dateView.setText(DateTimeUtils.formatChartDate(getEndDate()));
 
         final int[] zoneColors = zoneColors();
         if (data.score != null) {

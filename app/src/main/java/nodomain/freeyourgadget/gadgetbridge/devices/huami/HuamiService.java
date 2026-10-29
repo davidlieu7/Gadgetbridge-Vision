@@ -156,6 +156,9 @@ public class HuamiService {
     public static final byte[] COMMAND_DISABLE_HR_CONNECTION = new byte[]{ENDPOINT_DISPLAY, 0x1f, 0x00, 0x00};
     public static final byte[] COMMAND_ENABLE_BT_CONNECTED_ADVERTISEMENT = new byte[]{ENDPOINT_DISPLAY, 0x01, 0x00, 0x01};
     public static final byte[] COMMAND_DISABLE_BT_CONNECTED_ADVERTISEMENT = new byte[]{ENDPOINT_DISPLAY, 0x01, 0x00, 0x00};
+    // band acts as a HID device and sends a key press to trigger the phone camera (HidStatus in Zepp Life)
+    public static final byte[] COMMAND_ENABLE_HID_CAMERA = new byte[]{0x3d, 0x01, 0x00, 0x00, 0x00};
+    public static final byte[] COMMAND_DISABLE_HID_CAMERA = new byte[]{0x3d, 0x00, 0x00, 0x00, 0x00};
     public static final byte[] COMMAND_ENABLE_DISPLAY_ON_LIFT_WRIST = new byte[]{ENDPOINT_DISPLAY, 0x05, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00};
     public static final byte[] COMMAND_DISABLE_DISPLAY_ON_LIFT_WRIST = new byte[]{ENDPOINT_DISPLAY, 0x05, 0x00, 0x00};
     public static final byte[] COMMAND_SCHEDULE_DISPLAY_ON_LIFT_WRIST = new byte[]{ENDPOINT_DISPLAY, 0x05, 0x00, 0x01, 0x00, 0x00, 0x00, 0x00};

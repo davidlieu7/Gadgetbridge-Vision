@@ -399,6 +399,11 @@ public abstract class HuamiCoordinator extends AbstractBLEDeviceCoordinator {
         return prefs.getBoolean(DeviceSettingsPreferenceConst.PREF_BT_CONNECTED_ADVERTISEMENT, false);
     }
 
+    public static boolean getCameraRemote(String deviceAddress) {
+        Prefs prefs = new Prefs(GBApplication.getDeviceSpecificSharedPrefs(deviceAddress));
+        return prefs.getBoolean(DeviceSettingsPreferenceConst.PREF_CAMERA_REMOTE, false);
+    }
+
     public static boolean getOverwriteSettingsOnConnection(String deviceAddress) {
         Prefs prefs = new Prefs(GBApplication.getDeviceSpecificSharedPrefs(deviceAddress));
         return prefs.getBoolean("overwrite_settings_on_connection", true);

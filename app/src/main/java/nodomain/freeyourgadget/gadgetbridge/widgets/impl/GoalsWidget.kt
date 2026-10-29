@@ -13,6 +13,7 @@ import android.view.ViewGroup
 import android.widget.LinearLayout
 import android.widget.TextView
 import com.google.android.material.color.MaterialColors
+import java.text.NumberFormat
 import nodomain.freeyourgadget.gadgetbridge.GBApplication
 import nodomain.freeyourgadget.gadgetbridge.R
 import nodomain.freeyourgadget.gadgetbridge.activities.dashboard.GoalRingsView
@@ -24,6 +25,7 @@ import nodomain.freeyourgadget.gadgetbridge.activities.devicesettings.dsl.device
 import nodomain.freeyourgadget.gadgetbridge.impl.GBDevice
 import nodomain.freeyourgadget.gadgetbridge.model.ActivityUser
 import nodomain.freeyourgadget.gadgetbridge.model.DistanceUnit
+import nodomain.freeyourgadget.gadgetbridge.util.DateTimeUtils
 import nodomain.freeyourgadget.gadgetbridge.widgets.GBWidget
 import nodomain.freeyourgadget.gadgetbridge.widgets.WidgetActions
 import nodomain.freeyourgadget.gadgetbridge.widgets.WidgetColors
@@ -202,7 +204,7 @@ object GoalsWidget : GBWidget<GoalsWidget.Data> {
      * sleep in hours and minutes.
      */
     private fun formatted(context: Context, progress: Progress): Pair<String, String> = when (progress.goal) {
-        Goal.STEPS -> progress.current.roundToInt().toString() to progress.target.roundToInt().toString()
+        Goal.STEPS -> NumberFormat.getInstance().format(progress.current.roundToInt()) to NumberFormat.getInstance().format(progress.target.roundToInt())
         Goal.DISTANCE -> {
             val imperial = GBApplication.getPrefs().distanceUnit == DistanceUnit.IMPERIAL
             val factor = if (imperial) MILES_PER_METER else 1 / METERS_PER_KM
@@ -211,15 +213,12 @@ object GoalsWidget : GBWidget<GoalsWidget.Data> {
             val targetText = if (target % 1.0 == 0.0) target.toInt().toString() else String.format(Locale.getDefault(), "%.1f", target)
             String.format(Locale.getDefault(), "%.1f", progress.current * factor) to "$targetText $unit"
         }
-        Goal.ACTIVE_TIME -> progress.current.roundToInt().toString() to context.getString(R.string.widget_value_minutes, progress.target.roundToInt())
+        Goal.ACTIVE_TIME -> duration(context, progress.current.roundToInt()) to duration(context, progress.target.roundToInt())
         Goal.SLEEP -> duration(context, progress.current.roundToInt()) to duration(context, progress.target.roundToInt())
     }
 
-    private fun duration(context: Context, minutes: Int): String = if (minutes % 60 == 0) {
-        context.getString(R.string.widget_duration_hours, minutes / 60)
-    } else {
-        context.getString(R.string.widget_duration_hours_minutes, minutes / 60, minutes % 60)
-    }
+    @Suppress("UNUSED_PARAMETER")
+    private fun duration(context: Context, minutes: Int): String = DateTimeUtils.formatMinutes(minutes.toLong())
 
     private fun describe(context: Context, config: WidgetConfig, data: Data): String {
         val parts = data.goals.joinToString(", ") { progress ->
