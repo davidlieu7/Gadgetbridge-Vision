@@ -1,3 +1,34 @@
+# Gadgetbridge Advanced — an enhanced personal fork
+
+> **This is a fork.** It is a personal, enhanced build of
+> [Gadgetbridge](https://codeberg.org/Freeyourgadget/Gadgetbridge/). It is **not** affiliated with, endorsed by, or supported by the
+> upstream Gadgetbridge project, and these changes have **not** been submitted upstream.
+> For the official app, bug reports, and support, please use
+> [the upstream project](https://codeberg.org/Freeyourgadget/Gadgetbridge/).
+>
+> Licensed under the **GNU AGPL-3.0**, same as upstream. All upstream authors retain their
+> copyright; this fork only adds to their work. Upstream is tracked so the fork can stay
+> current (see tag [`advanced-v1.0`](../../releases)).
+
+### What this fork adds
+Built on top of upstream, with the Mi Band 5 as the reference device:
+
+- **Custom theming** — per-slot background / drawer-header / dashboard-hero images with
+  adjustable opacity, a **time-of-day banner cycle**, and an in-app **theme editor**
+  (schema is backward-compatible with older themes).
+- **Dashboard & charts** — rounded-end gauges/rings everywhere, status words per metric,
+  sparklines, and a Mi-Fitness-styled layout.
+- **New sections** — badges & streaks (with streak forgiveness), daily goals,
+  period reports, sleep insights/quality, and workout plans.
+- **Mi Band 5 specifics** — password lock, cycle tracking, camera remote (HID),
+  Mi Fitness history import.
+- Upstream fixes are periodically synced in.
+
+> Download the APK from the [Releases](../../releases) page. It installs alongside the
+> official app (package `nodomain.freeyourgadget.gadgetbridge.nightly`).
+
+---
+
 Gadgetbridge is hosted on [codeberg.org](https://codeberg.org/Freeyourgadget/Gadgetbridge/).
 
 
